@@ -12,7 +12,7 @@
  * and control flow arrive in M2/M4.
  */
 
-import { effect, signal, createOwner, runInOwner, disposeOwner, onDispose } from './reactive.js';
+import { effect, signal, createOwner, runInOwner, disposeOwner, onDispose, getOwner } from './reactive.js';
 import type { Signal, Owner } from './reactive.js';
 
 /* ──────────────────────────── structure ──────────────────────────── */
@@ -357,6 +357,10 @@ function firstChildNode(node: Node): ChildNode {
  */
 export function ifBlock(anchor: Comment, selector: () => (() => Node | null) | null): void {
   const parent = anchor.parentNode!;
+  // Capture the *construction-time* (lexical) owner. Branch owners parent to it so
+  // context (`inject`) keeps working after a re-render driven by an external signal
+  // (e.g. navigation), where the ambient owner at effect-re-run time is unrelated.
+  const host = getOwner();
   let owner: Owner | null = null;
   let nodes: ChildNode[] = [];
   let prev: unknown = NONE;
@@ -376,7 +380,7 @@ export function ifBlock(anchor: Comment, selector: () => (() => Node | null) | n
     prev = next;
     clear();
     if (next) {
-      owner = createOwner(null);
+      owner = runInOwner(host, () => createOwner(null));
       const node = runInOwner(owner, () => next());
       nodes = node ? placeBefore(parent, node, anchor) : [];
     }
@@ -416,6 +420,9 @@ export function eachBlock<T>(
   emptyRender?: () => Node
 ): void {
   const parent = anchor.parentNode!;
+  // Construction-time owner — row/empty owners parent to it (see ifBlock) so context
+  // survives reconciles driven by an external signal.
+  const host = getOwner();
   let rows: EachRow<T>[] = [];
   let emptyOwner: Owner | null = null;
   let emptyNodes: ChildNode[] = [];
@@ -442,7 +449,7 @@ export function eachBlock<T>(
     if (data.length === 0) {
       removeRows();
       if (emptyRender && !emptyOwner) {
-        emptyOwner = createOwner(null);
+        emptyOwner = runInOwner(host, () => createOwner(null));
         const node = runInOwner(emptyOwner, () => emptyRender());
         emptyNodes = placeBefore(parent, node, anchor);
       }
@@ -463,7 +470,7 @@ export function eachBlock<T>(
         even: () => indexSig() % 2 === 0,
         odd: () => indexSig() % 2 === 1,
       };
-      const owner = createOwner(null);
+      const owner = runInOwner(host, () => createOwner(null));
       const node = runInOwner(owner, () => renderRow(ctx));
       return {
         key: keyOf(item, i),

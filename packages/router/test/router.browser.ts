@@ -1,6 +1,6 @@
 import { test, assert } from '../../../tools/harness.js';
 import { effect, signal } from '@weave/runtime';
-import { mount, type Component } from '@weave/runtime/dom';
+import { mount, mountComponent, defineComponent, type Component } from '@weave/runtime/dom';
 import {
   createRouter,
   navigate,
@@ -166,6 +166,93 @@ test('RouterView syncs the address bar on a guard redirect', () => {
   mount(RouterView({ router: r }), el);
   assert.ok(el.textContent?.includes('login'), 'redirect target rendered');
   assert.equal(currentPath(), '/login', 'address bar synced to the redirect target');
+});
+
+// ── Nested routes (A.3b) ───────────────────────────────────────────────────
+const UserList: Component = () => span('user-list');
+const UserDetail: Component = (props = {}) => {
+  const el = document.createElement('span');
+  effect(() => {
+    el.textContent = 'detail:' + String((props as { params?: { id?: string } }).params?.id ?? '');
+  });
+  return el;
+};
+// A layout with a nested outlet — discovers the router + depth via context (no props).
+const UsersLayout = defineComponent(() => {
+  const wrap = document.createElement('div');
+  wrap.appendChild(span('users-layout'));
+  wrap.appendChild(RouterView({}));
+  return wrap;
+});
+
+function nestedRouter() {
+  return createRouter([
+    { path: '/', component: Home },
+    {
+      path: '/users',
+      component: UsersLayout,
+      children: [
+        { path: '', component: UserList },
+        { path: ':id', component: UserDetail },
+      ],
+    },
+    { path: '*', component: NotFound },
+  ]);
+}
+
+test('nested routes resolve to a layout→child chain with accumulated params', () => {
+  const r = nestedRouter();
+  navigate('/users');
+  let ch = r.chain();
+  assert.equal(ch.length, 2, 'layout + index child');
+  assert.is(ch[0].view, UsersLayout);
+  assert.is(ch[1].view, UserList);
+
+  navigate('/users/42');
+  ch = r.chain();
+  assert.equal(ch.length, 2);
+  assert.is(ch[1].view, UserDetail);
+  assert.equal(ch[1].params.id, '42', 'leaf carries the accumulated param');
+  assert.is(r.matched(0)?.view, UsersLayout, 'matched(0) = layout');
+  assert.is(r.matched(1)?.view, UserDetail, 'matched(1) = child');
+});
+
+test('nested RouterView renders the child inside the layout', () => {
+  const r = nestedRouter();
+  navigate('/users/7');
+  const el = host();
+  mountComponent(RouterView, el, { router: r });
+  assert.ok(el.textContent?.includes('users-layout'), 'layout rendered');
+  assert.ok(el.textContent?.includes('detail:7'), 'nested child rendered with its param');
+});
+
+test('navigating within a layout swaps the nested child but keeps the layout', () => {
+  const r = nestedRouter();
+  navigate('/users');
+  const el = host();
+  mountComponent(RouterView, el, { router: r });
+  const layoutSpan = el.querySelector('span');
+  assert.equal(layoutSpan?.textContent, 'users-layout');
+  assert.ok(el.textContent?.includes('user-list'), 'index child shown');
+
+  navigate('/users/3');
+  assert.ok(el.textContent?.includes('detail:3'), 'nested child swapped to detail');
+  assert.ok(!el.textContent?.includes('user-list'), 'index child removed');
+  assert.is(el.querySelector('span'), layoutSpan, 'layout not remounted');
+  assert.ok(el.textContent?.includes('users-layout'), 'layout persists across the nested swap');
+});
+
+test('leaving the layout subtree clears the nested outlet', () => {
+  const r = nestedRouter();
+  navigate('/users/9');
+  const el = host();
+  mountComponent(RouterView, el, { router: r });
+  assert.ok(el.textContent?.includes('detail:9'));
+
+  navigate('/');
+  assert.ok(el.textContent?.includes('home'), 'top outlet swapped to Home');
+  assert.ok(!el.textContent?.includes('users-layout'), 'layout gone');
+  assert.ok(!el.textContent?.includes('detail'), 'nested child gone');
 });
 
 test('Link navigates on a plain click', () => {

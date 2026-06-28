@@ -3,23 +3,27 @@
  * Zero third-party dependencies (only `@weave/runtime`).
  *
  * History-based and signal-driven: the current path and query are signals, so any
- * view that reads them updates surgically on navigation. Routes are an ordered array
- * of `{ path, component, guard?, redirect? }` objects (`'*'` = catch-all fallback),
- * supporting path params (`/user/:id`), query parsing (`?tab=x`), **sync guards**
- * (read auth signals; return `true`/`false`/a redirect path), and static `redirect`s.
- * The Angular-flavored surface is a `<RouterView>` outlet + `<Link>`.
+ * view that reads them updates surgically on navigation. Routes are an ordered tree
+ * of `{ path, component?, guard?, redirect?, children? }` objects (`'*'` = catch-all
+ * fallback), supporting path params (`/user/:id`), query parsing (`?tab=x`), **sync
+ * guards** (read auth signals; return `true`/`false`/a redirect path), static
+ * `redirect`s, and **nested routes** (a parent layout renders a nested `<RouterView>`).
  *
- * Guards are synchronous by design: they run inside the reactive `matched` computation
- * and read signals (e.g. `isAuthed()`), so a route re-resolves automatically when the
- * auth state changes. Async data loading belongs in the component via `@weave/data`.
+ * Matching produces a *chain* of matches (layout → … → leaf). The top `<RouterView>`
+ * renders the chain's first component; each nested `<RouterView>` renders the next,
+ * discovering its depth + the router through **provide/inject** (no prop drilling).
+ *
+ * Guards are synchronous by design: they run inside the reactive resolution and read
+ * signals (e.g. `isAuthed()`), so a route re-resolves automatically when auth changes.
+ * Async data loading belongs in the component via `@weave/data`.
  */
 
-import { signal, computed, effect, batch } from '@weave/runtime';
+import { signal, computed, effect, batch, getOwner, createContext, provide, inject } from '@weave/runtime';
 import { ifBlock, type Component } from '@weave/runtime/dom';
 
 export type RouteParams = Record<string, string>;
 
-/** Context handed to a guard: the resolved path, its path params, and parsed query. */
+/** Context handed to a guard: the resolved path, accumulated path params, and query. */
 export interface RouteContext {
   path: string;
   params: RouteParams;
@@ -34,14 +38,16 @@ export type Guard = (ctx: RouteContext) => boolean | string;
 
 /** A single route definition. `path: '*'` is the catch-all (404) fallback. */
 export interface Route {
-  /** Path pattern: `/`, `/user/:id`, or `'*'` (catch-all fallback). */
+  /** Path pattern: `/`, `/users`, `/user/:id`, `''` (index child), or `'*'` (fallback). */
   path: string;
-  /** Component to render when matched. Omit when using `redirect`. */
+  /** Component to render when matched (a layout, if it has `children`). */
   component?: Component;
   /** Sync guard: `true` allows, `false` blocks (→ fallback), a string redirects. */
   guard?: Guard;
   /** Static redirect target (pathname). When matched, resolve to this path instead. */
   redirect?: string;
+  /** Nested routes, matched against the path remainder under this route. */
+  children?: Route[];
 }
 
 const path = signal(typeof location !== 'undefined' ? location.pathname : '/');
@@ -93,130 +99,188 @@ export function back(): void {
   history.back();
 }
 
-type Matcher = (p: string) => RouteParams | null;
+/* ──────────────────────────── matching ──────────────────────────── */
 
-/** Compile `/user/:id` into a matcher returning its params, or null on no match. */
-function compileRoute(pattern: string): Matcher {
-  const keys: string[] = [];
-  const re = new RegExp(
-    '^' +
-      pattern
-        .replace(/\/+$/, '')
-        .replace(/:[^/]+/g, (m) => {
-          keys.push(m.slice(1));
-          return '([^/]+)';
-        })
-        .replace(/\//g, '\\/') +
-      '\\/?$'
-  );
-  return (p) => {
-    const m = re.exec(p.replace(/\/+$/, '') || '/');
-    if (!m) return null;
-    const params: RouteParams = {};
-    keys.forEach((k, i) => (params[k] = decodeURIComponent(m[i + 1])));
-    return params;
-  };
+type PatternSeg = { param: string } | { literal: string };
+
+interface Compiled {
+  route: Route;
+  segs: PatternSeg[];
+  children: Compiled[];
 }
 
-/** A reactive match: the winning component + its path params, or null. */
+const splitSegs = (s: string): string[] => s.split('/').filter(Boolean);
+
+function parsePattern(pattern: string): PatternSeg[] {
+  return splitSegs(pattern).map((s) =>
+    s.startsWith(':') ? { param: s.slice(1) } : { literal: s }
+  );
+}
+
+function compileRoutes(routes: Route[]): Compiled[] {
+  return routes
+    .filter((r) => r.path !== '*')
+    .map((r) => ({
+      route: r,
+      segs: parsePattern(r.path),
+      children: r.children ? compileRoutes(r.children) : [],
+    }));
+}
+
+/** Match a pattern's segments against a leading run of the path; return params + remainder. */
+function matchPrefix(
+  segs: PatternSeg[],
+  pathSegs: string[]
+): { params: RouteParams; rest: string[] } | null {
+  if (segs.length > pathSegs.length) return null;
+  const params: RouteParams = {};
+  for (let i = 0; i < segs.length; i++) {
+    const s = segs[i];
+    if ('param' in s) params[s.param] = decodeURIComponent(pathSegs[i]);
+    else if (s.literal !== pathSegs[i]) return null;
+  }
+  return { params, rest: pathSegs.slice(segs.length) };
+}
+
+/** A reactive match: a component + the path params accumulated down to its depth. */
 export interface Match {
   view: Component;
   params: RouteParams;
 }
 
+type LevelResult = { chain: Match[] } | { redirect: string } | null;
+
+/** Resolve one sibling level: first matching route → redirect / guard / descend / leaf. */
+function resolveLevel(
+  routes: Compiled[],
+  pathSegs: string[],
+  query: RouteParams,
+  fullPath: string,
+  inherited: RouteParams
+): LevelResult {
+  for (const c of routes) {
+    const m = matchPrefix(c.segs, pathSegs);
+    if (!m) continue;
+    const params = { ...inherited, ...m.params };
+    if (c.route.redirect) return { redirect: c.route.redirect };
+    const verdict = c.route.guard ? c.route.guard({ path: fullPath, params, query }) : true;
+    if (verdict === false) return null; // blocked → caller falls back
+    if (typeof verdict === 'string') return { redirect: verdict };
+    const here: Match = { view: c.route.component!, params };
+    if (m.rest.length === 0) {
+      // Path fully consumed: include an index child (`path: ''`) if one matches.
+      if (c.children.length) {
+        const idx = resolveLevel(c.children, [], query, fullPath, params);
+        if (idx && 'redirect' in idx) return idx;
+        if (idx && 'chain' in idx) return { chain: [here, ...idx.chain] };
+      }
+      return { chain: [here] };
+    }
+    // Segments remain: this route only matches if a child consumes the rest.
+    if (c.children.length) {
+      const sub = resolveLevel(c.children, m.rest, query, fullPath, params);
+      if (sub && 'redirect' in sub) return sub;
+      if (sub && 'chain' in sub) return { chain: [here, ...sub.chain] };
+    }
+    // No child matched the remainder → not a full match; try the next sibling.
+  }
+  return null;
+}
+
 export interface Router {
-  /** The currently matched route (component + params) after guards/redirects, or null. */
-  matched: () => Match | null;
-  /** The current path params (reactive; `{}` when unmatched). */
-  params: () => RouteParams;
+  /** The match at `depth` in the resolved chain (default 0 — the top component), or null. */
+  matched: (depth?: number) => Match | null;
+  /** The full resolved chain (layout → … → leaf). */
+  chain: () => Match[];
+  /** Accumulated path params at `depth` (default: the leaf — i.e. all params). */
+  params: (depth?: number) => RouteParams;
   /** The current query params (reactive). */
   query: () => RouteParams;
-  /**
-   * Canonical pathname the URL should be synced to (set when a guard/redirect moved the
-   * match elsewhere), or null. `RouterView` consumes this to push history; surfaced so
-   * a custom outlet can too.
-   */
+  /** Canonical pathname the URL should sync to after a guard/redirect, or null. */
   redirectTo: () => string | null;
 }
 
 /**
- * Build a router from an ordered `Route[]` (`path: '*'` = catch-all fallback).
- * Resolution (a single reactive computation): walk routes in order; on the first match,
- * follow a static `redirect`, run the `guard` (allow / block→fallback / redirect string),
- * else render the component. Redirect hops are capped to break loops. Place the output
- * with `<RouterView router={r}/>`.
+ * Build a router from an ordered `Route[]` tree (`path: '*'` = catch-all fallback).
+ * Resolution is a single reactive computation producing a match *chain*; redirect and
+ * guard-redirect hops are followed (capped at 16 to break loops). Place the output with
+ * a top `<RouterView router={r}/>` and a nested `<RouterView/>` inside each layout.
  */
 export function createRouter(routes: Route[]): Router {
-  const compiled = routes
-    .filter((r) => r.path !== '*')
-    .map((r) => ({ route: r, match: compileRoute(r.path) }));
+  const compiled = compileRoutes(routes);
   const fallback = routes.find((r) => r.path === '*');
-  const fallbackMatch = (): Match | null =>
-    fallback?.component ? { view: fallback.component, params: {} } : null;
+  const fallbackChain = (): Match[] =>
+    fallback?.component ? [{ view: fallback.component, params: {} }] : [];
 
-  const resolution = computed<{ match: Match | null; redirectTo: string | null }>(() => {
+  const resolution = computed<{ chain: Match[]; redirectTo: string | null }>(() => {
     const q = queryMap();
     const start = path();
     let p = start;
     for (let hops = 0; hops < 16; hops++) {
-      let chosen: { route: Route; match: Matcher } | null = null;
-      let params: RouteParams | null = null;
-      for (const c of compiled) {
-        const pr = c.match(p);
-        if (pr) {
-          chosen = c;
-          params = pr;
-          break;
-        }
-      }
+      const res = resolveLevel(compiled, splitSegs(p), q, p, {});
       const synced = p !== start ? p : null;
-      if (!chosen) return { match: fallbackMatch(), redirectTo: synced };
-      if (chosen.route.redirect) {
-        p = chosen.route.redirect;
+      if (res && 'redirect' in res) {
+        p = res.redirect.split('#')[0].split('?')[0];
         continue;
       }
-      const verdict = chosen.route.guard
-        ? chosen.route.guard({ path: p, params: params!, query: q })
-        : true;
-      if (verdict === false) return { match: fallbackMatch(), redirectTo: synced };
-      if (typeof verdict === 'string') {
-        p = verdict;
-        continue;
-      }
-      return { match: { view: chosen.route.component!, params: params! }, redirectTo: synced };
+      if (res && 'chain' in res) return { chain: res.chain, redirectTo: synced };
+      return { chain: fallbackChain(), redirectTo: synced };
     }
-    // Redirect loop: give up rather than spin.
-    return { match: null, redirectTo: null };
+    return { chain: [], redirectTo: null }; // redirect loop — give up rather than spin
   });
 
+  const chain = (): Match[] => resolution().chain;
   return {
-    matched: () => resolution().match,
-    params: () => resolution().match?.params ?? {},
+    chain,
+    matched: (depth = 0) => chain()[depth] ?? null,
+    params: (depth?: number) => {
+      const ch = chain();
+      const i = depth ?? ch.length - 1;
+      return ch[i]?.params ?? {};
+    },
     query: () => queryMap(),
     redirectTo: () => resolution().redirectTo,
   };
 }
 
+/* ──────────────────────────── outlets ──────────────────────────── */
+
+interface OutletCtx {
+  router: Router;
+  depth: number;
+}
+
+/** Carries the router + the next outlet's depth down the tree (set by each RouterView). */
+const OutletContext = createContext<OutletCtx | null>(null);
+
 /**
- * Router outlet: renders the matched component reactively. A `display:contents`
- * host keeps it layout-neutral. A stable render thunk per component means a
- * param-only change (`/user/1` → `/user/2`) updates `params` in place instead of
- * remounting; switching to a different route swaps the component. When a guard or
- * redirect moves the match elsewhere, a scoped effect syncs the address bar.
+ * Router outlet: renders the matched component at its depth in the chain. The top
+ * outlet takes `router` as a prop and renders depth 0; a nested `<RouterView/>` written
+ * inside a layout discovers the router + its depth via context. A `display:contents`
+ * host keeps it layout-neutral. A stable render thunk per component means a param-only
+ * change updates `params` in place instead of remounting; switching routes swaps the
+ * component. The top outlet also syncs the address bar after a guard/redirect.
  *
- * Usage in a template: `<RouterView router={r}/>`.
+ * Usage: `<RouterView router={r}/>` at the top, `<RouterView/>` inside each layout.
  */
 export const RouterView: Component = (props = {}) => {
-  const router = (props as { router?: Router }).router;
+  const parentCtx = inject(OutletContext);
+  const router = (props as { router?: Router }).router ?? parentCtx?.router;
+  const depth = parentCtx ? parentCtx.depth : 0;
+
+  // Hand the router + the next depth to any nested outlet below us. Only when an owner
+  // scope exists (a directly-invoked RouterView in a test has none — and won't nest).
+  if (router && getOwner()) provide(OutletContext, { router, depth: depth + 1 });
+
   const host = document.createElement('div');
   host.style.display = 'contents';
   const anchorNode = document.createComment('router');
   host.appendChild(anchorNode);
 
-  // Sync the URL when a guard/redirect resolved the match to a different path.
-  // Owned by this outlet's scope (disposed with it). Converges: after navigate the
-  // resolution lands on the target, so redirectTo() returns null and this no-ops.
-  if (router) {
+  // Only the top outlet syncs the URL on a guard/redirect (redirects bubble to the
+  // chain root regardless of depth). Owned by this outlet's scope; converges after
+  // navigating (resolution then lands on the target → redirectTo() is null).
+  if (router && depth === 0) {
     effect(() => {
       const to = router.redirectTo();
       if (to !== null && to !== path.peek()) navigate(to);
@@ -225,7 +289,7 @@ export const RouterView: Component = (props = {}) => {
 
   const thunks = new Map<Component, () => Node>();
   ifBlock(anchorNode, () => {
-    const m = router?.matched() ?? null;
+    const m = router?.matched(depth) ?? null;
     if (!m) return null;
     let thunk = thunks.get(m.view);
     if (!thunk) {
@@ -233,7 +297,7 @@ export const RouterView: Component = (props = {}) => {
       thunk = () =>
         view({
           get params() {
-            return router!.params();
+            return router!.params(depth);
           },
         });
       thunks.set(view, thunk);

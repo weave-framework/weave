@@ -10,7 +10,7 @@ import {
   runInOwner,
   type Signal,
 } from '@weave/runtime';
-import { defineComponent } from '@weave/runtime/dom';
+import { defineComponent, ifBlock } from '@weave/runtime/dom';
 
 test('inject reads the nearest provided value', () => {
   const Theme = createContext('light');
@@ -92,6 +92,38 @@ test('provide outside any owner scope throws', () => {
     threw = true;
   }
   assert.ok(threw, 'expected provide() to throw outside an owner');
+});
+
+test('context survives a control-flow re-render driven from outside the owner', () => {
+  const C = createContext('default');
+  const seen: string[] = [];
+  const toggle = signal(true);
+  const branchA = () => {
+    seen.push('A:' + inject(C));
+    return document.createTextNode('A');
+  };
+  const branchB = () => {
+    seen.push('B:' + inject(C));
+    return document.createTextNode('B');
+  };
+
+  let dispose!: () => void;
+  root((d) => {
+    dispose = d;
+    provide(C, 'provided');
+    const anchor = document.createComment('if');
+    const wrap = document.createElement('div');
+    wrap.appendChild(anchor);
+    ifBlock(anchor, () => (toggle() ? branchA : branchB));
+  });
+
+  // Re-render from OUTSIDE the owner (currentOwner is null here) — the regression:
+  // branch owners must parent to the construction-time owner, not the ambient one.
+  toggle.set(false);
+  toggle.set(true);
+
+  assert.deepEqual(seen, ['A:provided', 'B:provided', 'A:provided']);
+  dispose();
 });
 
 test('defineComponent: a descendant injects the provider, a sibling sees only the default', () => {
