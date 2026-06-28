@@ -1,7 +1,7 @@
 {
   "name": "@weave/cli",
   "version": "0.2.0",
-  "description": "Weave CLI — esbuild plugin, `weave build`, and `weave dev` (watch + live-reload).",
+  "description": "Weave CLI — esbuild plugin, `weave build`, `weave dev` (watch + live-reload), and `weave check`.",
   "type": "module",
   "bin": {
     "weave": "./bin/weave.mjs"
@@ -9,7 +9,11 @@
   "main": "./src/cli.ts",
   "files": ["src", "bin"],
   "dependencies": {
+    "@weave/check": "workspace:*",
     "@weave/compiler": "workspace:*"
+  },
+  "peerDependencies": {
+    "typescript": "^5.7.0"
   },
   "license": "MIT"
 }

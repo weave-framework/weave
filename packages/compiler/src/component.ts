@@ -71,6 +71,73 @@ export function compileComponent(src: ComponentSource, opts: ComponentOptions = 
   return { code, css, hash };
 }
 
+/**
+ * Location-faithful SFC split for `@weave/check`. Unlike {@link parseSfc}, the
+ * returned `template` keeps the SFC's exact character offsets: the `<script>`
+ * and `<style>` blocks are *blanked* (every non-newline char → a space, newlines
+ * kept) rather than removed, so an offset reported by {@link parseTemplate} maps
+ * straight back to a `.weave` line:col. `scriptLine` is the 0-based SFC line where
+ * the (trimmed) script body begins, used to map type errors in user code.
+ */
+export interface ComponentSourceLoc {
+  script?: string;
+  scriptLine: number;
+  template: string;
+  styles?: string;
+}
+
+export function parseSfcLoc(source: string): ComponentSourceLoc {
+  const script = locateBlock(source, 'script');
+  const style = locateBlock(source, 'style');
+  let template = source;
+  for (const b of [script, style]) {
+    if (b) template = blankRange(template, b.rawStart, b.rawEnd);
+  }
+  return {
+    script: script?.inner || undefined,
+    scriptLine: script ? lineAt(source, script.innerStart) : 0,
+    template,
+    styles: style?.inner || undefined,
+  };
+}
+
+interface LocatedBlock {
+  rawStart: number;
+  rawEnd: number;
+  /** offset of the first non-whitespace char of the (trimmed) inner */
+  innerStart: number;
+  inner: string;
+}
+
+function locateBlock(source: string, tag: string): LocatedBlock | null {
+  const open = source.search(new RegExp(`<${tag}(\\s[^>]*)?>`, 'i'));
+  if (open === -1) return null;
+  const gt = source.indexOf('>', open);
+  const close = source.toLowerCase().indexOf(`</${tag}>`, gt);
+  if (close === -1) return null;
+  const rawInner = source.slice(gt + 1, close);
+  const lead = rawInner.length - rawInner.trimStart().length;
+  return {
+    rawStart: open,
+    rawEnd: close + `</${tag}>`.length,
+    innerStart: gt + 1 + lead,
+    inner: rawInner.trim(),
+  };
+}
+
+/** Replace `[start, end)` with same-length whitespace, preserving newlines. */
+function blankRange(s: string, start: number, end: number): string {
+  let mid = '';
+  for (let i = start; i < end; i++) mid += s[i] === '\n' ? '\n' : ' ';
+  return s.slice(0, start) + mid + s.slice(end);
+}
+
+function lineAt(s: string, offset: number): number {
+  let line = 0;
+  for (let i = 0; i < offset && i < s.length; i++) if (s[i] === '\n') line++;
+  return line;
+}
+
 /** Split a `.weave` SFC into its `{ script, template, styles }` triple. */
 export function parseSfc(source: string): ComponentSource {
   const script = extractBlock(source, 'script');
