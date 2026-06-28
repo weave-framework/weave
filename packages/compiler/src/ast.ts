@@ -7,7 +7,8 @@ export type TemplateNode =
   | IfNode
   | ForNode
   | SwitchNode
-  | LetNode;
+  | LetNode
+  | DeferNode;
 
 /**
  * Source offset of an expression's first character within the template string
@@ -66,6 +67,28 @@ export interface LetNode {
   expr: string;
   exprOffset?: Offset;
 }
+
+/**
+ * `@defer (trigger) {…} @placeholder {…}` — gate the content's *rendering* until a
+ * trigger fires, showing the optional `@placeholder` until then. Code-splitting is
+ * opt-in via a `lazy()` component inside the content.
+ */
+export interface DeferNode {
+  type: 'defer';
+  trigger: DeferTrigger;
+  children: TemplateNode[];
+  placeholder?: TemplateNode[];
+}
+
+/** A `@defer` trigger. `when` is reactive; the rest are one-shot DOM/timing events. */
+export type DeferTrigger =
+  | { kind: 'when'; expr: string; exprOffset?: Offset }
+  | { kind: 'idle' }
+  | { kind: 'viewport' }
+  | { kind: 'timer'; ms: string; msOffset?: Offset }
+  | { kind: 'interaction' }
+  | { kind: 'hover' }
+  | { kind: 'immediate' };
 
 export interface ElementNode {
   type: 'element';
