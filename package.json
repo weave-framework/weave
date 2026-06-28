@@ -7,6 +7,8 @@
   "scripts": {
     "test": "node tools/run-browser-tests.mjs",
     "test:v01": "node --test \"test/**/*.test.mjs\"",
+    "check": "node packages/cli/bin/weave.mjs check",
+    "demo": "node packages/cli/bin/weave.mjs dev examples/demo/src/main.ts --serve examples/demo --out examples/demo/dist",
     "verify:build": "node tools/verify-build.mjs",
     "verify:cli": "node tools/verify-cli.mjs",
     "verify:check": "node tools/verify-check.mjs",

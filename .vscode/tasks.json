@@ -1,0 +1,31 @@
+{
+  // Level 0 IDE wiring: run `weave check` and surface its diagnostics in the
+  // Problems panel at exact file:line:col. Run via Terminal → Run Task… → "weave check"
+  // (or bind a key). For run-on-save, add the "Trigger Task on Save" extension, or use
+  // the WebStorm File Watcher in editor/webstorm/. Consumer projects: swap the command
+  // for "npx weave check src".
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "weave check",
+      "type": "shell",
+      "command": "pnpm run check src examples",
+      "group": "build",
+      "presentation": { "reveal": "silent", "panel": "shared", "clear": true },
+      "problemMatcher": {
+        "owner": "weave",
+        "source": "weave check",
+        "fileLocation": ["relative", "${workspaceFolder}"],
+        "pattern": {
+          "regexp": "^(.+?):(\\d+):(\\d+) - (error|warning|suggestion|message) TS(\\d+): (.+)$",
+          "file": 1,
+          "line": 2,
+          "column": 3,
+          "severity": 4,
+          "code": 5,
+          "message": 6
+        }
+      }
+    }
+  ]
+}
