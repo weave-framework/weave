@@ -1,0 +1,4 @@
+# weave build / dev output (generated from .weave + main.ts)
+main.js
+app.css
+dist/

@@ -10,7 +10,9 @@
   "scripts": {
     "test": "node tools/run-browser-tests.mjs",
     "test:v01": "node --test \"test/**/*.test.mjs\"",
-    "verify:build": "node tools/verify-build.mjs"
+    "verify:build": "node tools/verify-build.mjs",
+    "verify:cli": "node tools/verify-cli.mjs",
+    "typecheck": "tsc --noEmit -p packages/runtime/tsconfig.json && tsc --noEmit -p packages/compiler/tsconfig.json && tsc --noEmit -p packages/cli/tsconfig.json"
   },
   "keywords": [
     "reactive",
@@ -24,11 +26,12 @@
   "license": "MIT",
   "devDependencies": {
     "@playwright/test": "^1.49.0",
-    "esbuild": "^0.24.0",
+    "@types/node": "^22.0.0",
+    "esbuild": "^0.25.0",
     "playwright": "^1.49.0",
     "typescript": "^5.7.0"
   },
   "allowScripts": {
-    "esbuild@0.24.2": true
+    "esbuild@0.25.12": true
   }
 }

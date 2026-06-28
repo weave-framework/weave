@@ -1,0 +1,15 @@
+{
+  "name": "@weave/cli",
+  "version": "0.2.0",
+  "description": "Weave CLI — esbuild plugin, `weave build`, and `weave dev` (watch + live-reload).",
+  "type": "module",
+  "bin": {
+    "weave": "./bin/weave.mjs"
+  },
+  "main": "./src/cli.ts",
+  "files": ["src", "bin"],
+  "dependencies": {
+    "@weave/compiler": "*"
+  },
+  "license": "MIT"
+}
