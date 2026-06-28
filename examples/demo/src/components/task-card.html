@@ -1,0 +1,9 @@
+<article class="card">
+  <p class="title">{{ task().title }}</p>
+  <div class="meta">
+    <weave-badge priority={task().priority}></weave-badge>
+    @if (task().assignee) {
+      <span class="assignee">{{ task().assignee }}</span>
+    }
+  </div>
+</article>

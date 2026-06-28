@@ -1,0 +1,35 @@
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 14px 24px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+}
+
+.brand {
+  font-size: 16px;
+  letter-spacing: 0.2px;
+}
+
+.nav {
+  display: flex;
+  gap: 16px;
+}
+
+.nav a {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.nav a:hover {
+  color: var(--text);
+}
+
+.main {
+  padding: 24px;
+  max-width: 1100px;
+  margin: 0 auto;
+}
