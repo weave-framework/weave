@@ -349,6 +349,15 @@ export const Link: Component = (props = {}, slots = {}) => {
   const wantsPrefetch = (props as { prefetch?: unknown }).prefetch !== false;
   const a = document.createElement('a');
   a.setAttribute('href', to);
+  // Forward any other props (class, id, aria-*, title, …) to the anchor, so a
+  // `<Link class="nav" aria-label="Home">` actually styles/labels its <a>. The
+  // router-owned props and any function/event props are skipped; read once.
+  for (const key in props) {
+    if (key === 'to' || key === 'prefetch') continue;
+    const val = (props as Record<string, unknown>)[key];
+    if (val == null || val === false || typeof val === 'function') continue;
+    a.setAttribute(key, val === true ? '' : String(val));
+  }
   const kids = slots.default?.();
   if (kids) a.appendChild(kids);
   a.addEventListener('click', (e) => {

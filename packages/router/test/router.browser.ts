@@ -280,6 +280,19 @@ test('Link navigates on a plain click', () => {
   assert.equal(currentPath(), '/about', 'client-side navigation fired');
 });
 
+test('Link forwards class / attributes (but not to/prefetch) to the anchor', () => {
+  const link = Link(
+    { to: '/x', class: 'nav active', id: 'home', 'aria-label': 'Home', prefetch: false },
+    {}
+  ) as HTMLAnchorElement;
+  assert.equal(link.getAttribute('class'), 'nav active', 'class is forwarded');
+  assert.equal(link.getAttribute('id'), 'home');
+  assert.equal(link.getAttribute('aria-label'), 'Home');
+  assert.equal(link.getAttribute('href'), '/x', 'href still from `to`');
+  assert.equal(link.getAttribute('prefetch'), null, '`prefetch` is not leaked as an attribute');
+  assert.equal(link.getAttribute('to'), null, '`to` is not leaked as an attribute');
+});
+
 /* ──────────── prefetch (B.15) ──────────── */
 
 const LazyPage = defineComponent(() => span('lazy'));
