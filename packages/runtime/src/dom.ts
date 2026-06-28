@@ -880,7 +880,14 @@ export function defineComponent(
     onDispose(() => disposeOwner(owner)); // surrounding scope disposes this instance
     return runInOwner(owner, () => {
       const bindings = setup ? setup(props) || {} : {};
-      const ctx = Object.assign(Object.create(props), bindings);
+      // Define bindings as OWN properties over `props` (on the prototype). Uses
+      // descriptors, not assignment: `Object.assign` does a `[[Set]]`, which honours
+      // a getter-only prop of the same name on the prototype and throws — so a binding
+      // that shadows a like-named prop (the documented case) must be *defined*, not set.
+      const ctx = Object.defineProperties(
+        Object.create(props),
+        Object.getOwnPropertyDescriptors(bindings)
+      );
       return render(ctx, slots);
     });
   };

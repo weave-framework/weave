@@ -471,7 +471,10 @@ class Parser {
     if (this.peek() !== '>') throw new ParseError(`Expected '>' for <${tag}> at ${this.pos}`);
     this.pos++; // >
 
-    const isVoid = VOID.has(tag.toLowerCase());
+    // Only lowercase HTML tags are void. A capitalized tag is a component (e.g. the
+    // router's <Link>, which would otherwise collide with the void <link> element),
+    // so it always takes children + a close tag.
+    const isVoid = !/^[A-Z]/.test(tag) && VOID.has(tag.toLowerCase());
     if (selfClosing || isVoid) {
       return { type: 'element', tag, attrs, children: [], selfClosing: true };
     }
