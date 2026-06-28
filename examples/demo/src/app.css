@@ -33,3 +33,24 @@
   max-width: 1100px;
   margin: 0 auto;
 }
+
+.route-error {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: start;
+  padding: 20px;
+  background: var(--surface);
+  border: 1px solid #5a2a2a;
+  border-radius: var(--radius);
+  color: #f0a0a0;
+}
+.route-error .ghost {
+  padding: 6px 12px;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}

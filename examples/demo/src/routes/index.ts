@@ -1,11 +1,13 @@
 import { onMount, signal, debounced } from '@weave/runtime';
+import { Link } from '@weave/router';
 import { useBoard } from '../stores/board';
 import TaskCard from '../components/task-card';
 import type { Status } from '../types';
 
-// `<TaskCard>` is referenced in index.html — a capitalized tag resolves to this
-// module-level import, so it needs no entry in setup's return.
+// `<TaskCard>` / `<Link>` are referenced in index.html — capitalized tags resolve
+// to these module-level imports, so they need no entry in setup's return.
 void TaskCard;
+void Link;
 
 /** The board route (path `''`): three status columns with a debounced filter. */
 export function setup() {

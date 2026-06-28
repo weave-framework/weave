@@ -1,13 +1,27 @@
 import { RouterView, Link } from '@weave/router';
+import { ErrorBoundary } from '@weave/runtime/dom';
 import { router } from './router';
 
-// `RouterView` / `Link` are used as components in app.html — capitalized tags
-// resolve to these module-level imports, so they need no entry in setup's return.
-// Referencing them keeps the imports "used" for the type-checker.
+// Used as components in app.html (capitalized tags resolve to these imports).
 void RouterView;
 void Link;
+void ErrorBoundary;
 
-/** Root shell: the app chrome (header + nav) around the routed view. */
+/** Root shell: app chrome + an error boundary around the routed view. */
 export function setup() {
-  return { router };
+  /** Fallback UI when a route throws (built imperatively — it returns a DOM node). */
+  const errorFallback = (err: unknown, reset: () => void): Node => {
+    const div = document.createElement('div');
+    div.className = 'route-error';
+    const p = document.createElement('p');
+    p.textContent = err instanceof Error ? err.message : String(err);
+    const btn = document.createElement('button');
+    btn.className = 'ghost';
+    btn.textContent = 'Try again';
+    btn.addEventListener('click', reset);
+    div.append(p, btn);
+    return div;
+  };
+
+  return { router, errorFallback };
 }

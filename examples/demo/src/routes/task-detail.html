@@ -1,0 +1,24 @@
+<section class="detail">
+  <Link to="/" class="back">← Board</Link>
+
+  @await (task) {
+    <p class="muted">Loading task…</p>
+  } @then (t) {
+    <article class="detail-card">
+      <h1 class="d-title">{{ t.title }}</h1>
+      <dl class="fields">
+        <dt>Status</dt>
+        <dd>{{ t.status }}</dd>
+        <dt>Priority</dt>
+        <dd><weave-badge priority={t.priority}></weave-badge></dd>
+        <dt>Assignee</dt>
+        <dd>{{ t.assignee || 'Unassigned' }}</dd>
+      </dl>
+      <button class="ghost" on:click={toggleRaw}>{{ showRaw() ? 'Hide' : 'Show' }} raw JSON</button>
+      <!-- show={} keeps the node in the DOM and toggles display (B.9) -->
+      <pre class="raw" show={showRaw()}>{{ JSON.stringify(t, null, 2) }}</pre>
+    </article>
+  } @catch (e) {
+    <p class="error">Couldn't load task "{{ id() }}". {{ String(e) }}</p>
+  }
+</section>

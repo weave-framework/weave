@@ -2,8 +2,16 @@
   <strong class="brand">🧵 Weave Board</strong>
   <nav class="nav">
     <Link to="/">Board</Link>
+    <Link to="/boom">Boom</Link>
   </nav>
 </header>
 <main class="main">
-  <RouterView router={router} />
+  <!-- Re-key the boundary by the matched route component (B.10): a thrown route
+       latches the boundary, so remounting it on route change lets navigation
+       recover. Same component (task→task) keeps its key → params update in place. -->
+  @key (router.matched()?.view) {
+    <ErrorBoundary fallback={errorFallback}>
+      <RouterView router={router} />
+    </ErrorBoundary>
+  }
 </main>

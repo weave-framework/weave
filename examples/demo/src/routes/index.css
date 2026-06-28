@@ -55,6 +55,7 @@
 
 .col-body { display: flex; flex-direction: column; gap: 10px; min-height: 24px; }
 .card-slot { display: contents; }
+.card-slot a { display: contents; color: inherit; text-decoration: none; }
 .col-empty { margin: 4px 2px; font-size: 13px; }
 
 .error { color: #f85149; }
