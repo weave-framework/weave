@@ -118,6 +118,18 @@ export function bindClass(el: Element, name: string, fn: () => unknown): void {
   });
 }
 
+/**
+ * `show={expr}` — toggle visibility via `display` (the element stays in the DOM,
+ * unlike `@if` which removes it). Preserves the element's own inline `display`
+ * when shown; sets `display: none` when hidden.
+ */
+export function bindShow(el: HTMLElement, fn: () => unknown): void {
+  const original = el.style.display === 'none' ? '' : el.style.display;
+  effect(() => {
+    el.style.display = fn() ? original : 'none';
+  });
+}
+
 /* ──────────────────────────── events / refs ──────────────────────────── */
 
 /** Attach an event listener. Static — handlers are never reactive. */
@@ -406,6 +418,35 @@ export function ifBlock(anchor: Comment, selector: () => (() => Node | null) | n
     }
   });
   onDispose(clear);
+}
+
+/**
+ * `<w:element this={tag}>` — a dynamically-tagged element. Builds the element of
+ * the current `tag`, wiring its attributes/children via `build`, and **re-creates**
+ * it (disposing the old one's effects) whenever `tag` changes. Built on `ifBlock`,
+ * deduping by tag string so an unrelated re-render doesn't needlessly rebuild.
+ */
+export function dynElement(
+  anchor: Comment,
+  tag: () => string,
+  build: (el: HTMLElement) => void
+): void {
+  let lastTag: string | undefined;
+  let thunk: (() => Node) | null = null;
+  ifBlock(anchor, () => {
+    const t = tag();
+    if (t !== lastTag) {
+      lastTag = t;
+      thunk = t
+        ? () => {
+            const el = document.createElement(t);
+            build(el);
+            return el;
+          }
+        : null;
+    }
+    return thunk;
+  });
 }
 
 /** Per-row reactive context exposed to a `@for` body (item + implicit `$` vars). */

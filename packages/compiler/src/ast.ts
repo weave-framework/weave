@@ -165,7 +165,8 @@ export type Attr =
   | ClassAttr
   | BindAttr
   | RefAttr
-  | UseAttr;
+  | UseAttr
+  | ShowAttr;
 
 /** name="value" or bare name */
 export interface StaticAttr {
@@ -229,5 +230,11 @@ export interface UseAttr {
   /** optional argument expression */
   expr?: string;
   /** offset of the argument `expr` */
+  offset?: Offset;
+}
+/** `show={expr}` — toggle visibility via `display` (kept in the DOM, unlike `@if`). */
+export interface ShowAttr {
+  type: 'show';
+  expr: string;
   offset?: Offset;
 }

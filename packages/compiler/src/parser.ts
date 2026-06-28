@@ -536,6 +536,9 @@ class Parser {
       }
       return { type: 'use', name, expr, offset };
     }
+    if (rawName === 'show') {
+      return { type: 'show', expr: exprOf(), offset };
+    }
     if (rawName.startsWith('.')) {
       return { type: 'prop', name: rawName.slice(1), expr: exprOf(), offset };
     }
@@ -547,7 +550,8 @@ class Parser {
 
   readName(): string {
     const start = this.pos;
-    while (!this.eof() && /[A-Za-z0-9\-]/.test(this.peek())) this.pos++;
+    // `:` allowed so namespaced tags parse (`<w:element>` — the dynamic element).
+    while (!this.eof() && /[A-Za-z0-9\-:]/.test(this.peek())) this.pos++;
     return this.src.slice(start, this.pos);
   }
 
