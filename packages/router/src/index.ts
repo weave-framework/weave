@@ -328,3 +328,10 @@ export const Link: Component = (props = {}, slots = {}) => {
   });
   return a;
 };
+
+export {
+  fileToRoutes,
+  emitRoutesModule,
+  type FileRoute,
+  type EmitRoutesOptions,
+} from './files.js';
