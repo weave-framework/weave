@@ -69,6 +69,18 @@ export function inferCtxNames(nodes: TemplateNode[]): string[] {
           walk(node.children);
           if (node.placeholder) walk(node.placeholder);
           break;
+        case 'await':
+          add(node.expr);
+          if (node.pending) walk(node.pending);
+          if (node.then) {
+            if (node.then.alias) declared.add(node.then.alias);
+            walk(node.then.children);
+          }
+          if (node.catch) {
+            if (node.catch.alias) declared.add(node.catch.alias);
+            walk(node.catch.children);
+          }
+          break;
       }
     }
   };

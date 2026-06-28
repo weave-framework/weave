@@ -212,8 +212,9 @@ Skliausteliuose — kuriuose framework'uose ta feature pasikartoja (kuo daugiau,
    onMount timing, cleanup per grąžintą fn / `onDispose` / `effect`; reaktyvumui arg perduodi getteriu).
 
 ### Tier 2 — vertingi, vienas/du framework'ai arba lite versija
-7. **Async/Suspense šablono blokas** — (React Suspense · Svelte `{#await}` · Vue Suspense). `resource` jau
-   duoda `loading`; čia — deklaratyvus fallback.
+7. ✅ **Async/Suspense šablono blokas** — (React Suspense · Svelte `{#await}` · Vue Suspense).
+   **PADARYTA** (B.4: `@await (src) { pending } @then (val) {…} @catch (err) {…}` — ir resource, ir Promise;
+   visi blokai neprivalomi; `@then` alias tipuojamas kaip `Awaited<T>`).
 8. ✅ **Portal / Teleport** — (React `createPortal` · Vue Teleport). Modalai/tooltipai.
    **PADARYTA** (B.2: `Portal` runtime-komponentas — DOM perkeliamas, loginis medis/owner/context lieka).
 9. ✅ **Forms: cross-field + async validacija** — (Angular). Natūralus `@weave/forms` tęsinys.

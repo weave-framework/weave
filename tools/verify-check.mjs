@@ -61,6 +61,11 @@ const run = (...paths) =>
   const useLine = lineOf('use:tooltip');
   const reUse = new RegExp(`bad\\.weave:${useLine}:\\d+ - error TS\\d+: .*not assignable`);
   ok(reUse.test(out), `check: use: action arg type error flagged at bad.weave:${useLine}`);
+
+  // @await @then alias typo: u is { name } (Awaited<Promise<…>>), u.naem is invalid
+  const awaitLine = lineOf('u.naem');
+  const reAwait = new RegExp(`bad\\.weave:${awaitLine}:\\d+ - error TS\\d+: .*naem`);
+  ok(reAwait.test(out), `check: @await @then alias type error flagged at bad.weave:${awaitLine}`);
 }
 
 /* ── separate-file form: template error → .html, script error → .ts ── */

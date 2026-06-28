@@ -96,6 +96,7 @@ export function buildVirtualSeparate(
 
 function emit(nodes: TemplateNode[], ctx: Set<string>): Line[] {
   const lines: Line[] = [];
+  let awaitN = 0; // unique source-binding names for `@await` type-queries
   const push = (text: string, offset?: number): void => {
     lines.push({ text, offset });
   };
@@ -199,6 +200,44 @@ function emit(nodes: TemplateNode[], ctx: Set<string>): Line[] {
           if (node.placeholder) walk(node.placeholder, scope);
           break;
         }
+        case 'await': {
+          // Bind the source to a const so a `typeof` type-query has an entity name
+          // (`typeof (expr)` is a syntax error in a type position) — and so the source
+          // expression itself is type-checked. Only needed when `@then` binds an alias.
+          let srcVar = '';
+          if (node.then?.alias) {
+            srcVar = `__await${awaitN++}`;
+            push(`  const ${srcVar} = (${rw(node.expr, scope)});`, node.exprOffset);
+          } else {
+            push(`  void (${rw(node.expr, scope)});`, node.exprOffset);
+          }
+          if (node.pending) walk(node.pending, scope);
+          if (node.then) {
+            push(`  {`);
+            let inner = scope;
+            if (node.then.alias) {
+              // the resolved value: a resource's data type or the awaited Promise type
+              push(
+                `    const ${node.then.alias}: __WeaveAwaited<typeof ${srcVar}> = undefined as any;`,
+                node.exprOffset
+              );
+              inner = new Set(scope).add(node.then.alias);
+            }
+            walk(node.then.children, inner);
+            push(`  }`);
+          }
+          if (node.catch) {
+            push(`  {`);
+            let inner = scope;
+            if (node.catch.alias) {
+              push(`    const ${node.catch.alias}: unknown = undefined;`);
+              inner = new Set(scope).add(node.catch.alias);
+            }
+            walk(node.catch.children, inner);
+            push(`  }`);
+          }
+          break;
+        }
       }
     }
   };
@@ -225,6 +264,8 @@ function assemble(
       : 'type __WeaveCtx = Record<string, any>;'
   );
   out.push('declare const __ctx: __WeaveCtx;');
+  // `@await (src)` resolved-value type: a resource's data type, else the awaited Promise.
+  out.push('type __WeaveAwaited<S> = S extends { data: () => infer D } ? NonNullable<D> : Awaited<S>;');
   out.push('function __weave__(): void {');
 
   const bodyBase = out.length; // out index of body[0]
