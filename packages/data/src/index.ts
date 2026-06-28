@@ -8,8 +8,10 @@
  * thin wrapper over `fetch` (base URL, default headers, JSON, error hook) whose
  * methods drop straight into a resource fetcher.
  *
- * This is deliberately NOT an Angular-style HttpClient (no RxJS, no interceptor
- * chain) — just the few primitives an app actually needs, built on signals.
+ * This is deliberately NOT an Angular-style HttpClient (no RxJS) — just the few
+ * primitives an app actually needs, built on signals. It does ship a small
+ * functional-interceptor chain (`(req, next) => Promise<Response>`), the zero-RxJS
+ * analog of Angular's `HttpInterceptorFn`, for auth/logging/retry/caching.
  */
 
 import { signal, effect, batch, onCleanup } from '@weave/runtime';
@@ -156,6 +158,32 @@ export class HttpError extends Error {
   }
 }
 
+/**
+ * A mutable request descriptor passed down the interceptor chain. Mutate it
+ * in place (`req.headers.set(…)`) or hand `next` a fresh one — both work.
+ */
+export interface WeaveRequest {
+  /** Fully-resolved URL (baseUrl + path + query string). */
+  url: string;
+  method: string;
+  /** Mutable headers — set/append before calling `next`. */
+  headers: Headers;
+  body: BodyInit | null;
+  /** The remaining `RequestInit` fields (signal, credentials, mode, …). */
+  init: RequestInit;
+}
+
+/** Performs the request (the next interceptor, or finally the real `fetch`). */
+export type RequestHandler = (req: WeaveRequest) => Promise<Response>;
+
+/**
+ * A functional interceptor — the zero-RxJS analog of Angular's `HttpInterceptorFn`.
+ * Wrap `next(req)` to read/replace the request, inspect or retry the response, or
+ * short-circuit (return a `Response` without calling `next`). Interceptors run in
+ * the order given; the first is outermost.
+ */
+export type Interceptor = (req: WeaveRequest, next: RequestHandler) => Promise<Response>;
+
 export interface ClientOptions {
   /** Prepended to every request path. */
   baseUrl?: string;
@@ -163,6 +191,8 @@ export interface ClientOptions {
   headers?: HeadersInit | (() => HeadersInit);
   /** Called with any thrown error before it is re-thrown (logging / global handling). */
   onError?: (error: unknown) => void;
+  /** Functional interceptor chain (auth/logging/retry/cache). First = outermost. */
+  interceptors?: Interceptor[];
   /** Override the fetch implementation (tests / SSR). Defaults to global `fetch`. */
   fetch?: typeof fetch;
 }
@@ -190,6 +220,16 @@ export function createClient(options: ClientOptions = {}): Client {
   const doFetch = options.fetch ?? globalThis.fetch.bind(globalThis);
   const base = options.baseUrl ?? '';
 
+  // The terminal handler actually hits the network; interceptors wrap around it
+  // (composed once, outermost-first). reduceRight folds the chain so the first
+  // interceptor sees `next` = the rest of the chain ending in `doFetch`.
+  const terminal: RequestHandler = (req) =>
+    doFetch(req.url, { method: req.method, headers: req.headers, body: req.body, ...req.init });
+  const handler: RequestHandler = (options.interceptors ?? []).reduceRight<RequestHandler>(
+    (next, interceptor) => (req) => interceptor(req, next),
+    terminal
+  );
+
   async function request<T>(method: string, path: string, opts: RequestOptions = {}): Promise<T> {
     const { json, params, headers, body, ...rest } = opts;
 
@@ -210,8 +250,11 @@ export function createClient(options: ClientOptions = {}): Client {
       if (!h.has('Content-Type')) h.set('Content-Type', 'application/json');
     }
 
+    const req: WeaveRequest = { url, method, headers: h, body: finalBody, init: rest };
     try {
-      const res = await doFetch(url, { method, headers: h, body: finalBody, ...rest });
+      // The chain returns the raw Response (including non-2xx) so an interceptor
+      // can inspect/retry it; the ok-check + parse stay here, outside the chain.
+      const res = await handler(req);
       if (!res.ok) throw new HttpError(res.status, res.statusText, res);
       const ct = res.headers.get('content-type') ?? '';
       return (ct.includes('application/json') ? await res.json() : await res.text()) as T;

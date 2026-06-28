@@ -267,3 +267,106 @@ test('resource + client: client.get works as a fetcher and receives the abort si
   assert.deepEqual(r.data(), { v: 'hi' });
   assert.ok(gotSignal, 'client received the resource abort signal');
 });
+
+/* ──────────────────────────── interceptors ──────────────────────────── */
+
+test('interceptor: mutates the request (auth header) before fetch', async () => {
+  let seen = '';
+  const client = createClient({
+    interceptors: [
+      (req, next) => {
+        req.headers.set('Authorization', 'Bearer xyz');
+        return next(req);
+      },
+    ],
+    fetch: async (_u, i) => {
+      seen = new Headers(i!.headers).get('authorization') ?? '';
+      return jsonResponse({ ok: 1 });
+    },
+  });
+
+  await client.get('/a');
+  assert.equal(seen, 'Bearer xyz', 'request interceptor set the header');
+});
+
+test('interceptor: can read the response after next() resolves', async () => {
+  let observedStatus = 0;
+  const client = createClient({
+    interceptors: [
+      async (req, next) => {
+        const res = await next(req);
+        observedStatus = res.status;
+        return res;
+      },
+    ],
+    fetch: async () => jsonResponse({ ok: 1 }, { status: 201 }),
+  });
+
+  await client.get('/a');
+  assert.equal(observedStatus, 201, 'interceptor saw the response status');
+});
+
+test('interceptor: short-circuits (cache hit) without calling next', async () => {
+  let fetched = 0;
+  const client = createClient({
+    interceptors: [(_req, _next) => Promise.resolve(jsonResponse({ cached: true }))],
+    fetch: async () => {
+      fetched++;
+      return jsonResponse({ cached: false });
+    },
+  });
+
+  const out = await client.get<{ cached: boolean }>('/a');
+  assert.deepEqual(out, { cached: true });
+  assert.equal(fetched, 0, 'real fetch was bypassed');
+});
+
+test('interceptor: can retry a failed request', async () => {
+  let attempt = 0;
+  const client = createClient({
+    interceptors: [
+      async (req, next) => {
+        let res = await next(req);
+        if (!res.ok) res = await next(req); // one retry
+        return res;
+      },
+    ],
+    fetch: async () => {
+      attempt++;
+      return attempt === 1
+        ? new Response('err', { status: 500, statusText: 'Server Error' })
+        : jsonResponse({ ok: 1 });
+    },
+  });
+
+  const out = await client.get<{ ok: number }>('/a');
+  assert.equal(attempt, 2, 'retried once');
+  assert.deepEqual(out, { ok: 1 });
+});
+
+test('interceptor: chain runs outermost-first on the way in, unwinds on the way out', async () => {
+  const order: string[] = [];
+  const client = createClient({
+    interceptors: [
+      async (req, next) => {
+        order.push('a:in');
+        const res = await next(req);
+        order.push('a:out');
+        return res;
+      },
+      async (req, next) => {
+        order.push('b:in');
+        const res = await next(req);
+        order.push('b:out');
+        return res;
+      },
+    ],
+    fetch: async () => {
+      order.push('fetch');
+      return jsonResponse({});
+    },
+  });
+
+  await client.get('/a');
+  assert.deepEqual(order, ['a:in', 'b:in', 'fetch', 'b:out', 'a:out']);
+});
