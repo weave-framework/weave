@@ -2,6 +2,7 @@
 
 import { build } from './build.js';
 import { dev } from './dev.js';
+import { generateRoutes } from './routes.js';
 import { checkProject, type Diagnostic } from '@weave/check';
 
 function flag(args: string[], name: string): string | undefined {
@@ -39,7 +40,17 @@ export async function main(argv: string[]): Promise<void> {
     return;
   }
 
-  console.error('usage: weave <build|dev|check> [entry|paths…] [--out dir] [--serve dir] [--port n] [--minify]');
+  if (cmd === 'routes') {
+    const dir = rest.find((a) => !a.startsWith('-')) ?? 'src/routes';
+    const out = flag(rest, '--out');
+    const written = generateRoutes(dir, { out, lazy: !rest.includes('--eager') });
+    console.log(`weave routes → ${written}`);
+    return;
+  }
+
+  console.error(
+    'usage: weave <build|dev|check|routes> [entry|paths…] [--out dir] [--serve dir] [--port n] [--minify] [--eager]'
+  );
   process.exit(1);
 }
 
