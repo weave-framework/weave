@@ -1079,6 +1079,22 @@ export const ErrorBoundary: Component = (props = {}, slots = {}) => {
     failure.set(null);
   };
 
+  // Optional `resetKey`: a reactive value that clears the error when it changes
+  // (the React `resetKeys` pattern) — e.g. `resetKey={path()}` to recover on
+  // navigation without remounting the protected content. The initial run is skipped.
+  const resetKey = (props as { resetKey?: unknown }).resetKey;
+  if (resetKey !== undefined) {
+    let first = true;
+    effect(() => {
+      (props as { resetKey?: unknown }).resetKey; // track the (reactive) prop getter
+      if (first) {
+        first = false;
+        return;
+      }
+      reset();
+    });
+  }
+
   ifBlock(anchor, () => {
     const f = failure();
     if (f) {
