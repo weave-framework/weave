@@ -137,6 +137,10 @@ function emit(nodes: TemplateNode[], ctx: Set<string>): Line[] {
         case 'render':
           push(`  void (${rw(node.expr, scope)});`, node.exprOffset);
           break;
+        case 'key':
+          push(`  void (${rw(node.expr, scope)});`, node.exprOffset);
+          walk(node.children, scope);
+          break;
         case 'text':
           break;
         case 'interp':

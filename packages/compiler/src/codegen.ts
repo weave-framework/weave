@@ -12,7 +12,7 @@
 import { parseTemplate } from './parser.js';
 import type {
   TemplateNode, ElementNode, Attr, StaticAttr, EventAttr, IfNode, ForNode, SwitchNode,
-  DeferNode, DeferTrigger, AwaitNode, SnippetNode, RenderNode,
+  DeferNode, DeferTrigger, AwaitNode, SnippetNode, RenderNode, KeyNode,
 } from './ast.js';
 import { rewrite, ctxScope, childScope, type Scope, type Binding } from './scope.js';
 
@@ -167,6 +167,13 @@ function compileFragment(
     stmts.push(`${gen.H('mountChild')}(${nodeExpr(path)}, ${rewrite(node.expr, sc).code});`);
   }
 
+  function emitKey(node: KeyNode, path: number[], sc: Scope): void {
+    html += '<!---->';
+    const contentFn = gen.fn();
+    childDecls.push(compileFragment(gen, node.children, sc, contentFn));
+    stmts.push(`${gen.H('keyBlock')}(${nodeExpr(path)}, () => ${rewrite(node.expr, sc).code}, ${contentFn});`);
+  }
+
   function emitNode(node: TemplateNode, path: number[], sc: Scope, isHost = false): void {
     switch (node.type) {
       case 'text':
@@ -202,6 +209,9 @@ function compileFragment(
         return;
       case 'render':
         emitRender(node, path, sc);
+        return;
+      case 'key':
+        emitKey(node, path, sc);
         return;
       case 'snippet':
         throw new Error('@snippet is a declaration, handled in emitChildren');

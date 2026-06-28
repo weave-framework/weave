@@ -12,11 +12,11 @@
 import type {
   TemplateNode, ElementNode, Attr,
   IfNode, IfBranch, ForNode, SwitchNode, SwitchCase, LetNode, DeferNode, DeferTrigger,
-  AwaitNode, AwaitBranch, SnippetNode, RenderNode,
+  AwaitNode, AwaitBranch, SnippetNode, RenderNode, KeyNode,
 } from './ast.js';
 
 const BLOCK_KW =
-  /^@(if|else|for|empty|switch|case|default|let|defer|placeholder|await|then|catch|snippet|render)\b/;
+  /^@(if|else|for|empty|switch|case|default|let|defer|placeholder|await|then|catch|snippet|render|key)\b/;
 
 const VOID = new Set([
   'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input',
@@ -102,6 +102,7 @@ class Parser {
       case 'await': return this.parseAwait();
       case 'snippet': return this.parseSnippet();
       case 'render': return this.parseRender();
+      case 'key': return this.parseKey();
       default:
         throw new ParseError(`Unexpected @${kw} at ${this.pos} (no matching block)`);
     }
@@ -298,6 +299,16 @@ class Parser {
     }
     const children = this.readBlockBody();
     return { type: 'snippet', name, params, children };
+  }
+
+  parseKey(): KeyNode {
+    this.pos += '@key'.length;
+    this.skipWs();
+    const raw = this.readParen();
+    const expr = raw.trim();
+    if (!expr) throw new ParseError(`@key () needs an expression`);
+    const exprOffset = this.exprOffset(this.parenStart, raw, expr);
+    return { type: 'key', expr, exprOffset, children: this.readBlockBody() };
   }
 
   parseRender(): RenderNode {
