@@ -53,6 +53,24 @@ test('inferCtxNames excludes @for item, $vars, and @let names', () => {
   assert.deepEqual(l, ['n']);
 });
 
+test('a capitalized component named like a void element is not void', () => {
+  // `<link>` is a void HTML element, but `<Link>` is the router component — it must
+  // keep its children + close tag, or `</Link>` mismatches the parent (regression).
+  const [nav] = parseTemplate('<nav><Link to="/">Board</Link></nav>') as Array<{
+    children: Array<{ tag: string; selfClosing: boolean; children: unknown[] }>;
+  }>;
+  const link = nav.children[0];
+  assert.equal(link.tag, 'Link');
+  assert.equal(link.selfClosing, false);
+  assert.equal(link.children.length, 1, 'keeps its text child');
+  // The lowercase void element still self-closes.
+  const [p] = parseTemplate('<p>a<br>b</p>') as Array<{
+    children: Array<{ tag: string; selfClosing: boolean }>;
+  }>;
+  assert.equal(p.children[1].tag, 'br');
+  assert.equal(p.children[1].selfClosing, true);
+});
+
 /* ──────────── defineComponent runtime ──────────── */
 
 test('defineComponent wires setup + render and mounts/unmounts', () => {
@@ -84,6 +102,23 @@ test('defineComponent exposes props (lazy) alongside setup bindings', () => {
   assert.equal(node.textContent, 'x 6');
   n.set(5);
   assert.equal(node.textContent, 'x 10', 'binding over a reactive prop updates');
+});
+
+test('a setup binding may shadow a like-named (getter-only) prop', () => {
+  // Regression: ctx was built with Object.assign, whose [[Set]] honours a getter-only
+  // prop of the same name on the prototype and throws. A binding must be able to
+  // shadow a like-named prop (the documented case) — common when re-exposing a prop
+  // as a typed accessor (`task: () => props.task`).
+  const render = compileRender('<span>{{ task().title }}</span>', ['task']);
+  const Card = dom.defineComponent(render as never, (props) => ({
+    task: () => props.task as { title: string },
+  }));
+  const t = signal({ title: 'hi' });
+  const node = Card({ get task() { return t(); } }, {}) as Element;
+  host().appendChild(node);
+  assert.equal(node.textContent, 'hi');
+  t.set({ title: 'bye' });
+  assert.equal(node.textContent, 'bye', 'reactive through the shadowing accessor');
 });
 
 test('mountComponent disposes setup effects on unmount', () => {
