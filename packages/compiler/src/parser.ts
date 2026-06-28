@@ -11,10 +11,10 @@
 
 import type {
   TemplateNode, ElementNode, Attr,
-  IfNode, IfBranch, ForNode, SwitchNode, SwitchCase, LetNode,
+  IfNode, IfBranch, ForNode, SwitchNode, SwitchCase, LetNode, DeferNode, DeferTrigger,
 } from './ast.js';
 
-const BLOCK_KW = /^@(if|else|for|empty|switch|case|default|let)\b/;
+const BLOCK_KW = /^@(if|else|for|empty|switch|case|default|let|defer|placeholder)\b/;
 
 const VOID = new Set([
   'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input',
@@ -96,6 +96,7 @@ class Parser {
       case 'for': return this.parseFor();
       case 'switch': return this.parseSwitch();
       case 'let': return this.parseLet();
+      case 'defer': return this.parseDefer();
       default:
         throw new ParseError(`Unexpected @${kw} at ${this.pos} (no matching block)`);
     }
@@ -219,6 +220,50 @@ class Parser {
     if (this.peek() !== ';') throw new ParseError(`Expected ';' ending @let ${name}`);
     this.pos++;
     return { type: 'let', name, expr, exprOffset };
+  }
+
+  parseDefer(): DeferNode {
+    this.pos += 6; // @defer
+    this.skipWs();
+    const head = this.readParen();
+    const trigger = this.parseDeferTrigger(head, this.parenStart);
+    const children = this.readBlockBody();
+
+    let placeholder: TemplateNode[] | undefined;
+    const save = this.pos;
+    this.skipWs();
+    if (this.src.startsWith('@placeholder', this.pos)) {
+      this.pos += '@placeholder'.length;
+      placeholder = this.readBlockBody();
+    } else {
+      this.pos = save;
+    }
+    return { type: 'defer', trigger, children, placeholder };
+  }
+
+  parseDeferTrigger(head: string, headStart: number): DeferTrigger {
+    const h = head.trim();
+    const whenM = /^when\s+([\s\S]+)$/.exec(h);
+    if (whenM) {
+      const expr = whenM[1].trim();
+      return { kind: 'when', expr, exprOffset: this.exprOffset(headStart, head, expr) };
+    }
+    if (h === 'immediate') return { kind: 'immediate' };
+    const onM = /^on\s+([\s\S]+)$/.exec(h);
+    if (onM) {
+      const on = onM[1].trim();
+      const timerM = /^timer\s*\(\s*([\s\S]+?)\s*\)$/.exec(on);
+      if (timerM) {
+        const ms = timerM[1].trim();
+        return { kind: 'timer', ms, msOffset: this.exprOffset(headStart, head, ms) };
+      }
+      if (on === 'idle') return { kind: 'idle' };
+      if (on === 'viewport') return { kind: 'viewport' };
+      if (on === 'interaction') return { kind: 'interaction' };
+      if (on === 'hover') return { kind: 'hover' };
+      throw new ParseError(`Unknown @defer trigger 'on ${on}'`);
+    }
+    throw new ParseError(`Invalid @defer trigger '${h}' (use 'when <expr>', 'on idle|viewport|interaction|hover', 'on timer(ms)', or 'immediate')`);
   }
 
   /** `{ children }` */

@@ -497,6 +497,136 @@ export function eachBlock<T>(
   });
 }
 
+/* ──────────────────────────── defer ──────────────────────────── */
+
+/** A `@defer` trigger spec (emitted by codegen). `when` is reactive; the rest fire once. */
+export type DeferTrigger =
+  | { on: 'when'; when: () => unknown }
+  | { on: 'idle' }
+  | { on: 'viewport' }
+  | { on: 'timer'; ms: number }
+  | { on: 'interaction' }
+  | { on: 'hover' }
+  | { on: 'immediate' };
+
+/** First Element among a node list (the placeholder's root — for viewport/interaction/hover). */
+function firstElement(nodes: ChildNode[]): Element | null {
+  for (const n of nodes) if (n instanceof Element) return n;
+  return null;
+}
+
+/**
+ * `@defer` — gate the rendering of `content` until `trigger` fires; show the optional
+ * `placeholder` until then. Each region renders in its own owner scope (parented to the
+ * construction-time owner, like {@link ifBlock}), so effects dispose on unmount/swap and
+ * context still resolves. `viewport`/`interaction`/`hover` observe the placeholder's root
+ * element; with no placeholder they fire immediately (nothing to observe).
+ */
+export function deferBlock(
+  anchor: Comment,
+  trigger: DeferTrigger,
+  content: () => Node,
+  placeholder?: () => Node
+): void {
+  const parent = anchor.parentNode!;
+  const host = getOwner();
+  let owner: Owner | null = null;
+  let nodes: ChildNode[] = [];
+  let fired = false;
+  let disposed = false;
+  let disarm: (() => void) | void;
+
+  const clear = (): void => {
+    if (owner) {
+      disposeOwner(owner);
+      owner = null;
+    }
+    nodes.forEach((n) => n.remove());
+    nodes = [];
+  };
+  const render = (fn: () => Node): void => {
+    clear();
+    owner = runInOwner(host, () => createOwner(null));
+    const node = runInOwner(owner, () => fn());
+    nodes = node ? placeBefore(parent, node, anchor) : [];
+  };
+
+  if (placeholder) render(placeholder);
+
+  const fire = (): void => {
+    if (fired || disposed) return;
+    fired = true;
+    if (disarm) disarm();
+    render(content);
+  };
+
+  disarm = arm(trigger, fire, () => firstElement(nodes), host);
+  onDispose(() => {
+    disposed = true;
+    if (disarm) disarm();
+    clear();
+  });
+}
+
+/** Wire a trigger to `fire`; return a teardown. `target()` yields the placeholder root. */
+function arm(
+  trigger: DeferTrigger,
+  fire: () => void,
+  target: () => Element | null,
+  host: Owner | null
+): (() => void) | void {
+  const g = globalThis as typeof globalThis & {
+    requestIdleCallback?: (cb: () => void) => number;
+    cancelIdleCallback?: (id: number) => void;
+  };
+  switch (trigger.on) {
+    case 'immediate':
+      fire();
+      return;
+    case 'when':
+      // Reactive: fire when the condition becomes truthy. Runs in the host owner so it
+      // is tracked + disposed there; `fire` disarms it after the first truthy read.
+      return runInOwner(host, () =>
+        effect(() => {
+          if ((trigger as { when: () => unknown }).when()) fire();
+        })
+      );
+    case 'idle': {
+      if (g.requestIdleCallback) {
+        const id = g.requestIdleCallback(fire);
+        return () => g.cancelIdleCallback?.(id);
+      }
+      const t = setTimeout(fire, 1);
+      return () => clearTimeout(t);
+    }
+    case 'timer': {
+      const t = setTimeout(fire, (trigger as { ms: number }).ms);
+      return () => clearTimeout(t);
+    }
+    case 'viewport': {
+      const el = target();
+      if (!el || typeof IntersectionObserver === 'undefined') return void fire();
+      const io = new IntersectionObserver((entries) => {
+        if (entries.some((e) => e.isIntersecting)) fire();
+      });
+      io.observe(el);
+      return () => io.disconnect();
+    }
+    case 'interaction':
+    case 'hover': {
+      const el = target();
+      if (!el) return void fire();
+      const events =
+        trigger.on === 'hover' ? ['pointerenter', 'focusin'] : ['click', 'keydown'];
+      const handler = (): void => fire();
+      for (const ev of events) el.addEventListener(ev, handler);
+      return () => {
+        for (const ev of events) el.removeEventListener(ev, handler);
+      };
+    }
+  }
+}
+
 /* ──────────────────────────── components ──────────────────────────── */
 
 /**

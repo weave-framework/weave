@@ -62,6 +62,12 @@ export function inferCtxNames(nodes: TemplateNode[]): string[] {
             walk(c.children);
           }
           break;
+        case 'defer':
+          if (node.trigger.kind === 'when') add(node.trigger.expr);
+          if (node.trigger.kind === 'timer') add(node.trigger.ms);
+          walk(node.children);
+          if (node.placeholder) walk(node.placeholder);
+          break;
       }
     }
   };

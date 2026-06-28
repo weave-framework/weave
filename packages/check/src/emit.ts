@@ -176,6 +176,16 @@ function emit(nodes: TemplateNode[], ctx: Set<string>): Line[] {
           push(`  }`);
           break;
         }
+        case 'defer': {
+          if (node.trigger.kind === 'when') {
+            push(`  void (${rw(node.trigger.expr, scope)});`, node.trigger.exprOffset);
+          } else if (node.trigger.kind === 'timer') {
+            push(`  void (${rw(node.trigger.ms, scope)});`, node.trigger.msOffset);
+          }
+          walk(node.children, scope);
+          if (node.placeholder) walk(node.placeholder, scope);
+          break;
+        }
       }
     }
   };

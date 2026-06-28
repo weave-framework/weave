@@ -12,6 +12,7 @@
 import { parseTemplate } from './parser.js';
 import type {
   TemplateNode, ElementNode, Attr, StaticAttr, EventAttr, IfNode, ForNode, SwitchNode,
+  DeferNode, DeferTrigger,
 } from './ast.js';
 import { rewrite, ctxScope, childScope, type Scope } from './scope.js';
 
@@ -160,6 +161,9 @@ function compileFragment(
         return;
       case 'switch':
         emitSwitch(node, path, sc);
+        return;
+      case 'defer':
+        emitDefer(node, path, sc);
         return;
       case 'let':
         throw new Error('@let cannot be a single dynamic node here');
@@ -335,6 +339,37 @@ function compileFragment(
     if (!node.cases.some((c) => c.test === undefined)) lines.push('return null;');
 
     stmts.push(`${gen.H('ifBlock')}(${nodeExpr(path)}, () => { ${lines.join(' ')} });`);
+  }
+
+  function emitDefer(node: DeferNode, path: number[], sc: Scope): void {
+    html += '<!---->';
+    const contentFn = gen.fn();
+    childDecls.push(compileFragment(gen, node.children, sc, contentFn));
+
+    let phArg = 'undefined';
+    if (node.placeholder && trimTop(node.placeholder).length > 0) {
+      const phFn = gen.fn();
+      childDecls.push(compileFragment(gen, node.placeholder, sc, phFn));
+      phArg = phFn;
+    }
+
+    const trig = deferTriggerExpr(node.trigger, sc);
+    stmts.push(`${gen.H('deferBlock')}(${nodeExpr(path)}, ${trig}, ${contentFn}, ${phArg});`);
+  }
+
+  function deferTriggerExpr(t: DeferTrigger, sc: Scope): string {
+    switch (t.kind) {
+      case 'when':
+        return `{ on: "when", when: () => ${rewrite(t.expr, sc).code} }`;
+      case 'timer':
+        return `{ on: "timer", ms: ${rewrite(t.ms, sc).code} }`;
+      case 'idle':
+      case 'viewport':
+      case 'interaction':
+      case 'hover':
+      case 'immediate':
+        return `{ on: ${q(t.kind)} }`;
+    }
   }
 
   function emitFor(node: ForNode, path: number[], sc: Scope): void {
