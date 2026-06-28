@@ -31,6 +31,9 @@ export async function dev(config: DevConfig): Promise<DevServer> {
     entryPoints: [config.entry],
     bundle: true,
     format: 'esm',
+    // Split dynamic import()s into chunks so `lazy()` routes load on demand and
+    // <Link> prefetch (B.15) can warm them.
+    splitting: true,
     outdir: config.outdir,
     plugins: [
       weave(state),

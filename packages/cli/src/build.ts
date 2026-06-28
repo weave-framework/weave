@@ -17,6 +17,9 @@ export async function build(config: BuildConfig): Promise<void> {
     entryPoints: [config.entry],
     bundle: true,
     format: 'esm',
+    // Code-split dynamic import()s into separate chunks, so `lazy()` routes are
+    // actually their own files and <Link> prefetch (B.15) has something to warm.
+    splitting: true,
     outdir: config.outdir,
     minify: config.minify ?? true,
     plugins: [weave(state)],
