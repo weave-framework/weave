@@ -8,6 +8,7 @@ import {
   currentQuery,
   RouterView,
   Link,
+  prefetch,
 } from '@weave/router';
 
 // Route "components" are plain Component functions returning a <span> (so they
@@ -277,4 +278,60 @@ test('Link navigates on a plain click', () => {
   assert.equal((link as HTMLAnchorElement).getAttribute('href'), '/about');
   (link as HTMLAnchorElement).click();
   assert.equal(currentPath(), '/about', 'client-side navigation fired');
+});
+
+/* ──────────── prefetch (B.15) ──────────── */
+
+const LazyPage = defineComponent(() => span('lazy'));
+
+test('lazy().preload triggers the loader once, without rendering', () => {
+  let loads = 0;
+  const L = lazy(() => {
+    loads++;
+    return Promise.resolve({ default: LazyPage });
+  }) as Component & { preload: () => void };
+  assert.equal(loads, 0);
+  L.preload();
+  assert.equal(loads, 1, 'preload ran the loader');
+  L.preload();
+  assert.equal(loads, 1, 'idempotent — loads once');
+});
+
+test('router.preload warms a lazy route chunk ahead of navigation', () => {
+  let loads = 0;
+  const r = createRouter([
+    { path: '/heavy', component: lazy(() => { loads++; return Promise.resolve({ default: LazyPage }); }) },
+    { path: '*', component: NotFound },
+  ]);
+  assert.equal(loads, 0);
+  r.preload('/heavy');
+  assert.equal(loads, 1, 'lazy chunk loaded by preload');
+});
+
+test('Link prefetches the target chunk on hover (once)', () => {
+  navigate('/');
+  let loads = 0;
+  createRouter([
+    { path: '/hv', component: lazy(() => { loads++; return Promise.resolve({ default: LazyPage }); }) },
+    { path: '*', component: NotFound },
+  ]);
+  const link = Link({ to: '/hv' }, {}) as HTMLAnchorElement;
+  host().appendChild(link);
+  assert.equal(loads, 0, 'not loaded before hover');
+  link.dispatchEvent(new Event('pointerenter'));
+  assert.equal(loads, 1, 'hover warmed the chunk');
+  link.dispatchEvent(new Event('pointerenter'));
+  assert.equal(loads, 1, 'warmed only once');
+});
+
+test('Link prefetch={false} does not warm on hover', () => {
+  let loads = 0;
+  createRouter([
+    { path: '/np', component: lazy(() => { loads++; return Promise.resolve({ default: LazyPage }); }) },
+    { path: '*', component: NotFound },
+  ]);
+  const link = Link({ to: '/np', prefetch: false }, {}) as HTMLAnchorElement;
+  host().appendChild(link);
+  link.dispatchEvent(new Event('pointerenter'));
+  assert.equal(loads, 0, 'prefetch disabled — no load on hover');
 });

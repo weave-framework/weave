@@ -1018,7 +1018,7 @@ export function lazy(
     );
   };
 
-  return (props = {}, slots = {}) => {
+  const Lazy = ((props = {}, slots = {}) => {
     start();
     const host = document.createElement('div');
     host.style.display = 'contents';
@@ -1034,7 +1034,10 @@ export function lazy(
       return opts.loading ? () => opts.loading!(props, slots) : null;
     });
     return host;
-  };
+  }) as unknown as Component & { preload: () => void };
+  // Warm the import ahead of render (router Link prefetch) — runs the loader once.
+  Lazy.preload = start;
+  return Lazy;
 }
 
 /**

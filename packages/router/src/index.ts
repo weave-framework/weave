@@ -198,7 +198,12 @@ export interface Router {
   query: () => RouteParams;
   /** Canonical pathname the URL should sync to after a guard/redirect, or null. */
   redirectTo: () => string | null;
+  /** Warm a path's lazy route chunk(s) ahead of navigation (Link prefetch). */
+  preload: (to: string) => void;
 }
+
+/** The most recently created router — the target of the module-level {@link prefetch}. */
+let activeRouter: Router | null = null;
 
 /**
  * Build a router from an ordered `Route[]` tree (`path: '*'` = catch-all fallback).
@@ -230,7 +235,23 @@ export function createRouter(routes: Route[]): Router {
   });
 
   const chain = (): Match[] => resolution().chain;
-  return {
+
+  /** Non-reactive resolve of an arbitrary path → preload each chunk in its chain. */
+  const preload = (to: string): void => {
+    let p = to.split('#')[0].split('?')[0];
+    for (let hops = 0; hops < 16; hops++) {
+      const res = resolveLevel(compiled, splitSegs(p), {}, p, {});
+      if (res && 'redirect' in res) {
+        p = res.redirect.split('#')[0].split('?')[0];
+        continue;
+      }
+      const ch = res && 'chain' in res ? res.chain : fallbackChain();
+      for (const m of ch) (m.view as { preload?: () => void }).preload?.();
+      return;
+    }
+  };
+
+  const router: Router = {
     chain,
     matched: (depth = 0) => chain()[depth] ?? null,
     params: (depth?: number) => {
@@ -240,7 +261,15 @@ export function createRouter(routes: Route[]): Router {
     },
     query: () => queryMap(),
     redirectTo: () => resolution().redirectTo,
+    preload,
   };
+  activeRouter = router; // most-recent router answers the module-level prefetch()
+  return router;
+}
+
+/** Warm a path's lazy route chunk(s) via the active router (no-op if none / not lazy). */
+export function prefetch(to: string): void {
+  activeRouter?.preload(to);
 }
 
 /* ──────────────────────────── outlets ──────────────────────────── */
@@ -316,6 +345,8 @@ export const RouterView: Component = (props = {}) => {
  */
 export const Link: Component = (props = {}, slots = {}) => {
   const to = String((props as { to?: unknown }).to ?? '/');
+  // prefetch defaults on: warm the target's lazy chunk on first hover/focus.
+  const wantsPrefetch = (props as { prefetch?: unknown }).prefetch !== false;
   const a = document.createElement('a');
   a.setAttribute('href', to);
   const kids = slots.default?.();
@@ -326,6 +357,16 @@ export const Link: Component = (props = {}, slots = {}) => {
     e.preventDefault();
     navigate(to);
   });
+  if (wantsPrefetch) {
+    let warmed = false;
+    const warm = (): void => {
+      if (warmed) return;
+      warmed = true;
+      prefetch(to);
+    };
+    a.addEventListener('pointerenter', warm);
+    a.addEventListener('focusin', warm);
+  }
   return a;
 };
 
