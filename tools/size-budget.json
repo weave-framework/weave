@@ -1,0 +1,9 @@
+{
+  "_comment": "M11 size ceilings — minified + gzip (bytes). Guards against accidental bloat while the framework is still being built; bump a limit deliberately when a feature legitimately grows it. runtime-full's 3686 = the plan's ~3.6 kB gzip target class.",
+  "limits": {
+    "reactive-core": 1024,
+    "runtime-full": 3686,
+    "counter-app": 1536,
+    "counter-component": 512
+  }
+}
