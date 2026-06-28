@@ -11,7 +11,7 @@
 
 import { parseTemplate } from './parser.js';
 import type {
-  TemplateNode, ElementNode, Attr, EventAttr, IfNode, ForNode, SwitchNode,
+  TemplateNode, ElementNode, Attr, StaticAttr, EventAttr, IfNode, ForNode, SwitchNode,
 } from './ast.js';
 import { rewrite, ctxScope, childScope, type Scope } from './scope.js';
 
@@ -40,6 +40,10 @@ class Gen {
     this.usedCore.add(name);
     return this.mode === 'function' ? `rt.${name}` : name;
   }
+  /** Reference a child component: from the `_c` map in function mode, bare (imported) in module mode. */
+  Comp(name: string): string {
+    return this.mode === 'function' ? `_c.${name}` : name;
+  }
   tpl(html: string): string {
     const v = `_t${this.tplN++}`;
     this.templates.push(`const ${v} = ${this.H('template')}(${JSON.stringify(html)});`);
@@ -56,10 +60,10 @@ export function compileTemplate(input: string, options: CompileOptions = {}): { 
   const gen = new Gen(mode);
 
   const ast = parseTemplate(input);
-  const render = compileFragment(gen, ast, ctxScope(options.scope ?? []), 'render', 'ctx');
+  const render = compileFragment(gen, ast, ctxScope(options.scope ?? []), 'render', 'ctx, slots');
 
   if (mode === 'function') {
-    const body = [...gen.templates, render, 'return render(ctx);'].join('\n');
+    const body = [...gen.templates, render, 'return render(ctx, {});'].join('\n');
     return { code: body };
   }
 
@@ -82,7 +86,10 @@ function compileFragment(
 ): string {
   const top = trimTop(nodes);
   if (top.length === 0) throw new Error('Empty template fragment');
-  const singleRoot = top.length === 1 && top[0].type === 'element';
+  // A component/slot compiles to a bare `<!---->`, so it can't be the clone root —
+  // only a real DOM element qualifies for the single-root (clone) fast path.
+  const sole = top.length === 1 && top[0].type === 'element' ? (top[0] as ElementNode) : null;
+  const singleRoot = !!sole && !/^[A-Z]/.test(sole.tag) && sole.tag !== 'slot';
   if (requireSingleRoot && !singleRoot) {
     throw new Error('A @for row body must have a single root element');
   }
@@ -158,7 +165,8 @@ function compileFragment(
   }
 
   function emitElement(node: ElementNode, path: number[], sc: Scope): void {
-    if (/^[A-Z]/.test(node.tag)) throw new Error(`Components (<${node.tag}>) arrive in M5`);
+    if (node.tag === 'slot') return emitSlot(node, path, sc);
+    if (/^[A-Z]/.test(node.tag)) return emitComponent(node, path, sc);
     html += `<${node.tag}`;
     for (const attr of node.attrs) {
       if (attr.type === 'static') {
@@ -204,6 +212,76 @@ function compileFragment(
       case 'bind':
         throw new Error('bind: (two-way binding) arrives in M10');
     }
+  }
+
+  function emitComponent(node: ElementNode, path: number[], sc: Scope): void {
+    html += '<!---->'; // anchor the component mounts before
+    const anchorVar = nodeExpr(path);
+
+    // Props: `x="s"` static, `x={expr}` lazy/reactive getter, `on:evt` → onEvt handler.
+    const props: string[] = [];
+    for (const attr of node.attrs) {
+      switch (attr.type) {
+        case 'static':
+          props.push(`${propKey(attr.name)}: ${q(attr.value)}`);
+          break;
+        case 'attr':
+          // getter ⇒ the child re-reads through it, so the prop stays reactive
+          props.push(`get ${propKey(attr.name)}() { return ${rewrite(attr.expr, sc).code}; }`);
+          break;
+        case 'event':
+          props.push(`${propKey(onProp(attr.name))}: ${rewrite(attr.expr, sc).code}`);
+          break;
+        default:
+          throw new Error(`'${attr.type}' binding on <${node.tag}> is not supported yet (M5: props + on:event only)`);
+      }
+    }
+
+    // Slots: group children by a static `slot="name"` (default otherwise); strip the attr.
+    const groups = new Map<string, TemplateNode[]>();
+    for (const child of node.children) {
+      let target = child;
+      let slotName = 'default';
+      if (child.type === 'element') {
+        const i = child.attrs.findIndex((a) => a.type === 'static' && a.name === 'slot');
+        if (i >= 0) {
+          slotName = (child.attrs[i] as StaticAttr).value;
+          target = { ...child, attrs: child.attrs.filter((_, k) => k !== i) };
+        }
+      }
+      let arr = groups.get(slotName);
+      if (!arr) { arr = []; groups.set(slotName, arr); }
+      arr.push(target);
+    }
+
+    const slots: string[] = [];
+    for (const [name, children] of groups) {
+      if (trimTop(children).length === 0) continue; // whitespace-only group → no slot
+      const slotFn = gen.fn('_s');
+      childDecls.push(compileFragment(gen, children, sc, slotFn));
+      slots.push(`${propKey(name)}: ${slotFn}`);
+    }
+
+    const propsObj = props.length ? `{ ${props.join(', ')} }` : '{}';
+    const slotsObj = slots.length ? `{ ${slots.join(', ')} }` : '{}';
+    stmts.push(`${gen.H('mountChild')}(${anchorVar}, ${gen.Comp(node.tag)}(${propsObj}, ${slotsObj}));`);
+  }
+
+  function emitSlot(node: ElementNode, path: number[], sc: Scope): void {
+    html += '<!---->';
+    const anchorVar = nodeExpr(path);
+    const nameAttr = node.attrs.find((a) => a.type === 'static' && a.name === 'name');
+    const name = nameAttr ? (nameAttr as StaticAttr).value : 'default';
+
+    let fallback = 'null';
+    if (trimTop(node.children).length > 0) {
+      const fbFn = gen.fn('_f');
+      childDecls.push(compileFragment(gen, node.children, sc, fbFn));
+      fallback = `${fbFn}()`;
+    }
+    stmts.push(
+      `{ const _sf = slots[${q(name)}]; ${gen.H('mountChild')}(${anchorVar}, _sf ? _sf() : ${fallback}); }`
+    );
   }
 
   function emitIf(node: IfNode, path: number[], sc: Scope): void {
@@ -278,7 +356,7 @@ function compileFragment(
   }
 
   // walk
-  if (singleRoot) emitElement(top[0] as ElementNode, [], scope);
+  if (singleRoot) emitElement(sole!, [], scope);
   else emitChildren(top, [], scope);
 
   const ctor = singleRoot ? gen.H('clone') : gen.H('cloneFragment');
@@ -321,6 +399,16 @@ function trimTop(nodes: TemplateNode[]): TemplateNode[] {
 
 function q(s: string): string {
   return JSON.stringify(s);
+}
+
+/** Object-literal key: bare when a valid identifier, quoted otherwise. */
+function propKey(name: string): string {
+  return /^[A-Za-z_$][\w$]*$/.test(name) ? name : JSON.stringify(name);
+}
+
+/** `on:select` → `onSelect` (the prop the child receives). */
+function onProp(event: string): string {
+  return 'on' + event.charAt(0).toUpperCase() + event.slice(1);
 }
 
 function escapeText(s: string): string {
