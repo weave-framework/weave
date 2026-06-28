@@ -17,6 +17,15 @@ export function scopeAttr(hash: string): string {
   return `data-w-${hash}`;
 }
 
+/**
+ * The attribute marking a component's *root* element(s) — what `:host` targets.
+ * Weave has no shadow DOM, so `:host` resolves to the template roots (codegen
+ * stamps this only when the CSS actually uses `:host`).
+ */
+export function hostAttr(hash: string): string {
+  return `data-w-${hash}-h`;
+}
+
 /** Deterministic short hash (FNV-1a, base36) for a component's style+template. */
 export function hashCss(input: string): string {
   let h = 0x811c9dc5;
@@ -29,12 +38,12 @@ export function hashCss(input: string): string {
 
 /** Rewrite `css` so it only targets elements carrying `[data-w-<hash>]`. */
 export function scopeCss(css: string, hash: string): string {
-  return transformBlock(css, scopeAttr(hash), false);
+  return transformBlock(css, scopeAttr(hash), hostAttr(hash), false);
 }
 
 /* ──────────── block-level walk ──────────── */
 
-function transformBlock(css: string, attr: string, keyframes: boolean): string {
+function transformBlock(css: string, attr: string, host: string, keyframes: boolean): string {
   let out = '';
   let i = 0;
   const n = css.length;
@@ -120,14 +129,14 @@ function transformBlock(css: string, attr: string, keyframes: boolean): string {
     } else if (trimmed.startsWith('@')) {
       const kw = (/^@-?\w[\w-]*/.exec(trimmed)?.[0] ?? '').toLowerCase();
       if (kw.endsWith('keyframes')) {
-        out += prelude + '{' + transformBlock(body, attr, true) + '}';
+        out += prelude + '{' + transformBlock(body, attr, host, true) + '}';
       } else if (kw === '@font-face' || kw === '@page' || kw === '@property' || kw === '@counter-style') {
         out += prelude + '{' + body + '}'; // declarations only — nothing to scope
       } else {
-        out += prelude + '{' + transformBlock(body, attr, false) + '}'; // @media/@supports/@container/@layer…
+        out += prelude + '{' + transformBlock(body, attr, host, false) + '}'; // @media/@supports/@container/@layer…
       }
     } else {
-      out += scopeSelectorList(prelude, attr) + '{' + transformBlock(body, attr, false) + '}';
+      out += scopeSelectorList(prelude, attr, host) + '{' + transformBlock(body, attr, host, false) + '}';
     }
     i = after;
   }
@@ -136,26 +145,70 @@ function transformBlock(css: string, attr: string, keyframes: boolean): string {
 
 /* ──────────── selector scoping ──────────── */
 
-function scopeSelectorList(prelude: string, attr: string): string {
+function scopeSelectorList(prelude: string, attr: string, host: string): string {
   return splitTopLevel(prelude, ',')
-    .map((s) => scopeSelector(s, attr))
+    .map((s) => scopeSelector(s, attr, host))
     .join(', ');
 }
 
-function scopeSelector(raw: string, attr: string): string {
+function scopeSelector(raw: string, attr: string, host: string): string {
   const sel = raw.trim();
   if (!sel) return sel;
 
   const start = rightmostCompoundStart(sel);
-  const prefix = unwrapGlobal(sel.slice(0, start));
+  // `:host` may appear in an ancestor position (`:host .child`) — rewrite it there too.
+  const prefix = rewriteHost(unwrapGlobal(sel.slice(0, start)), host);
   const right = sel.slice(start);
   const rightTrim = right.trim();
 
+  // The rightmost compound is `:host` / `:host(.x)` → carries the host attr, not
+  // the normal element scope (a root is matched by where it is, not what it is).
+  if (rightTrim.startsWith(':host')) {
+    return prefix + rewriteHost(unwrapGlobal(right), host);
+  }
   // `:global(...)` rightmost compound or a nesting `&` already carry/inherit scope.
   if (rightTrim.startsWith(':global(') || right.includes('&')) {
     return prefix + unwrapGlobal(right);
   }
   return prefix + insertAttr(unwrapGlobal(right), attr);
+}
+
+/**
+ * Rewrite `:host` / `:host(<sel>)` tokens to the host attribute. `:host` →
+ * `[host]`; `:host(.active)` → `.active[host]` (Angular semantics). Leaves
+ * unrelated tokens (and `:host-context(...)`, not supported) untouched.
+ */
+function rewriteHost(s: string, host: string): string {
+  let out = '';
+  let i = 0;
+  while (i < s.length) {
+    if (s.startsWith(':host', i)) {
+      const after = s[i + 5];
+      if (after === '(') {
+        let depth = 1;
+        let j = i + 6;
+        let inner = '';
+        while (j < s.length && depth > 0) {
+          const c = s[j];
+          if (c === '(') depth++;
+          else if (c === ')' && --depth === 0) { j++; break; }
+          inner += c;
+          j++;
+        }
+        out += inner.trim() + `[${host}]`;
+        i = j;
+        continue;
+      }
+      // A bare `:host` token (not `:host-context` or `:hostfoo`).
+      if (after === undefined || !/[-\w]/.test(after)) {
+        out += `[${host}]`;
+        i += 5;
+        continue;
+      }
+    }
+    out += s[i++];
+  }
+  return out;
 }
 
 /** Index in `sel` where the rightmost compound selector begins (after the last combinator). */

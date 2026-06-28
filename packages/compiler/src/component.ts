@@ -16,7 +16,7 @@
 import { compileTemplate } from './codegen.js';
 import { parseTemplate } from './parser.js';
 import { inferCtxNames } from './infer.js';
-import { scopeCss, scopeAttr, hashCss } from './css.js';
+import { scopeCss, scopeAttr, hostAttr, hashCss } from './css.js';
 
 export interface ComponentSource {
   /** Setup module — user imports + `export function setup(props) { … return bindings }`. */
@@ -51,7 +51,9 @@ export function compileComponent(src: ComponentSource, opts: ComponentOptions = 
   const attr = scopeAttr(hash);
 
   const scope = inferCtxNames(parseTemplate(src.template));
-  const compiled = compileTemplate(src.template, { mode: 'module', scope, scopeAttr: attr });
+  // Stamp the `:host` root marker only when the styles actually use `:host` (else zero cost).
+  const host = src.styles && /:host\b/.test(src.styles) ? hostAttr(hash) : undefined;
+  const compiled = compileTemplate(src.template, { mode: 'module', scope, scopeAttr: attr, hostAttr: host });
   // Demote the template module's default export to a local `render` we can wire up.
   const renderBody = compiled.code.replace('export default function render', 'function render');
 

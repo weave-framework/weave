@@ -24,6 +24,8 @@ export interface CompileOptions {
   runtimeImport?: string;
   /** Scoped-CSS attribute (e.g. `data-w-a1b2c3`) stamped on every emitted element. */
   scopeAttr?: string;
+  /** `:host` attribute (e.g. `data-w-a1b2c3-h`) stamped on the template's root element(s). */
+  hostAttr?: string;
 }
 
 class Gen {
@@ -33,7 +35,11 @@ class Gen {
   private tplN = 0;
   private fnN = 0;
 
-  constructor(public mode: 'module' | 'function', public scopeAttr?: string) {}
+  constructor(
+    public mode: 'module' | 'function',
+    public scopeAttr?: string,
+    public hostAttr?: string
+  ) {}
 
   H(name: string): string {
     this.used.add(name);
@@ -60,10 +66,11 @@ class Gen {
 export function compileTemplate(input: string, options: CompileOptions = {}): { code: string } {
   const mode = options.mode ?? 'module';
   const runtimeImport = options.runtimeImport ?? '@weave/runtime/dom';
-  const gen = new Gen(mode, options.scopeAttr);
+  const gen = new Gen(mode, options.scopeAttr, options.hostAttr);
 
   const ast = parseTemplate(input);
-  const render = compileFragment(gen, ast, ctxScope(options.scope ?? []), 'render', 'ctx, slots');
+  // isHost: the render fragment's top-level elements are the component's roots → `:host`.
+  const render = compileFragment(gen, ast, ctxScope(options.scope ?? []), 'render', 'ctx, slots', false, true);
 
   if (mode === 'function') {
     const body = [...gen.templates, render, 'return render(ctx, {});'].join('\n');
@@ -85,7 +92,8 @@ function compileFragment(
   scope: Scope,
   name: string,
   param = '',
-  requireSingleRoot = false
+  requireSingleRoot = false,
+  isHost = false
 ): string {
   const top = trimTop(nodes);
   if (top.length === 0) throw new Error('Empty template fragment');
@@ -119,7 +127,7 @@ function compileFragment(
     return v;
   };
 
-  function emitChildren(children: TemplateNode[], basePath: number[], sc: Scope): void {
+  function emitChildren(children: TemplateNode[], basePath: number[], sc: Scope, isHost = false): void {
     let dom = 0;
     let cur = sc;
     for (const node of children) {
@@ -130,12 +138,12 @@ function compileFragment(
         dom++;
         continue;
       }
-      emitNode(node, [...basePath, dom], cur);
+      emitNode(node, [...basePath, dom], cur, isHost);
       dom++;
     }
   }
 
-  function emitNode(node: TemplateNode, path: number[], sc: Scope): void {
+  function emitNode(node: TemplateNode, path: number[], sc: Scope, isHost = false): void {
     switch (node.type) {
       case 'text':
         html += escapeText(node.value);
@@ -151,7 +159,7 @@ function compileFragment(
         return;
       }
       case 'element':
-        emitElement(node, path, sc);
+        emitElement(node, path, sc, isHost);
         return;
       case 'if':
         emitIf(node, path, sc);
@@ -173,11 +181,12 @@ function compileFragment(
     }
   }
 
-  function emitElement(node: ElementNode, path: number[], sc: Scope): void {
+  function emitElement(node: ElementNode, path: number[], sc: Scope, isHost = false): void {
     if (node.tag === 'slot') return emitSlot(node, path, sc);
     if (/^[A-Z]/.test(node.tag)) return emitComponent(node, path, sc);
     html += `<${node.tag}`;
     if (gen.scopeAttr) html += ` ${gen.scopeAttr}`; // scoped-CSS marker
+    if (isHost && gen.hostAttr) html += ` ${gen.hostAttr}`; // `:host` root marker
     for (const attr of node.attrs) {
       if (attr.type === 'static') {
         html += attr.value === '' ? ` ${attr.name}` : ` ${attr.name}="${escapeAttr(attr.value)}"`;
@@ -438,8 +447,8 @@ function compileFragment(
   }
 
   // walk
-  if (singleRoot) emitElement(sole!, [], scope);
-  else emitChildren(top, [], scope);
+  if (singleRoot) emitElement(sole!, [], scope, isHost);
+  else emitChildren(top, [], scope, isHost);
 
   const ctor = singleRoot ? gen.H('clone') : gen.H('cloneFragment');
   const tplVar = gen.tpl(html);
