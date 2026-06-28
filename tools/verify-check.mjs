@@ -56,6 +56,11 @@ const run = (...paths) =>
   const fixLine = lineOf('toFixedd');
   const reFix = new RegExp(`bad\\.weave:${fixLine}:\\d+ - error TS\\d+: .*toFixedd`);
   ok(reFix.test(out), `check: member typo flagged at bad.weave:${fixLine}`);
+
+  // use: action arg type mismatch: tooltip expects string, gets count() (number)
+  const useLine = lineOf('use:tooltip');
+  const reUse = new RegExp(`bad\\.weave:${useLine}:\\d+ - error TS\\d+: .*not assignable`);
+  ok(reUse.test(out), `check: use: action arg type error flagged at bad.weave:${useLine}`);
 }
 
 /* ── separate-file form: template error → .html, script error → .ts ── */

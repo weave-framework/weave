@@ -127,7 +127,20 @@ function emit(nodes: TemplateNode[], ctx: Set<string>): Line[] {
         }
         case 'element':
           for (const attr of node.attrs) {
-            if (attr.type !== 'static') push(`  void (${rw(attr.expr, scope)});`, attr.offset);
+            if (attr.type === 'static') continue;
+            if (attr.type === 'use') {
+              // verify the action is callable with the (Element, arg) pair; the
+              // arg's type is checked against the action's 2nd parameter.
+              const action = rw(attr.name, scope);
+              push(
+                attr.expr !== undefined
+                  ? `  (${action})(null as any, ${rw(attr.expr, scope)});`
+                  : `  (${action})(null as any);`,
+                attr.nameOffset ?? attr.offset
+              );
+              continue;
+            }
+            push(`  void (${rw(attr.expr, scope)});`, attr.offset);
           }
           walk(node.children, scope);
           break;

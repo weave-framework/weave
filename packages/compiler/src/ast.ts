@@ -118,7 +118,8 @@ export type Attr =
   | EventAttr
   | ClassAttr
   | BindAttr
-  | RefAttr;
+  | RefAttr
+  | UseAttr;
 
 /** name="value" or bare name */
 export interface StaticAttr {
@@ -166,5 +167,21 @@ export interface BindAttr {
 export interface RefAttr {
   type: 'ref';
   expr: string;
+  offset?: Offset;
+}
+/**
+ * `use:action` or `use:action={arg}` — an attribute directive. `name` is the
+ * action identifier (resolved against ctx, e.g. `tooltip` → `ctx.tooltip`);
+ * `expr` is the optional argument. The action runs after the element is inserted
+ * (onMount timing) and may return a cleanup fn or use `onCleanup`/`effect`.
+ */
+export interface UseAttr {
+  type: 'use';
+  name: string;
+  /** offset of the action identifier `name` (for `weave check`) */
+  nameOffset?: Offset;
+  /** optional argument expression */
+  expr?: string;
+  /** offset of the argument `expr` */
   offset?: Offset;
 }

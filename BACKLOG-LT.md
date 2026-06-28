@@ -207,8 +207,9 @@ Skliausteliuose — kuriuose framework'uose ta feature pasikartoja (kuo daugiau,
    viduje dengia).
 5. ✅ **Error boundary** — (React error boundaries · Svelte `<svelte:boundary>`). Atsparumas.
    **PADARYTA** (owner-maršrutuojama: `catchError` + `<ErrorBoundary>`; gaudo render + effect klaidas).
-6. **`use:` actions (attribute directives)** — (Angular attribute directives · Vue custom directives · Svelte actions).
-   Galingas, mažas.
+6. ✅ **`use:` actions (attribute directives)** — (Angular attribute directives · Vue custom directives · Svelte actions).
+   **PADARYTA** (A.6: `use:action`/`use:action={arg}` → `applyAction(el, action, arg)`; Weave-native kontraktas —
+   onMount timing, cleanup per grąžintą fn / `onDispose` / `effect`; reaktyvumui arg perduodi getteriu).
 
 ### Tier 2 — vertingi, vienas/du framework'ai arba lite versija
 7. **Async/Suspense šablono blokas** — (React Suspense · Svelte `{#await}` · Vue Suspense). `resource` jau
@@ -245,8 +246,8 @@ prireiks, plane paliktos „siūlės" (kompiliatoriaus `mode:'ssr'` + hidratacij
 Sprendimai: **SSR iškelta už v1** · **B/C fazės — darom pilnai** („jei darom tai darom"; Tier 2 + ne-SSR
 Tier 3 polišas įeina, padaryta kaip reikia).
 
-- **A faza — Core paritetas (Tier 1):** ✅ provide/inject · ✅ `onMount` · ✅ Router++ (A.3a guards/redirects/query
-  + A.3b nested) · ✅ `@defer`+lazy (A.4a lazy + A.4b `@defer`) · ✅ error boundary · `use:` actions.
+- **A faza — Core paritetas (Tier 1): ✅ BAIGTA.** ✅ provide/inject · ✅ `onMount` · ✅ Router++ (A.3a guards/
+  redirects/query + A.3b nested) · ✅ `@defer`+lazy (A.4a lazy + A.4b `@defer`) · ✅ error boundary · ✅ `use:` actions (A.6).
 - **B faza — Polish (pilnas Tier 2 + ne-SSR Tier 3):** async/Suspense blokas · portal/teleport · forms
   cross-field+async · HTTP interceptors · `linkedSignal`/debounced/`watch` · `:host` CSS · optimistic UI ·
   snippets su parametrais · custom elements · `v-show`/dinaminis elementas · `{#key}` · `tick()` · transitions

@@ -36,6 +36,16 @@ test('inferCtxNames excludes arrow parameters', () => {
   assert.deepEqual(names, ['count']);
 });
 
+test('inferCtxNames collects the use: action name (and its arg)', () => {
+  // bare action → just the action name
+  assert.deepEqual(inferCtxNames(parseTemplate('<div use:autofocus></div>')), ['autofocus']);
+  // action + arg → both, arg deps included
+  assert.deepEqual(
+    inferCtxNames(parseTemplate('<div use:tooltip={label()}></div>')),
+    ['label', 'tooltip']
+  );
+});
+
 test('inferCtxNames excludes @for item, $vars, and @let names', () => {
   const f = inferCtxNames(parseTemplate('<ul>@for (it of items(); track it.id) { <li>{{ $index }}:{{ it.t }}</li> }</ul>'));
   assert.deepEqual(f, ['items']);

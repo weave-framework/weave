@@ -397,6 +397,7 @@ class Parser {
   }
 
   parseAttr(): Attr {
+    const nameStart = this.pos;
     const rawName = this.readAttrName();
     let value: AttrValue = null;
 
@@ -405,7 +406,10 @@ class Parser {
       value = this.readAttrValue();
     }
 
-    return this.classifyAttr(rawName, value);
+    const attr = this.classifyAttr(rawName, value);
+    // record the action identifier's offset for `weave check` diagnostics
+    if (attr.type === 'use') attr.nameOffset = nameStart + 'use:'.length;
+    return attr;
   }
 
   classifyAttr(rawName: string, value: AttrValue): Attr {
@@ -428,6 +432,16 @@ class Parser {
     }
     if (rawName.startsWith('bind:')) {
       return { type: 'bind', name: rawName.slice(5), expr: exprOf(), offset };
+    }
+    if (rawName.startsWith('use:')) {
+      // `use:action` (no arg) or `use:action={arg}`. The arg is optional.
+      const name = rawName.slice(4);
+      if (!name) throw new ParseError(`'use:' requires an action name, e.g. use:tooltip`);
+      const expr = value && value.kind === 'expr' ? value.expr : undefined;
+      if (value && value.kind === 'static') {
+        throw new ParseError(`use:${name} needs {expr}, got a string`);
+      }
+      return { type: 'use', name, expr, offset };
     }
     if (rawName.startsWith('.')) {
       return { type: 'prop', name: rawName.slice(1), expr: exprOf(), offset };

@@ -216,6 +216,18 @@ function compileFragment(
       case 'ref':
         stmts.push(`${gen.H('setRef')}(${rewrite(attr.expr, sc).code}, ${n});`);
         break;
+      case 'use': {
+        // `use:action={arg}` → applyAction(el, action, arg). The action is the
+        // `name` identifier (rewritten against ctx); the arg is evaluated eagerly
+        // (a snapshot — pass a getter `={() => sig()}` for reactivity).
+        const action = rewrite(attr.name, sc).code;
+        stmts.push(
+          attr.expr !== undefined
+            ? `${gen.H('applyAction')}(${n}, ${action}, ${rewrite(attr.expr, sc).code});`
+            : `${gen.H('applyAction')}(${n}, ${action});`
+        );
+        break;
+      }
       case 'bind': {
         // bind:value / bind:checked / bind:group → two-way `bindValue`. The
         // expression must resolve to a writable signal (passed by reference, not
