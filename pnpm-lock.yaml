@@ -17,9 +17,18 @@ importers:
       '@weave/compiler':
         specifier: workspace:*
         version: link:packages/compiler
+      '@weave/forms':
+        specifier: workspace:*
+        version: link:packages/forms
+      '@weave/router':
+        specifier: workspace:*
+        version: link:packages/router
       '@weave/runtime':
         specifier: workspace:*
         version: link:packages/runtime
+      '@weave/store':
+        specifier: workspace:*
+        version: link:packages/store
       esbuild:
         specifier: ^0.25.0
         version: 0.25.12
@@ -53,7 +62,21 @@ importers:
 
   packages/compiler: {}
 
+  packages/forms:
+    dependencies:
+      '@weave/runtime':
+        specifier: workspace:*
+        version: link:../runtime
+
+  packages/router:
+    dependencies:
+      '@weave/runtime':
+        specifier: workspace:*
+        version: link:../runtime
+
   packages/runtime: {}
+
+  packages/store: {}
 
 packages:
 

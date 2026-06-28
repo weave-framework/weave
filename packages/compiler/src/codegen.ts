@@ -212,8 +212,14 @@ function compileFragment(
       case 'ref':
         stmts.push(`${gen.H('setRef')}(${rewrite(attr.expr, sc).code}, ${n});`);
         break;
-      case 'bind':
-        throw new Error('bind: (two-way binding) arrives in M10');
+      case 'bind': {
+        // bind:value / bind:checked / bind:group → two-way `bindValue`. The
+        // expression must resolve to a writable signal (passed by reference, not
+        // called): `bind:value={count}` → `bindValue(el, ctx.count, 'value')`.
+        const kind = attr.name === 'checked' ? 'checked' : attr.name === 'group' ? 'group' : 'value';
+        stmts.push(`${gen.H('bindValue')}(${n}, ${rewrite(attr.expr, sc).code}, ${q(kind)});`);
+        break;
+      }
     }
   }
 

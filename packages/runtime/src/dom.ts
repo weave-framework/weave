@@ -139,6 +139,86 @@ export function setRef(target: Signal<Element | null> | ((el: Element) => void),
   }
 }
 
+/* ──────────────────────────── two-way binding (forms) ──────────────────────────── */
+
+/**
+ * Two-way `bind:*` between a form control and a writable signal. One effect
+ * writes the signal → the DOM; native input events write the DOM → the signal.
+ * `kind` is decided by the compiler from the binding name:
+ *
+ *  - `'value'`  — text / textarea / number / range / `<select>` (single or multiple).
+ *                 Number/range read as `valueAsNumber`; a multiple select as `string[]`.
+ *  - `'checked'` — a checkbox as a boolean.
+ *  - `'group'`  — a radio (or value-checkbox): the signal holds the *selected value*.
+ *
+ * Text inputs are IME-safe: the DOM is not overwritten mid-composition, and the
+ * signal is written once composition ends. The signal is the source of truth, so
+ * we only assign back to the DOM when the value actually differs (no caret jump).
+ */
+export function bindValue(el: Element, sig: Signal<unknown>, kind: 'value' | 'checked' | 'group'): void {
+  if (kind === 'checked') {
+    const box = el as HTMLInputElement;
+    effect(() => {
+      box.checked = !!sig();
+    });
+    el.addEventListener('change', () => sig.set(box.checked));
+    return;
+  }
+
+  if (kind === 'group') {
+    const radio = el as HTMLInputElement;
+    effect(() => {
+      radio.checked = sig() === radio.value;
+    });
+    el.addEventListener('change', () => {
+      if (radio.checked) sig.set(radio.value);
+    });
+    return;
+  }
+
+  // kind === 'value'
+  const isSelect = el.tagName === 'SELECT';
+  const multiple = isSelect && (el as HTMLSelectElement).multiple;
+  const input = el as HTMLInputElement;
+  const numeric = !isSelect && (input.type === 'number' || input.type === 'range');
+  let composing = false;
+
+  effect(() => {
+    const v = sig();
+    if (composing) return; // don't fight the IME mid-composition
+    if (multiple) {
+      const set = new Set((Array.isArray(v) ? v : []).map(String));
+      for (const opt of (el as HTMLSelectElement).options) opt.selected = set.has(opt.value);
+    } else if (numeric) {
+      // compare numerically so typing "1." (NaN mid-edit) doesn't get clobbered
+      if (input.valueAsNumber !== v) input.value = v == null ? '' : String(v);
+    } else {
+      const s = v == null ? '' : String(v);
+      if (input.value !== s) input.value = s;
+    }
+  });
+
+  const read = (): unknown => {
+    if (multiple) {
+      return [...(el as HTMLSelectElement).selectedOptions].map((o) => o.value);
+    }
+    return numeric ? input.valueAsNumber : input.value;
+  };
+  const write = (): unknown => sig.set(read());
+
+  el.addEventListener('input', write);
+  if (isSelect) el.addEventListener('change', write); // <select> commits on change
+  if (!isSelect && !numeric) {
+    el.addEventListener('compositionstart', () => {
+      composing = true;
+    });
+    el.addEventListener('compositionend', () => {
+      composing = false;
+      write();
+    });
+  }
+}
+
 /* ──────────────────────────── keyed reconciliation ──────────────────────────── */
 
 /** One rendered row in a keyed list. `node` is its single root node. */

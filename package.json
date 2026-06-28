@@ -10,7 +10,7 @@
     "verify:build": "node tools/verify-build.mjs",
     "verify:cli": "node tools/verify-cli.mjs",
     "verify:check": "node tools/verify-check.mjs",
-    "typecheck": "tsc --noEmit -p packages/runtime/tsconfig.json && tsc --noEmit -p packages/compiler/tsconfig.json && tsc --noEmit -p packages/check/tsconfig.json && tsc --noEmit -p packages/cli/tsconfig.json"
+    "typecheck": "tsc --noEmit -p packages/runtime/tsconfig.json && tsc --noEmit -p packages/compiler/tsconfig.json && tsc --noEmit -p packages/check/tsconfig.json && tsc --noEmit -p packages/store/tsconfig.json && tsc --noEmit -p packages/router/tsconfig.json && tsc --noEmit -p packages/forms/tsconfig.json && tsc --noEmit -p packages/cli/tsconfig.json"
   },
   "keywords": [
     "reactive",
@@ -26,7 +26,10 @@
     "@playwright/test": "^1.49.0",
     "@types/node": "^22.0.0",
     "@weave/compiler": "workspace:*",
+    "@weave/forms": "workspace:*",
+    "@weave/router": "workspace:*",
     "@weave/runtime": "workspace:*",
+    "@weave/store": "workspace:*",
     "esbuild": "^0.25.0",
     "playwright": "^1.49.0",
     "typescript": "^5.7.0"
