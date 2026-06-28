@@ -66,7 +66,11 @@ const weave = {
 };
 
 // ── Measurements ──
-const reactiveV2 = await bundleStdin(`export * from '@weave/runtime';`);
+// Measure the reactive core alone (reactive.ts), not the package index — the index
+// also re-exports owner-level features (context: provide/inject) whose cost belongs to
+// runtime-full. This keeps "reactive-core" the reactive primitives and stays apples-to-
+// apples with the v0.1 column (which measures ./src/reactive.js on its own).
+const reactiveV2 = await bundleStdin(`export * from './packages/runtime/src/reactive.js';`);
 const runtimeV2 = await bundleStdin(
   `export * from '@weave/runtime';\nexport * from '@weave/runtime/dom';`
 );

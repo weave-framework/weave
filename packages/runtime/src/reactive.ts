@@ -230,11 +230,22 @@ export function effect(fn: () => void | (() => void)): () => void {
  */
 export interface Owner {
   _disposers: Array<() => void>;
+  /**
+   * The ambient owner captured at creation time. `inject` walks this chain to
+   * find a provided context value — independent of the disposal wiring, so a
+   * control-flow block (created with `parent: null`) still inherits context.
+   */
+  _parent: Owner | null;
+  /** Lazily-created context value map (`provide`/`inject`). Keyed by context identity. */
+  _contexts?: Map<object, unknown>;
 }
 
 /** Create an ownership scope, optionally linked to a parent that disposes it. */
 export function createOwner(parent: Owner | null = null): Owner {
-  const owner: Owner = { _disposers: [] };
+  // `_parent` captures the *ambient* owner (for context lookup); the explicit
+  // `parent` argument only wires disposal. In every call site they coincide or
+  // the ambient one is the correct context parent.
+  const owner: Owner = { _disposers: [], _parent: currentOwner };
   if (parent) parent._disposers.push(() => disposeOwner(owner));
   return owner;
 }

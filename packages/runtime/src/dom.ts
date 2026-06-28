@@ -510,17 +510,26 @@ export type Component = (props?: Record<string, unknown>, slots?: Record<string,
  * `export default defineComponent(render, setup)` per component. `ctx` exposes
  * `setup()`'s bindings as own properties over `props` on the prototype, so a
  * template name resolves to a binding first, else to a (lazy, reactive) prop
- * getter. Runs in the caller's ownership scope, so effects created in `setup`
- * dispose when the surrounding region unmounts.
+ * getter.
+ *
+ * Each instance runs in its **own** owner scope, registered for disposal with the
+ * surrounding region (so it tears down when that region unmounts). This gives each
+ * component a private context frame: a `provide` in `setup` is visible to this
+ * component's descendants but not to its siblings, and `inject` walks up to the
+ * provider — exactly the tree-context semantics other frameworks expose.
  */
 export function defineComponent(
   render: (ctx: Record<string, unknown>, slots: Record<string, () => Node>) => Node,
   setup?: (props: Record<string, unknown>) => Record<string, unknown> | void
 ): Component {
   return (props = {}, slots = {}) => {
-    const bindings = setup ? setup(props) || {} : {};
-    const ctx = Object.assign(Object.create(props), bindings);
-    return render(ctx, slots);
+    const owner = createOwner(); // _parent = surrounding owner (context chain)
+    onDispose(() => disposeOwner(owner)); // surrounding scope disposes this instance
+    return runInOwner(owner, () => {
+      const bindings = setup ? setup(props) || {} : {};
+      const ctx = Object.assign(Object.create(props), bindings);
+      return render(ctx, slots);
+    });
   };
 }
 
