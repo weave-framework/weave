@@ -16,7 +16,8 @@ export async function main(argv: string[]): Promise<void> {
   const outdir = flag(rest, '--out') ?? 'dist';
 
   if (cmd === 'build') {
-    await build({ entry, outdir, minify: rest.includes('--minify') });
+    // `weave build` is the production bundle → minify by default; `--no-minify` opts out.
+    await build({ entry, outdir, minify: !rest.includes('--no-minify') });
     console.log(`weave build → ${outdir}/`);
     return;
   }
@@ -49,7 +50,7 @@ export async function main(argv: string[]): Promise<void> {
   }
 
   console.error(
-    'usage: weave <build|dev|check|routes> [entry|paths…] [--out dir] [--serve dir] [--port n] [--minify] [--eager]'
+    'usage: weave <build|dev|check|routes> [entry|paths…] [--out dir] [--serve dir] [--port n] [--no-minify] [--eager]'
   );
   process.exit(1);
 }

@@ -18,7 +18,7 @@ export async function build(config: BuildConfig): Promise<void> {
     bundle: true,
     format: 'esm',
     outdir: config.outdir,
-    minify: config.minify ?? false,
+    minify: config.minify ?? true,
     plugins: [weave(state)],
   });
   await mkdir(config.outdir, { recursive: true });
