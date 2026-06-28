@@ -19,3 +19,5 @@ export {
   type Computed,
   type Owner,
 } from './reactive.js';
+
+export { createContext, provide, inject, type Context } from './context.js';
