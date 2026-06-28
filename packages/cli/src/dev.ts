@@ -1,0 +1,53 @@
+/**
+ * `weave dev` — watch + rebuild + serve with live-reload. Uses esbuild's serve
+ * (the cross-origin dev-server advisory GHSA-67mh-4wv8-2f99 is fixed in
+ * esbuild ≥ 0.25). The served `index.html` opts into reload via:
+ *   new EventSource('/esbuild').addEventListener('change', () => location.reload())
+ *
+ * Returns the build context so a caller (or test) can dispose it; the CLI keeps
+ * it running.
+ */
+
+import { context, type BuildContext } from 'esbuild';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { weave, type WeaveState } from './plugin.js';
+
+export interface DevConfig {
+  entry: string;
+  servedir: string;
+  outdir: string;
+  port?: number;
+}
+
+export interface DevServer {
+  ctx: BuildContext;
+  url: string;
+}
+
+export async function dev(config: DevConfig): Promise<DevServer> {
+  const state: WeaveState = { css: [] };
+  const ctx = await context({
+    entryPoints: [config.entry],
+    bundle: true,
+    format: 'esm',
+    outdir: config.outdir,
+    plugins: [
+      weave(state),
+      {
+        name: 'weave:css',
+        setup(build) {
+          build.onEnd(async () => {
+            await mkdir(config.outdir, { recursive: true });
+            await writeFile(join(config.outdir, 'app.css'), state.css.join('\n'));
+          });
+        },
+      },
+    ],
+  });
+  await ctx.watch();
+  // Bind to loopback only — a dev server should not be exposed on the LAN.
+  const { hosts, port } = await ctx.serve({ servedir: config.servedir, port: config.port, host: '127.0.0.1' });
+  const url = `http://${hosts[0] ?? '127.0.0.1'}:${port}`;
+  return { ctx, url };
+}

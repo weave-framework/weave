@@ -1,0 +1,26 @@
+/** `weave build` — one-shot production bundle: JS via esbuild + one `app.css`. */
+
+import { build as esbuild } from 'esbuild';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { weave, type WeaveState } from './plugin.js';
+
+export interface BuildConfig {
+  entry: string;
+  outdir: string;
+  minify?: boolean;
+}
+
+export async function build(config: BuildConfig): Promise<void> {
+  const state: WeaveState = { css: [] };
+  await esbuild({
+    entryPoints: [config.entry],
+    bundle: true,
+    format: 'esm',
+    outdir: config.outdir,
+    minify: config.minify ?? false,
+    plugins: [weave(state)],
+  });
+  await mkdir(config.outdir, { recursive: true });
+  await writeFile(join(config.outdir, 'app.css'), state.css.join('\n'));
+}
