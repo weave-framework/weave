@@ -95,6 +95,92 @@ function lastNonSpace(s: string): string {
   return '';
 }
 
+/**
+ * JS globals + keywords that a template expression may reference but that must
+ * NOT be rewritten to `ctx.*`. Used by auto-scope inference (the loader): every
+ * other free identifier is assumed to be component data. A lexical list now;
+ * M8 replaces inference with the TypeScript AST (`ReturnType<typeof setup>`).
+ */
+const NON_CTX = new Set([
+  // literals / keywords
+  'true', 'false', 'null', 'undefined', 'this', 'NaN', 'Infinity',
+  'typeof', 'instanceof', 'in', 'of', 'new', 'void', 'delete', 'await', 'yield',
+  'return', 'function', 'class', 'super', 'if', 'else', 'switch', 'case',
+  // built-in objects / functions
+  'Math', 'JSON', 'Object', 'Array', 'String', 'Number', 'Boolean', 'Date',
+  'RegExp', 'Map', 'Set', 'WeakMap', 'WeakSet', 'Symbol', 'Promise', 'BigInt',
+  'Error', 'TypeError', 'Intl', 'console', 'window', 'document', 'globalThis',
+  'parseInt', 'parseFloat', 'isNaN', 'isFinite', 'structuredClone',
+  'encodeURIComponent', 'decodeURIComponent', 'encodeURI', 'decodeURI',
+  'navigator', 'location', 'history', 'localStorage', 'sessionStorage',
+  'fetch', 'URL', 'URLSearchParams',
+]);
+
+/** Collect arrow-function parameter names in `expr` (so they aren't treated as ctx). */
+function arrowParams(expr: string): Set<string> {
+  const params = new Set<string>();
+  const ID = /^[A-Za-z_$][\w$]*$/;
+  let at = expr.indexOf('=>');
+  while (at !== -1) {
+    let k = at - 1;
+    while (k >= 0 && /\s/.test(expr[k])) k--;
+    if (expr[k] === ')') {
+      // (a, b, …) => …  — walk back to the matching '('
+      let depth = 1;
+      let m = k - 1;
+      for (; m >= 0; m--) {
+        if (expr[m] === ')') depth++;
+        else if (expr[m] === '(') {
+          depth--;
+          if (depth === 0) break;
+        }
+      }
+      for (const raw of expr.slice(m + 1, k).split(',')) {
+        const name = raw.trim().split(/[\s=:]/)[0].replace(/[{}[\]().]/g, '');
+        if (ID.test(name)) params.add(name);
+      }
+    } else {
+      // single bare param:  x => …
+      let m = k;
+      while (m >= 0 && ID_CHAR.test(expr[m])) m--;
+      const name = expr.slice(m + 1, k + 1);
+      if (ID.test(name)) params.add(name);
+    }
+    at = expr.indexOf('=>', at + 2);
+  }
+  return params;
+}
+
+/**
+ * Free identifiers in `expr` that should resolve to component data: every name
+ * that is not a property access, not a JS global/keyword, and not an arrow
+ * parameter. The basis for auto-scope (see {@link inferCtxNames}).
+ */
+export function freeIdentifiers(expr: string): string[] {
+  const out = new Set<string>();
+  const params = arrowParams(expr);
+  let i = 0;
+  const n = expr.length;
+  while (i < n) {
+    const c = expr[i];
+    if (c === '"' || c === "'" || c === '`') {
+      i = scanString(expr, i);
+      continue;
+    }
+    if (ID_START.test(c)) {
+      let j = i + 1;
+      while (j < n && ID_CHAR.test(expr[j])) j++;
+      const name = expr.slice(i, j);
+      const isProperty = lastNonSpace(expr.slice(0, i)) === '.';
+      if (!isProperty && !NON_CTX.has(name) && !params.has(name)) out.add(name);
+      i = j;
+      continue;
+    }
+    i++;
+  }
+  return [...out];
+}
+
 function scanString(s: string, start: number): number {
   const quote = s[start];
   let i = start + 1;

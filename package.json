@@ -9,7 +9,8 @@
   ],
   "scripts": {
     "test": "node tools/run-browser-tests.mjs",
-    "test:v01": "node --test \"test/**/*.test.mjs\""
+    "test:v01": "node --test \"test/**/*.test.mjs\"",
+    "verify:build": "node tools/verify-build.mjs"
   },
   "keywords": [
     "reactive",

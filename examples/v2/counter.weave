@@ -1,0 +1,18 @@
+<script>
+import { signal } from '@weave/runtime';
+
+export function setup() {
+  const count = signal(0);
+  const inc = () => count.set((n) => n + 1);
+  return { count, inc };
+}
+</script>
+
+<button on:click={inc}>count: {{ count() }}</button>
+
+<style>
+button {
+  color: rgb(0, 128, 0);
+  font-weight: bold;
+}
+</style>
