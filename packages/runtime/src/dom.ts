@@ -410,6 +410,18 @@ export function eachBlock<T>(
   });
 }
 
+/* ──────────────────────────── components ──────────────────────────── */
+
+/**
+ * Insert a child component's (or slot's) output before an anchor. Handles a
+ * single node, a fragment (its children are inserted), or null (no-op). The
+ * child instantiates within the current ownership scope, so its effects are
+ * disposed when the surrounding region unmounts.
+ */
+export function mountChild(anchorNode: Comment, node: Node | null): void {
+  if (node) anchorNode.parentNode!.insertBefore(node, anchorNode);
+}
+
 /* ──────────────────────────── mount ──────────────────────────── */
 
 /** Mount a node into a container, replacing its contents. Returns an unmount fn. */
