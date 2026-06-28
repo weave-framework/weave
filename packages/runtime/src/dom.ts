@@ -818,6 +818,36 @@ export const ErrorBoundary: Component = (props = {}, slots = {}) => {
   return host;
 };
 
+/**
+ * Portal / Teleport: render the default slot into a *different* DOM location while
+ * staying in the logical component tree (so owner-scoped effects, context, and
+ * disposal all behave as if the content lived here). The canonical use is modals,
+ * tooltips, and toasts that must escape an `overflow:hidden`/`z-index` ancestor.
+ *
+ * `to` is a CSS selector (`to="body"`) or an `Element` (`to={node}`); it defaults
+ * to `document.body` and is resolved **once** at mount. The content is created in
+ * the current owner, appended to the target, and removed on unmount via
+ * `onDispose`. A comment placeholder is returned so the component still occupies
+ * its logical slot (and the surrounding region's DOM cleanup is well-defined).
+ *
+ * Usage: `<Portal to="body"><div class="modal">…</div></Portal>`.
+ */
+export const Portal: Component = (props = {}, slots = {}) => {
+  const to = (props as { to?: string | Element }).to;
+  const target: Element =
+    (typeof to === 'string' ? document.querySelector(to) : to) ?? document.body;
+
+  const placeholder = document.createComment('portal');
+  const content = slots.default ? slots.default() : null;
+  if (content) {
+    // A fragment empties on insert, so capture the real child nodes first for removal.
+    const nodes = content instanceof DocumentFragment ? [...content.childNodes] : [content];
+    target.appendChild(content);
+    onDispose(() => nodes.forEach((n) => (n as ChildNode).remove()));
+  }
+  return placeholder;
+};
+
 /* ──────────────────────────── mount ──────────────────────────── */
 
 /** Mount a node into a container, replacing its contents. Returns an unmount fn. */
