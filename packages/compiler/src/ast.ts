@@ -11,7 +11,8 @@ export type TemplateNode =
   | DeferNode
   | AwaitNode
   | SnippetNode
-  | RenderNode;
+  | RenderNode
+  | KeyNode;
 
 /**
  * Source offset of an expression's first character within the template string
@@ -134,6 +135,14 @@ export interface RenderNode {
   type: 'render';
   expr: string;
   exprOffset?: Offset;
+}
+
+/** `@key (expr) { … }` — tear down + re-create the content whenever `expr` changes. */
+export interface KeyNode {
+  type: 'key';
+  expr: string;
+  exprOffset?: Offset;
+  children: TemplateNode[];
 }
 
 export interface ElementNode {

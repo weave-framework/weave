@@ -449,6 +449,25 @@ export function dynElement(
   });
 }
 
+/**
+ * `@key (expr) { … }` — tear down and re-create `content` whenever `key` changes
+ * (fresh DOM + effects; replays mount-time work). Built on `ifBlock`: a new thunk
+ * per distinct key forces a swap, while an unchanged key leaves the DOM untouched.
+ */
+export function keyBlock(anchor: Comment, key: () => unknown, content: () => Node | null): void {
+  const NONE = Symbol();
+  let last: unknown = NONE;
+  let thunk: (() => Node | null) | null = null;
+  ifBlock(anchor, () => {
+    const k = key();
+    if (k !== last) {
+      last = k;
+      thunk = () => content();
+    }
+    return thunk;
+  });
+}
+
 /** Per-row reactive context exposed to a `@for` body (item + implicit `$` vars). */
 export interface ForContext<T> {
   item: () => T;

@@ -90,6 +90,10 @@ export function inferCtxNames(nodes: TemplateNode[]): string[] {
         case 'render':
           add(node.expr); // the snippet name is subtracted via `declared`
           break;
+        case 'key':
+          add(node.expr);
+          walk(node.children);
+          break;
       }
     }
   };
