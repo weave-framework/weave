@@ -829,6 +829,82 @@ export function mountComponent(
   };
 }
 
+/** Options for {@link defineCustomElement}. */
+export interface CustomElementOptions {
+  /**
+   * Prop names exposed as observed attributes (kebab-cased) **and** JS properties.
+   * An attribute change or a property set updates the matching reactive prop.
+   */
+  props?: string[];
+}
+
+const kebab = (p: string): string => p.replace(/[A-Z]/g, (c) => '-' + c.toLowerCase());
+const camel = (a: string): string => a.replace(/-([a-z])/g, (_m, c: string) => c.toUpperCase());
+
+/**
+ * Register a Weave {@link Component} as a native custom element (Web Component) for
+ * interop — use `<my-widget label="hi">` from plain HTML or any framework. Renders
+ * into the element's **light DOM** (no shadow root), so the component's scoped CSS
+ * (collected into the app stylesheet) applies normally. Each declared prop becomes
+ * an observed attribute (kebab-cased) and a JS property; both feed a reactive signal,
+ * so the mounted component re-renders on change. Mounts on connect, disposes on
+ * disconnect. Re-defining the same tag is a no-op.
+ */
+export function defineCustomElement(
+  tag: string,
+  component: Component,
+  options: CustomElementOptions = {}
+): void {
+  const propNames = options.props ?? [];
+
+  class WeaveElement extends HTMLElement {
+    static observedAttributes = propNames.map(kebab);
+    private _sigs: Record<string, Signal<unknown>> = {};
+    private _dispose?: () => void;
+
+    constructor() {
+      super();
+      for (const p of propNames) {
+        const sig = signal<unknown>(undefined);
+        this._sigs[p] = sig;
+        // a JS property so `el.label = 'x'` works (and stays reactive)
+        Object.defineProperty(this, p, {
+          get: () => sig(),
+          set: (v: unknown) => sig.set(() => v),
+          configurable: true,
+          enumerable: true,
+        });
+      }
+    }
+
+    connectedCallback(): void {
+      if (this._dispose) return; // already mounted (re-connect without disconnect)
+      // seed from any attributes present at mount time
+      for (const p of propNames) {
+        const a = this.getAttribute(kebab(p));
+        if (a !== null) this._sigs[p].set(() => a);
+      }
+      const props: Record<string, unknown> = {};
+      for (const p of propNames) {
+        Object.defineProperty(props, p, { get: () => this._sigs[p](), enumerable: true });
+      }
+      this._dispose = mountComponent(component, this, props);
+    }
+
+    attributeChangedCallback(name: string, _old: string | null, val: string | null): void {
+      const p = camel(name);
+      this._sigs[p]?.set(() => val);
+    }
+
+    disconnectedCallback(): void {
+      this._dispose?.();
+      this._dispose = undefined;
+    }
+  }
+
+  if (!customElements.get(tag)) customElements.define(tag, WeaveElement);
+}
+
 /** Optional fallbacks for {@link lazy} while loading or on failure. */
 export interface LazyOptions {
   /** Rendered while the loader is in flight (e.g. a spinner). */
