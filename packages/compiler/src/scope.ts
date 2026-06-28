@@ -22,7 +22,8 @@ const ID_CHAR = /[A-Za-z0-9_$]/;
 /** How a referenced name is resolved. */
 export type Binding =
   | { kind: 'ctx' } // setup() binding → ctx.<name>
-  | { kind: 'call'; accessor: string }; // template local → <accessor>()
+  | { kind: 'call'; accessor: string } // template local → <accessor>()
+  | { kind: 'local' }; // a real lexical local — emit the bare name (used by `@weave/check`)
 
 export type Scope = Map<string, Binding>;
 
@@ -32,7 +33,13 @@ export interface RewriteResult {
   reactive: boolean;
 }
 
-export function rewrite(expr: string, scope: Scope): RewriteResult {
+/**
+ * Rewrite `expr` against `scope`, prefixing ctx bindings with `ctxRef` (default
+ * `ctx`, the runtime context object; `@weave/check` passes `__ctx`, its typed
+ * stand-in). Template locals emit either an accessor call (runtime) or the bare
+ * name (`kind: 'local'`, the check pass where they are real lexical bindings).
+ */
+export function rewrite(expr: string, scope: Scope, ctxRef = 'ctx'): RewriteResult {
   let out = '';
   let reactive = false;
   let i = 0;
@@ -56,7 +63,12 @@ export function rewrite(expr: string, scope: Scope): RewriteResult {
       const binding = scope.get(name);
 
       if (binding && !isProperty) {
-        out += binding.kind === 'ctx' ? `ctx.${name}` : `${binding.accessor}()`;
+        out +=
+          binding.kind === 'ctx'
+            ? `${ctxRef}.${name}`
+            : binding.kind === 'local'
+              ? name
+              : `${binding.accessor}()`;
         reactive = true;
       } else {
         out += name;

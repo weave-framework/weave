@@ -1,7 +1,8 @@
-/** Weave CLI entry — `weave build` / `weave dev`. */
+/** Weave CLI entry — `weave build` / `weave dev` / `weave check`. */
 
 import { build } from './build.js';
 import { dev } from './dev.js';
+import { checkProject, type Diagnostic } from '@weave/check';
 
 function flag(args: string[], name: string): string | undefined {
   const i = args.indexOf(name);
@@ -25,7 +26,23 @@ export async function main(argv: string[]): Promise<void> {
     console.log(`weave dev → ${url}`);
     return;
   }
+  if (cmd === 'check') {
+    const roots = rest.filter((a) => !a.startsWith('-'));
+    const diags = checkProject(roots.length ? roots : ['src']);
+    for (const d of diags) console.error(formatDiagnostic(d));
+    const errors = diags.filter((d) => d.category === 'error').length;
+    if (errors) {
+      console.error(`\nweave check: ${errors} error${errors === 1 ? '' : 's'}`);
+      process.exit(1);
+    }
+    console.log('weave check: no type errors');
+    return;
+  }
 
-  console.error('usage: weave <build|dev> [entry] [--out dir] [--serve dir] [--port n] [--minify]');
+  console.error('usage: weave <build|dev|check> [entry|paths…] [--out dir] [--serve dir] [--port n] [--minify]');
   process.exit(1);
+}
+
+function formatDiagnostic(d: Diagnostic): string {
+  return `${d.file}:${d.line}:${d.col} - ${d.category} TS${d.code}: ${d.message}`;
 }

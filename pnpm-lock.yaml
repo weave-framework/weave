@@ -30,11 +30,26 @@ importers:
         specifier: ^5.7.0
         version: 5.9.3
 
-  packages/cli:
+  packages/check:
     dependencies:
       '@weave/compiler':
         specifier: workspace:*
         version: link:../compiler
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+
+  packages/cli:
+    dependencies:
+      '@weave/check':
+        specifier: workspace:*
+        version: link:../check
+      '@weave/compiler':
+        specifier: workspace:*
+        version: link:../compiler
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
 
   packages/compiler: {}
 

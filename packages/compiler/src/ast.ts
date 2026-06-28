@@ -9,6 +9,15 @@ export type TemplateNode =
   | SwitchNode
   | LetNode;
 
+/**
+ * Source offset of an expression's first character within the template string
+ * passed to {@link parseTemplate}. Populated by the parser for every template
+ * expression; consumed by `@weave/check` to map type errors back to the
+ * original `.weave`/`.html` line:col. Optional so codegen and existing callers
+ * (which only read the expression text) are unaffected.
+ */
+export type Offset = number | undefined;
+
 /** `@if (cond) {…} @else if (cond2) {…} @else {…}`; optional `@if (expr; as alias)`. */
 export interface IfNode {
   type: 'if';
@@ -17,6 +26,8 @@ export interface IfNode {
 export interface IfBranch {
   /** undefined ⇒ the `@else` branch */
   cond?: string;
+  /** offset of `cond` */
+  condOffset?: Offset;
   /** alias from `@if (expr; as alias)` (only on the leading branch) */
   alias?: string;
   children: TemplateNode[];
@@ -27,7 +38,9 @@ export interface ForNode {
   type: 'for';
   item: string;
   list: string;
+  listOffset?: Offset;
   track?: string;
+  trackOffset?: Offset;
   children: TemplateNode[];
   empty?: TemplateNode[];
 }
@@ -36,11 +49,13 @@ export interface ForNode {
 export interface SwitchNode {
   type: 'switch';
   expr: string;
+  exprOffset?: Offset;
   cases: SwitchCase[];
 }
 export interface SwitchCase {
   /** undefined ⇒ `@default` */
   test?: string;
+  testOffset?: Offset;
   children: TemplateNode[];
 }
 
@@ -49,6 +64,7 @@ export interface LetNode {
   type: 'let';
   name: string;
   expr: string;
+  exprOffset?: Offset;
 }
 
 export interface ElementNode {
@@ -69,6 +85,7 @@ export interface TextNode {
 export interface InterpNode {
   type: 'interp';
   expr: string;
+  offset?: Offset;
 }
 
 export type Attr =
@@ -91,12 +108,14 @@ export interface ExprAttr {
   type: 'attr';
   name: string;
   expr: string;
+  offset?: Offset;
 }
 /** .prop={expr} */
 export interface PropAttr {
   type: 'prop';
   name: string;
   expr: string;
+  offset?: Offset;
 }
 /** on:event|mod1|mod2={expr} */
 export interface EventAttr {
@@ -104,21 +123,25 @@ export interface EventAttr {
   name: string;
   modifiers: string[];
   expr: string;
+  offset?: Offset;
 }
 /** class:name={expr} */
 export interface ClassAttr {
   type: 'class';
   name: string;
   expr: string;
+  offset?: Offset;
 }
 /** bind:name={expr} (two-way) */
 export interface BindAttr {
   type: 'bind';
   name: string;
   expr: string;
+  offset?: Offset;
 }
 /** ref={expr} or bind:this={expr} */
 export interface RefAttr {
   type: 'ref';
   expr: string;
+  offset?: Offset;
 }

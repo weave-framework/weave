@@ -23,6 +23,12 @@ const VOID = new Set([
 
 export class ParseError extends Error {}
 
+/** A parsed attribute value: a static string, a `{expr}` (with its source offset), or none. */
+type AttrValue =
+  | { kind: 'static'; text: string }
+  | { kind: 'expr'; expr: string; offset: number }
+  | null;
+
 export function parseTemplate(input: string): TemplateNode[] {
   const p = new Parser(input);
   const nodes = p.parseChildren(null);
@@ -31,7 +37,15 @@ export function parseTemplate(input: string): TemplateNode[] {
 
 class Parser {
   pos = 0;
+  /** Inner start offset of the most recent {@link readParen} — for block-head expr offsets. */
+  parenStart = 0;
   constructor(public src: string) {}
+
+  /** Offset of `sub`'s first non-whitespace char within `parent` (which starts at `parentStart`). */
+  exprOffset(parentStart: number, parent: string, sub: string): number {
+    const at = parent.indexOf(sub);
+    return parentStart + (at < 0 ? 0 : at) + (sub.length - sub.trimStart().length);
+  }
 
   eof(): boolean {
     return this.pos >= this.src.length;
@@ -50,7 +64,8 @@ class Parser {
         return out; // caller consumes the close tag
       }
       if (this.src.startsWith('{{', this.pos)) {
-        out.push({ type: 'interp', expr: this.readInterp() });
+        const it = this.readInterp();
+        out.push({ type: 'interp', expr: it.expr, offset: it.offset });
         continue;
       }
       if (this.src.startsWith('<!--', this.pos)) {
@@ -90,6 +105,7 @@ class Parser {
     this.pos += 3; // @if
     this.skipWs();
     const head = this.readParen();
+    const headStart = this.parenStart;
     const branches: IfBranch[] = [];
     let cond = head;
     let alias: string | undefined;
@@ -100,7 +116,8 @@ class Parser {
       if (!m) throw new ParseError(`Expected 'as <name>' in @if, got '${semi[1].trim()}'`);
       alias = m[1];
     }
-    branches.push({ cond, alias, children: this.readBlockBody() });
+    const condOffset = this.exprOffset(headStart, head, cond);
+    branches.push({ cond, condOffset, alias, children: this.readBlockBody() });
 
     // @else if / @else
     for (;;) {
@@ -109,7 +126,9 @@ class Parser {
       if (this.src.startsWith('@else if', this.pos)) {
         this.pos += '@else if'.length;
         this.skipWs();
-        branches.push({ cond: this.readParen().trim(), children: this.readBlockBody() });
+        const raw = this.readParen();
+        const off = this.exprOffset(this.parenStart, raw, raw.trim());
+        branches.push({ cond: raw.trim(), condOffset: off, children: this.readBlockBody() });
       } else if (this.src.startsWith('@else', this.pos)) {
         this.pos += '@else'.length;
         branches.push({ children: this.readBlockBody() });
@@ -126,6 +145,7 @@ class Parser {
     this.pos += 4; // @for
     this.skipWs();
     const head = this.readParen();
+    const headStart = this.parenStart;
     const parts = splitTopLevel(head, ';').map((s) => s.trim());
     const m = /^([A-Za-z_$][\w$]*)\s+of\s+([\s\S]+)$/.exec(parts[0]);
     if (!m) throw new ParseError(`Expected '@for (item of list)', got '${parts[0]}'`);
@@ -136,6 +156,8 @@ class Parser {
       const t = /^track\s+([\s\S]+)$/.exec(extra);
       if (t) track = t[1].trim();
     }
+    const listOffset = this.exprOffset(headStart, head, list);
+    const trackOffset = track ? this.exprOffset(headStart, head, track) : undefined;
     const children = this.readBlockBody();
 
     let empty: TemplateNode[] | undefined;
@@ -147,13 +169,15 @@ class Parser {
     } else {
       this.pos = save;
     }
-    return { type: 'for', item, list, track, children, empty };
+    return { type: 'for', item, list, listOffset, track, trackOffset, children, empty };
   }
 
   parseSwitch(): SwitchNode {
     this.pos += 7; // @switch
     this.skipWs();
-    const expr = this.readParen().trim();
+    const rawExpr = this.readParen();
+    const exprOffset = this.exprOffset(this.parenStart, rawExpr, rawExpr.trim());
+    const expr = rawExpr.trim();
     this.skipWs();
     if (this.peek() !== '{') throw new ParseError(`Expected '{' after @switch at ${this.pos}`);
     this.pos++;
@@ -167,8 +191,9 @@ class Parser {
       if (this.src.startsWith('@case', this.pos)) {
         this.pos += '@case'.length;
         this.skipWs();
-        const test = this.readParen().trim();
-        cases.push({ test, children: this.readBlockBody() });
+        const rawTest = this.readParen();
+        const testOffset = this.exprOffset(this.parenStart, rawTest, rawTest.trim());
+        cases.push({ test: rawTest.trim(), testOffset, children: this.readBlockBody() });
       } else if (this.src.startsWith('@default', this.pos)) {
         this.pos += '@default'.length;
         cases.push({ children: this.readBlockBody() });
@@ -176,7 +201,7 @@ class Parser {
         throw new ParseError(`Expected @case/@default or '}' in @switch at ${this.pos}`);
       }
     }
-    return { type: 'switch', expr, cases };
+    return { type: 'switch', expr, exprOffset, cases };
   }
 
   parseLet(): LetNode {
@@ -187,10 +212,13 @@ class Parser {
     this.skipWs();
     if (this.peek() !== '=') throw new ParseError(`Expected '=' in @let ${name}`);
     this.pos++;
-    const expr = this.readUntilSemicolon().trim();
+    const rawStart = this.pos;
+    const raw = this.readUntilSemicolon();
+    const expr = raw.trim();
+    const exprOffset = rawStart + (raw.length - raw.trimStart().length);
     if (this.peek() !== ';') throw new ParseError(`Expected ';' ending @let ${name}`);
     this.pos++;
-    return { type: 'let', name, expr };
+    return { type: 'let', name, expr, exprOffset };
   }
 
   /** `{ children }` */
@@ -225,6 +253,7 @@ class Parser {
     }
     if (depth !== 0) throw new ParseError('Unclosed ( in block head');
     const inner = this.src.slice(start, this.pos);
+    this.parenStart = start;
     this.pos++; // )
     return inner;
   }
@@ -251,13 +280,14 @@ class Parser {
     return this.src[this.pos];
   }
 
-  readInterp(): string {
+  readInterp(): { expr: string; offset: number } {
     this.pos += 2; // {{
     const start = this.pos;
     const end = this.src.indexOf('}}', this.pos);
     if (end === -1) throw new ParseError('Unclosed {{ interpolation');
     this.pos = end + 2;
-    return this.src.slice(start, end).trim();
+    const raw = this.src.slice(start, end);
+    return { expr: raw.trim(), offset: start + (raw.length - raw.trimStart().length) };
   }
 
   skipComment(): void {
@@ -323,7 +353,7 @@ class Parser {
 
   parseAttr(): Attr {
     const rawName = this.readAttrName();
-    let value: { kind: 'static'; text: string } | { kind: 'expr'; expr: string } | null = null;
+    let value: AttrValue = null;
 
     if (this.peek() === '=') {
       this.pos++; // =
@@ -333,34 +363,32 @@ class Parser {
     return this.classifyAttr(rawName, value);
   }
 
-  classifyAttr(
-    rawName: string,
-    value: { kind: 'static'; text: string } | { kind: 'expr'; expr: string } | null
-  ): Attr {
+  classifyAttr(rawName: string, value: AttrValue): Attr {
     const exprOf = (): string => {
       if (!value) throw new ParseError(`Binding '${rawName}' requires a value`);
       if (value.kind !== 'expr') throw new ParseError(`Binding '${rawName}' needs {expr}, got a string`);
       return value.expr;
     };
+    const offset = value && value.kind === 'expr' ? value.offset : undefined;
 
     if (rawName === 'ref' || rawName === 'bind:this') {
-      return { type: 'ref', expr: exprOf() };
+      return { type: 'ref', expr: exprOf(), offset };
     }
     if (rawName.startsWith('on:')) {
       const [name, ...modifiers] = rawName.slice(3).split('|');
-      return { type: 'event', name, modifiers, expr: exprOf() };
+      return { type: 'event', name, modifiers, expr: exprOf(), offset };
     }
     if (rawName.startsWith('class:')) {
-      return { type: 'class', name: rawName.slice(6), expr: exprOf() };
+      return { type: 'class', name: rawName.slice(6), expr: exprOf(), offset };
     }
     if (rawName.startsWith('bind:')) {
-      return { type: 'bind', name: rawName.slice(5), expr: exprOf() };
+      return { type: 'bind', name: rawName.slice(5), expr: exprOf(), offset };
     }
     if (rawName.startsWith('.')) {
-      return { type: 'prop', name: rawName.slice(1), expr: exprOf() };
+      return { type: 'prop', name: rawName.slice(1), expr: exprOf(), offset };
     }
     if (value && value.kind === 'expr') {
-      return { type: 'attr', name: rawName, expr: value.expr };
+      return { type: 'attr', name: rawName, expr: value.expr, offset };
     }
     return { type: 'static', name: rawName, value: value ? value.text : '' };
   }
@@ -377,9 +405,12 @@ class Parser {
     return this.src.slice(start, this.pos);
   }
 
-  readAttrValue(): { kind: 'static'; text: string } | { kind: 'expr'; expr: string } {
+  readAttrValue(): Exclude<AttrValue, null> {
     const c = this.peek();
-    if (c === '{') return { kind: 'expr', expr: this.readBracedExpr() };
+    if (c === '{') {
+      const b = this.readBracedExpr();
+      return { kind: 'expr', expr: b.expr, offset: b.offset };
+    }
     if (c === '"' || c === "'") return { kind: 'static', text: this.readQuoted(c) };
     // unquoted
     const start = this.pos;
@@ -397,7 +428,7 @@ class Parser {
   }
 
   /** Read a `{ ... }` expression, balancing braces and skipping string literals. */
-  readBracedExpr(): string {
+  readBracedExpr(): { expr: string; offset: number } {
     this.pos++; // {
     const start = this.pos;
     let depth = 1;
@@ -415,9 +446,9 @@ class Parser {
       this.pos++;
     }
     if (depth !== 0) throw new ParseError('Unclosed { expression');
-    const expr = this.src.slice(start, this.pos);
+    const raw = this.src.slice(start, this.pos);
     this.pos++; // }
-    return expr.trim();
+    return { expr: raw.trim(), offset: start + (raw.length - raw.trimStart().length) };
   }
 
   skipString(quote: string): void {

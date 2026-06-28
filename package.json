@@ -9,7 +9,8 @@
     "test:v01": "node --test \"test/**/*.test.mjs\"",
     "verify:build": "node tools/verify-build.mjs",
     "verify:cli": "node tools/verify-cli.mjs",
-    "typecheck": "tsc --noEmit -p packages/runtime/tsconfig.json && tsc --noEmit -p packages/compiler/tsconfig.json && tsc --noEmit -p packages/cli/tsconfig.json"
+    "verify:check": "node tools/verify-check.mjs",
+    "typecheck": "tsc --noEmit -p packages/runtime/tsconfig.json && tsc --noEmit -p packages/compiler/tsconfig.json && tsc --noEmit -p packages/check/tsconfig.json && tsc --noEmit -p packages/cli/tsconfig.json"
   },
   "keywords": [
     "reactive",

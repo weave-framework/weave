@@ -1,0 +1,16 @@
+<script>
+import { signal } from '@weave/runtime';
+
+export function setup() {
+  const count = signal(0);
+  const name = signal('weave');
+  const inc = () => count.set((n) => n + 1);
+  const items = signal([{ id: 1, label: 'a' }]);
+  return { count, name, inc, items };
+}
+</script>
+
+<button on:click={inc}>{{ name() }}: {{ count().toFixed(0) }}</button>
+@for (it of items(); track it.id) {
+  <span>{{ $index }}: {{ it.label }}</span>
+}
