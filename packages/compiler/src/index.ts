@@ -4,4 +4,5 @@
  */
 export { compileTemplate, type CompileOptions } from './codegen.js';
 export { parseTemplate, ParseError } from './parser.js';
+export { scopeCss, scopeAttr, hashCss } from './css.js';
 export type * from './ast.js';
