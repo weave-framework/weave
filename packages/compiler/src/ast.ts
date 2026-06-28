@@ -175,7 +175,8 @@ export type Attr =
   | BindAttr
   | RefAttr
   | UseAttr
-  | ShowAttr;
+  | ShowAttr
+  | TransitionAttr;
 
 /** name="value" or bare name */
 export interface StaticAttr {
@@ -245,5 +246,22 @@ export interface UseAttr {
 export interface ShowAttr {
   type: 'show';
   expr: string;
+  offset?: Offset;
+}
+/**
+ * `transition:fn` / `in:fn` / `out:fn` (+ optional `={params}`) — play an enter
+ * (`in`) / leave (`out`) / both (`transition`) animation. `name` is the transition
+ * function (resolved against ctx); leave animations defer DOM removal until done.
+ */
+export interface TransitionAttr {
+  type: 'transition';
+  name: string;
+  /** which directions to animate */
+  mode: 'both' | 'in' | 'out';
+  /** offset of the transition-function identifier `name` (for `weave check`) */
+  nameOffset?: Offset;
+  /** optional params expression */
+  expr?: string;
+  /** offset of the params `expr` */
   offset?: Offset;
 }

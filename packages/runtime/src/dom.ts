@@ -171,6 +171,78 @@ export function applyAction<A = void>(el: Element, action: Action<A>, arg?: A): 
   onMount(() => action(el, arg as A));
 }
 
+/* ──────────────────────────── transitions ──────────────────────────── */
+
+/** What a transition function returns — the Svelte-style transition contract. */
+export interface TransitionConfig {
+  /** ms before the animation starts. */
+  delay?: number;
+  /** ms the animation runs (default 300). */
+  duration?: number;
+  /** ease the 0→1 progress before it drives `css`/`tick`. */
+  easing?: (t: number) => number;
+  /** per-frame CSS, `t` 0→1 (entering) or 1→0 (leaving), `u = 1 - t`. */
+  css?: (t: number, u: number) => string;
+  /** per-frame side effect (use sparingly — `css` is GPU-friendlier). */
+  tick?: (t: number, u: number) => void;
+}
+
+/** A transition: given the node + params, returns how to animate it. */
+export type TransitionFn<P = void> = (node: Element, params: P) => TransitionConfig;
+
+interface Outroable extends ChildNode {
+  /** Registered by an `out:`/`transition:` directive; played before removal. */
+  __wOut?: () => Promise<void>;
+}
+
+/** Drive one transition with rAF; resolves when it finishes. */
+function playTransition(node: HTMLElement, config: TransitionConfig, intro: boolean): Promise<void> {
+  const { delay = 0, duration = 300, easing = (t) => t, css, tick } = config;
+  const orig = node.style.cssText;
+  const apply = (p: number): void => {
+    const e = easing(p);
+    const t = intro ? e : 1 - e;
+    if (css) node.style.cssText = orig + ';' + css(t, 1 - t);
+    if (tick) tick(t, 1 - t);
+  };
+  apply(0); // set the start frame now (intro: hidden) — runs in a microtask, before paint
+  return new Promise<void>((resolve) => {
+    const startAt = performance.now() + delay;
+    const step = (now: number): void => {
+      if (now < startAt) return void requestAnimationFrame(step);
+      const p = duration <= 0 ? 1 : Math.min(1, (now - startAt) / duration);
+      apply(p);
+      if (p < 1) return void requestAnimationFrame(step);
+      if (intro) node.style.cssText = orig; // entered — drop the inline overrides
+      resolve();
+    };
+    requestAnimationFrame(step);
+  });
+}
+
+/**
+ * `transition:fn` / `in:fn` / `out:fn` — play an enter/leave animation. The intro
+ * runs on mount; the outro is registered on the node so a control-flow block
+ * (`@if`/`@for`/`@key`) plays it and **waits** for it before removing the node.
+ * `params` is re-read through `fn` each time it plays.
+ */
+export function transition(
+  node: HTMLElement,
+  fn: TransitionFn<unknown>,
+  params: unknown,
+  mode: 'both' | 'in' | 'out'
+): void {
+  if (mode !== 'out') onMount(() => void playTransition(node, fn(node, params), true));
+  if (mode !== 'in') (node as Outroable).__wOut = () => playTransition(node, fn(node, params), false);
+}
+
+/** Remove a node, first playing (and awaiting) its registered outro if it has one. */
+export function removeWithOutro(node: ChildNode): void {
+  const out = (node as Outroable).__wOut;
+  if (out) out().then(() => node.remove());
+  else node.remove();
+}
+
 /* ──────────────────────────── two-way binding (forms) ──────────────────────────── */
 
 /**
@@ -341,11 +413,11 @@ export function reconcileKeyed<T>(
     }
   }
 
-  // Remove rows whose key vanished.
+  // Remove rows whose key vanished (playing a leave transition first, if any).
   for (const row of prev) {
     if (!reused.has(row)) {
       row.dispose?.();
-      row.node.remove();
+      removeWithOutro(row.node);
     }
   }
 
@@ -402,7 +474,7 @@ export function ifBlock(anchor: Comment, selector: () => (() => Node | null) | n
       disposeOwner(owner);
       owner = null;
     }
-    nodes.forEach((n) => n.remove());
+    nodes.forEach(removeWithOutro); // play a leave transition (if any) before removal
     nodes = [];
   };
 

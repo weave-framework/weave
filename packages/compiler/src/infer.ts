@@ -37,6 +37,7 @@ export function inferCtxNames(nodes: TemplateNode[]): string[] {
         case 'element':
           for (const attr of node.attrs) {
             if (attr.type === 'use') add(attr.name); // the action identifier resolves to ctx
+            if (attr.type === 'transition') add(attr.name); // the transition fn resolves to ctx
             if (attr.type !== 'static') add(attr.expr);
           }
           walk(node.children);

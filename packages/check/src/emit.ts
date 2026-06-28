@@ -166,6 +166,17 @@ function emit(nodes: TemplateNode[], ctx: Set<string>): Line[] {
               );
               continue;
             }
+            if (attr.type === 'transition') {
+              // verify the transition fn is callable with (Element, params).
+              const fn = rw(attr.name, scope);
+              push(
+                attr.expr !== undefined
+                  ? `  (${fn})(null as any, ${rw(attr.expr, scope)});`
+                  : `  (${fn})(null as any);`,
+                attr.nameOffset ?? attr.offset
+              );
+              continue;
+            }
             push(`  void (${rw(attr.expr, scope)});`, attr.offset);
           }
           walk(node.children, scope);

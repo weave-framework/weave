@@ -511,8 +511,12 @@ class Parser {
     }
 
     const attr = this.classifyAttr(rawName, value);
-    // record the action identifier's offset for `weave check` diagnostics
+    // record the directive identifier's offset for `weave check` diagnostics
     if (attr.type === 'use') attr.nameOffset = nameStart + 'use:'.length;
+    if (attr.type === 'transition') {
+      const prefix = attr.mode === 'both' ? 'transition:' : attr.mode === 'in' ? 'in:' : 'out:';
+      attr.nameOffset = nameStart + prefix.length;
+    }
     return attr;
   }
 
@@ -549,6 +553,15 @@ class Parser {
     }
     if (rawName === 'show') {
       return { type: 'show', expr: exprOf(), offset };
+    }
+    if (rawName.startsWith('transition:') || rawName.startsWith('in:') || rawName.startsWith('out:')) {
+      const mode = rawName.startsWith('transition:') ? 'both' : rawName.startsWith('in:') ? 'in' : 'out';
+      const prefix = mode === 'both' ? 'transition:' : mode === 'in' ? 'in:' : 'out:';
+      const name = rawName.slice(prefix.length);
+      if (!name) throw new ParseError(`'${prefix}' requires a transition function, e.g. ${prefix}fade`);
+      if (value && value.kind === 'static') throw new ParseError(`${rawName} needs {expr} params, got a string`);
+      const expr = value && value.kind === 'expr' ? value.expr : undefined;
+      return { type: 'transition', name, mode, expr, offset };
     }
     if (rawName.startsWith('.')) {
       return { type: 'prop', name: rawName.slice(1), expr: exprOf(), offset };

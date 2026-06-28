@@ -301,6 +301,14 @@ function compileFragment(
       case 'show':
         sink.push(`${gen.H('bindShow')}(${n}, () => ${rewrite(attr.expr, sc).code});`);
         break;
+      case 'transition': {
+        // transition:fn / in:fn / out:fn → transition(el, fn, params, mode). The
+        // params are a snapshot (re-read at play time via the fn); the fn resolves to ctx.
+        const fn = rewrite(attr.name, sc).code;
+        const params = attr.expr !== undefined ? rewrite(attr.expr, sc).code : 'undefined';
+        sink.push(`${gen.H('transition')}(${n}, ${fn}, ${params}, ${q(attr.mode)});`);
+        break;
+      }
       case 'event': {
         const handler = wrapHandler(attr, sc);
         const opts = eventOpts(attr.modifiers);
