@@ -66,6 +66,11 @@ const run = (...paths) =>
   const awaitLine = lineOf('u.naem');
   const reAwait = new RegExp(`bad\\.weave:${awaitLine}:\\d+ - error TS\\d+: .*naem`);
   ok(reAwait.test(out), `check: @await @then alias type error flagged at bad.weave:${awaitLine}`);
+
+  // @render arity: greet(name) needs 1 arg; greet() passes 0 → TS2554
+  const renderLine = lineOf('(greet())');
+  const reRender = new RegExp(`bad\\.weave:${renderLine}:\\d+ - error TS\\d+: .*[Aa]rgument`);
+  ok(reRender.test(out), `check: @render arity error flagged at bad.weave:${renderLine}`);
 }
 
 /* ── separate-file form: template error → .html, script error → .ts ── */
