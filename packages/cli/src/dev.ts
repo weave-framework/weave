@@ -47,7 +47,14 @@ export async function dev(config: DevConfig): Promise<DevServer> {
   });
   await ctx.watch();
   // Bind to loopback only — a dev server should not be exposed on the LAN.
-  const { hosts, port } = await ctx.serve({ servedir: config.servedir, port: config.port, host: '127.0.0.1' });
+  // `fallback` serves index.html for any unmatched path so client-side routes
+  // (e.g. /task/42) survive a refresh / direct link / back-forward instead of 404ing.
+  const { hosts, port } = await ctx.serve({
+    servedir: config.servedir,
+    fallback: join(config.servedir, 'index.html'),
+    port: config.port,
+    host: '127.0.0.1',
+  });
   const url = `http://${hosts[0] ?? '127.0.0.1'}:${port}`;
   return { ctx, url };
 }
