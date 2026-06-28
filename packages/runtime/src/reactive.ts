@@ -238,6 +238,8 @@ export interface Owner {
   _parent: Owner | null;
   /** Lazily-created context value map (`provide`/`inject`). Keyed by context identity. */
   _contexts?: Map<object, unknown>;
+  /** Set once disposed, so a deferred `onMount` can skip a scope that already unmounted. */
+  _disposed?: boolean;
 }
 
 /** Create an ownership scope, optionally linked to a parent that disposes it. */
@@ -263,6 +265,7 @@ export function runInOwner<T>(owner: Owner | null, fn: () => T): T {
 
 /** Dispose every effect/child owner registered in `owner` (children first, LIFO). */
 export function disposeOwner(owner: Owner): void {
+  owner._disposed = true;
   const ds = owner._disposers.splice(0);
   for (let i = ds.length - 1; i >= 0; i--) ds[i]();
 }
@@ -270,6 +273,25 @@ export function disposeOwner(owner: Owner): void {
 /** Register an arbitrary teardown with the active ownership scope. */
 export function onDispose(fn: () => void): void {
   if (currentOwner) currentOwner._disposers.push(fn);
+}
+
+/**
+ * Run `fn` after the current component's DOM has been inserted — on the next
+ * microtask, once the synchronous construct-and-mount pass has finished. Return a
+ * cleanup function (or call `onDispose` inside) to tear down on unmount. The callback
+ * runs in the owner scope active at registration, so `onDispose`/`onCleanup` inside it
+ * tie to that scope; it is skipped entirely if the scope is disposed (unmounted)
+ * before the microtask fires. No-op cleanup tie-in outside an owner scope.
+ */
+export function onMount(fn: () => void | (() => void)): void {
+  const owner = currentOwner;
+  queueMicrotask(() => {
+    if (owner && owner._disposed) return;
+    runInOwner(owner, () => {
+      const cleanup = fn();
+      if (typeof cleanup === 'function') onDispose(cleanup);
+    });
+  });
 }
 
 /** The current ownership scope, if any. */

@@ -9,6 +9,7 @@ export {
   batch,
   untrack,
   onCleanup,
+  onMount,
   createOwner,
   runInOwner,
   disposeOwner,
