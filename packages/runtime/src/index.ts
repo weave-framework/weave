@@ -26,3 +26,5 @@ export {
 export { createContext, provide, inject, type Context } from './context.js';
 
 export { linkedSignal, debounced, watch } from './extras.js';
+
+export { fade, fly, slide, scale } from './transitions.js';
