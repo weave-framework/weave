@@ -34,6 +34,8 @@ interface Computation extends Source {
   value: unknown;
   equals: (a: unknown, b: unknown) => boolean;
   cleanups: Array<() => void>;
+  /** Owner at creation — an effect routes a thrown error up this chain (error boundary). */
+  owner?: Owner | null;
 }
 
 /** The computation currently collecting dependencies. */
@@ -95,6 +97,8 @@ function run(c: Computation): void {
   unlink(c);
   const prev = listener;
   listener = c;
+  let threw = false;
+  let error: unknown;
   try {
     const result = c.fn();
     if (c.isMemo) {
@@ -103,10 +107,31 @@ function run(c: Computation): void {
         for (const o of c.observers) o.state = DIRTY;
       }
     }
+  } catch (e) {
+    threw = true;
+    error = e;
   } finally {
     listener = prev;
     c.state = CLEAN;
   }
+  if (threw) {
+    // Effects route to the nearest error boundary; a memo propagates to its reader.
+    if (c.isEffect) handleError(error, c.owner ?? null);
+    else throw error;
+  }
+}
+
+/** Walk the owner chain to the nearest error boundary; rethrow if there is none. */
+function handleError(err: unknown, owner: Owner | null): void {
+  let o = owner;
+  while (o) {
+    if (o._onError) {
+      o._onError(err);
+      return;
+    }
+    o = o._parent;
+  }
+  throw err;
 }
 
 /** Pull: bring a memo up to date only if a real source changed (lazy, glitch-free). */
@@ -208,6 +233,7 @@ export function effect(fn: () => void | (() => void)): () => void {
     value: undefined,
     equals: Object.is,
     cleanups: [],
+    owner: currentOwner,
   };
   run(c);
   const stop = () => {
@@ -240,6 +266,8 @@ export interface Owner {
   _contexts?: Map<object, unknown>;
   /** Set once disposed, so a deferred `onMount` can skip a scope that already unmounted. */
   _disposed?: boolean;
+  /** Error-boundary handler — a thrown error in this subtree's effects/render routes here. */
+  _onError?: (err: unknown) => void;
 }
 
 /** Create an ownership scope, optionally linked to a parent that disposes it. */
@@ -292,6 +320,24 @@ export function onMount(fn: () => void | (() => void)): void {
       if (typeof cleanup === 'function') onDispose(cleanup);
     });
   });
+}
+
+/**
+ * Run `fn` inside a child owner whose effects (and synchronous render errors) are caught
+ * by `handler` instead of propagating. The handler can read the error and trigger a
+ * fallback (e.g. set a signal). Powers the `ErrorBoundary` component; usable directly for
+ * programmatic boundaries. The boundary owner is disposed with the surrounding scope.
+ */
+export function catchError<T>(handler: (err: unknown) => void, fn: () => T): T | undefined {
+  const owner = createOwner(); // _parent = currentOwner (so inner effects route here)
+  owner._onError = handler;
+  if (currentOwner) currentOwner._disposers.push(() => disposeOwner(owner));
+  try {
+    return runInOwner(owner, fn);
+  } catch (err) {
+    handler(err); // synchronous error thrown during `fn` itself
+    return undefined;
+  }
 }
 
 /** The current ownership scope, if any. */

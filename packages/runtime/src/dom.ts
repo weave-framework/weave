@@ -745,6 +745,59 @@ export function lazy(
   };
 }
 
+/**
+ * Error boundary: render the default slot, but if it throws during render — or an effect
+ * inside it throws later — swap to `fallback(err, reset)` instead of letting the error
+ * propagate. `reset()` clears the error and re-renders the protected content. Routing is
+ * owner-based (see `catchError`): the boundary owner's `_onError` catches any error raised
+ * in its subtree; an error inside the fallback itself escapes to an outer boundary.
+ *
+ * Usage: `<ErrorBoundary fallback={(err, reset) => …}>…</ErrorBoundary>`.
+ */
+export const ErrorBoundary: Component = (props = {}, slots = {}) => {
+  const fallback = (props as { fallback?: (err: unknown, reset: () => void) => Node }).fallback;
+  const host = document.createElement('div');
+  host.style.display = 'contents';
+  const anchor = document.createComment('boundary');
+  host.appendChild(anchor);
+
+  const failure = signal<{ err: unknown } | null>(null);
+  let failing = false;
+  // Defer the swap to a microtask: the error often surfaces *inside* the children's
+  // render/effect run, so flipping the signal synchronously would re-enter the same
+  // ifBlock mid-render. The microtask lets the current pass unwind first. The `failing`
+  // latch keeps the first error and ignores the cascade until reset.
+  const fail = (err: unknown): void => {
+    if (failing) return;
+    failing = true;
+    queueMicrotask(() => failure.set({ err }));
+  };
+  const reset = (): void => {
+    failing = false;
+    failure.set(null);
+  };
+
+  ifBlock(anchor, () => {
+    const f = failure();
+    if (f) {
+      return () => (fallback ? fallback(f.err, reset) : document.createComment('error'));
+    }
+    return () => {
+      // Route effect errors from this subtree here, and catch synchronous render errors.
+      const owner = getOwner();
+      if (owner) owner._onError = fail;
+      try {
+        return slots.default ? slots.default() : document.createComment('empty');
+      } catch (err) {
+        fail(err);
+        return document.createComment('pending');
+      }
+    };
+  });
+
+  return host;
+};
+
 /* ──────────────────────────── mount ──────────────────────────── */
 
 /** Mount a node into a container, replacing its contents. Returns an unmount fn. */
