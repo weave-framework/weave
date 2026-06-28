@@ -555,6 +555,66 @@ export function mountComponent(
   };
 }
 
+/** Optional fallbacks for {@link lazy} while loading or on failure. */
+export interface LazyOptions {
+  /** Rendered while the loader is in flight (e.g. a spinner). */
+  loading?: Component;
+  /** Rendered if the loader rejects; receives the error. */
+  error?: (err: unknown) => Node;
+}
+
+/**
+ * Wrap a dynamic import as a {@link Component} for code-splitting — `lazy(() =>
+ * import('./Heavy'))`. The loader runs **once** (shared across every instance and
+ * cached), resolving to the module's `default` export (or a component returned
+ * directly). Until it settles, the optional `loading` fallback shows; on success the
+ * real component renders with the same props/slots; on failure the optional `error`
+ * fallback shows. Usable anywhere a component is — including a route
+ * (`{ path, component: lazy(() => import('./Page')) }`).
+ */
+export function lazy(
+  loader: () => Promise<{ default: Component } | Component>,
+  opts: LazyOptions = {}
+): Component {
+  let resolved: Component | null = null;
+  let failed: unknown = null;
+  let started = false;
+  const state = signal<'loading' | 'ready' | 'error'>('loading');
+
+  const start = (): void => {
+    if (started) return;
+    started = true;
+    loader().then(
+      (m) => {
+        resolved = (typeof m === 'function' ? m : m.default) as Component;
+        state.set('ready');
+      },
+      (e) => {
+        failed = e ?? new Error('lazy: load failed');
+        state.set('error');
+      }
+    );
+  };
+
+  return (props = {}, slots = {}) => {
+    start();
+    const host = document.createElement('div');
+    host.style.display = 'contents';
+    const anchor = document.createComment('lazy');
+    host.appendChild(anchor);
+    ifBlock(anchor, () => {
+      const s = state();
+      if (s === 'ready') {
+        const comp = resolved!;
+        return () => comp(props, slots);
+      }
+      if (s === 'error') return opts.error ? () => opts.error!(failed) : null;
+      return opts.loading ? () => opts.loading!(props, slots) : null;
+    });
+    return host;
+  };
+}
+
 /* ──────────────────────────── mount ──────────────────────────── */
 
 /** Mount a node into a container, replacing its contents. Returns an unmount fn. */

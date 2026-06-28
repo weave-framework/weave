@@ -1,6 +1,6 @@
 import { test, assert } from '../../../tools/harness.js';
 import { effect, signal } from '@weave/runtime';
-import { mount, mountComponent, defineComponent, type Component } from '@weave/runtime/dom';
+import { mount, mountComponent, defineComponent, lazy, type Component } from '@weave/runtime/dom';
 import {
   createRouter,
   navigate,
@@ -253,6 +253,20 @@ test('leaving the layout subtree clears the nested outlet', () => {
   assert.ok(el.textContent?.includes('home'), 'top outlet swapped to Home');
   assert.ok(!el.textContent?.includes('users-layout'), 'layout gone');
   assert.ok(!el.textContent?.includes('detail'), 'nested child gone');
+});
+
+test('a lazy() component works as a route (code-split page)', async () => {
+  const settle = () => new Promise<void>((r) => setTimeout(r, 0));
+  const Page = defineComponent(() => span('lazy-page'));
+  const r = createRouter([
+    { path: '/lz', component: lazy(() => Promise.resolve({ default: Page })) },
+    { path: '*', component: NotFound },
+  ]);
+  navigate('/lz');
+  const el = host();
+  mountComponent(RouterView, el, { router: r });
+  await settle();
+  assert.ok(el.textContent?.includes('lazy-page'), 'lazy route component loaded and rendered');
 });
 
 test('Link navigates on a plain click', () => {
