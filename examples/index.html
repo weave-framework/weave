@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Weave 🧵 — demo</title>
+  <style>
+    :root { --bg:#0f1115; --panel:#171a21; --line:#262b36; --fg:#e6e9ef; --mut:#8b94a7; --acc:#5b9dff; --ok:#3fb950; }
+    * { box-sizing: border-box; }
+    body { margin:0; font:15px/1.5 system-ui,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--fg); }
+    header { padding:18px 24px; border-bottom:1px solid var(--line); display:flex; gap:18px; align-items:baseline; }
+    header h1 { margin:0; font-size:20px; }
+    nav { display:flex; gap:14px; }
+    nav a { color:var(--mut); text-decoration:none; padding:4px 8px; border-radius:6px; }
+    nav a:hover { color:var(--fg); background:var(--panel); }
+    main { max-width:680px; margin:28px auto; padding:0 20px; }
+    .card { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:20px 22px; margin-bottom:20px; }
+    h2 { margin:0 0 12px; font-size:16px; }
+    button { font:inherit; background:var(--acc); color:#04122e; border:0; padding:8px 14px; border-radius:8px; cursor:pointer; font-weight:600; }
+    button.ghost { background:transparent; color:var(--mut); border:1px solid var(--line); font-weight:500; }
+    button:hover { filter:brightness(1.08); }
+    .row { display:flex; gap:10px; align-items:center; }
+    .big { font-size:34px; font-weight:700; min-width:60px; text-align:center; }
+    input { font:inherit; background:#0c0e13; color:var(--fg); border:1px solid var(--line); border-radius:8px; padding:8px 10px; flex:1; }
+    ul { list-style:none; padding:0; margin:14px 0 0; }
+    li { display:flex; gap:10px; align-items:center; padding:8px 0; border-top:1px solid var(--line); }
+    li .t { flex:1; }
+    li.done .t { text-decoration:line-through; color:var(--mut); }
+    .mut { color:var(--mut); }
+    code { background:#0c0e13; padding:2px 6px; border-radius:5px; font-size:13px; }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <script type="module">
+    import {
+      signal, computed, html, when, each, mount,
+      store, router, link, navigate,
+    } from '../src/index.js';
+
+    /* ---------- a shared store (built-in state management) ---------- */
+    const useTodos = store(() => {
+      const items = signal([
+        { id: 1, text: 'Try Weave', done: true },
+        { id: 2, text: 'Delete a framework', done: false },
+      ]);
+      let nextId = 3;
+      const remaining = computed(() => items().filter((t) => !t.done).length);
+      return {
+        items,
+        remaining,
+        add: (text) => items.set((xs) => [...xs, { id: nextId++, text, done: false }]),
+        toggle: (id) => items.set((xs) => xs.map((t) => t.id === id ? { ...t, done: !t.done } : t)),
+        remove: (id) => items.set((xs) => xs.filter((t) => t.id !== id)),
+      };
+    });
+
+    /* ---------- Counter page ---------- */
+    function Counter() {
+      const n = signal(0);
+      const parity = computed(() => (n() % 2 === 0 ? 'even' : 'odd'));
+      return html`
+        <div class="card">
+          <h2>Counter — fine-grained reactivity</h2>
+          <div class="row">
+            <button class="ghost" onclick=${() => n.set((v) => v - 1)}>−</button>
+            <div class="big">${n}</div>
+            <button onclick=${() => n.set((v) => v + 1)}>+</button>
+            <span class="mut">it is ${parity}</span>
+          </div>
+          <p class="mut">No re-render of this component. Only the number text node and the
+          word <code>${parity}</code> are touched — that is the whole update.</p>
+        </div>`;
+    }
+
+    /* ---------- Todos page (uses the store) ---------- */
+    function Todos() {
+      const t = useTodos();
+      const draft = signal('');
+      const submit = () => {
+        const text = draft().trim();
+        if (!text) return;
+        t.add(text);
+        draft.set('');
+      };
+      return html`
+        <div class="card">
+          <h2>Todos — shared store, keyed list</h2>
+          <div class="row">
+            <input placeholder="Add a task…" .value=${draft}
+              oninput=${(e) => draft.set(e.target.value)}
+              onkeydown=${(e) => e.key === 'Enter' && submit()} />
+            <button onclick=${submit}>Add</button>
+          </div>
+          <ul>
+            ${each(t.items, (todo) => html`
+              <li class=${() => 'item' + (todo.done ? ' done' : '')}>
+                <input type="checkbox" .checked=${todo.done} onchange=${() => t.toggle(todo.id)} />
+                <span class="t">${todo.text}</span>
+                <button class="ghost" onclick=${() => t.remove(todo.id)}>✕</button>
+              </li>`, (todo) => todo.id)}
+          </ul>
+          <p class="mut">${t.remaining} remaining · ${() => t.items().length} total</p>
+        </div>`;
+    }
+
+    function NotFound() {
+      return html`<div class="card"><h2>404</h2><p class="mut">No route here.</p></div>`;
+    }
+
+    /* ---------- App shell with the built-in router ---------- */
+    function App() {
+      return html`
+        <header>
+          <h1>Weave 🧵</h1>
+          <nav>
+            ${link('/', 'Counter')}
+            ${link('/todos', 'Todos')}
+            ${link('/nope', 'Broken link')}
+          </nav>
+        </header>
+        <main>
+          ${router({ '/': Counter, '/todos': Todos, '*': NotFound })}
+        </main>`;
+    }
+
+    if (location.pathname === '/' || location.pathname.endsWith('index.html')) {
+      navigate('/');
+    }
+    mount(App(), document.getElementById('app'));
+  </script>
+</body>
+</html>
