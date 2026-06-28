@@ -1,6 +1,6 @@
 import { test, assert } from '../../../tools/harness.js';
 import { signal, root } from '@weave/runtime';
-import { resource, createClient, HttpError } from '@weave/data';
+import { resource, createClient, HttpError, action, optimistic } from '@weave/data';
 
 /** Flush all pending microtasks (resource defers its fetch + chains two .then). */
 const tick = () => new Promise<void>((r) => setTimeout(r, 0));
@@ -369,4 +369,103 @@ test('interceptor: chain runs outermost-first on the way in, unwinds on the way 
 
   await client.get('/a');
   assert.deepEqual(order, ['a:in', 'b:in', 'fetch', 'b:out', 'a:out']);
+});
+
+/* ──────────────────────────── action ──────────────────────────── */
+
+test('action: pending toggles and result lands on resolve', async () => {
+  const d = deferred<string>();
+  const a = action(() => d.promise);
+  assert.equal(a.pending(), false);
+  assert.equal(a.result(), undefined);
+
+  const p = a.run();
+  assert.equal(a.pending(), true, 'pending while in flight');
+
+  d.resolve('done');
+  assert.equal(await p, 'done', 'run() resolves with the action result');
+  assert.equal(a.pending(), false);
+  assert.equal(a.result(), 'done');
+  assert.equal(a.error(), undefined);
+});
+
+test('action: a rejection lands in error(), clears pending, and run() rejects', async () => {
+  const d = deferred<number>();
+  const a = action(() => d.promise);
+
+  const p = a.run();
+  d.reject(new Error('nope'));
+  let caught: unknown;
+  try {
+    await p;
+  } catch (e) {
+    caught = e;
+  }
+  assert.equal((caught as Error).message, 'nope', 'run() rejects with the error');
+  assert.equal(a.pending(), false);
+  assert.equal((a.error() as Error).message, 'nope');
+  assert.equal(a.result(), undefined);
+});
+
+test('action: passes input through to the action fn', async () => {
+  const a = action((n: number) => Promise.resolve(n * 2));
+  assert.equal(await a.run(21), 42);
+  assert.equal(a.result(), 42);
+});
+
+test('action: a stale (slow) run does not overwrite a newer run’s state', async () => {
+  const d1 = deferred<string>();
+  const d2 = deferred<string>();
+  let call = 0;
+  const a = action(() => (++call === 1 ? d1.promise : d2.promise));
+
+  const p1 = a.run();
+  const p2 = a.run();
+  d2.resolve('second');
+  await p2;
+  assert.equal(a.result(), 'second');
+
+  d1.resolve('first'); // stale — arrives last
+  await p1;
+  assert.equal(a.result(), 'second', 'newer result is preserved');
+  assert.equal(a.pending(), false);
+});
+
+/* ──────────────────────────── optimistic ──────────────────────────── */
+
+test('optimistic: add() overlays the base; default reducer replaces', () => {
+  const base = signal('saved');
+  const o = root((d) => {
+    const opt = optimistic(() => base());
+    assert.equal(opt.value(), 'saved', 'starts at base');
+    opt.add('typing…');
+    assert.equal(opt.value(), 'typing…', 'optimistic value shown');
+    d();
+    return opt;
+  });
+  void o;
+});
+
+test('optimistic: a custom reducer folds adds in order (list append)', () => {
+  const base = signal<string[]>(['a']);
+  root((d) => {
+    const opt = optimistic<string[], string>(() => base(), (list, item) => [...list, item]);
+    opt.add('b');
+    opt.add('c');
+    assert.deepEqual(opt.value(), ['a', 'b', 'c']);
+    d();
+  });
+});
+
+test('optimistic: overlay clears when the base reconciles (changes)', () => {
+  const base = signal('v1');
+  root((d) => {
+    const opt = optimistic(() => base());
+    opt.add('pending');
+    assert.equal(opt.value(), 'pending');
+
+    base.set('v2'); // the real value arrived → reconcile
+    assert.equal(opt.value(), 'v2', 'overlay dropped, base shows through');
+    d();
+  });
 });

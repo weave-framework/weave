@@ -14,7 +14,7 @@
  * analog of Angular's `HttpInterceptorFn`, for auth/logging/retry/caching.
  */
 
-import { signal, effect, batch, onCleanup } from '@weave/runtime';
+import { signal, effect, batch, onCleanup, watch } from '@weave/runtime';
 
 /* ──────────────────────────── resource ──────────────────────────── */
 
@@ -141,6 +141,102 @@ export function resource(
       trigger.set((n) => n + 1);
     },
     mutate: (value) => data.set(() => value),
+  };
+}
+
+/* ──────────────────────────── action ──────────────────────────── */
+
+/** Reactive state for an async action (a form submit / mutation). */
+export interface Action<I, T> {
+  /** Run the action with `input`. Resolves/rejects with the action's own result. */
+  run: (input: I) => Promise<T>;
+  /** True while a run is in flight. Reactive. */
+  pending: () => boolean;
+  /** The last rejection, or undefined. Cleared at the start of each run. Reactive. */
+  error: () => unknown;
+  /** The latest resolved result, or undefined. Reactive. */
+  result: () => T | undefined;
+}
+
+/**
+ * Wrap an async action (submit / mutation) with reactive `pending`/`error`/`result`
+ * — the write-side counterpart to `resource` (which is for reads). The Weave analog
+ * of React's `useActionState`. If runs overlap, only the **latest** updates the
+ * signals (a stale slow run can't clobber a newer one); every caller still gets its
+ * own promise result back from `run`.
+ */
+export function action<I = void, T = unknown>(fn: (input: I) => Promise<T> | T): Action<I, T> {
+  const pending = signal(false);
+  const error = signal<unknown>(undefined);
+  const result = signal<T | undefined>(undefined);
+  let runId = 0;
+
+  async function run(input: I): Promise<T> {
+    const id = ++runId;
+    batch(() => {
+      pending.set(true);
+      error.set(() => undefined);
+    });
+    try {
+      const value = await fn(input);
+      if (id === runId) {
+        batch(() => {
+          result.set(() => value);
+          pending.set(false);
+        });
+      }
+      return value;
+    } catch (err) {
+      if (id === runId) {
+        batch(() => {
+          error.set(() => err);
+          pending.set(false);
+        });
+      }
+      throw err;
+    }
+  }
+
+  return {
+    run,
+    pending: () => pending(),
+    error: () => error(),
+    result: () => result(),
+  };
+}
+
+/* ──────────────────────────── optimistic ──────────────────────────── */
+
+/** A base value with optimistic updates folded in until the real value reconciles. */
+export interface Optimistic<T, U> {
+  /** `base` with every in-flight optimistic update applied via the reducer. Reactive. */
+  value: () => T;
+  /** Push an optimistic update; cleared automatically when `base` next changes. */
+  add: (optimistic: U) => void;
+}
+
+/**
+ * Show an optimistic value over `base` while a mutation is in flight, reconciling
+ * automatically when the real `base` changes — the Weave analog of React's
+ * `useOptimistic`. `reduce` folds each pending update onto the current value
+ * (default: replace). Must be called inside an owner (component `setup`) so its
+ * internal watcher disposes on unmount.
+ */
+export function optimistic<T, U = T>(
+  base: () => T,
+  reduce: (current: T, optimistic: U) => T = (_, u) => u as unknown as T
+): Optimistic<T, U> {
+  const pending = signal<U[]>([]);
+
+  // When the real base changes (the mutation's result landed), drop the overlay.
+  // `watch` fires on change only, never on creation — so the seed value is kept.
+  watch(base, () => {
+    pending.set([]);
+  });
+
+  return {
+    value: () => pending().reduce((acc, u) => reduce(acc, u), base()),
+    add: (u) => pending.set((list) => [...list, u]),
   };
 }
 
