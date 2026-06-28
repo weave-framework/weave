@@ -12,10 +12,11 @@
 import type {
   TemplateNode, ElementNode, Attr,
   IfNode, IfBranch, ForNode, SwitchNode, SwitchCase, LetNode, DeferNode, DeferTrigger,
-  AwaitNode, AwaitBranch,
+  AwaitNode, AwaitBranch, SnippetNode, RenderNode,
 } from './ast.js';
 
-const BLOCK_KW = /^@(if|else|for|empty|switch|case|default|let|defer|placeholder|await|then|catch)\b/;
+const BLOCK_KW =
+  /^@(if|else|for|empty|switch|case|default|let|defer|placeholder|await|then|catch|snippet|render)\b/;
 
 const VOID = new Set([
   'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input',
@@ -99,6 +100,8 @@ class Parser {
       case 'let': return this.parseLet();
       case 'defer': return this.parseDefer();
       case 'await': return this.parseAwait();
+      case 'snippet': return this.parseSnippet();
+      case 'render': return this.parseRender();
       default:
         throw new ParseError(`Unexpected @${kw} at ${this.pos} (no matching block)`);
     }
@@ -277,6 +280,43 @@ class Parser {
     const thenBranch = branch('@then');
     const catchBranch = branch('@catch');
     return { type: 'await', expr, exprOffset, pending, then: thenBranch, catch: catchBranch };
+  }
+
+  parseSnippet(): SnippetNode {
+    this.pos += '@snippet'.length;
+    this.skipWs();
+    const name = this.readIdent();
+    if (!name) throw new ParseError(`Expected a snippet name after @snippet at ${this.pos}`);
+    this.skipWs();
+    if (this.peek() !== '(') throw new ParseError(`Expected '(' after @snippet ${name}`);
+    const rawParams = this.readParen();
+    const params = splitTopLevel(rawParams, ',').map((s) => s.trim()).filter(Boolean);
+    for (const p of params) {
+      if (!/^[A-Za-z_$][\w$]*$/.test(p)) {
+        throw new ParseError(`Invalid @snippet parameter '${p}' (identifiers only)`);
+      }
+    }
+    const children = this.readBlockBody();
+    return { type: 'snippet', name, params, children };
+  }
+
+  parseRender(): RenderNode {
+    this.pos += '@render'.length;
+    this.skipWs();
+    if (this.peek() !== '(') throw new ParseError(`Expected '(' after @render at ${this.pos}`);
+    const raw = this.readParen();
+    const expr = raw.trim();
+    if (!expr) throw new ParseError(`@render () needs an expression`);
+    return { type: 'render', expr, exprOffset: this.exprOffset(this.parenStart, raw, expr) };
+  }
+
+  /** Read a JS identifier (`[A-Za-z_$][\w$]*`); '' if none at the cursor. */
+  readIdent(): string {
+    const start = this.pos;
+    if (this.eof() || !/[A-Za-z_$]/.test(this.peek())) return '';
+    this.pos++;
+    while (!this.eof() && /[\w$]/.test(this.peek())) this.pos++;
+    return this.src.slice(start, this.pos);
   }
 
   /** Optional `(name)` alias after `@then`/`@catch`. */

@@ -21,6 +21,7 @@ import {
   rewrite,
   type Scope,
   type TemplateNode,
+  type SnippetNode,
 } from '@weave/compiler';
 
 const FOR_VARS = ['$index', '$count', '$first', '$last', '$even', '$odd'];
@@ -114,8 +115,28 @@ function emit(nodes: TemplateNode[], ctx: Set<string>): Line[] {
 
   const walk = (list: TemplateNode[], locals: Set<string>): void => {
     let scope = locals; // `@let` extends scope for following siblings
+    // Hoist sibling snippets to typed arrows first (params: any), so a `@render`
+    // call type-checks the snippet name/arity regardless of declaration order.
+    const snippets = list.filter((n): n is SnippetNode => n.type === 'snippet');
+    if (snippets.length) {
+      scope = new Set(scope);
+      for (const s of snippets) scope.add(s.name);
+      for (const s of snippets) {
+        const params = s.params.map((p) => `${p}: any`).join(', ');
+        push(`  const ${s.name} = (${params}): void => {`);
+        const inner = new Set(scope);
+        for (const p of s.params) inner.add(p);
+        walk(s.children, inner);
+        push(`  };`);
+      }
+    }
     for (const node of list) {
       switch (node.type) {
+        case 'snippet':
+          break; // already emitted above
+        case 'render':
+          push(`  void (${rw(node.expr, scope)});`, node.exprOffset);
+          break;
         case 'text':
           break;
         case 'interp':

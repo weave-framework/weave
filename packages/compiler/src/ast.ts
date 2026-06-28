@@ -9,7 +9,9 @@ export type TemplateNode =
   | SwitchNode
   | LetNode
   | DeferNode
-  | AwaitNode;
+  | AwaitNode
+  | SnippetNode
+  | RenderNode;
 
 /**
  * Source offset of an expression's first character within the template string
@@ -112,6 +114,26 @@ export interface AwaitBranch {
   /** optional alias bound to the resolved value (`@then`) or error (`@catch`) */
   alias?: string;
   children: TemplateNode[];
+}
+
+/**
+ * `@snippet name(p1, p2) { … }` — a reusable, parameterized template fragment.
+ * Compiles to a function `(p1, p2) => Node`; `name` is a template-local value, so
+ * it can be `@render (name(args))`-ed locally or passed to a child as a prop.
+ */
+export interface SnippetNode {
+  type: 'snippet';
+  name: string;
+  /** parameter names (bare locals inside the body) */
+  params: string[];
+  children: TemplateNode[];
+}
+
+/** `@render (expr)` — render a snippet (or any expression resolving to a Node). */
+export interface RenderNode {
+  type: 'render';
+  expr: string;
+  exprOffset?: Offset;
 }
 
 export interface ElementNode {

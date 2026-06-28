@@ -12,7 +12,7 @@
 import { parseTemplate } from './parser.js';
 import type {
   TemplateNode, ElementNode, Attr, StaticAttr, EventAttr, IfNode, ForNode, SwitchNode,
-  DeferNode, DeferTrigger, AwaitNode,
+  DeferNode, DeferTrigger, AwaitNode, SnippetNode, RenderNode,
 } from './ast.js';
 import { rewrite, ctxScope, childScope, type Scope, type Binding } from './scope.js';
 
@@ -129,7 +129,14 @@ function compileFragment(
 
   function emitChildren(children: TemplateNode[], basePath: number[], sc: Scope, isHost = false): void {
     let dom = 0;
+    // Hoist sibling snippet names so any sibling can `@render` them regardless of
+    // declaration order (and so a snippet can be passed as a prop / reference another).
     let cur = sc;
+    const snippetNames = children.filter((n): n is SnippetNode => n.type === 'snippet').map((n) => n.name);
+    if (snippetNames.length) {
+      cur = new Map(cur);
+      for (const nm of snippetNames) cur.set(nm, { kind: 'local' });
+    }
     for (const node of children) {
       if (node.type === 'let') {
         html += '<!---->'; // placeholder slot keeps child indices stable
@@ -138,9 +145,26 @@ function compileFragment(
         dom++;
         continue;
       }
+      if (node.type === 'snippet') {
+        emitSnippet(node, cur); // a declaration — no DOM position, no index consumed
+        continue;
+      }
       emitNode(node, [...basePath, dom], cur, isHost);
       dom++;
     }
+  }
+
+  function emitSnippet(node: SnippetNode, sc: Scope): void {
+    // Compiles to a named function `name(p1, p2) { … return Node }` (hoisted in the
+    // render fn, closing over `ctx`); params are bare locals inside the body.
+    const bodyScope: Scope = new Map(sc);
+    for (const p of node.params) bodyScope.set(p, { kind: 'local' });
+    childDecls.push(compileFragment(gen, node.children, bodyScope, node.name, node.params.join(', ')));
+  }
+
+  function emitRender(node: RenderNode, path: number[], sc: Scope): void {
+    html += '<!---->';
+    stmts.push(`${gen.H('mountChild')}(${nodeExpr(path)}, ${rewrite(node.expr, sc).code});`);
   }
 
   function emitNode(node: TemplateNode, path: number[], sc: Scope, isHost = false): void {
@@ -176,6 +200,11 @@ function compileFragment(
       case 'await':
         emitAwait(node, path, sc);
         return;
+      case 'render':
+        emitRender(node, path, sc);
+        return;
+      case 'snippet':
+        throw new Error('@snippet is a declaration, handled in emitChildren');
       case 'let':
         throw new Error('@let cannot be a single dynamic node here');
     }

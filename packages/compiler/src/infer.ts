@@ -81,6 +81,15 @@ export function inferCtxNames(nodes: TemplateNode[]): string[] {
             walk(node.catch.children);
           }
           break;
+        case 'snippet':
+          // the snippet name + its params are template-locals, not ctx
+          declared.add(node.name);
+          for (const p of node.params) declared.add(p);
+          walk(node.children);
+          break;
+        case 'render':
+          add(node.expr); // the snippet name is subtracted via `declared`
+          break;
       }
     }
   };
