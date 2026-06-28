@@ -150,12 +150,18 @@ npm test
 |---|---|---|---|---|---|
 | Reactivity | VDOM + hooks | RxJS + signals | signals (refs) | signals (runes) | **signals only** |
 | Dependency arrays | yes (`useEffect`) | — | no | no | **no** |
-| Virtual DOM | yes | yes | yes | no | **no** |
-| Build step required | effectively | yes | yes | yes | **no** |
+| Virtual DOM | yes | no (change detection) | yes | no | **no** |
 | Manual memoization | `useMemo`/Compiler | — | rare | no | **never** |
-| Built-in router | no | yes | no (official lib) | SvelteKit | **yes** |
-| Built-in store | no | services | Pinia (lib) | stores | **yes** |
-| Runtime size (gzip) | ~45 kb | large | ~34 kb | ~1.6 kb | **~3.6 kb** |
+| Build step | effectively | yes | yes | yes | **yes (compiled)** ¹ |
+| Scoped CSS | no (CSS-in-JS) | yes | yes | yes | **yes** |
+| Template type-checking | JSX via TS | yes (template) | Volar | Svelte LS | **yes (planned)** ² |
+| Built-in router | no | yes | no (official lib) | SvelteKit | **yes** ² |
+| Built-in store | no | services | Pinia (lib) | stores | **yes** ² |
+| Runtime size (gzip) | ~45 kb | large | ~34 kb | ~1.6 kb | **target: Svelte-class** ³ |
+
+¹ **Weave is compiled** (`.weave` → esbuild). This is a deliberate trade-off, not a regression: an earlier prototype ran with no build step, but compiling is exactly what lets the runtime stay tiny and updates stay surgical (the same reason Svelte compiles). A `weave dev` server with watch + fast rebuilds is the intended workflow.
+² Router and store exist and are being re-ported to the compiled architecture; template type-checking ships with the type-aware milestone. See *Scope & honesty*.
+³ The compiled output is per-component fine-grained code over a small shared runtime. An exact gzipped figure is measured against an identical Svelte component before it is claimed here — no number is published until it's verified.
 
 ---
 
