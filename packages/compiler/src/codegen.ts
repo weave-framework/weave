@@ -212,6 +212,7 @@ function compileFragment(
 
   function emitElement(node: ElementNode, path: number[], sc: Scope, isHost = false): void {
     if (node.tag === 'slot') return emitSlot(node, path, sc);
+    if (node.tag === 'w:element') return emitDynamicElement(node, path, sc);
     if (/^[A-Z]/.test(node.tag)) return emitComponent(node, path, sc);
     html += `<${node.tag}`;
     if (gen.scopeAttr) html += ` ${gen.scopeAttr}`; // scoped-CSS marker
@@ -220,7 +221,7 @@ function compileFragment(
       if (attr.type === 'static') {
         html += attr.value === '' ? ` ${attr.name}` : ` ${attr.name}="${escapeAttr(attr.value)}"`;
       } else {
-        emitBinding(attr, path, sc);
+        emitBinding(attr, nodeExpr(path), sc);
       }
     }
     html += '>';
@@ -230,12 +231,51 @@ function compileFragment(
     }
   }
 
-  function emitBinding(attr: Exclude<Attr, { type: 'static' }>, path: number[], sc: Scope): void {
-    const n = nodeExpr(path);
+  /**
+   * `<w:element this={tag} …>children</w:element>` — a dynamically-tagged element.
+   * Emits a `<!---->` anchor + `dynElement(anchor, () => tag, build)`; `build(_el)`
+   * wires the (non-`this`) attributes/bindings/children onto the freshly-created
+   * element (re-run whenever the tag changes).
+   */
+  function emitDynamicElement(node: ElementNode, path: number[], sc: Scope): void {
+    html += '<!---->';
+    const anchor = nodeExpr(path);
+    let tagExpr = '""';
+    const build: string[] = [];
+
+    for (const attr of node.attrs) {
+      if ((attr.type === 'attr' || attr.type === 'static') && attr.name === 'this') {
+        tagExpr = attr.type === 'attr' ? rewrite(attr.expr, sc).code : q(attr.value);
+        continue;
+      }
+      if (attr.type === 'static') {
+        build.push(`${gen.H('setAttr')}(_el, ${q(attr.name)}, ${q(attr.value)});`);
+      } else {
+        emitBinding(attr, '_el', sc, build);
+      }
+    }
+
+    if (trimTop(node.children).length > 0) {
+      const contentFn = gen.fn();
+      childDecls.push(compileFragment(gen, node.children, sc, contentFn));
+      build.push(`_el.append(${contentFn}());`);
+    }
+
+    stmts.push(`${gen.H('dynElement')}(${anchor}, () => ${tagExpr}, (_el) => { ${build.join(' ')} });`);
+  }
+
+  // `n` is the target node expression; `sink` collects the statements (defaults to
+  // the fragment body, but the dynamic element redirects them into its build fn).
+  function emitBinding(
+    attr: Exclude<Attr, { type: 'static' }>,
+    n: string,
+    sc: Scope,
+    sink: string[] = stmts
+  ): void {
     switch (attr.type) {
       case 'attr': {
         const { code, reactive } = rewrite(attr.expr, sc);
-        stmts.push(
+        sink.push(
           reactive
             ? `${gen.H('bindAttr')}(${n}, ${q(attr.name)}, () => ${code});`
             : `${gen.H('setAttr')}(${n}, ${q(attr.name)}, ${code});`
@@ -243,26 +283,29 @@ function compileFragment(
         break;
       }
       case 'prop':
-        stmts.push(`${gen.H('bindProp')}(${n}, ${q(attr.name)}, () => ${rewrite(attr.expr, sc).code});`);
+        sink.push(`${gen.H('bindProp')}(${n}, ${q(attr.name)}, () => ${rewrite(attr.expr, sc).code});`);
         break;
       case 'class':
-        stmts.push(`${gen.H('bindClass')}(${n}, ${q(attr.name)}, () => ${rewrite(attr.expr, sc).code});`);
+        sink.push(`${gen.H('bindClass')}(${n}, ${q(attr.name)}, () => ${rewrite(attr.expr, sc).code});`);
+        break;
+      case 'show':
+        sink.push(`${gen.H('bindShow')}(${n}, () => ${rewrite(attr.expr, sc).code});`);
         break;
       case 'event': {
         const handler = wrapHandler(attr, sc);
         const opts = eventOpts(attr.modifiers);
-        stmts.push(`${gen.H('listen')}(${n}, ${q(attr.name)}, ${handler}${opts ? `, ${opts}` : ''});`);
+        sink.push(`${gen.H('listen')}(${n}, ${q(attr.name)}, ${handler}${opts ? `, ${opts}` : ''});`);
         break;
       }
       case 'ref':
-        stmts.push(`${gen.H('setRef')}(${rewrite(attr.expr, sc).code}, ${n});`);
+        sink.push(`${gen.H('setRef')}(${rewrite(attr.expr, sc).code}, ${n});`);
         break;
       case 'use': {
         // `use:action={arg}` → applyAction(el, action, arg). The action is the
         // `name` identifier (rewritten against ctx); the arg is evaluated eagerly
         // (a snapshot — pass a getter `={() => sig()}` for reactivity).
         const action = rewrite(attr.name, sc).code;
-        stmts.push(
+        sink.push(
           attr.expr !== undefined
             ? `${gen.H('applyAction')}(${n}, ${action}, ${rewrite(attr.expr, sc).code});`
             : `${gen.H('applyAction')}(${n}, ${action});`
@@ -274,7 +317,7 @@ function compileFragment(
         // expression must resolve to a writable signal (passed by reference, not
         // called): `bind:value={count}` → `bindValue(el, ctx.count, 'value')`.
         const kind = attr.name === 'checked' ? 'checked' : attr.name === 'group' ? 'group' : 'value';
-        stmts.push(`${gen.H('bindValue')}(${n}, ${rewrite(attr.expr, sc).code}, ${q(kind)});`);
+        sink.push(`${gen.H('bindValue')}(${n}, ${rewrite(attr.expr, sc).code}, ${q(kind)});`);
         break;
       }
     }
