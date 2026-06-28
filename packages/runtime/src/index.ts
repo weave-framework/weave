@@ -8,6 +8,7 @@ export {
   effect,
   batch,
   untrack,
+  tick,
   onCleanup,
   onMount,
   catchError,

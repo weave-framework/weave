@@ -1,5 +1,5 @@
 import { test, assert } from '../../../tools/harness.js';
-import { signal, computed, effect, batch, untrack, onCleanup } from '@weave/runtime';
+import { signal, computed, effect, batch, untrack, onCleanup, onMount, tick, root } from '@weave/runtime';
 
 test('signal read/write', () => {
   const n = signal(1);
@@ -177,4 +177,39 @@ test('dynamic dependencies: stale sources are dropped', () => {
   assert.equal(runs, 2);
   a.set('A2');
   assert.equal(runs, 2);
+});
+
+/* ──────────── tick ──────────── */
+
+test('tick resolves on a microtask (after earlier-queued microtasks)', async () => {
+  const order: string[] = [];
+  queueMicrotask(() => order.push('earlier'));
+  await tick();
+  order.push('after-tick');
+  assert.deepEqual(order, ['earlier', 'after-tick']);
+});
+
+test('await tick flushes a pending onMount callback', async () => {
+  let mounted = false;
+  root((d) => {
+    onMount(() => {
+      mounted = true;
+    });
+    return d;
+  });
+  assert.equal(mounted, false, 'onMount is deferred, not synchronous');
+  await tick();
+  assert.equal(mounted, true, 'onMount ran before tick resolved');
+});
+
+test('synchronous reactive updates are already applied before tick', async () => {
+  const n = signal(0);
+  let seen = -1;
+  effect(() => {
+    seen = n();
+  });
+  n.set(3);
+  assert.equal(seen, 3, 'effect already ran synchronously on set');
+  await tick(); // nothing pending — still resolves
+  assert.equal(seen, 3);
 });
