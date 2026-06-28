@@ -10,6 +10,7 @@ export {
   untrack,
   onCleanup,
   onMount,
+  catchError,
   createOwner,
   runInOwner,
   disposeOwner,

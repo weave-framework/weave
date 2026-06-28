@@ -205,7 +205,8 @@ Skliausteliuose — kuriuose framework'uose ta feature pasikartoja (kuo daugiau,
    **PADARYTA** (A.4a: `lazy()` + lazy routes; A.4b: `@defer` blokas — visi trigeriai when/idle/viewport/timer/
    interaction/hover + `@placeholder`). `@loading`/`@error` praleisti (sinchroniniam modeliui nereikalingi — `lazy()`
    viduje dengia).
-5. **Error boundary** — (React error boundaries · Svelte `<svelte:boundary>`). Atsparumas.
+5. ✅ **Error boundary** — (React error boundaries · Svelte `<svelte:boundary>`). Atsparumas.
+   **PADARYTA** (owner-maršrutuojama: `catchError` + `<ErrorBoundary>`; gaudo render + effect klaidas).
 6. **`use:` actions (attribute directives)** — (Angular attribute directives · Vue custom directives · Svelte actions).
    Galingas, mažas.
 
@@ -245,7 +246,7 @@ Sprendimai: **SSR iškelta už v1** · **B/C fazės — darom pilnai** („jei d
 Tier 3 polišas įeina, padaryta kaip reikia).
 
 - **A faza — Core paritetas (Tier 1):** ✅ provide/inject · ✅ `onMount` · ✅ Router++ (A.3a guards/redirects/query
-  + A.3b nested) · ✅ `@defer`+lazy (A.4a lazy + A.4b `@defer`) · error boundary · `use:` actions.
+  + A.3b nested) · ✅ `@defer`+lazy (A.4a lazy + A.4b `@defer`) · ✅ error boundary · `use:` actions.
 - **B faza — Polish (pilnas Tier 2 + ne-SSR Tier 3):** async/Suspense blokas · portal/teleport · forms
   cross-field+async · HTTP interceptors · `linkedSignal`/debounced/`watch` · `:host` CSS · optimistic UI ·
   snippets su parametrais · custom elements · `v-show`/dinaminis elementas · `{#key}` · `tick()` · transitions

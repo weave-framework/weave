@@ -1,7 +1,7 @@
 {
-  "_comment": "M11 size ceilings — minified + gzip (bytes). Guards against accidental bloat while the framework is still being built; bump a limit deliberately when a feature legitimately grows it. runtime-full is the WHOLE runtime+dom surface bundled together (NOT what an app ships — that's counter-app, kept tight). It was the plan's ~3.6 kB class at M11; Phase A added context, onMount, lazy, and @defer, so it was bumped to 4400 to leave room for the remaining Phase A features (error boundary, use: actions). counter-app stays the real-world guard.",
+  "_comment": "M11 size ceilings — minified + gzip (bytes). Guards against accidental bloat while the framework is still being built; bump a limit deliberately when a feature legitimately grows it. runtime-full is the WHOLE runtime+dom surface bundled together (NOT what an app ships — that's counter-app, kept tight). It was the plan's ~3.6 kB class at M11; Phase A added context, onMount, lazy, @defer, and error boundaries, so it was bumped to 4400 to leave room for the remaining Phase A features (use: actions). reactive-core grew 1024->1126 because error-boundary routing in run() is on the core hot path (not tree-shakeable). counter-app stays the real-world guard.",
   "limits": {
-    "reactive-core": 1024,
+    "reactive-core": 1126,
     "runtime-full": 4400,
     "counter-app": 1536,
     "counter-component": 512
