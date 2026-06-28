@@ -226,6 +226,30 @@ Skliausteliuose — kuriuose framework'uose ta feature pasikartoja (kuo daugiau,
   synthetic events · Zone.js + Angular/React testing harness'ai (turim Playwright) · KeepAlive ·
   NgOptimizedImage / Next image-font optimization · Reactive/Template-driven Forms · plugins/global filters.
 
-### Atidėta su SSR (atskiras didelis etapas)
+### Iškelta į TOLIMĄ ATEITĮ — SSR (NE v1) ⚠️
+Vartotojo sprendimas (2026-06-28): SSR visiškai už v1 ribų — reta praktikoje, mažai kas naudoja. Jei kada kam
+prireiks, plane paliktos „siūlės" (kompiliatoriaus `mode:'ssr'` + hidratacija per fine-grained binding'us).
 - Server Components/Actions · SSR/SSG/ISR/streaming · hidratacija · serverio caching · middleware ·
   metadata/SEO `<head>` · rendering strategies.
+
+---
+
+## 7. Kelias iki v1 (sutarta 2026-06-28)
+
+Sprendimai: **SSR iškelta už v1** · **B/C fazės — darom pilnai** („jei darom tai darom"; Tier 2 + ne-SSR
+Tier 3 polišas įeina, padaryta kaip reikia).
+
+- **A faza — Core paritetas (Tier 1):** provide/inject · `onMount` · Router++ (guards/redirects/query/nested)
+  · `@defer`+lazy · error boundary · `use:` actions.
+- **B faza — Polish (pilnas Tier 2 + ne-SSR Tier 3):** async/Suspense blokas · portal/teleport · forms
+  cross-field+async · HTTP interceptors · `linkedSignal`/debounced/`watch` · `:host` CSS · optimistic UI ·
+  snippets su parametrais · custom elements · `v-show`/dinaminis elementas · `{#key}` · `tick()` · transitions
+  · file-based routing · Link prefetch. (SEO/`<svelte:head>` — krenta kartu su SSR.)
+- **C faza — Įrankiai/DX:** M9 Volar (editoriaus plugin) · child-prop tipų tikrinimas `weave check`'e ·
+  perf benchmark (M11 antra dalis).
+- **D faza — Demo app:** reali app (router+store+forms+data) — integracija + showcase.
+- **F faza — Dokumentacija:** perrašyti viską public-ready forma (be AI pėdsakų).
+- **G faza — Publikavimas:** scrub tooling · public repo + pirmas mirror · sync workflow
+  (žr. atminties `weave-publish-plan`).
+
+Pradžia: **A faza → `provide/inject`** (mažas, atrakina context-priklausomus features).
