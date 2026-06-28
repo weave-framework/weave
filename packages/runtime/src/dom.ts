@@ -12,7 +12,7 @@
  * and control flow arrive in M2/M4.
  */
 
-import { effect, signal, createOwner, runInOwner, disposeOwner, onDispose, getOwner } from './reactive.js';
+import { effect, signal, createOwner, runInOwner, disposeOwner, onDispose, getOwner, onMount } from './reactive.js';
 import type { Signal, Owner } from './reactive.js';
 
 /* ──────────────────────────── structure ──────────────────────────── */
@@ -137,6 +137,26 @@ export function setRef(target: Signal<Element | null> | ((el: Element) => void),
   } else {
     (target as (el: Element) => void)(el);
   }
+}
+
+/* ──────────────────────────── use: actions ──────────────────────────── */
+
+/**
+ * An attribute directive (`use:action={arg}`). Runs `action(el, arg)` after the
+ * element is inserted. Tear-down options: return a cleanup function, call
+ * `onDispose` (owner-scoped), or create an `effect` (its `onCleanup`/disposal is
+ * tied to the element's region). All fire when the region unmounts. For reactivity
+ * over `arg`, pass a getter (`use:tip={() => x()}`) and read it inside an `effect`.
+ */
+export type Action<A = void> = (el: Element, arg: A) => void | (() => void);
+
+/**
+ * Wire a `use:` action onto an element. Deferred to `onMount` timing so the
+ * element is live in the document (focus / measure / 3rd-party init work), and
+ * skipped entirely if the region is disposed before the microtask fires.
+ */
+export function applyAction<A = void>(el: Element, action: Action<A>, arg?: A): void {
+  onMount(() => action(el, arg as A));
 }
 
 /* ──────────────────────────── two-way binding (forms) ──────────────────────────── */

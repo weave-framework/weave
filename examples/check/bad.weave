@@ -4,9 +4,11 @@ import { signal } from '@weave/runtime';
 export function setup() {
   const count = signal(0);
   const inc = () => count.set((n) => n + 1);
-  return { count, inc };
+  const tooltip = (el: Element, text: string) => el.setAttribute('title', text);
+  return { count, inc, tooltip };
 }
 </script>
 
 <button on:click={inc}>{{ coutn() }}</button>
 <span>{{ count().toFixedd(2) }}</span>
+<div use:tooltip={count()}></div>

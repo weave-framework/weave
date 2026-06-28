@@ -6,11 +6,17 @@ export function setup() {
   const name = signal('weave');
   const inc = () => count.set((n) => n + 1);
   const items = signal([{ id: 1, label: 'a' }]);
-  return { count, name, inc, items };
+  // a `use:` action: (el, text) => cleanup
+  const tooltip = (el: Element, text: string) => {
+    el.setAttribute('title', text);
+    return () => el.removeAttribute('title');
+  };
+  const autofocus = (el: Element) => (el as HTMLElement).focus();
+  return { count, name, inc, items, tooltip, autofocus };
 }
 </script>
 
-<button on:click={inc}>{{ name() }}: {{ count().toFixed(0) }}</button>
+<button on:click={inc} use:autofocus use:tooltip={name()}>{{ name() }}: {{ count().toFixed(0) }}</button>
 @for (it of items(); track it.id) {
   <span>{{ $index }}: {{ it.label }}</span>
 }
