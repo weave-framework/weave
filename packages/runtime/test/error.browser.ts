@@ -112,6 +112,39 @@ test('ErrorBoundary catches an effect error and swaps to the fallback', async ()
   assert.ok(!el.textContent?.includes('live'));
 });
 
+test('ErrorBoundary resetKey clears the error when the key changes', async () => {
+  const blow = signal(true);
+  const key = signal(0);
+  const Child: Component = () => {
+    const el = document.createElement('span');
+    effect(() => {
+      if (blow()) throw new Error('x');
+      el.textContent = 'recovered';
+    });
+    return el;
+  };
+  const el = host();
+  mount(
+    ErrorBoundary(
+      {
+        fallback: () => span('failed'),
+        get resetKey() {
+          return key();
+        },
+      },
+      { default: () => Child() }
+    ),
+    el
+  );
+  await tick();
+  assert.ok(el.textContent?.includes('failed'), 'fallback shown initially');
+  blow.set(false); // fix the underlying condition
+  key.set(1); // changing resetKey clears the error — no manual reset() call
+  await tick();
+  assert.ok(el.textContent?.includes('recovered'), 'recovered when resetKey changed');
+  assert.ok(!el.textContent?.includes('failed'));
+});
+
 test('ErrorBoundary reset() re-renders the protected content', async () => {
   const blow = signal(true);
   const Child: Component = () => {
