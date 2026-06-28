@@ -422,6 +422,43 @@ export function mountChild(anchorNode: Comment, node: Node | null): void {
   if (node) anchorNode.parentNode!.insertBefore(node, anchorNode);
 }
 
+/** A component instance: takes props + slots, returns its DOM. */
+export type Component = (props?: Record<string, unknown>, slots?: Record<string, () => Node>) => Node;
+
+/**
+ * Glue a compiled `render(ctx, slots)` to a `setup(props)`. The loader emits
+ * `export default defineComponent(render, setup)` per component. `ctx` exposes
+ * `setup()`'s bindings as own properties over `props` on the prototype, so a
+ * template name resolves to a binding first, else to a (lazy, reactive) prop
+ * getter. Runs in the caller's ownership scope, so effects created in `setup`
+ * dispose when the surrounding region unmounts.
+ */
+export function defineComponent(
+  render: (ctx: Record<string, unknown>, slots: Record<string, () => Node>) => Node,
+  setup?: (props: Record<string, unknown>) => Record<string, unknown> | void
+): Component {
+  return (props = {}, slots = {}) => {
+    const bindings = setup ? setup(props) || {} : {};
+    const ctx = Object.assign(Object.create(props), bindings);
+    return render(ctx, slots);
+  };
+}
+
+/** Mount a root component into a container under a fresh owner. Returns an unmount fn. */
+export function mountComponent(
+  component: Component,
+  container: Element,
+  props?: Record<string, unknown>
+): () => void {
+  const owner = createOwner(null);
+  const node = runInOwner(owner, () => component(props, {}));
+  const unmount = mount(node, container);
+  return () => {
+    disposeOwner(owner);
+    unmount();
+  };
+}
+
 /* ──────────────────────────── mount ──────────────────────────── */
 
 /** Mount a node into a container, replacing its contents. Returns an unmount fn. */

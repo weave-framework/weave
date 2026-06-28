@@ -1,0 +1,71 @@
+/**
+ * Auto-scope inference: walk a template AST and return the names that should
+ * resolve to component data (`ctx.*`). Every free identifier in every template
+ * expression qualifies, minus JS globals (handled in {@link freeIdentifiers})
+ * and minus names a block *declares* — `@for` items + implicit `$` vars, `@let`
+ * names, `@if (… as alias)` — since those are bound locally (and, for `@for`
+ * `track`, used as real arrow params against the parent scope).
+ *
+ * Lexical and intentionally simple; M8 replaces it with TS-AST resolution.
+ */
+
+import type { TemplateNode } from './ast.js';
+import { freeIdentifiers } from './scope.js';
+
+const FOR_VARS = ['$index', '$count', '$first', '$last', '$even', '$odd'];
+
+export function inferCtxNames(nodes: TemplateNode[]): string[] {
+  const used = new Set<string>();
+  const declared = new Set<string>();
+
+  const add = (expr: string | undefined): void => {
+    if (expr) for (const id of freeIdentifiers(expr)) used.add(id);
+  };
+
+  const walk = (list: TemplateNode[]): void => {
+    for (const node of list) {
+      switch (node.type) {
+        case 'text':
+          break;
+        case 'interp':
+          add(node.expr);
+          break;
+        case 'let':
+          add(node.expr);
+          declared.add(node.name);
+          break;
+        case 'element':
+          for (const attr of node.attrs) {
+            if (attr.type !== 'static') add(attr.expr);
+          }
+          walk(node.children);
+          break;
+        case 'if':
+          for (const br of node.branches) {
+            add(br.cond);
+            if (br.alias) declared.add(br.alias);
+            walk(br.children);
+          }
+          break;
+        case 'for':
+          add(node.list);
+          add(node.track);
+          declared.add(node.item);
+          for (const v of FOR_VARS) declared.add(v);
+          walk(node.children);
+          if (node.empty) walk(node.empty);
+          break;
+        case 'switch':
+          add(node.expr);
+          for (const c of node.cases) {
+            add(c.test);
+            walk(c.children);
+          }
+          break;
+      }
+    }
+  };
+
+  walk(nodes);
+  return [...used].filter((n) => !declared.has(n)).sort();
+}
