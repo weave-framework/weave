@@ -216,7 +216,9 @@ Skliausteliuose — kuriuose framework'uose ta feature pasikartoja (kuo daugiau,
    duoda `loading`; čia — deklaratyvus fallback.
 8. ✅ **Portal / Teleport** — (React `createPortal` · Vue Teleport). Modalai/tooltipai.
    **PADARYTA** (B.2: `Portal` runtime-komponentas — DOM perkeliamas, loginis medis/owner/context lieka).
-9. **Forms: cross-field + async validacija** — (Angular). Natūralus `@weave/forms` tęsinys.
+9. ✅ **Forms: cross-field + async validacija** — (Angular). Natūralus `@weave/forms` tęsinys.
+   **PADARYTA** (B.3: `form().validate` cross-field — laukui + `_form` formos lygiui; `field` `asyncValidate`
+   debounce 300ms + abort + `validating()`).
 10. **HTTP interceptors (lite)** — (Angular). Request/response hook'ai (auth/logging).
 11. ✅ **`linkedSignal`** + **debounced signals** + **`watch` helper (old/new)** — (Angular · Vue).
     **PADARYTA** (B.1: `@weave/runtime/extras` — `linkedSignal`/`debounced`/`watch`; tree-shake'inami).
