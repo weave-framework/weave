@@ -17,6 +17,9 @@ importers:
       '@weave/compiler':
         specifier: workspace:*
         version: link:packages/compiler
+      '@weave/data':
+        specifier: workspace:*
+        version: link:packages/data
       '@weave/forms':
         specifier: workspace:*
         version: link:packages/forms
@@ -61,6 +64,12 @@ importers:
         version: 5.9.3
 
   packages/compiler: {}
+
+  packages/data:
+    dependencies:
+      '@weave/runtime':
+        specifier: workspace:*
+        version: link:../runtime
 
   packages/forms:
     dependencies:
