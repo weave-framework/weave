@@ -9,7 +9,7 @@
   "main": "./src/cli.ts",
   "files": ["src", "bin"],
   "dependencies": {
-    "@weave/compiler": "*"
+    "@weave/compiler": "workspace:*"
   },
   "license": "MIT"
 }

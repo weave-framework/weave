@@ -1,0 +1,7 @@
+packages:
+  - 'packages/*'
+
+# esbuild ships a platform binary via a postinstall script. This environment's
+# pnpm requires explicit per-package build approval.
+allowBuilds:
+  esbuild: true
