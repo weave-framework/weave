@@ -362,6 +362,19 @@ export function batch<T>(fn: () => T): T {
   }
 }
 
+/**
+ * Resolve after pending microtask-scheduled work has run — `onMount` callbacks,
+ * deferred `ErrorBoundary` swaps, etc. Reactive updates in Weave are **synchronous**
+ * (the DOM is already current right after a `signal.set` outside a `batch`), so
+ * `await tick()` is for waiting on that microtask-queued work before reading the DOM
+ * — the analog of Svelte's `tick()` / Vue's `nextTick()`. If called inside a `batch`,
+ * the queued effects flush first, then the microtask resolves.
+ */
+export function tick(): Promise<void> {
+  flush(); // defensive: drain any queued effects (no-op when not batching)
+  return new Promise((resolve) => queueMicrotask(resolve));
+}
+
 /** Read reactive values without subscribing the current computation to them. */
 export function untrack<T>(fn: () => T): T {
   const prev = listener;
