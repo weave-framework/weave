@@ -217,7 +217,9 @@ Skliausteliuose — kuriuose framework'uose ta feature pasikartoja (kuo daugiau,
 8. **Portal / Teleport** — (React `createPortal` · Vue Teleport). Modalai/tooltipai.
 9. **Forms: cross-field + async validacija** — (Angular). Natūralus `@weave/forms` tęsinys.
 10. **HTTP interceptors (lite)** — (Angular). Request/response hook'ai (auth/logging).
-11. **`linkedSignal`** + **debounced signals** + **`watch` helper (old/new)** — (Angular · Vue). Pigūs reaktyvumo priedai.
+11. ✅ **`linkedSignal`** + **debounced signals** + **`watch` helper (old/new)** — (Angular · Vue).
+    **PADARYTA** (B.1: `@weave/runtime/extras` — `linkedSignal`/`debounced`/`watch`; tree-shake'inami).
+    *(throttled + linkedSignal computation-overload — lengvi follow-on'ai vėliau.)*
 12. **`:host` scoped CSS** — (Angular host elements · Svelte). Mažas.
 13. **Optimistic UI / form action state (lite)** — (React `useOptimistic`/`useActionState`). Turim `resource.mutate`.
 14. **Snippets su parametrais** — (Svelte snippets). Lankstesni už dabartinius slots.
