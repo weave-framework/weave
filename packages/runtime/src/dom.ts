@@ -12,7 +12,7 @@
  * and control flow arrive in M2/M4.
  */
 
-import { effect, signal, createOwner, runInOwner, disposeOwner, onDispose, getOwner, onMount } from './reactive.js';
+import { effect, signal, batch, untrack, createOwner, runInOwner, disposeOwner, onDispose, getOwner, onMount } from './reactive.js';
 import type { Signal, Owner } from './reactive.js';
 
 /* ──────────────────────────── structure ──────────────────────────── */
@@ -645,6 +645,70 @@ function arm(
       };
     }
   }
+}
+
+/* ──────────────────────────── await ──────────────────────────── */
+
+/** Minimal shape of a `@weave/data` resource that `awaitBlock` can drive directly. */
+interface ResourceLike {
+  loading: () => boolean;
+  error: () => unknown;
+  data: () => unknown;
+}
+function isResource(x: unknown): x is ResourceLike {
+  return (
+    !!x &&
+    typeof x === 'object' &&
+    typeof (x as ResourceLike).loading === 'function' &&
+    typeof (x as ResourceLike).data === 'function' &&
+    typeof (x as ResourceLike).error === 'function'
+  );
+}
+
+/**
+ * `@await` — render by the settle state of the `source`, which may be a
+ * `@weave/data` **resource** (driven reactively off its `loading`/`error`/`data`
+ * signals — a refetch shows `pending` again) or a bare **Promise** (or plain
+ * value; wired once via `then`/`catch`). The three branch fns are optional;
+ * `then`/`catch` receive the resolved value / error. Built on {@link ifBlock}, so
+ * each branch renders in its own owner scope (disposed on swap/unmount). The
+ * `source` is read **once, untracked** (a new Promise each render is not a dep).
+ */
+export function awaitBlock(
+  anchor: Comment,
+  source: () => unknown,
+  pending?: () => Node,
+  then?: (value: unknown) => Node,
+  onCatch?: (err: unknown) => Node
+): void {
+  const src = untrack(source);
+  const pendingThunk = pending ? () => pending() : null;
+
+  if (isResource(src)) {
+    const thenThunk = then ? () => then(src.data()) : null;
+    const catchThunk = onCatch ? () => onCatch(src.error()) : null;
+    ifBlock(anchor, () => {
+      if (src.loading()) return pendingThunk;
+      if (src.error() != null) return catchThunk;
+      return thenThunk;
+    });
+    return;
+  }
+
+  // a Promise (or plain value): settle once into a small state machine
+  const state = signal<'pending' | 'then' | 'catch'>('pending');
+  const value = signal<unknown>(undefined);
+  const failure = signal<unknown>(undefined);
+  Promise.resolve(src).then(
+    (v) => batch(() => { value.set(v); state.set('then'); }),
+    (e) => batch(() => { failure.set(e); state.set('catch'); })
+  );
+  const thenThunk = then ? () => then(value()) : null;
+  const catchThunk = onCatch ? () => onCatch(failure()) : null;
+  ifBlock(anchor, () => {
+    const s = state();
+    return s === 'pending' ? pendingThunk : s === 'catch' ? catchThunk : thenThunk;
+  });
 }
 
 /* ──────────────────────────── components ──────────────────────────── */

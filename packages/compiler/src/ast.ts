@@ -8,7 +8,8 @@ export type TemplateNode =
   | ForNode
   | SwitchNode
   | LetNode
-  | DeferNode;
+  | DeferNode
+  | AwaitNode;
 
 /**
  * Source offset of an expression's first character within the template string
@@ -89,6 +90,29 @@ export type DeferTrigger =
   | { kind: 'interaction' }
   | { kind: 'hover' }
   | { kind: 'immediate' };
+
+/**
+ * `@await (src) { pending } @then (val) { … } @catch (err) { … }` — render based on
+ * the settle state of a Promise OR a `@weave/data` resource. All three parts are
+ * optional; `@then`/`@catch` may bind an alias to the resolved value / error.
+ */
+export interface AwaitNode {
+  type: 'await';
+  /** the awaited source — a Promise or a resource */
+  expr: string;
+  exprOffset?: Offset;
+  /** content shown while pending (the block right after `@await (src) { … }`) */
+  pending?: TemplateNode[];
+  /** `@then (alias?) { … }` — fulfilled */
+  then?: AwaitBranch;
+  /** `@catch (alias?) { … }` — rejected */
+  catch?: AwaitBranch;
+}
+export interface AwaitBranch {
+  /** optional alias bound to the resolved value (`@then`) or error (`@catch`) */
+  alias?: string;
+  children: TemplateNode[];
+}
 
 export interface ElementNode {
   type: 'element';

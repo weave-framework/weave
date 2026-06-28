@@ -1,0 +1,165 @@
+import { test, assert } from '../../../tools/harness.js';
+import { signal, computed, effect, root } from '@weave/runtime';
+import * as dom from '@weave/runtime/dom';
+import { compileTemplate, parseTemplate } from '@weave/compiler';
+
+const rt = { ...dom, signal, computed, effect, root };
+
+function render(html: string, ctx: Record<string, unknown> = {}, scope: string[] = []): Element {
+  const { code } = compileTemplate(html, { mode: 'function', scope });
+  const fn = new Function('ctx', 'rt', '_c', code) as (c: unknown, r: unknown, k: unknown) => Element;
+  return fn(ctx, rt, {});
+}
+function host(el: Element): HTMLElement {
+  const h = document.createElement('div');
+  h.appendChild(el);
+  document.body.appendChild(h);
+  return h;
+}
+const flush = () => new Promise<void>((r) => setTimeout(r, 0)); // drains microtasks
+
+function deferred<T>() {
+  let resolve!: (v: T) => void;
+  let reject!: (e: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
+/* a resource is anything with signal-backed loading/data/error accessors */
+function mockResource<T>(init: { loading?: boolean; data?: T; error?: unknown } = {}) {
+  return {
+    loading: signal(init.loading ?? false),
+    data: signal<T | undefined>(init.data),
+    error: signal<unknown>(init.error),
+  };
+}
+
+/* ──────────────────────────── parse ──────────────────────────── */
+
+test('parses @await with pending + @then(alias) + @catch(alias)', () => {
+  const [node] = parseTemplate('@await (p) { <i>w</i> } @then (u) { <b>{{ u }}</b> } @catch (e) { <s>{{ e }}</s> }');
+  assert.equal(node.type, 'await');
+  if (node.type !== 'await') return;
+  assert.equal(node.expr, 'p');
+  assert.ok(node.pending, 'has pending');
+  assert.equal(node.then?.alias, 'u');
+  assert.equal(node.catch?.alias, 'e');
+});
+
+/* ──────────────────────────── Promise ──────────────────────────── */
+
+test('Promise: pending → then(value) on resolve', async () => {
+  const d = deferred<string>();
+  const h = host(
+    render(
+      '<div>@await (p) { <span class="l">loading</span> } @then (u) { <b class="d">{{ u }}</b> } @catch (e) { <i class="e">{{ e }}</i> }</div>',
+      { p: d.promise },
+      ['p']
+    )
+  );
+  assert.ok(h.querySelector('.l'), 'pending content shown first');
+  assert.equal(h.querySelector('.d'), null);
+
+  d.resolve('hi');
+  await flush();
+  assert.equal(h.querySelector('.l'), null, 'pending removed');
+  assert.equal(h.querySelector('.d')?.textContent, 'hi', 'then renders the resolved value');
+  h.remove();
+});
+
+test('Promise: pending → catch(error) on reject', async () => {
+  const d = deferred<string>();
+  const h = host(
+    render(
+      '<div>@await (p) { <span class="l">loading</span> } @then (u) { <b class="d">{{ u }}</b> } @catch (e) { <i class="e">{{ e }}</i> }</div>',
+      { p: d.promise },
+      ['p']
+    )
+  );
+  d.reject('boom');
+  await flush();
+  assert.equal(h.querySelector('.d'), null);
+  assert.equal(h.querySelector('.e')?.textContent, 'boom', 'catch renders the error');
+  h.remove();
+});
+
+test('Promise: a plain (non-thenable) value resolves into @then', async () => {
+  const h = host(render('<div>@await (v) @then (u) { <b class="d">{{ u }}</b> }</div>', { v: 42 }, ['v']));
+  await flush();
+  assert.equal(h.querySelector('.d')?.textContent, '42');
+  h.remove();
+});
+
+/* ──────────────────────────── resource ──────────────────────────── */
+
+test('resource: loading → then, driven off its signals', async () => {
+  const r = mockResource<string>({ loading: true });
+  const h = host(
+    render('<div>@await (r) { <span class="l">…</span> } @then (u) { <b class="d">{{ u }}</b> }</div>', { r }, ['r'])
+  );
+  assert.ok(h.querySelector('.l'), 'loading shows pending');
+
+  r.data.set('X');
+  r.loading.set(false);
+  assert.equal(h.querySelector('.l'), null);
+  assert.equal(h.querySelector('.d')?.textContent, 'X', 'then shows resource data');
+  h.remove();
+});
+
+test('resource: error() routes to @catch', async () => {
+  const r = mockResource<string>({ loading: true });
+  const h = host(
+    render(
+      '<div>@await (r) { <span class="l">…</span> } @then (u) { <b class="d">{{ u }}</b> } @catch (e) { <i class="e">{{ e }}</i> }</div>',
+      { r },
+      ['r']
+    )
+  );
+  r.error.set('failed');
+  r.loading.set(false);
+  assert.equal(h.querySelector('.e')?.textContent, 'failed');
+  assert.equal(h.querySelector('.d'), null);
+  h.remove();
+});
+
+test('resource: a refetch (loading again) shows pending, then the new value', async () => {
+  const r = mockResource<string>({ loading: false, data: 'first' });
+  const h = host(
+    render('<div>@await (r) { <span class="l">…</span> } @then (u) { <b class="d">{{ u }}</b> }</div>', { r }, ['r'])
+  );
+  assert.equal(h.querySelector('.d')?.textContent, 'first');
+
+  r.loading.set(true); // refetch
+  assert.ok(h.querySelector('.l'), 'pending shown again during refetch');
+  assert.equal(h.querySelector('.d'), null);
+
+  r.data.set('second');
+  r.loading.set(false);
+  assert.equal(h.querySelector('.d')?.textContent, 'second', 'then re-renders with the new value');
+  h.remove();
+});
+
+/* ──────────────────────────── optional parts ──────────────────────────── */
+
+test('no pending block: nothing renders until @then', async () => {
+  const d = deferred<string>();
+  const h = host(render('<div>@await (p) @then (u) { <b class="d">{{ u }}</b> }</div>', { p: d.promise }, ['p']));
+  assert.equal(h.querySelector('.d'), null, 'nothing while pending (no pending block)');
+  d.resolve('ok');
+  await flush();
+  assert.equal(h.querySelector('.d')?.textContent, 'ok');
+  h.remove();
+});
+
+test('no @then/@catch: pending content clears once settled', async () => {
+  const d = deferred<string>();
+  const h = host(render('<div>@await (p) { <span class="l">loading</span> }</div>', { p: d.promise }, ['p']));
+  assert.ok(h.querySelector('.l'));
+  d.resolve('whatever');
+  await flush();
+  assert.equal(h.querySelector('.l'), null, 'pending removed; nothing to render on fulfill');
+  h.remove();
+});

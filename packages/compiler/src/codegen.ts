@@ -12,9 +12,9 @@
 import { parseTemplate } from './parser.js';
 import type {
   TemplateNode, ElementNode, Attr, StaticAttr, EventAttr, IfNode, ForNode, SwitchNode,
-  DeferNode, DeferTrigger,
+  DeferNode, DeferTrigger, AwaitNode,
 } from './ast.js';
-import { rewrite, ctxScope, childScope, type Scope } from './scope.js';
+import { rewrite, ctxScope, childScope, type Scope, type Binding } from './scope.js';
 
 export interface CompileOptions {
   /** binding names (from setup()) to resolve via `ctx.*` */
@@ -164,6 +164,9 @@ function compileFragment(
         return;
       case 'defer':
         emitDefer(node, path, sc);
+        return;
+      case 'await':
+        emitAwait(node, path, sc);
         return;
       case 'let':
         throw new Error('@let cannot be a single dynamic node here');
@@ -367,6 +370,29 @@ function compileFragment(
 
     const trig = deferTriggerExpr(node.trigger, sc);
     stmts.push(`${gen.H('deferBlock')}(${nodeExpr(path)}, ${trig}, ${contentFn}, ${phArg});`);
+  }
+
+  function emitAwait(node: AwaitNode, path: number[], sc: Scope): void {
+    html += '<!---->';
+    const anchorVar = nodeExpr(path);
+    const source = `() => (${rewrite(node.expr, sc).code})`;
+
+    // each part → a fragment fn; @then/@catch take their alias as a parameter so
+    // the resolved value / error resolves to the bare name inside the branch.
+    const branchFn = (children: TemplateNode[] | undefined, alias?: string): string => {
+      if (!children || trimTop(children).length === 0) return 'undefined';
+      const fn = gen.fn();
+      // the alias is a real function PARAMETER holding the resolved value/error —
+      // a plain local (bare name), not an auto-called accessor like @for/@if.
+      const scope: Scope = alias ? new Map(sc).set(alias, { kind: 'local' } as Binding) : sc;
+      childDecls.push(compileFragment(gen, children, scope, fn, alias ?? ''));
+      return fn;
+    };
+
+    const pendingArg = branchFn(node.pending);
+    const thenArg = branchFn(node.then?.children, node.then?.alias);
+    const catchArg = branchFn(node.catch?.children, node.catch?.alias);
+    stmts.push(`${gen.H('awaitBlock')}(${anchorVar}, ${source}, ${pendingArg}, ${thenArg}, ${catchArg});`);
   }
 
   function deferTriggerExpr(t: DeferTrigger, sc: Scope): string {

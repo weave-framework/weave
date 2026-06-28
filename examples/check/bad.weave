@@ -5,10 +5,12 @@ export function setup() {
   const count = signal(0);
   const inc = () => count.set((n) => n + 1);
   const tooltip = (el: Element, text: string) => el.setAttribute('title', text);
-  return { count, inc, tooltip };
+  const user = Promise.resolve({ name: 'ada' });
+  return { count, inc, tooltip, user };
 }
 </script>
 
 <button on:click={inc}>{{ coutn() }}</button>
 <span>{{ count().toFixedd(2) }}</span>
 <div use:tooltip={count()}></div>
+@await (user) @then (u) { <b>{{ u.naem }}</b> }

@@ -12,9 +12,10 @@
 import type {
   TemplateNode, ElementNode, Attr,
   IfNode, IfBranch, ForNode, SwitchNode, SwitchCase, LetNode, DeferNode, DeferTrigger,
+  AwaitNode, AwaitBranch,
 } from './ast.js';
 
-const BLOCK_KW = /^@(if|else|for|empty|switch|case|default|let|defer|placeholder)\b/;
+const BLOCK_KW = /^@(if|else|for|empty|switch|case|default|let|defer|placeholder|await|then|catch)\b/;
 
 const VOID = new Set([
   'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input',
@@ -97,6 +98,7 @@ class Parser {
       case 'switch': return this.parseSwitch();
       case 'let': return this.parseLet();
       case 'defer': return this.parseDefer();
+      case 'await': return this.parseAwait();
       default:
         throw new ParseError(`Unexpected @${kw} at ${this.pos} (no matching block)`);
     }
@@ -239,6 +241,57 @@ class Parser {
       this.pos = save;
     }
     return { type: 'defer', trigger, children, placeholder };
+  }
+
+  parseAwait(): AwaitNode {
+    this.pos += 6; // @await
+    this.skipWs();
+    const rawExpr = this.readParen();
+    const expr = rawExpr.trim();
+    const exprOffset = this.exprOffset(this.parenStart, rawExpr, expr);
+
+    // Optional pending block: a `{` right after the source (anything else — e.g.
+    // `@then` — means there is no pending content).
+    let pending: TemplateNode[] | undefined;
+    const save = this.pos;
+    this.skipWs();
+    if (this.peek() === '{') {
+      this.pos = save;
+      pending = this.readBlockBody();
+    } else {
+      this.pos = save;
+    }
+
+    const branch = (kw: string): AwaitBranch | undefined => {
+      const s = this.pos;
+      this.skipWs();
+      if (this.src.startsWith(kw, this.pos)) {
+        this.pos += kw.length;
+        const alias = this.maybeAlias();
+        return { alias, children: this.readBlockBody() };
+      }
+      this.pos = s;
+      return undefined;
+    };
+
+    const thenBranch = branch('@then');
+    const catchBranch = branch('@catch');
+    return { type: 'await', expr, exprOffset, pending, then: thenBranch, catch: catchBranch };
+  }
+
+  /** Optional `(name)` alias after `@then`/`@catch`. */
+  maybeAlias(): string | undefined {
+    const save = this.pos;
+    this.skipWs();
+    if (this.peek() === '(') {
+      const inner = this.readParen().trim();
+      if (!/^[A-Za-z_$][\w$]*$/.test(inner)) {
+        throw new ParseError(`Expected an identifier alias in @then/@catch, got '${inner}'`);
+      }
+      return inner;
+    }
+    this.pos = save;
+    return undefined;
   }
 
   parseDeferTrigger(head: string, headStart: number): DeferTrigger {

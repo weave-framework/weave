@@ -12,7 +12,8 @@ export function setup() {
     return () => el.removeAttribute('title');
   };
   const autofocus = (el: Element) => (el as HTMLElement).focus();
-  return { count, name, inc, items, tooltip, autofocus };
+  const user = Promise.resolve({ name: 'ada' });
+  return { count, name, inc, items, tooltip, autofocus, user };
 }
 </script>
 
@@ -20,3 +21,4 @@ export function setup() {
 @for (it of items(); track it.id) {
   <span>{{ $index }}: {{ it.label }}</span>
 }
+@await (user) { <span>loading…</span> } @then (u) { <b>{{ u.name }}</b> } @catch (e) { <i>oops</i> }
