@@ -198,7 +198,8 @@ Skliausteliuose — kuriuose framework'uose ta feature pasikartoja (kuo daugiau,
    **PADARYTA** (`createContext` token + owner-medis; `@weave/runtime`). *Pašalino prop-drilling.*
 2. ✅ **`onMount` lifecycle hook** — (Angular · Vue `onMounted` · Svelte `onMount`).
    **PADARYTA** (microtask po įterpimo, owner-scoped; `@weave/runtime`).
-3. **Router: guards + redirects + query params + nested routes** — (Angular · Vue Router · Next). Reali app būtinybė.
+3. 🔧 **Router: guards + redirects + query params + nested routes** — (Angular · Vue Router · Next). Reali app būtinybė.
+   **A.3a PADARYTA** (`Route[]`, sync guard'ai, redirect'ai, query parsinimas); **nested routes — A.3b (liko)**.
 4. **`@defer` + lazy components/routes** — (Angular `@defer` · React `lazy` · Vue async components · Next).
    Našumas / code-splitting.
 5. **Error boundary** — (React error boundaries · Svelte `<svelte:boundary>`). Atsparumas.
@@ -240,8 +241,8 @@ prireiks, plane paliktos „siūlės" (kompiliatoriaus `mode:'ssr'` + hidratacij
 Sprendimai: **SSR iškelta už v1** · **B/C fazės — darom pilnai** („jei darom tai darom"; Tier 2 + ne-SSR
 Tier 3 polišas įeina, padaryta kaip reikia).
 
-- **A faza — Core paritetas (Tier 1):** ✅ provide/inject · ✅ `onMount` · Router++ (guards/redirects/query/nested)
-  · `@defer`+lazy · error boundary · `use:` actions.
+- **A faza — Core paritetas (Tier 1):** ✅ provide/inject · ✅ `onMount` · Router++ (✅ A.3a guards/redirects/query
+  · ⬜ A.3b nested) · `@defer`+lazy · error boundary · `use:` actions.
 - **B faza — Polish (pilnas Tier 2 + ne-SSR Tier 3):** async/Suspense blokas · portal/teleport · forms
   cross-field+async · HTTP interceptors · `linkedSignal`/debounced/`watch` · `:host` CSS · optimistic UI ·
   snippets su parametrais · custom elements · `v-show`/dinaminis elementas · `{#key}` · `tick()` · transitions
