@@ -21,6 +21,8 @@ export interface CompileOptions {
   /** 'module' → importable ES module (default); 'function' → body for `new Function('ctx','rt', …)` */
   mode?: 'module' | 'function';
   runtimeImport?: string;
+  /** Scoped-CSS attribute (e.g. `data-w-a1b2c3`) stamped on every emitted element. */
+  scopeAttr?: string;
 }
 
 class Gen {
@@ -30,7 +32,7 @@ class Gen {
   private tplN = 0;
   private fnN = 0;
 
-  constructor(public mode: 'module' | 'function') {}
+  constructor(public mode: 'module' | 'function', public scopeAttr?: string) {}
 
   H(name: string): string {
     this.used.add(name);
@@ -57,7 +59,7 @@ class Gen {
 export function compileTemplate(input: string, options: CompileOptions = {}): { code: string } {
   const mode = options.mode ?? 'module';
   const runtimeImport = options.runtimeImport ?? '@weave/runtime/dom';
-  const gen = new Gen(mode);
+  const gen = new Gen(mode, options.scopeAttr);
 
   const ast = parseTemplate(input);
   const render = compileFragment(gen, ast, ctxScope(options.scope ?? []), 'render', 'ctx, slots');
@@ -168,6 +170,7 @@ function compileFragment(
     if (node.tag === 'slot') return emitSlot(node, path, sc);
     if (/^[A-Z]/.test(node.tag)) return emitComponent(node, path, sc);
     html += `<${node.tag}`;
+    if (gen.scopeAttr) html += ` ${gen.scopeAttr}`; // scoped-CSS marker
     for (const attr of node.attrs) {
       if (attr.type === 'static') {
         html += attr.value === '' ? ` ${attr.name}` : ` ${attr.name}="${escapeAttr(attr.value)}"`;
