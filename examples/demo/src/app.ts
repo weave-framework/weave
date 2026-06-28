@@ -1,4 +1,4 @@
-import { RouterView, Link } from '@weave/router';
+import { RouterView, Link, currentPath } from '@weave/router';
 import { ErrorBoundary } from '@weave/runtime/dom';
 import { router } from './router';
 
@@ -23,5 +23,5 @@ export function setup() {
     return div;
   };
 
-  return { router, errorFallback };
+  return { router, errorFallback, path: currentPath };
 }
