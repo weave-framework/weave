@@ -7,10 +7,26 @@ import { compileTemplate } from '@weave/compiler';
 const rt = { ...dom, signal, computed, effect, root };
 
 /** Compile a template to a render function and instantiate it (simulates the compiler's output running). */
-function render(html: string, ctx: Record<string, unknown>, scope: string[]): Element {
+function render(
+  html: string,
+  ctx: Record<string, unknown>,
+  scope: string[],
+  components: Record<string, unknown> = {}
+): Element {
   const { code } = compileTemplate(html, { mode: 'function', scope });
-  const fn = new Function('ctx', 'rt', code) as (ctx: unknown, rt: unknown) => Element;
-  return fn(ctx, rt);
+  const fn = new Function('ctx', 'rt', '_c', code) as (ctx: unknown, rt: unknown, _c: unknown) => Element;
+  return fn(ctx, rt, components);
+}
+
+/**
+ * Compile a template into a reusable component `(props, slots) => Node`.
+ * Mirrors what a child component's compiled render is: ctx = props.
+ * (We strip the harness's trailing `return render(ctx, {})` and hand back `render` itself.)
+ */
+function compileComponent(html: string, scope: string[] = []): (props: unknown, slots?: unknown) => Node {
+  const { code } = compileTemplate(html, { mode: 'function', scope });
+  const body = code.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;');
+  return new Function('rt', '_c', body)(rt, {}) as (props: unknown, slots?: unknown) => Node;
 }
 
 function host(): HTMLElement {
@@ -231,8 +247,87 @@ test('module mode emits a real ES module', () => {
     scope: ['count', 'inc'],
   });
   assert.ok(code.includes("from \"@weave/runtime/dom\""), 'imports from runtime');
-  assert.ok(code.includes('export default function render(ctx)'), 'exports render');
+  assert.ok(code.includes('export default function render(ctx, slots)'), 'exports render');
   assert.ok(code.includes('bindText('), 'binds text');
   assert.ok(code.includes('listen('), 'wires event');
   assert.ok(code.includes('ctx.count') && code.includes('ctx.inc'), 'scope rewritten to ctx');
+});
+
+/* ──────────── M5: components + slots ──────────── */
+
+test('component renders with a prop', () => {
+  const Child = compileComponent('<span>{{ label }}</span>', ['label']);
+  const el = render('<div><Child label={"hi"} /></div>', {}, [], { Child });
+  host().appendChild(el);
+  assert.equal(el.querySelector('span')!.textContent, 'hi');
+});
+
+test('component prop is reactive (parent signal flows through the getter)', () => {
+  const name = signal('Ada');
+  const Child = compileComponent('<span>{{ label }}</span>', ['label']);
+  const el = render('<div><Child label={name()} /></div>', { name }, ['name'], { Child });
+  host().appendChild(el);
+  assert.equal(el.querySelector('span')!.textContent, 'Ada');
+  name.set('Lin');
+  assert.equal(el.querySelector('span')!.textContent, 'Lin', 'child text tracks parent signal');
+});
+
+test('on:event prop fires the parent handler', () => {
+  let got = 0;
+  const handler = () => { got++; };
+  const Child = compileComponent('<button on:click={onSelect}>x</button>', ['onSelect']);
+  const el = render('<div><Child on:select={handler} /></div>', { handler }, ['handler'], { Child });
+  host().appendChild(el);
+  const btn = el.querySelector('button') as HTMLButtonElement;
+  btn.click();
+  btn.click();
+  assert.equal(got, 2, 'on:select mapped to onSelect prop and fired');
+});
+
+test('default slot projects parent content', () => {
+  const Child = compileComponent('<div class="box"><slot/></div>');
+  const el = render('<section><Child>hello</Child></section>', {}, [], { Child });
+  host().appendChild(el);
+  assert.equal(el.querySelector('.box')!.textContent, 'hello');
+});
+
+test('slot content uses parent scope', () => {
+  const who = signal('world');
+  const Child = compileComponent('<div class="box"><slot/></div>');
+  const el = render('<section><Child>hi {{ who() }}</Child></section>', { who }, ['who'], { Child });
+  host().appendChild(el);
+  assert.equal(el.querySelector('.box')!.textContent, 'hi world');
+  who.set('Weave');
+  assert.equal(el.querySelector('.box')!.textContent, 'hi Weave', 'projected content stays reactive');
+});
+
+test('named slots route by slot="name"', () => {
+  const Card = compileComponent('<div><header><slot name="title"/></header><main><slot/></main></div>');
+  const el = render(
+    '<div><Card><h1 slot="title">T</h1><p>body</p></Card></div>',
+    {},
+    [],
+    { Card }
+  );
+  host().appendChild(el);
+  assert.equal(el.querySelector('header')!.textContent, 'T');
+  assert.equal(el.querySelector('main')!.textContent, 'body');
+});
+
+test('slot renders fallback when not provided', () => {
+  const Child = compileComponent('<div class="box"><slot>fallback</slot></div>');
+  const el = render('<div><Child/></div>', {}, [], { Child });
+  host().appendChild(el);
+  assert.equal(el.querySelector('.box')!.textContent, 'fallback');
+});
+
+test('module mode references components by name and emits getter props', () => {
+  const { code } = compileTemplate('<div><Child x={v()} on:go={h} /></div>', {
+    mode: 'module',
+    scope: ['v', 'h'],
+  });
+  assert.ok(code.includes('mountChild('), 'mounts the child');
+  assert.ok(/Child\(\{/.test(code), 'calls Child({ … })');
+  assert.ok(code.includes('get x()'), 'reactive prop is a getter');
+  assert.ok(code.includes('onGo:'), 'on:go mapped to onGo prop');
 });
