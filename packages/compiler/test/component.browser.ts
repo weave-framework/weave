@@ -53,6 +53,20 @@ test('inferCtxNames excludes @for item, $vars, and @let names', () => {
   assert.deepEqual(l, ['n']);
 });
 
+test('a comment between elements does not shift child-index paths', () => {
+  // Regression: the parser split the whitespace around a skipped comment into two
+  // adjacent text nodes. The browser merges them when the emitted template HTML is
+  // parsed, so every binding after the comment resolved the wrong node (off by one).
+  const x = signal('hi');
+  const render = compileRender('<div><span>a</span>\n<!-- c -->\n<p>{{ x() }}</p></div>', ['x']);
+  const el = render({ x }, {}) as HTMLElement;
+  host().appendChild(el);
+  const p = el.querySelector('p') as HTMLElement;
+  assert.equal(p.textContent, 'hi', 'interpolation landed in <p>, not a stray text node');
+  x.set('bye');
+  assert.equal(p.textContent, 'bye');
+});
+
 test('a capitalized component named like a void element is not void', () => {
   // `<link>` is a void HTML element, but `<Link>` is the router component — it must
   // keep its children + close tag, or `</Link>` mismatches the parent (regression).

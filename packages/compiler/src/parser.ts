@@ -83,7 +83,15 @@ class Parser {
         continue;
       }
       const text = this.readText(stopAtBrace);
-      if (text) out.push({ type: 'text', value: text });
+      if (text) {
+        // Coalesce with a preceding text node. Two text runs become adjacent when a
+        // comment between them is skipped; the browser merges them into one Text node
+        // when the emitted template HTML is parsed, so the AST must too — otherwise the
+        // child-index paths the codegen computes are off by one for every later sibling.
+        const last = out[out.length - 1];
+        if (last && last.type === 'text') last.value += text;
+        else out.push({ type: 'text', value: text });
+      }
     }
     if (closeTag !== null) throw new ParseError(`Unclosed <${closeTag}>`);
     return out;
