@@ -195,6 +195,20 @@ export interface Group<C extends Controls> extends Control<ValuesOf<C>> {
   reset: () => void;
   /** Mark every descendant touched (e.g. on a failed submit, to reveal all errors). */
   touchAll: () => void;
+
+  /** True while a {@link submit} run is in flight. Reactive. */
+  submitting: () => boolean;
+  /** The last submit rejection (the value `handler` threw), or undefined. Reactive. */
+  submitError: () => unknown;
+  /** Settle any in-flight async validation, then resolve with the current {@link valid}. */
+  validateAsync: () => Promise<boolean>;
+  /**
+   * Build a submit handler that owns the whole dance: `preventDefault` → reveal every
+   * error (`touchAll`) → await async validation → if invalid, focus the first control a
+   * `use:control` marked `aria-invalid` and stop → else run `handler(value())`, tracking
+   * {@link submitting} / {@link submitError}. Wire it as `<form on:submit={form.submit(fn)}>`.
+   */
+  submit: (handler: (values: ValuesOf<C>) => unknown | Promise<unknown>) => (e?: Event) => void;
 }
 
 /**
@@ -228,15 +242,64 @@ export function group<C extends Controls>(controls: C, opts: GroupOptions<C> = {
   }
   const formError: Computed<string | null> = computed<string | null>(() => crossErrors()[FORM_ERROR_KEY] ?? null);
 
+  const valid: Computed<boolean> = computed(() => list.every((c) => c.valid()) && formError() === null);
+  const validating: Computed<boolean> = computed(() => list.some((c) => c.validating()));
+  const touchAll = (): void => list.forEach((c) => c.touchAll());
+
+  const submitting: Signal<boolean> = signal(false);
+  const submitError: Signal<unknown> = signal<unknown>(undefined);
+
+  // Resolve once async validation has settled (bounded poll — reactivity is sync, so
+  // this only ever waits on a debounced/in-flight async validator), then report validity.
+  const validateAsync = (): Promise<boolean> =>
+    new Promise<boolean>((resolve) => {
+      let tries: number = 0;
+      const poll = (): void => {
+        if (!validating() || tries++ > 66) resolve(valid());
+        else setTimeout(poll, 30);
+      };
+      poll();
+    });
+
+  const submit =
+    (handler: (values: ValuesOf<C>) => unknown | Promise<unknown>) =>
+    async (e?: Event): Promise<void> => {
+      // Capture the form element NOW: the browser nulls `currentTarget` once dispatch
+      // ends, and we're about to `await`. Reads only off the event — no global DOM
+      // access, so the core stays pure.
+      const root: Element | null = (e?.currentTarget as Element | null) ?? null;
+      e?.preventDefault?.();
+      touchAll(); // reveal every error, not just visited fields
+      const ok: boolean = await validateAsync();
+      if (!ok) {
+        // Focus the first control a `use:control` flagged `aria-invalid`.
+        (root?.querySelector('[aria-invalid="true"]') as HTMLElement | null)?.focus();
+        return;
+      }
+      submitting.set(true);
+      submitError.set(() => undefined);
+      try {
+        await handler(values());
+      } catch (err) {
+        submitError.set(() => err);
+      } finally {
+        submitting.set(false);
+      }
+    };
+
   return {
     controls,
     value: values,
-    valid: computed(() => list.every((c) => c.valid()) && formError() === null),
+    valid,
     formError,
-    validating: computed(() => list.some((c) => c.validating())),
+    validating,
     touched: () => list.some((c) => c.touched()),
     reset: () => list.forEach((c) => c.reset()),
-    touchAll: () => list.forEach((c) => c.touchAll()),
+    touchAll,
+    submitting: () => submitting(),
+    submitError: () => submitError(),
+    validateAsync,
+    submit,
   };
 }
 
