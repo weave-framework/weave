@@ -60,6 +60,20 @@ writeFileSync(cardHtmlPath, cardHtmlSource);
 const cardHtmlUri = pathToFileURL(cardHtmlPath).toString();
 const cardBadLine = cardHtmlSource.split('\n').findIndex((l) => l.includes('toUpperCase'));
 
+/* ---------- component tags: Panel.html uses <Badge> (imported) + <Nope> (unknown) ---------- */
+writeFileSync(join(fixtureDir, 'Badge.ts'), 'export function Badge(props: { text: string }): unknown {\n  return props;\n}\n');
+const panelTsPath = join(fixtureDir, 'Panel.ts');
+writeFileSync(
+  panelTsPath,
+  ["import { Badge } from './Badge';", 'void Badge;', 'export function setup() {', "  return { title: 'hi' };", '}'].join('\n')
+);
+const panelHtmlPath = join(fixtureDir, 'Panel.html');
+const panelHtmlSource = ['<section>', '  <Badge text="ok" />', '  <Nope />', '</section>'].join('\n');
+writeFileSync(panelHtmlPath, panelHtmlSource);
+const panelHtmlUri = pathToFileURL(panelHtmlPath).toString();
+const nopeLine = panelHtmlSource.split('\n').findIndex((l) => l.includes('<Nope'));
+const badgeCol = panelHtmlSource.split('\n')[1].indexOf('Badge');
+
 /* ---------- minimal LSP client over stdio ---------- */
 const child = spawn(process.execPath, [serverPath, '--stdio'], { stdio: ['pipe', 'pipe', 'pipe'] });
 let stderr = '';
@@ -201,7 +215,39 @@ try {
   if (landsInTs) pass('separate-file: go-to-definition on a template variable lands in Card.ts');
   else console.log(`… go-to-definition did not land in Card.ts (defs: ${JSON.stringify(defs.map((d) => d.uri || d.targetUri))}) — revisit in M9.0c`);
 
-  console.log('\nWeave language server verified (SFC + separate .ts/.html).');
+  /* ===== scenario 2b: component tags — known <Badge> (imported) + unknown <Nope> ===== */
+  diags = await diagnose(panelHtmlUri, 'weave-html', panelHtmlSource);
+  const nopeErr = diags.find((d) => /Cannot find name 'Nope'/.test(d.message));
+  if (!nopeErr) fail(`component tag: expected "Cannot find name 'Nope'"; got: ${JSON.stringify(diags.map((d) => d.message))}`);
+  if (nopeErr.range.start.line !== nopeLine) fail(`component tag: <Nope> error mapped to line ${nopeErr.range.start.line}, expected ${nopeLine}`);
+  pass(`component tag: unknown <Nope> flagged at Panel.html:${nopeLine + 1}`);
+  if (diags.find((d) => /'?Badge'?/.test(d.message))) fail('component tag: unexpected error on the valid imported <Badge>');
+  pass('component tag: valid imported <Badge> reports no error');
+
+  // go-to-definition on the <Badge> tag should land in a component .ts (the import / its source).
+  const tagDef = await send('textDocument/definition', { textDocument: { uri: panelHtmlUri }, position: { line: 1, character: badgeCol } }, true);
+  const tagDefs = Array.isArray(tagDef) ? tagDef : tagDef ? [tagDef] : [];
+  const tagLandsInTs = tagDefs.some((d) => /(panel|badge)\.ts$/i.test((d.uri || d.targetUri || '').toLowerCase()));
+  if (!tagLandsInTs) fail(`component tag: go-to-def on <Badge> did not land in a .ts (defs: ${JSON.stringify(tagDefs.map((d) => d.uri || d.targetUri))})`);
+  pass('component tag: go-to-definition on <Badge> lands in the component .ts');
+
+  /* ===== scenario 3: a malformed template must NOT crash the server ===== */
+  // The editor reparses on every keystroke, so half-typed templates (mismatched/
+  // unclosed tags) are the common case. A parse error must degrade to "no types",
+  // never escape and kill the process (Volar stops restarting after 5 crashes).
+  const brokenPath = join(fixtureDir, 'Broken.weave');
+  const brokenSource = ['<script>export function setup() { return {}; }</script>', '<Link>oops</Linkas>'].join('\n');
+  writeFileSync(brokenPath, brokenSource);
+  const brokenUri = pathToFileURL(brokenPath).toString();
+  send('textDocument/didOpen', { textDocument: { uri: brokenUri, languageId: 'weave', version: 1, text: brokenSource } });
+  await wait(500);
+  if (child.exitCode !== null) fail(`server crashed on a malformed template (exit ${child.exitCode}) — parse errors must not escape`);
+  // Prove it is still serving: the earlier good file must still answer a pull request.
+  const stillAlive = await send('textDocument/diagnostic', { textDocument: { uri: weaveUri } }, true);
+  if (!stillAlive) fail('server stopped responding after a malformed template');
+  pass('malformed template: server survived (degraded to no type-checking, no crash)');
+
+  console.log('\nWeave language server verified (SFC + separate .ts/.html + malformed-template resilience).');
   child.kill();
   process.exit(0);
 } catch (e) {

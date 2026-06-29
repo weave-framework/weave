@@ -476,6 +476,7 @@ class Parser {
 
   parseElement(): ElementNode {
     this.pos++; // <
+    const tagOffset: number = this.pos;
     const tag: string = this.readName();
     if (!tag) throw new ParseError(`Expected tag name at ${this.pos}`);
     const attrs: Attr[] = this.parseAttrs();
@@ -494,7 +495,7 @@ class Parser {
     // so it always takes children + a close tag.
     const isVoid: boolean = !/^[A-Z]/.test(tag) && VOID.has(tag.toLowerCase());
     if (selfClosing || isVoid) {
-      return { type: 'element', tag, attrs, children: [], selfClosing: true };
+      return { type: 'element', tag, tagOffset, attrs, children: [], selfClosing: true };
     }
 
     const children: TemplateNode[] = this.parseChildren(tag);
@@ -507,7 +508,7 @@ class Parser {
     if (this.peek() !== '>') throw new ParseError(`Expected '>' closing </${tag}>`);
     this.pos++;
 
-    return { type: 'element', tag, attrs, children, selfClosing: false };
+    return { type: 'element', tag, tagOffset, attrs, children, selfClosing: false };
   }
 
   parseAttrs(): Attr[] {

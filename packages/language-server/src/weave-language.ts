@@ -17,6 +17,7 @@
 
 import {
   forEachEmbeddedCode,
+  type CodegenContext,
   type CodeInformation,
   type CodeMapping,
   type LanguagePlugin,
@@ -68,13 +69,12 @@ export function createWeaveLanguagePlugin(ts: typeof import('typescript')): Lang
       if (uri.path.endsWith('.html') && existsSync(siblingTs(uri.fsPath))) return 'weave-html';
       return undefined;
     },
-    createVirtualCode(uri: URI, languageId: string, snapshot: ts.IScriptSnapshot): VirtualCode | undefined {
-      if (languageId === 'weave') return buildSfcRoot(uri, snapshot);
-      if (languageId === 'weave-html') return buildTemplateRoot(uri, snapshot);
-      return undefined;
+    createVirtualCode(uri: URI, languageId: string, snapshot: ts.IScriptSnapshot, ctx: CodegenContext<URI>): VirtualCode | undefined {
+      if (languageId !== 'weave' && languageId !== 'weave-html') return undefined;
+      return buildRoot(uri, languageId, snapshot, ctx);
     },
-    updateVirtualCode(uri: URI, code: VirtualCode, snapshot: ts.IScriptSnapshot): VirtualCode {
-      return code.languageId === 'weave-html' ? buildTemplateRoot(uri, snapshot) : buildSfcRoot(uri, snapshot);
+    updateVirtualCode(uri: URI, code: VirtualCode, snapshot: ts.IScriptSnapshot, ctx: CodegenContext<URI>): VirtualCode {
+      return buildRoot(uri, code.languageId, snapshot, ctx);
     },
     typescript: {
       // Teach the TS project that `.weave`/`.html` are real source extensions (mixed
@@ -93,6 +93,22 @@ export function createWeaveLanguagePlugin(ts: typeof import('typescript')): Lang
       },
     },
   };
+}
+
+/**
+ * Build the root virtual code, never throwing. A half-typed template (mismatched or
+ * unclosed tag, stray brace) makes the parser throw — and the editor reparses on every
+ * keystroke, so this is the common case, not the exception. If we let it escape, Volar
+ * crashes the whole server process (it gives up after 5 crashes). On any parse failure
+ * we degrade to a bare root: the file stays claimed (HTML noise stays off) but offers no
+ * type-checking until it parses again.
+ */
+function buildRoot(uri: URI, languageId: string, snapshot: ts.IScriptSnapshot, ctx: CodegenContext<URI>): VirtualCode {
+  try {
+    return languageId === 'weave' ? buildSfcRoot(uri, snapshot) : buildTemplateRoot(uri, snapshot, ctx);
+  } catch {
+    return { id: 'root', languageId, snapshot, mappings: [], embeddedCodes: [] };
+  }
 }
 
 /** A `.weave` SFC: embedded `ts` + `css`, both mapping into the single file. */
@@ -133,7 +149,7 @@ function buildSfcRoot(uri: URI, snapshot: ts.IScriptSnapshot): VirtualCode {
 }
 
 /** A `.html` template paired with a sibling `.ts`: inline the component, split the maps. */
-function buildTemplateRoot(uri: URI, snapshot: ts.IScriptSnapshot): VirtualCode {
+function buildTemplateRoot(uri: URI, snapshot: ts.IScriptSnapshot, ctx: CodegenContext<URI>): VirtualCode {
   const htmlSource: string = snapshot.getText(0, snapshot.getLength());
   const htmlPath: string = uri.fsPath;
   const tsPath: string = siblingTs(htmlPath);
@@ -148,19 +164,31 @@ function buildTemplateRoot(uri: URI, snapshot: ts.IScriptSnapshot): VirtualCode 
   const v: Virtual = buildVirtualSeparate(tsPath, tsSource, htmlPath, htmlSource);
 
   // Template runs map to THIS `.html` (the root); the inlined script region maps back
-  // to the sibling `.ts` as an associated script (so definitions land in the `.ts`).
+  // to the sibling `.ts` as an *associated script* — so a definition that resolves
+  // into the inlined component (a `{{ ctx.x }}` binding, a `<Component>` tag) lands in
+  // the real `.ts`, not the throwaway virtual module.
+  //
+  // `getAssociatedScript` is the load-bearing call: it registers the `.ts` in the
+  // project's script registry and records the association (so we re-render when it
+  // changes). Without it, `@volar/language-core` finds no source script for the
+  // mapping key and silently drops every cross-file definition (go-to-def → `[]`).
+  // We key `associatedScriptMappings` by the *registered* script id it returns, so
+  // the lookup in language-core (`scriptRegistry.get(relatedScriptId)`) hits.
   const rootMappings: CodeMapping[] = [];
   const scriptMappings: CodeMapping[] = [];
   for (const m of v.mappings) {
     (m.source === 'template' ? rootMappings : scriptMappings).push(toMapping(m));
   }
 
+  const associated = ctx.getAssociatedScript(URI.file(tsPath));
+  const scriptKey: unknown = associated?.id ?? URI.file(tsPath);
+
   const tsCode: VirtualCode = {
     id: 'ts',
     languageId: 'typescript',
     snapshot: snapshotOf(v.text),
     mappings: rootMappings,
-    associatedScriptMappings: new Map<unknown, CodeMapping[]>([[URI.file(tsPath), scriptMappings]]),
+    associatedScriptMappings: new Map<unknown, CodeMapping[]>([[scriptKey, scriptMappings]]),
   };
 
   return {

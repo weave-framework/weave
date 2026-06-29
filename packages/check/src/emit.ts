@@ -225,7 +225,6 @@ function emit(nodes: TemplateNode[], ctx: Set<string>): Line[] {
   // props all surface, each pinned to its own attribute. Events stay outside the
   // contract (the runtime wires them) but their handler bodies are still checked.
   const emitComponent = (node: ElementNode, locals: Set<string>): void => {
-    const compRef: string = rewrite(node.tag, scopeOf(locals), '__ctx').code; // bare import, or `__ctx.Name`
     const dataProps: Array<{ key: string; expr?: string; srcOffset?: number; staticVal?: string }> = [];
     for (const attr of node.attrs) {
       if (attr.type === 'static') {
@@ -239,7 +238,14 @@ function emit(nodes: TemplateNode[], ctx: Set<string>): Line[] {
     }
     const id: string = `__props${propsN++}`;
     const anchor: number | undefined = dataProps.find((p) => p.srcOffset !== undefined)?.srcOffset;
-    push(`  const ${id}: NonNullable<Parameters<typeof ${compRef}>[0]> = {`, anchor);
+    // The tag name is emitted as a *mapped* expression (not scaffolding), so the
+    // `<Component>` tag itself supports go-to-definition into the `.ts` import and an
+    // unknown tag surfaces "Cannot find name 'X'" pinned to the tag span.
+    mk()
+      .lit(`  const ${id}: NonNullable<Parameters<typeof `)
+      .expr(node.tagOffset, node.tag, locals)
+      .lit(`>[0]> = {`)
+      .push(anchor ?? node.tagOffset);
     for (const p of dataProps) {
       if (p.expr !== undefined) {
         mk().lit(`    ${propKey(p.key)}: (`).expr(p.srcOffset, p.expr, locals).lit('),').push(p.srcOffset);
