@@ -20,7 +20,7 @@
 
 import { signal, computed, effect, batch, getOwner, createContext, provide, inject } from '@weave/runtime';
 import type { Signal, Computed, Context } from '@weave/runtime';
-import { ifBlock, type Component } from '@weave/runtime/dom';
+import { ifBlock, transition, type Component, type TransitionFn } from '@weave/runtime/dom';
 
 export type RouteParams = Record<string, string>;
 
@@ -373,12 +373,19 @@ const OutletContext: Context<OutletCtx | null> = createContext<OutletCtx | null>
  * change updates `params` in place instead of remounting; switching routes swaps the
  * component. The top outlet also syncs the address bar after a guard/redirect.
  *
+ * Pass `transition` (a `TransitionFn`, e.g. `fade`) to animate route changes: the
+ * entering view is wrapped in a real host element that plays the intro on swap — so
+ * it works even for `lazy()` routes (whose own host is `display:contents`). Author a
+ * page-root `out:` if you also want a leave animation.
+ *
  * Usage: `<RouterView router={r}/>` at the top, `<RouterView/>` inside each layout.
  */
 export const RouterView: Component = (props = {}) => {
   const parentCtx: OutletCtx | null = inject(OutletContext);
   const router: Router | undefined = (props as { router?: Router }).router ?? parentCtx?.router;
   const depth: number = parentCtx ? parentCtx.depth : 0;
+  const txFn: TransitionFn<unknown> | undefined = (props as { transition?: TransitionFn<unknown> }).transition;
+  const txParams: unknown = (props as { transitionParams?: unknown }).transitionParams;
 
   // Hand the router + the next depth to any nested outlet below us. Only when an owner
   // scope exists (a directly-invoked RouterView in a test has none — and won't nest).
@@ -406,12 +413,20 @@ export const RouterView: Component = (props = {}) => {
     let thunk: (() => Node) | undefined = thunks.get(m.view);
     if (!thunk) {
       const view: Component = m.view;
-      thunk = () =>
-        view({
+      thunk = () => {
+        const node: Node = view({
           get params() {
             return router!.params(depth);
           },
         });
+        if (!txFn) return node;
+        // Wrap in a real element so the intro plays even when the view's own root is
+        // `display:contents` (lazy host) or a fragment (multi-root template).
+        const wrap: HTMLDivElement = document.createElement('div');
+        wrap.appendChild(node);
+        transition(wrap, txFn, txParams, 'in');
+        return wrap;
+      };
       thunks.set(view, thunk);
     }
     return thunk;

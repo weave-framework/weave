@@ -166,6 +166,17 @@ try {
   await page.waitForFunction(() => location.pathname === '/' && window.scrollY === 0, { timeout: 5000 });
   ok(true, 'navigating to a new route scrolls back to the top');
 
+  /* ── 11. Router R.4 — routed view wrapped in a transition host (route fade) ── */
+  await page.waitForSelector('.board', { timeout: 5000 });
+  ok(
+    await page.evaluate(() => {
+      const s = document.querySelector('.board');
+      const wrap = s?.parentElement?.parentElement; // section → lazy host(contents) → tx wrap
+      return !!wrap && wrap.tagName === 'DIV' && getComputedStyle(wrap).display !== 'contents';
+    }),
+    'route view is wrapped in a real transition host (so the fade can play)'
+  );
+
   ok(errors.length === 0, errors.length ? `no page errors (got: ${errors.join('; ')})` : 'no page errors during the run');
 } finally {
   await browser.close();

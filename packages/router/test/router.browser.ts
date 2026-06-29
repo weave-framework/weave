@@ -1,5 +1,5 @@
 import { test, assert } from '../../../tools/harness.js';
-import { effect, signal, tick } from '@weave/runtime';
+import { effect, signal, tick, fade } from '@weave/runtime';
 import type { Signal } from '@weave/runtime';
 import { mount, mountComponent, defineComponent, lazy, type Component } from '@weave/runtime/dom';
 import {
@@ -141,6 +141,22 @@ test('RouterView swaps components on navigation', () => {
   navigate('/about');
   assert.ok(el.textContent?.includes('about'), 'swapped to new route');
   assert.ok(!el.textContent?.includes('home'), 'old route removed');
+});
+
+test('RouterView with a transition wraps the view (so the intro can play) and still swaps', () => {
+  const r: Router = createRouter([
+    { path: '/', component: Home },
+    { path: '/about', component: About },
+    { path: '*', component: NotFound },
+  ]);
+  navigate('/');
+  const el: HTMLElement = host();
+  mount(RouterView({ router: r, transition: fade }), el);
+  const span: HTMLSpanElement | null = el.querySelector('span');
+  assert.equal(el.textContent, 'home', 'initial route rendered');
+  assert.ok(span && span.parentElement !== el && span.parentElement!.tagName === 'DIV', 'view wrapped in a transition host <div>');
+  navigate('/about');
+  assert.equal(el.textContent, 'about', 'swaps the routed view under a transition');
 });
 
 test('RouterView keeps the instance on a param-only change', () => {

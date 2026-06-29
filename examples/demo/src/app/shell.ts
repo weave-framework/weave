@@ -1,6 +1,6 @@
-import { provide } from '@weave/runtime';
+import { provide, fade } from '@weave/runtime';
 import { RouterView, Link, currentPath, afterEach, type Router } from '@weave/router';
-import { ErrorBoundary } from '@weave/runtime/dom';
+import { ErrorBoundary, type TransitionFn } from '@weave/runtime/dom';
 import { router } from './router';
 import { SessionContext } from './session';
 import TaskModal from '../components/task-modal/task-modal';
@@ -10,6 +10,8 @@ interface ShellSetup {
   router: Router;
   errorFallback: (err: unknown, reset: () => void) => Node;
   path: () => string;
+  routeFade: TransitionFn<{ duration?: number } | void>;
+  routeFadeParams: { duration: number };
 }
 
 // Used as components in app.html (capitalized tags resolve to these imports).
@@ -49,5 +51,12 @@ export function setup(): ShellSetup {
     return div;
   };
 
-  return { router, errorFallback, path: currentPath };
+  return {
+    router,
+    errorFallback,
+    path: currentPath,
+    // Routed views fade in on navigation (R.4 — RouterView wraps + plays the intro).
+    routeFade: fade,
+    routeFadeParams: { duration: 180 },
+  };
 }
