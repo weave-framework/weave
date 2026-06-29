@@ -5,6 +5,9 @@
     @if (task().assignee) {
       <span class="assignee">{{ task().assignee }}</span>
     }
+    @if (mine()) {
+      <span class="mine">You</span>
+    }
   </div>
   <!-- Inside the board's <Link>: stop the click so editing doesn't also navigate. -->
   <button

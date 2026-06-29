@@ -37,5 +37,13 @@
       @render (column('doing', 'In progress'))
       @render (column('done', 'Done'))
     </div>
+
+    <!-- Non-critical: render the columns first, fill the summary in when the
+         browser is idle (A.4b @defer). The panel injects the shell's session. -->
+    @defer (on idle) {
+      <BoardInsights />
+    } @placeholder {
+      <div class="insights-skeleton" aria-hidden="true">Loading insights…</div>
+    }
   }
 </section>

@@ -739,7 +739,6 @@ export function deferBlock(
   content: () => Node,
   placeholder?: () => Node
 ): void {
-  const parent: Node = anchor.parentNode!;
   const host: Owner | null = getOwner();
   let owner: Owner | null = null;
   let nodes: ChildNode[] = [];
@@ -759,7 +758,11 @@ export function deferBlock(
     clear();
     owner = runInOwner(host, () => createOwner(null));
     const node: Node = runInOwner(owner, () => fn());
-    nodes = node ? placeBefore(parent, node, anchor) : [];
+    // Read the parent at insert time, not construction: when `@defer` sits inside an
+    // `@if`/`@for` branch, the anchor is still in a detached clone fragment when this
+    // block is wired — and the post-trigger render runs long after the branch was
+    // inserted, so the captured parent would be stale (same fix as ifBlock/eachBlock).
+    nodes = node ? placeBefore(anchor.parentNode!, node, anchor) : [];
   };
 
   if (placeholder) render(placeholder);
