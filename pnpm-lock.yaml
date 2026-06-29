@@ -151,6 +151,24 @@ importers:
 
   packages/store: {}
 
+  packages/typescript-plugin:
+    dependencies:
+      '@volar/language-core':
+        specifier: ^2.4.11
+        version: 2.4.28
+      '@volar/typescript':
+        specifier: ^2.4.11
+        version: 2.4.28
+      '@weave/check':
+        specifier: workspace:*
+        version: link:../check
+      '@weave/compiler':
+        specifier: workspace:*
+        version: link:../compiler
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+
 packages:
 
   '@azu/format-text@1.0.2':

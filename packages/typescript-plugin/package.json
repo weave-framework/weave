@@ -1,0 +1,21 @@
+{
+  "name": "@weave/typescript-plugin",
+  "version": "0.2.0",
+  "description": "Weave TypeScript Service plugin — gives component .ts files their synthesized default export (no TS1192) and counts template-only imports as used, in any editor that loads tsserver plugins (VS Code, WebStorm).",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "files": ["dist", "src"],
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "dependencies": {
+    "@volar/language-core": "^2.4.11",
+    "@volar/typescript": "^2.4.11",
+    "@weave/check": "workspace:*",
+    "@weave/compiler": "workspace:*"
+  },
+  "peerDependencies": {
+    "typescript": "^5.7.0"
+  },
+  "license": "MIT"
+}
