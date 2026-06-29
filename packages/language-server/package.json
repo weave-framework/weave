@@ -1,0 +1,32 @@
+{
+  "name": "@weave/language-server",
+  "version": "0.2.0",
+  "description": "Weave language server — Volar-based IDE support (.weave + template type-checking) for VS Code and WebStorm.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "bin": {
+    "weave-language-server": "./bin/weave-language-server.mjs"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": ["src", "bin", "dist"],
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "dependencies": {
+    "@volar/language-core": "^2.4.11",
+    "@volar/language-server": "^2.4.11",
+    "@volar/typescript": "^2.4.11",
+    "@weave/check": "workspace:*",
+    "@weave/compiler": "workspace:*",
+    "volar-service-css": "^0.0.62",
+    "volar-service-typescript": "^0.0.62",
+    "vscode-uri": "^3.1.0"
+  },
+  "peerDependencies": {
+    "typescript": "^5.7.0"
+  },
+  "license": "MIT"
+}
