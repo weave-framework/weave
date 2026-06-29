@@ -148,6 +148,9 @@ export interface KeyNode {
 export interface ElementNode {
   type: 'element';
   tag: string;
+  /** offset of the tag name's first char (after `<`); lets a `<Component>` tag map
+   *  to its `.ts` import for go-to-definition and "unknown component" errors. */
+  tagOffset?: Offset;
   attrs: Attr[];
   children: TemplateNode[];
   /** true for void elements (input, br, …) — no children, no closing tag */
