@@ -32,8 +32,30 @@ export interface FieldOptions<T> {
   debounceMs?: number;
 }
 
-export interface Field<T> {
-  /** The editable value — bind it with `bind:value={field.value}`. */
+/**
+ * The shared shape of every form control — a {@link Field}, a nested {@link Group},
+ * or a {@link FieldArray}. Aggregation (a group's validity/values/reset) is defined
+ * purely in terms of this interface, so the three compose recursively to any depth
+ * (`form → group → fieldArray → group → field`), the Weave analog of Angular's
+ * `AbstractControl` (`FormControl` / `FormGroup` / `FormArray`).
+ */
+export interface Control<T> {
+  /** Current value — a field's value, a group's nested snapshot, or an array's items. Reactive. */
+  value: () => T;
+  /** Whether this control and every descendant is valid. Reactive. */
+  valid: () => boolean;
+  /** Whether an async validation is in flight here or in a descendant. Reactive. */
+  validating: () => boolean;
+  /** Whether this control (or any descendant) has been touched. Reactive. */
+  touched: () => boolean;
+  /** Restore initial value(s) and clear touched/errors. */
+  reset: () => void;
+  /** Mark this control (and every descendant) touched — e.g. on a failed submit. */
+  touchAll: () => void;
+}
+
+export interface Field<T> extends Control<T> {
+  /** The editable value — bind it with `bind:value={field.value}`. (A `Signal`, so also callable.) */
   value: Signal<T>;
   /** First error across sync validators → cross-field → async. Reactive. */
   error: () => string | null;
@@ -45,6 +67,8 @@ export interface Field<T> {
   validating: () => boolean;
   /** Restore the initial value and clear `touched`. */
   reset: () => void;
+  /** Mark the field touched (Control parity; equivalent to `touched.set(true)`). */
+  touchAll: () => void;
 }
 
 /** Internal shape — `form` writes cross-field errors into `_external`. */
@@ -126,77 +150,156 @@ export function field<T>(
       asyncError.set(null);
       validating.set(false);
     },
+    touchAll: () => touched.set(true),
     _external: external,
   };
   return f;
 }
 
-type FieldsOf<F> = { [K in keyof F]: F[K] extends Field<infer T> ? T : never };
+/** A named bag of controls — the children of a {@link Group} (or {@link form}). */
+export type Controls = Record<string, Control<unknown>>;
 
-/** Cross-field validator: returns `{ fieldName: msg }` (and/or a reserved `_form` key), or null. */
-export type FormValidator<F extends Record<string, Field<unknown>>> = (
-  values: FieldsOf<F>
-) => Record<string, string> | null;
+/** The value snapshot type of a control bag: each control's own value type, recursively. */
+export type ValuesOf<C extends Controls> = { [K in keyof C]: C[K] extends Control<infer T> ? T : never };
 
-/** Reserved key in a {@link FormValidator} result for a form-level (not field-bound) error. */
+/** Cross-field validator: returns `{ childName: msg }` (and/or a reserved `_form` key), or null. */
+export type FormValidator<C extends Controls> = (values: ValuesOf<C>) => Record<string, string> | null;
+
+/** Reserved key in a {@link FormValidator} result for a group-level (not field-bound) error. */
 export const FORM_ERROR_KEY: '_form' = '_form';
 
-export interface FormOptions<F extends Record<string, Field<unknown>>> {
-  /** Cross-field validation over the whole values snapshot (e.g. password confirm). */
-  validate?: FormValidator<F>;
+export interface GroupOptions<C extends Controls> {
+  /** Cross-field validation over this group's own values snapshot (e.g. password confirm). */
+  validate?: FormValidator<C>;
 }
+/** @deprecated alias of {@link GroupOptions}. */
+export type FormOptions<C extends Controls> = GroupOptions<C>;
 
-export interface Form<F extends Record<string, Field<unknown>>> {
-  fields: F;
-  /** True when every field is valid AND there is no form-level cross-field error. Reactive. */
+/**
+ * A group of named controls — the Weave analog of Angular's `FormGroup`. A `Group`
+ * is itself a {@link Control}, so groups nest arbitrarily (and live inside a
+ * {@link FieldArray}). `form` is just the conventional name for the top-level group.
+ */
+export interface Group<C extends Controls> extends Control<ValuesOf<C>> {
+  /** The child controls (fields / nested groups / arrays). */
+  controls: C;
+  /** Alias of {@link controls} (back-compat with `form().fields`). */
+  fields: C;
+  /** Nested `{ name: value }` snapshot of every child value. Reactive. */
+  value: () => ValuesOf<C>;
+  /** Alias of {@link value}. Reactive. */
+  values: () => ValuesOf<C>;
+  /** True when every child is valid AND there is no group-level cross-field error. Reactive. */
   valid: () => boolean;
-  /** A form-level (`_form`) cross-field error, or null. Reactive. */
+  /** A group-level (`_form`) cross-field error, or null. Reactive. */
   formError: () => string | null;
-  /** True while any field is running an async validation. Reactive. */
+  /** True while any descendant is running an async validation. Reactive. */
   validating: () => boolean;
-  /** Plain `{ name: value }` snapshot of all field values. Reactive. */
-  values: () => FieldsOf<F>;
-  /** Reset every field. */
+  /** True once any descendant has been touched. Reactive. */
+  touched: () => boolean;
+  /** Reset every child. */
   reset: () => void;
-  /** Mark every field touched (e.g. on a failed submit, to reveal all errors). */
+  /** Mark every descendant touched (e.g. on a failed submit, to reveal all errors). */
   touchAll: () => void;
 }
 
-/** Aggregate named fields into one form, with optional cross-field validation. */
-export function form<F extends Record<string, Field<unknown>>>(
-  fields: F,
-  opts: FormOptions<F> = {}
-): Form<F> {
-  const list: Field<unknown>[] = Object.values(fields);
-  const values = (): FieldsOf<F> => {
-    const out: FieldsOf<F> = {} as FieldsOf<F>;
-    for (const key in fields) out[key] = fields[key].value() as FieldsOf<F>[Extract<keyof F, string>];
+/** @deprecated alias of {@link Group} (kept for back-compat). */
+export type Form<C extends Controls> = Group<C>;
+
+/**
+ * Aggregate named controls into one group, with optional cross-field validation.
+ * Children may be {@link field}s, nested {@link group}s, or {@link fieldArray}s — the
+ * group's validity, value snapshot, `touched`, `reset`, and `touchAll` recurse through
+ * them. Cross-field `validate` keys target this group's direct **field** children
+ * (pushed into their error); the reserved `_form` key surfaces via {@link Group.formError}.
+ */
+export function group<C extends Controls>(controls: C, opts: GroupOptions<C> = {}): Group<C> {
+  const list: Control<unknown>[] = Object.values(controls);
+  const values = (): ValuesOf<C> => {
+    const out: ValuesOf<C> = {} as ValuesOf<C>;
+    for (const key in controls) out[key] = controls[key].value() as ValuesOf<C>[Extract<keyof C, string>];
     return out;
   };
 
-  // Cross-field: compute the error map reactively and push each field-keyed error
-  // into that field's `_external`; the `_form` key is surfaced via `formError`.
+  // Cross-field: compute the error map reactively and push each child-keyed error into
+  // that child's `_external` (fields only); the `_form` key is surfaced via `formError`.
   const crossErrors: Computed<Record<string, string>> = computed<Record<string, string>>(() =>
     opts.validate ? opts.validate(values()) ?? {} : {}
   );
   if (opts.validate) {
     effect(() => {
       const errs: Record<string, string> = crossErrors();
-      for (const key in fields) {
-        (fields[key] as unknown as FieldInternal<unknown>)._external.set(errs[key] ?? null);
+      for (const key in controls) {
+        const ext: Signal<string | null> | undefined = (controls[key] as { _external?: Signal<string | null> })._external;
+        if (ext) ext.set(errs[key] ?? null);
       }
     });
   }
   const formError: Computed<string | null> = computed<string | null>(() => crossErrors()[FORM_ERROR_KEY] ?? null);
 
   return {
-    fields,
-    valid: computed(() => list.every((f) => f.valid()) && formError() === null),
-    formError,
-    validating: computed(() => list.some((f) => f.validating())),
+    controls,
+    fields: controls,
+    value: values,
     values,
-    reset: () => list.forEach((f) => f.reset()),
-    touchAll: () => list.forEach((f) => f.touched.set(true)),
+    valid: computed(() => list.every((c) => c.valid()) && formError() === null),
+    formError,
+    validating: computed(() => list.some((c) => c.validating())),
+    touched: () => list.some((c) => c.touched()),
+    reset: () => list.forEach((c) => c.reset()),
+    touchAll: () => list.forEach((c) => c.touchAll()),
+  };
+}
+
+/** Aggregate named controls into one form — the conventional name for a top-level {@link group}. */
+export const form: typeof group = group;
+
+/** A dynamic list of like-typed controls — the Weave analog of Angular's `FormArray`. */
+export interface FieldArray<T> extends Control<T[]> {
+  /** The live list of item controls — render with `@for (c of arr.controls(); …)`. Reactive. */
+  controls: () => Control<T>[];
+  /** Number of items. Reactive. */
+  length: () => number;
+  /** Append a new item, built by the factory (optionally seeded with a value). */
+  push: (seed?: T) => void;
+  /** Remove the item at `index`. */
+  removeAt: (index: number) => void;
+  /** Array of every item's value, in order. Reactive. */
+  value: () => T[];
+}
+
+/**
+ * A dynamic list of controls. `factory(seed?)` builds one item (a field, group, or
+ * nested array); `seeds` are the initial items. `push`/`removeAt` mutate the list,
+ * and validity/values/`touched` aggregate over the current items.
+ *
+ * ```ts
+ * const tags = fieldArray(() => field('', [validators.required()]));
+ * tags.push();                       // add a blank tag
+ * const checklist = fieldArray(
+ *   (s) => group({ text: field(s ?? ''), done: field(false) }),
+ *   ['Write tests']                  // one seeded item
+ * );
+ * ```
+ *
+ * **Caveat:** items added via `push` are created outside a component owner, so an item
+ * that itself registers effects (a field with `asyncValidate`, or a group with a
+ * cross-field `validate`) won't auto-dispose on `removeAt` — only when the whole
+ * component unmounts. Plain sync-validated items have no such effect and are unaffected.
+ */
+export function fieldArray<T>(factory: (seed?: T) => Control<T>, seeds: T[] = []): FieldArray<T> {
+  const items: Signal<Control<T>[]> = signal<Control<T>[]>(seeds.map((s) => factory(s)));
+  return {
+    controls: () => items(),
+    length: () => items().length,
+    value: () => items().map((c) => c.value()),
+    valid: () => items().every((c) => c.valid()),
+    validating: () => items().some((c) => c.validating()),
+    touched: () => items().some((c) => c.touched()),
+    reset: () => items.set(seeds.map((s) => factory(s))),
+    touchAll: () => items().forEach((c) => c.touchAll()),
+    push: (seed?: T) => items.set((xs) => [...xs, factory(seed)]),
+    removeAt: (index: number) => items.set((xs) => xs.filter((_, j) => j !== index)),
   };
 }
 
