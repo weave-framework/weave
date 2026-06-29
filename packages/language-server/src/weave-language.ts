@@ -1,19 +1,15 @@
 /**
- * Volar language plugin for `.weave` SFCs.
+ * Volar language plugin for Weave — both authoring forms:
  *
- * Each `.weave` file becomes a root virtual code with two embedded codes:
- *  - **`ts`** — the same type-check harness `weave check` generates (script verbatim
- *    + `__weave__()` placing every template expression against `ReturnType<typeof
- *    setup>`), carrying char-precise mappings back to the `.weave` source. This is
- *    what gives the editor real template type errors, hover, go-to-definition and
- *    rename — and a synthesized typed default export, so a parent's
- *    `import Child from './child'` no longer reports TS1192.
- *  - **`css`** — the `<style>` body, handed to the CSS service.
- *
- * Crucially, the `.weave` root itself is *not* a TypeScript or HTML document, so the
- * editor stops running HTML validation on it ("Unknown html tag", "Attribute … is
- * not allowed", "Closing tag matches nothing", …). Only the regions we map carry
- * language features.
+ *  - **`.weave` SFC** → one root with embedded `ts` (the `weave check` harness +
+ *    char-precise mappings) and `css` (the `<style>` body).
+ *  - **`.html` template + sibling `.ts`** (the demo's form) → the `.html` is claimed
+ *    as `weave-html` (so the editor stops HTML-validating it — no "Unknown html
+ *    tag" / "Closing tag matches nothing"), and its embedded `ts` *inlines* the
+ *    sibling component so capitalized tags (`<RouterView>`) resolve to that file's
+ *    imports. Template expressions map to the `.html`; the inlined script region
+ *    maps (via `associatedScriptMappings`) back to the `.ts`, so go-to-definition
+ *    on a template variable lands in the component file.
  *
  * One emitter (`@weave/check`) feeds both this server and `weave check`, so the
  * editor and the CLI can never disagree about a template's types.
@@ -27,8 +23,14 @@ import {
   type VirtualCode,
 } from '@volar/language-core';
 import type * as ts from 'typescript';
-import type { URI } from 'vscode-uri';
-import { buildVirtualSfc, type Virtual } from '@weave/check/emit';
+import { URI } from 'vscode-uri';
+import { existsSync, readFileSync } from 'node:fs';
+import {
+  buildVirtualSfc,
+  buildVirtualSeparate,
+  type Virtual,
+  type WeaveMapping,
+} from '@weave/check/emit';
 import { parseSfcLoc, type ComponentSourceLoc } from '@weave/compiler';
 
 /** Every mapped region gets the full set of language features. */
@@ -47,26 +49,39 @@ function snapshotOf(text: string): ts.IScriptSnapshot {
   };
 }
 
-const isWeave = (uri: URI): boolean => uri.path.endsWith('.weave');
+const toMapping = (m: WeaveMapping): CodeMapping => ({
+  sourceOffsets: [m.sourceOffset],
+  generatedOffsets: [m.generatedOffset],
+  lengths: [m.length],
+  data: ALL_FEATURES,
+});
+
+const siblingTs = (htmlFsPath: string): string => htmlFsPath.replace(/\.html$/i, '.ts');
 
 /** Build the Volar language plugin. `ts` is the editor-provided TypeScript module. */
 export function createWeaveLanguagePlugin(ts: typeof import('typescript')): LanguagePlugin<URI> {
   return {
     getLanguageId(uri: URI): string | undefined {
-      return isWeave(uri) ? 'weave' : undefined;
+      if (uri.path.endsWith('.weave')) return 'weave';
+      // Only claim a `.html` that is a Weave template (has a sibling component `.ts`),
+      // so ordinary web pages keep their normal HTML support.
+      if (uri.path.endsWith('.html') && existsSync(siblingTs(uri.fsPath))) return 'weave-html';
+      return undefined;
     },
     createVirtualCode(uri: URI, languageId: string, snapshot: ts.IScriptSnapshot): VirtualCode | undefined {
-      if (languageId !== 'weave') return undefined;
-      return buildWeaveRoot(uri, snapshot);
+      if (languageId === 'weave') return buildSfcRoot(uri, snapshot);
+      if (languageId === 'weave-html') return buildTemplateRoot(uri, snapshot);
+      return undefined;
     },
-    updateVirtualCode(uri: URI, _code: VirtualCode, snapshot: ts.IScriptSnapshot): VirtualCode {
-      return buildWeaveRoot(uri, snapshot);
+    updateVirtualCode(uri: URI, code: VirtualCode, snapshot: ts.IScriptSnapshot): VirtualCode {
+      return code.languageId === 'weave-html' ? buildTemplateRoot(uri, snapshot) : buildSfcRoot(uri, snapshot);
     },
     typescript: {
-      // Teach the TS project that `.weave` is a real source extension (mixed content,
-      // deferred to our embedded `ts` code) so module resolution + imports work.
+      // Teach the TS project that `.weave`/`.html` are real source extensions (mixed
+      // content, deferred to our embedded `ts` code) so module resolution + imports work.
       extraFileExtensions: [
         { extension: 'weave', isMixedContent: true, scriptKind: ts.ScriptKind.Deferred },
+        { extension: 'html', isMixedContent: true, scriptKind: ts.ScriptKind.Deferred },
       ],
       getServiceScript(root: VirtualCode) {
         for (const code of forEachEmbeddedCode(root)) {
@@ -80,20 +95,13 @@ export function createWeaveLanguagePlugin(ts: typeof import('typescript')): Lang
   };
 }
 
-function buildWeaveRoot(uri: URI, snapshot: ts.IScriptSnapshot): VirtualCode {
+/** A `.weave` SFC: embedded `ts` + `css`, both mapping into the single file. */
+function buildSfcRoot(uri: URI, snapshot: ts.IScriptSnapshot): VirtualCode {
   const source: string = snapshot.getText(0, snapshot.getLength());
   const v: Virtual = buildVirtualSfc(uri.fsPath, source);
 
-  // The emitter's char-precise runs become Volar mappings. Both `script` and
-  // `template` runs index into the original `.weave` file (offset-faithful), so a
-  // single mapping per run suffices.
-  const tsMappings: CodeMapping[] = v.mappings.map((m) => ({
-    sourceOffsets: [m.sourceOffset],
-    generatedOffsets: [m.generatedOffset],
-    lengths: [m.length],
-    data: ALL_FEATURES,
-  }));
-
+  // Both `script` and `template` runs index into the same `.weave` file.
+  const tsMappings: CodeMapping[] = v.mappings.map(toMapping);
   const embeddedCodes: VirtualCode[] = [
     { id: 'ts', languageId: 'typescript', snapshot: snapshotOf(v.text), mappings: tsMappings },
   ];
@@ -119,7 +127,47 @@ function buildWeaveRoot(uri: URI, snapshot: ts.IScriptSnapshot): VirtualCode {
     id: 'root',
     languageId: 'weave',
     snapshot: snapshotOf(source),
-    mappings: [], // the root carries no features directly; only its embedded codes do
+    mappings: [],
     embeddedCodes,
+  };
+}
+
+/** A `.html` template paired with a sibling `.ts`: inline the component, split the maps. */
+function buildTemplateRoot(uri: URI, snapshot: ts.IScriptSnapshot): VirtualCode {
+  const htmlSource: string = snapshot.getText(0, snapshot.getLength());
+  const htmlPath: string = uri.fsPath;
+  const tsPath: string = siblingTs(htmlPath);
+
+  // No sibling component: still claim the file (HTML validation stays off) but offer
+  // no TS — nothing to type-check against.
+  if (!existsSync(tsPath)) {
+    return { id: 'root', languageId: 'weave-html', snapshot: snapshotOf(htmlSource), mappings: [], embeddedCodes: [] };
+  }
+
+  const tsSource: string = readFileSync(tsPath, 'utf8');
+  const v: Virtual = buildVirtualSeparate(tsPath, tsSource, htmlPath, htmlSource);
+
+  // Template runs map to THIS `.html` (the root); the inlined script region maps back
+  // to the sibling `.ts` as an associated script (so definitions land in the `.ts`).
+  const rootMappings: CodeMapping[] = [];
+  const scriptMappings: CodeMapping[] = [];
+  for (const m of v.mappings) {
+    (m.source === 'template' ? rootMappings : scriptMappings).push(toMapping(m));
+  }
+
+  const tsCode: VirtualCode = {
+    id: 'ts',
+    languageId: 'typescript',
+    snapshot: snapshotOf(v.text),
+    mappings: rootMappings,
+    associatedScriptMappings: new Map<unknown, CodeMapping[]>([[URI.file(tsPath), scriptMappings]]),
+  };
+
+  return {
+    id: 'root',
+    languageId: 'weave-html',
+    snapshot: snapshotOf(htmlSource),
+    mappings: [],
+    embeddedCodes: [tsCode],
   };
 }

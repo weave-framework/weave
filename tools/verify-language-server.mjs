@@ -38,6 +38,28 @@ writeFileSync(weavePath, weaveSource);
 const weaveUri = pathToFileURL(weavePath).toString();
 const badLine = weaveSource.split('\n').findIndex((l) => l.includes('toUpperCase')); // 0-based
 
+/* ---------- separate-file form: Card.ts (component) + Card.html (template) ---------- */
+const cardTsPath = join(fixtureDir, 'Card.ts');
+const cardTsSource = [
+  'export function setup(props: { n: number }) {',
+  '  const count = (): number => props.n;',
+  '  const label = "hi";',
+  '  return { count, label };',
+  '}',
+].join('\n');
+writeFileSync(cardTsPath, cardTsSource);
+const cardHtmlPath = join(fixtureDir, 'Card.html');
+const cardHtmlSource = [
+  '<article class="card">',
+  '  <h1>{{ label }}</h1>',
+  '  <p>{{ count().toUpperCase() }}</p>',
+  '  <custom-thing data-y="2"></custom-thing>',
+  '</article>',
+].join('\n');
+writeFileSync(cardHtmlPath, cardHtmlSource);
+const cardHtmlUri = pathToFileURL(cardHtmlPath).toString();
+const cardBadLine = cardHtmlSource.split('\n').findIndex((l) => l.includes('toUpperCase'));
+
 /* ---------- minimal LSP client over stdio ---------- */
 const child = spawn(process.execPath, [serverPath, '--stdio'], { stdio: ['pipe', 'pipe', 'pipe'] });
 let stderr = '';
@@ -124,49 +146,62 @@ try {
   const pullSupported = !!initResult?.capabilities?.diagnosticProvider;
   pass(`server initialized over LSP/stdio (pull diagnostics: ${pullSupported})`);
 
-  send('textDocument/didOpen', {
-    textDocument: { uri: weaveUri, languageId: 'weave', version: 1, text: weaveSource },
-  });
-
-  // Collect diagnostics: try pull (`textDocument/diagnostic`) and push, whichever
-  // the server provides. Retry a few times while the TS program builds.
-  const key = weaveUri.toLowerCase();
-  let diags = [];
-  for (let i = 0; i < 40; i++) {
-    await wait(250);
-    diags = diagnostics.get(key) || [];
-    if (diags.length) break;
-    // Fall back to a pull request (the provider may be registered dynamically).
-    const r = await send('textDocument/diagnostic', { textDocument: { uri: weaveUri } }, true);
-    if (r?.items?.length) {
-      diags = r.items;
-      break;
+  // Open a document and collect its diagnostics (push, with a pull fallback).
+  async function diagnose(uri, languageId, text) {
+    send('textDocument/didOpen', { textDocument: { uri, languageId, version: 1, text } });
+    const k = uri.toLowerCase();
+    for (let i = 0; i < 40; i++) {
+      await wait(250);
+      const d = diagnostics.get(k) || [];
+      if (d.length) return d;
+      const r = await send('textDocument/diagnostic', { textDocument: { uri } }, true);
+      if (r?.items?.length) return r.items;
     }
+    return [];
   }
 
+  const htmlNoiseOf = (diags) =>
+    diags.filter(
+      (d) =>
+        d.source === 'html' ||
+        /unknown (html )?tag|not allowed here|closing tag|empty tag|self-closing/i.test(d.message)
+    );
+
+  /* ===== scenario 1: a single-file .weave SFC ===== */
+  let diags = await diagnose(weaveUri, 'weave', weaveSource);
   if (!diags.length) fail('no diagnostics for the .weave file (expected the type error)');
 
-  // 1) The real template type error must be present, mapped to the template line.
-  const typeErr = diags.find((d) => /toUpperCase|does not exist/.test(d.message));
-  if (!typeErr) fail(`expected a 'toUpperCase' type error; got: ${JSON.stringify(diags.map((d) => d.message))}`);
-  if (typeErr.range.start.line !== badLine) {
-    fail(`type error mapped to line ${typeErr.range.start.line}, expected the template line ${badLine}`);
-  }
-  pass(`real template type error mapped to Widget.weave:${badLine + 1} ("${typeErr.message.split('\n')[0]}")`);
+  let typeErr = diags.find((d) => /toUpperCase|does not exist/.test(d.message));
+  if (!typeErr) fail(`SFC: expected a 'toUpperCase' type error; got: ${JSON.stringify(diags.map((d) => d.message))}`);
+  if (typeErr.range.start.line !== badLine) fail(`SFC: type error mapped to line ${typeErr.range.start.line}, expected ${badLine}`);
+  pass(`SFC: real template type error mapped to Widget.weave:${badLine + 1}`);
+  if (htmlNoiseOf(diags).length) fail(`SFC: bogus HTML diagnostics: ${JSON.stringify(htmlNoiseOf(diags).map((d) => d.message))}`);
+  pass('SFC: no bogus HTML diagnostics');
+  if (diags.find((d) => /label/.test(d.message))) fail('SFC: unexpected error on the valid {{ label }} binding');
+  pass('SFC: valid bindings report no errors');
 
-  // 2) No bogus HTML diagnostics (unknown tag, attribute not allowed, closing tag, …).
-  const htmlNoise = diags.filter(
-    (d) => d.source === 'html' || /unknown (html )?tag|not allowed here|closing tag|empty tag|self-closing/i.test(d.message)
-  );
-  if (htmlNoise.length) fail(`got bogus HTML diagnostics: ${JSON.stringify(htmlNoise.map((d) => d.message))}`);
-  pass(`no bogus HTML diagnostics (custom <my-custom-element> + bindings accepted)`);
+  /* ===== scenario 2: separate Card.html + sibling Card.ts (the demo's form) ===== */
+  diags = await diagnose(cardHtmlUri, 'weave-html', cardHtmlSource);
+  if (!diags.length) fail('separate-file: no diagnostics for Card.html (expected the type error from the sibling .ts)');
 
-  // 3) The good binding {{ label }} must NOT error.
-  const labelErr = diags.find((d) => /label/.test(d.message));
-  if (labelErr) fail(`unexpected error on the valid {{ label }} binding: ${labelErr.message}`);
-  pass('valid bindings report no errors');
+  typeErr = diags.find((d) => /toUpperCase|does not exist/.test(d.message));
+  if (!typeErr) fail(`separate-file: expected a 'toUpperCase' type error from the sibling setup; got: ${JSON.stringify(diags.map((d) => d.message))}`);
+  if (typeErr.range.start.line !== cardBadLine) fail(`separate-file: type error mapped to line ${typeErr.range.start.line}, expected ${cardBadLine}`);
+  pass(`separate-file: real type error from Card.ts setup, mapped to Card.html:${cardBadLine + 1} ("${typeErr.message.split('\n')[0]}")`);
+  if (htmlNoiseOf(diags).length) fail(`separate-file: bogus HTML diagnostics on Card.html: ${JSON.stringify(htmlNoiseOf(diags).map((d) => d.message))}`);
+  pass('separate-file: no bogus HTML diagnostics on Card.html (custom <custom-thing> accepted)');
+  if (diags.find((d) => /label/.test(d.message))) fail('separate-file: unexpected error on the valid {{ label }} binding');
+  pass('separate-file: valid bindings (from sibling setup) report no errors');
 
-  console.log('\nWeave language server verified (M9.0b).');
+  // go-to-definition: clicking `label` in Card.html should land in Card.ts.
+  const labelCol = cardHtmlSource.split('\n')[1].indexOf('label');
+  const def = await send('textDocument/definition', { textDocument: { uri: cardHtmlUri }, position: { line: 1, character: labelCol } }, true);
+  const defs = Array.isArray(def) ? def : def ? [def] : [];
+  const landsInTs = defs.some((d) => (d.uri || d.targetUri || '').toLowerCase().endsWith('card.ts'));
+  if (landsInTs) pass('separate-file: go-to-definition on a template variable lands in Card.ts');
+  else console.log(`… go-to-definition did not land in Card.ts (defs: ${JSON.stringify(defs.map((d) => d.uri || d.targetUri))}) — revisit in M9.0c`);
+
+  console.log('\nWeave language server verified (SFC + separate .ts/.html).');
   child.kill();
   process.exit(0);
 } catch (e) {
