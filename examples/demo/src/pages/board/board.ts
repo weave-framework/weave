@@ -18,7 +18,7 @@ void Link;
 /** The board route (path `''`): three status columns with a debounced filter. */
 export function setup(): BoardSetup {
   const board: BoardStore = useBoard();
-  onMount(() => board.load());
+  onMount(() => void board.load());
 
   const query: Signal<string> = signal('');
   const filter: Computed<string> = debounced(query, 200); // trails the input by 200ms of quiet (B.1)
