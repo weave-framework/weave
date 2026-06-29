@@ -6,6 +6,8 @@ dist/
 build/
 *.tsbuildinfo
 *.vsix
+# ...except the published, downloadable plugin artifacts (this dir ships to public)
+!plugins/editor/**/*.vsix
 
 # Test / tooling artifacts
 test-results/
