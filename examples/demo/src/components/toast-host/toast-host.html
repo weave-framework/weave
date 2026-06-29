@@ -1,0 +1,19 @@
+<!-- Mounted once in the shell. The Portal lifts the stack to <body> so it floats
+     above the app (and the editor modal); aria-live announces new toasts politely. -->
+<Portal to="body">
+  <div class="toast-host" aria-live="polite" aria-atomic="false">
+    @for (t of toasts(); track t.id) {
+      <div
+        class="toast"
+        class:success={t.kind === 'success'}
+        class:error={t.kind === 'error'}
+        role="status"
+        in:fly={enter}
+        out:fade={leave}
+      >
+        <span class="toast-msg">{{ t.message }}</span>
+        <button type="button" class="toast-x" aria-label="Dismiss" on:click={() => dismiss(t.id)}>×</button>
+      </div>
+    }
+  </div>
+</Portal>

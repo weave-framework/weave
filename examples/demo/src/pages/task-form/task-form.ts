@@ -12,6 +12,7 @@ import {
 } from '@weave/forms';
 import { control } from '@weave/forms/dom';
 import { useBoard, type BoardStore } from '../../stores/board';
+import { useToasts, type ToastStore } from '../../stores/toast';
 import { api } from '../../data/api';
 import { STATUSES, type Status, type Priority, type NewTask, type Task, type ChecklistItem } from '../../types';
 
@@ -52,6 +53,7 @@ const PRIORITIES: Priority[] = ['low', 'med', 'high'];
  */
 export function setup(props: { editId?: string; onClose: () => void }): TaskFormSetup {
   const board: BoardStore = useBoard();
+  const toasts: ToastStore = useToasts();
   const editId: string | undefined = props.editId;
 
   // On a deep link the list may not be loaded yet; load + seed in onMount below.
@@ -111,7 +113,10 @@ export function setup(props: { editId?: string; onClose: () => void }): TaskForm
     });
   });
 
-  // The form drives validation + pending/error itself; we just persist + navigate.
+  // The form drives validation + pending/error itself; we just persist + notify.
+  // On success a toast confirms; on a rejection (the store rolls the optimistic
+  // change back) we toast the failure and rethrow so `form.submit` records
+  // `submitError` and keeps the modal open for a retry.
   const onSubmit: (e?: Event) => void = taskForm.submit(async (v: ValuesOf<TaskFields>): Promise<void> => {
     const input: NewTask = {
       title: v.title.trim(),
@@ -120,8 +125,14 @@ export function setup(props: { editId?: string; onClose: () => void }): TaskForm
       ...(v.assignee.trim() ? { assignee: v.assignee.trim() } : {}),
       ...(v.checklist.length ? { checklist: v.checklist } : {}),
     };
-    if (editId) await board.update(editId, input);
-    else await board.create(input);
+    try {
+      if (editId) await board.update(editId, input);
+      else await board.create(input);
+    } catch (err) {
+      toasts.push('error', `Couldn't save "${input.title}" — please retry`);
+      throw err;
+    }
+    toasts.push('success', editId ? `Updated "${input.title}"` : `Created "${input.title}"`);
     props.onClose();
   });
 
