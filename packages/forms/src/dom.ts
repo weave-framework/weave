@@ -6,8 +6,8 @@
  * signal state, testable without a DOM. Import this only where you bind to inputs.
  */
 
-import { effect } from '@weave/runtime';
-import { bindValue, type Action } from '@weave/runtime/dom';
+import { effect, type Signal } from '@weave/runtime';
+import { bindValue } from '@weave/runtime/dom';
 import type { Field } from './index';
 
 /**
@@ -24,11 +24,13 @@ import type { Field } from './index';
  * @if (form.controls.title.error()) { <span class="msg">{{ form.controls.title.error() }}</span> }
  * ```
  */
-export const control: Action<Field<unknown>> = (el: Element, f: Field<unknown>) => {
+export const control = <T>(el: Element, f: Field<T>): void => {
   const input: HTMLInputElement = el as HTMLInputElement;
   const kind: 'value' | 'checked' | 'group' =
     input.type === 'checkbox' ? 'checked' : input.type === 'radio' ? 'group' : 'value';
-  bindValue(el, f.value, kind);
+  // `Signal` is invariant; `bindValue` only ever reads/writes DOM-shaped values, so
+  // erase the field's value type here rather than thread `T` through `bindValue`.
+  bindValue(el, f.value as Signal<unknown>, kind);
 
   el.addEventListener('blur', () => f.touched.set(true));
 

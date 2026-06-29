@@ -94,4 +94,38 @@ const run = (...paths) =>
   );
 }
 
+/* ── child-component props: a parent's `<Card …>` is checked against the child's
+      `setup` prop contract (resolved through the synthesized default export) ── */
+{
+  const good = run('examples/check/card.ts', 'examples/check/uses-card-good.ts');
+  ok(good.status === 0, `check: correct child props pass (exit ${good.status})`);
+  ok(/no type errors/.test(good.stdout), 'check: well-typed <Card …> reports no errors');
+
+  const bad = run('examples/check/card.ts', 'examples/check/uses-card-bad.ts');
+  ok(bad.status === 1, `check: bad child props exit 1 (got ${bad.status})`);
+  const out = bad.stdout + bad.stderr;
+
+  const html = readFileSync('examples/check/uses-card-bad.html', 'utf8').split('\n');
+  // `label={it.count}` — a number passed to a `string` prop → TS2322, mapped to .html
+  const mismatchLine = html.findIndex((l) => l.includes('label={it.count}')) + 1;
+  ok(
+    new RegExp(`uses-card-bad\\.html:${mismatchLine}:\\d+ - error TS2322: .*not assignable`).test(out),
+    `check: child prop type mismatch flagged at uses-card-bad.html:${mismatchLine}`
+  );
+  // `extra={…}` — a prop the child doesn't declare → excess-property TS2353
+  const excessLine = html.findIndex((l) => l.includes('extra=')) + 1;
+  ok(
+    new RegExp(`uses-card-bad\\.html:${excessLine}:\\d+ - error TS2353: .*'extra'`).test(out),
+    `check: unknown child prop flagged at uses-card-bad.html:${excessLine}`
+  );
+}
+
+/* ── the demo app must type-check clean end-to-end: this exercises child-component
+      prop checking across a real multi-component tree (board → Card, modal → form, …) ── */
+{
+  const r = run('examples/demo/src');
+  ok(r.status === 0, `check: demo app type-checks clean (exit ${r.status})`);
+  if (r.status !== 0) console.error(r.stdout + r.stderr);
+}
+
 console.log('\nM8 check (weave check) verified.');
