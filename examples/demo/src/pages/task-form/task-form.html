@@ -1,0 +1,77 @@
+<section class="task-form">
+  <Link to="/" class="back">← Board</Link>
+  <h1 class="tf-title">{{ heading }}</h1>
+
+  <form class="tf-form" on:submit={onSubmit} novalidate>
+    <!-- Title -->
+    <label class="field" class:invalid={fields.title.touched() && !!fields.title.error()}>
+      <span class="label">Title</span>
+      <input
+        type="text"
+        autocomplete="off"
+        placeholder="What needs doing?"
+        bind:value={fields.title.value}
+        on:blur={() => fields.title.touched.set(true)}
+      />
+      @if (fields.title.touched() && fields.title.error()) {
+        <span class="msg">{{ fields.title.error() }}</span>
+      }
+    </label>
+
+    <!-- Assignee (async-validated against the team directory) -->
+    <label class="field" class:invalid={fields.assignee.touched() && !!fields.assignee.error()}>
+      <span class="label">
+        Assignee
+        @if (fields.assignee.validating()) {
+          <span class="checking">checking…</span>
+        }
+      </span>
+      <input
+        type="text"
+        autocomplete="off"
+        placeholder="Team member (Aidas, Lina, Marek, Sofia)"
+        bind:value={fields.assignee.value}
+        on:blur={() => fields.assignee.touched.set(true)}
+      />
+      @if (fields.assignee.touched() && fields.assignee.error()) {
+        <span class="msg">{{ fields.assignee.error() }}</span>
+      }
+    </label>
+
+    <div class="row">
+      <!-- Status -->
+      <label class="field">
+        <span class="label">Status</span>
+        <select bind:value={fields.status.value}>
+          @for (s of statuses; track s) {
+            <option value={s}>{{ s }}</option>
+          }
+        </select>
+      </label>
+
+      <!-- Priority -->
+      <label class="field">
+        <span class="label">Priority</span>
+        <select bind:value={fields.priority.value}>
+          @for (p of priorities; track p) {
+            <option value={p}>{{ p }}</option>
+          }
+        </select>
+      </label>
+    </div>
+
+    @if (form.formError()) {
+      <p class="form-error">{{ form.formError() }}</p>
+    }
+    @if (submitError()) {
+      <p class="form-error">Couldn't save: {{ submitError() }}</p>
+    }
+
+    <div class="actions">
+      <Link to="/" class="ghost">Cancel</Link>
+      <button type="submit" class="primary" disabled={submitting()}>
+        {{ submitting() ? 'Saving…' : (editId ? 'Save changes' : 'Create task') }}
+      </button>
+    </div>
+  </form>
+</section>

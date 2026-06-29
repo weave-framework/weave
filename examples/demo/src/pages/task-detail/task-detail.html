@@ -14,7 +14,10 @@
         <dt>Assignee</dt>
         <dd>{{ t.assignee || 'Unassigned' }}</dd>
       </dl>
-      <button class="ghost" on:click={toggleRaw}>{{ showRaw() ? 'Hide' : 'Show' }} raw JSON</button>
+      <div class="d-actions">
+        <Link to={'/task/' + t.id + '/edit'} class="ghost">Edit task</Link>
+        <button class="ghost" on:click={toggleRaw}>{{ showRaw() ? 'Hide' : 'Show' }} raw JSON</button>
+      </div>
       <!-- show={} keeps the node in the DOM and toggles display (B.9) -->
       <pre class="raw" show={showRaw()}>{{ JSON.stringify(t, null, 2) }}</pre>
     </article>

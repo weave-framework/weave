@@ -287,8 +287,7 @@ export function bindValue(el: Element, sig: Signal<unknown>, kind: 'value' | 'ch
   const numeric: boolean = !isSelect && (input.type === 'number' || input.type === 'range');
   let composing: boolean = false;
 
-  effect(() => {
-    const v: unknown = sig();
+  const applyValue = (v: unknown): void => {
     if (composing) return; // don't fight the IME mid-composition
     if (multiple) {
       const set: Set<string> = new Set((Array.isArray(v) ? v : []).map(String));
@@ -300,6 +299,17 @@ export function bindValue(el: Element, sig: Signal<unknown>, kind: 'value' | 'ch
       const s: string = v == null ? '' : String(v);
       if (input.value !== s) input.value = s;
     }
+  };
+
+  effect(() => {
+    const v: unknown = sig();
+    applyValue(v);
+    // A <select>'s <option>s are usually inserted (static, `@for`, or async)
+    // AFTER this binding runs — and the browser auto-selects the first option of a
+    // freshly-populated select, overriding the bound value. Re-assert once the
+    // current render settles so the signal still wins. (`sig()` here is read in a
+    // microtask, outside the effect's tracking scope — no extra dependency.)
+    if (isSelect) queueMicrotask(() => applyValue(sig()));
   });
 
   const read = (): unknown => {

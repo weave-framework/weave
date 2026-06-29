@@ -1,0 +1,95 @@
+$danger: #f85149;
+
+.task-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 560px;
+}
+
+.back { font-size: 13px; color: var(--muted); width: fit-content; }
+.back:hover { color: var(--text); }
+
+.tf-title { margin: 0; font-size: 20px; }
+
+.tf-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 22px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+
+  .label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  input,
+  select {
+    padding: 8px 10px;
+    font-size: 14px;
+    color: var(--text);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    outline: none;
+  }
+  input:focus,
+  select:focus { border-color: var(--accent); }
+
+  &.invalid input,
+  &.invalid select { border-color: $danger; }
+
+  .msg { font-size: 12px; color: $danger; }
+  .checking { font-size: 12px; color: var(--accent); }
+}
+
+.row { display: flex; gap: 16px; }
+
+.form-error {
+  margin: 0;
+  font-size: 13px;
+  color: $danger;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.ghost {
+  padding: 8px 14px;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.ghost:hover { border-color: var(--accent); }
+
+.primary {
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #0b1020;
+  background: var(--accent);
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.primary:disabled { opacity: 0.6; cursor: progress; }

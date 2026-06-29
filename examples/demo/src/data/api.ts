@@ -21,6 +21,9 @@ let db: Task[] = [
 ];
 let seq: number = db.length;
 
+/** The (mock) team directory — async assignee validation checks names against this. */
+const TEAM: string[] = ['Aidas', 'Lina', 'Marek', 'Sofia'];
+
 const LATENCY: number = 160; // ms — visible-but-snappy, so loading states actually show
 const delay = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
@@ -38,6 +41,8 @@ const fakeFetch: typeof fetch = async (input, init) => {
       status,
       headers: { 'content-type': 'application/json' },
     });
+
+  if (method === 'GET' && path === '/team') return json(TEAM);
 
   if (method === 'GET' && path === '/tasks') return json(db);
 

@@ -24,6 +24,8 @@
 .fields dt { color: var(--muted); font-size: 13px; }
 .fields dd { margin: 0; font-size: 14px; }
 
+.d-actions { display: flex; gap: 10px; }
+
 .ghost {
   width: fit-content;
   padding: 6px 12px;

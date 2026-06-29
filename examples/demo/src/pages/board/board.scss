@@ -19,7 +19,18 @@
 }
 .search:focus { outline: none; border-color: var(--accent); }
 
-.summary { margin: 0; font-size: 13px; }
+.summary { margin: 0 0 0 auto; font-size: 13px; }
+
+.new-task {
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  color: #0b1020;
+  background: var(--accent);
+  border-radius: var(--radius);
+}
+.new-task:hover { filter: brightness(1.08); }
 
 .columns {
   display: grid;

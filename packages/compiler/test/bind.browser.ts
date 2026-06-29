@@ -1,5 +1,5 @@
 import { test, assert } from '../../../tools/harness.js';
-import { signal, computed, effect, root, type Signal } from '@weave/runtime';
+import { signal, computed, effect, root, tick, type Signal } from '@weave/runtime';
 import * as dom from '@weave/runtime/dom';
 import { compileTemplate } from '@weave/compiler';
 
@@ -99,6 +99,30 @@ test('bind:value select — single', () => {
   el.value = 'y';
   fire(el, 'change');
   assert.equal(sel(), 'y', 'select → signal');
+});
+
+test('bind:value select — @for options: the signal wins over the browser auto-select', async () => {
+  // Regression: a `@for`-generated <option> list is inserted AFTER the binding
+  // runs, and the browser auto-selects the first physically-inserted option of a
+  // freshly-populated select. The bound signal (here the LAST option) must still win.
+  const opts: string[] = ['todo', 'doing', 'done'];
+  const sel: Signal<string> = signal('done');
+  const el: HTMLSelectElement = render(
+    '<select bind:value={sel}>@for (o of opts; track o) {<option value={o}>{{ o }}</option>}</select>',
+    { sel, opts },
+    ['sel', 'opts']
+  ) as HTMLSelectElement;
+
+  await tick(); // let the post-render re-assert run
+  assert.equal(el.value, 'done', 'signal value survives @for option insertion');
+  assert.equal(el.selectedIndex, 2);
+
+  sel.set('todo');
+  assert.equal(el.value, 'todo', 'signal → select once options are present (synchronous)');
+
+  el.value = 'doing';
+  fire(el, 'change');
+  assert.equal(sel(), 'doing', 'select → signal');
 });
 
 test('bind:value text is IME-safe — no overwrite mid-composition', () => {
