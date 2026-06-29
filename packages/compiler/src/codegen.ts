@@ -70,7 +70,7 @@ export function compileTemplate(input: string, options: CompileOptions = {}): { 
 
   const ast = parseTemplate(input);
   // isHost: the render fragment's top-level elements are the component's roots → `:host`.
-  const render = compileFragment(gen, ast, ctxScope(options.scope ?? []), 'render', 'ctx, slots', false, true);
+  const render = compileFragment(gen, ast, ctxScope(options.scope ?? []), 'render', 'ctx, slots', true);
 
   if (mode === 'function') {
     const body = [...gen.templates, render, 'return render(ctx, {});'].join('\n');
@@ -92,18 +92,17 @@ function compileFragment(
   scope: Scope,
   name: string,
   param = '',
-  requireSingleRoot = false,
   isHost = false
 ): string {
   const top = trimTop(nodes);
   if (top.length === 0) throw new Error('Empty template fragment');
   // A component/slot compiles to a bare `<!---->`, so it can't be the clone root —
-  // only a real DOM element qualifies for the single-root (clone) fast path.
+  // only a real DOM element qualifies for the single-root (clone) fast path. A
+  // fragment root (component / multiple roots / text) returns a DocumentFragment;
+  // `eachBlock` brackets such a `@for` row with marker comments so the keyed
+  // reconciler can still move/remove it as one unit.
   const sole = top.length === 1 && top[0].type === 'element' ? (top[0] as ElementNode) : null;
   const singleRoot = !!sole && !/^[A-Z]/.test(sole.tag) && sole.tag !== 'slot';
-  if (requireSingleRoot && !singleRoot) {
-    throw new Error('A @for row body must have a single root element');
-  }
 
   let html = '';
   const stmts: string[] = [];
@@ -521,7 +520,7 @@ function compileFragment(
       $even: '_row.even',
       $odd: '_row.odd',
     });
-    childDecls.push(compileFragment(gen, node.children, forScope, rowFn, '_row', true));
+    childDecls.push(compileFragment(gen, node.children, forScope, rowFn, '_row'));
 
     let emptyArg = '';
     if (node.empty) {

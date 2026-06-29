@@ -104,6 +104,40 @@ test('focus is preserved across reorder', () => {
   assert.is(document.activeElement, input2, 'focus survived the move');
 });
 
+test('multi-node rows move and remove as one span', () => {
+  // A component / fragment `@for` row has no single root node: it is a span
+  // bracketed by marker comments (Row.node = start, Row.end = stop). The
+  // reconciler must move and remove the whole span, not just the first node.
+  const parent = document.createElement('ul');
+  document.body.appendChild(parent);
+  const end = document.createComment('end');
+  parent.appendChild(end);
+  let rows: Row[] = [];
+  const update = (ids: number[]) => {
+    rows = reconcileKeyed(parent, end, rows, ids, (id) => id, (id) => {
+      const frag = document.createDocumentFragment();
+      const start = document.createComment('');
+      const a = document.createElement('li'); a.dataset.id = String(id); a.textContent = id + 'a';
+      const b = document.createElement('li'); b.dataset.id = String(id); b.textContent = id + 'b';
+      const stop = document.createComment('');
+      frag.append(start, a, b, stop);
+      return { key: id, node: start, end: stop };
+    });
+  };
+  const parts = () => [...parent.querySelectorAll('li')].map((li) => li.textContent);
+
+  update([1, 2, 3]);
+  assert.deepEqual(parts(), ['1a', '1b', '2a', '2b', '3a', '3b']);
+  const oneA = parent.querySelector('[data-id="1"]')!;
+
+  update([3, 1, 2]); // reorder — every span stays contiguous and intact
+  assert.deepEqual(parts(), ['3a', '3b', '1a', '1b', '2a', '2b']);
+  assert.is(parent.querySelector('[data-id="1"]'), oneA, 'span node reused, not recreated');
+
+  update([3, 2]); // remove the whole span for id:1 (both its <li> and its markers)
+  assert.deepEqual(parts(), ['3a', '3b', '2a', '2b']);
+});
+
 test('dispose is called for removed rows', () => {
   const parent = document.createElement('ul');
   document.body.appendChild(parent);

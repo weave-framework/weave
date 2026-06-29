@@ -325,12 +325,42 @@ export function bindValue(el: Element, sig: Signal<unknown>, kind: 'value' | 'ch
 
 /* ──────────────────────────── keyed reconciliation ──────────────────────────── */
 
-/** One rendered row in a keyed list. `node` is its single root node. */
+/**
+ * One rendered row in a keyed list. `node` is the row's first node (the anchor the
+ * reconciler positions it by). A single-element row is just `node`; a multi-node row
+ * (a component / fragment / text body) is the live span from `node` to `end` inclusive,
+ * bracketed by marker comments so the reconciler can move or remove it as one unit
+ * even as its inner node count changes.
+ */
 export interface Row {
   key: unknown;
   node: ChildNode;
+  /** last node of the row's span; absent ⇒ single-node row (`[node]`). */
+  end?: ChildNode;
   /** torn down when the row is removed (disposes the row's effects) */
   dispose?: () => void;
+}
+
+/** A row's live nodes: just `node`, or the marker-bracketed span `[node … end]`. */
+function rowSpan(row: Row): ChildNode[] {
+  if (!row.end || row.end === row.node) return [row.node];
+  const out: ChildNode[] = [];
+  let n: ChildNode | null = row.node;
+  while (n) {
+    out.push(n);
+    if (n === row.end) break;
+    n = n.nextSibling;
+  }
+  return out;
+}
+
+/** Move a row's whole span before `before` (gathered first, since moving shifts siblings). */
+function placeRow(parent: Node, row: Row, before: Node): void {
+  if (!row.end || row.end === row.node) {
+    parent.insertBefore(row.node, before);
+    return;
+  }
+  for (const n of rowSpan(row)) parent.insertBefore(n, before);
 }
 
 /**
@@ -417,7 +447,7 @@ export function reconcileKeyed<T>(
   for (const row of prev) {
     if (!reused.has(row)) {
       row.dispose?.();
-      removeWithOutro(row.node);
+      for (const n of rowSpan(row)) removeWithOutro(n);
     }
   }
 
@@ -429,7 +459,7 @@ export function reconcileKeyed<T>(
     const row = next[i];
     const isNew = newToOld[i] === 0;
     if (isNew || s < 0 || i !== seq[s]) {
-      parent.insertBefore(row.node, anchorNode); // new or moved
+      placeRow(parent, row, anchorNode); // new or moved (whole span)
     } else {
       s--; // stable: leave untouched (no DOM move → focus/scroll preserved)
     }
@@ -448,10 +478,6 @@ function placeBefore(parent: Node, node: Node, anchorNode: Node): ChildNode[] {
     node instanceof DocumentFragment ? ([...node.childNodes] as ChildNode[]) : [node as ChildNode];
   for (const n of nodes) parent.insertBefore(n, anchorNode);
   return nodes;
-}
-
-function firstChildNode(node: Node): ChildNode {
-  return (node instanceof DocumentFragment ? node.firstChild : node) as ChildNode;
 }
 
 /**
@@ -590,7 +616,7 @@ export function eachBlock<T>(
   const removeRows = () => {
     rows.forEach((r) => {
       disposeOwner(r.owner);
-      r.node.remove();
+      for (const n of rowSpan(r)) n.remove();
     });
     rows = [];
   };
@@ -623,10 +649,26 @@ export function eachBlock<T>(
         odd: () => indexSig() % 2 === 1,
       };
       const owner = runInOwner(host, () => createOwner(null));
-      const node = runInOwner(owner, () => renderRow(ctx));
+      const rendered = runInOwner(owner, () => renderRow(ctx));
+      // A single-element row is tracked by that one node (the hot path). A fragment
+      // row (component / multiple roots / text) has no stable single node — and its
+      // node count can vary at runtime (e.g. a top-level @if inside) — so bracket it
+      // with marker comments and track the span between them.
+      let node: ChildNode, end: ChildNode | undefined;
+      if (rendered instanceof DocumentFragment) {
+        const start = document.createComment('');
+        const stop = document.createComment('');
+        rendered.insertBefore(start, rendered.firstChild);
+        rendered.appendChild(stop);
+        node = start;
+        end = stop;
+      } else {
+        node = rendered as ChildNode;
+      }
       return {
         key: keyOf(item, i),
-        node: firstChildNode(node),
+        node,
+        end,
         dispose: () => disposeOwner(owner),
         owner,
         itemSig,
