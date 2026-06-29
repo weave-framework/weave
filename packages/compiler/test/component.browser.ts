@@ -149,6 +149,40 @@ test('mountComponent disposes setup effects on unmount', () => {
   assert.equal(disposed, true, 'owner disposal runs setup cleanups');
 });
 
+test('a @for row can be a component (multi-node keyed row)', () => {
+  // Bug #7: a `@for` row body that is a component (or any fragment root) compiles
+  // to a `<!---->` anchor + mountChild — never a single DOM node. `eachBlock` now
+  // brackets such a row with marker comments so the keyed reconciler can move and
+  // remove it as one span. Mirrors the demo's `<Link><TaskCard/></Link>` rows.
+  const Item = dom.defineComponent(
+    compileRender('<li class="item">{{ label() }}</li>', ['label']) as never,
+    (props) => ({ label: () => props.text })
+  );
+  const items = signal([{ id: 1, text: 'a' }, { id: 2, text: 'b' }]);
+  const { code } = compileTemplate(
+    '<ul>@for (it of items(); track it.id) { <Item text={it.text} /> }</ul>',
+    { mode: 'function', scope: ['items'] }
+  );
+  const body = code.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;');
+  const render = new Function('rt', '_c', body)(rt, { Item }) as (ctx: unknown) => Node;
+  const el = render({ items }) as HTMLElement;
+  host().appendChild(el);
+  const texts = () => [...el.querySelectorAll('li')].map((l) => l.textContent);
+
+  assert.deepEqual(texts(), ['a', 'b']);
+  const aLi = el.querySelector('li')!;
+
+  items.set((xs) => [...xs, { id: 3, text: 'c' }]); // append
+  assert.deepEqual(texts(), ['a', 'b', 'c']);
+
+  items.set([{ id: 3, text: 'c' }, { id: 1, text: 'a' }, { id: 2, text: 'b' }]); // reorder
+  assert.deepEqual(texts(), ['c', 'a', 'b']);
+  assert.is([...el.querySelectorAll('li')].find((l) => l.textContent === 'a'), aLi, 'row node reused across reorder');
+
+  items.set([{ id: 3, text: 'C' }, { id: 2, text: 'b' }]); // remove id:1, update id:3's prop
+  assert.deepEqual(texts(), ['C', 'b'], 'span removed + reused row reflects new prop');
+});
+
 /* ──────────── SFC split + full transform ──────────── */
 
 test('parseSfc splits script / template / style', () => {

@@ -18,12 +18,9 @@
         </header>
         <div class="col-body">
           @for (t of visible(status); track t.id) {
-            <!-- a @for row must be a single real element, so the Link (which
-                 prefetches the detail chunk on hover, B.15) is wrapped in a
-                 display:contents slot. -->
-            <div class="card-slot">
-              <Link to={'/task/' + t.id}><TaskCard task={t} /></Link>
-            </div>
+            <!-- A @for row can be a component/fragment: the Link (which prefetches
+                 the detail chunk on hover, B.15) is the row root directly. -->
+            <Link to={'/task/' + t.id}><TaskCard task={t} /></Link>
           } @empty {
             <p class="col-empty muted">—</p>
           }
