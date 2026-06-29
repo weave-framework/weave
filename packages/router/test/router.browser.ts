@@ -295,6 +295,32 @@ test('Link forwards class / attributes (but not to/prefetch) to the anchor', () 
   assert.equal(link.getAttribute('to'), null, '`to` is not leaked as an attribute');
 });
 
+test('Link sets aria-current + activeClass when active, clears when not', () => {
+  navigate('/about');
+  const a: HTMLAnchorElement = Link({ to: '/about', activeClass: 'is-active' }, {}) as HTMLAnchorElement;
+  assert.equal(a.getAttribute('aria-current'), 'page', 'aria-current set when active');
+  assert.ok(a.classList.contains('is-active'), 'activeClass added when active');
+  navigate('/elsewhere');
+  assert.equal(a.getAttribute('aria-current'), null, 'aria-current cleared on navigation away');
+  assert.ok(!a.classList.contains('is-active'), 'activeClass removed on navigation away');
+});
+
+test('Link active is prefix-matched for nested paths; exact opts out', () => {
+  navigate('/users/42');
+  const parent: HTMLAnchorElement = Link({ to: '/users', activeClass: 'on' }, {}) as HTMLAnchorElement;
+  assert.ok(parent.classList.contains('on'), 'parent link active on a child path (prefix)');
+  const strict: HTMLAnchorElement = Link({ to: '/users', activeClass: 'on', exact: true }, {}) as HTMLAnchorElement;
+  assert.ok(!strict.classList.contains('on'), 'exact link not active on a child path');
+});
+
+test('Link to "/" is active only at exactly "/"', () => {
+  navigate('/something');
+  const home: HTMLAnchorElement = Link({ to: '/', activeClass: 'on' }, {}) as HTMLAnchorElement;
+  assert.ok(!home.classList.contains('on'), 'root link not active on a sub-path');
+  navigate('/');
+  assert.ok(home.classList.contains('on'), 'root link active at root');
+});
+
 /* ──────────── prefetch (B.15) ──────────── */
 
 const LazyPage: Component = defineComponent(() => span('lazy'));

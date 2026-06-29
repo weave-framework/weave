@@ -88,6 +88,11 @@ try {
   await page.waitForSelector('.card', { timeout: 10000 });
   const initialCards = await page.locator('.card').count();
   ok(initialCards === 6, `board loaded ${initialCards} seed cards (expect 6)`);
+  ok(
+    (await page.locator('.nav a', { hasText: 'Board' }).getAttribute('aria-current')) === 'page' &&
+      (await page.locator('.nav a', { hasText: 'Stress' }).getAttribute('aria-current')) === null,
+    'active-link: the Board nav link is current at /, Stress is not'
+  );
   ok((await page.locator('.summary').textContent())?.includes('2 / 6 done'), 'progress summary reads "2 / 6 done"');
 
   // The @defer (on idle) insights panel resolves after the columns.
