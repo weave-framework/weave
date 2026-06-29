@@ -7,7 +7,7 @@
     <div class="toolbar">
       <input class="search" type="search" placeholder="Filter tasks…" bind:value={query} />
       <span class="summary muted">{{ board.counts().done }} / {{ board.counts().total }} done</span>
-      <Link to="/new" class="new-task">+ New task</Link>
+      <button type="button" class="new-task" on:click={() => editor.open()}>+ New task</button>
     </div>
 
     <!-- One reusable column body, rendered once per status (B.8 snippets). -->

@@ -9,14 +9,11 @@ import { lazy, type Component } from '@weave/runtime/dom';
 
 const Board: Component = lazy(() => import('../pages/board/board'));
 const TaskDetail: Component = lazy(() => import('../pages/task-detail/task-detail'));
-const TaskForm: Component = lazy(() => import('../pages/task-form/task-form'));
 const Boom: Component = lazy(() => import('../pages/boom/boom'));
 
 export const routes: Route[] = [
   { path: '', component: Board },
-  { path: 'new', component: TaskForm },
   { path: 'task/:id', component: TaskDetail },
-  { path: 'task/:id/edit', component: TaskForm },
   { path: 'boom', component: Boom },
 ];
 

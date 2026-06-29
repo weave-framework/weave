@@ -1,0 +1,12 @@
+<!-- Rendered once in the shell. The Portal mounts to <body>, and the @if inside it
+     reactively shows/hides the modal there — so transitions play in the body, clear
+     of the app's layout. -->
+<Portal to="body">
+  @if (editor.isOpen()) {
+    <div class="tm-overlay" transition:fade={overlayFade} on:click={onBackdrop}>
+      <div class="tm-dialog" role="dialog" aria-modal="true" in:scale={dialogIn}>
+        <TaskForm editId={editor.editId()} onClose={editor.close} />
+      </div>
+    </div>
+  }
+</Portal>

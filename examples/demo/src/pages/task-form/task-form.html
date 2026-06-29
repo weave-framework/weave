@@ -1,5 +1,4 @@
 <section class="task-form">
-  <Link to="/" class="back">← Board</Link>
   <h1 class="tf-title">{{ heading }}</h1>
 
   <form class="tf-form" on:submit={onSubmit} novalidate>
@@ -81,7 +80,7 @@
     }
 
     <div class="actions">
-      <Link to="/" class="ghost">Cancel</Link>
+      <button type="button" class="ghost" on:click={onClose}>Cancel</button>
       <button type="submit" class="primary" disabled={form.submitting()}>
         {{ form.submitting() ? 'Saving…' : (editId ? 'Save changes' : 'Create task') }}
       </button>

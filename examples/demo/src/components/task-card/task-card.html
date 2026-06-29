@@ -6,4 +6,13 @@
       <span class="assignee">{{ task().assignee }}</span>
     }
   </div>
+  <!-- Inside the board's <Link>: stop the click so editing doesn't also navigate. -->
+  <button
+    type="button"
+    class="edit"
+    aria-label="Edit task"
+    on:click|stopPropagation|preventDefault={() => editor.open(task().id)}
+  >
+    ✎
+  </button>
 </article>

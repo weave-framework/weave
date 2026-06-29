@@ -1,5 +1,4 @@
 import { onMount } from '@weave/runtime';
-import { navigate, Link } from '@weave/router';
 import {
   field,
   form,
@@ -15,9 +14,6 @@ import { control } from '@weave/forms/dom';
 import { useBoard, type BoardStore } from '../../stores/board';
 import { api } from '../../data/api';
 import { STATUSES, type Status, type Priority, type NewTask, type Task, type ChecklistItem } from '../../types';
-
-// `<Link>` is referenced in task-form.html.
-void Link;
 
 /** One acceptance-criteria row: a nested group (form → fieldArray → group → field). */
 type ChecklistGroup = Group<{ text: Field<string>; done: Field<boolean> }>;
@@ -42,20 +38,21 @@ interface TaskFormSetup {
   addItem: () => void;
   removeItem: (item: ChecklistGroup) => void;
   onSubmit: (e?: Event) => void;
+  onClose: () => void;
   control: typeof control;
 }
 
 const PRIORITIES: Priority[] = ['low', 'med', 'high'];
 
 /**
- * The create / edit form (routes `new` and `task/:id/edit`). The form owns the
- * whole submit dance — `form.submit()` does touchAll → await async validation →
- * focus-first-error / run the handler with `submitting`/`submitError` tracked —
- * so this setup is just *declaring* the controls and persisting on success.
+ * The create / edit form, shown inside the editor modal (see `TaskModal`). The form
+ * owns the whole submit dance — `form.submit()` does touchAll → await async validation
+ * → focus-first-error / run the handler with `submitting`/`submitError` tracked — so
+ * this setup just *declares* the controls and persists on success, then `onClose()`s.
  */
-export function setup(props: { params?: { id?: string } }): TaskFormSetup {
+export function setup(props: { editId?: string; onClose: () => void }): TaskFormSetup {
   const board: BoardStore = useBoard();
-  const editId: string | undefined = props.params?.id;
+  const editId: string | undefined = props.editId;
 
   // On a deep link the list may not be loaded yet; load + seed in onMount below.
   const seed: Task | undefined = editId ? board.byId(editId) : undefined;
@@ -123,8 +120,9 @@ export function setup(props: { params?: { id?: string } }): TaskFormSetup {
       ...(v.assignee.trim() ? { assignee: v.assignee.trim() } : {}),
       ...(v.checklist.length ? { checklist: v.checklist } : {}),
     };
-    const saved: Task = editId ? await board.update(editId, input) : await board.create(input);
-    navigate(editId ? '/task/' + saved.id : '/');
+    if (editId) await board.update(editId, input);
+    else await board.create(input);
+    props.onClose();
   });
 
   return {
@@ -141,6 +139,7 @@ export function setup(props: { params?: { id?: string } }): TaskFormSetup {
       if (i >= 0) checklist.removeAt(i);
     },
     onSubmit,
+    onClose: props.onClose,
     control,
   };
 }

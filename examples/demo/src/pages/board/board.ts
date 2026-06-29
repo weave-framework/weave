@@ -1,11 +1,13 @@
 import { onMount, signal, debounced, type Signal, type Computed } from '@weave/runtime';
 import { Link } from '@weave/router';
 import { useBoard, type BoardStore } from '../../stores/board';
+import { useEditor, type EditorStore } from '../../stores/editor';
 import TaskCard from '../../components/task-card/task-card';
 import type { Status, Task } from '../../types';
 
 interface BoardSetup {
   board: BoardStore;
+  editor: EditorStore;
   query: Signal<string>;
   visible: (status: Status) => Task[];
 }
@@ -18,6 +20,7 @@ void Link;
 /** The board route (path `''`): three status columns with a debounced filter. */
 export function setup(): BoardSetup {
   const board: BoardStore = useBoard();
+  const editor: EditorStore = useEditor();
   onMount(() => void board.load());
 
   const query: Signal<string> = signal('');
@@ -29,5 +32,5 @@ export function setup(): BoardSetup {
     return board.byStatus(status).filter((t) => !q || t.title.toLowerCase().includes(q));
   };
 
-  return { board, query, visible };
+  return { board, editor, query, visible };
 }

@@ -1,6 +1,7 @@
 import { RouterView, Link, currentPath, type Router } from '@weave/router';
 import { ErrorBoundary } from '@weave/runtime/dom';
 import { router } from './router';
+import TaskModal from '../components/task-modal/task-modal';
 
 interface ShellSetup {
   router: Router;
@@ -12,6 +13,7 @@ interface ShellSetup {
 void RouterView;
 void Link;
 void ErrorBoundary;
+void TaskModal;
 
 /** Root shell: app chrome + an error boundary around the routed view. */
 export function setup(): ShellSetup {

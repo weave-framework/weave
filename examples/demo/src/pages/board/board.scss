@@ -23,12 +23,15 @@
 
 .new-task {
   padding: 8px 14px;
+  font-family: inherit;
   font-size: 13px;
   font-weight: 600;
   white-space: nowrap;
   color: #0b1020;
   background: var(--accent);
+  border: none;
   border-radius: var(--radius);
+  cursor: pointer;
 }
 .new-task:hover { filter: brightness(1.08); }
 

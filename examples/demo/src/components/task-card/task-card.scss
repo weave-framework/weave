@@ -1,6 +1,7 @@
 /* `:host` targets the component's root <article> — Weave has no shadow DOM, so it
    resolves to the template's root element(s). Demonstrates B.6 scoped :host CSS. */
 :host {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -14,6 +15,25 @@
 :host(:hover) {
   border-color: #3a4150;
 }
+
+.edit {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 24px;
+  height: 24px;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+:host(:hover) .edit { opacity: 1; }
+.edit:hover { color: var(--text); border-color: var(--accent); }
 
 .title {
   margin: 0;
