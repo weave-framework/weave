@@ -13,6 +13,13 @@ function flag(args: string[], name: string): string | undefined {
   return i >= 0 ? args[i + 1] : undefined;
 }
 
+/** Regenerate the file-based routes module from the pages dir (when configured). */
+function syncRoutes(config: ResolvedConfig): void {
+  if (!config.routesDir) return;
+  const written: string = generateRoutes(config.routesDir, { lazy: true });
+  console.log(`weave routes → ${written}`);
+}
+
 /** Build the framework-owned entry (Level C) when the config declares a `root` component. */
 function virtualEntryFor(config: ResolvedConfig): { code: string; resolveDir: string } | undefined {
   if (!config.rootComponent) return undefined;
@@ -34,6 +41,7 @@ export async function main(argv: string[]): Promise<void> {
 
   if (cmd === 'build') {
     if (config) {
+      syncRoutes(config); // file-based routing: regenerate routes.gen.ts before bundling
       await build({
         entry: config.entry,
         virtualEntry: virtualEntryFor(config),
@@ -55,6 +63,7 @@ export async function main(argv: string[]): Promise<void> {
   }
   if (cmd === 'dev') {
     if (config) {
+      syncRoutes(config); // file-based routing: regenerate routes.gen.ts before serving
       // Serve the static web root (publicDir) from memory (outdir === servedir so
       // `main.js` lives at the web root); nothing is written to disk.
       const { url } = await dev({

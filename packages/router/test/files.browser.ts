@@ -61,6 +61,13 @@ test('emits a lazy module that code-splits each page', () => {
   assert.ok(mod.includes('lazy(() => import("./index.weave"))'), mod);
 });
 
+test('a TS/JS page extension is stripped so the import resolves under tsc + esbuild', () => {
+  const lazyMod: string = emitRoutesModule([{ path: 'task/:id', file: 'task/[id].ts' }], { lazy: true });
+  assert.ok(lazyMod.includes('import("./task/[id]")'), lazyMod);
+  const eager: string = emitRoutesModule([{ path: '', file: 'index.tsx' }]);
+  assert.ok(eager.includes('import Page0 from "./index";'), eager);
+});
+
 test('nested children serialize recursively', () => {
   const mod: string = emitRoutesModule([
     { path: 'users', file: 'users/_layout.weave', children: [{ path: '', file: 'users/index.weave' }] },

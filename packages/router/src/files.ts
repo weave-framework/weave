@@ -115,8 +115,13 @@ export function emitRoutesModule(routes: FileRoute[], opts: EmitRoutesOptions = 
   const imports: string[] = [];
   let n: number = 0;
   const prefix: string = opts.importPrefix ?? './';
-  const spec = (file: string): string =>
-    JSON.stringify(/^[./]/.test(file) ? file : prefix + file);
+  const spec = (file: string): string => {
+    const withPrefix: string = /^[./]/.test(file) ? file : prefix + file;
+    // Drop a TS/JS extension so the import resolves under both esbuild and `tsc`
+    // (importing a literal `.ts` errors without `allowImportingTsExtensions`).
+    // Keep `.weave` — the SFC loader needs the explicit extension to resolve.
+    return JSON.stringify(withPrefix.replace(/\.[mc]?[jt]sx?$/, ''));
+  };
 
   const componentField = (file: string): string => {
     if (opts.lazy) return `component: lazy(() => import(${spec(file)}))`;
