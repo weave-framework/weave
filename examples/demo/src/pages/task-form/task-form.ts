@@ -1,6 +1,5 @@
-import { onMount, tick, computed, type Computed } from '@weave/runtime';
+import { onMount } from '@weave/runtime';
 import { navigate, Link } from '@weave/router';
-import { action, type Action } from '@weave/data';
 import {
   field,
   form,
@@ -12,16 +11,10 @@ import {
   type FieldArray,
   type ValuesOf,
 } from '@weave/forms';
+import { control } from '@weave/forms/dom';
 import { useBoard, type BoardStore } from '../../stores/board';
 import { api } from '../../data/api';
-import {
-  STATUSES,
-  type Status,
-  type Priority,
-  type NewTask,
-  type Task,
-  type ChecklistItem,
-} from '../../types';
+import { STATUSES, type Status, type Priority, type NewTask, type Task, type ChecklistItem } from '../../types';
 
 // `<Link>` is referenced in task-form.html.
 void Link;
@@ -48,24 +41,23 @@ interface TaskFormSetup {
   checklist: () => ChecklistGroup[];
   addItem: () => void;
   removeItem: (item: ChecklistGroup) => void;
-  submitting: () => boolean;
-  submitError: () => string | null;
-  onSubmit: (e: Event) => void;
+  onSubmit: (e?: Event) => void;
+  control: typeof control;
 }
 
 const PRIORITIES: Priority[] = ['low', 'med', 'high'];
 
 /**
- * The create / edit form (routes `new` and `task/:id/edit`). It showcases:
- *   • `@weave/forms` sync validators, an async (server) check, and a cross-field rule,
- *   • an `action()`-wrapped optimistic submit (the store inserts/patches instantly),
- *   • `tick()` to move focus to the first error after a failed submit.
+ * The create / edit form (routes `new` and `task/:id/edit`). The form owns the
+ * whole submit dance — `form.submit()` does touchAll → await async validation →
+ * focus-first-error / run the handler with `submitting`/`submitError` tracked —
+ * so this setup is just *declaring* the controls and persisting on success.
  */
 export function setup(props: { params?: { id?: string } }): TaskFormSetup {
   const board: BoardStore = useBoard();
   const editId: string | undefined = props.params?.id;
 
-  // On a deep link the list may not be loaded yet; load then seed the fields.
+  // On a deep link the list may not be loaded yet; load + seed in onMount below.
   const seed: Task | undefined = editId ? board.byId(editId) : undefined;
 
   const title: Field<string> = field(seed?.title ?? '', [
@@ -75,7 +67,6 @@ export function setup(props: { params?: { id?: string } }): TaskFormSetup {
   ]);
 
   // Async: every non-empty assignee is checked against the (mock) team directory.
-  // Debounced + abortable by the field; `field.validating()` drives the spinner.
   const assignee: Field<string> = field<string>(seed?.assignee ?? '', [], {
     asyncValidate: async (name, { signal: abort }): Promise<string | null> => {
       if (!name.trim()) return null;
@@ -108,8 +99,8 @@ export function setup(props: { params?: { id?: string } }): TaskFormSetup {
         : null,
   });
 
-  // If we arrived before the list loaded, fetch it and seed the fields (only when
-  // the user hasn't typed yet — `touched` guards against clobbering live edits).
+  // Cold deep link: fetch the list, then seed the controls (guarded so a live edit
+  // is never clobbered).
   onMount(() => {
     if (!editId || seed) return;
     void board.load().then(() => {
@@ -123,39 +114,18 @@ export function setup(props: { params?: { id?: string } }): TaskFormSetup {
     });
   });
 
-  // The submit itself, wrapped so `pending`/`error` are reactive (`action`, B.7).
-  const save: Action<NewTask, Task> = action<NewTask, Task>((input) =>
-    editId ? board.update(editId, input) : board.create(input)
-  );
-
-  const submitError: Computed<string | null> = computed<string | null>(() => {
-    const e: unknown = save.error();
-    return e == null ? null : e instanceof Error ? e.message : String(e);
-  });
-
-  async function submit(): Promise<void> {
-    taskForm.touchAll(); // reveal every error, not just visited fields
-    if (taskForm.validating()) await waitForValidation(taskForm);
-    if (!taskForm.valid()) {
-      await tick(); // let the error nodes render…
-      focusFirstError(); // …then move focus to the first one
-      return;
-    }
-    const values: ValuesOf<TaskFields> = taskForm.value();
+  // The form drives validation + pending/error itself; we just persist + navigate.
+  const onSubmit: (e?: Event) => void = taskForm.submit(async (v: ValuesOf<TaskFields>): Promise<void> => {
     const input: NewTask = {
-      title: values.title.trim(),
-      status: values.status,
-      priority: values.priority,
-      ...(values.assignee.trim() ? { assignee: values.assignee.trim() } : {}),
-      ...(values.checklist.length ? { checklist: values.checklist } : {}),
+      title: v.title.trim(),
+      status: v.status,
+      priority: v.priority,
+      ...(v.assignee.trim() ? { assignee: v.assignee.trim() } : {}),
+      ...(v.checklist.length ? { checklist: v.checklist } : {}),
     };
-    try {
-      const saved: Task = await save.run(input);
-      navigate(editId ? '/task/' + saved.id : '/');
-    } catch {
-      /* surfaced via submitError() */
-    }
-  }
+    const saved: Task = editId ? await board.update(editId, input) : await board.create(input);
+    navigate(editId ? '/task/' + saved.id : '/');
+  });
 
   return {
     editId,
@@ -170,31 +140,7 @@ export function setup(props: { params?: { id?: string } }): TaskFormSetup {
       const i: number = checklist.controls().indexOf(item);
       if (i >= 0) checklist.removeAt(i);
     },
-    submitting: () => save.pending(),
-    submitError,
-    onSubmit: (e: Event) => {
-      e.preventDefault();
-      void submit();
-    },
+    onSubmit,
+    control,
   };
-}
-
-/** Resolve once the form's async validators have settled (or a 2s safety cap). */
-function waitForValidation(f: Group<TaskFields>): Promise<void> {
-  return new Promise((resolve) => {
-    const start: number = performance.now();
-    const poll = (): void => {
-      if (!f.validating() || performance.now() - start > 2000) resolve();
-      else setTimeout(poll, 30);
-    };
-    poll();
-  });
-}
-
-/** Focus the first field whose `.field` group is showing an error. */
-function focusFirstError(): void {
-  const bad: HTMLElement | null = document.querySelector<HTMLElement>(
-    '.task-form .field.invalid input, .task-form .field.invalid select, .task-form .check-row.invalid .check-text'
-  );
-  bad?.focus();
 }

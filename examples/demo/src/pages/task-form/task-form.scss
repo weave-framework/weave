@@ -49,8 +49,8 @@ $danger: #f85149;
   input:focus,
   select:focus { border-color: var(--accent); }
 
-  &.invalid input,
-  &.invalid select { border-color: $danger; }
+  input[aria-invalid='true'],
+  select[aria-invalid='true'] { border-color: $danger; }
 
   .msg { font-size: 12px; color: $danger; }
   .checking { font-size: 12px; color: var(--accent); }
@@ -86,7 +86,7 @@ $danger: #f85149;
       outline: none;
     }
     .check-text:focus { border-color: var(--accent); }
-    &.invalid .check-text { border-color: $danger; }
+    .check-text[aria-invalid='true'] { border-color: $danger; }
 
     .msg { grid-column: 2 / 3; font-size: 12px; color: $danger; }
 

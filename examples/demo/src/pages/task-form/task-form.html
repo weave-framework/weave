@@ -3,23 +3,18 @@
   <h1 class="tf-title">{{ heading }}</h1>
 
   <form class="tf-form" on:submit={onSubmit} novalidate>
-    <!-- Title -->
-    <label class="field" class:invalid={fields.title.touched() && !!fields.title.error()}>
+    <!-- `use:control` binds value + touched + aria-invalid in one; the error text is
+         all that's left to place by hand. -->
+    <label class="field">
       <span class="label">Title</span>
-      <input
-        type="text"
-        autocomplete="off"
-        placeholder="What needs doing?"
-        bind:value={fields.title.value}
-        on:blur={() => fields.title.touched.set(true)}
-      />
-      @if (fields.title.touched() && fields.title.error()) {
+      <input type="text" autocomplete="off" placeholder="What needs doing?" use:control={fields.title} />
+      @if (fields.title.error()) {
         <span class="msg">{{ fields.title.error() }}</span>
       }
     </label>
 
     <!-- Assignee (async-validated against the team directory) -->
-    <label class="field" class:invalid={fields.assignee.touched() && !!fields.assignee.error()}>
+    <label class="field">
       <span class="label">
         Assignee
         @if (fields.assignee.validating()) {
@@ -30,10 +25,9 @@
         type="text"
         autocomplete="off"
         placeholder="Team member (Aidas, Lina, Marek, Sofia)"
-        bind:value={fields.assignee.value}
-        on:blur={() => fields.assignee.touched.set(true)}
+        use:control={fields.assignee}
       />
-      @if (fields.assignee.touched() && fields.assignee.error()) {
+      @if (fields.assignee.error()) {
         <span class="msg">{{ fields.assignee.error() }}</span>
       }
     </label>
@@ -42,7 +36,7 @@
       <!-- Status -->
       <label class="field">
         <span class="label">Status</span>
-        <select bind:value={fields.status.value}>
+        <select use:control={fields.status}>
           @for (s of statuses; track s) {
             <option value={s}>{{ s }}</option>
           }
@@ -52,7 +46,7 @@
       <!-- Priority -->
       <label class="field">
         <span class="label">Priority</span>
-        <select bind:value={fields.priority.value}>
+        <select use:control={fields.priority}>
           @for (p of priorities; track p) {
             <option value={p}>{{ p }}</option>
           }
@@ -65,17 +59,11 @@
     <fieldset class="checklist">
       <legend>Checklist</legend>
       @for (item of checklist(); track item) {
-        <div class="check-row" class:invalid={item.controls.text.touched() && !!item.controls.text.error()}>
-          <input type="checkbox" bind:checked={item.controls.done.value} />
-          <input
-            type="text"
-            class="check-text"
-            placeholder="Acceptance criterion"
-            bind:value={item.controls.text.value}
-            on:blur={() => item.controls.text.touched.set(true)}
-          />
+        <div class="check-row">
+          <input type="checkbox" use:control={item.controls.done} />
+          <input type="text" class="check-text" placeholder="Acceptance criterion" use:control={item.controls.text} />
           <button type="button" class="rm" on:click={() => removeItem(item)} aria-label="Remove item">×</button>
-          @if (item.controls.text.touched() && item.controls.text.error()) {
+          @if (item.controls.text.error()) {
             <span class="msg">{{ item.controls.text.error() }}</span>
           }
         </div>
@@ -88,14 +76,14 @@
     @if (form.formError()) {
       <p class="form-error">{{ form.formError() }}</p>
     }
-    @if (submitError()) {
-      <p class="form-error">Couldn't save: {{ submitError() }}</p>
+    @if (form.submitError()) {
+      <p class="form-error">Couldn't save: {{ form.submitError() }}</p>
     }
 
     <div class="actions">
       <Link to="/" class="ghost">Cancel</Link>
-      <button type="submit" class="primary" disabled={submitting()}>
-        {{ submitting() ? 'Saving…' : (editId ? 'Save changes' : 'Create task') }}
+      <button type="submit" class="primary" disabled={form.submitting()}>
+        {{ form.submitting() ? 'Saving…' : (editId ? 'Save changes' : 'Create task') }}
       </button>
     </div>
   </form>
