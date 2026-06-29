@@ -28,7 +28,7 @@ import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { compileComponent, parseSfc, extractSources, classifyTemplate, classifyStyle } from '@weave/compiler';
 import type { ComponentSource, ExtractedSources } from '@weave/compiler';
-import { compileStyleFile, compileStyleSource, type StyleLang } from './styles.js';
+import { compileStyleFileTracked, compileStyleSource, type StyleLang } from './styles.js';
 
 export interface WeaveState {
   /** Scoped CSS collected from every component compiled this build (build mode only). */
@@ -61,19 +61,19 @@ async function resolveTemplate(
   tsPath: string,
   siblingHtml: string,
   hasSiblingHtml: boolean
-): Promise<string> {
+): Promise<{ text: string; files: string[] }> {
   if (decl.template !== undefined) {
     if (hasSiblingHtml) {
       throw new Error(
         `weave: ${tsPath} declares \`template\` and also has a sibling .html — remove one`
       );
     }
-    if (classifyTemplate(decl.template) === 'inline') return decl.template;
+    if (classifyTemplate(decl.template) === 'inline') return { text: decl.template, files: [] };
     const file: string = resolve(dirname(tsPath), decl.template);
     if (!existsSync(file)) throw new Error(`weave: template file not found: ${file} (from ${tsPath})`);
-    return readFile(file, 'utf8');
+    return { text: await readFile(file, 'utf8'), files: [file] };
   }
-  return readFile(siblingHtml, 'utf8');
+  return { text: await readFile(siblingHtml, 'utf8'), files: [siblingHtml] };
 }
 
 /**
@@ -87,7 +87,7 @@ async function resolveStyles(
   tsPath: string,
   dir: string,
   styleLang: StyleLang
-): Promise<string | undefined> {
+): Promise<{ css: string | undefined; files: string[] }> {
   if (decl.styles !== undefined) {
     const siblingStyle: string = tsPath.replace(/\.ts$/, '.' + styleLang);
     if (existsSync(siblingStyle)) {
@@ -96,19 +96,24 @@ async function resolveStyles(
       );
     }
     const parts: string[] = [];
+    const files: string[] = [];
     for (const entry of decl.styles) {
       if (classifyStyle(entry) === 'inline') {
         parts.push(await compileStyleSource(entry, styleLang, dir));
       } else {
         const file: string = resolve(dir, entry);
         if (!existsSync(file)) throw new Error(`weave: style file not found: ${file} (from ${tsPath})`);
-        parts.push(await compileStyleFile(file));
+        const compiled: { css: string; files: string[] } = await compileStyleFileTracked(file);
+        parts.push(compiled.css);
+        files.push(...compiled.files);
       }
     }
-    return parts.join('\n');
+    return { css: parts.join('\n'), files };
   }
   const siblingStyle: string = tsPath.replace(/\.ts$/, '.' + styleLang);
-  return existsSync(siblingStyle) ? compileStyleFile(siblingStyle) : undefined;
+  if (!existsSync(siblingStyle)) return { css: undefined, files: [] };
+  const compiled: { css: string; files: string[] } = await compileStyleFileTracked(siblingStyle);
+  return { css: compiled.css, files: compiled.files };
 }
 
 export function weave(state: WeaveState, options: WeaveOptions = {}): Plugin {
@@ -150,14 +155,27 @@ export function weave(state: WeaveState, options: WeaveOptions = {}): Plugin {
         if (decl.template === undefined && !hasSiblingHtml) return undefined; // ordinary module
 
         const dir: string = dirname(args.path);
-        const template: string = await resolveTemplate(decl, args.path, siblingHtml, hasSiblingHtml);
-        const styles: string | undefined = await resolveStyles(decl, args.path, dir, styleLang);
+        const template: { text: string; files: string[] } = await resolveTemplate(
+          decl,
+          args.path,
+          siblingHtml,
+          hasSiblingHtml
+        );
+        const styles: { css: string | undefined; files: string[] } = await resolveStyles(
+          decl,
+          args.path,
+          dir,
+          styleLang
+        );
 
         const { code, css } = compileComponent(
-          { script: decl.script, template, styles },
+          { script: decl.script, template: template.text, styles: styles.css },
           { filename: args.path }
         );
-        return emit(code, css, dir);
+        // Tell esbuild this module also depends on its template + style files, so a
+        // template-only or style-only edit (which leaves the .ts untouched) still
+        // triggers a watch-mode rebuild + live-reload.
+        return { ...emit(code, css, dir), watchFiles: [...template.files, ...styles.files] };
       });
     },
   };

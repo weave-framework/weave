@@ -9,6 +9,7 @@
  */
 
 import { readFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
 
 export type StyleLang = 'css' | 'scss' | 'sass';
 
@@ -24,6 +25,22 @@ export async function compileStyleFile(path: string): Promise<string> {
   if (langFromExt(path) === 'css') return readFile(path, 'utf8');
   const sass: typeof import('sass') = await import('sass'); // lazy — only when scss/sass is in play
   return sass.compile(path).css; // sass infers scss vs indented from the extension
+}
+
+/**
+ * Like {@link compileStyleFile} but also reports every file the compile pulled in —
+ * the entry itself plus any `@use`/`@import` partials (from sass's `loadedUrls`). The
+ * dev loader feeds these to esbuild's `watchFiles` so editing a partial (e.g. a tokens
+ * file) rebuilds the components that depend on it.
+ */
+export async function compileStyleFileTracked(path: string): Promise<{ css: string; files: string[] }> {
+  if (langFromExt(path) === 'css') return { css: await readFile(path, 'utf8'), files: [path] };
+  const sass: typeof import('sass') = await import('sass');
+  const result: import('sass').CompileResult = sass.compile(path);
+  const files: string[] = result.loadedUrls
+    .filter((u: URL): boolean => u.protocol === 'file:')
+    .map((u: URL): string => fileURLToPath(u));
+  return { css: result.css, files };
 }
 
 /** Compile a style STRING (inline `.weave` block) of `lang` to CSS. */

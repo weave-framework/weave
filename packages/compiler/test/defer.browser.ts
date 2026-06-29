@@ -69,6 +69,29 @@ test('@defer (on timer) swaps after the delay', async () => {
   assert.ok(!el.textContent?.includes('wait'));
 });
 
+test('@defer inside an @if branch renders content into the live DOM (regression)', async () => {
+  // The @defer sits in an @if branch, so its anchor is still in a detached clone
+  // fragment when deferBlock is wired — and the post-trigger render runs long after
+  // the branch was inserted. deferBlock must read the parent at insert time, or the
+  // content lands in the orphaned fragment and never appears. (Same class as the
+  // Portal/@if Bug #9; surfaced by the demo's @defer-on-the-board panel.)
+  const shown: Signal<boolean> = signal(true);
+  const el: Element = render(
+    `<div>@if (shown()) { <p>head</p>@defer (on timer(10)) { <span>late</span> } @placeholder { <span>wait</span> } }</div>`,
+    { shown },
+    ['shown']
+  );
+  host().appendChild(el);
+  assert.equal(el.querySelector('span')?.textContent, 'wait', 'placeholder shows inside the branch');
+
+  await wait(40);
+  assert.equal(
+    el.querySelector('span')?.textContent,
+    'late',
+    'content rendered into the live DOM (not an orphaned fragment) after the trigger'
+  );
+});
+
 test('@defer (on idle) renders after an idle tick', async () => {
   const el: Element = render(
     `<div>@defer (on idle) { <span>idle-content</span> } @placeholder { <span>p</span> }</div>`
