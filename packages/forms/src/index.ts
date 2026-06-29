@@ -172,8 +172,6 @@ export interface GroupOptions<C extends Controls> {
   /** Cross-field validation over this group's own values snapshot (e.g. password confirm). */
   validate?: FormValidator<C>;
 }
-/** @deprecated alias of {@link GroupOptions}. */
-export type FormOptions<C extends Controls> = GroupOptions<C>;
 
 /**
  * A group of named controls — the Weave analog of Angular's `FormGroup`. A `Group`
@@ -181,14 +179,10 @@ export type FormOptions<C extends Controls> = GroupOptions<C>;
  * {@link FieldArray}). `form` is just the conventional name for the top-level group.
  */
 export interface Group<C extends Controls> extends Control<ValuesOf<C>> {
-  /** The child controls (fields / nested groups / arrays). */
+  /** The child controls (fields / nested groups / arrays) — `group.controls.name`. */
   controls: C;
-  /** Alias of {@link controls} (back-compat with `form().fields`). */
-  fields: C;
-  /** Nested `{ name: value }` snapshot of every child value. Reactive. */
+  /** Nested `{ name: value }` snapshot of every child value (Angular's `FormGroup.value`). Reactive. */
   value: () => ValuesOf<C>;
-  /** Alias of {@link value}. Reactive. */
-  values: () => ValuesOf<C>;
   /** True when every child is valid AND there is no group-level cross-field error. Reactive. */
   valid: () => boolean;
   /** A group-level (`_form`) cross-field error, or null. Reactive. */
@@ -202,9 +196,6 @@ export interface Group<C extends Controls> extends Control<ValuesOf<C>> {
   /** Mark every descendant touched (e.g. on a failed submit, to reveal all errors). */
   touchAll: () => void;
 }
-
-/** @deprecated alias of {@link Group} (kept for back-compat). */
-export type Form<C extends Controls> = Group<C>;
 
 /**
  * Aggregate named controls into one group, with optional cross-field validation.
@@ -239,9 +230,7 @@ export function group<C extends Controls>(controls: C, opts: GroupOptions<C> = {
 
   return {
     controls,
-    fields: controls,
     value: values,
-    values,
     valid: computed(() => list.every((c) => c.valid()) && formError() === null),
     formError,
     validating: computed(() => list.some((c) => c.validating())),
