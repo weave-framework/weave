@@ -345,25 +345,52 @@ export const RouterView: Component = (props = {}) => {
  * Client-side anchor: navigates instead of reloading (plain clicks only — lets
  * ctrl/cmd/middle-click open a new tab as usual).
  *
- * Usage in a template: `<Link to="/about">About</Link>`.
+ * Active state (reactive on the current path): when the link's target matches the
+ * URL it gets `aria-current="page"` automatically, and — if you name one via
+ * `activeClass` — an active CSS class. Matching is prefix-by-segment so a parent
+ * link (`/users`) stays active on a child (`/users/42`); pass `exact` to require an
+ * exact match. A link to `/` is only ever active at exactly `/`.
+ *
+ * Usage in a template: `<Link to="/about" activeClass="active">About</Link>`.
  */
 export const Link: Component = (props = {}, slots = {}) => {
   const to: string = String((props as { to?: unknown }).to ?? '/');
   // prefetch defaults on: warm the target's lazy chunk on first hover/focus.
   const wantsPrefetch: boolean = (props as { prefetch?: unknown }).prefetch !== false;
+  const exact: boolean = (props as { exact?: unknown }).exact === true;
+  const activeClass: string | null =
+    typeof (props as { activeClass?: unknown }).activeClass === 'string'
+      ? (props as { activeClass: string }).activeClass
+      : null;
   const a: HTMLAnchorElement = document.createElement('a');
   a.setAttribute('href', to);
   // Forward any other props (class, id, aria-*, title, …) to the anchor, so a
   // `<Link class="nav" aria-label="Home">` actually styles/labels its <a>. The
   // router-owned props and any function/event props are skipped; read once.
   for (const key in props) {
-    if (key === 'to' || key === 'prefetch') continue;
+    if (key === 'to' || key === 'prefetch' || key === 'exact' || key === 'activeClass') continue;
     const val: unknown = (props as Record<string, unknown>)[key];
     if (val == null || val === false || typeof val === 'function') continue;
     a.setAttribute(key, val === true ? '' : String(val));
   }
   const kids: Node | undefined = slots.default?.();
   if (kids) a.appendChild(kids);
+
+  // Reactive active state. The target is compared without query/hash; `/` is
+  // exact-only (else its prefix would match every path).
+  const target: string = to.split('#')[0].split('?')[0];
+  const isActive = (cur: string): boolean => {
+    if (exact || target === '/') return cur === target;
+    if (cur === target) return true;
+    return cur.startsWith(target.endsWith('/') ? target : target + '/');
+  };
+  effect(() => {
+    const on: boolean = isActive(currentPath());
+    if (on) a.setAttribute('aria-current', 'page');
+    else a.removeAttribute('aria-current');
+    if (activeClass) a.classList.toggle(activeClass, on);
+  });
+
   a.addEventListener('click', (e) => {
     const me: MouseEvent = e as MouseEvent;
     if (me.metaKey || me.ctrlKey || me.shiftKey || me.button !== 0) return;

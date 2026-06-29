@@ -28,13 +28,22 @@
   gap: 16px;
 }
 
-.nav a {
+// The <a> is rendered by <Link> (a child component), so it never carries the
+// shell's scope attribute — `:global()` lets these rules reach it (Svelte-style).
+.nav :global(a) {
   color: var(--muted);
   font-size: 14px;
 }
 
-.nav a:hover {
+.nav :global(a:hover) {
   color: var(--text);
+}
+
+// Active route (set by <Link> via `activeClass`): the current nav item.
+.nav :global(a.active) {
+  color: var(--text);
+  font-weight: 600;
+  box-shadow: inset 0 -2px 0 var(--accent);
 }
 
 .main {
