@@ -157,6 +157,15 @@ try {
   await page.waitForFunction(() => document.querySelector('.stress-empty') !== null, { timeout: 5000 });
   ok((await page.locator('.rows-count').textContent()) === '0', 'clear empties the list (@empty shown)');
 
+  /* ── 10. Router R.3 — document title (afterEach) + scroll-to-top on navigate ── */
+  ok((await page.title()).includes('Stress'), 'afterEach set the document title to the route');
+  await page.click('button[data-op="create-1k"]'); // make the page tall enough to scroll
+  await page.waitForFunction(() => document.querySelectorAll('.stress-table tbody tr').length === 1000, { timeout: 5000 });
+  await page.evaluate(() => window.scrollTo(0, 800));
+  await page.click('.nav a[href="/"]'); // real <Link> navigation → push
+  await page.waitForFunction(() => location.pathname === '/' && window.scrollY === 0, { timeout: 5000 });
+  ok(true, 'navigating to a new route scrolls back to the top');
+
   ok(errors.length === 0, errors.length ? `no page errors (got: ${errors.join('; ')})` : 'no page errors during the run');
 } finally {
   await browser.close();

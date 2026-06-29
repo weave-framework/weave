@@ -1,5 +1,5 @@
 import { test, assert } from '../../../tools/harness.js';
-import { effect, signal } from '@weave/runtime';
+import { effect, signal, tick } from '@weave/runtime';
 import type { Signal } from '@weave/runtime';
 import { mount, mountComponent, defineComponent, lazy, type Component } from '@weave/runtime/dom';
 import {
@@ -7,6 +7,7 @@ import {
   navigate,
   currentPath,
   currentQuery,
+  afterEach,
   RouterView,
   Link,
   prefetch,
@@ -319,6 +320,72 @@ test('Link to "/" is active only at exactly "/"', () => {
   assert.ok(!home.classList.contains('on'), 'root link not active on a sub-path');
   navigate('/');
   assert.ok(home.classList.contains('on'), 'root link active at root');
+});
+
+/* ──────────── navigation hooks + scroll (R.3) ──────────── */
+
+test('afterEach fires on each navigation with the new path; unsubscribe stops it', () => {
+  const seen: string[] = [];
+  const off: () => void = afterEach((n) => seen.push(`${n.type}:${n.path}`));
+  navigate('/hook-a');
+  navigate('/hook-b');
+  off();
+  navigate('/hook-c');
+  assert.deepEqual(seen, ['push:/hook-a', 'push:/hook-b'], 'fired for each push, stopped after unsubscribe');
+});
+
+test('navigation scrolls to top on a push', async () => {
+  const ys: number[] = [];
+  const orig: typeof window.scrollTo = window.scrollTo;
+  (window as unknown as { scrollTo: (x: number, y: number) => void }).scrollTo = (_x, y) => ys.push(y);
+  try {
+    navigate('/scroll-top');
+    await tick();
+    assert.ok(ys.includes(0), `scrolled to top after push (got ${ys})`);
+  } finally {
+    window.scrollTo = orig;
+  }
+});
+
+test('a #fragment in the target scrolls to that element instead of the top', async () => {
+  const sec: HTMLDivElement = document.createElement('div');
+  sec.id = 'frag-target';
+  document.body.appendChild(sec);
+  let intoView: boolean = false;
+  sec.scrollIntoView = (): void => { intoView = true; };
+  const orig: typeof window.scrollTo = window.scrollTo;
+  let topped: boolean = false;
+  (window as unknown as { scrollTo: (x: number, y: number) => void }).scrollTo = () => { topped = true; };
+  try {
+    navigate('/with-frag#frag-target');
+    await tick();
+    assert.ok(intoView, 'scrollIntoView called on the #fragment element');
+    assert.ok(!topped, 'did not also scroll to top');
+  } finally {
+    window.scrollTo = orig;
+    sec.remove();
+  }
+});
+
+test('navigation saves the current scroll, and a pop restores it', async () => {
+  const desc: PropertyDescriptor | undefined = Object.getOwnPropertyDescriptor(window, 'scrollY');
+  let fakeY: number = 0;
+  Object.defineProperty(window, 'scrollY', { configurable: true, get: () => fakeY });
+  const ys: number[] = [];
+  const orig: typeof window.scrollTo = window.scrollTo;
+  (window as unknown as { scrollTo: (x: number, y: number) => void }).scrollTo = (_x, y) => ys.push(y);
+  try {
+    fakeY = 320; // the user has scrolled down the current page
+    navigate('/leave-here'); // saves 320 for the position being left
+    ys.length = 0;
+    // Going back to that position (a pop) should restore its saved scroll, not top.
+    window.dispatchEvent(new PopStateEvent('popstate', { state: { __wpos: 0 } }));
+    await tick();
+    assert.ok(ys.includes(320), `restored the saved scroll on pop (got ${ys})`);
+  } finally {
+    window.scrollTo = orig;
+    if (desc) Object.defineProperty(window, 'scrollY', desc);
+  }
 });
 
 /* ──────────── prefetch (B.15) ──────────── */
