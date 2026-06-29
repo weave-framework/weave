@@ -30,6 +30,7 @@ export async function main(argv: string[]): Promise<void> {
         minify: config.minify,
         styleLang: config.styleLang,
         styles: config.styles,
+        publicDir: config.publicDir,
         index: config.index,
         clean: true, // a fresh, self-contained artifact each prod build
       });
@@ -43,12 +44,12 @@ export async function main(argv: string[]): Promise<void> {
   }
   if (cmd === 'dev') {
     if (config) {
-      // Serve the config's directory from memory (outdir === servedir so `main.js`
-      // lives at the web root); nothing is written to disk.
+      // Serve the static web root (publicDir) from memory (outdir === servedir so
+      // `main.js` lives at the web root); nothing is written to disk.
       const { url } = await dev({
         entry: config.entry,
-        servedir: config.root,
-        outdir: config.root,
+        servedir: config.publicDir,
+        outdir: config.publicDir,
         port: config.port,
         styleLang: config.styleLang,
         styles: config.styles,

@@ -18,6 +18,8 @@ import type { StyleLang } from './styles.js';
 export interface WeaveConfig {
   /** App entry module (relative to the config file). */
   entry: string;
+  /** Static web root — served as-is in dev and copied verbatim into the build output. */
+  publicDir?: string;
   /** HTML shell template (relative to the config file). */
   index?: string;
   /** Output directory for `weave build` (default `dist`). */
@@ -37,9 +39,11 @@ export function defineConfig(config: WeaveConfig): WeaveConfig {
 
 /** A {@link WeaveConfig} with every path made absolute and defaults filled in. */
 export interface ResolvedConfig {
-  /** Directory containing the config — the dev server's web root. */
+  /** Directory containing the config. */
   root: string;
   entry: string;
+  /** Static web root (absolute) — defaults to {@link root} when no `publicDir` is set. */
+  publicDir: string;
   index?: string;
   outDir: string;
   styleLang: StyleLang;
@@ -102,6 +106,7 @@ function resolveConfig(raw: WeaveConfig, root: string): ResolvedConfig {
   return {
     root,
     entry: abs(raw.entry),
+    publicDir: raw.publicDir ? abs(raw.publicDir) : root,
     index: raw.index ? abs(raw.index) : undefined,
     outDir: abs(raw.outDir ?? 'dist'),
     styleLang: raw.styleLang ?? 'css',

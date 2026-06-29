@@ -7,7 +7,8 @@ import { defineConfig } from '@weave/cli';
  */
 export default defineConfig({
   entry: 'src/main.ts',
-  index: 'index.html',
+  publicDir: 'public', // static web root (served in dev, copied verbatim into dist)
+  index: 'public/index.html',
   outDir: 'dist',
   styleLang: 'scss', // components pair `<name>.scss`
   styles: ['src/styles/main.scss'], // global entry stylesheet (tokens + reset + layout)

@@ -1,7 +1,8 @@
 /** `weave build` — one-shot production bundle: JS via esbuild + one `app.css`. */
 
 import { build as esbuild } from 'esbuild';
-import { mkdir, writeFile, readFile, rm } from 'node:fs/promises';
+import { mkdir, writeFile, readFile, rm, cp } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { weave, type WeaveState } from './plugin.js';
 import { compileStyleFile, type StyleLang } from './styles.js';
@@ -13,6 +14,8 @@ export interface BuildConfig {
   styleLang?: StyleLang;
   /** Global entry stylesheets (absolute paths), compiled + prepended to `app.css` in order. */
   styles?: string[];
+  /** Static web root copied verbatim into the output dir (favicons, manifest, …). */
+  publicDir?: string;
   /** HTML shell to copy into the output dir, with `<script>`/`<link>` injected. */
   index?: string;
   /** Wipe the output dir before building so it is a clean, self-contained artifact (default false — config mode opts in). */
@@ -35,6 +38,12 @@ export async function build(config: BuildConfig): Promise<void> {
     minify: config.minify ?? true,
     plugins: [weave(state, { styleLang: config.styleLang })],
   });
+
+  // Copy the static web root (favicons, manifest, the raw index.html) into the output;
+  // the injected index.html below overwrites the raw copy.
+  if (config.publicDir && existsSync(config.publicDir)) {
+    await cp(config.publicDir, outDir, { recursive: true });
+  }
 
   // Global entry styles (in declared order) first, then component scoped CSS.
   const globalCss = (await Promise.all((config.styles ?? []).map(compileStyleFile))).join('\n');
