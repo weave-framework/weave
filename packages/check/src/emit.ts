@@ -1,5 +1,6 @@
 /**
- * Virtual `.ts` generation — the heart of M8.
+ * Virtual `.ts` generation — the heart of M8, shared by `weave check` and the
+ * M9 language server.
  *
  * For each component we synthesize a never-bundled TypeScript module: the user's
  * verbatim `setup` script, followed by a `__weave__()` harness that places every
@@ -8,10 +9,12 @@
  * `@if … as x`) become real lexical bindings, so TypeScript scopes and narrows
  * them exactly as the runtime does.
  *
- * Each emitted statement is one line; we remember which virtual line maps to
- * which source offset, so `check.ts` can translate a `tsc` diagnostic back to the
- * original `.weave`/`.html` line:col. Errors in the script region map straight to
- * the user's code (it is embedded verbatim).
+ * Two source maps come out of the same emit:
+ *  - `templateMap` (line → source offset) — what `weave check` uses to translate a
+ *    `tsc` diagnostic line back to a `.weave`/`.html` line:col.
+ *  - `mappings` (char-precise verbatim runs) — what the Volar language server uses
+ *    to drive hover / go-to-definition / rename and to surface diagnostics at the
+ *    exact template span. Built from `rewrite`'s segment maps.
  */
 
 import {
@@ -37,6 +40,22 @@ const isComponentTag = (tag: string): boolean => /^[A-Z]/.test(tag);
 const propKey = (name: string): string =>
   /^[A-Za-z_$][\w$]*$/.test(name) ? name : JSON.stringify(name);
 
+/**
+ * A verbatim run linking the generated module to its source, char-precise. The
+ * `source` tag selects which file `sourceOffset` indexes into (a SFC keeps both
+ * in the same file; the separate form splits script ↔ template across two).
+ */
+export interface WeaveMapping {
+  /** offset into the generated `text` */
+  generatedOffset: number;
+  /** offset into the mapped source file (see `source`) */
+  sourceOffset: number;
+  /** run length (same on both sides) */
+  length: number;
+  /** `script` → `scriptFile`/`scriptText`; `template` → `templateFile`/`templateText` */
+  source: 'script' | 'template';
+}
+
 /** A generated virtual module plus everything needed to map its diagnostics back. */
 export interface Virtual {
   /** Virtual module path (drives module resolution); never written to disk. */
@@ -45,22 +64,44 @@ export interface Virtual {
   text: string;
   /** File reported for template-region errors. */
   templateFile: string;
-  /** Offset-faithful template text (offsets index into this). */
+  /** Offset-faithful template text (template `sourceOffset`s index into this). */
   templateText: string;
   /** virtual line (1-based) → source offset into `templateText`. */
   templateMap: Map<number, number>;
   /** File reported for script-region (user TS) errors. */
   scriptFile: string;
+  /** Script source text (script `sourceOffset`s index into this). */
+  scriptText: string;
   /** 0-based line in `scriptFile` where the embedded script begins. */
   scriptLine: number;
   /** Number of leading virtual lines occupied by the embedded script. */
   scriptLineCount: number;
+  /** Char-precise generated↔source runs for editor tooling. */
+  mappings: WeaveMapping[];
+}
+
+interface LineSeg {
+  /** column within this line's `text` */
+  col: number;
+  /** source offset (into templateText) */
+  src: number;
+  /** run length */
+  len: number;
 }
 
 interface Line {
   text: string;
   /** source offset this line maps to (an expression), or undefined for scaffolding */
   offset?: number;
+  /** char-precise verbatim runs within this line, mapping `text` cols → source */
+  segs?: LineSeg[];
+}
+
+/** Chainable single-line builder accumulating text + char-precise mappings. */
+interface Builder {
+  lit(s: string): Builder;
+  expr(srcOffset: number | undefined, exprStr: string, locals: Set<string>): Builder;
+  push(offset?: number): void;
 }
 
 /** Build a virtual module for a `.weave` SFC. */
@@ -68,7 +109,8 @@ export function buildVirtualSfc(filePath: string, source: string): Virtual {
   const loc: ComponentSourceLoc = parseSfcLoc(source);
   const nodes: TemplateNode[] = parseTemplate(loc.template);
   const body: Line[] = emit(nodes, new Set(inferCtxNames(nodes)));
-  const asm: ReturnType<typeof assemble> = assemble(loc.script, HAS_SETUP.test(loc.script ?? ''), body);
+  const hasSetup: boolean = HAS_SETUP.test(loc.script ?? '');
+  const asm: ReturnType<typeof assemble> = assemble(loc.script, hasSetup, body, loc.scriptOffset);
   return {
     path: filePath + '.ts',
     text: asm.text,
@@ -76,8 +118,10 @@ export function buildVirtualSfc(filePath: string, source: string): Virtual {
     templateText: loc.template,
     templateMap: asm.templateMap,
     scriptFile: filePath,
+    scriptText: source,
     scriptLine: loc.scriptLine,
     scriptLineCount: asm.scriptLineCount,
+    mappings: asm.mappings,
   };
 }
 
@@ -90,7 +134,7 @@ export function buildVirtualSeparate(
 ): Virtual {
   const nodes: TemplateNode[] = parseTemplate(htmlSource);
   const body: Line[] = emit(nodes, new Set(inferCtxNames(nodes)));
-  const asm: ReturnType<typeof assemble> = assemble(tsSource, HAS_SETUP.test(tsSource), body);
+  const asm: ReturnType<typeof assemble> = assemble(tsSource, HAS_SETUP.test(tsSource), body, 0);
   return {
     // Live at the real `.ts` path (shadowing disk) so a parent's `import Foo from
     // './foo'` resolves to this virtual — which carries the synthesized typed
@@ -101,8 +145,10 @@ export function buildVirtualSeparate(
     templateText: htmlSource,
     templateMap: asm.templateMap,
     scriptFile: tsPath,
+    scriptText: tsSource,
     scriptLine: 0,
     scriptLineCount: asm.scriptLineCount,
+    mappings: asm.mappings,
   };
 }
 
@@ -112,6 +158,9 @@ function emit(nodes: TemplateNode[], ctx: Set<string>): Line[] {
   const lines: Line[] = [];
   let awaitN: number = 0; // unique source-binding names for `@await` type-queries
   let propsN: number = 0; // unique names for child-component prop-check objects
+
+  // A plain scaffolding line (no source mapping), optionally pinned to a source
+  // offset for the legacy line→offset `templateMap`.
   const push = (text: string, offset?: number): void => {
     lines.push({ text, offset });
   };
@@ -123,9 +172,36 @@ function emit(nodes: TemplateNode[], ctx: Set<string>): Line[] {
     for (const n of locals) s.set(n, { kind: 'local' });
     return s;
   };
-  // Rewrite an expression and flatten it to a single line (positions stay expr-level).
-  const rw = (expr: string, locals: Set<string>): string =>
-    rewrite(expr, scopeOf(locals), '__ctx').code.replace(/\r?\n/g, ' ');
+
+  // A chainable line builder: `lit()` appends scaffolding text, `expr()` appends a
+  // rewritten template expression and records its char-precise src↔gen segments
+  // (offset by where the expression landed in the line). `push()` flushes the line.
+  const mk = (): Builder => {
+    let text: string = '';
+    const segs: LineSeg[] = [];
+    const api: Builder = {
+      lit(s: string): Builder {
+        text += s;
+        return api;
+      },
+      expr(srcOffset: number | undefined, exprStr: string, locals: Set<string>): Builder {
+        const r: ReturnType<typeof rewrite> = rewrite(exprStr, scopeOf(locals), '__ctx');
+        // Length-preserving flatten keeps the statement single-line (so the legacy
+        // line map stays valid) without shifting any segment offset.
+        const code: string = r.code.replace(/[\r\n]/g, ' ');
+        const base: number = text.length;
+        if (srcOffset !== undefined) {
+          for (const s of r.segments) segs.push({ col: base + s.gen, src: srcOffset + s.src, len: s.len });
+        }
+        text += code;
+        return api;
+      },
+      push(offset?: number): void {
+        lines.push({ text, offset, segs });
+      },
+    };
+    return api;
+  };
 
   // A non-static attribute on a DOM element (or a directive on a component):
   // place its expression in a type-checked position. `use:`/`transition:` verify
@@ -133,16 +209,14 @@ function emit(nodes: TemplateNode[], ctx: Set<string>): Line[] {
   const emitAttr = (attr: Attr, locals: Set<string>): void => {
     if (attr.type === 'static') return;
     if (attr.type === 'use' || attr.type === 'transition') {
-      const fn: string = rw(attr.name, locals);
-      push(
-        attr.expr !== undefined
-          ? `  (${fn})(null as any, ${rw(attr.expr, locals)});`
-          : `  (${fn})(null as any);`,
-        attr.nameOffset ?? attr.offset
-      );
+      const at: number | undefined = attr.nameOffset ?? attr.offset;
+      const b: Builder = mk().lit('  (').expr(at, attr.name, locals);
+      if (attr.expr !== undefined) b.lit(')(null as any, ').expr(attr.offset, attr.expr, locals).lit(');');
+      else b.lit(')(null as any);');
+      b.push(at);
       return;
     }
-    push(`  void (${rw(attr.expr, locals)});`, attr.offset);
+    mk().lit('  void (').expr(attr.offset, attr.expr, locals).lit(');').push(attr.offset);
   };
 
   // A child component `<Tag prop={expr} …>`: assemble its data props into one typed
@@ -151,22 +225,28 @@ function emit(nodes: TemplateNode[], ctx: Set<string>): Line[] {
   // props all surface, each pinned to its own attribute. Events stay outside the
   // contract (the runtime wires them) but their handler bodies are still checked.
   const emitComponent = (node: ElementNode, locals: Set<string>): void => {
-    const compRef: string = rw(node.tag, locals); // bare import, or `__ctx.Name`
-    const dataProps: Array<{ key: string; value: string; offset?: number }> = [];
+    const compRef: string = rewrite(node.tag, scopeOf(locals), '__ctx').code; // bare import, or `__ctx.Name`
+    const dataProps: Array<{ key: string; expr?: string; srcOffset?: number; staticVal?: string }> = [];
     for (const attr of node.attrs) {
       if (attr.type === 'static') {
         if (attr.name === 'slot') continue; // slot marker, stripped by codegen
-        dataProps.push({ key: attr.name, value: JSON.stringify(attr.value) });
+        dataProps.push({ key: attr.name, staticVal: JSON.stringify(attr.value) });
       } else if (attr.type === 'attr') {
-        dataProps.push({ key: attr.name, value: rw(attr.expr, locals), offset: attr.offset });
+        dataProps.push({ key: attr.name, expr: attr.expr, srcOffset: attr.offset });
       } else {
         emitAttr(attr, locals); // events / stray directives — checked, not part of props
       }
     }
     const id: string = `__props${propsN++}`;
-    const anchor: number | undefined = dataProps.find((p) => p.offset !== undefined)?.offset;
+    const anchor: number | undefined = dataProps.find((p) => p.srcOffset !== undefined)?.srcOffset;
     push(`  const ${id}: NonNullable<Parameters<typeof ${compRef}>[0]> = {`, anchor);
-    for (const p of dataProps) push(`    ${propKey(p.key)}: (${p.value}),`, p.offset);
+    for (const p of dataProps) {
+      if (p.expr !== undefined) {
+        mk().lit(`    ${propKey(p.key)}: (`).expr(p.srcOffset, p.expr, locals).lit('),').push(p.srcOffset);
+      } else {
+        push(`    ${propKey(p.key)}: (${p.staticVal}),`);
+      }
+    }
     push(`  };`);
     push(`  void ${id};`);
   };
@@ -193,19 +273,19 @@ function emit(nodes: TemplateNode[], ctx: Set<string>): Line[] {
         case 'snippet':
           break; // already emitted above
         case 'render':
-          push(`  void (${rw(node.expr, scope)});`, node.exprOffset);
+          mk().lit('  void (').expr(node.exprOffset, node.expr, scope).lit(');').push(node.exprOffset);
           break;
         case 'key':
-          push(`  void (${rw(node.expr, scope)});`, node.exprOffset);
+          mk().lit('  void (').expr(node.exprOffset, node.expr, scope).lit(');').push(node.exprOffset);
           walk(node.children, scope);
           break;
         case 'text':
           break;
         case 'interp':
-          push(`  void (${rw(node.expr, scope)});`, node.offset);
+          mk().lit('  void (').expr(node.offset, node.expr, scope).lit(');').push(node.offset);
           break;
         case 'let': {
-          push(`  const ${node.name} = (${rw(node.expr, scope)});`, node.exprOffset);
+          mk().lit(`  const ${node.name} = (`).expr(node.exprOffset, node.expr, scope).lit(');').push(node.exprOffset);
           scope = new Set(scope).add(node.name);
           break;
         }
@@ -221,13 +301,13 @@ function emit(nodes: TemplateNode[], ctx: Set<string>): Line[] {
         case 'if':
           for (const br of node.branches) {
             if (br.cond !== undefined) {
-              push(`  if (${rw(br.cond, scope)}) {`, br.condOffset);
+              mk().lit('  if (').expr(br.condOffset, br.cond, scope).lit(') {').push(br.condOffset);
             } else {
               push(`  {`);
             }
             let inner: Set<string> = scope;
             if (br.alias && br.cond !== undefined) {
-              push(`    const ${br.alias} = (${rw(br.cond, scope)});`, br.condOffset);
+              mk().lit(`    const ${br.alias} = (`).expr(br.condOffset, br.cond, scope).lit(');').push(br.condOffset);
               inner = new Set(scope).add(br.alias);
             }
             walk(br.children, inner);
@@ -235,7 +315,7 @@ function emit(nodes: TemplateNode[], ctx: Set<string>): Line[] {
           }
           break;
         case 'for': {
-          push(`  for (const ${node.item} of (${rw(node.list, scope)})) {`, node.listOffset);
+          mk().lit(`  for (const ${node.item} of (`).expr(node.listOffset, node.list, scope).lit(')) {').push(node.listOffset);
           push(
             `    const $index: number = 0, $count: number = 0, ` +
               `$first: boolean = true, $last: boolean = true, ` +
@@ -243,17 +323,17 @@ function emit(nodes: TemplateNode[], ctx: Set<string>): Line[] {
           );
           const inner: Set<string> = new Set(scope).add(node.item);
           for (const v of FOR_VARS) inner.add(v);
-          if (node.track) push(`    void (${rw(node.track, inner)});`, node.trackOffset);
+          if (node.track) mk().lit('    void (').expr(node.trackOffset, node.track, inner).lit(');').push(node.trackOffset);
           walk(node.children, inner);
           push(`  }`);
           if (node.empty) walk(node.empty, scope);
           break;
         }
         case 'switch': {
-          push(`  switch (${rw(node.expr, scope)}) {`, node.exprOffset);
+          mk().lit('  switch (').expr(node.exprOffset, node.expr, scope).lit(') {').push(node.exprOffset);
           for (const c of node.cases) {
             if (c.test !== undefined) {
-              push(`    case ${rw(c.test, scope)}: {`, c.testOffset);
+              mk().lit('    case ').expr(c.testOffset, c.test, scope).lit(': {').push(c.testOffset);
             } else {
               push(`    default: {`);
             }
@@ -265,9 +345,9 @@ function emit(nodes: TemplateNode[], ctx: Set<string>): Line[] {
         }
         case 'defer': {
           if (node.trigger.kind === 'when') {
-            push(`  void (${rw(node.trigger.expr, scope)});`, node.trigger.exprOffset);
+            mk().lit('  void (').expr(node.trigger.exprOffset, node.trigger.expr, scope).lit(');').push(node.trigger.exprOffset);
           } else if (node.trigger.kind === 'timer') {
-            push(`  void (${rw(node.trigger.ms, scope)});`, node.trigger.msOffset);
+            mk().lit('  void (').expr(node.trigger.msOffset, node.trigger.ms, scope).lit(');').push(node.trigger.msOffset);
           }
           walk(node.children, scope);
           if (node.placeholder) walk(node.placeholder, scope);
@@ -280,9 +360,9 @@ function emit(nodes: TemplateNode[], ctx: Set<string>): Line[] {
           let srcVar: string = '';
           if (node.then?.alias) {
             srcVar = `__await${awaitN++}`;
-            push(`  const ${srcVar} = (${rw(node.expr, scope)});`, node.exprOffset);
+            mk().lit(`  const ${srcVar} = (`).expr(node.exprOffset, node.expr, scope).lit(');').push(node.exprOffset);
           } else {
-            push(`  void (${rw(node.expr, scope)});`, node.exprOffset);
+            mk().lit('  void (').expr(node.exprOffset, node.expr, scope).lit(');').push(node.exprOffset);
           }
           if (node.pending) walk(node.pending, scope);
           if (node.then) {
@@ -324,8 +404,9 @@ function emit(nodes: TemplateNode[], ctx: Set<string>): Line[] {
 function assemble(
   script: string | undefined,
   hasSetup: boolean,
-  body: Line[]
-): { text: string; scriptLineCount: number; templateMap: Map<number, number> } {
+  body: Line[],
+  scriptBaseOffset: number
+): { text: string; scriptLineCount: number; templateMap: Map<number, number>; mappings: WeaveMapping[] } {
   const out: string[] = [];
   const scriptLines: string[] = script ? script.split('\n') : [];
   for (const l of scriptLines) out.push(l);
@@ -358,5 +439,25 @@ function assemble(
   out.push(`declare const __weaveDefault: (props: ${propsType}, slots?: Record<string, () => unknown>) => unknown;`);
   out.push('export default __weaveDefault;'); // also forces module scope
 
-  return { text: out.join('\n'), scriptLineCount: scriptLines.length, templateMap };
+  // Char-precise mappings. The script is embedded verbatim at the very top, so it
+  // maps 1:1 as a single run; template runs are placed by each line's offset.
+  const mappings: WeaveMapping[] = [];
+  if (script && script.length) {
+    mappings.push({ generatedOffset: 0, sourceOffset: scriptBaseOffset, length: script.length, source: 'script' });
+  }
+  const lineGenOffset: number[] = new Array<number>(out.length);
+  let acc: number = 0;
+  for (let k: number = 0; k < out.length; k++) {
+    lineGenOffset[k] = acc;
+    acc += out[k].length + 1; // +1 for the joining '\n'
+  }
+  body.forEach((ln, i) => {
+    if (!ln.segs) return;
+    const gBase: number = lineGenOffset[bodyBase + i];
+    for (const s of ln.segs) {
+      mappings.push({ generatedOffset: gBase + s.col, sourceOffset: s.src, length: s.len, source: 'template' });
+    }
+  });
+
+  return { text: out.join('\n'), scriptLineCount: scriptLines.length, templateMap, mappings };
 }

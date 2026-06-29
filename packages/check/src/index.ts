@@ -7,6 +7,6 @@
  * compiler, and maps diagnostics back to the original `.weave`/`.html` line:col.
  */
 
-export { buildVirtualSfc, buildVirtualSeparate, type Virtual } from './emit.js';
+export { buildVirtualSfc, buildVirtualSeparate, type Virtual, type WeaveMapping } from './emit.js';
 export { runCheck, offsetToLineCol, type Diagnostic } from './check.js';
 export { checkProject } from './project.js';

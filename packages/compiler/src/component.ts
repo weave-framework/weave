@@ -84,7 +84,11 @@ export function compileComponent(src: ComponentSource, opts: ComponentOptions = 
 export interface ComponentSourceLoc {
   script?: string;
   scriptLine: number;
+  /** char offset in `source` where the (trimmed) script body begins (0 if no script). */
+  scriptOffset: number;
   template: string;
+  /** char offset in `source` where the (trimmed) style body begins (0 if no style). */
+  styleOffset: number;
   styles?: string;
 }
 
@@ -98,7 +102,9 @@ export function parseSfcLoc(source: string): ComponentSourceLoc {
   return {
     script: script?.inner || undefined,
     scriptLine: script ? lineAt(source, script.innerStart) : 0,
+    scriptOffset: script ? script.innerStart : 0,
     template,
+    styleOffset: style ? style.innerStart : 0,
     styles: style?.inner || undefined,
   };
 }
