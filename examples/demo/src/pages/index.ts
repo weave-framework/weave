@@ -1,11 +1,11 @@
 import { onMount, signal, debounced, fade, scale, type Signal, type Computed } from '@weave/runtime';
 import type { TransitionFn } from '@weave/runtime/dom';
 import { Link } from '@weave/router';
-import { useBoard, type BoardStore } from '../../stores/board';
-import { useEditor, type EditorStore } from '../../stores/editor';
-import TaskCard from '../../components/task-card/task-card';
-import BoardInsights from '../../components/board-insights/board-insights';
-import type { Status, Task } from '../../types';
+import { useBoard, type BoardStore } from '../stores/board';
+import { useEditor, type EditorStore } from '../stores/editor';
+import TaskCard from '../components/task-card/task-card';
+import BoardInsights from '../components/board-insights/board-insights';
+import type { Status, Task } from '../types';
 
 interface BoardSetup {
   board: BoardStore;

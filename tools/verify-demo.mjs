@@ -127,7 +127,12 @@ try {
   await page.waitForSelector('.route-error', { timeout: 5000 });
   ok((await page.locator('.route-error p').textContent())?.includes('Boom!'), 'error boundary renders the route fault');
 
-  /* ── 8. Perf stress route — COLD deep-link (SPA fallback + lazy chunk) ── */
+  /* ── 8. Wildcard 404 (file-based [...rest] → path '*') ── */
+  await page.goto(`${base}/no-such-page`, { waitUntil: 'load' });
+  await page.waitForSelector('.notfound', { timeout: 5000 });
+  ok((await page.locator('.nf-code').textContent()) === '404', 'unknown path falls through to the 404 page');
+
+  /* ── 9. Perf stress route — COLD deep-link (SPA fallback + lazy chunk) ── */
   await page.goto(`${base}/stress`, { waitUntil: 'load' });
   await page.waitForSelector('.stress-bar', { timeout: 5000 });
   ok((await page.locator('.stress code').textContent()) === '@for', '@@ escape renders a literal @for in prose');

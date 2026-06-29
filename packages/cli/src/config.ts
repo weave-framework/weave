@@ -35,6 +35,13 @@ export interface WeaveConfig {
   outDir?: string;
   /** Component style language — the loader pairs `<base>.<styleLang>`, no probing (default `css`). */
   styleLang?: StyleLang;
+  /**
+   * Pages directory for file-based routing (relative to the config file). When set,
+   * `weave build`/`dev` regenerate a `routes.gen.ts` from the directory before
+   * bundling — a new page file becomes a route with no central table to edit.
+   * Convention: `index.*` → `/`, `name.*` → `/name`, `[id].*` → `:id`, `[...x].*` → `*`.
+   */
+  routesDir?: string;
   /** Global entry stylesheets, compiled + concatenated in order (first = base). */
   styles?: string[];
   dev?: { port?: number };
@@ -61,6 +68,8 @@ export interface ResolvedConfig {
   index?: string;
   outDir: string;
   styleLang: StyleLang;
+  /** Pages directory (absolute) for file-based routing, or undefined. */
+  routesDir?: string;
   styles: string[];
   port?: number;
   minify: boolean;
@@ -134,6 +143,7 @@ function resolveConfig(raw: WeaveConfig, root: string): ResolvedConfig {
     index: raw.index ? abs(raw.index) : undefined,
     outDir: abs(raw.outDir ?? 'dist'),
     styleLang: raw.styleLang ?? 'css',
+    routesDir: raw.routesDir ? abs(raw.routesDir) : undefined,
     styles: (raw.styles ?? []).map(abs),
     port: raw.dev?.port,
     minify: raw.build?.minify ?? true,

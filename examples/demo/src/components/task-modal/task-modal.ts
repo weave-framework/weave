@@ -1,6 +1,6 @@
 import { effect, fade, scale } from '@weave/runtime';
 import { Portal, type TransitionFn } from '@weave/runtime/dom';
-import TaskForm from '../../pages/task-form/task-form';
+import TaskForm from '../task-form/task-form';
 import { useEditor, type EditorStore } from '../../stores/editor';
 
 // `<Portal>` / `<TaskForm>` are referenced in task-modal.html.

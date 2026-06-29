@@ -8,6 +8,9 @@ import { fileToRoutes, emitRoutesModule } from '@weave/router/files';
 import type { FileRoute } from '@weave/router/files';
 
 const PAGE: RegExp = /\.(weave|tsx?|jsx?)$/;
+// The generated module + sibling templates/styles are not pages — skip them so a
+// re-scan never turns its own output (or a page's `.html`/`.scss`) into a route.
+const NOT_A_PAGE: RegExp = /\.(gen|d)\.[mc]?tsx?$/;
 
 /** Recursively collect page-file specifiers under `dir`, relative to it (POSIX, sorted). */
 export function scanRoutes(dir: string): string[] {
@@ -16,7 +19,8 @@ export function scanRoutes(dir: string): string[] {
     for (const entry of readdirSync(cur, { withFileTypes: true })) {
       const full: string = join(cur, entry.name);
       if (entry.isDirectory()) walk(full);
-      else if (PAGE.test(entry.name)) out.push(relative(dir, full).split(sep).join('/'));
+      else if (PAGE.test(entry.name) && !NOT_A_PAGE.test(entry.name))
+        out.push(relative(dir, full).split(sep).join('/'));
     }
   };
   walk(dir);
