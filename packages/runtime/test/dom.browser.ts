@@ -1,5 +1,6 @@
 import { test, assert } from '../../../tools/harness.js';
 import { signal } from '@weave/runtime';
+import type { Signal } from '@weave/runtime';
 import {
   template, clone, child, anchor, insert,
   setText, bindText, setAttr, bindAttr, bindProp, bindClass,
@@ -7,30 +8,30 @@ import {
 } from '@weave/runtime/dom';
 
 function host(): HTMLElement {
-  const el = document.createElement('div');
+  const el: HTMLDivElement = document.createElement('div');
   document.body.appendChild(el);
   return el;
 }
 
 test('template + clone + child resolve real DOM', () => {
-  const tpl = template('<button>clicks: <!----></button>');
-  const root = clone(tpl) as HTMLButtonElement;
+  const tpl: HTMLTemplateElement = template('<button>clicks: <!----></button>');
+  const root: HTMLButtonElement = clone(tpl) as HTMLButtonElement;
   assert.equal(root.tagName, 'BUTTON');
-  const a = child(root, 1); // the comment anchor
+  const a: Node = child(root, 1); // the comment anchor
   assert.equal(a.nodeType, 8);
 });
 
 test('bindText updates the SAME text node in place (surgical)', () => {
   // Simulates compiled: <span>n: {count}</span>
-  const tpl = template('<span>n: <!----></span>');
-  const root = clone(tpl);
-  const count = signal(0);
+  const tpl: HTMLTemplateElement = template('<span>n: <!----></span>');
+  const root: Element = clone(tpl);
+  const count: Signal<number> = signal(0);
   bindText(child(root, 1) as Comment, () => count());
   mount(root, host());
 
   assert.equal(root.textContent, 'n: 0');
   // capture the dynamic text node; it must be reused, not recreated, on update
-  const dynText = root.childNodes[1] as Text;
+  const dynText: Text = root.childNodes[1] as Text;
   assert.equal(dynText.data, '0');
   count.set(42);
   assert.equal(root.textContent, 'n: 42');
@@ -39,9 +40,9 @@ test('bindText updates the SAME text node in place (surgical)', () => {
 });
 
 test('setText is static (one-shot, no reactivity)', () => {
-  const tpl = template('<p><!----></p>');
-  const root = clone(tpl);
-  const x = signal('hello');
+  const tpl: HTMLTemplateElement = template('<p><!----></p>');
+  const root: Element = clone(tpl);
+  const x: Signal<string> = signal('hello');
   setText(child(root, 0) as Comment, x()); // read once, not bound
   assert.equal(root.textContent, 'hello');
   x.set('world');
@@ -49,10 +50,10 @@ test('setText is static (one-shot, no reactivity)', () => {
 });
 
 test('bindAttr toggles boolean and sets value attributes', () => {
-  const tpl = template('<input>');
-  const root = clone(tpl) as HTMLInputElement;
-  const disabled = signal(true);
-  const cls = signal('a');
+  const tpl: HTMLTemplateElement = template('<input>');
+  const root: HTMLInputElement = clone(tpl) as HTMLInputElement;
+  const disabled: Signal<boolean> = signal(true);
+  const cls: Signal<string> = signal('a');
   bindAttr(root, 'disabled', () => disabled());
   bindAttr(root, 'class', () => cls());
   assert.equal(root.hasAttribute('disabled'), true);
@@ -64,9 +65,9 @@ test('bindAttr toggles boolean and sets value attributes', () => {
 });
 
 test('bindProp drives DOM properties (.value)', () => {
-  const tpl = template('<input>');
-  const root = clone(tpl) as HTMLInputElement;
-  const text = signal('one');
+  const tpl: HTMLTemplateElement = template('<input>');
+  const root: HTMLInputElement = clone(tpl) as HTMLInputElement;
+  const text: Signal<string> = signal('one');
   bindProp(root, 'value', () => text());
   assert.equal(root.value, 'one');
   text.set('two');
@@ -74,9 +75,9 @@ test('bindProp drives DOM properties (.value)', () => {
 });
 
 test('bindClass toggles a single class', () => {
-  const tpl = template('<li>x</li>');
-  const root = clone(tpl);
-  const done = signal(false);
+  const tpl: HTMLTemplateElement = template('<li>x</li>');
+  const root: Element = clone(tpl);
+  const done: Signal<boolean> = signal(false);
   bindClass(root, 'done', () => done());
   assert.equal(root.className, '');
   done.set(true);
@@ -86,9 +87,9 @@ test('bindClass toggles a single class', () => {
 });
 
 test('listen wires events that mutate signals', () => {
-  const tpl = template('<button>x</button>');
-  const root = clone(tpl) as HTMLButtonElement;
-  const count = signal(0);
+  const tpl: HTMLTemplateElement = template('<button>x</button>');
+  const root: HTMLButtonElement = clone(tpl) as HTMLButtonElement;
+  const count: Signal<number> = signal(0);
   listen(root, 'click', () => count.set((c) => c + 1));
   mount(root, host());
   root.click();
@@ -97,9 +98,9 @@ test('listen wires events that mutate signals', () => {
 });
 
 test('setRef assigns to a signal and to a callback', () => {
-  const tpl = template('<div>x</div>');
-  const root = clone(tpl);
-  const elSig = signal<Element | null>(null);
+  const tpl: HTMLTemplateElement = template('<div>x</div>');
+  const root: Element = clone(tpl);
+  const elSig: Signal<Element | null> = signal<Element | null>(null);
   setRef(elSig, root);
   assert.is(elSig(), root);
 
@@ -110,15 +111,15 @@ test('setRef assigns to a signal and to a callback', () => {
 
 test('two independent bindings update independently (fine-grained)', () => {
   // <p data-x={a}>{a}-{b}</p> compiled shape
-  const tpl = template('<p>x</p>');
-  const root = clone(tpl);
+  const tpl: HTMLTemplateElement = template('<p>x</p>');
+  const root: Element = clone(tpl);
   // rebuild children: anchorA, "-", anchorB
   root.textContent = '';
-  const aAnchor = anchor(root);
+  const aAnchor: Comment = anchor(root);
   insert(root, document.createTextNode('-'));
-  const bAnchor = anchor(root);
-  const a = signal('A');
-  const b = signal('B');
+  const bAnchor: Comment = anchor(root);
+  const a: Signal<string> = signal('A');
+  const b: Signal<string> = signal('B');
   bindText(aAnchor, () => a());
   bindText(bAnchor, () => b());
   bindAttr(root, 'data-x', () => a());

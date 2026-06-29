@@ -43,25 +43,25 @@ export interface CompiledComponent {
   hash: string;
 }
 
-const HAS_SETUP = /export\s+(?:async\s+)?function\s+setup\b|export\s+(?:const|let|var)\s+setup\b/;
+const HAS_SETUP: RegExp = /export\s+(?:async\s+)?function\s+setup\b|export\s+(?:const|let|var)\s+setup\b/;
 
 /** Compile a `{ script, template, styles }` triple into a component module + scoped CSS. */
 export function compileComponent(src: ComponentSource, opts: ComponentOptions = {}): CompiledComponent {
-  const hash = opts.hash ?? hashCss(opts.filename ?? src.template);
-  const attr = scopeAttr(hash);
+  const hash: string = opts.hash ?? hashCss(opts.filename ?? src.template);
+  const attr: string = scopeAttr(hash);
 
-  const scope = inferCtxNames(parseTemplate(src.template));
+  const scope: string[] = inferCtxNames(parseTemplate(src.template));
   // Stamp the `:host` root marker only when the styles actually use `:host` (else zero cost).
-  const host = src.styles && /:host\b/.test(src.styles) ? hostAttr(hash) : undefined;
-  const compiled = compileTemplate(src.template, { mode: 'module', scope, scopeAttr: attr, hostAttr: host });
+  const host: string | undefined = src.styles && /:host\b/.test(src.styles) ? hostAttr(hash) : undefined;
+  const compiled: { code: string } = compileTemplate(src.template, { mode: 'module', scope, scopeAttr: attr, hostAttr: host });
   // Demote the template module's default export to a local `render` we can wire up.
-  const renderBody = compiled.code.replace('export default function render', 'function render');
+  const renderBody: string = compiled.code.replace('export default function render', 'function render');
 
-  const css = src.styles ? scopeCss(src.styles, hash) : '';
-  const script = src.script ?? '';
-  const setupArg = HAS_SETUP.test(script) ? 'render, setup' : 'render';
+  const css: string = src.styles ? scopeCss(src.styles, hash) : '';
+  const script: string = src.script ?? '';
+  const setupArg: string = HAS_SETUP.test(script) ? 'render, setup' : 'render';
 
-  const code = [
+  const code: string = [
     script.trim(),
     'import { defineComponent } from "@weave/runtime/dom";',
     renderBody,
@@ -89,9 +89,9 @@ export interface ComponentSourceLoc {
 }
 
 export function parseSfcLoc(source: string): ComponentSourceLoc {
-  const script = locateBlock(source, 'script');
-  const style = locateBlock(source, 'style');
-  let template = source;
+  const script: LocatedBlock | null = locateBlock(source, 'script');
+  const style: LocatedBlock | null = locateBlock(source, 'style');
+  let template: string = source;
   for (const b of [script, style]) {
     if (b) template = blankRange(template, b.rawStart, b.rawEnd);
   }
@@ -112,13 +112,13 @@ interface LocatedBlock {
 }
 
 function locateBlock(source: string, tag: string): LocatedBlock | null {
-  const open = source.search(new RegExp(`<${tag}(\\s[^>]*)?>`, 'i'));
+  const open: number = source.search(new RegExp(`<${tag}(\\s[^>]*)?>`, 'i'));
   if (open === -1) return null;
-  const gt = source.indexOf('>', open);
-  const close = source.toLowerCase().indexOf(`</${tag}>`, gt);
+  const gt: number = source.indexOf('>', open);
+  const close: number = source.toLowerCase().indexOf(`</${tag}>`, gt);
   if (close === -1) return null;
-  const rawInner = source.slice(gt + 1, close);
-  const lead = rawInner.length - rawInner.trimStart().length;
+  const rawInner: string = source.slice(gt + 1, close);
+  const lead: number = rawInner.length - rawInner.trimStart().length;
   return {
     rawStart: open,
     rawEnd: close + `</${tag}>`.length,
@@ -129,22 +129,22 @@ function locateBlock(source: string, tag: string): LocatedBlock | null {
 
 /** Replace `[start, end)` with same-length whitespace, preserving newlines. */
 function blankRange(s: string, start: number, end: number): string {
-  let mid = '';
-  for (let i = start; i < end; i++) mid += s[i] === '\n' ? '\n' : ' ';
+  let mid: string = '';
+  for (let i: number = start; i < end; i++) mid += s[i] === '\n' ? '\n' : ' ';
   return s.slice(0, start) + mid + s.slice(end);
 }
 
 function lineAt(s: string, offset: number): number {
-  let line = 0;
-  for (let i = 0; i < offset && i < s.length; i++) if (s[i] === '\n') line++;
+  let line: number = 0;
+  for (let i: number = 0; i < offset && i < s.length; i++) if (s[i] === '\n') line++;
   return line;
 }
 
 /** Split a `.weave` SFC into its `{ script, template, styles }` triple. */
 export function parseSfc(source: string): ComponentSource {
-  const script = extractBlock(source, 'script');
-  const style = extractBlock(source, 'style');
-  const template = source
+  const script: { raw: string; inner: string } = extractBlock(source, 'script');
+  const style: { raw: string; inner: string } = extractBlock(source, 'style');
+  const template: string = source
     .replace(script.raw, '')
     .replace(style.raw, '')
     .trim();
@@ -156,11 +156,11 @@ export function parseSfc(source: string): ComponentSource {
 }
 
 function extractBlock(source: string, tag: string): { raw: string; inner: string } {
-  const open = source.search(new RegExp(`<${tag}(\\s[^>]*)?>`, 'i'));
+  const open: number = source.search(new RegExp(`<${tag}(\\s[^>]*)?>`, 'i'));
   if (open === -1) return { raw: '', inner: '' };
-  const gt = source.indexOf('>', open);
-  const close = source.toLowerCase().indexOf(`</${tag}>`, gt);
+  const gt: number = source.indexOf('>', open);
+  const close: number = source.toLowerCase().indexOf(`</${tag}>`, gt);
   if (close === -1) return { raw: '', inner: '' };
-  const end = close + `</${tag}>`.length;
+  const end: number = close + `</${tag}>`.length;
   return { raw: source.slice(open, end), inner: source.slice(gt + 1, close).trim() };
 }

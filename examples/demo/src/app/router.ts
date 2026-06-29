@@ -4,12 +4,12 @@
  * file-based-routing step replaces this hand-written table with a generated one.
  */
 
-import { createRouter, type Route } from '@weave/router';
-import { lazy } from '@weave/runtime/dom';
+import { createRouter, type Route, type Router } from '@weave/router';
+import { lazy, type Component } from '@weave/runtime/dom';
 
-const Board = lazy(() => import('../pages/board/board'));
-const TaskDetail = lazy(() => import('../pages/task-detail/task-detail'));
-const Boom = lazy(() => import('../pages/boom/boom'));
+const Board: Component = lazy(() => import('../pages/board/board'));
+const TaskDetail: Component = lazy(() => import('../pages/task-detail/task-detail'));
+const Boom: Component = lazy(() => import('../pages/boom/boom'));
 
 export const routes: Route[] = [
   { path: '', component: Board },
@@ -17,4 +17,4 @@ export const routes: Route[] = [
   { path: 'boom', component: Boom },
 ];
 
-export const router = createRouter(routes);
+export const router: Router = createRouter(routes);

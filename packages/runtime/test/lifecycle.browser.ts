@@ -1,17 +1,19 @@
 import { test, assert } from '../../../tools/harness.js';
 import { signal, onMount, onDispose, createOwner, runInOwner, disposeOwner } from '@weave/runtime';
+import type { Signal, Owner } from '@weave/runtime';
 import { defineComponent, mountComponent } from '@weave/runtime/dom';
+import type { Component } from '@weave/runtime/dom';
 
 /** Let queued onMount microtasks flush (FIFO — ours were enqueued earlier). */
-const tick = () => new Promise<void>((r) => queueMicrotask(r));
+const tick = (): Promise<void> => new Promise<void>((r) => queueMicrotask(r));
 
 test('onMount fires after the component DOM is inserted (not synchronously)', async () => {
-  const host = document.createElement('div');
+  const host: HTMLDivElement = document.createElement('div');
   document.body.appendChild(host);
   let liveAtMount: boolean | null = null;
-  const C = defineComponent(
+  const C: Component = defineComponent(
     () => {
-      const p = document.createElement('p');
+      const p: HTMLParagraphElement = document.createElement('p');
       p.id = 'om-live';
       return p;
     },
@@ -21,7 +23,7 @@ test('onMount fires after the component DOM is inserted (not synchronously)', as
       });
     }
   );
-  const unmount = mountComponent(C, host);
+  const unmount: () => void = mountComponent(C, host);
   assert.equal(liveAtMount, null, 'onMount must not run during construction');
   await tick();
   assert.equal(liveAtMount, true, 'onMount runs after insertion — DOM is live');
@@ -30,13 +32,13 @@ test('onMount fires after the component DOM is inserted (not synchronously)', as
 });
 
 test('onMount can read a ref populated during render', async () => {
-  const host = document.createElement('div');
+  const host: HTMLDivElement = document.createElement('div');
   document.body.appendChild(host);
-  const elRef = signal<HTMLElement | null>(null);
-  let tag = '';
-  const C = defineComponent(
+  const elRef: Signal<HTMLElement | null> = signal<HTMLElement | null>(null);
+  let tag: string = '';
+  const C: Component = defineComponent(
     () => {
-      const b = document.createElement('button');
+      const b: HTMLButtonElement = document.createElement('button');
       elRef.set(b);
       return b;
     },
@@ -53,10 +55,10 @@ test('onMount can read a ref populated during render', async () => {
 });
 
 test('a returned cleanup runs on unmount', async () => {
-  const host = document.createElement('div');
+  const host: HTMLDivElement = document.createElement('div');
   document.body.appendChild(host);
-  let cleaned = 0;
-  const C = defineComponent(
+  let cleaned: number = 0;
+  const C: Component = defineComponent(
     () => document.createElement('span'),
     () => {
       onMount(() => () => {
@@ -64,7 +66,7 @@ test('a returned cleanup runs on unmount', async () => {
       });
     }
   );
-  const unmount = mountComponent(C, host);
+  const unmount: () => void = mountComponent(C, host);
   await tick();
   assert.equal(cleaned, 0);
   unmount();
@@ -73,10 +75,10 @@ test('a returned cleanup runs on unmount', async () => {
 });
 
 test('onDispose registered inside onMount ties to the component owner', async () => {
-  const host = document.createElement('div');
+  const host: HTMLDivElement = document.createElement('div');
   document.body.appendChild(host);
-  let disposed = 0;
-  const C = defineComponent(
+  let disposed: number = 0;
+  const C: Component = defineComponent(
     () => document.createElement('i'),
     () => {
       onMount(() => {
@@ -84,7 +86,7 @@ test('onDispose registered inside onMount ties to the component owner', async ()
       });
     }
   );
-  const unmount = mountComponent(C, host);
+  const unmount: () => void = mountComponent(C, host);
   await tick();
   assert.equal(disposed, 0);
   unmount();
@@ -93,8 +95,8 @@ test('onDispose registered inside onMount ties to the component owner', async ()
 });
 
 test('onMount does not fire if its scope is disposed before the microtask', async () => {
-  let ran = 0;
-  const owner = createOwner();
+  let ran: number = 0;
+  const owner: Owner = createOwner();
   runInOwner(owner, () => {
     onMount(() => ran++);
   });
@@ -105,7 +107,7 @@ test('onMount does not fire if its scope is disposed before the microtask', asyn
 
 test('multiple onMount callbacks fire in registration order', async () => {
   const order: number[] = [];
-  const owner = createOwner();
+  const owner: Owner = createOwner();
   runInOwner(owner, () => {
     onMount(() => order.push(1));
     onMount(() => order.push(2));

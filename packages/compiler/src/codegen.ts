@@ -11,7 +11,7 @@
 
 import { parseTemplate } from './parser.js';
 import type {
-  TemplateNode, ElementNode, Attr, StaticAttr, EventAttr, IfNode, ForNode, SwitchNode,
+  TemplateNode, ElementNode, Attr, StaticAttr, EventAttr, IfNode, IfBranch, ForNode, SwitchNode,
   DeferNode, DeferTrigger, AwaitNode, SnippetNode, RenderNode, KeyNode,
 } from './ast.js';
 import { rewrite, ctxScope, childScope, type Scope, type Binding } from './scope.js';
@@ -29,11 +29,11 @@ export interface CompileOptions {
 }
 
 class Gen {
-  used = new Set<string>(); // @weave/runtime/dom helpers
-  usedCore = new Set<string>(); // @weave/runtime primitives (computed, …)
+  used: Set<string> = new Set<string>(); // @weave/runtime/dom helpers
+  usedCore: Set<string> = new Set<string>(); // @weave/runtime primitives (computed, …)
   templates: string[] = [];
-  private tplN = 0;
-  private fnN = 0;
+  private tplN: number = 0;
+  private fnN: number = 0;
 
   constructor(
     public mode: 'module' | 'function',
@@ -54,34 +54,34 @@ class Gen {
     return this.mode === 'function' ? `_c.${name}` : name;
   }
   tpl(html: string): string {
-    const v = `_t${this.tplN++}`;
+    const v: string = `_t${this.tplN++}`;
     this.templates.push(`const ${v} = ${this.H('template')}(${JSON.stringify(html)});`);
     return v;
   }
-  fn(prefix = '_b'): string {
+  fn(prefix: string = '_b'): string {
     return `${prefix}${this.fnN++}`;
   }
 }
 
 export function compileTemplate(input: string, options: CompileOptions = {}): { code: string } {
-  const mode = options.mode ?? 'module';
-  const runtimeImport = options.runtimeImport ?? '@weave/runtime/dom';
-  const gen = new Gen(mode, options.scopeAttr, options.hostAttr);
+  const mode: 'module' | 'function' = options.mode ?? 'module';
+  const runtimeImport: string = options.runtimeImport ?? '@weave/runtime/dom';
+  const gen: Gen = new Gen(mode, options.scopeAttr, options.hostAttr);
 
-  const ast = parseTemplate(input);
+  const ast: TemplateNode[] = parseTemplate(input);
   // isHost: the render fragment's top-level elements are the component's roots → `:host`.
-  const render = compileFragment(gen, ast, ctxScope(options.scope ?? []), 'render', 'ctx, slots', true);
+  const render: string = compileFragment(gen, ast, ctxScope(options.scope ?? []), 'render', 'ctx, slots', true);
 
   if (mode === 'function') {
-    const body = [...gen.templates, render, 'return render(ctx, {});'].join('\n');
+    const body: string = [...gen.templates, render, 'return render(ctx, {});'].join('\n');
     return { code: body };
   }
 
-  const domImport = `import { ${[...gen.used].sort().join(', ')} } from ${JSON.stringify(runtimeImport)};`;
-  const coreImport = gen.usedCore.size
+  const domImport: string = `import { ${[...gen.used].sort().join(', ')} } from ${JSON.stringify(runtimeImport)};`;
+  const coreImport: string = gen.usedCore.size
     ? `import { ${[...gen.usedCore].sort().join(', ')} } from "@weave/runtime";\n`
     : '';
-  const code = [domImport + '\n' + coreImport, ...gen.templates, `export default ${render}`].join('\n');
+  const code: string = [domImport + '\n' + coreImport, ...gen.templates, `export default ${render}`].join('\n');
   return { code };
 }
 
@@ -91,20 +91,20 @@ function compileFragment(
   nodes: TemplateNode[],
   scope: Scope,
   name: string,
-  param = '',
-  isHost = false
+  param: string = '',
+  isHost: boolean = false
 ): string {
-  const top = trimTop(nodes);
+  const top: TemplateNode[] = trimTop(nodes);
   if (top.length === 0) throw new Error('Empty template fragment');
   // A component/slot compiles to a bare `<!---->`, so it can't be the clone root —
   // only a real DOM element qualifies for the single-root (clone) fast path. A
   // fragment root (component / multiple roots / text) returns a DocumentFragment;
   // `eachBlock` brackets such a `@for` row with marker comments so the keyed
   // reconciler can still move/remove it as one unit.
-  const sole = top.length === 1 && top[0].type === 'element' ? (top[0] as ElementNode) : null;
-  const singleRoot = !!sole && !/^[A-Z]/.test(sole.tag) && sole.tag !== 'slot';
+  const sole: ElementNode | null = top.length === 1 && top[0].type === 'element' ? (top[0] as ElementNode) : null;
+  const singleRoot: boolean = !!sole && !/^[A-Z]/.test(sole.tag) && sole.tag !== 'slot';
 
-  let html = '';
+  let html: string = '';
   const stmts: string[] = [];
   const childDecls: string[] = [];
 
@@ -112,12 +112,12 @@ function compileFragment(
   // inserts nodes, which would shift the child indices later `child()` lookups
   // rely on. Capturing the (stable) node references up front avoids that.
   const nodeDecls: string[] = [];
-  const nodeVars = new Map<string, string>();
-  let nodeVarN = 0;
+  const nodeVars: Map<string, string> = new Map<string, string>();
+  let nodeVarN: number = 0;
   const nodeExpr = (path: number[]): string => {
     if (path.length === 0) return '_r';
-    const key = path.join(',');
-    let v = nodeVars.get(key);
+    const key: string = path.join(',');
+    let v: string | undefined = nodeVars.get(key);
     if (!v) {
       v = `_n${nodeVarN++}`;
       nodeVars.set(key, v);
@@ -126,12 +126,12 @@ function compileFragment(
     return v;
   };
 
-  function emitChildren(children: TemplateNode[], basePath: number[], sc: Scope, isHost = false): void {
-    let dom = 0;
+  function emitChildren(children: TemplateNode[], basePath: number[], sc: Scope, isHost: boolean = false): void {
+    let dom: number = 0;
     // Hoist sibling snippet names so any sibling can `@render` them regardless of
     // declaration order (and so a snippet can be passed as a prop / reference another).
-    let cur = sc;
-    const snippetNames = children.filter((n): n is SnippetNode => n.type === 'snippet').map((n) => n.name);
+    let cur: Scope = sc;
+    const snippetNames: string[] = children.filter((n): n is SnippetNode => n.type === 'snippet').map((n) => n.name);
     if (snippetNames.length) {
       cur = new Map(cur);
       for (const nm of snippetNames) cur.set(nm, { kind: 'local' });
@@ -168,12 +168,12 @@ function compileFragment(
 
   function emitKey(node: KeyNode, path: number[], sc: Scope): void {
     html += '<!---->';
-    const contentFn = gen.fn();
+    const contentFn: string = gen.fn();
     childDecls.push(compileFragment(gen, node.children, sc, contentFn));
     stmts.push(`${gen.H('keyBlock')}(${nodeExpr(path)}, () => ${rewrite(node.expr, sc).code}, ${contentFn});`);
   }
 
-  function emitNode(node: TemplateNode, path: number[], sc: Scope, isHost = false): void {
+  function emitNode(node: TemplateNode, path: number[], sc: Scope, isHost: boolean = false): void {
     switch (node.type) {
       case 'text':
         html += escapeText(node.value);
@@ -219,7 +219,7 @@ function compileFragment(
     }
   }
 
-  function emitElement(node: ElementNode, path: number[], sc: Scope, isHost = false): void {
+  function emitElement(node: ElementNode, path: number[], sc: Scope, isHost: boolean = false): void {
     if (node.tag === 'slot') return emitSlot(node, path, sc);
     if (node.tag === 'w:element') return emitDynamicElement(node, path, sc);
     if (/^[A-Z]/.test(node.tag)) return emitComponent(node, path, sc);
@@ -248,8 +248,8 @@ function compileFragment(
    */
   function emitDynamicElement(node: ElementNode, path: number[], sc: Scope): void {
     html += '<!---->';
-    const anchor = nodeExpr(path);
-    let tagExpr = '""';
+    const anchor: string = nodeExpr(path);
+    let tagExpr: string = '""';
     const build: string[] = [];
 
     for (const attr of node.attrs) {
@@ -265,7 +265,7 @@ function compileFragment(
     }
 
     if (trimTop(node.children).length > 0) {
-      const contentFn = gen.fn();
+      const contentFn: string = gen.fn();
       childDecls.push(compileFragment(gen, node.children, sc, contentFn));
       build.push(`_el.append(${contentFn}());`);
     }
@@ -303,14 +303,14 @@ function compileFragment(
       case 'transition': {
         // transition:fn / in:fn / out:fn → transition(el, fn, params, mode). The
         // params are a snapshot (re-read at play time via the fn); the fn resolves to ctx.
-        const fn = rewrite(attr.name, sc).code;
-        const params = attr.expr !== undefined ? rewrite(attr.expr, sc).code : 'undefined';
+        const fn: string = rewrite(attr.name, sc).code;
+        const params: string = attr.expr !== undefined ? rewrite(attr.expr, sc).code : 'undefined';
         sink.push(`${gen.H('transition')}(${n}, ${fn}, ${params}, ${q(attr.mode)});`);
         break;
       }
       case 'event': {
-        const handler = wrapHandler(attr, sc);
-        const opts = eventOpts(attr.modifiers);
+        const handler: string = wrapHandler(attr, sc);
+        const opts: string = eventOpts(attr.modifiers);
         sink.push(`${gen.H('listen')}(${n}, ${q(attr.name)}, ${handler}${opts ? `, ${opts}` : ''});`);
         break;
       }
@@ -321,7 +321,7 @@ function compileFragment(
         // `use:action={arg}` → applyAction(el, action, arg). The action is the
         // `name` identifier (rewritten against ctx); the arg is evaluated eagerly
         // (a snapshot — pass a getter `={() => sig()}` for reactivity).
-        const action = rewrite(attr.name, sc).code;
+        const action: string = rewrite(attr.name, sc).code;
         sink.push(
           attr.expr !== undefined
             ? `${gen.H('applyAction')}(${n}, ${action}, ${rewrite(attr.expr, sc).code});`
@@ -333,7 +333,7 @@ function compileFragment(
         // bind:value / bind:checked / bind:group → two-way `bindValue`. The
         // expression must resolve to a writable signal (passed by reference, not
         // called): `bind:value={count}` → `bindValue(el, ctx.count, 'value')`.
-        const kind = attr.name === 'checked' ? 'checked' : attr.name === 'group' ? 'group' : 'value';
+        const kind: 'checked' | 'group' | 'value' = attr.name === 'checked' ? 'checked' : attr.name === 'group' ? 'group' : 'value';
         sink.push(`${gen.H('bindValue')}(${n}, ${rewrite(attr.expr, sc).code}, ${q(kind)});`);
         break;
       }
@@ -342,7 +342,7 @@ function compileFragment(
 
   function emitComponent(node: ElementNode, path: number[], sc: Scope): void {
     html += '<!---->'; // anchor the component mounts before
-    const anchorVar = nodeExpr(path);
+    const anchorVar: string = nodeExpr(path);
 
     // Props: `x="s"` static, `x={expr}` lazy/reactive getter, `on:evt` → onEvt handler.
     const props: string[] = [];
@@ -364,18 +364,18 @@ function compileFragment(
     }
 
     // Slots: group children by a static `slot="name"` (default otherwise); strip the attr.
-    const groups = new Map<string, TemplateNode[]>();
+    const groups: Map<string, TemplateNode[]> = new Map<string, TemplateNode[]>();
     for (const child of node.children) {
-      let target = child;
-      let slotName = 'default';
+      let target: TemplateNode = child;
+      let slotName: string = 'default';
       if (child.type === 'element') {
-        const i = child.attrs.findIndex((a) => a.type === 'static' && a.name === 'slot');
+        const i: number = child.attrs.findIndex((a) => a.type === 'static' && a.name === 'slot');
         if (i >= 0) {
           slotName = (child.attrs[i] as StaticAttr).value;
           target = { ...child, attrs: child.attrs.filter((_, k) => k !== i) };
         }
       }
-      let arr = groups.get(slotName);
+      let arr: TemplateNode[] | undefined = groups.get(slotName);
       if (!arr) { arr = []; groups.set(slotName, arr); }
       arr.push(target);
     }
@@ -383,25 +383,25 @@ function compileFragment(
     const slots: string[] = [];
     for (const [name, children] of groups) {
       if (trimTop(children).length === 0) continue; // whitespace-only group → no slot
-      const slotFn = gen.fn('_s');
+      const slotFn: string = gen.fn('_s');
       childDecls.push(compileFragment(gen, children, sc, slotFn));
       slots.push(`${propKey(name)}: ${slotFn}`);
     }
 
-    const propsObj = props.length ? `{ ${props.join(', ')} }` : '{}';
-    const slotsObj = slots.length ? `{ ${slots.join(', ')} }` : '{}';
+    const propsObj: string = props.length ? `{ ${props.join(', ')} }` : '{}';
+    const slotsObj: string = slots.length ? `{ ${slots.join(', ')} }` : '{}';
     stmts.push(`${gen.H('mountChild')}(${anchorVar}, ${gen.Comp(node.tag)}(${propsObj}, ${slotsObj}));`);
   }
 
   function emitSlot(node: ElementNode, path: number[], sc: Scope): void {
     html += '<!---->';
-    const anchorVar = nodeExpr(path);
-    const nameAttr = node.attrs.find((a) => a.type === 'static' && a.name === 'name');
-    const name = nameAttr ? (nameAttr as StaticAttr).value : 'default';
+    const anchorVar: string = nodeExpr(path);
+    const nameAttr: Attr | undefined = node.attrs.find((a) => a.type === 'static' && a.name === 'name');
+    const name: string = nameAttr ? (nameAttr as StaticAttr).value : 'default';
 
-    let fallback = 'null';
+    let fallback: string = 'null';
     if (trimTop(node.children).length > 0) {
-      const fbFn = gen.fn('_f');
+      const fbFn: string = gen.fn('_f');
       childDecls.push(compileFragment(gen, node.children, sc, fbFn));
       fallback = `${fbFn}()`;
     }
@@ -412,16 +412,16 @@ function compileFragment(
 
   function emitIf(node: IfNode, path: number[], sc: Scope): void {
     html += '<!---->';
-    const head = node.branches[0];
+    const head: IfBranch = node.branches[0];
     let aliasVar: string | undefined;
     if (head.alias) {
       aliasVar = gen.fn('_a');
       stmts.push(`const ${aliasVar} = ${gen.Hc('computed')}(() => ${rewrite(head.cond ?? 'undefined', sc).code});`);
     }
 
-    const branchNames = node.branches.map(() => gen.fn());
+    const branchNames: string[] = node.branches.map(() => gen.fn());
     node.branches.forEach((br, i) => {
-      const bScope = i === 0 && head.alias && aliasVar
+      const bScope: Scope = i === 0 && head.alias && aliasVar
         ? childScope(sc, { [head.alias]: aliasVar })
         : sc;
       childDecls.push(compileFragment(gen, br.children, bScope, branchNames[i]));
@@ -433,7 +433,7 @@ function compileFragment(
       else if (br.cond !== undefined) lines.push(`if (${rewrite(br.cond, sc).code}) return ${branchNames[i]};`);
       else lines.push(`return ${branchNames[i]};`);
     });
-    const hasElse = node.branches[node.branches.length - 1].cond === undefined;
+    const hasElse: boolean = node.branches[node.branches.length - 1].cond === undefined;
     if (!hasElse) lines.push('return null;');
 
     stmts.push(`${gen.H('ifBlock')}(${nodeExpr(path)}, () => { ${lines.join(' ')} });`);
@@ -441,10 +441,10 @@ function compileFragment(
 
   function emitSwitch(node: SwitchNode, path: number[], sc: Scope): void {
     html += '<!---->';
-    const names = node.cases.map(() => gen.fn());
+    const names: string[] = node.cases.map(() => gen.fn());
     node.cases.forEach((c, i) => childDecls.push(compileFragment(gen, c.children, sc, names[i])));
 
-    const lines = [`const _v = ${rewrite(node.expr, sc).code};`];
+    const lines: string[] = [`const _v = ${rewrite(node.expr, sc).code};`];
     node.cases.forEach((c, i) => {
       if (c.test !== undefined) lines.push(`if (_v === ${rewrite(c.test, sc).code}) return ${names[i]};`);
       else lines.push(`return ${names[i]};`);
@@ -456,30 +456,30 @@ function compileFragment(
 
   function emitDefer(node: DeferNode, path: number[], sc: Scope): void {
     html += '<!---->';
-    const contentFn = gen.fn();
+    const contentFn: string = gen.fn();
     childDecls.push(compileFragment(gen, node.children, sc, contentFn));
 
-    let phArg = 'undefined';
+    let phArg: string = 'undefined';
     if (node.placeholder && trimTop(node.placeholder).length > 0) {
-      const phFn = gen.fn();
+      const phFn: string = gen.fn();
       childDecls.push(compileFragment(gen, node.placeholder, sc, phFn));
       phArg = phFn;
     }
 
-    const trig = deferTriggerExpr(node.trigger, sc);
+    const trig: string = deferTriggerExpr(node.trigger, sc);
     stmts.push(`${gen.H('deferBlock')}(${nodeExpr(path)}, ${trig}, ${contentFn}, ${phArg});`);
   }
 
   function emitAwait(node: AwaitNode, path: number[], sc: Scope): void {
     html += '<!---->';
-    const anchorVar = nodeExpr(path);
-    const source = `() => (${rewrite(node.expr, sc).code})`;
+    const anchorVar: string = nodeExpr(path);
+    const source: string = `() => (${rewrite(node.expr, sc).code})`;
 
     // each part → a fragment fn; @then/@catch take their alias as a parameter so
     // the resolved value / error resolves to the bare name inside the branch.
     const branchFn = (children: TemplateNode[] | undefined, alias?: string): string => {
       if (!children || trimTop(children).length === 0) return 'undefined';
-      const fn = gen.fn();
+      const fn: string = gen.fn();
       // the alias is a real function PARAMETER holding the resolved value/error —
       // a plain local (bare name), not an auto-called accessor like @for/@if.
       const scope: Scope = alias ? new Map(sc).set(alias, { kind: 'local' } as Binding) : sc;
@@ -487,9 +487,9 @@ function compileFragment(
       return fn;
     };
 
-    const pendingArg = branchFn(node.pending);
-    const thenArg = branchFn(node.then?.children, node.then?.alias);
-    const catchArg = branchFn(node.catch?.children, node.catch?.alias);
+    const pendingArg: string = branchFn(node.pending);
+    const thenArg: string = branchFn(node.then?.children, node.then?.alias);
+    const catchArg: string = branchFn(node.catch?.children, node.catch?.alias);
     stmts.push(`${gen.H('awaitBlock')}(${anchorVar}, ${source}, ${pendingArg}, ${thenArg}, ${catchArg});`);
   }
 
@@ -510,8 +510,8 @@ function compileFragment(
 
   function emitFor(node: ForNode, path: number[], sc: Scope): void {
     html += '<!---->';
-    const rowFn = gen.fn();
-    const forScope = childScope(sc, {
+    const rowFn: string = gen.fn();
+    const forScope: Scope = childScope(sc, {
       [node.item]: '_row.item',
       $index: '_row.index',
       $count: '_row.count',
@@ -522,16 +522,16 @@ function compileFragment(
     });
     childDecls.push(compileFragment(gen, node.children, forScope, rowFn, '_row'));
 
-    let emptyArg = '';
+    let emptyArg: string = '';
     if (node.empty) {
-      const emptyFn = gen.fn();
+      const emptyFn: string = gen.fn();
       childDecls.push(compileFragment(gen, node.empty, sc, emptyFn));
       emptyArg = `, ${emptyFn}`;
     }
 
-    const list = rewrite(node.list, sc).code;
-    const track = node.track ? rewrite(node.track, sc).code : '$index';
-    const keyFn = `(${node.item}, $index) => ${track}`;
+    const list: string = rewrite(node.list, sc).code;
+    const track: string = node.track ? rewrite(node.track, sc).code : '$index';
+    const keyFn: string = `(${node.item}, $index) => ${track}`;
     stmts.push(`${gen.H('eachBlock')}(${nodeExpr(path)}, () => ${list}, ${keyFn}, ${rowFn}${emptyArg});`);
   }
 
@@ -539,9 +539,9 @@ function compileFragment(
   if (singleRoot) emitElement(sole!, [], scope, isHost);
   else emitChildren(top, [], scope, isHost);
 
-  const ctor = singleRoot ? gen.H('clone') : gen.H('cloneFragment');
-  const tplVar = gen.tpl(html);
-  const body = [
+  const ctor: string = singleRoot ? gen.H('clone') : gen.H('cloneFragment');
+  const tplVar: string = gen.tpl(html);
+  const body: string[] = [
     `const _r = ${ctor}(${tplVar});`,
     ...nodeDecls,
     ...stmts,
@@ -554,7 +554,7 @@ function compileFragment(
 /* ──────────── helpers ──────────── */
 
 function wrapHandler(attr: EventAttr, scope: Scope): string {
-  const expr = rewrite(attr.expr, scope).code;
+  const expr: string = rewrite(attr.expr, scope).code;
   const guards: string[] = [];
   for (const m of attr.modifiers) {
     if (m === 'preventDefault') guards.push('$e.preventDefault();');

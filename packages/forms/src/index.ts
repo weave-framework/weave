@@ -13,7 +13,7 @@
  *   3. an async (`asyncValidate`) result — debounced + abortable (B.3).
  */
 
-import { signal, computed, effect, onCleanup, type Signal } from '@weave/runtime';
+import { signal, computed, effect, onCleanup, type Signal, type Computed } from '@weave/runtime';
 
 /** Return an error message for an invalid value, or `null` when valid. */
 export type Validator<T> = (value: T) => string | null;
@@ -58,16 +58,16 @@ export function field<T>(
   validators: Validator<T>[] = [],
   opts: FieldOptions<T> = {}
 ): Field<T> {
-  const value = signal(initial);
-  const touched = signal(false);
-  const external = signal<string | null>(null); // cross-field error from the parent form
-  const asyncError = signal<string | null>(null);
-  const validating = signal(false);
+  const value: Signal<T> = signal(initial);
+  const touched: Signal<boolean> = signal(false);
+  const external: Signal<string | null> = signal<string | null>(null); // cross-field error from the parent form
+  const asyncError: Signal<string | null> = signal<string | null>(null);
+  const validating: Signal<boolean> = signal(false);
 
   // Sync layer, shared by `error()` and the async gate (no server call on a format error).
-  const syncError = computed<string | null>(() => {
+  const syncError: Computed<string | null> = computed<string | null>(() => {
     for (const v of validators) {
-      const msg = v(value());
+      const msg: string | null = v(value());
       if (msg) return msg;
     }
     return null;
@@ -75,9 +75,9 @@ export function field<T>(
 
   // Async layer: debounced + abortable, only when the sync layer is clean.
   if (opts.asyncValidate) {
-    const debounceMs = opts.debounceMs ?? 300;
+    const debounceMs: number = opts.debounceMs ?? 300;
     effect(() => {
-      const val = value(); // track edits
+      const val: T = value(); // track edits
       if (syncError()) {
         // format-invalid → don't hit the server; drop any stale async state
         asyncError.set(null);
@@ -86,9 +86,9 @@ export function field<T>(
       }
       asyncError.set(null); // optimistic: clear while (re)checking
       validating.set(true);
-      let cancelled = false;
-      const ctrl = new AbortController();
-      const timer = setTimeout(() => {
+      let cancelled: boolean = false;
+      const ctrl: AbortController = new AbortController();
+      const timer: ReturnType<typeof setTimeout> = setTimeout(() => {
         opts
           .asyncValidate!(val, { signal: ctrl.signal })
           .then((msg) => {
@@ -111,7 +111,7 @@ export function field<T>(
     });
   }
 
-  const error = computed<string | null>(() => syncError() ?? external() ?? asyncError());
+  const error: Computed<string | null> = computed<string | null>(() => syncError() ?? external() ?? asyncError());
 
   const f: FieldInternal<T> = {
     value,
@@ -139,7 +139,7 @@ export type FormValidator<F extends Record<string, Field<unknown>>> = (
 ) => Record<string, string> | null;
 
 /** Reserved key in a {@link FormValidator} result for a form-level (not field-bound) error. */
-export const FORM_ERROR_KEY = '_form';
+export const FORM_ERROR_KEY: '_form' = '_form';
 
 export interface FormOptions<F extends Record<string, Field<unknown>>> {
   /** Cross-field validation over the whole values snapshot (e.g. password confirm). */
@@ -167,27 +167,27 @@ export function form<F extends Record<string, Field<unknown>>>(
   fields: F,
   opts: FormOptions<F> = {}
 ): Form<F> {
-  const list = Object.values(fields);
+  const list: Field<unknown>[] = Object.values(fields);
   const values = (): FieldsOf<F> => {
-    const out = {} as FieldsOf<F>;
+    const out: FieldsOf<F> = {} as FieldsOf<F>;
     for (const key in fields) out[key] = fields[key].value() as FieldsOf<F>[Extract<keyof F, string>];
     return out;
   };
 
   // Cross-field: compute the error map reactively and push each field-keyed error
   // into that field's `_external`; the `_form` key is surfaced via `formError`.
-  const crossErrors = computed<Record<string, string>>(() =>
+  const crossErrors: Computed<Record<string, string>> = computed<Record<string, string>>(() =>
     opts.validate ? opts.validate(values()) ?? {} : {}
   );
   if (opts.validate) {
     effect(() => {
-      const errs = crossErrors();
+      const errs: Record<string, string> = crossErrors();
       for (const key in fields) {
         (fields[key] as unknown as FieldInternal<unknown>)._external.set(errs[key] ?? null);
       }
     });
   }
-  const formError = computed<string | null>(() => crossErrors()[FORM_ERROR_KEY] ?? null);
+  const formError: Computed<string | null> = computed<string | null>(() => crossErrors()[FORM_ERROR_KEY] ?? null);
 
   return {
     fields,
@@ -201,7 +201,15 @@ export function form<F extends Record<string, Field<unknown>>>(
 }
 
 /** A small set of ready-made validators (compose freely; first failure wins). */
-export const validators = {
+export const validators: {
+  required: (msg?: string) => Validator<unknown>;
+  minLength: (n: number, msg?: string) => Validator<string>;
+  maxLength: (n: number, msg?: string) => Validator<string>;
+  pattern: (re: RegExp, msg?: string) => Validator<string>;
+  email: (msg?: string) => Validator<string>;
+  min: (n: number, msg?: string) => Validator<number>;
+  max: (n: number, msg?: string) => Validator<number>;
+} = {
   required:
     (msg = 'Required'): Validator<unknown> =>
     (v) =>

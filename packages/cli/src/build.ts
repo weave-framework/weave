@@ -46,13 +46,15 @@ export async function build(config: BuildConfig): Promise<void> {
   }
 
   // Global entry styles (in declared order) first, then component scoped CSS.
-  const globalCss = (await Promise.all((config.styles ?? []).map(compileStyleFile))).join('\n');
+  const globalCss: string = (await Promise.all((config.styles ?? []).map(compileStyleFile))).join(
+    '\n'
+  );
   await mkdir(outDir, { recursive: true });
   await writeFile(join(outDir, 'app.css'), [globalCss, ...state.css].filter(Boolean).join('\n'));
 
   // Copy the HTML shell into the output, making it self-contained + deployable.
   if (config.index) {
-    const html = injectIndexHtml(await readFile(config.index, 'utf8'));
+    const html: string = injectIndexHtml(await readFile(config.index, 'utf8'));
     await writeFile(join(outDir, 'index.html'), html);
   }
 }
@@ -64,7 +66,7 @@ export async function build(config: BuildConfig): Promise<void> {
 function injectIndexHtml(html: string): string {
   // The `(?:(?!-->)[\s\S])*?` guards keep each match WITHIN one comment/script, so it
   // can't span from an earlier comment to the live-reload one and eat the body between.
-  let out = html
+  let out: string = html
     // drop the dev live-reload comment + its `<script>…EventSource('/esbuild')…</script>`
     .replace(/[ \t]*<!--(?:(?!-->)[\s\S])*?live-reload(?:(?!-->)[\s\S])*?-->\n?/gi, '')
     .replace(/[ \t]*<script>(?:(?!<\/script>)[\s\S])*?EventSource\(\s*['"]\/esbuild['"][\s\S]*?<\/script>\n?/gi, '');

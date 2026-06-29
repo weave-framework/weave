@@ -10,6 +10,7 @@
  */
 
 import { build as esbuildBuild } from 'esbuild';
+import type { BuildResult, PluginBuild } from 'esbuild';
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { resolve, dirname, join, isAbsolute } from 'node:path';
@@ -52,11 +53,11 @@ export interface ResolvedConfig {
   minify: boolean;
 }
 
-const CONFIG_NAMES = ['weave.config.ts', 'weave.config.js', 'weave.config.mjs', 'weave.config.json'];
+const CONFIG_NAMES: string[] = ['weave.config.ts', 'weave.config.js', 'weave.config.mjs', 'weave.config.json'];
 
 /** Find + load a Weave config from `cwd` (or an explicit path). Returns null if none exists. */
 export async function loadConfig(cwd: string, explicit?: string): Promise<ResolvedConfig | null> {
-  const file = explicit
+  const file: string | undefined = explicit
     ? resolve(cwd, explicit)
     : CONFIG_NAMES.map((n) => join(cwd, n)).find((p) => existsSync(p));
   if (!file || !existsSync(file)) return null;
@@ -70,7 +71,7 @@ export async function loadConfig(cwd: string, explicit?: string): Promise<Resolv
 
 /** Compile a TS/JS config to one ESM string and import it via a `data:` URL. */
 async function importConfigModule(file: string): Promise<WeaveConfig> {
-  const out = await esbuildBuild({
+  const out: BuildResult = await esbuildBuild({
     entryPoints: [file],
     bundle: true,
     format: 'esm',
@@ -82,7 +83,7 @@ async function importConfigModule(file: string): Promise<WeaveConfig> {
         // `import { defineConfig } from '@weave/cli'` → a tiny inline identity, so
         // the config doesn't drag the whole CLI (and esbuild) into the bundle.
         name: 'weave-config-shim',
-        setup(b) {
+        setup(b: PluginBuild): void {
           b.onResolve({ filter: /^@weave\/cli$/ }, () => ({
             path: '@weave/cli',
             namespace: 'weave-cli-shim',
@@ -95,9 +96,11 @@ async function importConfigModule(file: string): Promise<WeaveConfig> {
       },
     ],
   });
-  const code = out.outputFiles[0].text;
-  const url = `data:text/javascript;base64,${Buffer.from(code).toString('base64')}`;
-  const mod = (await import(url)) as { default?: WeaveConfig } & WeaveConfig;
+  const code: string = out.outputFiles![0].text;
+  const url: string = `data:text/javascript;base64,${Buffer.from(code).toString('base64')}`;
+  const mod: { default?: WeaveConfig } & WeaveConfig = (await import(url)) as {
+    default?: WeaveConfig;
+  } & WeaveConfig;
   return (mod.default ?? mod) as WeaveConfig;
 }
 

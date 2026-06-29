@@ -1,22 +1,27 @@
 import { test, assert } from '../../../tools/harness.js';
-import { signal, computed, effect, root, tick } from '@weave/runtime';
+import { signal, computed, effect, root, tick, type Signal } from '@weave/runtime';
 import * as dom from '@weave/runtime/dom';
 import { compileTemplate, parseTemplate } from '@weave/compiler';
 import type { TransitionConfig } from '@weave/runtime/dom';
 
-const rt = { ...dom, signal, computed, effect, root };
+const rt: typeof dom & {
+  signal: typeof signal;
+  computed: typeof computed;
+  effect: typeof effect;
+  root: typeof root;
+} = { ...dom, signal, computed, effect, root };
 
 function render(html: string, ctx: Record<string, unknown> = {}, scope: string[] = []): Element {
   const { code } = compileTemplate(html, { mode: 'function', scope });
-  const fn = new Function('ctx', 'rt', '_c', code) as (c: unknown, r: unknown, k: unknown) => Element;
+  const fn: (c: unknown, r: unknown, k: unknown) => Element = new Function('ctx', 'rt', '_c', code) as (c: unknown, r: unknown, k: unknown) => Element;
   return fn(ctx, rt, {});
 }
 function host(): HTMLElement {
-  const el = document.createElement('div');
+  const el: HTMLDivElement = document.createElement('div');
   document.body.appendChild(el);
   return el;
 }
-const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+const wait = (ms: number): Promise<void> => new Promise<void>((r) => setTimeout(r, ms));
 
 /** A short, observable transition: animates opacity over 20ms. */
 const tFade = (): TransitionConfig => ({ duration: 20, css: (t) => `opacity: ${t}` });
@@ -24,9 +29,9 @@ const tFade = (): TransitionConfig => ({ duration: 20, css: (t) => `opacity: ${t
 /* ──────────── parse + codegen ──────────── */
 
 test('transition: / in: / out: parse into transition attrs with a mode', () => {
-  const a = parseTemplate(`<div transition:fade></div>`)[0] as { attrs: { type: string; name: string; mode: string }[] };
-  const b = parseTemplate(`<div in:fly></div>`)[0] as { attrs: { type: string; mode: string }[] };
-  const c = parseTemplate(`<div out:slide></div>`)[0] as { attrs: { type: string; mode: string }[] };
+  const a: { attrs: { type: string; name: string; mode: string }[] } = parseTemplate(`<div transition:fade></div>`)[0] as { attrs: { type: string; name: string; mode: string }[] };
+  const b: { attrs: { type: string; mode: string }[] } = parseTemplate(`<div in:fly></div>`)[0] as { attrs: { type: string; mode: string }[] };
+  const c: { attrs: { type: string; mode: string }[] } = parseTemplate(`<div out:slide></div>`)[0] as { attrs: { type: string; mode: string }[] };
   assert.equal(a.attrs[0].type, 'transition');
   assert.equal(a.attrs[0].name, 'fade');
   assert.equal(a.attrs[0].mode, 'both');
@@ -43,7 +48,7 @@ test('codegen emits a transition() call with the mode', () => {
 /* ──────────── runtime: intro ──────────── */
 
 test('in: plays an intro that cleans up its inline style when finished', async () => {
-  const el = render(`<div in:run>hi</div>`, { run: tFade }, ['run']) as HTMLElement;
+  const el: HTMLElement = render(`<div in:run>hi</div>`, { run: tFade }, ['run']) as HTMLElement;
   host().appendChild(el);
   await tick(); // onMount fires the intro (sets opacity: 0 to start)
   await wait(60); // let it finish
@@ -53,8 +58,8 @@ test('in: plays an intro that cleans up its inline style when finished', async (
 /* ──────────── runtime: outro coordination (the headline) ──────────── */
 
 test('out: defers DOM removal until the leave animation finishes', async () => {
-  const show = signal(true);
-  const el = render(`<div>@if (show()) { <p out:run>bye</p> }</div>`, { show, run: tFade }, ['show', 'run']);
+  const show: Signal<boolean> = signal(true);
+  const el: Element = render(`<div>@if (show()) { <p out:run>bye</p> }</div>`, { show, run: tFade }, ['show', 'run']);
   host().appendChild(el);
   assert.ok(el.querySelector('p'), 'present initially');
 
@@ -66,8 +71,8 @@ test('out: defers DOM removal until the leave animation finishes', async () => {
 });
 
 test('out: leave animation also runs for a removed @for row', async () => {
-  const items = signal([1, 2, 3]);
-  const el = render(
+  const items: Signal<number[]> = signal([1, 2, 3]);
+  const el: Element = render(
     `<ul>@for (n of items(); track n) { <li out:run>{{ n }}</li> }</ul>`,
     { items, run: tFade },
     ['items', 'run']
@@ -83,8 +88,8 @@ test('out: leave animation also runs for a removed @for row', async () => {
 });
 
 test('no outro registered (in: only) removes immediately', async () => {
-  const show = signal(true);
-  const el = render(`<div>@if (show()) { <p in:run>hi</p> }</div>`, { show, run: tFade }, ['show', 'run']);
+  const show: Signal<boolean> = signal(true);
+  const el: Element = render(`<div>@if (show()) { <p in:run>hi</p> }</div>`, { show, run: tFade }, ['show', 'run']);
   host().appendChild(el);
   await tick();
   show.set(false);

@@ -5,15 +5,16 @@ import { join, relative, sep } from 'node:path';
 // Import the DOM-free subpath so the node CLI tsconfig never reaches into the
 // router's runtime (DOM) code — these are pure string functions.
 import { fileToRoutes, emitRoutesModule } from '@weave/router/files';
+import type { FileRoute } from '@weave/router/files';
 
-const PAGE = /\.(weave|tsx?|jsx?)$/;
+const PAGE: RegExp = /\.(weave|tsx?|jsx?)$/;
 
 /** Recursively collect page-file specifiers under `dir`, relative to it (POSIX, sorted). */
 export function scanRoutes(dir: string): string[] {
   const out: string[] = [];
   const walk = (cur: string): void => {
     for (const entry of readdirSync(cur, { withFileTypes: true })) {
-      const full = join(cur, entry.name);
+      const full: string = join(cur, entry.name);
       if (entry.isDirectory()) walk(full);
       else if (PAGE.test(entry.name)) out.push(relative(dir, full).split(sep).join('/'));
     }
@@ -31,10 +32,10 @@ export interface GenerateRoutesOptions {
 
 /** Scan `dir`, build the manifest, and write the generated routes module. Returns its path. */
 export function generateRoutes(dir: string, opts: GenerateRoutesOptions = {}): string {
-  const files = scanRoutes(dir);
-  const routes = fileToRoutes(files);
-  const module = emitRoutesModule(routes, { lazy: opts.lazy ?? true });
-  const out = opts.out ?? join(dir, 'routes.gen.ts');
+  const files: string[] = scanRoutes(dir);
+  const routes: FileRoute[] = fileToRoutes(files);
+  const module: string = emitRoutesModule(routes, { lazy: opts.lazy ?? true });
+  const out: string = opts.out ?? join(dir, 'routes.gen.ts');
   writeFileSync(out, module);
   return out;
 }

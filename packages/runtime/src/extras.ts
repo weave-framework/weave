@@ -29,7 +29,7 @@ export function linkedSignal<T>(
   source: () => T,
   opts: { equals?: (a: T, b: T) => boolean } = {}
 ): Signal<T> {
-  const sig = signal<T>(untrack(source), opts);
+  const sig: Signal<T> = signal<T>(untrack(source), opts);
   effect(() => {
     sig.set(source()); // tracks `source`; resets the (possibly overridden) value
   });
@@ -49,10 +49,10 @@ export function linkedSignal<T>(
  * Owner-scoped; the pending timeout is cleared on each change and on unmount.
  */
 export function debounced<T>(source: () => T, ms: number): Computed<T> {
-  const sig = signal<T>(untrack(source));
+  const sig: Signal<T> = signal<T>(untrack(source));
   effect(() => {
-    const v = source(); // track the source
-    const id = setTimeout(() => sig.set(v), ms);
+    const v: T = source(); // track the source
+    const id: ReturnType<typeof setTimeout> = setTimeout(() => sig.set(v), ms);
     onCleanup(() => clearTimeout(id)); // a new change (or unmount) cancels the pending write
   });
   return () => sig();
@@ -73,9 +73,9 @@ export function watch<T>(
   opts: { immediate?: boolean } = {}
 ): () => void {
   let prev: T | undefined;
-  let first = true;
+  let first: boolean = true;
   return effect(() => {
-    const value = source(); // the ONLY tracked read
+    const value: T = source(); // the ONLY tracked read
     let ret: (() => void) | undefined;
     untrack(() => {
       let r: unknown = undefined;

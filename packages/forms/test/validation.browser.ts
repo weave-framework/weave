@@ -1,14 +1,14 @@
 import { test, assert } from '../../../tools/harness.js';
-import { createOwner, runInOwner, disposeOwner } from '@weave/runtime';
-import { field, form, validators } from '@weave/forms';
+import { createOwner, runInOwner, disposeOwner, type Owner } from '@weave/runtime';
+import { field, form, validators, type Field, type Form } from '@weave/forms';
 
-const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+const wait = (ms: number): Promise<void> => new Promise<void>((r) => setTimeout(r, ms));
 
 /* ──────────────────────────── cross-field ──────────────────────────── */
 
 test('cross-field: a field-keyed error attaches to that field and gates form validity', () => {
-  const owner = createOwner();
-  const f = runInOwner(owner, () =>
+  const owner: Owner = createOwner();
+  const f: Form<{ pw: Field<string>; pw2: Field<string> }> = runInOwner(owner, () =>
     form(
       { pw: field('secret'), pw2: field('', [validators.required()]) },
       { validate: (v) => (v.pw === v.pw2 ? null : { pw2: 'passwords do not match' }) }
@@ -26,8 +26,8 @@ test('cross-field: a field-keyed error attaches to that field and gates form val
 });
 
 test('cross-field: own sync validators take precedence over the cross-field error', () => {
-  const owner = createOwner();
-  const f = runInOwner(owner, () =>
+  const owner: Owner = createOwner();
+  const f: Form<{ pw: Field<string>; pw2: Field<string> }> = runInOwner(owner, () =>
     form(
       { pw: field('secret'), pw2: field('', [validators.required('required!')]) },
       { validate: (v) => (v.pw === v.pw2 ? null : { pw2: 'mismatch' }) }
@@ -39,8 +39,8 @@ test('cross-field: own sync validators take precedence over the cross-field erro
 });
 
 test('cross-field: a reserved _form key surfaces as a form-level error', () => {
-  const owner = createOwner();
-  const f = runInOwner(owner, () =>
+  const owner: Owner = createOwner();
+  const f: Form<{ from: Field<number>; to: Field<number> }> = runInOwner(owner, () =>
     form(
       { from: field(10), to: field(5) },
       { validate: (v) => (v.to >= v.from ? null : { _form: 'range is inverted' }) }
@@ -59,9 +59,9 @@ test('cross-field: a reserved _form key surfaces as a form-level error', () => {
 /* ──────────────────────────── async ──────────────────────────── */
 
 test('async: validating() toggles and the error lands after the debounce', async () => {
-  const owner = createOwner();
-  const taken = new Set(['taken']);
-  const username = runInOwner(owner, () =>
+  const owner: Owner = createOwner();
+  const taken: Set<string> = new Set(['taken']);
+  const username: Field<string> = runInOwner(owner, () =>
     field('', [validators.required()], {
       asyncValidate: async (v) => (taken.has(v) ? 'already taken' : null),
       debounceMs: 20,
@@ -83,9 +83,9 @@ test('async: validating() toggles and the error lands after the debounce', async
 });
 
 test('async: rapid edits debounce + abort to a single trailing call', async () => {
-  const owner = createOwner();
+  const owner: Owner = createOwner();
   const calls: string[] = [];
-  const f = runInOwner(owner, () =>
+  const f: Field<string> = runInOwner(owner, () =>
     field('', [validators.required()], {
       asyncValidate: async (v) => {
         calls.push(v);
@@ -104,9 +104,9 @@ test('async: rapid edits debounce + abort to a single trailing call', async () =
 });
 
 test('async: a sync (format) error skips the server check entirely', async () => {
-  const owner = createOwner();
-  let called = 0;
-  const f = runInOwner(owner, () =>
+  const owner: Owner = createOwner();
+  let called: number = 0;
+  const f: Field<string> = runInOwner(owner, () =>
     field('', [validators.email()], {
       asyncValidate: async () => {
         called++;
@@ -129,8 +129,8 @@ test('async: a sync (format) error skips the server check entirely', async () =>
 });
 
 test('form.validating() is true while any field checks', async () => {
-  const owner = createOwner();
-  const f = runInOwner(owner, () =>
+  const owner: Owner = createOwner();
+  const f: Form<{ u: Field<string> }> = runInOwner(owner, () =>
     form({
       u: field('', [validators.required()], {
         asyncValidate: async () => null,

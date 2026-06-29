@@ -16,8 +16,8 @@
  * it is rare.
  */
 
-const ID_START = /[A-Za-z_$]/;
-const ID_CHAR = /[A-Za-z0-9_$]/;
+const ID_START: RegExp = /[A-Za-z_$]/;
+const ID_CHAR: RegExp = /[A-Za-z0-9_$]/;
 
 /** How a referenced name is resolved. */
 export type Binding =
@@ -39,28 +39,28 @@ export interface RewriteResult {
  * stand-in). Template locals emit either an accessor call (runtime) or the bare
  * name (`kind: 'local'`, the check pass where they are real lexical bindings).
  */
-export function rewrite(expr: string, scope: Scope, ctxRef = 'ctx'): RewriteResult {
-  let out = '';
-  let reactive = false;
-  let i = 0;
-  const n = expr.length;
+export function rewrite(expr: string, scope: Scope, ctxRef: string = 'ctx'): RewriteResult {
+  let out: string = '';
+  let reactive: boolean = false;
+  let i: number = 0;
+  const n: number = expr.length;
 
   while (i < n) {
-    const c = expr[i];
+    const c: string = expr[i];
 
     if (c === '"' || c === "'" || c === '`') {
-      const end = scanString(expr, i);
+      const end: number = scanString(expr, i);
       out += expr.slice(i, end);
       i = end;
       continue;
     }
 
     if (ID_START.test(c)) {
-      let j = i + 1;
+      let j: number = i + 1;
       while (j < n && ID_CHAR.test(expr[j])) j++;
-      const name = expr.slice(i, j);
-      const isProperty = lastNonSpace(out) === '.';
-      const binding = scope.get(name);
+      const name: string = expr.slice(i, j);
+      const isProperty: boolean = lastNonSpace(out) === '.';
+      const binding: Binding | undefined = scope.get(name);
 
       if (binding && !isProperty) {
         out +=
@@ -101,7 +101,7 @@ export function childScope(parent: Scope, locals: Record<string, string>): Scope
 }
 
 function lastNonSpace(s: string): string {
-  for (let i = s.length - 1; i >= 0; i--) {
+  for (let i: number = s.length - 1; i >= 0; i--) {
     if (!/\s/.test(s[i])) return s[i];
   }
   return '';
@@ -113,7 +113,7 @@ function lastNonSpace(s: string): string {
  * other free identifier is assumed to be component data. A lexical list now;
  * M8 replaces inference with the TypeScript AST (`ReturnType<typeof setup>`).
  */
-const NON_CTX = new Set([
+const NON_CTX: Set<string> = new Set([
   // literals / keywords
   'true', 'false', 'null', 'undefined', 'this', 'NaN', 'Infinity',
   'typeof', 'instanceof', 'in', 'of', 'new', 'void', 'delete', 'await', 'yield',
@@ -130,16 +130,16 @@ const NON_CTX = new Set([
 
 /** Collect arrow-function parameter names in `expr` (so they aren't treated as ctx). */
 function arrowParams(expr: string): Set<string> {
-  const params = new Set<string>();
-  const ID = /^[A-Za-z_$][\w$]*$/;
-  let at = expr.indexOf('=>');
+  const params: Set<string> = new Set<string>();
+  const ID: RegExp = /^[A-Za-z_$][\w$]*$/;
+  let at: number = expr.indexOf('=>');
   while (at !== -1) {
-    let k = at - 1;
+    let k: number = at - 1;
     while (k >= 0 && /\s/.test(expr[k])) k--;
     if (expr[k] === ')') {
       // (a, b, …) => …  — walk back to the matching '('
-      let depth = 1;
-      let m = k - 1;
+      let depth: number = 1;
+      let m: number = k - 1;
       for (; m >= 0; m--) {
         if (expr[m] === ')') depth++;
         else if (expr[m] === '(') {
@@ -148,14 +148,14 @@ function arrowParams(expr: string): Set<string> {
         }
       }
       for (const raw of expr.slice(m + 1, k).split(',')) {
-        const name = raw.trim().split(/[\s=:]/)[0].replace(/[{}[\]().]/g, '');
+        const name: string = raw.trim().split(/[\s=:]/)[0].replace(/[{}[\]().]/g, '');
         if (ID.test(name)) params.add(name);
       }
     } else {
       // single bare param:  x => …
-      let m = k;
+      let m: number = k;
       while (m >= 0 && ID_CHAR.test(expr[m])) m--;
-      const name = expr.slice(m + 1, k + 1);
+      const name: string = expr.slice(m + 1, k + 1);
       if (ID.test(name)) params.add(name);
     }
     at = expr.indexOf('=>', at + 2);
@@ -169,21 +169,21 @@ function arrowParams(expr: string): Set<string> {
  * parameter. The basis for auto-scope (see {@link inferCtxNames}).
  */
 export function freeIdentifiers(expr: string): string[] {
-  const out = new Set<string>();
-  const params = arrowParams(expr);
-  let i = 0;
-  const n = expr.length;
+  const out: Set<string> = new Set<string>();
+  const params: Set<string> = arrowParams(expr);
+  let i: number = 0;
+  const n: number = expr.length;
   while (i < n) {
-    const c = expr[i];
+    const c: string = expr[i];
     if (c === '"' || c === "'" || c === '`') {
       i = scanString(expr, i);
       continue;
     }
     if (ID_START.test(c)) {
-      let j = i + 1;
+      let j: number = i + 1;
       while (j < n && ID_CHAR.test(expr[j])) j++;
-      const name = expr.slice(i, j);
-      const isProperty = lastNonSpace(expr.slice(0, i)) === '.';
+      const name: string = expr.slice(i, j);
+      const isProperty: boolean = lastNonSpace(expr.slice(0, i)) === '.';
       if (!isProperty && !NON_CTX.has(name) && !params.has(name)) out.add(name);
       i = j;
       continue;
@@ -194,10 +194,10 @@ export function freeIdentifiers(expr: string): string[] {
 }
 
 function scanString(s: string, start: number): number {
-  const quote = s[start];
-  let i = start + 1;
+  const quote: string = s[start];
+  let i: number = start + 1;
   while (i < s.length) {
-    const c = s[i];
+    const c: string = s[i];
     if (c === '\\') {
       i += 2;
       continue;

@@ -28,8 +28,8 @@ export function hostAttr(hash: string): string {
 
 /** Deterministic short hash (FNV-1a, base36) for a component's style+template. */
 export function hashCss(input: string): string {
-  let h = 0x811c9dc5;
-  for (let i = 0; i < input.length; i++) {
+  let h: number = 0x811c9dc5;
+  for (let i: number = 0; i < input.length; i++) {
     h ^= input.charCodeAt(i);
     h = Math.imul(h, 0x01000193);
   }
@@ -44,37 +44,37 @@ export function scopeCss(css: string, hash: string): string {
 /* ──────────── block-level walk ──────────── */
 
 function transformBlock(css: string, attr: string, host: string, keyframes: boolean): string {
-  let out = '';
-  let i = 0;
-  const n = css.length;
+  let out: string = '';
+  let i: number = 0;
+  const n: number = css.length;
 
   while (i < n) {
-    const c = css[i];
+    const c: string = css[i];
     if (/\s/.test(c)) {
       out += c;
       i++;
       continue;
     }
     if (css.startsWith('/*', i)) {
-      const end = css.indexOf('*/', i + 2);
-      const stop = end === -1 ? n : end + 2;
+      const end: number = css.indexOf('*/', i + 2);
+      const stop: number = end === -1 ? n : end + 2;
       out += css.slice(i, stop);
       i = stop;
       continue;
     }
 
     // Read a statement prelude up to a top-level ';' (declaration / @import) or '{' (block).
-    let j = i;
-    let depth = 0;
+    let j: number = i;
+    let depth: number = 0;
     let kind: '' | 'decl' | 'block' = '';
     while (j < n) {
-      const ch = css[j];
+      const ch: string = css[j];
       if (ch === '"' || ch === "'") {
         j = skipString(css, j);
         continue;
       }
       if (css.startsWith('/*', j)) {
-        const e = css.indexOf('*/', j + 2);
+        const e: number = css.indexOf('*/', j + 2);
         j = e === -1 ? n : e + 2;
         continue;
       }
@@ -90,7 +90,7 @@ function transformBlock(css: string, attr: string, host: string, keyframes: bool
       break;
     }
 
-    const prelude = css.slice(i, j);
+    const prelude: string = css.slice(i, j);
     if (kind === 'decl') {
       out += prelude + ';';
       i = j + 1;
@@ -98,17 +98,17 @@ function transformBlock(css: string, attr: string, host: string, keyframes: bool
     }
 
     // Block: read its balanced body.
-    const bodyStart = j + 1;
-    let k = bodyStart;
-    let bd = 1;
+    const bodyStart: number = j + 1;
+    let k: number = bodyStart;
+    let bd: number = 1;
     while (k < n) {
-      const ch = css[k];
+      const ch: string = css[k];
       if (ch === '"' || ch === "'") {
         k = skipString(css, k);
         continue;
       }
       if (css.startsWith('/*', k)) {
-        const e = css.indexOf('*/', k + 2);
+        const e: number = css.indexOf('*/', k + 2);
         k = e === -1 ? n : e + 2;
         continue;
       }
@@ -119,15 +119,15 @@ function transformBlock(css: string, attr: string, host: string, keyframes: bool
       }
       k++;
     }
-    const body = css.slice(bodyStart, k);
-    const after = k < n ? k + 1 : n;
-    const trimmed = prelude.trim();
+    const body: string = css.slice(bodyStart, k);
+    const after: number = k < n ? k + 1 : n;
+    const trimmed: string = prelude.trim();
 
     if (keyframes) {
       // Frame selector (`0%`, `from`, `to`) — never scoped; body is declarations.
       out += prelude + '{' + body + '}';
     } else if (trimmed.startsWith('@')) {
-      const kw = (/^@-?\w[\w-]*/.exec(trimmed)?.[0] ?? '').toLowerCase();
+      const kw: string = (/^@-?\w[\w-]*/.exec(trimmed)?.[0] ?? '').toLowerCase();
       if (kw.endsWith('keyframes')) {
         out += prelude + '{' + transformBlock(body, attr, host, true) + '}';
       } else if (kw === '@font-face' || kw === '@page' || kw === '@property' || kw === '@counter-style') {
@@ -152,14 +152,14 @@ function scopeSelectorList(prelude: string, attr: string, host: string): string 
 }
 
 function scopeSelector(raw: string, attr: string, host: string): string {
-  const sel = raw.trim();
+  const sel: string = raw.trim();
   if (!sel) return sel;
 
-  const start = rightmostCompoundStart(sel);
+  const start: number = rightmostCompoundStart(sel);
   // `:host` may appear in an ancestor position (`:host .child`) — rewrite it there too.
-  const prefix = rewriteHost(unwrapGlobal(sel.slice(0, start)), host);
-  const right = sel.slice(start);
-  const rightTrim = right.trim();
+  const prefix: string = rewriteHost(unwrapGlobal(sel.slice(0, start)), host);
+  const right: string = sel.slice(start);
+  const rightTrim: string = right.trim();
 
   // The rightmost compound is `:host` / `:host(.x)` → carries the host attr, not
   // the normal element scope (a root is matched by where it is, not what it is).
@@ -179,17 +179,17 @@ function scopeSelector(raw: string, attr: string, host: string): string {
  * unrelated tokens (and `:host-context(...)`, not supported) untouched.
  */
 function rewriteHost(s: string, host: string): string {
-  let out = '';
-  let i = 0;
+  let out: string = '';
+  let i: number = 0;
   while (i < s.length) {
     if (s.startsWith(':host', i)) {
-      const after = s[i + 5];
+      const after: string = s[i + 5];
       if (after === '(') {
-        let depth = 1;
-        let j = i + 6;
-        let inner = '';
+        let depth: number = 1;
+        let j: number = i + 6;
+        let inner: string = '';
         while (j < s.length && depth > 0) {
-          const c = s[j];
+          const c: string = s[j];
           if (c === '(') depth++;
           else if (c === ')' && --depth === 0) { j++; break; }
           inner += c;
@@ -213,11 +213,11 @@ function rewriteHost(s: string, host: string): string {
 
 /** Index in `sel` where the rightmost compound selector begins (after the last combinator). */
 function rightmostCompoundStart(sel: string): number {
-  let depth = 0;
-  let start = 0;
-  let i = 0;
+  let depth: number = 0;
+  let start: number = 0;
+  let i: number = 0;
   while (i < sel.length) {
-    const c = sel[i];
+    const c: string = sel[i];
     if (c === '(' || c === '[') {
       depth++;
       i++;
@@ -236,9 +236,9 @@ function rightmostCompoundStart(sel: string): number {
         continue;
       }
       if (/\s/.test(c)) {
-        let j = i;
+        let j: number = i;
         while (j < sel.length && /\s/.test(sel[j])) j++;
-        const next = sel[j];
+        const next: string = sel[j];
         if (j >= sel.length) { i = j; continue; } // trailing space
         if (next === '>' || next === '+' || next === '~') { i = j; continue; } // space around a combinator
         start = j; // descendant combinator
@@ -253,9 +253,9 @@ function rightmostCompoundStart(sel: string): number {
 
 /** Insert `[attr]` into a compound selector before its first top-level pseudo (`:`), else append. */
 function insertAttr(compound: string, attr: string): string {
-  let depth = 0;
-  for (let i = 0; i < compound.length; i++) {
-    const c = compound[i];
+  let depth: number = 0;
+  for (let i: number = 0; i < compound.length; i++) {
+    const c: string = compound[i];
     if (c === '(' || c === '[') depth++;
     else if (c === ')' || c === ']') depth--;
     else if (depth === 0 && c === ':') {
@@ -267,14 +267,14 @@ function insertAttr(compound: string, attr: string): string {
 
 /** Replace every `:global(X)` with `X` (parens balanced). */
 function unwrapGlobal(s: string): string {
-  let out = '';
-  let i = 0;
+  let out: string = '';
+  let i: number = 0;
   while (i < s.length) {
     if (s.startsWith(':global(', i)) {
       i += ':global('.length;
-      let depth = 1;
+      let depth: number = 1;
       while (i < s.length && depth > 0) {
-        const c = s[i];
+        const c: string = s[i];
         if (c === '(') depth++;
         else if (c === ')') {
           depth--;
@@ -294,10 +294,10 @@ function unwrapGlobal(s: string): string {
 
 function splitTopLevel(s: string, sep: string): string[] {
   const out: string[] = [];
-  let depth = 0;
-  let last = 0;
-  for (let i = 0; i < s.length; i++) {
-    const c = s[i];
+  let depth: number = 0;
+  let last: number = 0;
+  for (let i: number = 0; i < s.length; i++) {
+    const c: string = s[i];
     if (c === '"' || c === "'") {
       i = skipString(s, i) - 1;
       continue;
@@ -315,10 +315,10 @@ function splitTopLevel(s: string, sep: string): string[] {
 
 /** Skip a quoted string starting at `start`; returns the index just past the closing quote. */
 function skipString(s: string, start: number): number {
-  const q = s[start];
-  let i = start + 1;
+  const q: string = s[start];
+  let i: number = start + 1;
   while (i < s.length) {
-    const c = s[i];
+    const c: string = s[i];
     if (c === '\\') {
       i += 2;
       continue;

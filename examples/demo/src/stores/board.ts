@@ -8,18 +8,27 @@
  */
 
 import { store } from '@weave/store';
-import { signal, computed } from '@weave/runtime';
+import { signal, computed, type Signal, type Computed } from '@weave/runtime';
 import { api } from '../data/api';
 import type { Task, Status } from '../types';
 
-export const useBoard = store(() => {
-  const tasks = signal<Task[]>([]);
-  const loading = signal(false);
-  const error = signal<string | null>(null);
-  let loaded = false;
+export interface BoardStore {
+  tasks: Signal<Task[]>;
+  loading: Signal<boolean>;
+  error: Signal<string | null>;
+  load: (force?: boolean) => Promise<void>;
+  byStatus: (status: Status) => Task[];
+  counts: Computed<{ total: number; done: number }>;
+}
+
+export const useBoard: () => BoardStore = store(() => {
+  const tasks: Signal<Task[]> = signal<Task[]>([]);
+  const loading: Signal<boolean> = signal(false);
+  const error: Signal<string | null> = signal<string | null>(null);
+  let loaded: boolean = false;
 
   /** Fetch the task list. Safe to call repeatedly; only the first triggers a load. */
-  async function load(force = false): Promise<void> {
+  async function load(force: boolean = false): Promise<void> {
     if (loaded && !force) return;
     loaded = true;
     loading.set(true);
@@ -37,8 +46,8 @@ export const useBoard = store(() => {
   const byStatus = (status: Status): Task[] => tasks().filter((t) => t.status === status);
 
   /** Reactive progress summary for the header. */
-  const counts = computed(() => {
-    const list = tasks();
+  const counts: Computed<{ total: number; done: number }> = computed(() => {
+    const list: Task[] = tasks();
     return {
       total: list.length,
       done: list.filter((t) => t.status === 'done').length,

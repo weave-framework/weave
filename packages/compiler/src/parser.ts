@@ -15,10 +15,10 @@ import type {
   AwaitNode, AwaitBranch, SnippetNode, RenderNode, KeyNode,
 } from './ast.js';
 
-const BLOCK_KW =
+const BLOCK_KW: RegExp =
   /^@(if|else|for|empty|switch|case|default|let|defer|placeholder|await|then|catch|snippet|render|key)\b/;
 
-const VOID = new Set([
+const VOID: Set<string> = new Set([
   'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input',
   'link', 'meta', 'param', 'source', 'track', 'wbr',
 ]);
@@ -32,20 +32,20 @@ type AttrValue =
   | null;
 
 export function parseTemplate(input: string): TemplateNode[] {
-  const p = new Parser(input);
-  const nodes = p.parseChildren(null);
+  const p: Parser = new Parser(input);
+  const nodes: TemplateNode[] = p.parseChildren(null);
   return nodes;
 }
 
 class Parser {
-  pos = 0;
+  pos: number = 0;
   /** Inner start offset of the most recent {@link readParen} — for block-head expr offsets. */
-  parenStart = 0;
+  parenStart: number = 0;
   constructor(public src: string) {}
 
   /** Offset of `sub`'s first non-whitespace char within `parent` (which starts at `parentStart`). */
   exprOffset(parentStart: number, parent: string, sub: string): number {
-    const at = parent.indexOf(sub);
+    const at: number = parent.indexOf(sub);
     return parentStart + (at < 0 ? 0 : at) + (sub.length - sub.trimStart().length);
   }
 
@@ -57,7 +57,7 @@ class Parser {
    * Parse children until `</closeTag>` (element), `}` (block body when
    * `stopAtBrace`), or EOF. Does not consume the terminator.
    */
-  parseChildren(closeTag: string | null, stopAtBrace = false): TemplateNode[] {
+  parseChildren(closeTag: string | null, stopAtBrace: boolean = false): TemplateNode[] {
     const out: TemplateNode[] = [];
     while (!this.eof()) {
       if (stopAtBrace && this.peek() === '}') return out;
@@ -66,7 +66,7 @@ class Parser {
         return out; // caller consumes the close tag
       }
       if (this.src.startsWith('{{', this.pos)) {
-        const it = this.readInterp();
+        const it: { expr: string; offset: number } = this.readInterp();
         out.push({ type: 'interp', expr: it.expr, offset: it.offset });
         continue;
       }
@@ -82,13 +82,13 @@ class Parser {
         out.push(this.parseElement());
         continue;
       }
-      const text = this.readText(stopAtBrace);
+      const text: string = this.readText(stopAtBrace);
       if (text) {
         // Coalesce with a preceding text node. Two text runs become adjacent when a
         // comment between them is skipped; the browser merges them into one Text node
         // when the emitted template HTML is parsed, so the AST must too — otherwise the
         // child-index paths the codegen computes are off by one for every later sibling.
-        const last = out[out.length - 1];
+        const last: TemplateNode | undefined = out[out.length - 1];
         if (last && last.type === 'text') last.value += text;
         else out.push({ type: 'text', value: text });
       }
@@ -100,7 +100,7 @@ class Parser {
   /* ──────────── control-flow blocks ──────────── */
 
   parseBlock(): TemplateNode {
-    const kw = (BLOCK_KW.exec(this.src.slice(this.pos)) as RegExpExecArray)[1];
+    const kw: string = (BLOCK_KW.exec(this.src.slice(this.pos)) as RegExpExecArray)[1];
     switch (kw) {
       case 'if': return this.parseIf();
       case 'for': return this.parseFor();
@@ -119,30 +119,30 @@ class Parser {
   parseIf(): IfNode {
     this.pos += 3; // @if
     this.skipWs();
-    const head = this.readParen();
-    const headStart = this.parenStart;
+    const head: string = this.readParen();
+    const headStart: number = this.parenStart;
     const branches: IfBranch[] = [];
-    let cond = head;
+    let cond: string = head;
     let alias: string | undefined;
-    const semi = splitTopLevel(head, ';');
+    const semi: string[] = splitTopLevel(head, ';');
     if (semi.length === 2) {
       cond = semi[0].trim();
-      const m = /^as\s+([A-Za-z_$][\w$]*)$/.exec(semi[1].trim());
+      const m: RegExpExecArray | null = /^as\s+([A-Za-z_$][\w$]*)$/.exec(semi[1].trim());
       if (!m) throw new ParseError(`Expected 'as <name>' in @if, got '${semi[1].trim()}'`);
       alias = m[1];
     }
-    const condOffset = this.exprOffset(headStart, head, cond);
+    const condOffset: number = this.exprOffset(headStart, head, cond);
     branches.push({ cond, condOffset, alias, children: this.readBlockBody() });
 
     // @else if / @else
     for (;;) {
-      const save = this.pos;
+      const save: number = this.pos;
       this.skipWs();
       if (this.src.startsWith('@else if', this.pos)) {
         this.pos += '@else if'.length;
         this.skipWs();
-        const raw = this.readParen();
-        const off = this.exprOffset(this.parenStart, raw, raw.trim());
+        const raw: string = this.readParen();
+        const off: number = this.exprOffset(this.parenStart, raw, raw.trim());
         branches.push({ cond: raw.trim(), condOffset: off, children: this.readBlockBody() });
       } else if (this.src.startsWith('@else', this.pos)) {
         this.pos += '@else'.length;
@@ -159,24 +159,24 @@ class Parser {
   parseFor(): ForNode {
     this.pos += 4; // @for
     this.skipWs();
-    const head = this.readParen();
-    const headStart = this.parenStart;
-    const parts = splitTopLevel(head, ';').map((s) => s.trim());
-    const m = /^([A-Za-z_$][\w$]*)\s+of\s+([\s\S]+)$/.exec(parts[0]);
+    const head: string = this.readParen();
+    const headStart: number = this.parenStart;
+    const parts: string[] = splitTopLevel(head, ';').map((s) => s.trim());
+    const m: RegExpExecArray | null = /^([A-Za-z_$][\w$]*)\s+of\s+([\s\S]+)$/.exec(parts[0]);
     if (!m) throw new ParseError(`Expected '@for (item of list)', got '${parts[0]}'`);
-    const item = m[1];
-    const list = m[2].trim();
+    const item: string = m[1];
+    const list: string = m[2].trim();
     let track: string | undefined;
     for (const extra of parts.slice(1)) {
-      const t = /^track\s+([\s\S]+)$/.exec(extra);
+      const t: RegExpExecArray | null = /^track\s+([\s\S]+)$/.exec(extra);
       if (t) track = t[1].trim();
     }
-    const listOffset = this.exprOffset(headStart, head, list);
-    const trackOffset = track ? this.exprOffset(headStart, head, track) : undefined;
-    const children = this.readBlockBody();
+    const listOffset: number = this.exprOffset(headStart, head, list);
+    const trackOffset: number | undefined = track ? this.exprOffset(headStart, head, track) : undefined;
+    const children: TemplateNode[] = this.readBlockBody();
 
     let empty: TemplateNode[] | undefined;
-    const save = this.pos;
+    const save: number = this.pos;
     this.skipWs();
     if (this.src.startsWith('@empty', this.pos)) {
       this.pos += '@empty'.length;
@@ -190,9 +190,9 @@ class Parser {
   parseSwitch(): SwitchNode {
     this.pos += 7; // @switch
     this.skipWs();
-    const rawExpr = this.readParen();
-    const exprOffset = this.exprOffset(this.parenStart, rawExpr, rawExpr.trim());
-    const expr = rawExpr.trim();
+    const rawExpr: string = this.readParen();
+    const exprOffset: number = this.exprOffset(this.parenStart, rawExpr, rawExpr.trim());
+    const expr: string = rawExpr.trim();
     this.skipWs();
     if (this.peek() !== '{') throw new ParseError(`Expected '{' after @switch at ${this.pos}`);
     this.pos++;
@@ -206,8 +206,8 @@ class Parser {
       if (this.src.startsWith('@case', this.pos)) {
         this.pos += '@case'.length;
         this.skipWs();
-        const rawTest = this.readParen();
-        const testOffset = this.exprOffset(this.parenStart, rawTest, rawTest.trim());
+        const rawTest: string = this.readParen();
+        const testOffset: number = this.exprOffset(this.parenStart, rawTest, rawTest.trim());
         cases.push({ test: rawTest.trim(), testOffset, children: this.readBlockBody() });
       } else if (this.src.startsWith('@default', this.pos)) {
         this.pos += '@default'.length;
@@ -222,15 +222,15 @@ class Parser {
   parseLet(): LetNode {
     this.pos += 4; // @let
     this.skipWs();
-    const name = this.readName();
+    const name: string = this.readName();
     if (!name) throw new ParseError(`Expected name after @let at ${this.pos}`);
     this.skipWs();
     if (this.peek() !== '=') throw new ParseError(`Expected '=' in @let ${name}`);
     this.pos++;
-    const rawStart = this.pos;
-    const raw = this.readUntilSemicolon();
-    const expr = raw.trim();
-    const exprOffset = rawStart + (raw.length - raw.trimStart().length);
+    const rawStart: number = this.pos;
+    const raw: string = this.readUntilSemicolon();
+    const expr: string = raw.trim();
+    const exprOffset: number = rawStart + (raw.length - raw.trimStart().length);
     if (this.peek() !== ';') throw new ParseError(`Expected ';' ending @let ${name}`);
     this.pos++;
     return { type: 'let', name, expr, exprOffset };
@@ -239,12 +239,12 @@ class Parser {
   parseDefer(): DeferNode {
     this.pos += 6; // @defer
     this.skipWs();
-    const head = this.readParen();
-    const trigger = this.parseDeferTrigger(head, this.parenStart);
-    const children = this.readBlockBody();
+    const head: string = this.readParen();
+    const trigger: DeferTrigger = this.parseDeferTrigger(head, this.parenStart);
+    const children: TemplateNode[] = this.readBlockBody();
 
     let placeholder: TemplateNode[] | undefined;
-    const save = this.pos;
+    const save: number = this.pos;
     this.skipWs();
     if (this.src.startsWith('@placeholder', this.pos)) {
       this.pos += '@placeholder'.length;
@@ -258,14 +258,14 @@ class Parser {
   parseAwait(): AwaitNode {
     this.pos += 6; // @await
     this.skipWs();
-    const rawExpr = this.readParen();
-    const expr = rawExpr.trim();
-    const exprOffset = this.exprOffset(this.parenStart, rawExpr, expr);
+    const rawExpr: string = this.readParen();
+    const expr: string = rawExpr.trim();
+    const exprOffset: number = this.exprOffset(this.parenStart, rawExpr, expr);
 
     // Optional pending block: a `{` right after the source (anything else — e.g.
     // `@then` — means there is no pending content).
     let pending: TemplateNode[] | undefined;
-    const save = this.pos;
+    const save: number = this.pos;
     this.skipWs();
     if (this.peek() === '{') {
       this.pos = save;
@@ -275,47 +275,47 @@ class Parser {
     }
 
     const branch = (kw: string): AwaitBranch | undefined => {
-      const s = this.pos;
+      const s: number = this.pos;
       this.skipWs();
       if (this.src.startsWith(kw, this.pos)) {
         this.pos += kw.length;
-        const alias = this.maybeAlias();
+        const alias: string | undefined = this.maybeAlias();
         return { alias, children: this.readBlockBody() };
       }
       this.pos = s;
       return undefined;
     };
 
-    const thenBranch = branch('@then');
-    const catchBranch = branch('@catch');
+    const thenBranch: AwaitBranch | undefined = branch('@then');
+    const catchBranch: AwaitBranch | undefined = branch('@catch');
     return { type: 'await', expr, exprOffset, pending, then: thenBranch, catch: catchBranch };
   }
 
   parseSnippet(): SnippetNode {
     this.pos += '@snippet'.length;
     this.skipWs();
-    const name = this.readIdent();
+    const name: string = this.readIdent();
     if (!name) throw new ParseError(`Expected a snippet name after @snippet at ${this.pos}`);
     this.skipWs();
     if (this.peek() !== '(') throw new ParseError(`Expected '(' after @snippet ${name}`);
-    const rawParams = this.readParen();
-    const params = splitTopLevel(rawParams, ',').map((s) => s.trim()).filter(Boolean);
+    const rawParams: string = this.readParen();
+    const params: string[] = splitTopLevel(rawParams, ',').map((s) => s.trim()).filter(Boolean);
     for (const p of params) {
       if (!/^[A-Za-z_$][\w$]*$/.test(p)) {
         throw new ParseError(`Invalid @snippet parameter '${p}' (identifiers only)`);
       }
     }
-    const children = this.readBlockBody();
+    const children: TemplateNode[] = this.readBlockBody();
     return { type: 'snippet', name, params, children };
   }
 
   parseKey(): KeyNode {
     this.pos += '@key'.length;
     this.skipWs();
-    const raw = this.readParen();
-    const expr = raw.trim();
+    const raw: string = this.readParen();
+    const expr: string = raw.trim();
     if (!expr) throw new ParseError(`@key () needs an expression`);
-    const exprOffset = this.exprOffset(this.parenStart, raw, expr);
+    const exprOffset: number = this.exprOffset(this.parenStart, raw, expr);
     return { type: 'key', expr, exprOffset, children: this.readBlockBody() };
   }
 
@@ -323,15 +323,15 @@ class Parser {
     this.pos += '@render'.length;
     this.skipWs();
     if (this.peek() !== '(') throw new ParseError(`Expected '(' after @render at ${this.pos}`);
-    const raw = this.readParen();
-    const expr = raw.trim();
+    const raw: string = this.readParen();
+    const expr: string = raw.trim();
     if (!expr) throw new ParseError(`@render () needs an expression`);
     return { type: 'render', expr, exprOffset: this.exprOffset(this.parenStart, raw, expr) };
   }
 
   /** Read a JS identifier (`[A-Za-z_$][\w$]*`); '' if none at the cursor. */
   readIdent(): string {
-    const start = this.pos;
+    const start: number = this.pos;
     if (this.eof() || !/[A-Za-z_$]/.test(this.peek())) return '';
     this.pos++;
     while (!this.eof() && /[\w$]/.test(this.peek())) this.pos++;
@@ -340,10 +340,10 @@ class Parser {
 
   /** Optional `(name)` alias after `@then`/`@catch`. */
   maybeAlias(): string | undefined {
-    const save = this.pos;
+    const save: number = this.pos;
     this.skipWs();
     if (this.peek() === '(') {
-      const inner = this.readParen().trim();
+      const inner: string = this.readParen().trim();
       if (!/^[A-Za-z_$][\w$]*$/.test(inner)) {
         throw new ParseError(`Expected an identifier alias in @then/@catch, got '${inner}'`);
       }
@@ -354,19 +354,19 @@ class Parser {
   }
 
   parseDeferTrigger(head: string, headStart: number): DeferTrigger {
-    const h = head.trim();
-    const whenM = /^when\s+([\s\S]+)$/.exec(h);
+    const h: string = head.trim();
+    const whenM: RegExpExecArray | null = /^when\s+([\s\S]+)$/.exec(h);
     if (whenM) {
-      const expr = whenM[1].trim();
+      const expr: string = whenM[1].trim();
       return { kind: 'when', expr, exprOffset: this.exprOffset(headStart, head, expr) };
     }
     if (h === 'immediate') return { kind: 'immediate' };
-    const onM = /^on\s+([\s\S]+)$/.exec(h);
+    const onM: RegExpExecArray | null = /^on\s+([\s\S]+)$/.exec(h);
     if (onM) {
-      const on = onM[1].trim();
-      const timerM = /^timer\s*\(\s*([\s\S]+?)\s*\)$/.exec(on);
+      const on: string = onM[1].trim();
+      const timerM: RegExpExecArray | null = /^timer\s*\(\s*([\s\S]+?)\s*\)$/.exec(on);
       if (timerM) {
-        const ms = timerM[1].trim();
+        const ms: string = timerM[1].trim();
         return { kind: 'timer', ms, msOffset: this.exprOffset(headStart, head, ms) };
       }
       if (on === 'idle') return { kind: 'idle' };
@@ -383,7 +383,7 @@ class Parser {
     this.skipWs();
     if (this.peek() !== '{') throw new ParseError(`Expected '{' at ${this.pos}`);
     this.pos++;
-    const children = this.parseChildren(null, true);
+    const children: TemplateNode[] = this.parseChildren(null, true);
     if (this.peek() !== '}') throw new ParseError(`Expected '}' closing block at ${this.pos}`);
     this.pos++;
     return children;
@@ -393,10 +393,10 @@ class Parser {
   readParen(): string {
     if (this.peek() !== '(') throw new ParseError(`Expected '(' at ${this.pos}`);
     this.pos++;
-    const start = this.pos;
-    let depth = 1;
+    const start: number = this.pos;
+    let depth: number = 1;
     while (!this.eof()) {
-      const c = this.peek();
+      const c: string = this.peek();
       if (c === '"' || c === "'" || c === '`') {
         this.skipString(c);
         continue;
@@ -409,7 +409,7 @@ class Parser {
       this.pos++;
     }
     if (depth !== 0) throw new ParseError('Unclosed ( in block head');
-    const inner = this.src.slice(start, this.pos);
+    const inner: string = this.src.slice(start, this.pos);
     this.parenStart = start;
     this.pos++; // )
     return inner;
@@ -417,10 +417,10 @@ class Parser {
 
   /** Read an expression up to a top-level `;` (for @let). */
   readUntilSemicolon(): string {
-    const start = this.pos;
-    let depth = 0;
+    const start: number = this.pos;
+    let depth: number = 0;
     while (!this.eof()) {
-      const c = this.peek();
+      const c: string = this.peek();
       if (c === '"' || c === "'" || c === '`') {
         this.skipString(c);
         continue;
@@ -439,23 +439,23 @@ class Parser {
 
   readInterp(): { expr: string; offset: number } {
     this.pos += 2; // {{
-    const start = this.pos;
-    const end = this.src.indexOf('}}', this.pos);
+    const start: number = this.pos;
+    const end: number = this.src.indexOf('}}', this.pos);
     if (end === -1) throw new ParseError('Unclosed {{ interpolation');
     this.pos = end + 2;
-    const raw = this.src.slice(start, end);
+    const raw: string = this.src.slice(start, end);
     return { expr: raw.trim(), offset: start + (raw.length - raw.trimStart().length) };
   }
 
   skipComment(): void {
-    const end = this.src.indexOf('-->', this.pos);
+    const end: number = this.src.indexOf('-->', this.pos);
     this.pos = end === -1 ? this.src.length : end + 3;
   }
 
   readText(stopAtBrace: boolean): string {
-    const start = this.pos;
+    const start: number = this.pos;
     while (!this.eof()) {
-      const c = this.peek();
+      const c: string = this.peek();
       if (c === '<' || this.src.startsWith('{{', this.pos)) break;
       if (stopAtBrace && c === '}') break;
       if (c === '@' && BLOCK_KW.test(this.src.slice(this.pos))) break;
@@ -466,12 +466,12 @@ class Parser {
 
   parseElement(): ElementNode {
     this.pos++; // <
-    const tag = this.readName();
+    const tag: string = this.readName();
     if (!tag) throw new ParseError(`Expected tag name at ${this.pos}`);
-    const attrs = this.parseAttrs();
+    const attrs: Attr[] = this.parseAttrs();
 
     this.skipWs();
-    let selfClosing = false;
+    let selfClosing: boolean = false;
     if (this.peek() === '/') {
       selfClosing = true;
       this.pos++;
@@ -482,16 +482,16 @@ class Parser {
     // Only lowercase HTML tags are void. A capitalized tag is a component (e.g. the
     // router's <Link>, which would otherwise collide with the void <link> element),
     // so it always takes children + a close tag.
-    const isVoid = !/^[A-Z]/.test(tag) && VOID.has(tag.toLowerCase());
+    const isVoid: boolean = !/^[A-Z]/.test(tag) && VOID.has(tag.toLowerCase());
     if (selfClosing || isVoid) {
       return { type: 'element', tag, attrs, children: [], selfClosing: true };
     }
 
-    const children = this.parseChildren(tag);
+    const children: TemplateNode[] = this.parseChildren(tag);
     // consume the matching close tag
     if (!this.src.startsWith('</', this.pos)) throw new ParseError(`Unclosed <${tag}>`);
     this.pos += 2;
-    const closeName = this.readName();
+    const closeName: string = this.readName();
     if (closeName !== tag) throw new ParseError(`Mismatched </${closeName}>, expected </${tag}>`);
     this.skipWs();
     if (this.peek() !== '>') throw new ParseError(`Expected '>' closing </${tag}>`);
@@ -504,7 +504,7 @@ class Parser {
     const attrs: Attr[] = [];
     while (!this.eof()) {
       this.skipWs();
-      const c = this.peek();
+      const c: string = this.peek();
       if (c === '>' || c === '/' || c === undefined) break;
       attrs.push(this.parseAttr());
     }
@@ -512,8 +512,8 @@ class Parser {
   }
 
   parseAttr(): Attr {
-    const nameStart = this.pos;
-    const rawName = this.readAttrName();
+    const nameStart: number = this.pos;
+    const rawName: string = this.readAttrName();
     let value: AttrValue = null;
 
     if (this.peek() === '=') {
@@ -521,11 +521,11 @@ class Parser {
       value = this.readAttrValue();
     }
 
-    const attr = this.classifyAttr(rawName, value);
+    const attr: Attr = this.classifyAttr(rawName, value);
     // record the directive identifier's offset for `weave check` diagnostics
     if (attr.type === 'use') attr.nameOffset = nameStart + 'use:'.length;
     if (attr.type === 'transition') {
-      const prefix = attr.mode === 'both' ? 'transition:' : attr.mode === 'in' ? 'in:' : 'out:';
+      const prefix: string = attr.mode === 'both' ? 'transition:' : attr.mode === 'in' ? 'in:' : 'out:';
       attr.nameOffset = nameStart + prefix.length;
     }
     return attr;
@@ -537,7 +537,7 @@ class Parser {
       if (value.kind !== 'expr') throw new ParseError(`Binding '${rawName}' needs {expr}, got a string`);
       return value.expr;
     };
-    const offset = value && value.kind === 'expr' ? value.offset : undefined;
+    const offset: number | undefined = value && value.kind === 'expr' ? value.offset : undefined;
 
     if (rawName === 'ref' || rawName === 'bind:this') {
       return { type: 'ref', expr: exprOf(), offset };
@@ -554,9 +554,9 @@ class Parser {
     }
     if (rawName.startsWith('use:')) {
       // `use:action` (no arg) or `use:action={arg}`. The arg is optional.
-      const name = rawName.slice(4);
+      const name: string = rawName.slice(4);
       if (!name) throw new ParseError(`'use:' requires an action name, e.g. use:tooltip`);
-      const expr = value && value.kind === 'expr' ? value.expr : undefined;
+      const expr: string | undefined = value && value.kind === 'expr' ? value.expr : undefined;
       if (value && value.kind === 'static') {
         throw new ParseError(`use:${name} needs {expr}, got a string`);
       }
@@ -566,12 +566,12 @@ class Parser {
       return { type: 'show', expr: exprOf(), offset };
     }
     if (rawName.startsWith('transition:') || rawName.startsWith('in:') || rawName.startsWith('out:')) {
-      const mode = rawName.startsWith('transition:') ? 'both' : rawName.startsWith('in:') ? 'in' : 'out';
-      const prefix = mode === 'both' ? 'transition:' : mode === 'in' ? 'in:' : 'out:';
-      const name = rawName.slice(prefix.length);
+      const mode: 'both' | 'in' | 'out' = rawName.startsWith('transition:') ? 'both' : rawName.startsWith('in:') ? 'in' : 'out';
+      const prefix: string = mode === 'both' ? 'transition:' : mode === 'in' ? 'in:' : 'out:';
+      const name: string = rawName.slice(prefix.length);
       if (!name) throw new ParseError(`'${prefix}' requires a transition function, e.g. ${prefix}fade`);
       if (value && value.kind === 'static') throw new ParseError(`${rawName} needs {expr} params, got a string`);
-      const expr = value && value.kind === 'expr' ? value.expr : undefined;
+      const expr: string | undefined = value && value.kind === 'expr' ? value.expr : undefined;
       return { type: 'transition', name, mode, expr, offset };
     }
     if (rawName.startsWith('.')) {
@@ -584,36 +584,36 @@ class Parser {
   }
 
   readName(): string {
-    const start = this.pos;
+    const start: number = this.pos;
     // `:` allowed so namespaced tags parse (`<w:element>` — the dynamic element).
     while (!this.eof() && /[A-Za-z0-9\-:]/.test(this.peek())) this.pos++;
     return this.src.slice(start, this.pos);
   }
 
   readAttrName(): string {
-    const start = this.pos;
+    const start: number = this.pos;
     while (!this.eof() && /[A-Za-z0-9_\-:.|@]/.test(this.peek())) this.pos++;
     return this.src.slice(start, this.pos);
   }
 
   readAttrValue(): Exclude<AttrValue, null> {
-    const c = this.peek();
+    const c: string = this.peek();
     if (c === '{') {
-      const b = this.readBracedExpr();
+      const b: { expr: string; offset: number } = this.readBracedExpr();
       return { kind: 'expr', expr: b.expr, offset: b.offset };
     }
     if (c === '"' || c === "'") return { kind: 'static', text: this.readQuoted(c) };
     // unquoted
-    const start = this.pos;
+    const start: number = this.pos;
     while (!this.eof() && !/[\s>/]/.test(this.peek())) this.pos++;
     return { kind: 'static', text: this.src.slice(start, this.pos) };
   }
 
   readQuoted(quote: string): string {
     this.pos++; // opening quote
-    const start = this.pos;
+    const start: number = this.pos;
     while (!this.eof() && this.peek() !== quote) this.pos++;
-    const text = this.src.slice(start, this.pos);
+    const text: string = this.src.slice(start, this.pos);
     this.pos++; // closing quote
     return text;
   }
@@ -621,10 +621,10 @@ class Parser {
   /** Read a `{ ... }` expression, balancing braces and skipping string literals. */
   readBracedExpr(): { expr: string; offset: number } {
     this.pos++; // {
-    const start = this.pos;
-    let depth = 1;
+    const start: number = this.pos;
+    let depth: number = 1;
     while (!this.eof()) {
-      const c = this.peek();
+      const c: string = this.peek();
       if (c === '"' || c === "'" || c === '`') {
         this.skipString(c);
         continue;
@@ -637,7 +637,7 @@ class Parser {
       this.pos++;
     }
     if (depth !== 0) throw new ParseError('Unclosed { expression');
-    const raw = this.src.slice(start, this.pos);
+    const raw: string = this.src.slice(start, this.pos);
     this.pos++; // }
     return { expr: raw.trim(), offset: start + (raw.length - raw.trimStart().length) };
   }
@@ -645,7 +645,7 @@ class Parser {
   skipString(quote: string): void {
     this.pos++; // opening
     while (!this.eof()) {
-      const c = this.peek();
+      const c: string = this.peek();
       if (c === '\\') {
         this.pos += 2;
         continue;
@@ -663,10 +663,10 @@ class Parser {
 /** Split `s` on top-level occurrences of `sep`, respecting (), [], {}, and strings. */
 function splitTopLevel(s: string, sep: string): string[] {
   const out: string[] = [];
-  let depth = 0;
-  let last = 0;
-  for (let i = 0; i < s.length; i++) {
-    const c = s[i];
+  let depth: number = 0;
+  let last: number = 0;
+  for (let i: number = 0; i < s.length; i++) {
+    const c: string = s[i];
     if (c === '"' || c === "'" || c === '`') {
       i = skipStr(s, i);
       continue;
@@ -683,8 +683,8 @@ function splitTopLevel(s: string, sep: string): string[] {
 }
 
 function skipStr(s: string, start: number): number {
-  const q = s[start];
-  let i = start + 1;
+  const q: string = s[start];
+  let i: number = start + 1;
   while (i < s.length) {
     if (s[i] === '\\') {
       i += 2;

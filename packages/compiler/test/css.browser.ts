@@ -2,13 +2,23 @@ import { test, assert } from '../../../tools/harness.js';
 import { signal, computed, effect, root } from '@weave/runtime';
 import * as dom from '@weave/runtime/dom';
 import { compileTemplate, compileComponent, scopeCss, scopeAttr, hostAttr, hashCss } from '@weave/compiler';
+import type { CompiledComponent } from '@weave/compiler';
 
-const rt = { ...dom, signal, computed, effect, root };
+const rt: typeof dom & {
+  signal: typeof signal;
+  computed: typeof computed;
+  effect: typeof effect;
+  root: typeof root;
+} = { ...dom, signal, computed, effect, root };
 
 /** Compile a template with a scope attribute and instantiate it. */
 function render(html: string, hash: string): Element {
   const { code } = compileTemplate(html, { mode: 'function', scope: [], scopeAttr: scopeAttr(hash) });
-  const fn = new Function('ctx', 'rt', '_c', code) as (ctx: unknown, rt: unknown, _c: unknown) => Element;
+  const fn: (ctx: unknown, rt: unknown, _c: unknown) => Element = new Function('ctx', 'rt', '_c', code) as (
+    ctx: unknown,
+    rt: unknown,
+    _c: unknown
+  ) => Element;
   return fn({}, rt, {});
 }
 
@@ -20,12 +30,16 @@ function renderHost(html: string, hash: string): Element {
     scopeAttr: scopeAttr(hash),
     hostAttr: hostAttr(hash),
   });
-  const fn = new Function('ctx', 'rt', '_c', code) as (ctx: unknown, rt: unknown, _c: unknown) => Element;
+  const fn: (ctx: unknown, rt: unknown, _c: unknown) => Element = new Function('ctx', 'rt', '_c', code) as (
+    ctx: unknown,
+    rt: unknown,
+    _c: unknown
+  ) => Element;
   return fn({}, rt, {});
 }
 
 function host(): HTMLElement {
-  const el = document.createElement('div');
+  const el: HTMLDivElement = document.createElement('div');
   document.body.appendChild(el);
   return el;
 }
@@ -33,15 +47,15 @@ function host(): HTMLElement {
 /* ──────────── scopeCss: selectors ──────────── */
 
 test('scopes a simple selector with the attribute', () => {
-  const out = scopeCss('.btn { color: red }', 'h');
+  const out: string = scopeCss('.btn { color: red }', 'h');
   assert.ok(out.includes('.btn[data-w-h]'), out);
 });
 
 test('scopes only the rightmost compound (descendant + child)', () => {
-  const a = scopeCss('.a .b { x: 1 }', 'h');
+  const a: string = scopeCss('.a .b { x: 1 }', 'h');
   assert.ok(a.includes('.a .b[data-w-h]'), a);
   assert.ok(!a.includes('.a[data-w-h]'), 'left compound is not scoped');
-  const b = scopeCss('.a > .b { x: 1 }', 'h');
+  const b: string = scopeCss('.a > .b { x: 1 }', 'h');
   assert.ok(b.includes('.a > .b[data-w-h]'), b);
 });
 
@@ -51,35 +65,35 @@ test('inserts the attribute before a pseudo-class / pseudo-element', () => {
 });
 
 test('scopes every selector in a comma list', () => {
-  const out = scopeCss('.a, .b { x: 1 }', 'h');
+  const out: string = scopeCss('.a, .b { x: 1 }', 'h');
   assert.ok(out.includes('.a[data-w-h]'), out);
   assert.ok(out.includes('.b[data-w-h]'), out);
 });
 
 test(':global(...) is unwrapped and left unscoped', () => {
-  const a = scopeCss(':global(body) { margin: 0 }', 'h');
+  const a: string = scopeCss(':global(body) { margin: 0 }', 'h');
   assert.ok(a.includes('body'), a);
   assert.ok(!a.includes('data-w-h'), 'no scope attribute on a global selector');
-  const b = scopeCss(':global(.x) .y { z: 1 }', 'h');
+  const b: string = scopeCss(':global(.x) .y { z: 1 }', 'h');
   assert.ok(b.includes('.x .y[data-w-h]'), b); // global prefix kept, local tail scoped
 });
 
 /* ──────────── scopeCss: at-rules + nesting ──────────── */
 
 test('recurses into @media, scoping inner rules', () => {
-  const out = scopeCss('@media (min-width: 0px) { .a { x: 1 } }', 'h');
+  const out: string = scopeCss('@media (min-width: 0px) { .a { x: 1 } }', 'h');
   assert.ok(out.includes('@media (min-width: 0px)'), out);
   assert.ok(out.includes('.a[data-w-h]'), out);
 });
 
 test('@keyframes keeps its name and does not scope frame selectors', () => {
-  const out = scopeCss('@keyframes spin { from { o: 0 } to { o: 1 } }', 'h');
+  const out: string = scopeCss('@keyframes spin { from { o: 0 } to { o: 1 } }', 'h');
   assert.ok(out.includes('@keyframes spin'), out);
   assert.ok(!out.includes('data-w-h'), 'frame selectors are not scoped');
 });
 
 test('native nesting: nested rules scoped, & inherits scope', () => {
-  const out = scopeCss('.card { color: red; .title { x: 1 } &:hover { y: 2 } }', 'h');
+  const out: string = scopeCss('.card { color: red; .title { x: 1 } &:hover { y: 2 } }', 'h');
   assert.ok(out.includes('.card[data-w-h]'), out);
   assert.ok(out.includes('.title[data-w-h]'), out);
   assert.ok(out.includes('&:hover{') || out.includes('&:hover {'), out);
@@ -96,23 +110,23 @@ test('hashCss is deterministic and scopeAttr is data-w-<hash>', () => {
 /* ──────────── scopeCss: :host ──────────── */
 
 test(':host targets the host attribute (root element)', () => {
-  const out = scopeCss(':host { display: block }', 'h');
+  const out: string = scopeCss(':host { display: block }', 'h');
   assert.ok(out.includes('[data-w-h-h]'), out);
   assert.ok(!out.includes(':host'), 'the :host pseudo is rewritten away');
 });
 
 test(':host(.modifier) becomes modifier + host attribute', () => {
-  const out = scopeCss(':host(.active) { x: 1 }', 'h');
+  const out: string = scopeCss(':host(.active) { x: 1 }', 'h');
   assert.ok(out.includes('.active[data-w-h-h]'), out);
 });
 
 test(':host in an ancestor position scopes the descendant normally', () => {
-  const out = scopeCss(':host .child { x: 1 }', 'h');
+  const out: string = scopeCss(':host .child { x: 1 }', 'h');
   assert.ok(out.includes('[data-w-h-h] .child[data-w-h]'), out);
 });
 
 test(':host-context is left untouched (unsupported, not mangled)', () => {
-  const out = scopeCss(':host-context(.dark) .x { y: 1 }', 'h');
+  const out: string = scopeCss(':host-context(.dark) .x { y: 1 }', 'h');
   assert.ok(out.includes(':host-context(.dark)'), out);
   assert.ok(out.includes('.x[data-w-h]'), out);
 });
@@ -143,27 +157,27 @@ test('codegen stamps the host attribute on the root element only', () => {
 });
 
 test('compileComponent stamps the host attr only when the styles use :host', () => {
-  const withHost = compileComponent({ template: '<div>x</div>', styles: ':host { color: red }' });
+  const withHost: CompiledComponent = compileComponent({ template: '<div>x</div>', styles: ':host { color: red }' });
   assert.ok(withHost.code.includes(`${scopeAttr(withHost.hash)} ${hostAttr(withHost.hash)}`), withHost.code);
   assert.ok(withHost.css.includes(`[${hostAttr(withHost.hash)}]`), withHost.css);
 
-  const without = compileComponent({ template: '<div>x</div>', styles: '.a { color: red }' });
+  const without: CompiledComponent = compileComponent({ template: '<div>x</div>', styles: '.a { color: red }' });
   assert.ok(!without.code.includes(hostAttr(without.hash)), 'no host attr when :host is unused');
 });
 
 /* ──────────── end-to-end: real computed style ──────────── */
 
 test('scoped CSS applies to scoped elements only', () => {
-  const hash = 'sc' + hashCss('p{color}');
-  const style = document.createElement('style');
+  const hash: string = 'sc' + hashCss('p{color}');
+  const style: HTMLStyleElement = document.createElement('style');
   style.textContent = scopeCss('p { color: rgb(255, 0, 0) }', hash);
   document.head.appendChild(style);
 
-  const scoped = render('<p>scoped</p>', hash);
-  const plain = document.createElement('p');
+  const scoped: Element = render('<p>scoped</p>', hash);
+  const plain: HTMLParagraphElement = document.createElement('p');
   plain.textContent = 'plain';
 
-  const h = host();
+  const h: HTMLElement = host();
   h.appendChild(scoped);
   h.appendChild(plain);
 
@@ -172,13 +186,13 @@ test('scoped CSS applies to scoped elements only', () => {
 });
 
 test(':host styles the root element but not a nested child', () => {
-  const hash = 'ho' + hashCss(':host{}');
-  const style = document.createElement('style');
+  const hash: string = 'ho' + hashCss(':host{}');
+  const style: HTMLStyleElement = document.createElement('style');
   style.textContent = scopeCss(':host { color: rgb(0, 128, 0) } span { color: rgb(0, 0, 255) }', hash);
   document.head.appendChild(style);
 
-  const rootEl = renderHost('<div><span>x</span></div>', hash) as HTMLElement;
-  const span = rootEl.querySelector('span')!;
+  const rootEl: HTMLElement = renderHost('<div><span>x</span></div>', hash) as HTMLElement;
+  const span: HTMLSpanElement = rootEl.querySelector('span')!;
   host().appendChild(rootEl);
 
   assert.equal(getComputedStyle(rootEl).color, 'rgb(0, 128, 0)', ':host matched the root');

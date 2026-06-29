@@ -6,7 +6,7 @@
  * one is the only change a production app would make.
  */
 
-import { createClient, type Interceptor } from '@weave/data';
+import { createClient, type Interceptor, type Client } from '@weave/data';
 import type { Task, NewTask } from '../types';
 
 /* ──────────────────────────── in-memory db ──────────────────────────── */
@@ -19,18 +19,18 @@ let db: Task[] = [
   { id: 't5', title: 'Drag-to-reorder with transitions', status: 'todo', priority: 'low', assignee: 'Lina' },
   { id: 't6', title: 'Write the Playwright integration test', status: 'todo', priority: 'high' },
 ];
-let seq = db.length;
+let seq: number = db.length;
 
-const LATENCY = 160; // ms — visible-but-snappy, so loading states actually show
+const LATENCY: number = 160; // ms — visible-but-snappy, so loading states actually show
 const delay = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
 /* ──────────────────────────── fake fetch ──────────────────────────── */
 
 /** A `fetch` whose responses come from the in-memory db. Matches `typeof fetch`. */
 const fakeFetch: typeof fetch = async (input, init) => {
-  const url = typeof input === 'string' ? input : (input as Request).url;
-  const method = (init?.method ?? 'GET').toUpperCase();
-  const path = new URL(url, 'http://demo').pathname;
+  const url: string = typeof input === 'string' ? input : (input as Request).url;
+  const method: string = (init?.method ?? 'GET').toUpperCase();
+  const path: string = new URL(url, 'http://demo').pathname;
   await delay(LATENCY);
 
   const json = (data: unknown, status = 200): Response =>
@@ -42,22 +42,22 @@ const fakeFetch: typeof fetch = async (input, init) => {
   if (method === 'GET' && path === '/tasks') return json(db);
 
   if (method === 'POST' && path === '/tasks') {
-    const input = init?.body ? (JSON.parse(init.body as string) as NewTask) : null;
+    const input: NewTask | null = init?.body ? (JSON.parse(init.body as string) as NewTask) : null;
     if (!input) return json({ error: 'missing body' }, 400);
     const task: Task = { ...input, id: `t${++seq}` };
     db = [...db, task];
     return json(task, 201);
   }
 
-  const idMatch = /^\/tasks\/(.+)$/.exec(path);
+  const idMatch: RegExpExecArray | null = /^\/tasks\/(.+)$/.exec(path);
   if (idMatch) {
-    const id = idMatch[1];
-    const task = db.find((t) => t.id === id);
+    const id: string = idMatch[1];
+    const task: Task | undefined = db.find((t) => t.id === id);
     if (method === 'GET') return task ? json(task) : json({ error: 'not found' }, 404);
     if (!task) return json({ error: 'not found' }, 404);
     if (method === 'PATCH') {
-      const patch = init?.body ? (JSON.parse(init.body as string) as Partial<Task>) : {};
-      const updated = { ...task, ...patch, id };
+      const patch: Partial<Task> = init?.body ? (JSON.parse(init.body as string) as Partial<Task>) : {};
+      const updated: Task = { ...task, ...patch, id };
       db = db.map((t) => (t.id === id ? updated : t));
       return json(updated);
     }
@@ -80,7 +80,7 @@ const authInterceptor: Interceptor = (req, next) => {
 
 /** Logs every call + its resulting status to the console (open devtools to see). */
 const loggingInterceptor: Interceptor = async (req, next) => {
-  const res = await next(req);
+  const res: Response = await next(req);
   console.debug(`[api] ${req.method} ${new URL(req.url, 'http://demo').pathname} → ${res.status}`);
   return res;
 };
@@ -88,7 +88,7 @@ const loggingInterceptor: Interceptor = async (req, next) => {
 /* ──────────────────────────── the client ──────────────────────────── */
 
 /** The app-wide API client. Its methods drop straight into resources/actions. */
-export const api = createClient({
+export const api: Client = createClient({
   fetch: fakeFetch,
   interceptors: [loggingInterceptor, authInterceptor], // first = outermost
 });

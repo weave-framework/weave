@@ -15,7 +15,7 @@
  * it running.
  */
 
-import { context, type BuildContext, type Plugin } from 'esbuild';
+import { context, type BuildContext, type Plugin, type PluginBuild } from 'esbuild';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { weave, type WeaveState } from './plugin.js';
@@ -40,12 +40,12 @@ export interface DevServer {
 
 export async function dev(config: DevConfig): Promise<DevServer> {
   const state: WeaveState = { css: [] };
-  const inMemory = config.inMemory ?? false;
+  const inMemory: boolean = config.inMemory ?? false;
 
   // In-memory mode: global styles ride a banner that injects them as one <style>.
   let banner: { js: string } | undefined;
   if (inMemory && config.styles?.length) {
-    const css = (await Promise.all(config.styles.map(compileStyleFile))).join('\n');
+    const css: string = (await Promise.all(config.styles.map(compileStyleFile))).join('\n');
     if (css)
       banner = {
         js: `(()=>{const s=document.createElement("style");s.textContent=${JSON.stringify(
@@ -59,7 +59,7 @@ export async function dev(config: DevConfig): Promise<DevServer> {
   if (!inMemory) {
     plugins.push({
       name: 'weave:css',
-      setup(build) {
+      setup(build: PluginBuild): void {
         build.onEnd(async () => {
           await mkdir(config.outdir, { recursive: true });
           await writeFile(join(config.outdir, 'app.css'), state.css.join('\n'));
@@ -68,7 +68,7 @@ export async function dev(config: DevConfig): Promise<DevServer> {
     });
   }
 
-  const ctx = await context({
+  const ctx: BuildContext = await context({
     entryPoints: [config.entry],
     bundle: true,
     format: 'esm',
@@ -92,6 +92,6 @@ export async function dev(config: DevConfig): Promise<DevServer> {
     port: config.port,
     host: '127.0.0.1',
   });
-  const url = `http://${hosts[0] ?? '127.0.0.1'}:${port}`;
+  const url: string = `http://${hosts[0] ?? '127.0.0.1'}:${port}`;
   return { ctx, url };
 }

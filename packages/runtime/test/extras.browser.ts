@@ -8,15 +8,16 @@ import {
   debounced,
   watch,
 } from '@weave/runtime';
+import type { Signal, Computed, Owner } from '@weave/runtime';
 
-const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+const wait = (ms: number): Promise<void> => new Promise<void>((r) => setTimeout(r, ms));
 
 /* ──────────────────────────── linkedSignal ──────────────────────────── */
 
 test('linkedSignal seeds from the source and is writable', () => {
-  const items = signal([10, 20, 30]);
-  const owner = createOwner();
-  const sel = runInOwner(owner, () => linkedSignal(() => items()[0]));
+  const items: Signal<number[]> = signal([10, 20, 30]);
+  const owner: Owner = createOwner();
+  const sel: Signal<number> = runInOwner(owner, () => linkedSignal(() => items()[0]));
   assert.equal(sel(), 10, 'seeded from the source');
 
   sel.set(20);
@@ -25,9 +26,9 @@ test('linkedSignal seeds from the source and is writable', () => {
 });
 
 test('linkedSignal resets when the source changes (overriding a local edit)', () => {
-  const items = signal([10, 20, 30]);
-  const owner = createOwner();
-  const sel = runInOwner(owner, () => linkedSignal(() => items()[0]));
+  const items: Signal<number[]> = signal([10, 20, 30]);
+  const owner: Owner = createOwner();
+  const sel: Signal<number> = runInOwner(owner, () => linkedSignal(() => items()[0]));
 
   sel.set(99); // local override
   assert.equal(sel(), 99);
@@ -38,9 +39,9 @@ test('linkedSignal resets when the source changes (overriding a local edit)', ()
 });
 
 test('linkedSignal stops resetting after its owner is disposed', () => {
-  const src = signal(1);
-  const owner = createOwner();
-  const v = runInOwner(owner, () => linkedSignal(() => src()));
+  const src: Signal<number> = signal(1);
+  const owner: Owner = createOwner();
+  const v: Signal<number> = runInOwner(owner, () => linkedSignal(() => src()));
   assert.equal(v(), 1);
 
   disposeOwner(owner);
@@ -51,9 +52,9 @@ test('linkedSignal stops resetting after its owner is disposed', () => {
 /* ──────────────────────────── debounced ──────────────────────────── */
 
 test('debounced seeds immediately and trails the source', async () => {
-  const q = signal('a');
-  const owner = createOwner();
-  const dq = runInOwner(owner, () => debounced(() => q(), 30));
+  const q: Signal<string> = signal('a');
+  const owner: Owner = createOwner();
+  const dq: Computed<string> = runInOwner(owner, () => debounced(() => q(), 30));
   assert.equal(dq(), 'a', 'initial value is immediate (no delay)');
 
   q.set('ab');
@@ -64,9 +65,9 @@ test('debounced seeds immediately and trails the source', async () => {
 });
 
 test('debounced collapses rapid changes — only the last value lands', async () => {
-  const q = signal('');
-  const owner = createOwner();
-  const dq = runInOwner(owner, () => debounced(() => q(), 30));
+  const q: Signal<string> = signal('');
+  const owner: Owner = createOwner();
+  const dq: Computed<string> = runInOwner(owner, () => debounced(() => q(), 30));
 
   q.set('a');
   await wait(10);
@@ -80,9 +81,9 @@ test('debounced collapses rapid changes — only the last value lands', async ()
 });
 
 test('debounced cancels a pending write on dispose', async () => {
-  const q = signal('x');
-  const owner = createOwner();
-  const dq = runInOwner(owner, () => debounced(() => q(), 30));
+  const q: Signal<string> = signal('x');
+  const owner: Owner = createOwner();
+  const dq: Computed<string> = runInOwner(owner, () => debounced(() => q(), 30));
 
   q.set('y');
   disposeOwner(owner); // unmount before the timer fires
@@ -93,9 +94,9 @@ test('debounced cancels a pending write on dispose', async () => {
 /* ──────────────────────────── watch ──────────────────────────── */
 
 test('watch fires on change with (value, prev), not on init', () => {
-  const n = signal(0);
+  const n: Signal<number> = signal(0);
   const seen: Array<[number, number | undefined]> = [];
-  const owner = createOwner();
+  const owner: Owner = createOwner();
   runInOwner(owner, () => watch(() => n(), (v, p) => seen.push([v, p])));
 
   assert.deepEqual(seen, [], 'lazy by default — no initial call');
@@ -106,9 +107,9 @@ test('watch fires on change with (value, prev), not on init', () => {
 });
 
 test('watch immediate fires on creation with prev undefined', () => {
-  const n = signal(5);
+  const n: Signal<number> = signal(5);
   const seen: Array<[number, number | undefined]> = [];
-  const owner = createOwner();
+  const owner: Owner = createOwner();
   runInOwner(owner, () => watch(() => n(), (v, p) => seen.push([v, p]), { immediate: true }));
 
   assert.deepEqual(seen, [[5, undefined]], 'fires immediately with no previous');
@@ -118,10 +119,10 @@ test('watch immediate fires on creation with prev undefined', () => {
 });
 
 test('watch tracks only the source — the callback\'s reads do not subscribe', () => {
-  const src = signal(0);
-  const other = signal(100);
-  let runs = 0;
-  const owner = createOwner();
+  const src: Signal<number> = signal(0);
+  const other: Signal<number> = signal(100);
+  let runs: number = 0;
+  const owner: Owner = createOwner();
   runInOwner(owner, () =>
     watch(
       () => src(),
@@ -140,9 +141,9 @@ test('watch tracks only the source — the callback\'s reads do not subscribe', 
 });
 
 test('watch callback cleanup runs before the next call and on stop', () => {
-  const n = signal(0);
+  const n: Signal<number> = signal(0);
   const cleaned: number[] = [];
-  const owner = createOwner();
+  const owner: Owner = createOwner();
   runInOwner(owner, () =>
     watch(() => n(), (v) => () => cleaned.push(v))
   );

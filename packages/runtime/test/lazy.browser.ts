@@ -1,25 +1,27 @@
 import { test, assert } from '../../../tools/harness.js';
 import { defineComponent, mountComponent, lazy } from '@weave/runtime/dom';
+import type { Component } from '@weave/runtime/dom';
 
 /** Flush all microtasks (the loader promise settles across a few of them). */
-const settle = () => new Promise<void>((r) => setTimeout(r, 0));
+const settle = (): Promise<void> =>
+  new Promise<void>((r: (value: void | PromiseLike<void>) => void) => setTimeout(r, 0));
 
 function span(text: string): HTMLSpanElement {
-  const el = document.createElement('span');
+  const el: HTMLSpanElement = document.createElement('span');
   el.textContent = text;
   return el;
 }
 function host(): HTMLElement {
-  const el = document.createElement('div');
+  const el: HTMLDivElement = document.createElement('div');
   document.body.appendChild(el);
   return el;
 }
 
 test('lazy shows the loading fallback, then swaps to the resolved component', async () => {
-  const Real = defineComponent(() => span('real'));
-  const Loading = defineComponent(() => span('loading…'));
-  const L = lazy(() => Promise.resolve({ default: Real }), { loading: Loading });
-  const el = host();
+  const Real: Component = defineComponent(() => span('real'));
+  const Loading: Component = defineComponent(() => span('loading…'));
+  const L: Component = lazy(() => Promise.resolve({ default: Real }), { loading: Loading });
+  const el: HTMLElement = host();
   mountComponent(L, el);
   assert.ok(el.textContent?.includes('loading'), 'loading fallback shown first');
   await settle();
@@ -29,9 +31,9 @@ test('lazy shows the loading fallback, then swaps to the resolved component', as
 });
 
 test('lazy accepts a promise resolving directly to a component (no default wrapper)', async () => {
-  const Real = defineComponent(() => span('direct'));
-  const L = lazy(() => Promise.resolve(Real));
-  const el = host();
+  const Real: Component = defineComponent(() => span('direct'));
+  const L: Component = lazy(() => Promise.resolve(Real));
+  const el: HTMLElement = host();
   mountComponent(L, el);
   await settle();
   assert.ok(el.textContent?.includes('direct'));
@@ -39,9 +41,9 @@ test('lazy accepts a promise resolving directly to a component (no default wrapp
 });
 
 test('lazy forwards props to the resolved component', async () => {
-  const Greet = defineComponent((props) => span('hi ' + String(props.name)));
-  const L = lazy(() => Promise.resolve({ default: Greet }));
-  const el = host();
+  const Greet: Component = defineComponent((props) => span('hi ' + String(props.name)));
+  const L: Component = lazy(() => Promise.resolve({ default: Greet }));
+  const el: HTMLElement = host();
   mountComponent(L, el, { name: 'Aidas' });
   await settle();
   assert.ok(el.textContent?.includes('hi Aidas'), 'props reached the lazy-loaded component');
@@ -49,10 +51,10 @@ test('lazy forwards props to the resolved component', async () => {
 });
 
 test('lazy renders the error fallback when the loader rejects', async () => {
-  const L = lazy(() => Promise.reject(new Error('nope')), {
+  const L: Component = lazy(() => Promise.reject(new Error('nope')), {
     error: (e) => span('error:' + (e as Error).message),
   });
-  const el = host();
+  const el: HTMLElement = host();
   mountComponent(L, el);
   await settle();
   assert.ok(el.textContent?.includes('error:nope'));
@@ -60,14 +62,14 @@ test('lazy renders the error fallback when the loader rejects', async () => {
 });
 
 test('lazy loads once and shares the result across instances', async () => {
-  let calls = 0;
-  const Real = defineComponent(() => span('x'));
-  const L = lazy(() => {
+  let calls: number = 0;
+  const Real: Component = defineComponent(() => span('x'));
+  const L: Component = lazy(() => {
     calls++;
     return Promise.resolve({ default: Real });
   });
-  const a = host();
-  const b = host();
+  const a: HTMLElement = host();
+  const b: HTMLElement = host();
   mountComponent(L, a);
   mountComponent(L, b);
   await settle();
@@ -78,15 +80,15 @@ test('lazy loads once and shares the result across instances', async () => {
 });
 
 test('lazy renders immediately (no loading flash) once already loaded', async () => {
-  const Real = defineComponent(() => span('cached'));
-  const Loading = defineComponent(() => span('spinner'));
-  const L = lazy(() => Promise.resolve({ default: Real }), { loading: Loading });
-  const warm = host();
+  const Real: Component = defineComponent(() => span('cached'));
+  const Loading: Component = defineComponent(() => span('spinner'));
+  const L: Component = lazy(() => Promise.resolve({ default: Real }), { loading: Loading });
+  const warm: HTMLElement = host();
   mountComponent(L, warm); // first mount kicks off + completes the load
   await settle();
   warm.remove();
 
-  const el = host();
+  const el: HTMLElement = host();
   mountComponent(L, el); // second mount — cache is warm
   assert.ok(el.textContent?.includes('cached'), 'real component shown synchronously');
   assert.ok(!el.textContent?.includes('spinner'), 'no loading flash');
