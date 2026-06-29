@@ -13,13 +13,13 @@ import {
 
 /* ──────────────────────────── nested groups ──────────────────────────── */
 
-test('group nests: values() snapshots recursively', () => {
+test('group nests: value() snapshots recursively', () => {
   const f: Group<{ title: Field<string>; address: Group<{ street: Field<string>; city: Field<string> }> }> = form({
     title: field('Ship it'),
     address: group({ street: field('1 Main'), city: field('Town') }),
   });
-  assert.deepEqual(f.values(), { title: 'Ship it', address: { street: '1 Main', city: 'Town' } });
-  assert.equal(f.value().address.city, 'Town', 'value() is an alias of values()');
+  assert.deepEqual(f.value(), { title: 'Ship it', address: { street: '1 Main', city: 'Town' } });
+  assert.equal(f.value().address.city, 'Town', 'a nested group contributes its own snapshot');
 });
 
 test('group validity recurses through a nested group', () => {
@@ -27,7 +27,7 @@ test('group validity recurses through a nested group', () => {
     address: group({ street: field('', [validators.required()]), city: field('Town') }),
   });
   assert.equal(f.valid(), false, 'invalid while a deep child is invalid');
-  f.fields.address.fields.street.value.set('1 Main');
+  f.controls.address.controls.street.value.set('1 Main');
   assert.equal(f.valid(), true, 'valid once the deep child is fixed');
 });
 
@@ -39,16 +39,16 @@ test('touched() is derived (any descendant) and touchAll cascades', () => {
   assert.equal(f.touched(), false);
   f.touchAll();
   assert.equal(f.touched(), true, 'group touched once any descendant is');
-  assert.equal(f.fields.nested.fields.b.touched(), true, 'touchAll reaches a deep field');
+  assert.equal(f.controls.nested.controls.b.touched(), true, 'touchAll reaches a deep field');
 });
 
 test('reset cascades to every descendant', () => {
   const f: Group<{ nested: Group<{ b: Field<string> }> }> = form({ nested: group({ b: field('seed') }) });
-  f.fields.nested.fields.b.value.set('edited');
-  f.fields.nested.fields.b.touched.set(true);
+  f.controls.nested.controls.b.value.set('edited');
+  f.controls.nested.controls.b.touched.set(true);
   f.reset();
-  assert.equal(f.fields.nested.fields.b.value(), 'seed', 'value restored');
-  assert.equal(f.fields.nested.fields.b.touched(), false, 'touched cleared');
+  assert.equal(f.controls.nested.controls.b.value(), 'seed', 'value restored');
+  assert.equal(f.controls.nested.controls.b.touched(), false, 'touched cleared');
 });
 
 test('cross-field validate at a nested-group level targets that group’s fields', () => {
@@ -59,8 +59,8 @@ test('cross-field validate at a nested-group level targets that group’s fields
     ),
   });
   assert.equal(f.valid(), true, 'matching → valid');
-  f.fields.pair.fields.pw2.value.set('typo');
-  assert.equal(f.fields.pair.fields.pw2.error(), 'mismatch', 'group-level error lands on the field');
+  f.controls.pair.controls.pw2.value.set('typo');
+  assert.equal(f.controls.pair.controls.pw2.error(), 'mismatch', 'group-level error lands on the field');
   assert.equal(f.valid(), false, 'a deep cross-field error gates the whole form');
 });
 
@@ -108,7 +108,7 @@ test('the full stack composes: form → fieldArray → group → field', () => {
   );
 
   assert.equal(f.valid(), true, 'an empty checklist does not block validity');
-  const arr: FieldArray<{ text: string; done: boolean }> = f.fields.checklist as FieldArray<{
+  const arr: FieldArray<{ text: string; done: boolean }> = f.controls.checklist as FieldArray<{
     text: string;
     done: boolean;
   }>;
@@ -119,8 +119,8 @@ test('the full stack composes: form → fieldArray → group → field', () => {
     text: Field<string>;
     done: Field<boolean>;
   }>;
-  item.fields.text.value.set('Write tests');
-  item.fields.done.value.set(true);
+  item.controls.text.value.set('Write tests');
+  item.controls.done.value.set(true);
   assert.equal(f.valid(), true, 'valid once the deep field is filled');
-  assert.deepEqual(f.values(), { title: 'Task', checklist: [{ text: 'Write tests', done: true }] });
+  assert.deepEqual(f.value(), { title: 'Task', checklist: [{ text: 'Write tests', done: true }] });
 });

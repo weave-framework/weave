@@ -8,7 +8,6 @@ import {
   fieldArray,
   validators,
   type Field,
-  type Form,
   type Group,
   type FieldArray,
   type ValuesOf,
@@ -43,7 +42,7 @@ interface TaskFormSetup {
   editId: string | undefined;
   heading: string;
   fields: TaskFields;
-  form: Form<TaskFields>;
+  form: Group<TaskFields>;
   statuses: Status[];
   priorities: Priority[];
   checklist: () => ChecklistGroup[];
@@ -102,7 +101,7 @@ export function setup(props: { params?: { id?: string } }): TaskFormSetup {
   const fields: TaskFields = { title, assignee, status, priority, checklist };
 
   // Cross-field rule: a high-priority task must have an owner.
-  const taskForm: Form<TaskFields> = form<TaskFields>(fields, {
+  const taskForm: Group<TaskFields> = form<TaskFields>(fields, {
     validate: (v): Record<string, string> | null =>
       v.priority === 'high' && !v.assignee.trim()
         ? { assignee: 'High-priority tasks need an owner' }
@@ -142,7 +141,7 @@ export function setup(props: { params?: { id?: string } }): TaskFormSetup {
       focusFirstError(); // …then move focus to the first one
       return;
     }
-    const values: ValuesOf<TaskFields> = taskForm.values();
+    const values: ValuesOf<TaskFields> = taskForm.value();
     const input: NewTask = {
       title: values.title.trim(),
       status: values.status,
@@ -181,7 +180,7 @@ export function setup(props: { params?: { id?: string } }): TaskFormSetup {
 }
 
 /** Resolve once the form's async validators have settled (or a 2s safety cap). */
-function waitForValidation(f: Form<TaskFields>): Promise<void> {
+function waitForValidation(f: Group<TaskFields>): Promise<void> {
   return new Promise((resolve) => {
     const start: number = performance.now();
     const poll = (): void => {

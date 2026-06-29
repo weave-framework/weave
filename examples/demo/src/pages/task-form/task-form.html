@@ -65,18 +65,18 @@
     <fieldset class="checklist">
       <legend>Checklist</legend>
       @for (item of checklist(); track item) {
-        <div class="check-row" class:invalid={item.fields.text.touched() && !!item.fields.text.error()}>
-          <input type="checkbox" bind:checked={item.fields.done.value} />
+        <div class="check-row" class:invalid={item.controls.text.touched() && !!item.controls.text.error()}>
+          <input type="checkbox" bind:checked={item.controls.done.value} />
           <input
             type="text"
             class="check-text"
             placeholder="Acceptance criterion"
-            bind:value={item.fields.text.value}
-            on:blur={() => item.fields.text.touched.set(true)}
+            bind:value={item.controls.text.value}
+            on:blur={() => item.controls.text.touched.set(true)}
           />
           <button type="button" class="rm" on:click={() => removeItem(item)} aria-label="Remove item">×</button>
-          @if (item.fields.text.touched() && item.fields.text.error()) {
-            <span class="msg">{{ item.fields.text.error() }}</span>
+          @if (item.controls.text.touched() && item.controls.text.error()) {
+            <span class="msg">{{ item.controls.text.error() }}</span>
           }
         </div>
       } @empty {

@@ -1,5 +1,5 @@
 import { test, assert } from '../../../tools/harness.js';
-import { field, form, validators, type Field, type Form } from '@weave/forms';
+import { field, form, validators, type Field, type Group } from '@weave/forms';
 
 test('field validates reactively (first failure wins)', () => {
   const email: Field<string> = field('', [validators.required(), validators.email()]);
@@ -24,26 +24,26 @@ test('field reset restores the initial value and clears touched', () => {
 });
 
 test('form aggregates validity + a values snapshot', () => {
-  const f: Form<{ name: Field<string>; age: Field<number> }> = form({
+  const f: Group<{ name: Field<string>; age: Field<number> }> = form({
     name: field('', [validators.required()]),
     age: field(0, [validators.min(18)]),
   });
   assert.equal(f.valid(), false, 'invalid while any field is invalid');
 
-  f.fields.name.value.set('Aidas');
-  f.fields.age.value.set(20);
+  f.controls.name.value.set('Aidas');
+  f.controls.age.value.set(20);
   assert.equal(f.valid(), true);
-  assert.deepEqual(f.values(), { name: 'Aidas', age: 20 });
+  assert.deepEqual(f.value(), { name: 'Aidas', age: 20 });
 
   f.reset();
-  assert.equal(f.fields.name.value(), '');
-  assert.equal(f.fields.age.value(), 0);
+  assert.equal(f.controls.name.value(), '');
+  assert.equal(f.controls.age.value(), 0);
 });
 
 test('touchAll marks every field touched', () => {
-  const f: Form<{ a: Field<string>; b: Field<string> }> = form({ a: field(''), b: field('') });
-  assert.equal(f.fields.a.touched(), false);
+  const f: Group<{ a: Field<string>; b: Field<string> }> = form({ a: field(''), b: field('') });
+  assert.equal(f.controls.a.touched(), false);
   f.touchAll();
-  assert.equal(f.fields.a.touched(), true);
-  assert.equal(f.fields.b.touched(), true);
+  assert.equal(f.controls.a.touched(), true);
+  assert.equal(f.controls.b.touched(), true);
 });
