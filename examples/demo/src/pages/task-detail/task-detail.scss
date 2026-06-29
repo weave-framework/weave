@@ -24,6 +24,19 @@
 .fields dt { color: var(--muted); font-size: 13px; }
 .fields dd { margin: 0; font-size: 14px; }
 
+.checklist-view {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+}
+.checklist-view li { color: var(--text); }
+.checklist-view li.done { color: var(--muted); text-decoration: line-through; }
+.checklist-view .mark { color: var(--done); }
+
 .d-actions { display: flex; gap: 10px; }
 
 .ghost {

@@ -14,6 +14,15 @@
         <dt>Assignee</dt>
         <dd>{{ t.assignee || 'Unassigned' }}</dd>
       </dl>
+      @if (t.checklist && t.checklist.length) {
+        <ul class="checklist-view">
+          @for (c of t.checklist; track c.text) {
+            <li class:done={c.done}>
+              <span class="mark">{{ c.done ? '✓' : '○' }}</span> {{ c.text }}
+            </li>
+          }
+        </ul>
+      }
       <div class="d-actions">
         <Link to={'/task/' + t.id + '/edit'} class="ghost">Edit task</Link>
         <button class="ghost" on:click={toggleRaw}>{{ showRaw() ? 'Hide' : 'Show' }} raw JSON</button>

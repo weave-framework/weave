@@ -58,6 +58,55 @@ $danger: #f85149;
 
 .row { display: flex; gap: 16px; }
 
+.checklist {
+  margin: 0;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+
+  legend { padding: 0 6px; font-size: 13px; color: var(--muted); }
+  .hint { margin: 0; font-size: 13px; }
+
+  .check-row {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 10px;
+
+    .check-text {
+      padding: 7px 10px;
+      font-size: 14px;
+      color: var(--text);
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      outline: none;
+    }
+    .check-text:focus { border-color: var(--accent); }
+    &.invalid .check-text { border-color: $danger; }
+
+    .msg { grid-column: 2 / 3; font-size: 12px; color: $danger; }
+
+    .rm {
+      width: 28px;
+      height: 28px;
+      font-size: 18px;
+      line-height: 1;
+      color: var(--muted);
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      cursor: pointer;
+    }
+    .rm:hover { color: $danger; border-color: $danger; }
+  }
+
+  .add { width: fit-content; }
+}
+
 .form-error {
   margin: 0;
   font-size: 13px;

@@ -15,7 +15,17 @@ let db: Task[] = [
   { id: 't1', title: 'Sketch the board layout', status: 'done', priority: 'med', assignee: 'Aidas' },
   { id: 't2', title: 'Wire the mock API client', status: 'done', priority: 'high', assignee: 'Aidas' },
   { id: 't3', title: 'Build the task card component', status: 'doing', priority: 'high', assignee: 'Lina' },
-  { id: 't4', title: 'Add cross-field form validation', status: 'todo', priority: 'med' },
+  {
+    id: 't4',
+    title: 'Add cross-field form validation',
+    status: 'todo',
+    priority: 'med',
+    checklist: [
+      { text: 'Required + length on the title', done: true },
+      { text: 'Async assignee check against /team', done: true },
+      { text: 'High-priority needs an owner', done: false },
+    ],
+  },
   { id: 't5', title: 'Drag-to-reorder with transitions', status: 'todo', priority: 'low', assignee: 'Lina' },
   { id: 't6', title: 'Write the Playwright integration test', status: 'todo', priority: 'high' },
 ];

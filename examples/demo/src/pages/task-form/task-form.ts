@@ -1,20 +1,42 @@
 import { onMount, tick, computed, type Computed } from '@weave/runtime';
 import { navigate, Link } from '@weave/router';
 import { action, type Action } from '@weave/data';
-import { field, form, validators, type Field, type Form } from '@weave/forms';
+import {
+  field,
+  form,
+  group,
+  fieldArray,
+  validators,
+  type Field,
+  type Form,
+  type Group,
+  type FieldArray,
+  type ValuesOf,
+} from '@weave/forms';
 import { useBoard, type BoardStore } from '../../stores/board';
 import { api } from '../../data/api';
-import { STATUSES, type Status, type Priority, type NewTask, type Task } from '../../types';
+import {
+  STATUSES,
+  type Status,
+  type Priority,
+  type NewTask,
+  type Task,
+  type ChecklistItem,
+} from '../../types';
 
 // `<Link>` is referenced in task-form.html.
 void Link;
 
-/** The form's field set — one named field per editable column. */
+/** One acceptance-criteria row: a nested group (form → fieldArray → group → field). */
+type ChecklistGroup = Group<{ text: Field<string>; done: Field<boolean> }>;
+
+/** The form's control set — fields plus a dynamic checklist array of nested groups. */
 type TaskFields = {
   title: Field<string>;
   assignee: Field<string>;
   status: Field<Status>;
   priority: Field<Priority>;
+  checklist: FieldArray<ChecklistItem>;
 };
 
 interface TaskFormSetup {
@@ -24,6 +46,9 @@ interface TaskFormSetup {
   form: Form<TaskFields>;
   statuses: Status[];
   priorities: Priority[];
+  checklist: () => ChecklistGroup[];
+  addItem: () => void;
+  removeItem: (item: ChecklistGroup) => void;
   submitting: () => boolean;
   submitError: () => string | null;
   onSubmit: (e: Event) => void;
@@ -63,7 +88,18 @@ export function setup(props: { params?: { id?: string } }): TaskFormSetup {
   const status: Field<Status> = field<Status>(seed?.status ?? 'todo');
   const priority: Field<Priority> = field<Priority>(seed?.priority ?? 'med');
 
-  const fields: TaskFields = { title, assignee, status, priority };
+  // A dynamic checklist: each row is a nested group { text, done }, so the form
+  // nests form → fieldArray → group → field. Seeded from the task on edit.
+  const checklist: FieldArray<ChecklistItem> = fieldArray<ChecklistItem>(
+    (s) =>
+      group({
+        text: field(s?.text ?? '', [validators.required('Describe the item')]),
+        done: field(s?.done ?? false),
+      }),
+    seed?.checklist ?? []
+  );
+
+  const fields: TaskFields = { title, assignee, status, priority, checklist };
 
   // Cross-field rule: a high-priority task must have an owner.
   const taskForm: Form<TaskFields> = form<TaskFields>(fields, {
@@ -84,6 +120,7 @@ export function setup(props: { params?: { id?: string } }): TaskFormSetup {
       if (!assignee.touched()) assignee.value.set(t.assignee ?? '');
       status.value.set(t.status);
       priority.value.set(t.priority);
+      if (checklist.length() === 0) (t.checklist ?? []).forEach((c) => checklist.push(c));
     });
   });
 
@@ -105,13 +142,13 @@ export function setup(props: { params?: { id?: string } }): TaskFormSetup {
       focusFirstError(); // …then move focus to the first one
       return;
     }
-    const values: { title: string; assignee: string; status: Status; priority: Priority } =
-      taskForm.values();
+    const values: ValuesOf<TaskFields> = taskForm.values();
     const input: NewTask = {
       title: values.title.trim(),
       status: values.status,
       priority: values.priority,
       ...(values.assignee.trim() ? { assignee: values.assignee.trim() } : {}),
+      ...(values.checklist.length ? { checklist: values.checklist } : {}),
     };
     try {
       const saved: Task = await save.run(input);
@@ -128,6 +165,12 @@ export function setup(props: { params?: { id?: string } }): TaskFormSetup {
     form: taskForm,
     statuses: STATUSES,
     priorities: PRIORITIES,
+    checklist: () => checklist.controls() as ChecklistGroup[],
+    addItem: () => checklist.push(),
+    removeItem: (item: ChecklistGroup) => {
+      const i: number = checklist.controls().indexOf(item);
+      if (i >= 0) checklist.removeAt(i);
+    },
     submitting: () => save.pending(),
     submitError,
     onSubmit: (e: Event) => {
@@ -152,7 +195,7 @@ function waitForValidation(f: Form<TaskFields>): Promise<void> {
 /** Focus the first field whose `.field` group is showing an error. */
 function focusFirstError(): void {
   const bad: HTMLElement | null = document.querySelector<HTMLElement>(
-    '.task-form .field.invalid input, .task-form .field.invalid select'
+    '.task-form .field.invalid input, .task-form .field.invalid select, .task-form .check-row.invalid .check-text'
   );
   bad?.focus();
 }

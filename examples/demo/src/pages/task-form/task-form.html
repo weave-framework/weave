@@ -60,6 +60,31 @@
       </label>
     </div>
 
+    <!-- Checklist: a fieldArray of nested {text,done} groups — the form nests
+         form → fieldArray → group → field, with per-item required validation. -->
+    <fieldset class="checklist">
+      <legend>Checklist</legend>
+      @for (item of checklist(); track item) {
+        <div class="check-row" class:invalid={item.fields.text.touched() && !!item.fields.text.error()}>
+          <input type="checkbox" bind:checked={item.fields.done.value} />
+          <input
+            type="text"
+            class="check-text"
+            placeholder="Acceptance criterion"
+            bind:value={item.fields.text.value}
+            on:blur={() => item.fields.text.touched.set(true)}
+          />
+          <button type="button" class="rm" on:click={() => removeItem(item)} aria-label="Remove item">×</button>
+          @if (item.fields.text.touched() && item.fields.text.error()) {
+            <span class="msg">{{ item.fields.text.error() }}</span>
+          }
+        </div>
+      } @empty {
+        <p class="muted hint">No items yet.</p>
+      }
+      <button type="button" class="ghost add" on:click={addItem}>+ Add item</button>
+    </fieldset>
+
     @if (form.formError()) {
       <p class="form-error">{{ form.formError() }}</p>
     }
