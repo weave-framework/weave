@@ -21,12 +21,21 @@ import {
   rewrite,
   type Scope,
   type TemplateNode,
+  type ElementNode,
+  type Attr,
   type SnippetNode,
   type ComponentSourceLoc,
 } from '@weave/compiler';
 
 const FOR_VARS: string[] = ['$index', '$count', '$first', '$last', '$even', '$odd'];
 const HAS_SETUP: RegExp = /export\s+(?:async\s+)?function\s+setup\b|export\s+(?:const|let|var)\s+setup\b/;
+
+/** A capitalized tag (`<TaskCard>`) is a child component, not a DOM element. */
+const isComponentTag = (tag: string): boolean => /^[A-Z]/.test(tag);
+
+/** Object-literal key: bare when a valid identifier, else quoted. */
+const propKey = (name: string): string =>
+  /^[A-Za-z_$][\w$]*$/.test(name) ? name : JSON.stringify(name);
 
 /** A generated virtual module plus everything needed to map its diagnostics back. */
 export interface Virtual {
@@ -83,7 +92,10 @@ export function buildVirtualSeparate(
   const body: Line[] = emit(nodes, new Set(inferCtxNames(nodes)));
   const asm: ReturnType<typeof assemble> = assemble(tsSource, HAS_SETUP.test(tsSource), body);
   return {
-    path: tsPath.replace(/\.ts$/, '.weave.ts'),
+    // Live at the real `.ts` path (shadowing disk) so a parent's `import Foo from
+    // './foo'` resolves to this virtual — which carries the synthesized typed
+    // default export — instead of the on-disk source (which has only `setup`).
+    path: tsPath,
     text: asm.text,
     templateFile: htmlPath,
     templateText: htmlSource,
@@ -99,6 +111,7 @@ export function buildVirtualSeparate(
 function emit(nodes: TemplateNode[], ctx: Set<string>): Line[] {
   const lines: Line[] = [];
   let awaitN: number = 0; // unique source-binding names for `@await` type-queries
+  let propsN: number = 0; // unique names for child-component prop-check objects
   const push = (text: string, offset?: number): void => {
     lines.push({ text, offset });
   };
@@ -113,6 +126,50 @@ function emit(nodes: TemplateNode[], ctx: Set<string>): Line[] {
   // Rewrite an expression and flatten it to a single line (positions stay expr-level).
   const rw = (expr: string, locals: Set<string>): string =>
     rewrite(expr, scopeOf(locals), '__ctx').code.replace(/\r?\n/g, ' ');
+
+  // A non-static attribute on a DOM element (or a directive on a component):
+  // place its expression in a type-checked position. `use:`/`transition:` verify
+  // the referenced fn is callable with the runtime's (Element, arg) pair.
+  const emitAttr = (attr: Attr, locals: Set<string>): void => {
+    if (attr.type === 'static') return;
+    if (attr.type === 'use' || attr.type === 'transition') {
+      const fn: string = rw(attr.name, locals);
+      push(
+        attr.expr !== undefined
+          ? `  (${fn})(null as any, ${rw(attr.expr, locals)});`
+          : `  (${fn})(null as any);`,
+        attr.nameOffset ?? attr.offset
+      );
+      return;
+    }
+    push(`  void (${rw(attr.expr, locals)});`, attr.offset);
+  };
+
+  // A child component `<Tag prop={expr} …>`: assemble its data props into one typed
+  // object literal checked against the child's prop contract (the first parameter of
+  // its `setup`, exposed via the generated default export). Required/excess/mismatched
+  // props all surface, each pinned to its own attribute. Events stay outside the
+  // contract (the runtime wires them) but their handler bodies are still checked.
+  const emitComponent = (node: ElementNode, locals: Set<string>): void => {
+    const compRef: string = rw(node.tag, locals); // bare import, or `__ctx.Name`
+    const dataProps: Array<{ key: string; value: string; offset?: number }> = [];
+    for (const attr of node.attrs) {
+      if (attr.type === 'static') {
+        if (attr.name === 'slot') continue; // slot marker, stripped by codegen
+        dataProps.push({ key: attr.name, value: JSON.stringify(attr.value) });
+      } else if (attr.type === 'attr') {
+        dataProps.push({ key: attr.name, value: rw(attr.expr, locals), offset: attr.offset });
+      } else {
+        emitAttr(attr, locals); // events / stray directives — checked, not part of props
+      }
+    }
+    const id: string = `__props${propsN++}`;
+    const anchor: number | undefined = dataProps.find((p) => p.offset !== undefined)?.offset;
+    push(`  const ${id}: NonNullable<Parameters<typeof ${compRef}>[0]> = {`, anchor);
+    for (const p of dataProps) push(`    ${propKey(p.key)}: (${p.value}),`, p.offset);
+    push(`  };`);
+    push(`  void ${id};`);
+  };
 
   const walk = (list: TemplateNode[], locals: Set<string>): void => {
     let scope: Set<string> = locals; // `@let` extends scope for following siblings
@@ -153,33 +210,12 @@ function emit(nodes: TemplateNode[], ctx: Set<string>): Line[] {
           break;
         }
         case 'element':
-          for (const attr of node.attrs) {
-            if (attr.type === 'static') continue;
-            if (attr.type === 'use') {
-              // verify the action is callable with the (Element, arg) pair; the
-              // arg's type is checked against the action's 2nd parameter.
-              const action: string = rw(attr.name, scope);
-              push(
-                attr.expr !== undefined
-                  ? `  (${action})(null as any, ${rw(attr.expr, scope)});`
-                  : `  (${action})(null as any);`,
-                attr.nameOffset ?? attr.offset
-              );
-              continue;
-            }
-            if (attr.type === 'transition') {
-              // verify the transition fn is callable with (Element, params).
-              const fn: string = rw(attr.name, scope);
-              push(
-                attr.expr !== undefined
-                  ? `  (${fn})(null as any, ${rw(attr.expr, scope)});`
-                  : `  (${fn})(null as any);`,
-                attr.nameOffset ?? attr.offset
-              );
-              continue;
-            }
-            push(`  void (${rw(attr.expr, scope)});`, attr.offset);
+          if (isComponentTag(node.tag)) {
+            emitComponent(node, scope);
+            walk(node.children, scope); // slot content is authored in the parent scope
+            break;
           }
+          for (const attr of node.attrs) emitAttr(attr, scope);
           walk(node.children, scope);
           break;
         case 'if':
@@ -303,6 +339,8 @@ function assemble(
   out.push('declare const __ctx: __WeaveCtx;');
   // `@await (src)` resolved-value type: a resource's data type, else the awaited Promise.
   out.push('type __WeaveAwaited<S> = S extends { data: () => infer D } ? NonNullable<D> : Awaited<S>;');
+  // A child component's prop contract = the first parameter of its `setup`.
+  out.push('type __WeavePropsOf<F> = F extends (props: infer P, ...rest: any[]) => any ? P : Record<string, never>;');
   out.push('function __weave__(): void {');
 
   const bodyBase: number = out.length; // out index of body[0]
@@ -313,7 +351,12 @@ function assemble(
   });
 
   out.push('}');
-  out.push('export {};'); // force module scope even when the script has no imports
+  // Synthesize the typed default export the loader emits at build time
+  // (`defineComponent(render, setup)`), so a PARENT importing this component
+  // type-checks the props it passes against this component's `setup` contract.
+  const propsType: string = hasSetup ? '__WeavePropsOf<typeof setup>' : 'Record<string, never>';
+  out.push(`declare const __weaveDefault: (props: ${propsType}, slots?: Record<string, () => unknown>) => unknown;`);
+  out.push('export default __weaveDefault;'); // also forces module scope
 
   return { text: out.join('\n'), scriptLineCount: scriptLines.length, templateMap };
 }

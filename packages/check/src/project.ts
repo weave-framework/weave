@@ -32,11 +32,24 @@ function collect(path: string, out: Virtual[]): void {
     return;
   }
   if (path.endsWith('.weave')) {
-    out.push(buildVirtualSfc(path, readFileSync(path, 'utf8')));
+    out.push(absolutize(buildVirtualSfc(path, readFileSync(path, 'utf8'))));
   } else if (path.endsWith('.ts') && !path.endsWith('.d.ts')) {
     const v: Virtual | null = collectTs(path);
-    if (v) out.push(v);
+    if (v) out.push(absolutize(v));
   }
+}
+
+/**
+ * Make a virtual's module path absolute so cross-component imports resolve to it.
+ * TypeScript resolves a relative import specifier to an ABSOLUTE path; the host's
+ * lookup table is keyed on `v.path`, so an unresolved relative key would miss and
+ * fall through to the on-disk source (which lacks the synthesized default export).
+ * Display paths (`scriptFile`/`templateFile`) stay as-passed, so diagnostics keep
+ * their tidy relative form.
+ */
+function absolutize(v: Virtual): Virtual {
+  v.path = resolve(v.path);
+  return v;
 }
 
 /** Resolve a `.ts` component's template into a virtual (or null if it is not a component). */
