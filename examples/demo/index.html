@@ -4,39 +4,14 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Weave Board — demo</title>
-    <link rel="stylesheet" href="/dist/app.css" />
-    <style>
-      /* Global layout + design tokens. Component-scoped CSS is collected into
-         /dist/app.css by the Weave loader; these are the app-wide basics. */
-      :root {
-        --bg: #0f1115;
-        --surface: #171a21;
-        --surface-2: #1e222b;
-        --border: #2a2f3a;
-        --text: #e6e9ef;
-        --muted: #8b93a3;
-        --accent: #6ea8fe;
-        --done: #3fb950;
-        --doing: #d29922;
-        --todo: #8b93a3;
-        --radius: 10px;
-        font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-      }
-      * { box-sizing: border-box; }
-      body {
-        margin: 0;
-        background: var(--bg);
-        color: var(--text);
-        line-height: 1.5;
-      }
-      a { color: var(--accent); text-decoration: none; }
-      .muted { color: var(--muted); }
-    </style>
+    <!-- No inline styles and no asset links here: the global stylesheet is declared
+         in weave.config.ts (`styles`), and the CLI wires CSS/JS in (build injects a
+         <link>/<script>; dev serves them from memory). -->
   </head>
   <body>
     <div id="app"></div>
-    <script type="module" src="/dist/main.js"></script>
-    <!-- weave dev live-reload -->
+    <script type="module" src="/main.js"></script>
+    <!-- weave dev live-reload (stripped from the production build) -->
     <script>
       new EventSource('/esbuild').addEventListener('change', () => location.reload());
     </script>

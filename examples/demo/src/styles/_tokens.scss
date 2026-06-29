@@ -1,0 +1,15 @@
+// Design tokens — colors, radius, base font. Consumed app-wide via CSS custom props.
+:root {
+  --bg: #0f1115;
+  --surface: #171a21;
+  --surface-2: #1e222b;
+  --border: #2a2f3a;
+  --text: #e6e9ef;
+  --muted: #8b93a3;
+  --accent: #6ea8fe;
+  --done: #3fb950;
+  --doing: #d29922;
+  --todo: #8b93a3;
+  --radius: 10px;
+  font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}

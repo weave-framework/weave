@@ -1,0 +1,4 @@
+// Global entry stylesheet, declared in weave.config.ts (`styles`). Pulls the design
+// tokens and the base reset; component-scoped styles live next to each component.
+@use 'tokens';
+@use 'base';

@@ -8,7 +8,8 @@
     "test": "node tools/run-browser-tests.mjs",
     "test:v01": "node --test \"test/**/*.test.mjs\"",
     "check": "node packages/cli/bin/weave.mjs check",
-    "demo": "node packages/cli/bin/weave.mjs dev examples/demo/src/main.ts --serve examples/demo --out examples/demo/dist",
+    "demo": "node packages/cli/bin/weave.mjs dev --config examples/demo/weave.config.ts",
+    "demo:build": "node packages/cli/bin/weave.mjs build --config examples/demo/weave.config.ts",
     "verify:build": "node tools/verify-build.mjs",
     "verify:cli": "node tools/verify-cli.mjs",
     "verify:check": "node tools/verify-check.mjs",
@@ -36,6 +37,7 @@
     "@weave/store": "workspace:*",
     "esbuild": "^0.25.0",
     "playwright": "^1.49.0",
+    "sass": "^1.101.0",
     "typescript": "^5.7.0"
   }
 }

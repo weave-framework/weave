@@ -13,7 +13,14 @@
     "@weave/compiler": "workspace:*"
   },
   "peerDependencies": {
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "esbuild": "^0.25.0",
+    "sass": "^1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "sass": {
+      "optional": true
+    }
   },
   "license": "MIT"
 }
