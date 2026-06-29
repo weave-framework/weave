@@ -239,6 +239,14 @@ Skliausteliuose — kuriuose framework'uose ta feature pasikartoja (kuo daugiau,
   synthetic events · Zone.js + Angular/React testing harness'ai (turim Playwright) · KeepAlive ·
   NgOptimizedImage / Next image-font optimization · Reactive/Template-driven Forms · plugins/global filters.
 
+### Pagal pareikalavimą (įmanoma, statom kai prireiks)
+- **Named / auxiliary outlets** (Angular-stiliaus) — keli nepriklausomi įvardyti `<RouterView name="…">`, kur tas
+  pats URL koduoja kelias route medžio dalis vienu metu (`/inbox(popup:compose)`). **Įmanoma** mūsų architektūroje:
+  `OutletContext` praplečiamas `name`, route'as gali turėti `outlet: 'name'`, + aux-segmentų parse/serialize URL'e.
+  Sąmoningai atidėta (2026-06-29): niša + viena painiausių Angular dalių; nested outlets (jau yra) + layout dengia
+  99% poreikių. Statom **tik kai atsiras realus poreikis**. (Master-detail/sidebar — sprendžiami nested+layout,
+  feature nereikia.)
+
 ### Iškelta į TOLIMĄ ATEITĮ — SSR (NE v1) ⚠️
 Vartotojo sprendimas (2026-06-28): SSR visiškai už v1 ribų — reta praktikoje, mažai kas naudoja. Jei kada kam
 prireiks, plane paliktos „siūlės" (kompiliatoriaus `mode:'ssr'` + hidratacija per fine-grained binding'us).
