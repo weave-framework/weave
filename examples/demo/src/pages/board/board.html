@@ -19,9 +19,12 @@
         </header>
         <div class="col-body">
           @for (t of visible(status); track t.id) {
-            <!-- A @for row can be a component/fragment: the Link (which prefetches
-                 the detail chunk on hover, B.15) is the row root directly. -->
-            <Link to={'/task/' + t.id}><TaskCard task={t} /></Link>
+            <!-- The row root is a real element so it can carry enter/leave transitions
+                 (B.13): `reconcileKeyed` plays `out:fade` and waits before removal. The
+                 Link inside still prefetches the detail chunk on hover (B.15). -->
+            <div class="card-wrap" in:scale={cardIn} out:fade={cardOut}>
+              <Link to={'/task/' + t.id}><TaskCard task={t} /></Link>
+            </div>
           } @empty {
             <p class="col-empty muted">—</p>
           }

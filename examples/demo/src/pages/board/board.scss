@@ -68,6 +68,9 @@
 }
 
 .col-body { display: flex; flex-direction: column; gap: 10px; min-height: 24px; }
+// The row root: a transparent box (the flex item) that carries the card's
+// enter/leave transition. `will-change` keeps the opacity/transform animation smooth.
+.card-wrap { will-change: opacity, transform; }
 .col-body a { display: contents; color: inherit; text-decoration: none; }
 .col-empty { margin: 4px 2px; font-size: 13px; }
 

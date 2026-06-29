@@ -620,13 +620,17 @@ export function eachBlock<T>(
       disposeOwner(emptyOwner);
       emptyOwner = null;
     }
-    emptyNodes.forEach((n) => n.remove());
+    emptyNodes.forEach(removeWithOutro); // honor an out: transition on @empty content
     emptyNodes = [];
   };
+  // The whole-list removal path (data → empty, and block teardown). Plays each row's
+  // leave transition first, just like reconcileKeyed's partial removal and ifBlock —
+  // so emptying a `@for` animates out instead of snapping (a transition node with no
+  // outro registered removes synchronously).
   const removeRows = (): void => {
     rows.forEach((r) => {
       disposeOwner(r.owner);
-      for (const n of rowSpan(r)) n.remove();
+      for (const n of rowSpan(r)) removeWithOutro(n);
     });
     rows = [];
   };

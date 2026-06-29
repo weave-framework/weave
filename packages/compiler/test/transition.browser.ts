@@ -87,6 +87,27 @@ test('out: leave animation also runs for a removed @for row', async () => {
   assert.equal(el.querySelectorAll('li').length, 2, 'leaving row removed after the animation');
 });
 
+test('out: leave animation runs when a @for is emptied to zero', async () => {
+  // The whole-list removal path (data → empty) is separate from reconcileKeyed's
+  // partial removal; it must play outros too, or emptying a list snaps instead of
+  // animating. Regression for the demo D.5b board (filtering a column to empty).
+  const items: Signal<number[]> = signal([1, 2]);
+  const el: Element = render(
+    `<ul>@for (n of items(); track n) { <li out:run>{{ n }}</li> } @empty { <li class="none">—</li> }</ul>`,
+    { items, run: tFade },
+    ['items', 'run']
+  );
+  host().appendChild(el);
+  assert.equal(el.querySelectorAll('li:not(.none)').length, 2);
+
+  items.set([]); // empties the list → removeRows must outro, not snap
+  assert.equal(el.querySelectorAll('li:not(.none)').length, 2, 'leaving rows linger during their animation');
+  assert.ok(el.querySelector('li.none'), '@empty placeholder appears immediately alongside the fading rows');
+
+  await wait(80);
+  assert.equal(el.querySelectorAll('li:not(.none)').length, 0, 'rows removed after the animation finishes');
+});
+
 test('no outro registered (in: only) removes immediately', async () => {
   const show: Signal<boolean> = signal(true);
   const el: Element = render(`<div>@if (show()) { <p in:run>hi</p> }</div>`, { show, run: tFade }, ['show', 'run']);

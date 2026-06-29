@@ -1,4 +1,5 @@
-import { onMount, signal, debounced, type Signal, type Computed } from '@weave/runtime';
+import { onMount, signal, debounced, fade, scale, type Signal, type Computed } from '@weave/runtime';
+import type { TransitionFn } from '@weave/runtime/dom';
 import { Link } from '@weave/router';
 import { useBoard, type BoardStore } from '../../stores/board';
 import { useEditor, type EditorStore } from '../../stores/editor';
@@ -10,6 +11,10 @@ interface BoardSetup {
   editor: EditorStore;
   query: Signal<string>;
   visible: (status: Status) => Task[];
+  scale: TransitionFn<{ start?: number; duration?: number } | void>;
+  fade: TransitionFn<{ duration?: number } | void>;
+  cardIn: { start: number; duration: number };
+  cardOut: { duration: number };
 }
 
 // `<TaskCard>` / `<Link>` are referenced in index.html — capitalized tags resolve
@@ -32,5 +37,18 @@ export function setup(): BoardSetup {
     return board.byStatus(status).filter((t) => !q || t.title.toLowerCase().includes(q));
   };
 
-  return { board, editor, query, visible };
+  return {
+    board,
+    editor,
+    query,
+    visible,
+    // Cards scale+fade in on enter and fade out on leave (B.13). The `@for` row root
+    // (a real `.card-wrap` element) carries the directives so `reconcileKeyed` waits
+    // for the leave outro before removing — a card added/removed by a filter, status
+    // change, or optimistic create animates in/out instead of snapping.
+    scale,
+    fade,
+    cardIn: { start: 0.97, duration: 160 },
+    cardOut: { duration: 140 },
+  };
 }
