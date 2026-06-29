@@ -27,10 +27,29 @@ export type Binding =
 
 export type Scope = Map<string, Binding>;
 
+/**
+ * A maximal run of characters copied **verbatim** from the source expression
+ * into the generated code, identical in both (so `len` applies to each side).
+ * Used by `@weave/language-server` to build Volar's bidirectional source↔virtual
+ * mappings: every source character is covered by exactly one segment, while
+ * synthesized text (the `ctxRef.` prefix, an accessor `()`) is intentionally left
+ * unmapped. Offsets are relative to the start of `expr` / `code` respectively.
+ */
+export interface RewriteSegment {
+  /** offset into the source expression */
+  src: number;
+  /** offset into the generated `code` */
+  gen: number;
+  /** length of the verbatim run (same on both sides) */
+  len: number;
+}
+
 export interface RewriteResult {
   code: string;
   /** whether any binding (ctx or local) was referenced ⇒ the expression is reactive */
   reactive: boolean;
+  /** verbatim src↔gen runs, in generated order (for editor tooling source maps) */
+  segments: RewriteSegment[];
 }
 
 /**
@@ -38,6 +57,9 @@ export interface RewriteResult {
  * `ctx`, the runtime context object; `@weave/check` passes `__ctx`, its typed
  * stand-in). Template locals emit either an accessor call (runtime) or the bare
  * name (`kind: 'local'`, the check pass where they are real lexical bindings).
+ *
+ * Alongside `code`, returns `segments` — the verbatim src↔gen character runs — so
+ * editor tooling can map a position in the generated module back to the template.
  */
 export function rewrite(expr: string, scope: Scope, ctxRef: string = 'ctx'): RewriteResult {
   let out: string = '';
@@ -45,12 +67,41 @@ export function rewrite(expr: string, scope: Scope, ctxRef: string = 'ctx'): Rew
   let i: number = 0;
   const n: number = expr.length;
 
+  const segments: RewriteSegment[] = [];
+  // The current verbatim run, contiguous in both source and generated text.
+  let runSrc: number = -1;
+  let runGen: number = -1;
+  let runLen: number = 0;
+  const flush = (): void => {
+    if (runLen > 0) segments.push({ src: runSrc, gen: runGen, len: runLen });
+    runLen = 0;
+  };
+  // Append `text` (== expr.slice(srcPos, srcPos+len)) verbatim, extending the
+  // current run when it stays contiguous on both sides, else starting a new one.
+  const copy = (srcPos: number, text: string): void => {
+    const genPos: number = out.length;
+    if (runLen > 0 && runSrc + runLen === srcPos && runGen + runLen === genPos) {
+      runLen += text.length;
+    } else {
+      flush();
+      runSrc = srcPos;
+      runGen = genPos;
+      runLen = text.length;
+    }
+    out += text;
+  };
+  // Append synthesized text that has no source counterpart (leaves a gen-side gap).
+  const insert = (text: string): void => {
+    flush();
+    out += text;
+  };
+
   while (i < n) {
     const c: string = expr[i];
 
     if (c === '"' || c === "'" || c === '`') {
       const end: number = scanString(expr, i);
-      out += expr.slice(i, end);
+      copy(i, expr.slice(i, end));
       i = end;
       continue;
     }
@@ -63,25 +114,28 @@ export function rewrite(expr: string, scope: Scope, ctxRef: string = 'ctx'): Rew
       const binding: Binding | undefined = scope.get(name);
 
       if (binding && !isProperty) {
-        out +=
-          binding.kind === 'ctx'
-            ? `${ctxRef}.${name}`
-            : binding.kind === 'local'
-              ? name
-              : `${binding.accessor}()`;
+        if (binding.kind === 'ctx') {
+          insert(`${ctxRef}.`);
+          copy(i, name);
+        } else if (binding.kind === 'local') {
+          copy(i, name);
+        } else {
+          insert(`${binding.accessor}()`);
+        }
         reactive = true;
       } else {
-        out += name;
+        copy(i, name);
       }
       i = j;
       continue;
     }
 
-    out += c;
+    copy(i, c);
     i++;
   }
+  flush();
 
-  return { code: out, reactive };
+  return { code: out, reactive, segments };
 }
 
 /** Build a scope from a list of ctx binding names. */
