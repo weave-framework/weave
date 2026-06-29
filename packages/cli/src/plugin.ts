@@ -22,11 +22,12 @@
  * `undefined`, so esbuild falls through to its default loader).
  */
 
-import type { Plugin } from 'esbuild';
+import type { OnLoadArgs, OnLoadResult, Plugin, PluginBuild } from 'esbuild';
 import { readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { compileComponent, parseSfc } from '@weave/compiler';
+import type { ComponentSource } from '@weave/compiler';
 import { compileStyleFile, compileStyleSource, type StyleLang } from './styles.js';
 
 export interface WeaveState {
@@ -51,10 +52,10 @@ function cssInjector(css: string): string {
 
 export function weave(state: WeaveState, options: WeaveOptions = {}): Plugin {
   const styleLang: StyleLang = options.styleLang ?? 'css';
-  const dev = options.dev ?? false;
+  const dev: boolean = options.dev ?? false;
 
   /** Emit a compiled component: collect its CSS (build) or inject it (dev). */
-  const emit = (code: string, css: string, resolveDir: string) => {
+  const emit = (code: string, css: string, resolveDir: string): OnLoadResult => {
     if (dev) return { contents: code + cssInjector(css), loader: 'ts' as const, resolveDir };
     if (css) state.css.push(css);
     return { contents: code, loader: 'ts' as const, resolveDir };
@@ -62,26 +63,26 @@ export function weave(state: WeaveState, options: WeaveOptions = {}): Plugin {
 
   return {
     name: 'weave',
-    setup(build) {
+    setup(build: PluginBuild): void {
       build.onStart(() => {
         state.css.length = 0; // fresh collection each (re)build
       });
 
-      build.onLoad({ filter: /\.weave$/ }, async (args) => {
-        const source = await readFile(args.path, 'utf8');
-        const src = parseSfc(source);
-        const styles = src.styles
+      build.onLoad({ filter: /\.weave$/ }, async (args: OnLoadArgs) => {
+        const source: string = await readFile(args.path, 'utf8');
+        const src: ComponentSource = parseSfc(source);
+        const styles: string | undefined = src.styles
           ? await compileStyleSource(src.styles, styleLang, dirname(args.path))
           : undefined;
         const { code, css } = compileComponent({ ...src, styles }, { filename: args.path });
         return emit(code, css, dirname(args.path));
       });
 
-      build.onLoad({ filter: /\.ts$/ }, async (args) => {
+      build.onLoad({ filter: /\.ts$/ }, async (args: OnLoadArgs) => {
         if (args.path.includes('node_modules')) return undefined;
-        const template = args.path.replace(/\.ts$/, '.html');
+        const template: string = args.path.replace(/\.ts$/, '.html');
         if (!existsSync(template)) return undefined; // ordinary module
-        const stylePath = args.path.replace(/\.ts$/, '.' + styleLang);
+        const stylePath: string = args.path.replace(/\.ts$/, '.' + styleLang);
         const { code, css } = compileComponent(
           {
             script: await readFile(args.path, 'utf8'),

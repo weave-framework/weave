@@ -13,6 +13,7 @@
  */
 
 import { getOwner } from './reactive.js';
+import type { Owner } from './reactive.js';
 
 /** An opaque, typed context token. Create with `createContext`; never construct by hand. */
 export interface Context<T> {
@@ -34,7 +35,7 @@ export function createContext<T>(defaultValue?: T): Context<T> {
  * a component `setup` (or any active owner scope).
  */
 export function provide<T>(context: Context<T>, value: T): void {
-  const owner = getOwner();
+  const owner: Owner | null = getOwner();
   if (!owner) {
     throw new Error('weave: provide() must be called within a component setup or owner scope');
   }
@@ -46,9 +47,9 @@ export function provide<T>(context: Context<T>, value: T): void {
  * if none provided one. Walks the owner chain from the current scope upward.
  */
 export function inject<T>(context: Context<T>): T {
-  let owner = getOwner();
+  let owner: Owner | null = getOwner();
   while (owner) {
-    const contexts = owner._contexts;
+    const contexts: Map<object, unknown> | undefined = owner._contexts;
     if (contexts && contexts.has(context)) return contexts.get(context) as T;
     owner = owner._parent;
   }

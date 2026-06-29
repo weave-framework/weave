@@ -1,8 +1,9 @@
 import { test, assert } from '../../../tools/harness.js';
 import { signal, computed, effect, batch, untrack, onCleanup, onMount, tick, root } from '@weave/runtime';
+import type { Signal, Computed } from '@weave/runtime';
 
 test('signal read/write', () => {
-  const n = signal(1);
+  const n: Signal<number> = signal(1);
   assert.equal(n(), 1);
   n.set(2);
   assert.equal(n(), 2);
@@ -12,10 +13,10 @@ test('signal read/write', () => {
 });
 
 test('computed derives and caches', () => {
-  const a = signal(2);
-  const b = signal(3);
-  let runs = 0;
-  const sum = computed(() => {
+  const a: Signal<number> = signal(2);
+  const b: Signal<number> = signal(3);
+  let runs: number = 0;
+  const sum: Computed<number> = computed(() => {
     runs++;
     return a() + b();
   });
@@ -28,7 +29,7 @@ test('computed derives and caches', () => {
 });
 
 test('effect runs on create and on change', () => {
-  const n = signal(0);
+  const n: Signal<number> = signal(0);
   const seen: number[] = [];
   effect(() => seen.push(n()));
   assert.deepEqual(seen, [0]);
@@ -38,8 +39,8 @@ test('effect runs on create and on change', () => {
 });
 
 test('effect does not fire when value is equal', () => {
-  const n = signal(1);
-  let runs = 0;
+  const n: Signal<number> = signal(1);
+  let runs: number = 0;
   effect(() => {
     n();
     runs++;
@@ -49,11 +50,11 @@ test('effect does not fire when value is equal', () => {
 });
 
 test('diamond graph is glitch-free (no double compute)', () => {
-  const a = signal(1);
-  const b = computed(() => a() + 1);
-  const c = computed(() => a() + 1);
-  let effectRuns = 0;
-  let sum = 0;
+  const a: Signal<number> = signal(1);
+  const b: Computed<number> = computed(() => a() + 1);
+  const c: Computed<number> = computed(() => a() + 1);
+  let effectRuns: number = 0;
+  let sum: number = 0;
   effect(() => {
     sum = b() + c();
     effectRuns++;
@@ -66,10 +67,10 @@ test('diamond graph is glitch-free (no double compute)', () => {
 });
 
 test('deep chain recomputes lazily', () => {
-  const a = signal(1);
-  let cRuns = 0;
-  const b = computed(() => a() * 2);
-  const c = computed(() => {
+  const a: Signal<number> = signal(1);
+  let cRuns: number = 0;
+  const b: Computed<number> = computed(() => a() * 2);
+  const c: Computed<number> = computed(() => {
     cRuns++;
     return b() + 1;
   });
@@ -81,10 +82,10 @@ test('deep chain recomputes lazily', () => {
 });
 
 test('unchanged memo blocks downstream recompute', () => {
-  const a = signal(4);
-  const even = computed(() => a() % 2 === 0);
-  let runs = 0;
-  const label = computed(() => {
+  const a: Signal<number> = signal(4);
+  const even: Computed<boolean> = computed(() => a() % 2 === 0);
+  let runs: number = 0;
+  const label: Computed<string> = computed(() => {
     runs++;
     return even() ? 'even' : 'odd';
   });
@@ -99,9 +100,9 @@ test('unchanged memo blocks downstream recompute', () => {
 });
 
 test('batch coalesces effect runs', () => {
-  const a = signal(1);
-  const b = signal(2);
-  let runs = 0;
+  const a: Signal<number> = signal(1);
+  const b: Signal<number> = signal(2);
+  let runs: number = 0;
   effect(() => {
     a();
     b();
@@ -116,9 +117,9 @@ test('batch coalesces effect runs', () => {
 });
 
 test('untrack reads without subscribing', () => {
-  const a = signal(1);
-  const b = signal(1);
-  let runs = 0;
+  const a: Signal<number> = signal(1);
+  const b: Signal<number> = signal(1);
+  let runs: number = 0;
   effect(() => {
     a();
     untrack(() => b());
@@ -132,10 +133,10 @@ test('untrack reads without subscribing', () => {
 });
 
 test('effect cleanup runs before re-run and on dispose', () => {
-  const n = signal(0);
+  const n: Signal<number> = signal(0);
   const log: string[] = [];
-  const stop = effect(() => {
-    const v = n();
+  const stop: () => void = effect(() => {
+    const v: number = n();
     log.push(`run:${v}`);
     onCleanup(() => log.push(`cleanup:${v}`));
   });
@@ -148,10 +149,10 @@ test('effect cleanup runs before re-run and on dispose', () => {
 });
 
 test('returned cleanup function works too', () => {
-  const n = signal(0);
+  const n: Signal<number> = signal(0);
   const log: string[] = [];
   effect(() => {
-    const v = n();
+    const v: number = n();
     return () => log.push(`tear:${v}`);
   });
   n.set(1);
@@ -159,11 +160,11 @@ test('returned cleanup function works too', () => {
 });
 
 test('dynamic dependencies: stale sources are dropped', () => {
-  const cond = signal(true);
-  const a = signal('A');
-  const b = signal('B');
-  let out = '';
-  let runs = 0;
+  const cond: Signal<boolean> = signal(true);
+  const a: Signal<string> = signal('A');
+  const b: Signal<string> = signal('B');
+  let out: string = '';
+  let runs: number = 0;
   effect(() => {
     out = cond() ? a() : b();
     runs++;
@@ -190,7 +191,7 @@ test('tick resolves on a microtask (after earlier-queued microtasks)', async () 
 });
 
 test('await tick flushes a pending onMount callback', async () => {
-  let mounted = false;
+  let mounted: boolean = false;
   root((d) => {
     onMount(() => {
       mounted = true;
@@ -203,8 +204,8 @@ test('await tick flushes a pending onMount callback', async () => {
 });
 
 test('synchronous reactive updates are already applied before tick', async () => {
-  const n = signal(0);
-  let seen = -1;
+  const n: Signal<number> = signal(0);
+  let seen: number = -1;
   effect(() => {
     seen = n();
   });

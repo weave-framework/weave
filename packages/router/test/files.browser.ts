@@ -1,10 +1,11 @@
 import { test, assert } from '../../../tools/harness.js';
 import { fileToRoutes, emitRoutesModule } from '@weave/router';
+import type { FileRoute } from '@weave/router';
 
 /* ──────────── fileToRoutes: conventions ──────────── */
 
 test('flat files map to routes (index → "", name → path)', () => {
-  const r = fileToRoutes(['index.weave', 'about.weave']);
+  const r: FileRoute[] = fileToRoutes(['index.weave', 'about.weave']);
   assert.deepEqual(r, [
     { path: '', file: 'index.weave' },
     { path: 'about', file: 'about.weave' },
@@ -12,8 +13,8 @@ test('flat files map to routes (index → "", name → path)', () => {
 });
 
 test('[id] → :param and [...rest] → * (catch-all)', () => {
-  const r = fileToRoutes(['[id].weave', '[...all].weave', 'index.weave']);
-  const byPath = Object.fromEntries(r.map((x) => [x.path, x.file]));
+  const r: FileRoute[] = fileToRoutes(['[id].weave', '[...all].weave', 'index.weave']);
+  const byPath: Record<string, string | undefined> = Object.fromEntries(r.map((x) => [x.path, x.file]));
   assert.equal(byPath[':id'], '[id].weave');
   assert.equal(byPath['*'], '[...all].weave');
   assert.equal(byPath[''], 'index.weave');
@@ -22,7 +23,7 @@ test('[id] → :param and [...rest] → * (catch-all)', () => {
 });
 
 test('a folder without a layout is flattened with a path prefix', () => {
-  const r = fileToRoutes(['users/index.weave', 'users/[id].weave']);
+  const r: FileRoute[] = fileToRoutes(['users/index.weave', 'users/[id].weave']);
   assert.deepEqual(r, [
     { path: 'users', file: 'users/index.weave' },
     { path: 'users/:id', file: 'users/[id].weave' },
@@ -30,7 +31,7 @@ test('a folder without a layout is flattened with a path prefix', () => {
 });
 
 test('a folder with a _layout becomes a nested route with children', () => {
-  const r = fileToRoutes(['users/_layout.weave', 'users/index.weave', 'users/[id].weave']);
+  const r: FileRoute[] = fileToRoutes(['users/_layout.weave', 'users/index.weave', 'users/[id].weave']);
   assert.equal(r.length, 1);
   assert.equal(r[0].path, 'users');
   assert.equal(r[0].file, 'users/_layout.weave');
@@ -43,7 +44,7 @@ test('a folder with a _layout becomes a nested route with children', () => {
 /* ──────────── emitRoutesModule ──────────── */
 
 test('emits an eager module with imports + component refs', () => {
-  const mod = emitRoutesModule([
+  const mod: string = emitRoutesModule([
     { path: '', file: 'index.weave' },
     { path: 'about', file: 'about.weave' },
   ]);
@@ -55,13 +56,13 @@ test('emits an eager module with imports + component refs', () => {
 });
 
 test('emits a lazy module that code-splits each page', () => {
-  const mod = emitRoutesModule([{ path: '', file: 'index.weave' }], { lazy: true });
+  const mod: string = emitRoutesModule([{ path: '', file: 'index.weave' }], { lazy: true });
   assert.ok(mod.includes('import { lazy } from "@weave/runtime/dom";'), mod);
   assert.ok(mod.includes('lazy(() => import("./index.weave"))'), mod);
 });
 
 test('nested children serialize recursively', () => {
-  const mod = emitRoutesModule([
+  const mod: string = emitRoutesModule([
     { path: 'users', file: 'users/_layout.weave', children: [{ path: '', file: 'users/index.weave' }] },
   ]);
   assert.ok(mod.includes('children: ['), mod);

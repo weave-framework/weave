@@ -19,14 +19,14 @@ import type { Signal, Owner } from './reactive.js';
 
 /** Parse an HTML string into a reusable, cached `<template>`. Parsed once. */
 export function template(html: string): HTMLTemplateElement {
-  const tpl = document.createElement('template');
+  const tpl: HTMLTemplateElement = document.createElement('template');
   tpl.innerHTML = html;
   return tpl;
 }
 
 /** Clone a template's single root node (the common single-root component case). */
 export function clone(tpl: HTMLTemplateElement): Element {
-  const root = tpl.content.firstElementChild ?? tpl.content.firstChild;
+  const root: Element | ChildNode | null = tpl.content.firstElementChild ?? tpl.content.firstChild;
   return root!.cloneNode(true) as Element;
 }
 
@@ -47,7 +47,7 @@ export function child(node: Node, ...path: number[]): Node {
 
 /** Insert a comment placeholder, the stable anchor a dynamic region renders before. */
 export function anchor(parent: Node, before: Node | null = null): Comment {
-  const c = document.createComment('');
+  const c: Comment = document.createComment('');
   parent.insertBefore(c, before);
   return c;
 }
@@ -60,7 +60,7 @@ export function insert(parent: Node, node: Node, before: Node | null = null): vo
 /* ──────────────────────────── text ──────────────────────────── */
 
 function textBefore(anchorNode: Comment): Text {
-  const t = document.createTextNode('');
+  const t: Text = document.createTextNode('');
   anchorNode.parentNode!.insertBefore(t, anchorNode);
   return t;
 }
@@ -76,7 +76,7 @@ export function setText(anchorNode: Comment, value: unknown): void {
 
 /** Reactive text: one effect, one text node, updated in place. */
 export function bindText(anchorNode: Comment, fn: () => unknown): void {
-  const t = textBefore(anchorNode);
+  const t: Text = textBefore(anchorNode);
   effect(() => {
     t.data = stringify(fn());
   });
@@ -124,7 +124,7 @@ export function bindClass(el: Element, name: string, fn: () => unknown): void {
  * when shown; sets `display: none` when hidden.
  */
 export function bindShow(el: HTMLElement, fn: () => unknown): void {
-  const original = el.style.display === 'none' ? '' : el.style.display;
+  const original: string = el.style.display === 'none' ? '' : el.style.display;
   effect(() => {
     el.style.display = fn() ? original : 'none';
   });
@@ -198,19 +198,19 @@ interface Outroable extends ChildNode {
 /** Drive one transition with rAF; resolves when it finishes. */
 function playTransition(node: HTMLElement, config: TransitionConfig, intro: boolean): Promise<void> {
   const { delay = 0, duration = 300, easing = (t) => t, css, tick } = config;
-  const orig = node.style.cssText;
+  const orig: string = node.style.cssText;
   const apply = (p: number): void => {
-    const e = easing(p);
-    const t = intro ? e : 1 - e;
+    const e: number = easing(p);
+    const t: number = intro ? e : 1 - e;
     if (css) node.style.cssText = orig + ';' + css(t, 1 - t);
     if (tick) tick(t, 1 - t);
   };
   apply(0); // set the start frame now (intro: hidden) — runs in a microtask, before paint
   return new Promise<void>((resolve) => {
-    const startAt = performance.now() + delay;
+    const startAt: number = performance.now() + delay;
     const step = (now: number): void => {
       if (now < startAt) return void requestAnimationFrame(step);
-      const p = duration <= 0 ? 1 : Math.min(1, (now - startAt) / duration);
+      const p: number = duration <= 0 ? 1 : Math.min(1, (now - startAt) / duration);
       apply(p);
       if (p < 1) return void requestAnimationFrame(step);
       if (intro) node.style.cssText = orig; // entered — drop the inline overrides
@@ -238,7 +238,7 @@ export function transition(
 
 /** Remove a node, first playing (and awaiting) its registered outro if it has one. */
 export function removeWithOutro(node: ChildNode): void {
-  const out = (node as Outroable).__wOut;
+  const out: (() => Promise<void>) | undefined = (node as Outroable).__wOut;
   if (out) out().then(() => node.remove());
   else node.remove();
 }
@@ -261,7 +261,7 @@ export function removeWithOutro(node: ChildNode): void {
  */
 export function bindValue(el: Element, sig: Signal<unknown>, kind: 'value' | 'checked' | 'group'): void {
   if (kind === 'checked') {
-    const box = el as HTMLInputElement;
+    const box: HTMLInputElement = el as HTMLInputElement;
     effect(() => {
       box.checked = !!sig();
     });
@@ -270,7 +270,7 @@ export function bindValue(el: Element, sig: Signal<unknown>, kind: 'value' | 'ch
   }
 
   if (kind === 'group') {
-    const radio = el as HTMLInputElement;
+    const radio: HTMLInputElement = el as HTMLInputElement;
     effect(() => {
       radio.checked = sig() === radio.value;
     });
@@ -281,23 +281,23 @@ export function bindValue(el: Element, sig: Signal<unknown>, kind: 'value' | 'ch
   }
 
   // kind === 'value'
-  const isSelect = el.tagName === 'SELECT';
-  const multiple = isSelect && (el as HTMLSelectElement).multiple;
-  const input = el as HTMLInputElement;
-  const numeric = !isSelect && (input.type === 'number' || input.type === 'range');
-  let composing = false;
+  const isSelect: boolean = el.tagName === 'SELECT';
+  const multiple: boolean = isSelect && (el as HTMLSelectElement).multiple;
+  const input: HTMLInputElement = el as HTMLInputElement;
+  const numeric: boolean = !isSelect && (input.type === 'number' || input.type === 'range');
+  let composing: boolean = false;
 
   effect(() => {
-    const v = sig();
+    const v: unknown = sig();
     if (composing) return; // don't fight the IME mid-composition
     if (multiple) {
-      const set = new Set((Array.isArray(v) ? v : []).map(String));
+      const set: Set<string> = new Set((Array.isArray(v) ? v : []).map(String));
       for (const opt of (el as HTMLSelectElement).options) opt.selected = set.has(opt.value);
     } else if (numeric) {
       // compare numerically so typing "1." (NaN mid-edit) doesn't get clobbered
       if (input.valueAsNumber !== v) input.value = v == null ? '' : String(v);
     } else {
-      const s = v == null ? '' : String(v);
+      const s: string = v == null ? '' : String(v);
       if (input.value !== s) input.value = s;
     }
   });
@@ -368,12 +368,12 @@ function placeRow(parent: Node, row: Row, before: Node): void {
  * `0` marks a brand-new item to skip. Returns the indices that may stay put.
  */
 function getSequence(arr: number[]): number[] {
-  const p = arr.slice();
-  const result = [0];
-  let i, j, u, v, c;
-  const len = arr.length;
+  const p: number[] = arr.slice();
+  const result: number[] = [0];
+  let i: number, j: number, u: number, v: number, c: number;
+  const len: number = arr.length;
   for (i = 0; i < len; i++) {
-    const arrI = arr[i];
+    const arrI: number = arr[i];
     if (arrI !== 0) {
       j = result[result.length - 1];
       if (arr[j] < arrI) {
@@ -421,23 +421,23 @@ export function reconcileKeyed<T>(
   keyOf: (item: T, i: number) => unknown,
   create: (item: T, i: number) => Row
 ): Row[] {
-  const prevByKey = new Map<unknown, { row: Row; oldIndex: number }>();
+  const prevByKey: Map<unknown, { row: Row; oldIndex: number }> = new Map<unknown, { row: Row; oldIndex: number }>();
   prev.forEach((row, i) => prevByKey.set(row.key, { row, oldIndex: i }));
 
   const next: Row[] = new Array(data.length);
   const newToOld: number[] = new Array(data.length).fill(0); // 0 ⇒ brand new
-  const reused = new Set<Row>();
+  const reused: Set<Row> = new Set<Row>();
 
-  for (let i = 0; i < data.length; i++) {
-    const key = keyOf(data[i], i);
-    const hit = prevByKey.get(key);
+  for (let i: number = 0; i < data.length; i++) {
+    const key: unknown = keyOf(data[i], i);
+    const hit: { row: Row; oldIndex: number } | undefined = prevByKey.get(key);
     if (hit && !reused.has(hit.row)) {
       reused.add(hit.row);
       hit.row.key = key;
       next[i] = hit.row;
       newToOld[i] = hit.oldIndex + 1;
     } else {
-      const row = create(data[i], i);
+      const row: Row = create(data[i], i);
       row.key = key;
       next[i] = row;
     }
@@ -452,12 +452,12 @@ export function reconcileKeyed<T>(
   }
 
   // Place nodes back-to-front; nodes in the LIS are already in order and stay put.
-  const seq = getSequence(newToOld);
-  let s = seq.length - 1;
+  const seq: number[] = getSequence(newToOld);
+  let s: number = seq.length - 1;
   let anchorNode: Node = end;
-  for (let i = data.length - 1; i >= 0; i--) {
-    const row = next[i];
-    const isNew = newToOld[i] === 0;
+  for (let i: number = data.length - 1; i >= 0; i--) {
+    const row: Row = next[i];
+    const isNew: boolean = newToOld[i] === 0;
     if (isNew || s < 0 || i !== seq[s]) {
       placeRow(parent, row, anchorNode); // new or moved (whole span)
     } else {
@@ -471,7 +471,7 @@ export function reconcileKeyed<T>(
 
 /* ──────────────────────────── control flow ──────────────────────────── */
 
-const NONE = Symbol('none');
+const NONE: symbol = Symbol('none');
 
 function placeBefore(parent: Node, node: Node, anchorNode: Node): ChildNode[] {
   const nodes: ChildNode[] =
@@ -486,16 +486,16 @@ function placeBefore(parent: Node, node: Node, anchorNode: Node): ChildNode[] {
  * runs in its own ownership scope so its effects are disposed when it unmounts.
  */
 export function ifBlock(anchor: Comment, selector: () => (() => Node | null) | null): void {
-  const parent = anchor.parentNode!;
+  const parent: Node = anchor.parentNode!;
   // Capture the *construction-time* (lexical) owner. Branch owners parent to it so
   // context (`inject`) keeps working after a re-render driven by an external signal
   // (e.g. navigation), where the ambient owner at effect-re-run time is unrelated.
-  const host = getOwner();
+  const host: Owner | null = getOwner();
   let owner: Owner | null = null;
   let nodes: ChildNode[] = [];
   let prev: unknown = NONE;
 
-  const clear = () => {
+  const clear = (): void => {
     if (owner) {
       disposeOwner(owner);
       owner = null;
@@ -505,13 +505,13 @@ export function ifBlock(anchor: Comment, selector: () => (() => Node | null) | n
   };
 
   effect(() => {
-    const next = selector();
+    const next: (() => Node | null) | null = selector();
     if (next === prev) return; // same branch → leave the live DOM untouched
     prev = next;
     clear();
     if (next) {
       owner = runInOwner(host, () => createOwner(null));
-      const node = runInOwner(owner, () => next());
+      const node: Node | null = runInOwner(owner, () => next());
       nodes = node ? placeBefore(parent, node, anchor) : [];
     }
   });
@@ -532,12 +532,12 @@ export function dynElement(
   let lastTag: string | undefined;
   let thunk: (() => Node) | null = null;
   ifBlock(anchor, () => {
-    const t = tag();
+    const t: string = tag();
     if (t !== lastTag) {
       lastTag = t;
       thunk = t
         ? () => {
-            const el = document.createElement(t);
+            const el: HTMLElement = document.createElement(t);
             build(el);
             return el;
           }
@@ -553,11 +553,11 @@ export function dynElement(
  * per distinct key forces a swap, while an unchanged key leaves the DOM untouched.
  */
 export function keyBlock(anchor: Comment, key: () => unknown, content: () => Node | null): void {
-  const NONE = Symbol();
+  const NONE: symbol = Symbol();
   let last: unknown = NONE;
   let thunk: (() => Node | null) | null = null;
   ifBlock(anchor, () => {
-    const k = key();
+    const k: unknown = key();
     if (k !== last) {
       last = k;
       thunk = () => content();
@@ -597,15 +597,15 @@ export function eachBlock<T>(
   renderRow: (ctx: ForContext<T>) => Node,
   emptyRender?: () => Node
 ): void {
-  const parent = anchor.parentNode!;
+  const parent: Node = anchor.parentNode!;
   // Construction-time owner — row/empty owners parent to it (see ifBlock) so context
   // survives reconciles driven by an external signal.
-  const host = getOwner();
+  const host: Owner | null = getOwner();
   let rows: EachRow<T>[] = [];
   let emptyOwner: Owner | null = null;
   let emptyNodes: ChildNode[] = [];
 
-  const clearEmpty = () => {
+  const clearEmpty = (): void => {
     if (emptyOwner) {
       disposeOwner(emptyOwner);
       emptyOwner = null;
@@ -613,7 +613,7 @@ export function eachBlock<T>(
     emptyNodes.forEach((n) => n.remove());
     emptyNodes = [];
   };
-  const removeRows = () => {
+  const removeRows = (): void => {
     rows.forEach((r) => {
       disposeOwner(r.owner);
       for (const n of rowSpan(r)) n.remove();
@@ -622,13 +622,13 @@ export function eachBlock<T>(
   };
 
   effect(() => {
-    const data = items() || [];
+    const data: readonly T[] = items() || [];
 
     if (data.length === 0) {
       removeRows();
       if (emptyRender && !emptyOwner) {
         emptyOwner = runInOwner(host, () => createOwner(null));
-        const node = runInOwner(emptyOwner, () => emptyRender());
+        const node: Node = runInOwner(emptyOwner, () => emptyRender());
         emptyNodes = placeBefore(parent, node, anchor);
       }
       return;
@@ -636,9 +636,9 @@ export function eachBlock<T>(
     clearEmpty();
 
     rows = reconcileKeyed(parent, anchor, rows, data, keyOf, (item, i) => {
-      const itemSig = signal(item) as Signal<T>;
-      const indexSig = signal(i);
-      const countSig = signal(data.length);
+      const itemSig: Signal<T> = signal(item) as Signal<T>;
+      const indexSig: Signal<number> = signal(i);
+      const countSig: Signal<number> = signal(data.length);
       const ctx: ForContext<T> = {
         item: itemSig,
         index: indexSig,
@@ -648,16 +648,16 @@ export function eachBlock<T>(
         even: () => indexSig() % 2 === 0,
         odd: () => indexSig() % 2 === 1,
       };
-      const owner = runInOwner(host, () => createOwner(null));
-      const rendered = runInOwner(owner, () => renderRow(ctx));
+      const owner: Owner = runInOwner(host, () => createOwner(null));
+      const rendered: Node = runInOwner(owner, () => renderRow(ctx));
       // A single-element row is tracked by that one node (the hot path). A fragment
       // row (component / multiple roots / text) has no stable single node — and its
       // node count can vary at runtime (e.g. a top-level @if inside) — so bracket it
       // with marker comments and track the span between them.
       let node: ChildNode, end: ChildNode | undefined;
       if (rendered instanceof DocumentFragment) {
-        const start = document.createComment('');
-        const stop = document.createComment('');
+        const start: Comment = document.createComment('');
+        const stop: Comment = document.createComment('');
         rendered.insertBefore(start, rendered.firstChild);
         rendered.appendChild(stop);
         node = start;
@@ -722,12 +722,12 @@ export function deferBlock(
   content: () => Node,
   placeholder?: () => Node
 ): void {
-  const parent = anchor.parentNode!;
-  const host = getOwner();
+  const parent: Node = anchor.parentNode!;
+  const host: Owner | null = getOwner();
   let owner: Owner | null = null;
   let nodes: ChildNode[] = [];
-  let fired = false;
-  let disposed = false;
+  let fired: boolean = false;
+  let disposed: boolean = false;
   let disarm: (() => void) | void;
 
   const clear = (): void => {
@@ -741,7 +741,7 @@ export function deferBlock(
   const render = (fn: () => Node): void => {
     clear();
     owner = runInOwner(host, () => createOwner(null));
-    const node = runInOwner(owner, () => fn());
+    const node: Node = runInOwner(owner, () => fn());
     nodes = node ? placeBefore(parent, node, anchor) : [];
   };
 
@@ -769,7 +769,10 @@ function arm(
   target: () => Element | null,
   host: Owner | null
 ): (() => void) | void {
-  const g = globalThis as typeof globalThis & {
+  const g: typeof globalThis & {
+    requestIdleCallback?: (cb: () => void) => number;
+    cancelIdleCallback?: (id: number) => void;
+  } = globalThis as typeof globalThis & {
     requestIdleCallback?: (cb: () => void) => number;
     cancelIdleCallback?: (id: number) => void;
   };
@@ -787,20 +790,20 @@ function arm(
       );
     case 'idle': {
       if (g.requestIdleCallback) {
-        const id = g.requestIdleCallback(fire);
+        const id: number = g.requestIdleCallback(fire);
         return () => g.cancelIdleCallback?.(id);
       }
-      const t = setTimeout(fire, 1);
+      const t: ReturnType<typeof setTimeout> = setTimeout(fire, 1);
       return () => clearTimeout(t);
     }
     case 'timer': {
-      const t = setTimeout(fire, (trigger as { ms: number }).ms);
+      const t: ReturnType<typeof setTimeout> = setTimeout(fire, (trigger as { ms: number }).ms);
       return () => clearTimeout(t);
     }
     case 'viewport': {
-      const el = target();
+      const el: Element | null = target();
       if (!el || typeof IntersectionObserver === 'undefined') return void fire();
-      const io = new IntersectionObserver((entries) => {
+      const io: IntersectionObserver = new IntersectionObserver((entries) => {
         if (entries.some((e) => e.isIntersecting)) fire();
       });
       io.observe(el);
@@ -808,9 +811,9 @@ function arm(
     }
     case 'interaction':
     case 'hover': {
-      const el = target();
+      const el: Element | null = target();
       if (!el) return void fire();
-      const events =
+      const events: string[] =
         trigger.on === 'hover' ? ['pointerenter', 'focusin'] : ['click', 'keydown'];
       const handler = (): void => fire();
       for (const ev of events) el.addEventListener(ev, handler);
@@ -855,12 +858,12 @@ export function awaitBlock(
   then?: (value: unknown) => Node,
   onCatch?: (err: unknown) => Node
 ): void {
-  const src = untrack(source);
-  const pendingThunk = pending ? () => pending() : null;
+  const src: unknown = untrack(source);
+  const pendingThunk: (() => Node) | null = pending ? () => pending() : null;
 
   if (isResource(src)) {
-    const thenThunk = then ? () => then(src.data()) : null;
-    const catchThunk = onCatch ? () => onCatch(src.error()) : null;
+    const thenThunk: (() => Node) | null = then ? () => then(src.data()) : null;
+    const catchThunk: (() => Node) | null = onCatch ? () => onCatch(src.error()) : null;
     ifBlock(anchor, () => {
       if (src.loading()) return pendingThunk;
       if (src.error() != null) return catchThunk;
@@ -870,17 +873,17 @@ export function awaitBlock(
   }
 
   // a Promise (or plain value): settle once into a small state machine
-  const state = signal<'pending' | 'then' | 'catch'>('pending');
-  const value = signal<unknown>(undefined);
-  const failure = signal<unknown>(undefined);
+  const state: Signal<'pending' | 'then' | 'catch'> = signal<'pending' | 'then' | 'catch'>('pending');
+  const value: Signal<unknown> = signal<unknown>(undefined);
+  const failure: Signal<unknown> = signal<unknown>(undefined);
   Promise.resolve(src).then(
     (v) => batch(() => { value.set(v); state.set('then'); }),
     (e) => batch(() => { failure.set(e); state.set('catch'); })
   );
-  const thenThunk = then ? () => then(value()) : null;
-  const catchThunk = onCatch ? () => onCatch(failure()) : null;
+  const thenThunk: (() => Node) | null = then ? () => then(value()) : null;
+  const catchThunk: (() => Node) | null = onCatch ? () => onCatch(failure()) : null;
   ifBlock(anchor, () => {
-    const s = state();
+    const s: 'pending' | 'then' | 'catch' = state();
     return s === 'pending' ? pendingThunk : s === 'catch' ? catchThunk : thenThunk;
   });
 }
@@ -918,15 +921,15 @@ export function defineComponent(
   setup?: (props: Record<string, unknown>) => Record<string, unknown> | void
 ): Component {
   return (props = {}, slots = {}) => {
-    const owner = createOwner(); // _parent = surrounding owner (context chain)
+    const owner: Owner = createOwner(); // _parent = surrounding owner (context chain)
     onDispose(() => disposeOwner(owner)); // surrounding scope disposes this instance
     return runInOwner(owner, () => {
-      const bindings = setup ? setup(props) || {} : {};
+      const bindings: Record<string, unknown> = setup ? setup(props) || {} : {};
       // Define bindings as OWN properties over `props` (on the prototype). Uses
       // descriptors, not assignment: `Object.assign` does a `[[Set]]`, which honours
       // a getter-only prop of the same name on the prototype and throws — so a binding
       // that shadows a like-named prop (the documented case) must be *defined*, not set.
-      const ctx = Object.defineProperties(
+      const ctx: Record<string, unknown> = Object.defineProperties(
         Object.create(props),
         Object.getOwnPropertyDescriptors(bindings)
       );
@@ -941,9 +944,9 @@ export function mountComponent(
   container: Element,
   props?: Record<string, unknown>
 ): () => void {
-  const owner = createOwner(null);
-  const node = runInOwner(owner, () => component(props, {}));
-  const unmount = mount(node, container);
+  const owner: Owner = createOwner(null);
+  const node: Node = runInOwner(owner, () => component(props, {}));
+  const unmount: () => void = mount(node, container);
   return () => {
     disposeOwner(owner);
     unmount();
@@ -976,17 +979,17 @@ export function defineCustomElement(
   component: Component,
   options: CustomElementOptions = {}
 ): void {
-  const propNames = options.props ?? [];
+  const propNames: string[] = options.props ?? [];
 
   class WeaveElement extends HTMLElement {
-    static observedAttributes = propNames.map(kebab);
+    static observedAttributes: string[] = propNames.map(kebab);
     private _sigs: Record<string, Signal<unknown>> = {};
     private _dispose?: () => void;
 
     constructor() {
       super();
       for (const p of propNames) {
-        const sig = signal<unknown>(undefined);
+        const sig: Signal<unknown> = signal<unknown>(undefined);
         this._sigs[p] = sig;
         // a JS property so `el.label = 'x'` works (and stays reactive)
         Object.defineProperty(this, p, {
@@ -1002,7 +1005,7 @@ export function defineCustomElement(
       if (this._dispose) return; // already mounted (re-connect without disconnect)
       // seed from any attributes present at mount time
       for (const p of propNames) {
-        const a = this.getAttribute(kebab(p));
+        const a: string | null = this.getAttribute(kebab(p));
         if (a !== null) this._sigs[p].set(() => a);
       }
       const props: Record<string, unknown> = {};
@@ -1013,7 +1016,7 @@ export function defineCustomElement(
     }
 
     attributeChangedCallback(name: string, _old: string | null, val: string | null): void {
-      const p = camel(name);
+      const p: string = camel(name);
       this._sigs[p]?.set(() => val);
     }
 
@@ -1049,8 +1052,8 @@ export function lazy(
 ): Component {
   let resolved: Component | null = null;
   let failed: unknown = null;
-  let started = false;
-  const state = signal<'loading' | 'ready' | 'error'>('loading');
+  let started: boolean = false;
+  const state: Signal<'loading' | 'ready' | 'error'> = signal<'loading' | 'ready' | 'error'>('loading');
 
   const start = (): void => {
     if (started) return;
@@ -1067,16 +1070,16 @@ export function lazy(
     );
   };
 
-  const Lazy = ((props = {}, slots = {}) => {
+  const Lazy: Component & { preload: () => void } = ((props = {}, slots = {}) => {
     start();
-    const host = document.createElement('div');
+    const host: HTMLDivElement = document.createElement('div');
     host.style.display = 'contents';
-    const anchor = document.createComment('lazy');
+    const anchor: Comment = document.createComment('lazy');
     host.appendChild(anchor);
     ifBlock(anchor, () => {
-      const s = state();
+      const s: 'loading' | 'ready' | 'error' = state();
       if (s === 'ready') {
-        const comp = resolved!;
+        const comp: Component = resolved!;
         return () => comp(props, slots);
       }
       if (s === 'error') return opts.error ? () => opts.error!(failed) : null;
@@ -1099,14 +1102,14 @@ export function lazy(
  * Usage: `<ErrorBoundary fallback={(err, reset) => …}>…</ErrorBoundary>`.
  */
 export const ErrorBoundary: Component = (props = {}, slots = {}) => {
-  const fallback = (props as { fallback?: (err: unknown, reset: () => void) => Node }).fallback;
-  const host = document.createElement('div');
+  const fallback: ((err: unknown, reset: () => void) => Node) | undefined = (props as { fallback?: (err: unknown, reset: () => void) => Node }).fallback;
+  const host: HTMLDivElement = document.createElement('div');
   host.style.display = 'contents';
-  const anchor = document.createComment('boundary');
+  const anchor: Comment = document.createComment('boundary');
   host.appendChild(anchor);
 
-  const failure = signal<{ err: unknown } | null>(null);
-  let failing = false;
+  const failure: Signal<{ err: unknown } | null> = signal<{ err: unknown } | null>(null);
+  let failing: boolean = false;
   // Defer the swap to a microtask: the error often surfaces *inside* the children's
   // render/effect run, so flipping the signal synchronously would re-enter the same
   // ifBlock mid-render. The microtask lets the current pass unwind first. The `failing`
@@ -1124,9 +1127,9 @@ export const ErrorBoundary: Component = (props = {}, slots = {}) => {
   // Optional `resetKey`: a reactive value that clears the error when it changes
   // (the React `resetKeys` pattern) — e.g. `resetKey={path()}` to recover on
   // navigation without remounting the protected content. The initial run is skipped.
-  const resetKey = (props as { resetKey?: unknown }).resetKey;
+  const resetKey: unknown = (props as { resetKey?: unknown }).resetKey;
   if (resetKey !== undefined) {
-    let first = true;
+    let first: boolean = true;
     effect(() => {
       (props as { resetKey?: unknown }).resetKey; // track the (reactive) prop getter
       if (first) {
@@ -1138,13 +1141,13 @@ export const ErrorBoundary: Component = (props = {}, slots = {}) => {
   }
 
   ifBlock(anchor, () => {
-    const f = failure();
+    const f: { err: unknown } | null = failure();
     if (f) {
       return () => (fallback ? fallback(f.err, reset) : document.createComment('error'));
     }
     return () => {
       // Route effect errors from this subtree here, and catch synchronous render errors.
-      const owner = getOwner();
+      const owner: Owner | null = getOwner();
       if (owner) owner._onError = fail;
       try {
         return slots.default ? slots.default() : document.createComment('empty');
@@ -1173,15 +1176,15 @@ export const ErrorBoundary: Component = (props = {}, slots = {}) => {
  * Usage: `<Portal to="body"><div class="modal">…</div></Portal>`.
  */
 export const Portal: Component = (props = {}, slots = {}) => {
-  const to = (props as { to?: string | Element }).to;
+  const to: string | Element | undefined = (props as { to?: string | Element }).to;
   const target: Element =
     (typeof to === 'string' ? document.querySelector(to) : to) ?? document.body;
 
-  const placeholder = document.createComment('portal');
-  const content = slots.default ? slots.default() : null;
+  const placeholder: Comment = document.createComment('portal');
+  const content: Node | null = slots.default ? slots.default() : null;
   if (content) {
     // A fragment empties on insert, so capture the real child nodes first for removal.
-    const nodes = content instanceof DocumentFragment ? [...content.childNodes] : [content];
+    const nodes: Node[] = content instanceof DocumentFragment ? [...content.childNodes] : [content];
     target.appendChild(content);
     onDispose(() => nodes.forEach((n) => (n as ChildNode).remove()));
   }
@@ -1193,7 +1196,7 @@ export const Portal: Component = (props = {}, slots = {}) => {
 /** Mount a node into a container, replacing its contents. Returns an unmount fn. */
 export function mount(node: Node, container: Element): () => void {
   container.textContent = '';
-  const nodes = node instanceof DocumentFragment ? [...node.childNodes] : [node];
+  const nodes: Node[] = node instanceof DocumentFragment ? [...node.childNodes] : [node];
   container.append(node);
   return () => nodes.forEach((n) => (n as ChildNode).remove());
 }

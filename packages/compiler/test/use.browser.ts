@@ -1,13 +1,18 @@
 import { test, assert } from '../../../tools/harness.js';
-import { signal, computed, effect, root, onDispose, onCleanup, createOwner, runInOwner, disposeOwner } from '@weave/runtime';
+import { signal, computed, effect, root, onDispose, onCleanup, createOwner, runInOwner, disposeOwner, type Signal, type Owner } from '@weave/runtime';
 import * as dom from '@weave/runtime/dom';
 import { compileTemplate } from '@weave/compiler';
 
 // The runtime object the compiled (function-mode) code references as `rt`.
-const rt = { ...dom, signal, computed, effect, root };
+const rt: typeof dom & {
+  signal: typeof signal;
+  computed: typeof computed;
+  effect: typeof effect;
+  root: typeof root;
+} = { ...dom, signal, computed, effect, root };
 
 /** Let queued onMount microtasks flush (applyAction defers to onMount timing). */
-const tick = () => new Promise<void>((r) => queueMicrotask(r));
+const tick = (): Promise<void> => new Promise<void>((r) => queueMicrotask(r));
 
 /**
  * Compile a `use:` template (function mode), instantiate it inside a fresh owner,
@@ -20,9 +25,9 @@ function mount(
   scope: string[]
 ): { el: Element; dispose: () => void } {
   const { code } = compileTemplate(html, { mode: 'function', scope });
-  const fn = new Function('ctx', 'rt', '_c', code) as (c: unknown, r: unknown, k: unknown) => Element;
-  const owner = createOwner();
-  const el = runInOwner(owner, () => fn(ctx, rt, {}));
+  const fn: (c: unknown, r: unknown, k: unknown) => Element = new Function('ctx', 'rt', '_c', code) as (c: unknown, r: unknown, k: unknown) => Element;
+  const owner: Owner = createOwner();
+  const el: Element = runInOwner(owner, () => fn(ctx, rt, {}));
   document.body.appendChild(el);
   return {
     el,
@@ -35,7 +40,7 @@ function mount(
 
 test('use: runs the action after insertion with the live element (not synchronously)', async () => {
   let calledWith: { el: Element | null; live: boolean } | null = null;
-  const flag = (el: Element) => {
+  const flag = (el: Element): void => {
     calledWith = { el, live: document.contains(el) };
   };
   const { el, dispose } = mount('<div id="ua-a" use:flag></div>', { flag }, ['flag']);
@@ -50,7 +55,7 @@ test('use: runs the action after insertion with the live element (not synchronou
 
 test('use:action={arg} passes the argument through', async () => {
   let seen: unknown = undefined;
-  const grab = (_el: Element, arg: unknown) => {
+  const grab = (_el: Element, arg: unknown): void => {
     seen = arg;
   };
   const { dispose } = mount('<div use:grab={opts}></div>', { grab, opts: { color: 'red' } }, ['grab', 'opts']);
@@ -62,7 +67,7 @@ test('use:action={arg} passes the argument through', async () => {
 test('use:action with no arg calls action(el, undefined)', async () => {
   let arg: unknown = 'sentinel';
   let gotEl: Element | null = null;
-  const probe = (el: Element, a: unknown) => {
+  const probe = (el: Element, a: unknown): void => {
     gotEl = el;
     arg = a;
   };
@@ -74,10 +79,10 @@ test('use:action with no arg calls action(el, undefined)', async () => {
 });
 
 test('reactive arg via getter — action wraps the read in an effect', async () => {
-  const text = signal('hi');
+  const text: Signal<string> = signal('hi');
   const seen: string[] = [];
   // The Weave-native reactivity contract: pass a getter, read it inside an effect.
-  const tip = (_el: Element, get: () => string) => {
+  const tip = (_el: Element, get: () => string): void => {
     effect(() => {
       seen.push(get());
     });
@@ -95,7 +100,7 @@ test('reactive arg via getter — action wraps the read in an effect', async () 
 });
 
 test('a returned cleanup runs on unmount', async () => {
-  let cleaned = 0;
+  let cleaned: number = 0;
   const listen = () => () => {
     cleaned++;
   };
@@ -107,8 +112,8 @@ test('a returned cleanup runs on unmount', async () => {
 });
 
 test('onDispose inside an action runs on unmount (owner-scoped teardown)', async () => {
-  let cleaned = 0;
-  const wire = () => {
+  let cleaned: number = 0;
+  const wire = (): void => {
     onDispose(() => {
       cleaned++;
     });
@@ -121,11 +126,11 @@ test('onDispose inside an action runs on unmount (owner-scoped teardown)', async
 });
 
 test('onCleanup works inside an effect the action creates', async () => {
-  const n = signal(0);
+  const n: Signal<number> = signal(0);
   const cleanups: number[] = [];
-  const wire = () => {
+  const wire = (): void => {
     effect(() => {
-      const v = n();
+      const v: number = n();
       onCleanup(() => cleanups.push(v)); // effect-scoped: fires before each re-run + on dispose
     });
   };
@@ -139,8 +144,8 @@ test('onCleanup works inside an effect the action creates', async () => {
 
 test('multiple use: directives on one element each run with that element', async () => {
   const hits: string[] = [];
-  const a = (el: Element) => hits.push('a:' + el.tagName);
-  const b = (el: Element) => hits.push('b:' + el.tagName);
+  const a = (el: Element): number => hits.push('a:' + el.tagName);
+  const b = (el: Element): number => hits.push('b:' + el.tagName);
   const { dispose } = mount('<section use:a use:b></section>', { a, b }, ['a', 'b']);
   await tick();
   assert.deepEqual(hits.sort(), ['a:SECTION', 'b:SECTION'], 'both actions ran on the same element');
@@ -148,8 +153,8 @@ test('multiple use: directives on one element each run with that element', async
 });
 
 test('use: on a nested (non-root) element resolves the right node', async () => {
-  let tag = '';
-  const mark = (el: Element) => {
+  let tag: string = '';
+  const mark = (el: Element): void => {
     tag = el.tagName + '#' + el.id;
   };
   const { dispose } = mount('<div><p></p><span id="inner" use:mark></span></div>', { mark }, ['mark']);

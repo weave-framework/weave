@@ -9,14 +9,17 @@ import {
   createOwner,
   runInOwner,
   type Signal,
+  type Context,
+  type Owner,
 } from '@weave/runtime';
 import { defineComponent, ifBlock } from '@weave/runtime/dom';
+import type { Component } from '@weave/runtime/dom';
 
 test('inject reads the nearest provided value', () => {
-  const Theme = createContext('light');
+  const Theme: Context<string> = createContext('light');
   root(() => {
     provide(Theme, 'dark');
-    const child = createOwner();
+    const child: Owner = createOwner();
     runInOwner(child, () => {
       assert.equal(inject(Theme), 'dark');
     });
@@ -24,24 +27,24 @@ test('inject reads the nearest provided value', () => {
 });
 
 test('inject falls back to the context default when no ancestor provided', () => {
-  const Count = createContext(42);
+  const Count: Context<number> = createContext(42);
   root(() => {
     assert.equal(inject(Count), 42);
   });
 });
 
 test('inject returns undefined when there is no default and no provider', () => {
-  const C = createContext<string>();
+  const C: Context<string> = createContext<string>();
   root(() => {
     assert.equal(inject(C), undefined);
   });
 });
 
 test('a nested provide shadows an outer one for its subtree only', () => {
-  const C = createContext('a');
+  const C: Context<string> = createContext('a');
   root(() => {
     provide(C, 'b');
-    const inner = createOwner();
+    const inner: Owner = createOwner();
     runInOwner(inner, () => {
       provide(C, 'c');
       assert.equal(inject(C), 'c');
@@ -52,14 +55,14 @@ test('a nested provide shadows an outer one for its subtree only', () => {
 });
 
 test('context carries a reactive signal that stays live across the boundary', () => {
-  const Count = createContext<Signal<number>>();
+  const Count: Context<Signal<number>> = createContext<Signal<number>>();
   root(() => {
-    const n = signal(1);
+    const n: Signal<number> = signal(1);
     provide(Count, n);
-    const child = createOwner();
+    const child: Owner = createOwner();
     const seen: number[] = [];
     runInOwner(child, () => {
-      const c = inject(Count)!;
+      const c: Signal<number> = inject(Count)!;
       effect(() => seen.push(c()));
     });
     assert.deepEqual(seen, [1]);
@@ -69,11 +72,11 @@ test('context carries a reactive signal that stays live across the boundary', ()
 });
 
 test('inject works inside an effect, not just synchronous setup (owner-tree, not a render stack)', () => {
-  const C = createContext('x');
+  const C: Context<string> = createContext('x');
   root(() => {
     provide(C, 'y');
-    const child = createOwner();
-    let got = '';
+    const child: Owner = createOwner();
+    let got: string = '';
     runInOwner(child, () => {
       effect(() => {
         got = inject(C);
@@ -84,8 +87,8 @@ test('inject works inside an effect, not just synchronous setup (owner-tree, not
 });
 
 test('provide outside any owner scope throws', () => {
-  const C = createContext(0);
-  let threw = false;
+  const C: Context<number> = createContext(0);
+  let threw: boolean = false;
   try {
     provide(C, 1);
   } catch {
@@ -95,14 +98,14 @@ test('provide outside any owner scope throws', () => {
 });
 
 test('context survives a control-flow re-render driven from outside the owner', () => {
-  const C = createContext('default');
+  const C: Context<string> = createContext('default');
   const seen: string[] = [];
-  const toggle = signal(true);
-  const branchA = () => {
+  const toggle: Signal<boolean> = signal(true);
+  const branchA = (): Text => {
     seen.push('A:' + inject(C));
     return document.createTextNode('A');
   };
-  const branchB = () => {
+  const branchB = (): Text => {
     seen.push('B:' + inject(C));
     return document.createTextNode('B');
   };
@@ -111,8 +114,8 @@ test('context survives a control-flow re-render driven from outside the owner', 
   root((d) => {
     dispose = d;
     provide(C, 'provided');
-    const anchor = document.createComment('if');
-    const wrap = document.createElement('div');
+    const anchor: Comment = document.createComment('if');
+    const wrap: HTMLDivElement = document.createElement('div');
     wrap.appendChild(anchor);
     ifBlock(anchor, () => (toggle() ? branchA : branchB));
   });
@@ -127,11 +130,11 @@ test('context survives a control-flow re-render driven from outside the owner', 
 });
 
 test('defineComponent: a descendant injects the provider, a sibling sees only the default', () => {
-  const Ctx = createContext('default');
+  const Ctx: Context<string> = createContext('default');
   const log: string[] = [];
 
   // Leaf injects the context during setup and records it under a label prop.
-  const Leaf = defineComponent(
+  const Leaf: Component = defineComponent(
     () => document.createComment('leaf'),
     (props) => {
       log.push(`${props.label}:${inject(Ctx)}`);
@@ -139,7 +142,7 @@ test('defineComponent: a descendant injects the provider, a sibling sees only th
   );
 
   // Provider provides a value in setup, then mounts a Leaf inside its own scope.
-  const Provider = defineComponent(
+  const Provider: Component = defineComponent(
     () => {
       Leaf({ label: 'inside' }, {});
       return document.createComment('provider');

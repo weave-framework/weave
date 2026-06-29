@@ -1,20 +1,22 @@
 import { test, assert } from '../../../tools/harness.js';
 import { signal, root } from '@weave/runtime';
+import type { Signal } from '@weave/runtime';
 import { resource, createClient, HttpError, action, optimistic } from '@weave/data';
+import type { Resource, Client, Action, Optimistic } from '@weave/data';
 
 /** Flush all pending microtasks (resource defers its fetch + chains two .then). */
-const tick = () => new Promise<void>((r) => setTimeout(r, 0));
+const tick = (): Promise<void> => new Promise<void>((r) => setTimeout(r, 0));
 
 /** Await until a predicate holds — robust to real `Response.json()` resolving across ticks. */
-async function until(pred: () => boolean, tries = 50): Promise<void> {
-  for (let i = 0; i < tries && !pred(); i++) await tick();
+async function until(pred: () => boolean, tries: number = 50): Promise<void> {
+  for (let i: number = 0; i < tries && !pred(); i++) await tick();
 }
 
 /** A promise whose resolve/reject are available synchronously. */
-function deferred<T>() {
+function deferred<T>(): { promise: Promise<T>; resolve: (v: T) => void; reject: (e: unknown) => void } {
   let resolve!: (v: T) => void;
   let reject!: (e: unknown) => void;
-  const promise = new Promise<T>((res, rej) => {
+  const promise: Promise<T> = new Promise<T>((res, rej) => {
     resolve = res;
     reject = rej;
   });
@@ -32,8 +34,8 @@ function jsonResponse(body: unknown, init: ResponseInit = {}): Response {
 /* ──────────────────────────── resource ──────────────────────────── */
 
 test('resource: loading starts true, then data resolves', async () => {
-  const d = deferred<number>();
-  const r = resource(() => d.promise);
+  const d: ReturnType<typeof deferred<number>> = deferred<number>();
+  const r: Resource<number> = resource(() => d.promise);
   assert.equal(r.loading(), true, 'loading true while pending');
   assert.equal(r.data(), undefined);
 
@@ -45,10 +47,10 @@ test('resource: loading starts true, then data resolves', async () => {
 });
 
 test('resource: refetches when the source changes, aborting the previous request', async () => {
-  const id = signal(1);
+  const id: Signal<number> = signal(1);
   const seen: number[] = [];
   const signals: AbortSignal[] = [];
-  const r = resource(
+  const r: Resource<string> = resource(
     () => id(),
     (n, { signal }) => {
       seen.push(n);
@@ -69,10 +71,10 @@ test('resource: refetches when the source changes, aborting the previous request
 });
 
 test('resource: a stale in-flight result never overwrites a newer one', async () => {
-  const id = signal(1);
-  const d1 = deferred<string>();
-  const d2 = deferred<string>();
-  const r = resource(
+  const id: Signal<number> = signal(1);
+  const d1: ReturnType<typeof deferred<string>> = deferred<string>();
+  const d2: ReturnType<typeof deferred<string>> = deferred<string>();
+  const r: Resource<string> = resource(
     () => id(),
     (n) => (n === 1 ? d1.promise : d2.promise)
   );
@@ -88,9 +90,9 @@ test('resource: a stale in-flight result never overwrites a newer one', async ()
 });
 
 test('resource: a not-ready source (null) skips the fetch', async () => {
-  const id = signal<number | null>(null);
-  let calls = 0;
-  const r = resource(
+  const id: Signal<number | null> = signal<number | null>(null);
+  let calls: number = 0;
+  const r: Resource<number> = resource(
     () => id(),
     (n) => {
       calls++;
@@ -109,8 +111,8 @@ test('resource: a not-ready source (null) skips the fetch', async () => {
 });
 
 test('resource: a rejection lands in error() and clears loading', async () => {
-  const d = deferred<number>();
-  const r = resource(() => d.promise);
+  const d: ReturnType<typeof deferred<number>> = deferred<number>();
+  const r: Resource<number> = resource(() => d.promise);
 
   d.reject(new Error('boom'));
   await tick();
@@ -120,8 +122,8 @@ test('resource: a rejection lands in error() and clears loading', async () => {
 });
 
 test('resource: refetch() re-runs the fetcher with the same source', async () => {
-  let calls = 0;
-  const r = resource(
+  let calls: number = 0;
+  const r: Resource<number> = resource(
     () => true,
     () => Promise.resolve(++calls)
   );
@@ -136,8 +138,8 @@ test('resource: refetch() re-runs the fetcher with the same source', async () =>
 });
 
 test('resource: mutate() sets data without fetching', async () => {
-  let calls = 0;
-  const r = resource(
+  let calls: number = 0;
+  const r: Resource<number> = resource(
     () => true,
     () => Promise.resolve(++calls)
   );
@@ -151,8 +153,8 @@ test('resource: mutate() sets data without fetching', async () => {
 });
 
 test('resource: initialValue is returned before the first resolve', async () => {
-  const d = deferred<string>();
-  const r = resource(() => d.promise, { initialValue: 'seed' });
+  const d: ReturnType<typeof deferred<string>> = deferred<string>();
+  const r: Resource<string> = resource(() => d.promise, { initialValue: 'seed' });
   assert.equal(r.data(), 'seed');
 
   d.resolve('real');
@@ -162,7 +164,7 @@ test('resource: initialValue is returned before the first resolve', async () => 
 
 test('resource: disposing the owner aborts the in-flight request', async () => {
   let captured!: AbortSignal;
-  const dispose = root((d) => {
+  const dispose: () => void = root((d) => {
     resource((_v: true, { signal }) => {
       captured = signal;
       return new Promise<number>(() => {}); // never resolves
@@ -179,8 +181,8 @@ test('resource: disposing the owner aborts the in-flight request', async () => {
 /* ──────────────────────────── createClient ──────────────────────────── */
 
 test('client.get: applies baseUrl + params and parses JSON', async () => {
-  let calledUrl = '';
-  const client = createClient({
+  let calledUrl: string = '';
+  const client: Client = createClient({
     baseUrl: 'https://api.test',
     fetch: async (url) => {
       calledUrl = String(url);
@@ -188,14 +190,16 @@ test('client.get: applies baseUrl + params and parses JSON', async () => {
     },
   });
 
-  const out = await client.get<{ ok: number }>('/items', { params: { page: 2, q: 'x' } });
+  const out: { ok: number } = await client.get<{ ok: number }>('/items', {
+    params: { page: 2, q: 'x' },
+  });
   assert.equal(calledUrl, 'https://api.test/items?page=2&q=x');
   assert.deepEqual(out, { ok: 1 });
 });
 
 test('client.post: sends a JSON body with Content-Type and default headers', async () => {
   let init!: RequestInit;
-  const client = createClient({
+  const client: Client = createClient({
     headers: { Authorization: 'Bearer t' },
     fetch: async (_url, i) => {
       init = i!;
@@ -203,8 +207,8 @@ test('client.post: sends a JSON body with Content-Type and default headers', asy
     },
   });
 
-  const out = await client.post<{ id: number }>('/u', { name: 'A' });
-  const h = new Headers(init.headers);
+  const out: { id: number } = await client.post<{ id: number }>('/u', { name: 'A' });
+  const h: Headers = new Headers(init.headers);
   assert.equal(h.get('content-type'), 'application/json');
   assert.equal(h.get('authorization'), 'Bearer t');
   assert.equal(init.body, JSON.stringify({ name: 'A' }));
@@ -214,7 +218,7 @@ test('client.post: sends a JSON body with Content-Type and default headers', asy
 
 test('client: a non-2xx response throws HttpError and calls onError', async () => {
   let caught: unknown;
-  const client = createClient({
+  const client: Client = createClient({
     onError: (e) => (caught = e),
     fetch: async () => new Response('nope', { status: 404, statusText: 'Not Found' }),
   });
@@ -231,9 +235,9 @@ test('client: a non-2xx response throws HttpError and calls onError', async () =
 });
 
 test('client: a headers function is evaluated per request', async () => {
-  let token = 1;
-  let seen = '';
-  const client = createClient({
+  let token: number = 1;
+  let seen: string = '';
+  const client: Client = createClient({
     headers: () => ({ Authorization: `Bearer ${token}` }),
     fetch: async (_u, i) => {
       seen = new Headers(i!.headers).get('authorization') ?? '';
@@ -250,15 +254,15 @@ test('client: a headers function is evaluated per request', async () => {
 
 test('resource + client: client.get works as a fetcher and receives the abort signal', async () => {
   let gotSignal: AbortSignal | undefined;
-  const client = createClient({
+  const client: Client = createClient({
     fetch: async (_u, i) => {
       gotSignal = i?.signal ?? undefined;
       return jsonResponse({ v: 'hi' });
     },
   });
 
-  const id = signal('a');
-  const r = resource(
+  const id: Signal<string> = signal('a');
+  const r: Resource<unknown> = resource(
     () => id(),
     (key, { signal }) => client.get(`/x/${key}`, { signal })
   );
@@ -271,8 +275,8 @@ test('resource + client: client.get works as a fetcher and receives the abort si
 /* ──────────────────────────── interceptors ──────────────────────────── */
 
 test('interceptor: mutates the request (auth header) before fetch', async () => {
-  let seen = '';
-  const client = createClient({
+  let seen: string = '';
+  const client: Client = createClient({
     interceptors: [
       (req, next) => {
         req.headers.set('Authorization', 'Bearer xyz');
@@ -290,11 +294,11 @@ test('interceptor: mutates the request (auth header) before fetch', async () => 
 });
 
 test('interceptor: can read the response after next() resolves', async () => {
-  let observedStatus = 0;
-  const client = createClient({
+  let observedStatus: number = 0;
+  const client: Client = createClient({
     interceptors: [
       async (req, next) => {
-        const res = await next(req);
+        const res: Response = await next(req);
         observedStatus = res.status;
         return res;
       },
@@ -307,8 +311,8 @@ test('interceptor: can read the response after next() resolves', async () => {
 });
 
 test('interceptor: short-circuits (cache hit) without calling next', async () => {
-  let fetched = 0;
-  const client = createClient({
+  let fetched: number = 0;
+  const client: Client = createClient({
     interceptors: [(_req, _next) => Promise.resolve(jsonResponse({ cached: true }))],
     fetch: async () => {
       fetched++;
@@ -316,17 +320,17 @@ test('interceptor: short-circuits (cache hit) without calling next', async () =>
     },
   });
 
-  const out = await client.get<{ cached: boolean }>('/a');
+  const out: { cached: boolean } = await client.get<{ cached: boolean }>('/a');
   assert.deepEqual(out, { cached: true });
   assert.equal(fetched, 0, 'real fetch was bypassed');
 });
 
 test('interceptor: can retry a failed request', async () => {
-  let attempt = 0;
-  const client = createClient({
+  let attempt: number = 0;
+  const client: Client = createClient({
     interceptors: [
       async (req, next) => {
-        let res = await next(req);
+        let res: Response = await next(req);
         if (!res.ok) res = await next(req); // one retry
         return res;
       },
@@ -339,24 +343,24 @@ test('interceptor: can retry a failed request', async () => {
     },
   });
 
-  const out = await client.get<{ ok: number }>('/a');
+  const out: { ok: number } = await client.get<{ ok: number }>('/a');
   assert.equal(attempt, 2, 'retried once');
   assert.deepEqual(out, { ok: 1 });
 });
 
 test('interceptor: chain runs outermost-first on the way in, unwinds on the way out', async () => {
   const order: string[] = [];
-  const client = createClient({
+  const client: Client = createClient({
     interceptors: [
       async (req, next) => {
         order.push('a:in');
-        const res = await next(req);
+        const res: Response = await next(req);
         order.push('a:out');
         return res;
       },
       async (req, next) => {
         order.push('b:in');
-        const res = await next(req);
+        const res: Response = await next(req);
         order.push('b:out');
         return res;
       },
@@ -374,12 +378,12 @@ test('interceptor: chain runs outermost-first on the way in, unwinds on the way 
 /* ──────────────────────────── action ──────────────────────────── */
 
 test('action: pending toggles and result lands on resolve', async () => {
-  const d = deferred<string>();
-  const a = action(() => d.promise);
+  const d: ReturnType<typeof deferred<string>> = deferred<string>();
+  const a: Action<void, string> = action(() => d.promise);
   assert.equal(a.pending(), false);
   assert.equal(a.result(), undefined);
 
-  const p = a.run();
+  const p: Promise<string> = a.run();
   assert.equal(a.pending(), true, 'pending while in flight');
 
   d.resolve('done');
@@ -390,10 +394,10 @@ test('action: pending toggles and result lands on resolve', async () => {
 });
 
 test('action: a rejection lands in error(), clears pending, and run() rejects', async () => {
-  const d = deferred<number>();
-  const a = action(() => d.promise);
+  const d: ReturnType<typeof deferred<number>> = deferred<number>();
+  const a: Action<void, number> = action(() => d.promise);
 
-  const p = a.run();
+  const p: Promise<number> = a.run();
   d.reject(new Error('nope'));
   let caught: unknown;
   try {
@@ -408,19 +412,19 @@ test('action: a rejection lands in error(), clears pending, and run() rejects', 
 });
 
 test('action: passes input through to the action fn', async () => {
-  const a = action((n: number) => Promise.resolve(n * 2));
+  const a: Action<number, number> = action((n: number) => Promise.resolve(n * 2));
   assert.equal(await a.run(21), 42);
   assert.equal(a.result(), 42);
 });
 
 test('action: a stale (slow) run does not overwrite a newer run’s state', async () => {
-  const d1 = deferred<string>();
-  const d2 = deferred<string>();
-  let call = 0;
-  const a = action(() => (++call === 1 ? d1.promise : d2.promise));
+  const d1: ReturnType<typeof deferred<string>> = deferred<string>();
+  const d2: ReturnType<typeof deferred<string>> = deferred<string>();
+  let call: number = 0;
+  const a: Action<void, string> = action(() => (++call === 1 ? d1.promise : d2.promise));
 
-  const p1 = a.run();
-  const p2 = a.run();
+  const p1: Promise<string> = a.run();
+  const p2: Promise<string> = a.run();
   d2.resolve('second');
   await p2;
   assert.equal(a.result(), 'second');
@@ -434,9 +438,9 @@ test('action: a stale (slow) run does not overwrite a newer run’s state', asyn
 /* ──────────────────────────── optimistic ──────────────────────────── */
 
 test('optimistic: add() overlays the base; default reducer replaces', () => {
-  const base = signal('saved');
-  const o = root((d) => {
-    const opt = optimistic(() => base());
+  const base: Signal<string> = signal('saved');
+  const o: Optimistic<string, string> = root((d) => {
+    const opt: Optimistic<string, string> = optimistic(() => base());
     assert.equal(opt.value(), 'saved', 'starts at base');
     opt.add('typing…');
     assert.equal(opt.value(), 'typing…', 'optimistic value shown');
@@ -447,9 +451,12 @@ test('optimistic: add() overlays the base; default reducer replaces', () => {
 });
 
 test('optimistic: a custom reducer folds adds in order (list append)', () => {
-  const base = signal<string[]>(['a']);
+  const base: Signal<string[]> = signal<string[]>(['a']);
   root((d) => {
-    const opt = optimistic<string[], string>(() => base(), (list, item) => [...list, item]);
+    const opt: Optimistic<string[], string> = optimistic<string[], string>(
+      () => base(),
+      (list, item) => [...list, item]
+    );
     opt.add('b');
     opt.add('c');
     assert.deepEqual(opt.value(), ['a', 'b', 'c']);
@@ -458,9 +465,9 @@ test('optimistic: a custom reducer folds adds in order (list append)', () => {
 });
 
 test('optimistic: overlay clears when the base reconciles (changes)', () => {
-  const base = signal('v1');
+  const base: Signal<string> = signal('v1');
   root((d) => {
-    const opt = optimistic(() => base());
+    const opt: Optimistic<string, string> = optimistic(() => base());
     opt.add('pending');
     assert.equal(opt.value(), 'pending');
 

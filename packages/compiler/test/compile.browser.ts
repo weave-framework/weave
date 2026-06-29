@@ -1,10 +1,15 @@
 import { test, assert } from '../../../tools/harness.js';
-import { signal, computed, effect, root } from '@weave/runtime';
+import { signal, computed, effect, root, type Signal } from '@weave/runtime';
 import * as dom from '@weave/runtime/dom';
 import { compileTemplate } from '@weave/compiler';
 
 // The runtime object the compiled (function-mode) code references as `rt`.
-const rt = { ...dom, signal, computed, effect, root };
+const rt: typeof dom & {
+  signal: typeof signal;
+  computed: typeof computed;
+  effect: typeof effect;
+  root: typeof root;
+} = { ...dom, signal, computed, effect, root };
 
 /** Compile a template to a render function and instantiate it (simulates the compiler's output running). */
 function render(
@@ -14,7 +19,7 @@ function render(
   components: Record<string, unknown> = {}
 ): Element {
   const { code } = compileTemplate(html, { mode: 'function', scope });
-  const fn = new Function('ctx', 'rt', '_c', code) as (ctx: unknown, rt: unknown, _c: unknown) => Element;
+  const fn: (ctx: unknown, rt: unknown, _c: unknown) => Element = new Function('ctx', 'rt', '_c', code) as (ctx: unknown, rt: unknown, _c: unknown) => Element;
   return fn(ctx, rt, components);
 }
 
@@ -25,42 +30,42 @@ function render(
  */
 function compileComponent(html: string, scope: string[] = []): (props: unknown, slots?: unknown) => Node {
   const { code } = compileTemplate(html, { mode: 'function', scope });
-  const body = code.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;');
+  const body: string = code.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;');
   return new Function('rt', '_c', body)(rt, {}) as (props: unknown, slots?: unknown) => Node;
 }
 
 function host(): HTMLElement {
-  const el = document.createElement('div');
+  const el: HTMLDivElement = document.createElement('div');
   document.body.appendChild(el);
   return el;
 }
 
 test('static element compiles and renders', () => {
-  const el = render('<p class="x">hi</p>', {}, []);
+  const el: Element = render('<p class="x">hi</p>', {}, []);
   host().appendChild(el);
   assert.equal((el as HTMLElement).outerHTML, '<p class="x">hi</p>');
 });
 
 test('reactive interpolation updates the same text node', () => {
-  const count = signal(7);
-  const el = render('<span>n: {{ count() }}</span>', { count }, ['count']);
+  const count: Signal<number> = signal(7);
+  const el: Element = render('<span>n: {{ count() }}</span>', { count }, ['count']);
   host().appendChild(el);
   assert.equal(el.textContent, 'n: 7');
-  const dyn = el.childNodes[1] as Text;
+  const dyn: Text = el.childNodes[1] as Text;
   count.set(8);
   assert.equal(el.textContent, 'n: 8');
   assert.is(el.childNodes[1], dyn, 'same text node reused');
 });
 
 test('static interpolation uses setText (no reactivity)', () => {
-  const el = render('<b>{{ 2 + 2 }}</b>', {}, []);
+  const el: Element = render('<b>{{ 2 + 2 }}</b>', {}, []);
   assert.equal(el.textContent, '4');
 });
 
 test('event binding wires a handler that mutates a signal', () => {
-  const count = signal(0);
-  const inc = () => count.set((c) => c + 1);
-  const el = render('<button on:click={inc}>{{ count() }}</button>', { count, inc }, ['count', 'inc']);
+  const count: Signal<number> = signal(0);
+  const inc = (): number => count.set((c) => c + 1);
+  const el: Element = render('<button on:click={inc}>{{ count() }}</button>', { count, inc }, ['count', 'inc']);
   host().appendChild(el);
   assert.equal(el.textContent, '0');
   (el as HTMLButtonElement).click();
@@ -69,17 +74,17 @@ test('event binding wires a handler that mutates a signal', () => {
 });
 
 test('inline arrow handler with member access rewrites only bindings', () => {
-  const count = signal(0);
-  const el = render('<button on:click={() => count.set(n => n + 1)}>x</button>', { count }, ['count']);
+  const count: Signal<number> = signal(0);
+  const el: Element = render('<button on:click={() => count.set(n => n + 1)}>x</button>', { count }, ['count']);
   host().appendChild(el);
   (el as HTMLButtonElement).click();
   assert.equal(count(), 1);
 });
 
 test('dynamic attribute binds reactively (boolean + value)', () => {
-  const disabled = signal(true);
-  const cls = signal('a');
-  const el = render('<input disabled={disabled()} class={cls()}>', { disabled, cls }, ['disabled', 'cls']);
+  const disabled: Signal<boolean> = signal(true);
+  const cls: Signal<string> = signal('a');
+  const el: Element = render('<input disabled={disabled()} class={cls()}>', { disabled, cls }, ['disabled', 'cls']);
   assert.equal(el.hasAttribute('disabled'), true);
   assert.equal(el.getAttribute('class'), 'a');
   disabled.set(false);
@@ -89,45 +94,45 @@ test('dynamic attribute binds reactively (boolean + value)', () => {
 });
 
 test('property binding (.value)', () => {
-  const text = signal('one');
-  const el = render('<input .value={text()}>', { text }, ['text']) as HTMLInputElement;
+  const text: Signal<string> = signal('one');
+  const el: HTMLInputElement = render('<input .value={text()}>', { text }, ['text']) as HTMLInputElement;
   assert.equal(el.value, 'one');
   text.set('two');
   assert.equal(el.value, 'two');
 });
 
 test('class: binding toggles', () => {
-  const done = signal(false);
-  const el = render('<li class:done={done()}>x</li>', { done }, ['done']);
+  const done: Signal<boolean> = signal(false);
+  const el: Element = render('<li class:done={done()}>x</li>', { done }, ['done']);
   assert.equal(el.className, '');
   done.set(true);
   assert.equal(el.className, 'done');
 });
 
 test('event modifier preventDefault wraps the handler', () => {
-  let ran = false;
-  const onSubmit = () => (ran = true);
-  const el = render('<button on:click|preventDefault={onSubmit}>go</button>', { onSubmit }, ['onSubmit']);
+  let ran: boolean = false;
+  const onSubmit = (): boolean => (ran = true);
+  const el: Element = render('<button on:click|preventDefault={onSubmit}>go</button>', { onSubmit }, ['onSubmit']);
   host().appendChild(el);
-  const ev = new MouseEvent('click', { cancelable: true });
+  const ev: MouseEvent = new MouseEvent('click', { cancelable: true });
   el.dispatchEvent(ev);
   assert.ok(ran, 'handler ran');
   assert.ok(ev.defaultPrevented, 'default prevented by modifier');
 });
 
 test('globals are not rewritten to ctx (Math stays Math)', () => {
-  const n = signal(3);
-  const el = render('<b>{{ Math.max(n(), 5) }}</b>', { n }, ['n']);
+  const n: Signal<number> = signal(3);
+  const el: Element = render('<b>{{ Math.max(n(), 5) }}</b>', { n }, ['n']);
   assert.equal(el.textContent, '5');
   n.set(9);
   assert.equal(el.textContent, '9');
 });
 
 test('multi-root template renders a fragment', () => {
-  const a = signal('A');
-  const b = signal('B');
-  const frag = render('<h1>{{ a() }}</h1><p>{{ b() }}</p>', { a, b }, ['a', 'b']);
-  const h = host();
+  const a: Signal<string> = signal('A');
+  const b: Signal<string> = signal('B');
+  const frag: Element = render('<h1>{{ a() }}</h1><p>{{ b() }}</p>', { a, b }, ['a', 'b']);
+  const h: HTMLElement = host();
   h.appendChild(frag);
   assert.equal(h.querySelector('h1')!.textContent, 'A');
   assert.equal(h.querySelector('p')!.textContent, 'B');
@@ -138,8 +143,8 @@ test('multi-root template renders a fragment', () => {
 /* ──────────── M4: control flow ──────────── */
 
 test('@if / @else toggles branches', () => {
-  const open = signal(true);
-  const el = render('<div>@if (open()) { <p>yes</p> } @else { <p>no</p> }</div>', { open }, ['open']);
+  const open: Signal<boolean> = signal(true);
+  const el: Element = render('<div>@if (open()) { <p>yes</p> } @else { <p>no</p> }</div>', { open }, ['open']);
   host().appendChild(el);
   assert.equal(el.querySelector('p')!.textContent, 'yes');
   open.set(false);
@@ -149,19 +154,19 @@ test('@if / @else toggles branches', () => {
 });
 
 test('@if branch is not remounted while condition stays true', () => {
-  const open = signal(true);
-  const tick = signal(0);
-  const el = render('<div>@if (open()) { <p>{{ tick() }}</p> }</div>', { open, tick }, ['open', 'tick']);
+  const open: Signal<boolean> = signal(true);
+  const tick: Signal<number> = signal(0);
+  const el: Element = render('<div>@if (open()) { <p>{{ tick() }}</p> }</div>', { open, tick }, ['open', 'tick']);
   host().appendChild(el);
-  const p = el.querySelector('p')!;
+  const p: HTMLParagraphElement = el.querySelector('p')!;
   tick.set(1);
   assert.is(el.querySelector('p'), p, 'same <p> node — branch not remounted');
   assert.equal(p.textContent, '1');
 });
 
 test('@if (expr; as alias) exposes the value', () => {
-  const user = signal<{ name: string } | null>({ name: 'Ada' });
-  const el = render(
+  const user: Signal<{ name: string } | null> = signal<{ name: string } | null>({ name: 'Ada' });
+  const el: Element = render(
     '<div>@if (user(); as u) { <p>{{ u.name }}</p> } @else { <p>none</p> }</div>',
     { user },
     ['user']
@@ -175,8 +180,8 @@ test('@if (expr; as alias) exposes the value', () => {
 });
 
 test('@for renders, reacts, and exposes $index/$first/$last', () => {
-  const items = signal([{ id: 1, t: 'a' }, { id: 2, t: 'b' }]);
-  const el = render(
+  const items: Signal<{ id: number; t: string }[]> = signal([{ id: 1, t: 'a' }, { id: 2, t: 'b' }]);
+  const el: Element = render(
     '<ul>@for (it of items(); track it.id) { <li>{{ $index }}:{{ it.t }}{{ $last ? "!" : "" }}</li> }</ul>',
     { items },
     ['items']
@@ -188,22 +193,22 @@ test('@for renders, reacts, and exposes $index/$first/$last', () => {
 });
 
 test('@for reflects immutable item updates on reused rows', () => {
-  const items = signal([{ id: 1, t: 'a' }]);
-  const el = render(
+  const items: Signal<{ id: number; t: string }[]> = signal([{ id: 1, t: 'a' }]);
+  const el: Element = render(
     '<ul>@for (it of items(); track it.id) { <li>{{ it.t }}</li> }</ul>',
     { items },
     ['items']
   );
   host().appendChild(el);
-  const li = el.querySelector('li')!;
+  const li: HTMLLIElement = el.querySelector('li')!;
   items.set([{ id: 1, t: 'A' }]); // same key, new object
   assert.is(el.querySelector('li'), li, 'row node reused');
   assert.equal(li.textContent, 'A', 'reused row reflects new item value');
 });
 
 test('@for @empty shows when the list is empty', () => {
-  const items = signal<number[]>([]);
-  const el = render(
+  const items: Signal<number[]> = signal<number[]>([]);
+  const el: Element = render(
     '<ul>@for (n of items(); track n) { <li>{{ n }}</li> } @empty { <li class="e">none</li> }</ul>',
     { items },
     ['items']
@@ -218,8 +223,8 @@ test('@for @empty shows when the list is empty', () => {
 });
 
 test('@switch picks a case and @default', () => {
-  const status = signal('a');
-  const el = render(
+  const status: Signal<string> = signal('a');
+  const el: Element = render(
     '<div>@switch (status()) { @case ("a") { <p>A</p> } @case ("b") { <p>B</p> } @default { <p>?</p> } }</div>',
     { status },
     ['status']
@@ -233,8 +238,8 @@ test('@switch picks a case and @default', () => {
 });
 
 test('@let defines a reactive local', () => {
-  const n = signal(3);
-  const el = render('<div>@let dbl = n() * 2;<b>{{ dbl }}</b></div>', { n }, ['n']);
+  const n: Signal<number> = signal(3);
+  const el: Element = render('<div>@let dbl = n() * 2;<b>{{ dbl }}</b></div>', { n }, ['n']);
   host().appendChild(el);
   assert.equal(el.querySelector('b')!.textContent, '6');
   n.set(5);
@@ -256,16 +261,16 @@ test('module mode emits a real ES module', () => {
 /* ──────────── M5: components + slots ──────────── */
 
 test('component renders with a prop', () => {
-  const Child = compileComponent('<span>{{ label }}</span>', ['label']);
-  const el = render('<div><Child label={"hi"} /></div>', {}, [], { Child });
+  const Child: (props: unknown, slots?: unknown) => Node = compileComponent('<span>{{ label }}</span>', ['label']);
+  const el: Element = render('<div><Child label={"hi"} /></div>', {}, [], { Child });
   host().appendChild(el);
   assert.equal(el.querySelector('span')!.textContent, 'hi');
 });
 
 test('component prop is reactive (parent signal flows through the getter)', () => {
-  const name = signal('Ada');
-  const Child = compileComponent('<span>{{ label }}</span>', ['label']);
-  const el = render('<div><Child label={name()} /></div>', { name }, ['name'], { Child });
+  const name: Signal<string> = signal('Ada');
+  const Child: (props: unknown, slots?: unknown) => Node = compileComponent('<span>{{ label }}</span>', ['label']);
+  const el: Element = render('<div><Child label={name()} /></div>', { name }, ['name'], { Child });
   host().appendChild(el);
   assert.equal(el.querySelector('span')!.textContent, 'Ada');
   name.set('Lin');
@@ -273,28 +278,28 @@ test('component prop is reactive (parent signal flows through the getter)', () =
 });
 
 test('on:event prop fires the parent handler', () => {
-  let got = 0;
-  const handler = () => { got++; };
-  const Child = compileComponent('<button on:click={onSelect}>x</button>', ['onSelect']);
-  const el = render('<div><Child on:select={handler} /></div>', { handler }, ['handler'], { Child });
+  let got: number = 0;
+  const handler = (): void => { got++; };
+  const Child: (props: unknown, slots?: unknown) => Node = compileComponent('<button on:click={onSelect}>x</button>', ['onSelect']);
+  const el: Element = render('<div><Child on:select={handler} /></div>', { handler }, ['handler'], { Child });
   host().appendChild(el);
-  const btn = el.querySelector('button') as HTMLButtonElement;
+  const btn: HTMLButtonElement = el.querySelector('button') as HTMLButtonElement;
   btn.click();
   btn.click();
   assert.equal(got, 2, 'on:select mapped to onSelect prop and fired');
 });
 
 test('default slot projects parent content', () => {
-  const Child = compileComponent('<div class="box"><slot/></div>');
-  const el = render('<section><Child>hello</Child></section>', {}, [], { Child });
+  const Child: (props: unknown, slots?: unknown) => Node = compileComponent('<div class="box"><slot/></div>');
+  const el: Element = render('<section><Child>hello</Child></section>', {}, [], { Child });
   host().appendChild(el);
   assert.equal(el.querySelector('.box')!.textContent, 'hello');
 });
 
 test('slot content uses parent scope', () => {
-  const who = signal('world');
-  const Child = compileComponent('<div class="box"><slot/></div>');
-  const el = render('<section><Child>hi {{ who() }}</Child></section>', { who }, ['who'], { Child });
+  const who: Signal<string> = signal('world');
+  const Child: (props: unknown, slots?: unknown) => Node = compileComponent('<div class="box"><slot/></div>');
+  const el: Element = render('<section><Child>hi {{ who() }}</Child></section>', { who }, ['who'], { Child });
   host().appendChild(el);
   assert.equal(el.querySelector('.box')!.textContent, 'hi world');
   who.set('Weave');
@@ -302,8 +307,8 @@ test('slot content uses parent scope', () => {
 });
 
 test('named slots route by slot="name"', () => {
-  const Card = compileComponent('<div><header><slot name="title"/></header><main><slot/></main></div>');
-  const el = render(
+  const Card: (props: unknown, slots?: unknown) => Node = compileComponent('<div><header><slot name="title"/></header><main><slot/></main></div>');
+  const el: Element = render(
     '<div><Card><h1 slot="title">T</h1><p>body</p></Card></div>',
     {},
     [],
@@ -315,8 +320,8 @@ test('named slots route by slot="name"', () => {
 });
 
 test('slot renders fallback when not provided', () => {
-  const Child = compileComponent('<div class="box"><slot>fallback</slot></div>');
-  const el = render('<div><Child/></div>', {}, [], { Child });
+  const Child: (props: unknown, slots?: unknown) => Node = compileComponent('<div class="box"><slot>fallback</slot></div>');
+  const el: Element = render('<div><Child/></div>', {}, [], { Child });
   host().appendChild(el);
   assert.equal(el.querySelector('.box')!.textContent, 'fallback');
 });

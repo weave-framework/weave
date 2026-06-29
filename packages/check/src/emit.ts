@@ -22,10 +22,11 @@ import {
   type Scope,
   type TemplateNode,
   type SnippetNode,
+  type ComponentSourceLoc,
 } from '@weave/compiler';
 
-const FOR_VARS = ['$index', '$count', '$first', '$last', '$even', '$odd'];
-const HAS_SETUP = /export\s+(?:async\s+)?function\s+setup\b|export\s+(?:const|let|var)\s+setup\b/;
+const FOR_VARS: string[] = ['$index', '$count', '$first', '$last', '$even', '$odd'];
+const HAS_SETUP: RegExp = /export\s+(?:async\s+)?function\s+setup\b|export\s+(?:const|let|var)\s+setup\b/;
 
 /** A generated virtual module plus everything needed to map its diagnostics back. */
 export interface Virtual {
@@ -55,10 +56,10 @@ interface Line {
 
 /** Build a virtual module for a `.weave` SFC. */
 export function buildVirtualSfc(filePath: string, source: string): Virtual {
-  const loc = parseSfcLoc(source);
-  const nodes = parseTemplate(loc.template);
-  const body = emit(nodes, new Set(inferCtxNames(nodes)));
-  const asm = assemble(loc.script, HAS_SETUP.test(loc.script ?? ''), body);
+  const loc: ComponentSourceLoc = parseSfcLoc(source);
+  const nodes: TemplateNode[] = parseTemplate(loc.template);
+  const body: Line[] = emit(nodes, new Set(inferCtxNames(nodes)));
+  const asm: ReturnType<typeof assemble> = assemble(loc.script, HAS_SETUP.test(loc.script ?? ''), body);
   return {
     path: filePath + '.ts',
     text: asm.text,
@@ -78,9 +79,9 @@ export function buildVirtualSeparate(
   htmlPath: string,
   htmlSource: string
 ): Virtual {
-  const nodes = parseTemplate(htmlSource);
-  const body = emit(nodes, new Set(inferCtxNames(nodes)));
-  const asm = assemble(tsSource, HAS_SETUP.test(tsSource), body);
+  const nodes: TemplateNode[] = parseTemplate(htmlSource);
+  const body: Line[] = emit(nodes, new Set(inferCtxNames(nodes)));
+  const asm: ReturnType<typeof assemble> = assemble(tsSource, HAS_SETUP.test(tsSource), body);
   return {
     path: tsPath.replace(/\.ts$/, '.weave.ts'),
     text: asm.text,
@@ -97,7 +98,7 @@ export function buildVirtualSeparate(
 
 function emit(nodes: TemplateNode[], ctx: Set<string>): Line[] {
   const lines: Line[] = [];
-  let awaitN = 0; // unique source-binding names for `@await` type-queries
+  let awaitN: number = 0; // unique source-binding names for `@await` type-queries
   const push = (text: string, offset?: number): void => {
     lines.push({ text, offset });
   };
@@ -114,17 +115,17 @@ function emit(nodes: TemplateNode[], ctx: Set<string>): Line[] {
     rewrite(expr, scopeOf(locals), '__ctx').code.replace(/\r?\n/g, ' ');
 
   const walk = (list: TemplateNode[], locals: Set<string>): void => {
-    let scope = locals; // `@let` extends scope for following siblings
+    let scope: Set<string> = locals; // `@let` extends scope for following siblings
     // Hoist sibling snippets to typed arrows first (params: any), so a `@render`
     // call type-checks the snippet name/arity regardless of declaration order.
-    const snippets = list.filter((n): n is SnippetNode => n.type === 'snippet');
+    const snippets: SnippetNode[] = list.filter((n): n is SnippetNode => n.type === 'snippet');
     if (snippets.length) {
       scope = new Set(scope);
       for (const s of snippets) scope.add(s.name);
       for (const s of snippets) {
-        const params = s.params.map((p) => `${p}: any`).join(', ');
+        const params: string = s.params.map((p) => `${p}: any`).join(', ');
         push(`  const ${s.name} = (${params}): void => {`);
-        const inner = new Set(scope);
+        const inner: Set<string> = new Set(scope);
         for (const p of s.params) inner.add(p);
         walk(s.children, inner);
         push(`  };`);
@@ -157,7 +158,7 @@ function emit(nodes: TemplateNode[], ctx: Set<string>): Line[] {
             if (attr.type === 'use') {
               // verify the action is callable with the (Element, arg) pair; the
               // arg's type is checked against the action's 2nd parameter.
-              const action = rw(attr.name, scope);
+              const action: string = rw(attr.name, scope);
               push(
                 attr.expr !== undefined
                   ? `  (${action})(null as any, ${rw(attr.expr, scope)});`
@@ -168,7 +169,7 @@ function emit(nodes: TemplateNode[], ctx: Set<string>): Line[] {
             }
             if (attr.type === 'transition') {
               // verify the transition fn is callable with (Element, params).
-              const fn = rw(attr.name, scope);
+              const fn: string = rw(attr.name, scope);
               push(
                 attr.expr !== undefined
                   ? `  (${fn})(null as any, ${rw(attr.expr, scope)});`
@@ -188,7 +189,7 @@ function emit(nodes: TemplateNode[], ctx: Set<string>): Line[] {
             } else {
               push(`  {`);
             }
-            let inner = scope;
+            let inner: Set<string> = scope;
             if (br.alias && br.cond !== undefined) {
               push(`    const ${br.alias} = (${rw(br.cond, scope)});`, br.condOffset);
               inner = new Set(scope).add(br.alias);
@@ -204,7 +205,7 @@ function emit(nodes: TemplateNode[], ctx: Set<string>): Line[] {
               `$first: boolean = true, $last: boolean = true, ` +
               `$even: boolean = true, $odd: boolean = true;`
           );
-          const inner = new Set(scope).add(node.item);
+          const inner: Set<string> = new Set(scope).add(node.item);
           for (const v of FOR_VARS) inner.add(v);
           if (node.track) push(`    void (${rw(node.track, inner)});`, node.trackOffset);
           walk(node.children, inner);
@@ -240,7 +241,7 @@ function emit(nodes: TemplateNode[], ctx: Set<string>): Line[] {
           // Bind the source to a const so a `typeof` type-query has an entity name
           // (`typeof (expr)` is a syntax error in a type position) — and so the source
           // expression itself is type-checked. Only needed when `@then` binds an alias.
-          let srcVar = '';
+          let srcVar: string = '';
           if (node.then?.alias) {
             srcVar = `__await${awaitN++}`;
             push(`  const ${srcVar} = (${rw(node.expr, scope)});`, node.exprOffset);
@@ -250,7 +251,7 @@ function emit(nodes: TemplateNode[], ctx: Set<string>): Line[] {
           if (node.pending) walk(node.pending, scope);
           if (node.then) {
             push(`  {`);
-            let inner = scope;
+            let inner: Set<string> = scope;
             if (node.then.alias) {
               // the resolved value: a resource's data type or the awaited Promise type
               push(
@@ -264,7 +265,7 @@ function emit(nodes: TemplateNode[], ctx: Set<string>): Line[] {
           }
           if (node.catch) {
             push(`  {`);
-            let inner = scope;
+            let inner: Set<string> = scope;
             if (node.catch.alias) {
               push(`    const ${node.catch.alias}: unknown = undefined;`);
               inner = new Set(scope).add(node.catch.alias);
@@ -290,7 +291,7 @@ function assemble(
   body: Line[]
 ): { text: string; scriptLineCount: number; templateMap: Map<number, number> } {
   const out: string[] = [];
-  const scriptLines = script ? script.split('\n') : [];
+  const scriptLines: string[] = script ? script.split('\n') : [];
   for (const l of scriptLines) out.push(l);
 
   out.push('');
@@ -304,8 +305,8 @@ function assemble(
   out.push('type __WeaveAwaited<S> = S extends { data: () => infer D } ? NonNullable<D> : Awaited<S>;');
   out.push('function __weave__(): void {');
 
-  const bodyBase = out.length; // out index of body[0]
-  const templateMap = new Map<number, number>();
+  const bodyBase: number = out.length; // out index of body[0]
+  const templateMap: Map<number, number> = new Map<number, number>();
   body.forEach((ln, i) => {
     out.push(ln.text);
     if (ln.offset !== undefined) templateMap.set(bodyBase + i + 1, ln.offset); // +1 → 1-based line

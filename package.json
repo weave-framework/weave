@@ -8,6 +8,7 @@
     "test": "node tools/run-browser-tests.mjs",
     "test:v01": "node --test \"test/**/*.test.mjs\"",
     "check": "node packages/cli/bin/weave.mjs check",
+    "lint": "eslint .",
     "demo": "node packages/cli/bin/weave.mjs dev --config examples/demo/weave.config.ts",
     "demo:build": "node packages/cli/bin/weave.mjs build --config examples/demo/weave.config.ts",
     "verify:build": "node tools/verify-build.mjs",
@@ -36,8 +37,10 @@
     "@weave/runtime": "workspace:*",
     "@weave/store": "workspace:*",
     "esbuild": "^0.25.0",
+    "eslint": "^10.6.0",
     "playwright": "^1.49.0",
     "sass": "^1.101.0",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "typescript-eslint": "^8.62.0"
   }
 }

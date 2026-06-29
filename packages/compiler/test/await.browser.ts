@@ -1,27 +1,32 @@
 import { test, assert } from '../../../tools/harness.js';
-import { signal, computed, effect, root } from '@weave/runtime';
+import { signal, computed, effect, root, type Signal } from '@weave/runtime';
 import * as dom from '@weave/runtime/dom';
 import { compileTemplate, parseTemplate } from '@weave/compiler';
 
-const rt = { ...dom, signal, computed, effect, root };
+const rt: typeof dom & {
+  signal: typeof signal;
+  computed: typeof computed;
+  effect: typeof effect;
+  root: typeof root;
+} = { ...dom, signal, computed, effect, root };
 
 function render(html: string, ctx: Record<string, unknown> = {}, scope: string[] = []): Element {
   const { code } = compileTemplate(html, { mode: 'function', scope });
-  const fn = new Function('ctx', 'rt', '_c', code) as (c: unknown, r: unknown, k: unknown) => Element;
+  const fn: (c: unknown, r: unknown, k: unknown) => Element = new Function('ctx', 'rt', '_c', code) as (c: unknown, r: unknown, k: unknown) => Element;
   return fn(ctx, rt, {});
 }
 function host(el: Element): HTMLElement {
-  const h = document.createElement('div');
+  const h: HTMLDivElement = document.createElement('div');
   h.appendChild(el);
   document.body.appendChild(h);
   return h;
 }
-const flush = () => new Promise<void>((r) => setTimeout(r, 0)); // drains microtasks
+const flush = (): Promise<void> => new Promise<void>((r) => setTimeout(r, 0)); // drains microtasks
 
-function deferred<T>() {
+function deferred<T>(): { promise: Promise<T>; resolve: (v: T) => void; reject: (e: unknown) => void } {
   let resolve!: (v: T) => void;
   let reject!: (e: unknown) => void;
-  const promise = new Promise<T>((res, rej) => {
+  const promise: Promise<T> = new Promise<T>((res, rej) => {
     resolve = res;
     reject = rej;
   });
@@ -29,7 +34,9 @@ function deferred<T>() {
 }
 
 /* a resource is anything with signal-backed loading/data/error accessors */
-function mockResource<T>(init: { loading?: boolean; data?: T; error?: unknown } = {}) {
+function mockResource<T>(
+  init: { loading?: boolean; data?: T; error?: unknown } = {}
+): { loading: Signal<boolean>; data: Signal<T | undefined>; error: Signal<unknown> } {
   return {
     loading: signal(init.loading ?? false),
     data: signal<T | undefined>(init.data),
@@ -52,8 +59,8 @@ test('parses @await with pending + @then(alias) + @catch(alias)', () => {
 /* ──────────────────────────── Promise ──────────────────────────── */
 
 test('Promise: pending → then(value) on resolve', async () => {
-  const d = deferred<string>();
-  const h = host(
+  const d: { promise: Promise<string>; resolve: (v: string) => void; reject: (e: unknown) => void } = deferred<string>();
+  const h: HTMLElement = host(
     render(
       '<div>@await (p) { <span class="l">loading</span> } @then (u) { <b class="d">{{ u }}</b> } @catch (e) { <i class="e">{{ e }}</i> }</div>',
       { p: d.promise },
@@ -71,8 +78,8 @@ test('Promise: pending → then(value) on resolve', async () => {
 });
 
 test('Promise: pending → catch(error) on reject', async () => {
-  const d = deferred<string>();
-  const h = host(
+  const d: { promise: Promise<string>; resolve: (v: string) => void; reject: (e: unknown) => void } = deferred<string>();
+  const h: HTMLElement = host(
     render(
       '<div>@await (p) { <span class="l">loading</span> } @then (u) { <b class="d">{{ u }}</b> } @catch (e) { <i class="e">{{ e }}</i> }</div>',
       { p: d.promise },
@@ -87,7 +94,7 @@ test('Promise: pending → catch(error) on reject', async () => {
 });
 
 test('Promise: a plain (non-thenable) value resolves into @then', async () => {
-  const h = host(render('<div>@await (v) @then (u) { <b class="d">{{ u }}</b> }</div>', { v: 42 }, ['v']));
+  const h: HTMLElement = host(render('<div>@await (v) @then (u) { <b class="d">{{ u }}</b> }</div>', { v: 42 }, ['v']));
   await flush();
   assert.equal(h.querySelector('.d')?.textContent, '42');
   h.remove();
@@ -96,8 +103,8 @@ test('Promise: a plain (non-thenable) value resolves into @then', async () => {
 /* ──────────────────────────── resource ──────────────────────────── */
 
 test('resource: loading → then, driven off its signals', async () => {
-  const r = mockResource<string>({ loading: true });
-  const h = host(
+  const r: { loading: Signal<boolean>; data: Signal<string | undefined>; error: Signal<unknown> } = mockResource<string>({ loading: true });
+  const h: HTMLElement = host(
     render('<div>@await (r) { <span class="l">…</span> } @then (u) { <b class="d">{{ u }}</b> }</div>', { r }, ['r'])
   );
   assert.ok(h.querySelector('.l'), 'loading shows pending');
@@ -110,8 +117,8 @@ test('resource: loading → then, driven off its signals', async () => {
 });
 
 test('resource: error() routes to @catch', async () => {
-  const r = mockResource<string>({ loading: true });
-  const h = host(
+  const r: { loading: Signal<boolean>; data: Signal<string | undefined>; error: Signal<unknown> } = mockResource<string>({ loading: true });
+  const h: HTMLElement = host(
     render(
       '<div>@await (r) { <span class="l">…</span> } @then (u) { <b class="d">{{ u }}</b> } @catch (e) { <i class="e">{{ e }}</i> }</div>',
       { r },
@@ -126,8 +133,8 @@ test('resource: error() routes to @catch', async () => {
 });
 
 test('resource: a refetch (loading again) shows pending, then the new value', async () => {
-  const r = mockResource<string>({ loading: false, data: 'first' });
-  const h = host(
+  const r: { loading: Signal<boolean>; data: Signal<string | undefined>; error: Signal<unknown> } = mockResource<string>({ loading: false, data: 'first' });
+  const h: HTMLElement = host(
     render('<div>@await (r) { <span class="l">…</span> } @then (u) { <b class="d">{{ u }}</b> }</div>', { r }, ['r'])
   );
   assert.equal(h.querySelector('.d')?.textContent, 'first');
@@ -145,8 +152,8 @@ test('resource: a refetch (loading again) shows pending, then the new value', as
 /* ──────────────────────────── optional parts ──────────────────────────── */
 
 test('no pending block: nothing renders until @then', async () => {
-  const d = deferred<string>();
-  const h = host(render('<div>@await (p) @then (u) { <b class="d">{{ u }}</b> }</div>', { p: d.promise }, ['p']));
+  const d: { promise: Promise<string>; resolve: (v: string) => void; reject: (e: unknown) => void } = deferred<string>();
+  const h: HTMLElement = host(render('<div>@await (p) @then (u) { <b class="d">{{ u }}</b> }</div>', { p: d.promise }, ['p']));
   assert.equal(h.querySelector('.d'), null, 'nothing while pending (no pending block)');
   d.resolve('ok');
   await flush();
@@ -155,8 +162,8 @@ test('no pending block: nothing renders until @then', async () => {
 });
 
 test('no @then/@catch: pending content clears once settled', async () => {
-  const d = deferred<string>();
-  const h = host(render('<div>@await (p) { <span class="l">loading</span> }</div>', { p: d.promise }, ['p']));
+  const d: { promise: Promise<string>; resolve: (v: string) => void; reject: (e: unknown) => void } = deferred<string>();
+  const h: HTMLElement = host(render('<div>@await (p) { <span class="l">loading</span> }</div>', { p: d.promise }, ['p']));
   assert.ok(h.querySelector('.l'));
   d.resolve('whatever');
   await flush();

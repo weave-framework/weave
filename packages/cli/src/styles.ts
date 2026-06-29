@@ -22,7 +22,7 @@ export function langFromExt(file: string): StyleLang {
 /** Compile a style FILE to CSS — `@use`/`@import` resolve relative to it. */
 export async function compileStyleFile(path: string): Promise<string> {
   if (langFromExt(path) === 'css') return readFile(path, 'utf8');
-  const sass = await import('sass'); // lazy — only when scss/sass is in play
+  const sass: typeof import('sass') = await import('sass'); // lazy — only when scss/sass is in play
   return sass.compile(path).css; // sass infers scss vs indented from the extension
 }
 
@@ -33,7 +33,7 @@ export async function compileStyleSource(
   fromDir?: string
 ): Promise<string> {
   if (lang === 'css' || !source.trim()) return source;
-  const sass = await import('sass');
+  const sass: typeof import('sass') = await import('sass');
   return sass.compileString(source, {
     syntax: lang === 'sass' ? 'indented' : 'scss',
     loadPaths: fromDir ? [fromDir] : [],

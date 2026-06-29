@@ -15,15 +15,15 @@ interface BaseParams {
 
 /** Fade opacity in/out. */
 export const fade: TransitionFn<BaseParams | void> = (_node, params) => {
-  const p = params || {};
+  const p: BaseParams = params || {};
   return { delay: p.delay, duration: p.duration ?? 300, easing: p.easing, css: (t) => `opacity: ${t}` };
 };
 
 /** Fly in/out from an (x, y) offset while fading. */
 export const fly: TransitionFn<(BaseParams & { x?: number; y?: number }) | void> = (_node, params) => {
-  const p = params || {};
-  const x = p.x ?? 0;
-  const y = p.y ?? 0;
+  const p: BaseParams & { x?: number; y?: number } = params || {};
+  const x: number = p.x ?? 0;
+  const y: number = p.y ?? 0;
   return {
     delay: p.delay,
     duration: p.duration ?? 300,
@@ -34,8 +34,8 @@ export const fly: TransitionFn<(BaseParams & { x?: number; y?: number }) | void>
 
 /** Scale in/out from `start` (default 0) while fading. */
 export const scale: TransitionFn<(BaseParams & { start?: number }) | void> = (_node, params) => {
-  const p = params || {};
-  const start = p.start ?? 0;
+  const p: BaseParams & { start?: number } = params || {};
+  const start: number = p.start ?? 0;
   return {
     delay: p.delay,
     duration: p.duration ?? 300,
@@ -46,8 +46,8 @@ export const scale: TransitionFn<(BaseParams & { start?: number }) | void> = (_n
 
 /** Slide the element's height (collapse/expand) while fading. */
 export const slide: TransitionFn<BaseParams | void> = (node, params) => {
-  const p = params || {};
-  const height = (node as HTMLElement).offsetHeight;
+  const p: BaseParams = params || {};
+  const height: number = (node as HTMLElement).offsetHeight;
   return {
     delay: p.delay,
     duration: p.duration ?? 300,

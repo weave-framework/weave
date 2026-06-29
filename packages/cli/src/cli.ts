@@ -4,10 +4,11 @@ import { build } from './build.js';
 import { dev } from './dev.js';
 import { generateRoutes } from './routes.js';
 import { loadConfig } from './config.js';
+import type { ResolvedConfig } from './config.js';
 import { checkProject, type Diagnostic } from '@weave/check';
 
 function flag(args: string[], name: string): string | undefined {
-  const i = args.indexOf(name);
+  const i: number = args.indexOf(name);
   return i >= 0 ? args[i + 1] : undefined;
 }
 
@@ -16,11 +17,11 @@ export type { WeaveConfig } from './config.js';
 
 export async function main(argv: string[]): Promise<void> {
   const [cmd, ...rest] = argv;
-  const entry = rest.find((a) => !a.startsWith('-')) ?? 'src/main.ts';
-  const outdir = flag(rest, '--out') ?? 'dist';
+  const entry: string = rest.find((a) => !a.startsWith('-')) ?? 'src/main.ts';
+  const outdir: string = flag(rest, '--out') ?? 'dist';
   // A `weave.config.ts/json` (auto-discovered in cwd, or via `--config`) switches both
   // build + dev into the config-driven pipeline (Angular-style); else the flags drive it.
-  const config = await loadConfig(process.cwd(), flag(rest, '--config'));
+  const config: ResolvedConfig | null = await loadConfig(process.cwd(), flag(rest, '--config'));
 
   if (cmd === 'build') {
     if (config) {
@@ -58,17 +59,17 @@ export async function main(argv: string[]): Promise<void> {
       console.log(`weave dev → ${url}`);
       return;
     }
-    const servedir = flag(rest, '--serve') ?? '.';
-    const port = Number(flag(rest, '--port')) || undefined;
+    const servedir: string = flag(rest, '--serve') ?? '.';
+    const port: number | undefined = Number(flag(rest, '--port')) || undefined;
     const { url } = await dev({ entry, outdir, servedir, port });
     console.log(`weave dev → ${url}`);
     return;
   }
   if (cmd === 'check') {
-    const roots = rest.filter((a) => !a.startsWith('-'));
-    const diags = checkProject(roots.length ? roots : ['src']);
+    const roots: string[] = rest.filter((a) => !a.startsWith('-'));
+    const diags: Diagnostic[] = checkProject(roots.length ? roots : ['src']);
     for (const d of diags) console.error(formatDiagnostic(d));
-    const errors = diags.filter((d) => d.category === 'error').length;
+    const errors: number = diags.filter((d) => d.category === 'error').length;
     if (errors) {
       console.error(`\nweave check: ${errors} error${errors === 1 ? '' : 's'}`);
       process.exit(1);
@@ -78,9 +79,9 @@ export async function main(argv: string[]): Promise<void> {
   }
 
   if (cmd === 'routes') {
-    const dir = rest.find((a) => !a.startsWith('-')) ?? 'src/routes';
-    const out = flag(rest, '--out');
-    const written = generateRoutes(dir, { out, lazy: !rest.includes('--eager') });
+    const dir: string = rest.find((a) => !a.startsWith('-')) ?? 'src/routes';
+    const out: string | undefined = flag(rest, '--out');
+    const written: string = generateRoutes(dir, { out, lazy: !rest.includes('--eager') });
     console.log(`weave routes → ${written}`);
     return;
   }

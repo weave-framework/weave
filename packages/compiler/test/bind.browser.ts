@@ -1,15 +1,20 @@
 import { test, assert } from '../../../tools/harness.js';
-import { signal, computed, effect, root } from '@weave/runtime';
+import { signal, computed, effect, root, type Signal } from '@weave/runtime';
 import * as dom from '@weave/runtime/dom';
 import { compileTemplate } from '@weave/compiler';
 
 // The runtime object the compiled (function-mode) code references as `rt`.
-const rt = { ...dom, signal, computed, effect, root };
+const rt: typeof dom & {
+  signal: typeof signal;
+  computed: typeof computed;
+  effect: typeof effect;
+  root: typeof root;
+} = { ...dom, signal, computed, effect, root };
 
 function render(html: string, ctx: Record<string, unknown>, scope: string[]): Element {
   const { code } = compileTemplate(html, { mode: 'function', scope });
-  const fn = new Function('ctx', 'rt', '_c', code) as (ctx: unknown, rt: unknown, _c: unknown) => Element;
-  const el = fn(ctx, rt, {});
+  const fn: (ctx: unknown, rt: unknown, _c: unknown) => Element = new Function('ctx', 'rt', '_c', code) as (ctx: unknown, rt: unknown, _c: unknown) => Element;
+  const el: Element = fn(ctx, rt, {});
   document.body.appendChild(el);
   return el;
 }
@@ -20,8 +25,8 @@ function fire(el: Element, type: 'input' | 'change'): void {
 }
 
 test('bind:value text — two-way (signal ⇄ input)', () => {
-  const name = signal('alpha');
-  const el = render('<input bind:value={name} />', { name }, ['name']) as HTMLInputElement;
+  const name: Signal<string> = signal('alpha');
+  const el: HTMLInputElement = render('<input bind:value={name} />', { name }, ['name']) as HTMLInputElement;
   assert.equal(el.value, 'alpha', 'signal seeds the input');
 
   name.set('beta');
@@ -33,8 +38,8 @@ test('bind:value text — two-way (signal ⇄ input)', () => {
 });
 
 test('bind:value number — reads valueAsNumber', () => {
-  const n = signal(5);
-  const el = render('<input type="number" bind:value={n} />', { n }, ['n']) as HTMLInputElement;
+  const n: Signal<number> = signal(5);
+  const el: HTMLInputElement = render('<input type="number" bind:value={n} />', { n }, ['n']) as HTMLInputElement;
   assert.equal(el.value, '5');
 
   n.set(10);
@@ -46,8 +51,8 @@ test('bind:value number — reads valueAsNumber', () => {
 });
 
 test('bind:checked — boolean checkbox', () => {
-  const on = signal(true);
-  const el = render('<input type="checkbox" bind:checked={on} />', { on }, ['on']) as HTMLInputElement;
+  const on: Signal<boolean> = signal(true);
+  const el: HTMLInputElement = render('<input type="checkbox" bind:checked={on} />', { on }, ['on']) as HTMLInputElement;
   assert.equal(el.checked, true, 'signal seeds checked');
 
   on.set(false);
@@ -59,8 +64,8 @@ test('bind:checked — boolean checkbox', () => {
 });
 
 test('bind:group — radio selects by value', () => {
-  const pick = signal('a');
-  const wrap = render(
+  const pick: Signal<string> = signal('a');
+  const wrap: Element = render(
     '<div><input type="radio" name="g" value="a" bind:group={pick} />' +
       '<input type="radio" name="g" value="b" bind:group={pick} /></div>',
     { pick },
@@ -80,8 +85,8 @@ test('bind:group — radio selects by value', () => {
 });
 
 test('bind:value select — single', () => {
-  const sel = signal('y');
-  const el = render(
+  const sel: Signal<string> = signal('y');
+  const el: HTMLSelectElement = render(
     '<select bind:value={sel}><option value="x">X</option><option value="y">Y</option></select>',
     { sel },
     ['sel']
@@ -97,8 +102,8 @@ test('bind:value select — single', () => {
 });
 
 test('bind:value text is IME-safe — no overwrite mid-composition', () => {
-  const name = signal('');
-  const el = render('<input bind:value={name} />', { name }, ['name']) as HTMLInputElement;
+  const name: Signal<string> = signal('');
+  const el: HTMLInputElement = render('<input bind:value={name} />', { name }, ['name']) as HTMLInputElement;
 
   el.dispatchEvent(new Event('compositionstart', { bubbles: true }));
   // a competing signal write must NOT clobber the half-composed text

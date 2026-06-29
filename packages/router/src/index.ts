@@ -19,6 +19,7 @@
  */
 
 import { signal, computed, effect, batch, getOwner, createContext, provide, inject } from '@weave/runtime';
+import type { Signal, Computed, Context } from '@weave/runtime';
 import { ifBlock, type Component } from '@weave/runtime/dom';
 
 export type RouteParams = Record<string, string>;
@@ -50,8 +51,8 @@ export interface Route {
   children?: Route[];
 }
 
-const path = signal(typeof location !== 'undefined' ? location.pathname : '/');
-const search = signal(typeof location !== 'undefined' ? location.search : '');
+const path: Signal<string> = signal(typeof location !== 'undefined' ? location.pathname : '/');
+const search: Signal<string> = signal(typeof location !== 'undefined' ? location.search : '');
 
 if (typeof window !== 'undefined') {
   window.addEventListener('popstate', () => {
@@ -66,9 +67,9 @@ if (typeof window !== 'undefined') {
 export const currentPath = (): string => path();
 
 /** Parsed query string as a reactive `{ key: value }` map (last value wins on repeats). */
-const queryMap = computed<RouteParams>(() => {
+const queryMap: Computed<RouteParams> = computed<RouteParams>(() => {
   const out: RouteParams = {};
-  const s = search();
+  const s: string = search();
   if (s) new URLSearchParams(s).forEach((v, k) => (out[k] = v));
   return out;
 });
@@ -78,10 +79,10 @@ export const currentQuery = (): RouteParams => queryMap();
 
 /** Programmatic navigation (pushes history). Resilient if the env blocks pushState. */
 export function navigate(to: string): void {
-  const noHash = to.split('#')[0];
-  const qI = noHash.indexOf('?');
-  const nextPath = qI === -1 ? noHash : noHash.slice(0, qI);
-  const nextSearch = qI === -1 ? '' : noHash.slice(qI);
+  const noHash: string = to.split('#')[0];
+  const qI: number = noHash.indexOf('?');
+  const nextPath: string = qI === -1 ? noHash : noHash.slice(0, qI);
+  const nextSearch: string = qI === -1 ? '' : noHash.slice(qI);
   if (nextPath === path.peek() && nextSearch === search.peek()) return;
   try {
     history.pushState(null, '', to);
@@ -134,8 +135,8 @@ function matchPrefix(
 ): { params: RouteParams; rest: string[] } | null {
   if (segs.length > pathSegs.length) return null;
   const params: RouteParams = {};
-  for (let i = 0; i < segs.length; i++) {
-    const s = segs[i];
+  for (let i: number = 0; i < segs.length; i++) {
+    const s: PatternSeg = segs[i];
     if ('param' in s) params[s.param] = decodeURIComponent(pathSegs[i]);
     else if (s.literal !== pathSegs[i]) return null;
   }
@@ -159,18 +160,18 @@ function resolveLevel(
   inherited: RouteParams
 ): LevelResult {
   for (const c of routes) {
-    const m = matchPrefix(c.segs, pathSegs);
+    const m: { params: RouteParams; rest: string[] } | null = matchPrefix(c.segs, pathSegs);
     if (!m) continue;
-    const params = { ...inherited, ...m.params };
+    const params: RouteParams = { ...inherited, ...m.params };
     if (c.route.redirect) return { redirect: c.route.redirect };
-    const verdict = c.route.guard ? c.route.guard({ path: fullPath, params, query }) : true;
+    const verdict: boolean | string = c.route.guard ? c.route.guard({ path: fullPath, params, query }) : true;
     if (verdict === false) return null; // blocked → caller falls back
     if (typeof verdict === 'string') return { redirect: verdict };
     const here: Match = { view: c.route.component!, params };
     if (m.rest.length === 0) {
       // Path fully consumed: include an index child (`path: ''`) if one matches.
       if (c.children.length) {
-        const idx = resolveLevel(c.children, [], query, fullPath, params);
+        const idx: LevelResult = resolveLevel(c.children, [], query, fullPath, params);
         if (idx && 'redirect' in idx) return idx;
         if (idx && 'chain' in idx) return { chain: [here, ...idx.chain] };
       }
@@ -178,7 +179,7 @@ function resolveLevel(
     }
     // Segments remain: this route only matches if a child consumes the rest.
     if (c.children.length) {
-      const sub = resolveLevel(c.children, m.rest, query, fullPath, params);
+      const sub: LevelResult = resolveLevel(c.children, m.rest, query, fullPath, params);
       if (sub && 'redirect' in sub) return sub;
       if (sub && 'chain' in sub) return { chain: [here, ...sub.chain] };
     }
@@ -212,18 +213,21 @@ let activeRouter: Router | null = null;
  * a top `<RouterView router={r}/>` and a nested `<RouterView/>` inside each layout.
  */
 export function createRouter(routes: Route[]): Router {
-  const compiled = compileRoutes(routes);
-  const fallback = routes.find((r) => r.path === '*');
+  const compiled: Compiled[] = compileRoutes(routes);
+  const fallback: Route | undefined = routes.find((r) => r.path === '*');
   const fallbackChain = (): Match[] =>
     fallback?.component ? [{ view: fallback.component, params: {} }] : [];
 
-  const resolution = computed<{ chain: Match[]; redirectTo: string | null }>(() => {
-    const q = queryMap();
-    const start = path();
-    let p = start;
-    for (let hops = 0; hops < 16; hops++) {
-      const res = resolveLevel(compiled, splitSegs(p), q, p, {});
-      const synced = p !== start ? p : null;
+  const resolution: Computed<{ chain: Match[]; redirectTo: string | null }> = computed<{
+    chain: Match[];
+    redirectTo: string | null;
+  }>(() => {
+    const q: RouteParams = queryMap();
+    const start: string = path();
+    let p: string = start;
+    for (let hops: number = 0; hops < 16; hops++) {
+      const res: LevelResult = resolveLevel(compiled, splitSegs(p), q, p, {});
+      const synced: string | null = p !== start ? p : null;
       if (res && 'redirect' in res) {
         p = res.redirect.split('#')[0].split('?')[0];
         continue;
@@ -238,14 +242,14 @@ export function createRouter(routes: Route[]): Router {
 
   /** Non-reactive resolve of an arbitrary path → preload each chunk in its chain. */
   const preload = (to: string): void => {
-    let p = to.split('#')[0].split('?')[0];
-    for (let hops = 0; hops < 16; hops++) {
-      const res = resolveLevel(compiled, splitSegs(p), {}, p, {});
+    let p: string = to.split('#')[0].split('?')[0];
+    for (let hops: number = 0; hops < 16; hops++) {
+      const res: LevelResult = resolveLevel(compiled, splitSegs(p), {}, p, {});
       if (res && 'redirect' in res) {
         p = res.redirect.split('#')[0].split('?')[0];
         continue;
       }
-      const ch = res && 'chain' in res ? res.chain : fallbackChain();
+      const ch: Match[] = res && 'chain' in res ? res.chain : fallbackChain();
       for (const m of ch) (m.view as { preload?: () => void }).preload?.();
       return;
     }
@@ -255,8 +259,8 @@ export function createRouter(routes: Route[]): Router {
     chain,
     matched: (depth = 0) => chain()[depth] ?? null,
     params: (depth?: number) => {
-      const ch = chain();
-      const i = depth ?? ch.length - 1;
+      const ch: Match[] = chain();
+      const i: number = depth ?? ch.length - 1;
       return ch[i]?.params ?? {};
     },
     query: () => queryMap(),
@@ -280,7 +284,7 @@ interface OutletCtx {
 }
 
 /** Carries the router + the next outlet's depth down the tree (set by each RouterView). */
-const OutletContext = createContext<OutletCtx | null>(null);
+const OutletContext: Context<OutletCtx | null> = createContext<OutletCtx | null>(null);
 
 /**
  * Router outlet: renders the matched component at its depth in the chain. The top
@@ -293,17 +297,17 @@ const OutletContext = createContext<OutletCtx | null>(null);
  * Usage: `<RouterView router={r}/>` at the top, `<RouterView/>` inside each layout.
  */
 export const RouterView: Component = (props = {}) => {
-  const parentCtx = inject(OutletContext);
-  const router = (props as { router?: Router }).router ?? parentCtx?.router;
-  const depth = parentCtx ? parentCtx.depth : 0;
+  const parentCtx: OutletCtx | null = inject(OutletContext);
+  const router: Router | undefined = (props as { router?: Router }).router ?? parentCtx?.router;
+  const depth: number = parentCtx ? parentCtx.depth : 0;
 
   // Hand the router + the next depth to any nested outlet below us. Only when an owner
   // scope exists (a directly-invoked RouterView in a test has none — and won't nest).
   if (router && getOwner()) provide(OutletContext, { router, depth: depth + 1 });
 
-  const host = document.createElement('div');
+  const host: HTMLDivElement = document.createElement('div');
   host.style.display = 'contents';
-  const anchorNode = document.createComment('router');
+  const anchorNode: Comment = document.createComment('router');
   host.appendChild(anchorNode);
 
   // Only the top outlet syncs the URL on a guard/redirect (redirects bubble to the
@@ -311,18 +315,18 @@ export const RouterView: Component = (props = {}) => {
   // navigating (resolution then lands on the target → redirectTo() is null).
   if (router && depth === 0) {
     effect(() => {
-      const to = router.redirectTo();
+      const to: string | null = router.redirectTo();
       if (to !== null && to !== path.peek()) navigate(to);
     });
   }
 
-  const thunks = new Map<Component, () => Node>();
+  const thunks: Map<Component, () => Node> = new Map<Component, () => Node>();
   ifBlock(anchorNode, () => {
-    const m = router?.matched(depth) ?? null;
+    const m: Match | null = router?.matched(depth) ?? null;
     if (!m) return null;
-    let thunk = thunks.get(m.view);
+    let thunk: (() => Node) | undefined = thunks.get(m.view);
     if (!thunk) {
-      const view = m.view;
+      const view: Component = m.view;
       thunk = () =>
         view({
           get params() {
@@ -344,30 +348,30 @@ export const RouterView: Component = (props = {}) => {
  * Usage in a template: `<Link to="/about">About</Link>`.
  */
 export const Link: Component = (props = {}, slots = {}) => {
-  const to = String((props as { to?: unknown }).to ?? '/');
+  const to: string = String((props as { to?: unknown }).to ?? '/');
   // prefetch defaults on: warm the target's lazy chunk on first hover/focus.
-  const wantsPrefetch = (props as { prefetch?: unknown }).prefetch !== false;
-  const a = document.createElement('a');
+  const wantsPrefetch: boolean = (props as { prefetch?: unknown }).prefetch !== false;
+  const a: HTMLAnchorElement = document.createElement('a');
   a.setAttribute('href', to);
   // Forward any other props (class, id, aria-*, title, …) to the anchor, so a
   // `<Link class="nav" aria-label="Home">` actually styles/labels its <a>. The
   // router-owned props and any function/event props are skipped; read once.
   for (const key in props) {
     if (key === 'to' || key === 'prefetch') continue;
-    const val = (props as Record<string, unknown>)[key];
+    const val: unknown = (props as Record<string, unknown>)[key];
     if (val == null || val === false || typeof val === 'function') continue;
     a.setAttribute(key, val === true ? '' : String(val));
   }
-  const kids = slots.default?.();
+  const kids: Node | undefined = slots.default?.();
   if (kids) a.appendChild(kids);
   a.addEventListener('click', (e) => {
-    const me = e as MouseEvent;
+    const me: MouseEvent = e as MouseEvent;
     if (me.metaKey || me.ctrlKey || me.shiftKey || me.button !== 0) return;
     e.preventDefault();
     navigate(to);
   });
   if (wantsPrefetch) {
-    let warmed = false;
+    let warmed: boolean = false;
     const warm = (): void => {
       if (warmed) return;
       warmed = true;

@@ -38,22 +38,22 @@ const norm = (p: string): string => p.replace(/\\/g, '/').toLowerCase();
 
 /** Type-check the given virtual modules; returns diagnostics mapped to original source. */
 export function runCheck(virtuals: Virtual[]): Diagnostic[] {
-  const byPath = new Map(virtuals.map((v) => [norm(v.path), v]));
+  const byPath: Map<string, Virtual> = new Map(virtuals.map((v) => [norm(v.path), v]));
 
-  const host = ts.createCompilerHost(OPTIONS, true);
-  const getSourceFile = host.getSourceFile.bind(host);
-  const readFile = host.readFile.bind(host);
-  const fileExists = host.fileExists.bind(host);
+  const host: ts.CompilerHost = ts.createCompilerHost(OPTIONS, true);
+  const getSourceFile: ts.CompilerHost['getSourceFile'] = host.getSourceFile.bind(host);
+  const readFile: ts.CompilerHost['readFile'] = host.readFile.bind(host);
+  const fileExists: ts.CompilerHost['fileExists'] = host.fileExists.bind(host);
 
   host.getSourceFile = (fileName, languageVersion, onError, shouldCreate) => {
-    const v = byPath.get(norm(fileName));
+    const v: Virtual | undefined = byPath.get(norm(fileName));
     if (v) return ts.createSourceFile(fileName, v.text, languageVersion, true);
     return getSourceFile(fileName, languageVersion, onError, shouldCreate);
   };
   host.readFile = (fileName) => byPath.get(norm(fileName))?.text ?? readFile(fileName);
   host.fileExists = (fileName) => byPath.has(norm(fileName)) || fileExists(fileName);
 
-  const program = ts.createProgram(
+  const program: ts.Program = ts.createProgram(
     virtuals.map((v) => v.path),
     OPTIONS,
     host
@@ -61,7 +61,7 @@ export function runCheck(virtuals: Virtual[]): Diagnostic[] {
 
   const raw: ts.Diagnostic[] = [];
   for (const v of virtuals) {
-    const sf = program.getSourceFile(v.path);
+    const sf: ts.SourceFile | undefined = program.getSourceFile(v.path);
     if (!sf) continue;
     raw.push(...program.getSyntacticDiagnostics(sf), ...program.getSemanticDiagnostics(sf));
   }
@@ -70,23 +70,23 @@ export function runCheck(virtuals: Virtual[]): Diagnostic[] {
 }
 
 function mapDiagnostic(d: ts.Diagnostic, byPath: Map<string, Virtual>): Diagnostic {
-  const message = ts.flattenDiagnosticMessageText(d.messageText, '\n');
-  const category = categoryName(d.category);
+  const message: string = ts.flattenDiagnosticMessageText(d.messageText, '\n');
+  const category: Diagnostic['category'] = categoryName(d.category);
 
   if (!d.file || d.start === undefined) {
     return { file: '(global)', line: 0, col: 0, code: d.code, message, category };
   }
 
   const { line, character } = d.file.getLineAndCharacterOfPosition(d.start); // 0-based
-  const v = byPath.get(norm(d.file.fileName));
+  const v: Virtual | undefined = byPath.get(norm(d.file.fileName));
   if (!v) {
     // An error surfaced in a real dependency — report it as-is.
     return { file: d.file.fileName, line: line + 1, col: character + 1, code: d.code, message, category };
   }
 
-  const vLine = line + 1; // 1-based virtual line
+  const vLine: number = line + 1; // 1-based virtual line
 
-  const offset = v.templateMap.get(vLine);
+  const offset: number | undefined = v.templateMap.get(vLine);
   if (offset !== undefined) {
     const { line: l, col } = offsetToLineCol(v.templateText, offset);
     return { file: v.templateFile, line: l, col, code: d.code, message, category };
@@ -118,10 +118,10 @@ function categoryName(c: ts.DiagnosticCategory): Diagnostic['category'] {
 
 /** Translate a character offset into a 1-based line:col within `text`. */
 export function offsetToLineCol(text: string, offset: number): { line: number; col: number } {
-  let line = 1;
-  let col = 1;
-  const end = Math.min(offset, text.length);
-  for (let i = 0; i < end; i++) {
+  let line: number = 1;
+  let col: number = 1;
+  const end: number = Math.min(offset, text.length);
+  for (let i: number = 0; i < end; i++) {
     if (text[i] === '\n') {
       line++;
       col = 1;

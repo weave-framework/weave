@@ -12,9 +12,9 @@
  * and memos stay cached until a true dependency changes.
  */
 
-const CLEAN = 0;
-const CHECK = 1;
-const DIRTY = 2;
+const CLEAN: 0 = 0;
+const CHECK: 1 = 1;
+const DIRTY: 2 = 2;
 type State = typeof CLEAN | typeof CHECK | typeof DIRTY;
 
 /** A trackable value: a signal or a memo. */
@@ -43,9 +43,9 @@ let listener: Computation | null = null;
 /** The ownership scope effects register into, so a block can dispose them on unmount. */
 let currentOwner: Owner | null = null;
 /** Batch nesting depth. While > 0, effects are queued, not run. */
-let batchDepth = 0;
+let batchDepth: number = 0;
 /** Effects scheduled to run once the current batch unwinds. */
-const queue = new Set<Computation>();
+const queue: Set<Computation> = new Set<Computation>();
 
 /** Register an edge from `source` to the active listener, if any. */
 function track(source: Source): void {
@@ -95,12 +95,12 @@ function dispose(c: Computation): void {
 function run(c: Computation): void {
   dispose(c);
   unlink(c);
-  const prev = listener;
+  const prev: Computation | null = listener;
   listener = c;
-  let threw = false;
+  let threw: boolean = false;
   let error: unknown;
   try {
-    const result = c.fn();
+    const result: unknown = c.fn();
     if (c.isMemo) {
       if (!c.equals(c.value, result)) {
         c.value = result;
@@ -123,7 +123,7 @@ function run(c: Computation): void {
 
 /** Walk the owner chain to the nearest error boundary; rethrow if there is none. */
 function handleError(err: unknown, owner: Owner | null): void {
-  let o = owner;
+  let o: Owner | null = owner;
   while (o) {
     if (o._onError) {
       o._onError(err);
@@ -173,12 +173,12 @@ export function signal<T>(initial: T, opts: { equals?: (a: T, b: T) => boolean }
     observers: new Set(),
     equals: opts.equals || Object.is,
   };
-  const read = (() => {
+  const read: Signal<T> = (() => {
     track(node);
     return node.value;
   }) as Signal<T>;
   read.set = (next) => {
-    const value = typeof next === 'function' ? (next as (prev: T) => T)(node.value) : next;
+    const value: T = typeof next === 'function' ? (next as (prev: T) => T)(node.value) : next;
     if (node.equals(node.value, value)) return node.value;
     node.value = value;
     notify(node.observers);
@@ -222,7 +222,7 @@ export function computed<T>(fn: () => T, opts: { equals?: (a: T, b: T) => boolea
 export function effect(fn: () => void | (() => void)): () => void {
   const c: Computation = {
     fn: () => {
-      const ret = fn();
+      const ret: void | (() => void) = fn();
       if (typeof ret === 'function') c.cleanups.push(ret);
     },
     sources: new Set(),
@@ -236,7 +236,7 @@ export function effect(fn: () => void | (() => void)): () => void {
     owner: currentOwner,
   };
   run(c);
-  const stop = () => {
+  const stop = (): void => {
     dispose(c);
     unlink(c);
     c.state = CLEAN;
@@ -282,7 +282,7 @@ export function createOwner(parent: Owner | null = null): Owner {
 
 /** Run `fn` with `owner` active; effects created inside register into it. */
 export function runInOwner<T>(owner: Owner | null, fn: () => T): T {
-  const prev = currentOwner;
+  const prev: Owner | null = currentOwner;
   currentOwner = owner;
   try {
     return fn();
@@ -294,8 +294,8 @@ export function runInOwner<T>(owner: Owner | null, fn: () => T): T {
 /** Dispose every effect/child owner registered in `owner` (children first, LIFO). */
 export function disposeOwner(owner: Owner): void {
   owner._disposed = true;
-  const ds = owner._disposers.splice(0);
-  for (let i = ds.length - 1; i >= 0; i--) ds[i]();
+  const ds: Array<() => void> = owner._disposers.splice(0);
+  for (let i: number = ds.length - 1; i >= 0; i--) ds[i]();
 }
 
 /** Register an arbitrary teardown with the active ownership scope. */
@@ -312,11 +312,11 @@ export function onDispose(fn: () => void): void {
  * before the microtask fires. No-op cleanup tie-in outside an owner scope.
  */
 export function onMount(fn: () => void | (() => void)): void {
-  const owner = currentOwner;
+  const owner: Owner | null = currentOwner;
   queueMicrotask(() => {
     if (owner && owner._disposed) return;
     runInOwner(owner, () => {
-      const cleanup = fn();
+      const cleanup: void | (() => void) = fn();
       if (typeof cleanup === 'function') onDispose(cleanup);
     });
   });
@@ -329,7 +329,7 @@ export function onMount(fn: () => void | (() => void)): void {
  * programmatic boundaries. The boundary owner is disposed with the surrounding scope.
  */
 export function catchError<T>(handler: (err: unknown) => void, fn: () => T): T | undefined {
-  const owner = createOwner(); // _parent = currentOwner (so inner effects route here)
+  const owner: Owner = createOwner(); // _parent = currentOwner (so inner effects route here)
   owner._onError = handler;
   if (currentOwner) currentOwner._disposers.push(() => disposeOwner(owner));
   try {
@@ -347,7 +347,7 @@ export function getOwner(): Owner | null {
 
 /** Run `fn` inside a fresh root owner; returns the result and a dispose handle. */
 export function root<T>(fn: (dispose: () => void) => T): T {
-  const owner = createOwner();
+  const owner: Owner = createOwner();
   return runInOwner(owner, () => fn(() => disposeOwner(owner)));
 }
 
@@ -377,7 +377,7 @@ export function tick(): Promise<void> {
 
 /** Read reactive values without subscribing the current computation to them. */
 export function untrack<T>(fn: () => T): T {
-  const prev = listener;
+  const prev: Computation | null = listener;
   listener = null;
   try {
     return fn();

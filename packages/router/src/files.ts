@@ -24,19 +24,19 @@ export interface FileRoute {
   children?: FileRoute[];
 }
 
-const EXT = /\.(weave|tsx?|jsx?)$/;
+const EXT: RegExp = /\.(weave|tsx?|jsx?)$/;
 
 const baseName = (file: string): string => {
-  const slash = file.lastIndexOf('/');
+  const slash: number = file.lastIndexOf('/');
   return file.slice(slash + 1).replace(EXT, '');
 };
 
 /** Filename (no extension) → a route path segment. */
 function segment(name: string): string {
   if (name === 'index') return '';
-  const catchAll = /^\[\.\.\.(.+)]$/.exec(name);
+  const catchAll: RegExpExecArray | null = /^\[\.\.\.(.+)]$/.exec(name);
   if (catchAll) return '*';
-  const dynamic = /^\[(.+)]$/.exec(name);
+  const dynamic: RegExpExecArray | null = /^\[(.+)]$/.exec(name);
   if (dynamic) return `:${dynamic[1]}`;
   return name;
 }
@@ -68,8 +68,8 @@ function convert(tree: Tree): FileRoute[] {
   }
 
   for (const [dir, sub] of Object.entries(tree.dirs)) {
-    const childRoutes = convert(sub);
-    const layout = sub.files['_layout'];
+    const childRoutes: FileRoute[] = convert(sub);
+    const layout: string | undefined = sub.files['_layout'];
     if (layout) {
       routes.push({ path: dir, file: layout, children: sortRoutes(childRoutes) });
     } else {
@@ -87,12 +87,12 @@ function sortRoutes(routes: FileRoute[]): FileRoute[] {
 
 /** Map a flat list of page-file specifiers to a nested {@link FileRoute} manifest. */
 export function fileToRoutes(files: string[]): FileRoute[] {
-  const root = emptyTree();
+  const root: Tree = emptyTree();
   for (const file of files) {
-    const parts = file.split('/');
-    let node = root;
-    for (let i = 0; i < parts.length - 1; i++) {
-      const dir = parts[i];
+    const parts: string[] = file.split('/');
+    let node: Tree = root;
+    for (let i: number = 0; i < parts.length - 1; i++) {
+      const dir: string = parts[i];
       node = node.dirs[dir] ??= emptyTree();
     }
     node.files[baseName(parts[parts.length - 1])] = file;
@@ -113,22 +113,22 @@ export interface EmitRoutesOptions {
 /** Serialise a manifest into an importable ES module exporting `const routes: Route[]`. */
 export function emitRoutesModule(routes: FileRoute[], opts: EmitRoutesOptions = {}): string {
   const imports: string[] = [];
-  let n = 0;
-  const prefix = opts.importPrefix ?? './';
+  let n: number = 0;
+  const prefix: string = opts.importPrefix ?? './';
   const spec = (file: string): string =>
     JSON.stringify(/^[./]/.test(file) ? file : prefix + file);
 
   const componentField = (file: string): string => {
     if (opts.lazy) return `component: lazy(() => import(${spec(file)}))`;
-    const id = `Page${n++}`;
+    const id: string = `Page${n++}`;
     imports.push(`import ${id} from ${spec(file)};`);
     return `component: ${id}`;
   };
 
   const serialize = (list: FileRoute[], indent: string): string => {
-    const inner = indent + '  ';
-    const items = list.map((r) => {
-      const fields = [`path: ${JSON.stringify(r.path)}`];
+    const inner: string = indent + '  ';
+    const items: string[] = list.map((r) => {
+      const fields: string[] = [`path: ${JSON.stringify(r.path)}`];
       if (r.file) fields.push(componentField(r.file));
       if (r.children && r.children.length) {
         fields.push(`children: ${serialize(r.children, inner)}`);
@@ -138,8 +138,8 @@ export function emitRoutesModule(routes: FileRoute[], opts: EmitRoutesOptions = 
     return `[\n${items.join(',\n')}\n${indent}]`;
   };
 
-  const body = serialize(routes, '');
-  const header = opts.lazy
+  const body: string = serialize(routes, '');
+  const header: string = opts.lazy
     ? `import { lazy } from ${JSON.stringify(opts.runtimeImport ?? '@weave/runtime/dom')};\n`
     : '';
   return `${header}${imports.join('\n')}${imports.length ? '\n' : ''}\nexport const routes = ${body};\n`;

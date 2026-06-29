@@ -1,8 +1,8 @@
 import { test, assert } from '../../../tools/harness.js';
-import { field, form, validators } from '@weave/forms';
+import { field, form, validators, type Field, type Form } from '@weave/forms';
 
 test('field validates reactively (first failure wins)', () => {
-  const email = field('', [validators.required(), validators.email()]);
+  const email: Field<string> = field('', [validators.required(), validators.email()]);
   assert.equal(email.valid(), false);
   assert.equal(email.error(), 'Required', 'required fails first');
 
@@ -15,7 +15,7 @@ test('field validates reactively (first failure wins)', () => {
 });
 
 test('field reset restores the initial value and clears touched', () => {
-  const f = field('init', [validators.minLength(2)]);
+  const f: Field<string> = field('init', [validators.minLength(2)]);
   f.value.set('changed');
   f.touched.set(true);
   f.reset();
@@ -24,7 +24,7 @@ test('field reset restores the initial value and clears touched', () => {
 });
 
 test('form aggregates validity + a values snapshot', () => {
-  const f = form({
+  const f: Form<{ name: Field<string>; age: Field<number> }> = form({
     name: field('', [validators.required()]),
     age: field(0, [validators.min(18)]),
   });
@@ -41,7 +41,7 @@ test('form aggregates validity + a values snapshot', () => {
 });
 
 test('touchAll marks every field touched', () => {
-  const f = form({ a: field(''), b: field('') });
+  const f: Form<{ a: Field<string>; b: Field<string> }> = form({ a: field(''), b: field('') });
   assert.equal(f.fields.a.touched(), false);
   f.touchAll();
   assert.equal(f.fields.a.touched(), true);

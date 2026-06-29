@@ -1,16 +1,16 @@
 import { test, assert } from '../../../tools/harness.js';
-import { signal, effect, root, catchError } from '@weave/runtime';
+import { signal, effect, root, catchError, type Signal } from '@weave/runtime';
 import { mount, ErrorBoundary, type Component } from '@weave/runtime/dom';
 
-const tick = () => new Promise<void>((r) => queueMicrotask(r));
+const tick = (): Promise<void> => new Promise<void>((r) => queueMicrotask(r));
 
 function span(text: string): HTMLSpanElement {
-  const el = document.createElement('span');
+  const el: HTMLSpanElement = document.createElement('span');
   el.textContent = text;
   return el;
 }
 function host(): HTMLElement {
-  const el = document.createElement('div');
+  const el: HTMLDivElement = document.createElement('div');
   document.body.appendChild(el);
   return el;
 }
@@ -33,7 +33,7 @@ test('catchError catches a synchronous error thrown in fn', () => {
 });
 
 test('catchError catches an error thrown later in an inner effect', () => {
-  const trigger = signal(0);
+  const trigger: Signal<number> = signal(0);
   let caught: unknown = null;
   root(() => {
     catchError(
@@ -53,7 +53,7 @@ test('catchError catches an error thrown later in an inner effect', () => {
 });
 
 test('an effect error with no boundary propagates', () => {
-  let threw = false;
+  let threw: boolean = false;
   try {
     root(() => {
       effect(() => {
@@ -72,19 +72,19 @@ function mountEB(
   fallback: (err: unknown, reset: () => void) => Node,
   child: () => Node
 ): HTMLElement {
-  const el = host();
+  const el: HTMLElement = host();
   mount(ErrorBoundary({ fallback }, { default: child }), el);
   return el;
 }
 
 test('ErrorBoundary renders the protected content when nothing throws', () => {
-  const el = mountEB((e) => span('fallback'), () => span('content'));
+  const el: HTMLElement = mountEB((e) => span('fallback'), () => span('content'));
   assert.ok(el.textContent?.includes('content'));
   assert.ok(!el.textContent?.includes('fallback'));
 });
 
 test('ErrorBoundary shows the fallback when a child throws during render', async () => {
-  const el = mountEB(
+  const el: HTMLElement = mountEB(
     (err) => span('caught:' + (err as Error).message),
     () => {
       throw new Error('render-fail');
@@ -95,16 +95,16 @@ test('ErrorBoundary shows the fallback when a child throws during render', async
 });
 
 test('ErrorBoundary catches an effect error and swaps to the fallback', async () => {
-  const blow = signal(false);
+  const blow: Signal<boolean> = signal(false);
   const Child: Component = () => {
-    const el = document.createElement('span');
+    const el: HTMLSpanElement = document.createElement('span');
     effect(() => {
       if (blow()) throw new Error('late');
       el.textContent = 'live';
     });
     return el;
   };
-  const el = mountEB((err) => span('boom:' + (err as Error).message), () => Child());
+  const el: HTMLElement = mountEB((err) => span('boom:' + (err as Error).message), () => Child());
   assert.ok(el.textContent?.includes('live'), 'renders normally first');
   blow.set(true);
   await tick();
@@ -113,17 +113,17 @@ test('ErrorBoundary catches an effect error and swaps to the fallback', async ()
 });
 
 test('ErrorBoundary resetKey clears the error when the key changes', async () => {
-  const blow = signal(true);
-  const key = signal(0);
+  const blow: Signal<boolean> = signal(true);
+  const key: Signal<number> = signal(0);
   const Child: Component = () => {
-    const el = document.createElement('span');
+    const el: HTMLSpanElement = document.createElement('span');
     effect(() => {
       if (blow()) throw new Error('x');
       el.textContent = 'recovered';
     });
     return el;
   };
-  const el = host();
+  const el: HTMLElement = host();
   mount(
     ErrorBoundary(
       {
@@ -146,9 +146,9 @@ test('ErrorBoundary resetKey clears the error when the key changes', async () =>
 });
 
 test('ErrorBoundary reset() re-renders the protected content', async () => {
-  const blow = signal(true);
+  const blow: Signal<boolean> = signal(true);
   const Child: Component = () => {
-    const el = document.createElement('span');
+    const el: HTMLSpanElement = document.createElement('span');
     effect(() => {
       if (blow()) throw new Error('x');
       el.textContent = 'recovered';
@@ -156,7 +156,7 @@ test('ErrorBoundary reset() re-renders the protected content', async () => {
     return el;
   };
   let doReset!: () => void;
-  const el = mountEB(
+  const el: HTMLElement = mountEB(
     (err, reset) => {
       doReset = reset;
       return span('failed');

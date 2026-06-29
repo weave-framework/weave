@@ -1,5 +1,6 @@
 import { test, assert } from '../../../tools/harness.js';
 import { effect, signal } from '@weave/runtime';
+import type { Signal } from '@weave/runtime';
 import { mount, mountComponent, defineComponent, lazy, type Component } from '@weave/runtime/dom';
 import {
   createRouter,
@@ -10,6 +11,7 @@ import {
   Link,
   prefetch,
 } from '@weave/router';
+import type { Router, Match } from '@weave/router';
 
 // Route "components" are plain Component functions returning a <span> (so they
 // are distinguishable from RouterView's own display:contents <div> host).
@@ -18,7 +20,7 @@ const About: Component = () => span('about');
 const NotFound: Component = () => span('404');
 const Login: Component = () => span('login');
 const User: Component = (props = {}) => {
-  const el = document.createElement('span');
+  const el: HTMLSpanElement = document.createElement('span');
   effect(() => {
     el.textContent = 'user:' + String((props as { params?: { id?: string } }).params?.id ?? '');
   });
@@ -26,18 +28,18 @@ const User: Component = (props = {}) => {
 };
 
 function span(text: string): HTMLSpanElement {
-  const el = document.createElement('span');
+  const el: HTMLSpanElement = document.createElement('span');
   el.textContent = text;
   return el;
 }
 function host(): HTMLElement {
-  const el = document.createElement('div');
+  const el: HTMLDivElement = document.createElement('div');
   document.body.appendChild(el);
   return el;
 }
 
 test('createRouter matches static, param, and fallback routes', () => {
-  const r = createRouter([
+  const r: Router = createRouter([
     { path: '/', component: Home },
     { path: '/about', component: About },
     { path: '/user/:id', component: User },
@@ -60,7 +62,7 @@ test('navigate updates currentPath', () => {
 });
 
 test('query string is parsed reactively (pathname stays clean)', () => {
-  const r = createRouter([{ path: '/search', component: Home }]);
+  const r: Router = createRouter([{ path: '/search', component: Home }]);
   navigate('/search?q=hello&page=2');
   assert.equal(currentPath(), '/search', 'pathname excludes the query');
   assert.equal(currentQuery().q, 'hello');
@@ -72,7 +74,7 @@ test('query string is parsed reactively (pathname stays clean)', () => {
 });
 
 test('a guard returning true allows the route', () => {
-  const r = createRouter([
+  const r: Router = createRouter([
     { path: '/ok', component: Home, guard: () => true },
     { path: '*', component: NotFound },
   ]);
@@ -81,7 +83,7 @@ test('a guard returning true allows the route', () => {
 });
 
 test('a guard returning false blocks the route (falls back)', () => {
-  const r = createRouter([
+  const r: Router = createRouter([
     { path: '/secret', component: Home, guard: () => false },
     { path: '*', component: NotFound },
   ]);
@@ -90,7 +92,7 @@ test('a guard returning false blocks the route (falls back)', () => {
 });
 
 test('a guard returning a path redirects (and signals the canonical URL)', () => {
-  const r = createRouter([
+  const r: Router = createRouter([
     { path: '/admin', component: Home, guard: () => '/login' },
     { path: '/login', component: Login },
     { path: '*', component: NotFound },
@@ -101,7 +103,7 @@ test('a guard returning a path redirects (and signals the canonical URL)', () =>
 });
 
 test('a static redirect resolves to the target component', () => {
-  const r = createRouter([
+  const r: Router = createRouter([
     { path: '/old', redirect: '/new' },
     { path: '/new', component: About },
     { path: '*', component: NotFound },
@@ -112,8 +114,8 @@ test('a static redirect resolves to the target component', () => {
 });
 
 test('a guard re-resolves when the auth signal it reads changes', () => {
-  const authed = signal(false);
-  const r = createRouter([
+  const authed: Signal<boolean> = signal(false);
+  const r: Router = createRouter([
     { path: '/dash', component: Home, guard: () => (authed() ? true : '/login') },
     { path: '/login', component: Login },
     { path: '*', component: NotFound },
@@ -125,13 +127,13 @@ test('a guard re-resolves when the auth signal it reads changes', () => {
 });
 
 test('RouterView swaps components on navigation', () => {
-  const r = createRouter([
+  const r: Router = createRouter([
     { path: '/', component: Home },
     { path: '/about', component: About },
     { path: '*', component: NotFound },
   ]);
   navigate('/');
-  const el = host();
+  const el: HTMLElement = host();
   mount(RouterView({ router: r }), el);
   assert.ok(el.textContent?.includes('home'), 'initial route rendered');
 
@@ -141,14 +143,14 @@ test('RouterView swaps components on navigation', () => {
 });
 
 test('RouterView keeps the instance on a param-only change', () => {
-  const r = createRouter([
+  const r: Router = createRouter([
     { path: '/user/:id', component: User },
     { path: '*', component: NotFound },
   ]);
   navigate('/user/1');
-  const el = host();
+  const el: HTMLElement = host();
   mount(RouterView({ router: r }), el);
-  const node = el.querySelector('span');
+  const node: HTMLSpanElement | null = el.querySelector('span');
   assert.equal(node?.textContent, 'user:1');
 
   navigate('/user/2');
@@ -157,13 +159,13 @@ test('RouterView keeps the instance on a param-only change', () => {
 });
 
 test('RouterView syncs the address bar on a guard redirect', () => {
-  const r = createRouter([
+  const r: Router = createRouter([
     { path: '/private', component: Home, guard: () => '/login' },
     { path: '/login', component: Login },
     { path: '*', component: NotFound },
   ]);
   navigate('/private');
-  const el = host();
+  const el: HTMLElement = host();
   mount(RouterView({ router: r }), el);
   assert.ok(el.textContent?.includes('login'), 'redirect target rendered');
   assert.equal(currentPath(), '/login', 'address bar synced to the redirect target');
@@ -172,21 +174,21 @@ test('RouterView syncs the address bar on a guard redirect', () => {
 // ── Nested routes (A.3b) ───────────────────────────────────────────────────
 const UserList: Component = () => span('user-list');
 const UserDetail: Component = (props = {}) => {
-  const el = document.createElement('span');
+  const el: HTMLSpanElement = document.createElement('span');
   effect(() => {
     el.textContent = 'detail:' + String((props as { params?: { id?: string } }).params?.id ?? '');
   });
   return el;
 };
 // A layout with a nested outlet — discovers the router + depth via context (no props).
-const UsersLayout = defineComponent(() => {
-  const wrap = document.createElement('div');
+const UsersLayout: Component = defineComponent(() => {
+  const wrap: HTMLDivElement = document.createElement('div');
   wrap.appendChild(span('users-layout'));
   wrap.appendChild(RouterView({}));
   return wrap;
 });
 
-function nestedRouter() {
+function nestedRouter(): Router {
   return createRouter([
     { path: '/', component: Home },
     {
@@ -202,9 +204,9 @@ function nestedRouter() {
 }
 
 test('nested routes resolve to a layout→child chain with accumulated params', () => {
-  const r = nestedRouter();
+  const r: Router = nestedRouter();
   navigate('/users');
-  let ch = r.chain();
+  let ch: Match[] = r.chain();
   assert.equal(ch.length, 2, 'layout + index child');
   assert.is(ch[0].view, UsersLayout);
   assert.is(ch[1].view, UserList);
@@ -219,20 +221,20 @@ test('nested routes resolve to a layout→child chain with accumulated params', 
 });
 
 test('nested RouterView renders the child inside the layout', () => {
-  const r = nestedRouter();
+  const r: Router = nestedRouter();
   navigate('/users/7');
-  const el = host();
+  const el: HTMLElement = host();
   mountComponent(RouterView, el, { router: r });
   assert.ok(el.textContent?.includes('users-layout'), 'layout rendered');
   assert.ok(el.textContent?.includes('detail:7'), 'nested child rendered with its param');
 });
 
 test('navigating within a layout swaps the nested child but keeps the layout', () => {
-  const r = nestedRouter();
+  const r: Router = nestedRouter();
   navigate('/users');
-  const el = host();
+  const el: HTMLElement = host();
   mountComponent(RouterView, el, { router: r });
-  const layoutSpan = el.querySelector('span');
+  const layoutSpan: HTMLSpanElement | null = el.querySelector('span');
   assert.equal(layoutSpan?.textContent, 'users-layout');
   assert.ok(el.textContent?.includes('user-list'), 'index child shown');
 
@@ -244,9 +246,9 @@ test('navigating within a layout swaps the nested child but keeps the layout', (
 });
 
 test('leaving the layout subtree clears the nested outlet', () => {
-  const r = nestedRouter();
+  const r: Router = nestedRouter();
   navigate('/users/9');
-  const el = host();
+  const el: HTMLElement = host();
   mountComponent(RouterView, el, { router: r });
   assert.ok(el.textContent?.includes('detail:9'));
 
@@ -257,14 +259,14 @@ test('leaving the layout subtree clears the nested outlet', () => {
 });
 
 test('a lazy() component works as a route (code-split page)', async () => {
-  const settle = () => new Promise<void>((r) => setTimeout(r, 0));
-  const Page = defineComponent(() => span('lazy-page'));
-  const r = createRouter([
+  const settle = (): Promise<void> => new Promise<void>((r) => setTimeout(r, 0));
+  const Page: Component = defineComponent(() => span('lazy-page'));
+  const r: Router = createRouter([
     { path: '/lz', component: lazy(() => Promise.resolve({ default: Page })) },
     { path: '*', component: NotFound },
   ]);
   navigate('/lz');
-  const el = host();
+  const el: HTMLElement = host();
   mountComponent(RouterView, el, { router: r });
   await settle();
   assert.ok(el.textContent?.includes('lazy-page'), 'lazy route component loaded and rendered');
@@ -272,8 +274,8 @@ test('a lazy() component works as a route (code-split page)', async () => {
 
 test('Link navigates on a plain click', () => {
   navigate('/');
-  const el = host();
-  const link = Link({ to: '/about' }, { default: () => document.createTextNode('About') });
+  const el: HTMLElement = host();
+  const link: Node = Link({ to: '/about' }, { default: () => document.createTextNode('About') });
   el.appendChild(link);
   assert.equal((link as HTMLAnchorElement).getAttribute('href'), '/about');
   (link as HTMLAnchorElement).click();
@@ -281,7 +283,7 @@ test('Link navigates on a plain click', () => {
 });
 
 test('Link forwards class / attributes (but not to/prefetch) to the anchor', () => {
-  const link = Link(
+  const link: HTMLAnchorElement = Link(
     { to: '/x', class: 'nav active', id: 'home', 'aria-label': 'Home', prefetch: false },
     {}
   ) as HTMLAnchorElement;
@@ -295,11 +297,11 @@ test('Link forwards class / attributes (but not to/prefetch) to the anchor', () 
 
 /* ──────────── prefetch (B.15) ──────────── */
 
-const LazyPage = defineComponent(() => span('lazy'));
+const LazyPage: Component = defineComponent(() => span('lazy'));
 
 test('lazy().preload triggers the loader once, without rendering', () => {
-  let loads = 0;
-  const L = lazy(() => {
+  let loads: number = 0;
+  const L: Component & { preload: () => void } = lazy(() => {
     loads++;
     return Promise.resolve({ default: LazyPage });
   }) as Component & { preload: () => void };
@@ -311,8 +313,8 @@ test('lazy().preload triggers the loader once, without rendering', () => {
 });
 
 test('router.preload warms a lazy route chunk ahead of navigation', () => {
-  let loads = 0;
-  const r = createRouter([
+  let loads: number = 0;
+  const r: Router = createRouter([
     { path: '/heavy', component: lazy(() => { loads++; return Promise.resolve({ default: LazyPage }); }) },
     { path: '*', component: NotFound },
   ]);
@@ -323,12 +325,12 @@ test('router.preload warms a lazy route chunk ahead of navigation', () => {
 
 test('Link prefetches the target chunk on hover (once)', () => {
   navigate('/');
-  let loads = 0;
+  let loads: number = 0;
   createRouter([
     { path: '/hv', component: lazy(() => { loads++; return Promise.resolve({ default: LazyPage }); }) },
     { path: '*', component: NotFound },
   ]);
-  const link = Link({ to: '/hv' }, {}) as HTMLAnchorElement;
+  const link: HTMLAnchorElement = Link({ to: '/hv' }, {}) as HTMLAnchorElement;
   host().appendChild(link);
   assert.equal(loads, 0, 'not loaded before hover');
   link.dispatchEvent(new Event('pointerenter'));
@@ -338,12 +340,12 @@ test('Link prefetches the target chunk on hover (once)', () => {
 });
 
 test('Link prefetch={false} does not warm on hover', () => {
-  let loads = 0;
+  let loads: number = 0;
   createRouter([
     { path: '/np', component: lazy(() => { loads++; return Promise.resolve({ default: LazyPage }); }) },
     { path: '*', component: NotFound },
   ]);
-  const link = Link({ to: '/np', prefetch: false }, {}) as HTMLAnchorElement;
+  const link: HTMLAnchorElement = Link({ to: '/np', prefetch: false }, {}) as HTMLAnchorElement;
   host().appendChild(link);
   link.dispatchEvent(new Event('pointerenter'));
   assert.equal(loads, 0, 'prefetch disabled — no load on hover');

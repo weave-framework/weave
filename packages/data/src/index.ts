@@ -15,6 +15,7 @@
  */
 
 import { signal, effect, batch, onCleanup, watch } from '@weave/runtime';
+import type { Signal } from '@weave/runtime';
 
 /* ──────────────────────────── resource ──────────────────────────── */
 
@@ -74,18 +75,18 @@ export function resource(
     options = (b as ResourceOptions<unknown>) ?? {};
   }
 
-  const data = signal<unknown>(options.initialValue);
-  const error = signal<unknown>(undefined);
-  const loading = signal(false);
+  const data: Signal<unknown> = signal<unknown>(options.initialValue);
+  const error: Signal<unknown> = signal<unknown>(undefined);
+  const loading: Signal<boolean> = signal(false);
 
   // A plain counter signal the effect subscribes to, so refetch() can re-trigger
   // it even when `source` is unchanged.
-  const trigger = signal(0);
-  let pendingRefetch = false;
+  const trigger: Signal<number> = signal(0);
+  let pendingRefetch: boolean = false;
 
   function load(value: unknown, refetching: boolean): void {
-    const controller = new AbortController();
-    let cancelled = false;
+    const controller: AbortController = new AbortController();
+    let cancelled: boolean = false;
     // Registered on the owning effect's computation, so the next re-run (source
     // change / refetch) or unmount aborts this in-flight request.
     onCleanup(() => {
@@ -122,8 +123,8 @@ export function resource(
 
   effect(() => {
     trigger(); // subscribe so refetch() re-runs this
-    const value = source();
-    const refetching = pendingRefetch;
+    const value: unknown = source();
+    const refetching: boolean = pendingRefetch;
     pendingRefetch = false;
     if (value === undefined || value === null || value === false) {
       loading.set(false); // not ready — keep last data, ensure not stuck loading
@@ -166,19 +167,19 @@ export interface Action<I, T> {
  * own promise result back from `run`.
  */
 export function action<I = void, T = unknown>(fn: (input: I) => Promise<T> | T): Action<I, T> {
-  const pending = signal(false);
-  const error = signal<unknown>(undefined);
-  const result = signal<T | undefined>(undefined);
-  let runId = 0;
+  const pending: Signal<boolean> = signal(false);
+  const error: Signal<unknown> = signal<unknown>(undefined);
+  const result: Signal<T | undefined> = signal<T | undefined>(undefined);
+  let runId: number = 0;
 
   async function run(input: I): Promise<T> {
-    const id = ++runId;
+    const id: number = ++runId;
     batch(() => {
       pending.set(true);
       error.set(() => undefined);
     });
     try {
-      const value = await fn(input);
+      const value: T = await fn(input);
       if (id === runId) {
         batch(() => {
           result.set(() => value);
@@ -226,7 +227,7 @@ export function optimistic<T, U = T>(
   base: () => T,
   reduce: (current: T, optimistic: U) => T = (_, u) => u as unknown as T
 ): Optimistic<T, U> {
-  const pending = signal<U[]>([]);
+  const pending: Signal<U[]> = signal<U[]>([]);
 
   // When the real base changes (the mutation's result landed), drop the overlay.
   // `watch` fires on change only, never on creation — so the seed value is kept.
@@ -313,8 +314,8 @@ export interface Client {
 
 /** Create a small fetch client. Its methods are ready-made resource fetchers. */
 export function createClient(options: ClientOptions = {}): Client {
-  const doFetch = options.fetch ?? globalThis.fetch.bind(globalThis);
-  const base = options.baseUrl ?? '';
+  const doFetch: typeof fetch = options.fetch ?? globalThis.fetch.bind(globalThis);
+  const base: string = options.baseUrl ?? '';
 
   // The terminal handler actually hits the network; interceptors wrap around it
   // (composed once, outermost-first). reduceRight folds the chain so the first
@@ -329,18 +330,19 @@ export function createClient(options: ClientOptions = {}): Client {
   async function request<T>(method: string, path: string, opts: RequestOptions = {}): Promise<T> {
     const { json, params, headers, body, ...rest } = opts;
 
-    let url = base + path;
+    let url: string = base + path;
     if (params) {
-      const qs = new URLSearchParams();
+      const qs: URLSearchParams = new URLSearchParams();
       for (const k in params) qs.set(k, String(params[k]));
       url += (url.includes('?') ? '&' : '?') + qs.toString();
     }
 
-    const defaults = typeof options.headers === 'function' ? options.headers() : options.headers;
-    const h = new Headers(defaults);
+    const defaults: HeadersInit | undefined =
+      typeof options.headers === 'function' ? options.headers() : options.headers;
+    const h: Headers = new Headers(defaults);
     if (headers) new Headers(headers).forEach((v, k) => h.set(k, v));
 
-    let finalBody = body ?? null;
+    let finalBody: BodyInit | null = body ?? null;
     if (json !== undefined) {
       finalBody = JSON.stringify(json);
       if (!h.has('Content-Type')) h.set('Content-Type', 'application/json');
@@ -350,9 +352,9 @@ export function createClient(options: ClientOptions = {}): Client {
     try {
       // The chain returns the raw Response (including non-2xx) so an interceptor
       // can inspect/retry it; the ok-check + parse stay here, outside the chain.
-      const res = await handler(req);
+      const res: Response = await handler(req);
       if (!res.ok) throw new HttpError(res.status, res.statusText, res);
-      const ct = res.headers.get('content-type') ?? '';
+      const ct: string = res.headers.get('content-type') ?? '';
       return (ct.includes('application/json') ? await res.json() : await res.text()) as T;
     } catch (err) {
       options.onError?.(err);

@@ -1,22 +1,32 @@
 import { test, assert } from '../../../tools/harness.js';
 import { signal, computed, effect, root } from '@weave/runtime';
+import type { Signal } from '@weave/runtime';
 import * as dom from '@weave/runtime/dom';
 import { compileTemplate } from '@weave/compiler';
 
-const rt = { ...dom, signal, computed, effect, root };
+const rt: typeof dom & {
+  signal: typeof signal;
+  computed: typeof computed;
+  effect: typeof effect;
+  root: typeof root;
+} = { ...dom, signal, computed, effect, root };
 
 /** Compile a template (function mode) and instantiate it — runs the real runtime path. */
 function render(html: string, ctx: Record<string, unknown> = {}, scope: string[] = []): Element {
   const { code } = compileTemplate(html, { mode: 'function', scope });
-  const fn = new Function('ctx', 'rt', '_c', code) as (c: unknown, r: unknown, k: unknown) => Element;
+  const fn: (c: unknown, r: unknown, k: unknown) => Element = new Function('ctx', 'rt', '_c', code) as (
+    c: unknown,
+    r: unknown,
+    k: unknown
+  ) => Element;
   return fn(ctx, rt, {});
 }
 function host(): HTMLElement {
-  const el = document.createElement('div');
+  const el: HTMLDivElement = document.createElement('div');
   document.body.appendChild(el);
   return el;
 }
-const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+const wait = (ms: number): Promise<void> => new Promise<void>((r) => setTimeout(r, ms));
 
 test('@defer compiles to a deferBlock call with a trigger spec', () => {
   const { code } = compileTemplate(`<div>@defer (on idle) { <p>x</p> }</div>`, { mode: 'module' });
@@ -25,8 +35,8 @@ test('@defer compiles to a deferBlock call with a trigger spec', () => {
 });
 
 test('@defer (when) shows the placeholder until the condition flips', () => {
-  const ready = signal(false);
-  const el = render(
+  const ready: Signal<boolean> = signal(false);
+  const el: Element = render(
     `<div>@defer (when ready()) { <span>content</span> } @placeholder { <span>ph</span> }</div>`,
     { ready },
     ['ready']
@@ -40,7 +50,7 @@ test('@defer (when) shows the placeholder until the condition flips', () => {
 });
 
 test('@defer (immediate) renders the content right away', () => {
-  const el = render(
+  const el: Element = render(
     `<div>@defer (immediate) { <span>now</span> } @placeholder { <span>ph</span> }</div>`
   );
   host().appendChild(el);
@@ -49,7 +59,7 @@ test('@defer (immediate) renders the content right away', () => {
 });
 
 test('@defer (on timer) swaps after the delay', async () => {
-  const el = render(
+  const el: Element = render(
     `<div>@defer (on timer(10)) { <span>late</span> } @placeholder { <span>wait</span> }</div>`
   );
   host().appendChild(el);
@@ -60,7 +70,7 @@ test('@defer (on timer) swaps after the delay', async () => {
 });
 
 test('@defer (on idle) renders after an idle tick', async () => {
-  const el = render(
+  const el: Element = render(
     `<div>@defer (on idle) { <span>idle-content</span> } @placeholder { <span>p</span> }</div>`
   );
   host().appendChild(el);
@@ -70,26 +80,26 @@ test('@defer (on idle) renders after an idle tick', async () => {
 });
 
 test('@defer (on interaction) renders on a click of the placeholder', () => {
-  const el = render(
+  const el: Element = render(
     `<div>@defer (on interaction) { <span>loaded</span> } @placeholder { <button>tap</button> }</div>`
   );
   host().appendChild(el);
-  const btn = el.querySelector('button')!;
+  const btn: HTMLButtonElement = el.querySelector('button')!;
   assert.ok(!el.textContent?.includes('loaded'), 'not loaded before interaction');
   btn.click();
   assert.ok(el.textContent?.includes('loaded'), 'content rendered after interaction');
 });
 
 test('@defer (on viewport) with no placeholder renders immediately (nothing to observe)', () => {
-  const el = render(`<div>@defer (on viewport) { <span>vp</span> }</div>`);
+  const el: Element = render(`<div>@defer (on viewport) { <span>vp</span> }</div>`);
   host().appendChild(el);
   assert.ok(el.textContent?.includes('vp'));
 });
 
 test('deferred content keeps fine-grained reactivity after it renders', () => {
-  const ready = signal(true);
-  const count = signal(1);
-  const el = render(
+  const ready: Signal<boolean> = signal(true);
+  const count: Signal<number> = signal(1);
+  const el: Element = render(
     `<div>@defer (when ready()) { <span>{{ count() }}</span> }</div>`,
     { ready, count },
     ['ready', 'count']

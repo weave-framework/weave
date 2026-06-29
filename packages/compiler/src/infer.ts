@@ -12,11 +12,11 @@
 import type { TemplateNode } from './ast.js';
 import { freeIdentifiers } from './scope.js';
 
-const FOR_VARS = ['$index', '$count', '$first', '$last', '$even', '$odd'];
+const FOR_VARS: string[] = ['$index', '$count', '$first', '$last', '$even', '$odd'];
 
 export function inferCtxNames(nodes: TemplateNode[]): string[] {
-  const used = new Set<string>();
-  const declared = new Set<string>();
+  const used: Set<string> = new Set<string>();
+  const declared: Set<string> = new Set<string>();
 
   const add = (expr: string | undefined): void => {
     if (expr) for (const id of freeIdentifiers(expr)) used.add(id);
