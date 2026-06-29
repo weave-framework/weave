@@ -453,15 +453,25 @@ class Parser {
   }
 
   readText(stopAtBrace: boolean): string {
-    const start: number = this.pos;
+    let out: string = '';
     while (!this.eof()) {
       const c: string = this.peek();
       if (c === '<' || this.src.startsWith('{{', this.pos)) break;
       if (stopAtBrace && c === '}') break;
-      if (c === '@' && BLOCK_KW.test(this.src.slice(this.pos))) break;
+      if (c === '@') {
+        // `@@` is the escape for a literal `@` — lets prose mention block
+        // keywords (`@@for`, `@@if`) without the parser treating them as blocks.
+        if (this.src[this.pos + 1] === '@') {
+          out += '@';
+          this.pos += 2;
+          continue;
+        }
+        if (BLOCK_KW.test(this.src.slice(this.pos))) break;
+      }
+      out += c;
       this.pos++;
     }
-    return this.src.slice(start, this.pos);
+    return out;
   }
 
   parseElement(): ElementNode {

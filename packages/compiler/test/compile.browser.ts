@@ -237,6 +237,18 @@ test('@switch picks a case and @default', () => {
   assert.equal(el.querySelector('p')!.textContent, '?');
 });
 
+test('@@ escapes a literal @ so prose can mention block keywords', () => {
+  const el: Element = render('<p>Use <code>@@for</code> and @@if in docs</p>', {}, []);
+  host().appendChild(el);
+  assert.equal(el.querySelector('code')!.textContent, '@for', 'escaped @@for renders as literal @for');
+  assert.equal(el.textContent, 'Use @for and @if in docs', 'both escapes collapse; no block parsed');
+});
+
+test('a single @ in text is left untouched (emails, decorators)', () => {
+  const el: Element = render('<p>mail me at ada@weave.dev</p>', {}, []);
+  assert.equal(el.textContent, 'mail me at ada@weave.dev');
+});
+
 test('@let defines a reactive local', () => {
   const n: Signal<number> = signal(3);
   const el: Element = render('<div>@let dbl = n() * 2;<b>{{ dbl }}</b></div>', { n }, ['n']);
