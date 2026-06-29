@@ -4,4 +4,7 @@ packages:
 # esbuild ships a platform binary via a postinstall script. This environment's
 # pnpm requires explicit per-package build approval.
 allowBuilds:
+  # @parcel/watcher (a transitive dep of `sass`, only used by its `--watch` CLI) ships a
+  # native build we don't need — we use the sass compile API, so deny its postinstall.
+  '@parcel/watcher': false
   esbuild: true

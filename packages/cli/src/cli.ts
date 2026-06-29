@@ -1,8 +1,9 @@
-/** Weave CLI entry — `weave build` / `weave dev` / `weave check`. */
+/** Weave CLI entry — `weave build` / `weave dev` / `weave check` / `weave routes`. */
 
 import { build } from './build.js';
 import { dev } from './dev.js';
 import { generateRoutes } from './routes.js';
+import { loadConfig } from './config.js';
 import { checkProject, type Diagnostic } from '@weave/check';
 
 function flag(args: string[], name: string): string | undefined {
@@ -10,18 +11,52 @@ function flag(args: string[], name: string): string | undefined {
   return i >= 0 ? args[i + 1] : undefined;
 }
 
+export { defineConfig } from './config.js';
+export type { WeaveConfig } from './config.js';
+
 export async function main(argv: string[]): Promise<void> {
   const [cmd, ...rest] = argv;
   const entry = rest.find((a) => !a.startsWith('-')) ?? 'src/main.ts';
   const outdir = flag(rest, '--out') ?? 'dist';
+  // A `weave.config.ts/json` (auto-discovered in cwd, or via `--config`) switches both
+  // build + dev into the config-driven pipeline (Angular-style); else the flags drive it.
+  const config = await loadConfig(process.cwd(), flag(rest, '--config'));
 
   if (cmd === 'build') {
+    if (config) {
+      await build({
+        entry: config.entry,
+        outDir: config.outDir,
+        minify: config.minify,
+        styleLang: config.styleLang,
+        styles: config.styles,
+        index: config.index,
+        clean: true, // a fresh, self-contained artifact each prod build
+      });
+      console.log(`weave build → ${config.outDir}/`);
+      return;
+    }
     // `weave build` is the production bundle → minify by default; `--no-minify` opts out.
-    await build({ entry, outdir, minify: !rest.includes('--no-minify') });
+    await build({ entry, outDir: outdir, minify: !rest.includes('--no-minify') });
     console.log(`weave build → ${outdir}/`);
     return;
   }
   if (cmd === 'dev') {
+    if (config) {
+      // Serve the config's directory from memory (outdir === servedir so `main.js`
+      // lives at the web root); nothing is written to disk.
+      const { url } = await dev({
+        entry: config.entry,
+        servedir: config.root,
+        outdir: config.root,
+        port: config.port,
+        styleLang: config.styleLang,
+        styles: config.styles,
+        inMemory: true,
+      });
+      console.log(`weave dev → ${url}`);
+      return;
+    }
     const servedir = flag(rest, '--serve') ?? '.';
     const port = Number(flag(rest, '--port')) || undefined;
     const { url } = await dev({ entry, outdir, servedir, port });
@@ -50,7 +85,7 @@ export async function main(argv: string[]): Promise<void> {
   }
 
   console.error(
-    'usage: weave <build|dev|check|routes> [entry|paths…] [--out dir] [--serve dir] [--port n] [--no-minify] [--eager]'
+    'usage: weave <build|dev|check|routes> [entry|paths…] [--config file] [--out dir] [--serve dir] [--port n] [--no-minify] [--eager]'
   );
   process.exit(1);
 }

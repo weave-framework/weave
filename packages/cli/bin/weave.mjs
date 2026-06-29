@@ -23,7 +23,7 @@ await esbuild({
   platform: 'node',
   // Keep heavy native/peer deps out of the on-the-fly bundle — resolved at runtime
   // via normal upward node_modules lookup from `node_modules/.weave/cli.mjs`.
-  external: ['esbuild', 'typescript'],
+  external: ['esbuild', 'typescript', 'sass'],
   outfile: out,
 });
 
