@@ -17,8 +17,16 @@ import { resolve, dirname, join, isAbsolute } from 'node:path';
 import type { StyleLang } from './styles.js';
 
 export interface WeaveConfig {
-  /** App entry module (relative to the config file). */
-  entry: string;
+  /**
+   * Root component module (relative to the config file). When set, the framework
+   * OWNS the bootstrap: it generates the entry (import root, auto-register custom
+   * elements, mount) — no hand-written `main.ts`. Mutually exclusive with `entry`.
+   */
+  root?: string;
+  /** Mount target for the generated bootstrap — a CSS selector (default `#app`). Only with `root`. */
+  mount?: string;
+  /** App entry module (relative to the config file). The escape hatch when you want a hand-written bootstrap. */
+  entry?: string;
   /** Static web root — served as-is in dev and copied verbatim into the build output. */
   publicDir?: string;
   /** HTML shell template (relative to the config file). */
@@ -42,7 +50,12 @@ export function defineConfig(config: WeaveConfig): WeaveConfig {
 export interface ResolvedConfig {
   /** Directory containing the config. */
   root: string;
-  entry: string;
+  /** App entry (absolute) — set when the author hand-writes the bootstrap. */
+  entry?: string;
+  /** Root component (absolute) — set when the framework generates the bootstrap. */
+  rootComponent?: string;
+  /** Mount selector for the generated bootstrap. */
+  mount: string;
   /** Static web root (absolute) — defaults to {@link root} when no `publicDir` is set. */
   publicDir: string;
   index?: string;
@@ -106,9 +119,17 @@ async function importConfigModule(file: string): Promise<WeaveConfig> {
 
 function resolveConfig(raw: WeaveConfig, root: string): ResolvedConfig {
   const abs = (p: string): string => (isAbsolute(p) ? p : resolve(root, p));
+  if (!raw.root && !raw.entry) {
+    throw new Error('weave: config must declare either `root` (generated bootstrap) or `entry` (hand-written)');
+  }
+  if (raw.root && raw.entry) {
+    throw new Error('weave: config declares both `root` and `entry` — pick one');
+  }
   return {
     root,
-    entry: abs(raw.entry),
+    entry: raw.entry ? abs(raw.entry) : undefined,
+    rootComponent: raw.root ? abs(raw.root) : undefined,
+    mount: raw.mount ?? '#app',
     publicDir: raw.publicDir ? abs(raw.publicDir) : root,
     index: raw.index ? abs(raw.index) : undefined,
     outDir: abs(raw.outDir ?? 'dist'),

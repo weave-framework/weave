@@ -938,10 +938,14 @@ export function defineComponent(
   };
 }
 
-/** Mount a root component into a container under a fresh owner. Returns an unmount fn. */
+/**
+ * Mount a root component into a container under a fresh owner. The container is an
+ * `Element` or a CSS selector string (`'#app'`, `'.root'`, …) resolved via
+ * `querySelector` — a non-matching selector throws. Returns an unmount fn.
+ */
 export function mountComponent(
   component: Component,
-  container: Element,
+  container: Element | string,
   props?: Record<string, unknown>
 ): () => void {
   const owner: Owner = createOwner(null);
@@ -1193,8 +1197,21 @@ export const Portal: Component = (props = {}, slots = {}) => {
 
 /* ──────────────────────────── mount ──────────────────────────── */
 
-/** Mount a node into a container, replacing its contents. Returns an unmount fn. */
-export function mount(node: Node, container: Element): () => void {
+/**
+ * Resolve a mount target: an `Element`, or a CSS selector string resolved via
+ * `document.querySelector` (`'#app'`, `'.root'`, `'main'`, `'[data-app]'`, …).
+ * Throws a clear error when a selector matches nothing — no silent no-op.
+ */
+function resolveContainer(target: Element | string): Element {
+  if (typeof target !== 'string') return target;
+  const el: Element | null = document.querySelector(target);
+  if (!el) throw new Error(`weave: mount target "${target}" matched no element`);
+  return el;
+}
+
+/** Mount a node into a container (an `Element` or CSS selector), replacing its contents. Returns an unmount fn. */
+export function mount(node: Node, target: Element | string): () => void {
+  const container: Element = resolveContainer(target);
   container.textContent = '';
   const nodes: Node[] = node instanceof DocumentFragment ? [...node.childNodes] : [node];
   container.append(node);

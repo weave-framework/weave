@@ -21,11 +21,15 @@ import type { AddressInfo } from 'node:net';
 import { mkdir, writeFile, readFile } from 'node:fs/promises';
 import { join, extname, relative, sep } from 'node:path';
 import { weave, type WeaveState } from './plugin.js';
+import { entryPlugin, VIRTUAL_ENTRY } from './entry.js';
 import { compileStyleFile, type StyleLang } from './styles.js';
 import { injectHtml } from './html.js';
 
 export interface DevConfig {
-  entry: string;
+  /** Hand-written entry module (absolute). Mutually exclusive with {@link virtualEntry}. */
+  entry?: string;
+  /** Framework-generated entry (Level C): the module source + the dir its imports resolve against. */
+  virtualEntry?: { code: string; resolveDir: string };
   servedir: string;
   outdir: string;
   port?: number;
@@ -102,15 +106,20 @@ async function devInMemory(config: DevConfig): Promise<DevServer> {
     },
   };
 
+  const ve: { code: string; resolveDir: string } | undefined = config.virtualEntry;
   const ctx: BuildContext = await context({
-    entryPoints: [config.entry],
+    entryPoints: ve ? [{ in: VIRTUAL_ENTRY, out: 'main' }] : [config.entry!],
     bundle: true,
     format: 'esm',
     splitting: true,
     outdir: config.outdir,
     write: false, // everything stays in memory — dev creates no dist/
     banner,
-    plugins: [weave(state, { styleLang: config.styleLang, dev: true }), capture],
+    plugins: [
+      weave(state, { styleLang: config.styleLang, dev: true }),
+      ...(ve ? [entryPlugin(ve.code, ve.resolveDir)] : []),
+      capture,
+    ],
   });
   await ctx.watch();
 
@@ -208,7 +217,7 @@ async function devLegacy(config: DevConfig): Promise<DevServer> {
   ];
 
   const ctx: BuildContext = await context({
-    entryPoints: [config.entry],
+    entryPoints: [config.entry!], // legacy mode always has a hand-written entry
     bundle: true,
     format: 'esm',
     splitting: true,

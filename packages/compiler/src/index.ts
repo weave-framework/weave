@@ -16,4 +16,11 @@ export {
   type ComponentOptions,
   type CompiledComponent,
 } from './component.js';
+export {
+  extractSources,
+  faithfulTemplate,
+  classifyTemplate,
+  classifyStyle,
+  type ExtractedSources,
+} from './sources.js';
 export type * from './ast.js';

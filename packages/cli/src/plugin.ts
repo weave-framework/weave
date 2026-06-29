@@ -25,9 +25,9 @@
 import type { OnLoadArgs, OnLoadResult, Plugin, PluginBuild } from 'esbuild';
 import { readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
-import { dirname } from 'node:path';
-import { compileComponent, parseSfc } from '@weave/compiler';
-import type { ComponentSource } from '@weave/compiler';
+import { dirname, resolve } from 'node:path';
+import { compileComponent, parseSfc, extractSources, classifyTemplate, classifyStyle } from '@weave/compiler';
+import type { ComponentSource, ExtractedSources } from '@weave/compiler';
 import { compileStyleFile, compileStyleSource, type StyleLang } from './styles.js';
 
 export interface WeaveState {
@@ -48,6 +48,67 @@ function cssInjector(css: string): string {
   return `\n;(()=>{const s=document.createElement("style");s.textContent=${JSON.stringify(
     css
   )};document.head.appendChild(s);})();\n`;
+}
+
+/**
+ * Resolve a component's template to its source text. Precedence: a declared
+ * `template` (inline markup, or a path-shaped value read from disk) wins; otherwise
+ * the sibling `<base>.html`. Fails loud on ambiguity (declared + sibling) and on a
+ * declared file that does not exist.
+ */
+async function resolveTemplate(
+  decl: ExtractedSources,
+  tsPath: string,
+  siblingHtml: string,
+  hasSiblingHtml: boolean
+): Promise<string> {
+  if (decl.template !== undefined) {
+    if (hasSiblingHtml) {
+      throw new Error(
+        `weave: ${tsPath} declares \`template\` and also has a sibling .html — remove one`
+      );
+    }
+    if (classifyTemplate(decl.template) === 'inline') return decl.template;
+    const file: string = resolve(dirname(tsPath), decl.template);
+    if (!existsSync(file)) throw new Error(`weave: template file not found: ${file} (from ${tsPath})`);
+    return readFile(file, 'utf8');
+  }
+  return readFile(siblingHtml, 'utf8');
+}
+
+/**
+ * Resolve a component's styles to one CSS string. Precedence: declared `styles`
+ * (inline CSS and/or path-shaped files, compiled and concatenated in order) win;
+ * otherwise the sibling `<base>.<styleLang>`; otherwise none. Fails loud on
+ * ambiguity and on a declared file that does not exist.
+ */
+async function resolveStyles(
+  decl: ExtractedSources,
+  tsPath: string,
+  dir: string,
+  styleLang: StyleLang
+): Promise<string | undefined> {
+  if (decl.styles !== undefined) {
+    const siblingStyle: string = tsPath.replace(/\.ts$/, '.' + styleLang);
+    if (existsSync(siblingStyle)) {
+      throw new Error(
+        `weave: ${tsPath} declares \`styles\` and also has a sibling .${styleLang} — remove one`
+      );
+    }
+    const parts: string[] = [];
+    for (const entry of decl.styles) {
+      if (classifyStyle(entry) === 'inline') {
+        parts.push(await compileStyleSource(entry, styleLang, dir));
+      } else {
+        const file: string = resolve(dir, entry);
+        if (!existsSync(file)) throw new Error(`weave: style file not found: ${file} (from ${tsPath})`);
+        parts.push(await compileStyleFile(file));
+      }
+    }
+    return parts.join('\n');
+  }
+  const siblingStyle: string = tsPath.replace(/\.ts$/, '.' + styleLang);
+  return existsSync(siblingStyle) ? compileStyleFile(siblingStyle) : undefined;
 }
 
 export function weave(state: WeaveState, options: WeaveOptions = {}): Plugin {
@@ -80,18 +141,23 @@ export function weave(state: WeaveState, options: WeaveOptions = {}): Plugin {
 
       build.onLoad({ filter: /\.ts$/ }, async (args: OnLoadArgs) => {
         if (args.path.includes('node_modules')) return undefined;
-        const template: string = args.path.replace(/\.ts$/, '.html');
-        if (!existsSync(template)) return undefined; // ordinary module
-        const stylePath: string = args.path.replace(/\.ts$/, '.' + styleLang);
+        const source: string = await readFile(args.path, 'utf8');
+        const decl: ExtractedSources = extractSources(source);
+
+        const siblingHtml: string = args.path.replace(/\.ts$/, '.html');
+        const hasSiblingHtml: boolean = existsSync(siblingHtml);
+        // A `.ts` is a component iff it declares a template OR has a sibling `.html`.
+        if (decl.template === undefined && !hasSiblingHtml) return undefined; // ordinary module
+
+        const dir: string = dirname(args.path);
+        const template: string = await resolveTemplate(decl, args.path, siblingHtml, hasSiblingHtml);
+        const styles: string | undefined = await resolveStyles(decl, args.path, dir, styleLang);
+
         const { code, css } = compileComponent(
-          {
-            script: await readFile(args.path, 'utf8'),
-            template: await readFile(template, 'utf8'),
-            styles: existsSync(stylePath) ? await compileStyleFile(stylePath) : undefined,
-          },
+          { script: decl.script, template, styles },
           { filename: args.path }
         );
-        return emit(code, css, dirname(args.path));
+        return emit(code, css, dir);
       });
     },
   };
