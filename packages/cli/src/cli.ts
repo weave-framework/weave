@@ -54,6 +54,7 @@ export async function main(argv: string[]): Promise<void> {
         port: config.port,
         styleLang: config.styleLang,
         styles: config.styles,
+        index: config.index,
         inMemory: true,
       });
       console.log(`weave dev → ${url}`);

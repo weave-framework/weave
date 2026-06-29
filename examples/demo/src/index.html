@@ -13,17 +13,11 @@
     <link rel="icon" type="image/png" sizes="32x32" href="/icon-32.png" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/site.webmanifest" />
-
-    <!-- No inline styles and no asset links here: the global stylesheet is declared
-         in weave.config.ts (`styles`), and the CLI wires CSS/JS in (build injects a
-         <link>/<script>; dev serves them from memory). -->
   </head>
   <body>
     <div id="app"></div>
-    <script type="module" src="/main.js"></script>
-    <!-- weave dev live-reload (stripped from the production build) -->
-    <script>
-      new EventSource('/esbuild').addEventListener('change', () => location.reload());
-    </script>
+    <!-- No inline CSS, no asset links, no entry <script>: Weave injects the entry
+         module (and, in dev, live-reload) at build/serve time, and the global
+         stylesheet is declared in weave.config.ts (`styles`). Keep this shell clean. -->
   </body>
 </html>

@@ -1,25 +1,28 @@
 /**
- * `weave dev` — watch + rebuild + serve with live-reload. Uses esbuild's serve
- * (the cross-origin dev-server advisory GHSA-67mh-4wv8-2f99 is fixed in
- * esbuild ≥ 0.25). The served `index.html` opts into reload via:
- *   new EventSource('/esbuild').addEventListener('change', () => location.reload())
+ * `weave dev` — watch + rebuild + serve with live-reload. Two modes:
  *
- * Two modes:
- *  - **legacy** (flag-driven): scoped CSS is written to `outdir/app.css` and the
- *    static `servedir` (which may equal `outdir`) is served.
- *  - **in-memory** (config-driven): NOTHING is written to disk — component CSS is
- *    injected via JS by the plugin, global entry styles ride a JS banner, and the
- *    bundle is served from memory. `dist/` stays a build-only artifact.
+ *  - **in-memory** (config-driven): Weave runs its OWN dev server. The author's
+ *    `index.html` is a clean shell — the framework injects the entry `<script>` and
+ *    the live-reload client itself (so a developer never writes or forgets that
+ *    boilerplate). Nothing is written to disk: the JS bundle is served from memory,
+ *    component CSS self-injects, global styles ride a JS banner, and static assets
+ *    (favicons, manifest) come from `publicDir`. Unmatched routes fall back to the
+ *    injected shell so client routes survive a refresh.
  *
- * Returns the build context so a caller (or test) can dispose it; the CLI keeps
- * it running.
+ *  - **legacy** (flag-driven): esbuild's own serve over a static `servedir`, writing
+ *    the collected stylesheet to `outdir/app.css`. Kept for `examples/v2` + verify.
+ *
+ * Returns the build context so a caller (or test) can dispose it; the CLI keeps it running.
  */
 
-import { context, type BuildContext, type Plugin, type PluginBuild } from 'esbuild';
-import { mkdir, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { context, type BuildContext, type Plugin, type PluginBuild, type BuildResult } from 'esbuild';
+import { createServer, type Server, type IncomingMessage, type ServerResponse } from 'node:http';
+import type { AddressInfo } from 'node:net';
+import { mkdir, writeFile, readFile } from 'node:fs/promises';
+import { join, extname, relative, sep } from 'node:path';
 import { weave, type WeaveState } from './plugin.js';
 import { compileStyleFile, type StyleLang } from './styles.js';
+import { injectHtml } from './html.js';
 
 export interface DevConfig {
   entry: string;
@@ -29,7 +32,9 @@ export interface DevConfig {
   styleLang?: StyleLang;
   /** Global entry stylesheets (absolute paths) — injected via a JS banner in memory. */
   styles?: string[];
-  /** In-memory mode: write nothing to disk (config-driven). Default false (legacy). */
+  /** HTML shell to inject + serve (in-memory mode). */
+  index?: string;
+  /** In-memory mode: write nothing to disk, run Weave's own dev server. Default false (legacy). */
   inMemory?: boolean;
 }
 
@@ -38,13 +43,38 @@ export interface DevServer {
   url: string;
 }
 
-export async function dev(config: DevConfig): Promise<DevServer> {
-  const state: WeaveState = { css: [] };
-  const inMemory: boolean = config.inMemory ?? false;
+/** The live-reload SSE endpoint Weave's dev server exposes (and the injected client connects to). */
+const RELOAD_PATH: string = '/__weave_reload';
 
-  // In-memory mode: global styles ride a banner that injects them as one <style>.
+const MIME: Record<string, string> = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.mjs': 'text/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.webmanifest': 'application/manifest+json; charset=utf-8',
+  '.svg': 'image/svg+xml',
+  '.png': 'image/png',
+  '.ico': 'image/x-icon',
+  '.woff2': 'font/woff2',
+};
+
+function mime(path: string): string {
+  return MIME[extname(path).toLowerCase()] ?? 'application/octet-stream';
+}
+
+export async function dev(config: DevConfig): Promise<DevServer> {
+  return (config.inMemory ?? false) ? devInMemory(config) : devLegacy(config);
+}
+
+/* ──────────────────────────── in-memory (config) ──────────────────────────── */
+
+async function devInMemory(config: DevConfig): Promise<DevServer> {
+  const state: WeaveState = { css: [] };
+
+  // Global entry styles → a JS banner that injects them as one <style> (compiled once).
   let banner: { js: string } | undefined;
-  if (inMemory && config.styles?.length) {
+  if (config.styles?.length) {
     const css: string = (await Promise.all(config.styles.map(compileStyleFile))).join('\n');
     if (css)
       banner = {
@@ -54,44 +84,144 @@ export async function dev(config: DevConfig): Promise<DevServer> {
       };
   }
 
-  // Legacy mode keeps writing the collected stylesheet to disk; in-memory writes nothing.
-  const plugins: Plugin[] = [weave(state, { styleLang: config.styleLang, dev: inMemory })];
-  if (!inMemory) {
-    plugins.push({
-      name: 'weave:css',
-      setup(build: PluginBuild): void {
-        build.onEnd(async () => {
-          await mkdir(config.outdir, { recursive: true });
-          await writeFile(join(config.outdir, 'app.css'), state.css.join('\n'));
-        });
-      },
-    });
-  }
+  // In-memory build outputs ('/main.js' → bytes) + connected live-reload clients.
+  const outputs: Map<string, Uint8Array> = new Map();
+  const clients: Set<ServerResponse> = new Set();
+
+  const capture: Plugin = {
+    name: 'weave:dev-capture',
+    setup(build: PluginBuild): void {
+      build.onEnd((result: BuildResult): void => {
+        outputs.clear();
+        for (const file of result.outputFiles ?? []) {
+          const rel: string = relative(config.outdir, file.path).split(sep).join('/');
+          outputs.set('/' + rel, file.contents);
+        }
+        for (const res of clients) res.write('data: reload\n\n'); // tell every client to reload
+      });
+    },
+  };
 
   const ctx: BuildContext = await context({
     entryPoints: [config.entry],
     bundle: true,
     format: 'esm',
-    // Split dynamic import()s into chunks so `lazy()` routes load on demand and
-    // <Link> prefetch (B.15) can warm them.
     splitting: true,
     outdir: config.outdir,
-    // In-memory mode keeps every output in memory (served, never written) so the dev
-    // server creates no `dist/` — `src` and `dist` stay separate worlds.
-    write: !inMemory,
+    write: false, // everything stays in memory — dev creates no dist/
     banner,
+    plugins: [weave(state, { styleLang: config.styleLang, dev: true }), capture],
+  });
+  await ctx.watch();
+
+  const server: Server = createServer((req: IncomingMessage, res: ServerResponse): void => {
+    void handleRequest(req, res, config, outputs, clients);
+  });
+  const port: number = await listen(server, config.port);
+  return { ctx, url: `http://127.0.0.1:${port}` };
+}
+
+async function handleRequest(
+  req: IncomingMessage,
+  res: ServerResponse,
+  config: DevConfig,
+  outputs: Map<string, Uint8Array>,
+  clients: Set<ServerResponse>
+): Promise<void> {
+  const url: string = (req.url ?? '/').split('?')[0];
+
+  // Live-reload SSE: hold the connection open; `capture` pushes 'reload' on rebuild.
+  if (url === RELOAD_PATH) {
+    res.writeHead(200, {
+      'content-type': 'text/event-stream',
+      'cache-control': 'no-cache',
+      connection: 'keep-alive',
+    });
+    res.write('\n');
+    clients.add(res);
+    req.on('close', (): void => {
+      clients.delete(res);
+    });
+    return;
+  }
+
+  // In-memory build output (main.js, chunk-*.js).
+  const built: Uint8Array | undefined = outputs.get(url);
+  if (built) {
+    res.writeHead(200, { 'content-type': mime(url) });
+    res.end(Buffer.from(built));
+    return;
+  }
+
+  // A real asset path → static file from publicDir (favicons, manifest, …).
+  if (extname(url)) {
+    try {
+      const buf: Buffer = await readFile(join(config.servedir, url));
+      res.writeHead(200, { 'content-type': mime(url) });
+      res.end(buf);
+    } catch {
+      res.writeHead(404);
+      res.end('Not found');
+    }
+    return;
+  }
+
+  // No extension → a client route: serve the injected shell (SPA fallback).
+  try {
+    const shell: string = config.index ?? join(config.servedir, 'index.html');
+    const html: string = injectHtml(await readFile(shell, 'utf8'), {
+      script: '/main.js',
+      liveReload: RELOAD_PATH,
+    });
+    res.writeHead(200, { 'content-type': MIME['.html'] });
+    res.end(html);
+  } catch {
+    res.writeHead(500);
+    res.end('No index.html');
+  }
+}
+
+function listen(server: Server, port?: number): Promise<number> {
+  return new Promise((resolve: (port: number) => void): void => {
+    server.listen(port ?? 0, '127.0.0.1', (): void => {
+      const addr: AddressInfo | string | null = server.address();
+      resolve(typeof addr === 'object' && addr ? addr.port : (port ?? 0));
+    });
+  });
+}
+
+/* ──────────────────────────── legacy (flags) ──────────────────────────── */
+
+async function devLegacy(config: DevConfig): Promise<DevServer> {
+  const state: WeaveState = { css: [] };
+  const plugins: Plugin[] = [
+    weave(state, { styleLang: config.styleLang }),
+    {
+      name: 'weave:css',
+      setup(build: PluginBuild): void {
+        build.onEnd(async (): Promise<void> => {
+          await mkdir(config.outdir, { recursive: true });
+          await writeFile(join(config.outdir, 'app.css'), state.css.join('\n'));
+        });
+      },
+    },
+  ];
+
+  const ctx: BuildContext = await context({
+    entryPoints: [config.entry],
+    bundle: true,
+    format: 'esm',
+    splitting: true,
+    outdir: config.outdir,
     plugins,
   });
   await ctx.watch();
-  // Bind to loopback only — a dev server should not be exposed on the LAN.
-  // `fallback` serves index.html for any unmatched path so client-side routes
-  // (e.g. /task/42) survive a refresh / direct link / back-forward instead of 404ing.
+  // Bind to loopback only; `fallback` serves index.html for unmatched client routes.
   const { hosts, port } = await ctx.serve({
     servedir: config.servedir,
     fallback: join(config.servedir, 'index.html'),
     port: config.port,
     host: '127.0.0.1',
   });
-  const url: string = `http://${hosts[0] ?? '127.0.0.1'}:${port}`;
-  return { ctx, url };
+  return { ctx, url: `http://${hosts[0] ?? '127.0.0.1'}:${port}` };
 }
