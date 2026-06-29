@@ -5,11 +5,15 @@ import { mkdir, writeFile, readFile, rm, cp } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { weave, type WeaveState } from './plugin.js';
+import { entryPlugin, VIRTUAL_ENTRY } from './entry.js';
 import { compileStyleFile, type StyleLang } from './styles.js';
 import { injectHtml } from './html.js';
 
 export interface BuildConfig {
-  entry: string;
+  /** Hand-written entry module (absolute). Mutually exclusive with {@link virtualEntry}. */
+  entry?: string;
+  /** Framework-generated entry (Level C): the module source + the dir its imports resolve against. */
+  virtualEntry?: { code: string; resolveDir: string };
   outDir: string;
   minify?: boolean;
   styleLang?: StyleLang;
@@ -28,8 +32,10 @@ export async function build(config: BuildConfig): Promise<void> {
   if (config.clean) await rm(outDir, { recursive: true, force: true });
 
   const state: WeaveState = { css: [] };
+  const ve: { code: string; resolveDir: string } | undefined = config.virtualEntry;
   await esbuild({
-    entryPoints: [config.entry],
+    // A virtual entry (Level C) is emitted as `main.js`; else the hand-written entry.
+    entryPoints: ve ? [{ in: VIRTUAL_ENTRY, out: 'main' }] : [config.entry!],
     bundle: true,
     format: 'esm',
     // Code-split dynamic import()s into separate chunks, so `lazy()` routes are
@@ -37,7 +43,10 @@ export async function build(config: BuildConfig): Promise<void> {
     splitting: true,
     outdir: outDir,
     minify: config.minify ?? true,
-    plugins: [weave(state, { styleLang: config.styleLang })],
+    plugins: [
+      weave(state, { styleLang: config.styleLang }),
+      ...(ve ? [entryPlugin(ve.code, ve.resolveDir)] : []),
+    ],
   });
 
   // Copy the static web root (favicons, manifest, the raw index.html) into the output;

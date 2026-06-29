@@ -5,11 +5,20 @@ import { dev } from './dev.js';
 import { generateRoutes } from './routes.js';
 import { loadConfig } from './config.js';
 import type { ResolvedConfig } from './config.js';
+import { discoverCustomElements, generateEntry, type CustomElement } from './entry.js';
 import { checkProject, type Diagnostic } from '@weave/check';
 
 function flag(args: string[], name: string): string | undefined {
   const i: number = args.indexOf(name);
   return i >= 0 ? args[i + 1] : undefined;
+}
+
+/** Build the framework-owned entry (Level C) when the config declares a `root` component. */
+function virtualEntryFor(config: ResolvedConfig): { code: string; resolveDir: string } | undefined {
+  if (!config.rootComponent) return undefined;
+  const elements: CustomElement[] = discoverCustomElements(config.root);
+  const code: string = generateEntry(config.rootComponent, config.mount, config.root, elements);
+  return { code, resolveDir: config.root };
 }
 
 export { defineConfig } from './config.js';
@@ -27,6 +36,7 @@ export async function main(argv: string[]): Promise<void> {
     if (config) {
       await build({
         entry: config.entry,
+        virtualEntry: virtualEntryFor(config),
         outDir: config.outDir,
         minify: config.minify,
         styleLang: config.styleLang,
@@ -49,6 +59,7 @@ export async function main(argv: string[]): Promise<void> {
       // `main.js` lives at the web root); nothing is written to disk.
       const { url } = await dev({
         entry: config.entry,
+        virtualEntry: virtualEntryFor(config),
         servedir: config.publicDir,
         outdir: config.publicDir,
         port: config.port,
