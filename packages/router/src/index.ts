@@ -54,12 +54,84 @@ export interface Route {
 const path: Signal<string> = signal(typeof location !== 'undefined' ? location.pathname : '/');
 const search: Signal<string> = signal(typeof location !== 'undefined' ? location.search : '');
 
+/* ──────────── navigation hooks + scroll ──────────── */
+
+/** What a navigation was: a `navigate()` push, a back/forward `pop`, or a `replace`. */
+export type NavType = 'push' | 'pop' | 'replace';
+
+/** Payload handed to every {@link afterEach} hook after a navigation settles. */
+export interface NavInfo {
+  path: string;
+  search: string;
+  hash: string;
+  type: NavType;
+}
+
+type AfterHook = (nav: NavInfo) => void;
+const afterHooks: Set<AfterHook> = new Set<AfterHook>();
+
+/**
+ * Register a callback that runs after every navigation (push / pop / replace) —
+ * the place for document-title updates, analytics, focus management, etc. Returns
+ * an unsubscribe function.
+ */
+export function afterEach(fn: AfterHook): () => void {
+  afterHooks.add(fn);
+  return () => void afterHooks.delete(fn);
+}
+
+// Built-in scroll handling (on by default in the browser): scroll to top on a new
+// navigation, to a `#fragment` element if the URL has one, and restore the saved
+// position on back/forward. Apps that manage scroll themselves opt out.
+let scrollManaged: boolean = typeof window !== 'undefined';
+/** Toggle Weave's built-in scroll handling (top-on-push, `#fragment`, restore-on-pop). */
+export function setScrollHandling(on: boolean): void {
+  scrollManaged = on;
+}
+
+const scrollPositions: Map<number, number> = new Map<number, number>();
+let posSeq: number = 0;
+let curPos: number = 0;
+
+// Own scroll restoration so the browser's native one doesn't fight ours.
+if (typeof history !== 'undefined' && 'scrollRestoration' in history) {
+  try {
+    history.scrollRestoration = 'manual';
+  } catch {
+    /* some embedded contexts disallow it */
+  }
+}
+
+/** Fire the after-hooks, then apply built-in scroll (in a microtask, after the swap). */
+function runAfter(nav: NavInfo): void {
+  for (const fn of afterHooks) fn(nav);
+  if (!scrollManaged || typeof window === 'undefined') return;
+  const { type, hash } = nav;
+  queueMicrotask(() => {
+    if (type === 'pop') {
+      window.scrollTo(0, scrollPositions.get(curPos) ?? 0);
+      return;
+    }
+    if (hash) {
+      const el: HTMLElement | null = document.getElementById(hash.slice(1));
+      if (el) {
+        el.scrollIntoView();
+        return;
+      }
+    }
+    window.scrollTo(0, 0);
+  });
+}
+
 if (typeof window !== 'undefined') {
-  window.addEventListener('popstate', () => {
+  window.addEventListener('popstate', (e: PopStateEvent) => {
+    const st: { __wpos?: number } | null = e.state as { __wpos?: number } | null;
+    curPos = st && typeof st.__wpos === 'number' ? st.__wpos : 0;
     batch(() => {
       path.set(location.pathname);
       search.set(location.search);
     });
+    runAfter({ path: location.pathname, search: location.search, hash: location.hash, type: 'pop' });
   });
 }
 
@@ -79,13 +151,19 @@ export const currentQuery = (): RouteParams => queryMap();
 
 /** Programmatic navigation (pushes history). Resilient if the env blocks pushState. */
 export function navigate(to: string): void {
+  const hash: string = to.includes('#') ? to.slice(to.indexOf('#')) : '';
   const noHash: string = to.split('#')[0];
   const qI: number = noHash.indexOf('?');
   const nextPath: string = qI === -1 ? noHash : noHash.slice(0, qI);
   const nextSearch: string = qI === -1 ? '' : noHash.slice(qI);
-  if (nextPath === path.peek() && nextSearch === search.peek()) return;
+  // A bare same-URL navigation is a no-op — unless there's a `#fragment` to scroll to.
+  if (nextPath === path.peek() && nextSearch === search.peek() && !hash) return;
+  // Remember where we are before leaving, so back/forward can restore it.
+  if (typeof window !== 'undefined') scrollPositions.set(curPos, window.scrollY);
+  const nextPos: number = ++posSeq;
   try {
-    history.pushState(null, '', to);
+    history.pushState({ __wpos: nextPos }, '', to);
+    curPos = nextPos;
   } catch {
     /* non-navigable environment (tests, sandboxes) — the signals stay authoritative */
   }
@@ -93,6 +171,7 @@ export function navigate(to: string): void {
     path.set(nextPath);
     search.set(nextSearch);
   });
+  runAfter({ path: nextPath, search: nextSearch, hash, type: 'push' });
 }
 
 /** Go back one history entry (the `popstate` listener syncs the path). */
