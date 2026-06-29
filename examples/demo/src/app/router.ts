@@ -7,9 +7,9 @@
 import { createRouter, type Route } from '@weave/router';
 import { lazy } from '@weave/runtime/dom';
 
-const Board = lazy(() => import('./routes/index'));
-const TaskDetail = lazy(() => import('./routes/task-detail'));
-const Boom = lazy(() => import('./routes/boom'));
+const Board = lazy(() => import('../pages/board/board'));
+const TaskDetail = lazy(() => import('../pages/task-detail/task-detail'));
+const Boom = lazy(() => import('../pages/boom/boom'));
 
 export const routes: Route[] = [
   { path: '', component: Board },

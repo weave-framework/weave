@@ -9,7 +9,7 @@
 
 import { store } from '@weave/store';
 import { signal, computed } from '@weave/runtime';
-import { api } from '../api/mock';
+import { api } from '../data/api';
 import type { Task, Status } from '../types';
 
 export const useBoard = store(() => {

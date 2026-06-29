@@ -5,6 +5,6 @@
  */
 
 import { defineCustomElement } from '@weave/runtime/dom';
-import Badge from './weave-badge';
+import Badge from './badge/badge';
 
 defineCustomElement('weave-badge', Badge, { props: ['priority'] });

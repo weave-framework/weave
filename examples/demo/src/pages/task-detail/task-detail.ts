@@ -1,8 +1,8 @@
 import { signal } from '@weave/runtime';
 import { resource } from '@weave/data';
 import { Link } from '@weave/router';
-import { api } from '../api/mock';
-import type { Task } from '../types';
+import { api } from '../../data/api';
+import type { Task } from '../../types';
 
 // `<Link>` is used in task-detail.html.
 void Link;

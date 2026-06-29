@@ -1,8 +1,8 @@
 import { onMount, signal, debounced } from '@weave/runtime';
 import { Link } from '@weave/router';
-import { useBoard } from '../stores/board';
-import TaskCard from '../components/task-card';
-import type { Status } from '../types';
+import { useBoard } from '../../stores/board';
+import TaskCard from '../../components/task-card/task-card';
+import type { Status } from '../../types';
 
 // `<TaskCard>` / `<Link>` are referenced in index.html — capitalized tags resolve
 // to these module-level imports, so they need no entry in setup's return.
