@@ -128,6 +128,55 @@ test('context flows into portal content (logical tree, not DOM tree)', () => {
   t.remove();
 });
 
+test('an @if INSIDE a Portal renders into the target (regression: relocated anchor)', () => {
+  // Bug #9: ifBlock/eachBlock used to cache `anchor.parentNode` at construction, but a
+  // Portal moves the anchor to its target afterwards — so inserts went to the (detached)
+  // original parent and nothing showed. The blocks now read the parent at insert time.
+  const t: HTMLElement = target('tgt-cf-if');
+  const show: Signal<boolean> = signal(false);
+  const { code } = compileTemplate('<div><Portal to="#tgt-cf-if">@if (show()) { <b class="cf">hi</b> }</Portal></div>', {
+    mode: 'function',
+    scope: ['show'],
+  });
+  const fn: (c: unknown, r: unknown, k: unknown) => Element = new Function('ctx', 'rt', '_c', code) as (c: unknown, r: unknown, k: unknown) => Element;
+  const owner: Owner = createOwner();
+  const elRoot: Element = runInOwner(owner, () => fn({ show }, rt, { Portal: dom.Portal }));
+  document.body.appendChild(elRoot);
+
+  assert.equal(t.querySelector('.cf'), null, 'nothing while the @if is false');
+  show.set(true);
+  assert.equal(t.querySelector('.cf')?.textContent, 'hi', 'inserts into the portal target, not the relocated original parent');
+  show.set(false);
+  assert.equal(t.querySelector('.cf'), null, 'removed again');
+
+  disposeOwner(owner);
+  elRoot.remove();
+  t.remove();
+});
+
+test('a @for INSIDE a Portal renders + reconciles rows in the target', () => {
+  const t: HTMLElement = target('tgt-cf-for');
+  const items: Signal<number[]> = signal<number[]>([]);
+  const { code } = compileTemplate(
+    '<div><Portal to="#tgt-cf-for">@for (n of items(); track n) { <i class="row">{{ n }}</i> }</Portal></div>',
+    { mode: 'function', scope: ['items'] }
+  );
+  const fn: (c: unknown, r: unknown, k: unknown) => Element = new Function('ctx', 'rt', '_c', code) as (c: unknown, r: unknown, k: unknown) => Element;
+  const owner: Owner = createOwner();
+  const elRoot: Element = runInOwner(owner, () => fn({ items }, rt, { Portal: dom.Portal }));
+  document.body.appendChild(elRoot);
+
+  assert.equal(t.querySelectorAll('.row').length, 0, 'starts empty');
+  items.set([1, 2, 3]);
+  assert.equal([...t.querySelectorAll('.row')].map((e) => e.textContent).join(''), '123', 'rows land in the target');
+  items.set([1, 3]);
+  assert.equal(t.querySelectorAll('.row').length, 2, 'reconcile works in the relocated parent');
+
+  disposeOwner(owner);
+  elRoot.remove();
+  t.remove();
+});
+
 test('Portal inside a compiled @if: toggling adds/removes the teleported content', () => {
   const t: HTMLElement = target('tgt-if');
   const show: Signal<boolean> = signal(true);

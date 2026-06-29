@@ -496,7 +496,6 @@ function placeBefore(parent: Node, node: Node, anchorNode: Node): ChildNode[] {
  * runs in its own ownership scope so its effects are disposed when it unmounts.
  */
 export function ifBlock(anchor: Comment, selector: () => (() => Node | null) | null): void {
-  const parent: Node = anchor.parentNode!;
   // Capture the *construction-time* (lexical) owner. Branch owners parent to it so
   // context (`inject`) keeps working after a re-render driven by an external signal
   // (e.g. navigation), where the ambient owner at effect-re-run time is unrelated.
@@ -522,7 +521,9 @@ export function ifBlock(anchor: Comment, selector: () => (() => Node | null) | n
     if (next) {
       owner = runInOwner(host, () => createOwner(null));
       const node: Node | null = runInOwner(owner, () => next());
-      nodes = node ? placeBefore(parent, node, anchor) : [];
+      // Read the parent at insert time, not construction: a `<Portal>` (or any
+      // relocation) can move the anchor after this block is wired.
+      nodes = node ? placeBefore(anchor.parentNode!, node, anchor) : [];
     }
   });
   onDispose(clear);
@@ -607,7 +608,6 @@ export function eachBlock<T>(
   renderRow: (ctx: ForContext<T>) => Node,
   emptyRender?: () => Node
 ): void {
-  const parent: Node = anchor.parentNode!;
   // Construction-time owner — row/empty owners parent to it (see ifBlock) so context
   // survives reconciles driven by an external signal.
   const host: Owner | null = getOwner();
@@ -632,6 +632,9 @@ export function eachBlock<T>(
   };
 
   effect(() => {
+    // Read the parent at run time, not construction: a `<Portal>` (or any relocation)
+    // can move the anchor after this block is wired.
+    const parent: Node = anchor.parentNode!;
     const data: readonly T[] = items() || [];
 
     if (data.length === 0) {
