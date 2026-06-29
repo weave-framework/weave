@@ -1,0 +1,105 @@
+.stress {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+
+  .stress-head {
+    h1 {
+      margin: 0;
+      font-size: 1.25rem;
+    }
+    .muted {
+      margin: 0.2rem 0 0;
+      font-size: 0.85rem;
+    }
+    code {
+      background: var(--surface-2);
+      padding: 0.05em 0.35em;
+      border-radius: 4px;
+    }
+  }
+
+  .stress-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+
+    button {
+      background: var(--surface-2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 0.4rem 0.7rem;
+      font-size: 0.82rem;
+      cursor: pointer;
+
+      &:hover {
+        border-color: var(--accent);
+      }
+    }
+  }
+
+  .stress-readout {
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--muted);
+
+    .rows-count,
+    .last-ms {
+      color: var(--accent);
+      font-variant-numeric: tabular-nums;
+    }
+    strong {
+      color: var(--text);
+    }
+  }
+
+  .stress-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+
+    tr {
+      cursor: pointer;
+      border-bottom: 1px solid var(--border);
+
+      &:hover {
+        background: var(--surface);
+      }
+      &.selected {
+        background: color-mix(in srgb, var(--accent) 22%, transparent);
+      }
+    }
+
+    td {
+      padding: 0.3rem 0.6rem;
+    }
+
+    .cell-id {
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+      width: 5rem;
+    }
+    .cell-remove {
+      width: 2.5rem;
+      text-align: right;
+    }
+
+    .remove {
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 0.9rem;
+
+      &:hover {
+        color: var(--doing);
+      }
+    }
+
+    .stress-empty td {
+      text-align: center;
+      padding: 1.2rem;
+    }
+  }
+}
