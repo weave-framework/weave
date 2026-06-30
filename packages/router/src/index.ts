@@ -51,7 +51,45 @@ export interface Route {
   children?: Route[];
 }
 
-const path: Signal<string> = signal(typeof location !== 'undefined' ? location.pathname : '/');
+/* ──────────── base path (for hosting under a sub-path, e.g. GitHub Pages) ──────────── */
+
+// All public paths (route patterns, navigate(), Link `to`, currentPath()) are
+// "internal" — written as if the app were at the origin root. `basename` is the
+// prefix the app is actually served under (default '' = root). It's stripped when
+// reading location and re-added when writing history, so nothing else changes.
+let basename = '';
+
+/** Normalize a base: strip a trailing slash; treat '' / '/' as "no base". */
+function normalizeBase(b: string): string {
+  const t: string = b.replace(/\/+$/, '');
+  return t === '' || t === '/' ? '' : t;
+}
+
+/** location.pathname → internal path (drop the basename prefix). */
+function stripBase(pathname: string): string {
+  if (basename && (pathname === basename || pathname.startsWith(basename + '/'))) {
+    const rest: string = pathname.slice(basename.length);
+    return rest === '' ? '/' : rest;
+  }
+  return pathname || '/';
+}
+
+/** Internal path → external URL path (prepend the basename). */
+function withBase(p: string): string {
+  if (!basename) return p;
+  return basename + (p.startsWith('/') ? p : '/' + p);
+}
+
+/**
+ * Set the base path the app is served under (e.g. `/weave` for a project page at
+ * `user.github.io/weave/`). Call once before the first render. Default is root.
+ */
+export function setBasename(base: string): void {
+  basename = normalizeBase(base);
+  if (typeof location !== 'undefined') path.set(stripBase(location.pathname));
+}
+
+const path: Signal<string> = signal(typeof location !== 'undefined' ? stripBase(location.pathname) : '/');
 const search: Signal<string> = signal(typeof location !== 'undefined' ? location.search : '');
 
 /* ──────────── navigation hooks + scroll ──────────── */
@@ -127,11 +165,12 @@ if (typeof window !== 'undefined') {
   window.addEventListener('popstate', (e: PopStateEvent) => {
     const st: { __wpos?: number } | null = e.state as { __wpos?: number } | null;
     curPos = st && typeof st.__wpos === 'number' ? st.__wpos : 0;
+    const internal: string = stripBase(location.pathname);
     batch(() => {
-      path.set(location.pathname);
+      path.set(internal);
       search.set(location.search);
     });
-    runAfter({ path: location.pathname, search: location.search, hash: location.hash, type: 'pop' });
+    runAfter({ path: internal, search: location.search, hash: location.hash, type: 'pop' });
   });
 }
 
@@ -162,7 +201,8 @@ export function navigate(to: string): void {
   if (typeof window !== 'undefined') scrollPositions.set(curPos, window.scrollY);
   const nextPos: number = ++posSeq;
   try {
-    history.pushState({ __wpos: nextPos }, '', to);
+    // Write the externally-visible URL (basename-prefixed); signals stay internal.
+    history.pushState({ __wpos: nextPos }, '', withBase(nextPath) + nextSearch + hash);
     curPos = nextPos;
   } catch {
     /* non-navigable environment (tests, sandboxes) — the signals stay authoritative */
@@ -291,7 +331,8 @@ let activeRouter: Router | null = null;
  * guard-redirect hops are followed (capped at 16 to break loops). Place the output with
  * a top `<RouterView router={r}/>` and a nested `<RouterView/>` inside each layout.
  */
-export function createRouter(routes: Route[]): Router {
+export function createRouter(routes: Route[], options?: { basename?: string }): Router {
+  if (options?.basename !== undefined) setBasename(options.basename);
   const compiled: Compiled[] = compileRoutes(routes);
   const fallback: Route | undefined = routes.find((r) => r.path === '*');
   const fallbackChain = (): Match[] =>
@@ -457,7 +498,9 @@ export const Link: Component = (props = {}, slots = {}) => {
       ? (props as { activeClass: string }).activeClass
       : null;
   const a: HTMLAnchorElement = document.createElement('a');
-  a.setAttribute('href', to);
+  // The visible href is basename-prefixed (so middle/ctrl-click + SSR are correct);
+  // navigation + active-matching use the internal `to`.
+  a.setAttribute('href', withBase(to));
   // Forward any other props (class, id, aria-*, title, …) to the anchor, so a
   // `<Link class="nav" aria-label="Home">` actually styles/labels its <a>. The
   // router-owned props and any function/event props are skipped; read once.
