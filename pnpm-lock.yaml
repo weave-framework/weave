@@ -14,6 +14,12 @@ importers:
       '@types/node':
         specifier: ^22.0.0
         version: 22.20.0
+      '@weave/check':
+        specifier: workspace:*
+        version: link:packages/check
+      '@weave/cli':
+        specifier: workspace:*
+        version: link:packages/cli
       '@weave/compiler':
         specifier: workspace:*
         version: link:packages/compiler
@@ -87,23 +93,20 @@ importers:
 
   packages/cli:
     dependencies:
-      '@weave/check':
-        specifier: workspace:*
-        version: link:../check
-      '@weave/compiler':
-        specifier: workspace:*
-        version: link:../compiler
       esbuild:
         specifier: ^0.25.0
         version: 0.25.12
-      sass:
-        specifier: ^1.0.0
-        version: 1.101.0
       typescript:
         specifier: ^5.7.0
         version: 5.9.3
+    optionalDependencies:
+      sass:
+        specifier: ^1.0.0
+        version: 1.101.0
 
   packages/compiler: {}
+
+  packages/create-weave: {}
 
   packages/data:
     dependencies:

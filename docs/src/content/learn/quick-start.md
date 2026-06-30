@@ -2,8 +2,8 @@
 
 Let's get something on screen. By the end of this page you'll have a running app, a component you wrote, and a feel for the loop: edit a file, see it live.
 
-:::callout info "Pre-release note"
-Weave is pre-1.0. The packages are published under the `@weave/*` scope (`@weave/runtime`, `@weave/cli`, `@weave/router`, …) and the CLI ships a `weave` binary. The shapes on this page are stable; if a command or path differs in your checkout, trust your local `weave.config.ts` and the [Tooling](/learn/tooling) page.
+:::callout info "First, get Weave running"
+This page assumes you've already got a project. If not, the quickest start is `npm create weave@latest my-app` (or pnpm/yarn) — see [Installation](/learn/installation), which also covers adding Weave to an existing project. Weave is **pre-1.0** (published on npm under the `@weave/*` scope), but the shapes on this page are stable.
 :::
 
 ## The shape of a project
@@ -117,6 +117,10 @@ weave routes   # generate file-based routes (see the Router page)
 ~~~
 
 Run `weave dev`, open the printed URL, and edit `app.html` — the page reloads on save. Change `count.set((n) => n + 1)` to `+ 2` and watch the counter jump by twos.
+
+:::callout tip "Running the CLI"
+With `@weave/cli` installed, the `weave` command is available through your package scripts (`npm run dev`) or `npx weave dev`. The scaffold sets up the `dev`/`build`/`check` scripts for you. See [Installation](/learn/installation) for the full setup.
+:::
 
 :::callout info "What you just learned"
 A Weave app is `weave.config.ts` + components. A **component** is a `setup` function (`.ts`) plus a sibling template (`.html`) and optional scoped styles (`.scss`). `root` in the config bootstraps everything; `weave dev` runs it with live reload. Read a signal in a template with `{{ … }}`, wire events with `on:…={{ … }}`.

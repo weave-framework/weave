@@ -1,0 +1,17 @@
+{
+  "name": "create-weave",
+  "version": "0.2.0",
+  "description": "Scaffold a new Weave app — `npm create weave my-app` (also pnpm/yarn create).",
+  "type": "module",
+  "bin": { "create-weave": "./bin/index.mjs" },
+  "files": ["bin", "template"],
+  "engines": { "node": ">=18" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/weave-framework/weave.git",
+    "directory": "packages/create-weave"
+  },
+  "publishConfig": { "access": "public" },
+  "keywords": ["weave", "scaffold", "create", "starter"],
+  "license": "MIT"
+}

@@ -12,28 +12,46 @@ Every dynamic value uses double braces: `{{ expr }}`. A single brace (`attr={x}`
 |--------|-------------|
 | `{{ expr }}` | Interpolate an expression as text. Reactive if it reads a signal; computed once otherwise. Inserted as text (never HTML), so `<`, `{`, `&` render literally — safe from injection. |
 
+To render HTML rather than text, use the `.innerHTML` property binding below — and only with trusted content.
+
 ## Attributes & bindings
 
 | Syntax | Description |
 |--------|-------------|
-| `name="value"` | Static string attribute. A bare `name` is a boolean attribute. |
-| `name={{ expr }}` | Reactive attribute. Removed when the value is `null`/`false`; set to `""` when `true`. |
-| `.prop={{ expr }}` | Set a DOM **property** (e.g. `.value`, `.innerHTML`), not an attribute. |
-| `class:name={{ expr }}` | Toggle a single class by truthiness. |
-| `show={{ expr }}` | Toggle visibility via `display` (element stays in the DOM, unlike `@if`). |
-| `on:event={{ handler }}` | Attach an event listener. |
-| `on:event\|mod={{ handler }}` | Event modifiers: `preventDefault`, `stopPropagation`, `capture` (chain with `\|`). |
-| `bind:value={{ signal }}` | Two-way bind text/number/range/`<select>` to a writable signal. |
-| `bind:checked={{ signal }}` | Two-way bind a checkbox (boolean). |
-| `bind:group={{ signal }}` | Two-way bind radios (signal holds the selected value). |
-| `ref={{ target }}` | Store the element reference (signal or callback). Alias: `bind:this`. |
-| `use:action={{ arg }}` | Run a `use:` action `(el, arg) => cleanup?` after insertion. |
+| `name="value"` | Static string attribute. |
+| `name` | A bare attribute name is a static boolean attribute (set to `""`). |
+| `name={{ expr }}` | Reactive attribute. Removed when the value is `null`/`false`; set to `""` when `true`; otherwise stringified. |
+| `.prop={{ expr }}` | Set a DOM **property** (e.g. `.value`, `.checked`, `.innerHTML`), not an attribute. Reactive. |
+| `class:name={{ expr }}` | Toggle a single class by truthiness of the expression. |
+| `show={{ expr }}` | Toggle visibility via `display` (the element stays in the DOM, unlike `@if`). Restores the element's own inline `display` when shown. |
+| `on:event={{ handler }}` | Attach an event listener. The handler is read once (handlers are never reactive). |
+| `on:event\|mod={{ handler }}` | Event with modifiers (chain with `\|`). See the modifier table below. |
+| `bind:value={{ signal }}` | Two-way bind text / textarea / number / range / `<select>` to a writable signal. |
+| `bind:checked={{ signal }}` | Two-way bind a checkbox as a boolean. |
+| `bind:group={{ signal }}` | Two-way bind a radio group or value-checkbox; the signal holds the **selected value**. |
+| `ref={{ target }}` | Store the element reference into a signal or callback after insertion. Alias: `bind:this`. |
+| `use:action={{ arg }}` | Run a `use:` action `(el, arg) => cleanup?` after the element is inserted (at mount timing). |
 | `transition:fn={{ params }}` | Play an enter **and** leave animation. |
 | `in:fn={{ params }}` | Enter animation only. |
-| `out:fn={{ params }}` | Leave animation only (the removal waits for it). |
+| `out:fn={{ params }}` | Leave animation only (the element's removal waits for it). |
+
+### Event modifiers
+
+Chain with `|` after the event name, e.g. `on:submit|preventDefault|once`.
+
+| Modifier | Effect |
+|----------|--------|
+| `preventDefault` | Calls `e.preventDefault()` before your handler. |
+| `stopPropagation` | Calls `e.stopPropagation()` before your handler. |
+| `self` | Only runs when `e.target === e.currentTarget` (the event originated on this element, not a descendant). |
+| `once` | Listener auto-removes after the first call (`{ once: true }`). |
+| `capture` | Listen in the capture phase (`{ capture: true }`). |
+| `passive` | Mark the listener passive (`{ passive: true }`) — promises not to call `preventDefault`. |
+
+`preventDefault`, `stopPropagation`, and `self` wrap the handler as guards; `once`, `capture`, and `passive` are passed as `addEventListener` options. They can be combined freely.
 
 :::callout tip "bind: takes the signal, not its value"
-Write `bind:value={{ name }}` (the signal itself), not `bind:value={{ name() }}` — the runtime needs to call `.set()` on it. Text inputs are IME-safe; a `<select>` populated by `@for` re-asserts the bound value after its options render.
+Write `bind:value={{ name }}` (the signal itself), not `bind:value={{ name() }}` — the runtime needs to call `.set()` on it. Number and range inputs read as numbers (`valueAsNumber`); a `<select multiple>` binds to a `string[]` of the selected option values. Text inputs are IME-safe (the value is committed on `compositionend`, not mid-composition), and a `<select>` populated by `@for` re-asserts the bound value after its options render so the signal still wins.
 :::
 
 ## Control flow
@@ -42,8 +60,10 @@ Write `bind:value={{ name }}` (the signal itself), not `bind:value={{ name() }}`
 
 ~~~html
 @if (cond) { … } @else if (other) { … } @else { … }
-@if (expr; as alias) { {{ alias }} }   <!-- bind the tested value -->
+@if (expr; as alias) { {{ alias }} }   <!-- bind the tested value to a local -->
 ~~~
+
+Switching to a different branch unmounts the old one (disposing its effects); staying on the same branch leaves its live DOM untouched.
 
 ### @for
 
@@ -51,7 +71,7 @@ Write `bind:value={{ name }}` (the signal itself), not `bind:value={{ name() }}`
 @for (item of list(); track item.id) { … } @empty { … }
 ~~~
 
-Always provide `track` (a stable, unique key). Body locals: `$index`, `$count`, `$first`, `$last`, `$even`, `$odd`. Keyed reconciliation moves the minimum nodes; reused rows keep focus, scroll, and input state.
+Always provide `track` (a stable, unique key). The `@empty` block is optional and renders when the list is empty. Body locals: `$index`, `$count`, `$first`, `$last`, `$even`, `$odd` — all reactive across reorders. Keyed reconciliation moves the minimum number of nodes; reused rows keep focus, scroll, and uncontrolled input state.
 
 ### @switch
 
@@ -71,7 +91,7 @@ Always provide `track` (a stable, unique key). Body locals: `$index`, `$count`, 
 ### @key
 
 ~~~html
-@key (expr) { … }   <!-- tear down + recreate the content when expr changes -->
+@key (expr) { … }   <!-- tear down + recreate the content (fresh DOM + effects) when expr changes -->
 ~~~
 
 ## Async blocks
@@ -82,17 +102,19 @@ Always provide `track` (a stable, unique key). Body locals: `$index`, `$count`, 
 @defer (trigger) { … } @placeholder { … }
 ~~~
 
+The `@placeholder` is optional. Triggers:
+
 | Trigger | Fires when |
 |---------|-----------|
-| `on idle` | the browser is idle (`requestIdleCallback`) |
-| `on viewport` | the placeholder scrolls into view |
-| `on interaction` | the placeholder is clicked / keyed |
-| `on hover` | pointer enters / focuses the placeholder |
-| `on timer(ms)` | after `ms` milliseconds |
-| `when expr()` | the (reactive) condition becomes truthy |
-| `immediate` | right away (e.g. to code-split with `lazy()`) |
+| `idle` | the browser is idle (`requestIdleCallback`, falling back to a 1 ms timer) |
+| `viewport` | the placeholder's root element scrolls into view (`IntersectionObserver`) |
+| `interaction` | the placeholder is clicked or keyed (`click` / `keydown`) |
+| `hover` | the pointer enters or focuses the placeholder (`pointerenter` / `focusin`) |
+| `timer(ms)` | after `ms` milliseconds |
+| `when expr()` | the (reactive) condition becomes truthy — fires once, then disarms |
+| `immediate` | right away (e.g. to code-split with `lazy()` without waiting on anything) |
 
-`viewport`/`interaction`/`hover` observe the placeholder's element — provide a `@placeholder`, or they fire immediately.
+`viewport`, `interaction`, and `hover` observe the placeholder's root element — provide a `@placeholder`, or there is nothing to observe and they fire immediately. `idle`, `viewport`, and the unsupported-API fallbacks degrade gracefully (fire immediately) when the platform lacks the API.
 
 ### @await
 
@@ -106,16 +128,20 @@ Always provide `track` (a stable, unique key). Body locals: `$index`, `$count`, 
 }
 ~~~
 
-Accepts a Promise, a `@weave/data` resource (a refetch re-shows pending), or a plain value. `@then (alias)` / `@catch (alias)` bind the value / error.
+Accepts a Promise, a `@weave/data` resource (a refetch re-shows the pending branch), or a plain value (settles immediately into `@then`). All three branches are optional. `@then (alias)` / `@catch (alias)` bind the resolved value / error to a local. The source is read once, untracked — a fresh Promise on each render is not treated as a dependency.
 
 ## Snippets
 
 ~~~html
-@snippet name(param, other = 'default') { … }
-@render (name(arg))
+@snippet name(param, other) { … }
+@render (name(arg, value))
 ~~~
 
-A named, parameterized template fragment; `@render` invokes it (and a snippet can be passed to a child as a prop — render-prop / scoped-slot pattern).
+A named, parameterized template fragment; `@render` invokes it. A snippet can also be passed to a child as a prop — the render-prop / scoped-slot pattern.
+
+:::callout info "Snippet parameters are bare identifiers only"
+Each parameter must be a plain identifier (`param`, `other`, `$x`, `_y`). Default values, destructuring, and type annotations are **not** supported — `@snippet row(item, sep = ',')` is a compile error (`Invalid @snippet parameter`). Pass any defaults from the call site at `@render` instead.
+:::
 
 ## Components & slots
 
@@ -128,7 +154,7 @@ A named, parameterized template fragment; `@render` invokes it (and a snippet ca
 </Card>
 ~~~
 
-In the child: `<slot />` is the default slot, `<slot name="header" />` a named one, and content between the tags (`<slot>fallback</slot>`) is the fallback shown when nothing is provided.
+In the child: `<slot />` is the default slot, `<slot name="header" />` a named one, and content between the tags (`<slot>fallback</slot>`) is the fallback shown when nothing is provided for that slot.
 
 ## Dynamic elements
 
@@ -136,12 +162,12 @@ In the child: `<slot />` is the default slot, `<slot name="header" />` a named o
 <w:element this={{ tag }}> … </w:element>
 ~~~
 
-Renders an element whose tag name is dynamic; it rebuilds when `this` changes. All other attributes apply to the created element.
+Renders an element whose tag name is dynamic; it rebuilds (disposing the old element's effects) when `this` changes. All other attributes and children apply to the created element.
 
 ## Escaping
 
-In template **text**, a literal block keyword is escaped by doubling the `@`: write `@@for` to render the characters `@for` (a single `@`, as in an email, is untouched).
+In template **text**, a literal block keyword is escaped by doubling the `@`: write `@@for` to render the characters `@for`. A single `@` that is not a block keyword (as in an email address) is left untouched.
 
 :::callout info "See also"
-[Templates (guide)](/learn/templates) · [Styling](/learn/styling) · [Motion](/learn/motion) · [@weave/runtime reference](/reference/runtime)
+[Templates (guide)](/learn/templates) · [Components](/learn/components) · [Styling](/learn/styling) · [Motion](/learn/motion) · [@weave/runtime reference](/reference/runtime)
 :::

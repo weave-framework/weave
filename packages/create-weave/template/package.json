@@ -1,0 +1,17 @@
+{
+  "name": "weave-app",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "weave dev",
+    "build": "weave build",
+    "check": "weave check"
+  },
+  "dependencies": {
+    "@weave/runtime": "^0.2.0"
+  },
+  "devDependencies": {
+    "@weave/cli": "^0.2.0",
+    "typescript": "^5.7.0"
+  }
+}

@@ -8,6 +8,9 @@
     "test": "node tools/run-browser-tests.mjs",
     "check": "node packages/cli/bin/weave.mjs check",
     "lint": "eslint .",
+    "build:packages": "node tools/build-packages.mjs",
+    "publish:dry": "node tools/publish-packages.mjs --dry-run",
+    "publish:packages": "node tools/publish-packages.mjs",
     "demo": "node packages/cli/bin/weave.mjs dev --config examples/demo/weave.config.ts",
     "demo:build": "node packages/cli/bin/weave.mjs build --config examples/demo/weave.config.ts",
     "docs:content": "node docs/tools/gen-content.mjs && node docs/tools/gen-api.mjs",
@@ -37,6 +40,8 @@
   "devDependencies": {
     "@playwright/test": "^1.49.0",
     "@types/node": "^22.0.0",
+    "@weave/check": "workspace:*",
+    "@weave/cli": "workspace:*",
     "@weave/compiler": "workspace:*",
     "@weave/data": "workspace:*",
     "@weave/forms": "workspace:*",

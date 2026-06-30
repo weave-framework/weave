@@ -1,0 +1,15 @@
+{
+  "//": "Shared base for PUBLISH builds (emit on). The per-package tsconfig.json files stay noEmit for type-checking; tsconfig.build.json extends this to emit dist/.",
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "skipLibCheck": true,
+    "verbatimModuleSyntax": false,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "noEmit": false
+  }
+}
