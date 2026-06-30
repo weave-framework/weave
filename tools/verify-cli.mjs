@@ -3,7 +3,7 @@
  * (one-shot bundle) and `weave dev` (watch + serve + live-reload), and the
  * output mounts + reacts + is scoped in a real browser.
  *
- * Part A loads the already-built `examples/v2/dist` bundle headless.
+ * Part A loads the already-built `examples/__fixtures__/v2/dist` bundle headless.
  * Part B starts `weave dev` for real and drives the live server with Playwright.
  */
 import { chromium } from 'playwright';
@@ -22,8 +22,8 @@ const browser = await chromium.launch();
 
 /* ── Part A: the production bundle runs ── */
 {
-  const js = readFileSync('examples/v2/dist/main.js', 'utf8');
-  const css = readFileSync('examples/v2/dist/app.css', 'utf8');
+  const js = readFileSync('examples/__fixtures__/v2/dist/main.js', 'utf8');
+  const css = readFileSync('examples/__fixtures__/v2/dist/app.css', 'utf8');
   ok(css.includes('[data-w-'), 'build: app.css is scoped');
 
   const page = await browser.newPage();
@@ -47,7 +47,7 @@ const browser = await chromium.launch();
   const port = 5191;
   const proc = spawn(
     process.execPath,
-    ['packages/cli/bin/weave.mjs', 'dev', 'examples/v2/main.ts', '--serve', 'examples/v2', '--out', 'examples/v2', '--port', String(port)],
+    ['packages/cli/bin/weave.mjs', 'dev', 'examples/__fixtures__/v2/main.ts', '--serve', 'examples/__fixtures__/v2', '--out', 'examples/__fixtures__/v2', '--port', String(port)],
     { stdio: ['ignore', 'pipe', 'pipe'] }
   );
 

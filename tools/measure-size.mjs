@@ -73,7 +73,7 @@ const runtimeV2 = await bundleStdin(
 
 const counterApp = (
   await build({
-    entryPoints: ['examples/v2/main.ts'],
+    entryPoints: ['examples/__fixtures__/v2/main.ts'],
     bundle: true,
     minify: true,
     format: 'esm',
@@ -84,7 +84,7 @@ const counterApp = (
 ).outputFiles[0].text;
 
 // Per-component cost: the compiled module on its own, minified.
-const counterSrc = readFileSync('examples/v2/counter.weave', 'utf8');
+const counterSrc = readFileSync('examples/__fixtures__/v2/counter.weave', 'utf8');
 const { code: counterModule } = compileComponent(parseSfc(counterSrc), {
   filename: 'counter.weave',
 });

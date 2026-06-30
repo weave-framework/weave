@@ -25,18 +25,18 @@ const run = (...paths) =>
 
 /* ── valid components pass (both authoring forms) ── */
 {
-  const r = run('examples/check/good.weave', 'examples/check/widget.ts');
+  const r = run('examples/__fixtures__/check/good.weave', 'examples/__fixtures__/check/widget.ts');
   ok(r.status === 0, `check: valid SFC + separate-file exit 0 (got ${r.status})`);
   ok(/no type errors/.test(r.stdout), 'check: valid components report no type errors');
 }
 
 /* ── invalid component fails, with exact positions ── */
 {
-  const r = run('examples/check/bad.weave');
+  const r = run('examples/__fixtures__/check/bad.weave');
   ok(r.status === 1, `check: bad.weave exits 1 (got ${r.status})`);
 
   const out = r.stdout + r.stderr;
-  const src = readFileSync('examples/check/bad.weave', 'utf8').split('\n');
+  const src = readFileSync('examples/__fixtures__/check/bad.weave', 'utf8').split('\n');
   const lineOf = (needle) => src.findIndex((l) => l.includes(needle)) + 1; // 1-based
 
   // ctx typo: `coutn` → "Property 'coutn' does not exist … Did you mean 'count'?"
@@ -75,18 +75,18 @@ const run = (...paths) =>
 
 /* ── separate-file form: template error → .html, script error → .ts ── */
 {
-  const r = run('examples/check/sep-bad.ts');
+  const r = run('examples/__fixtures__/check/sep-bad.ts');
   ok(r.status === 1, `check: sep-bad exits 1 (got ${r.status})`);
   const out = r.stdout + r.stderr;
 
-  const html = readFileSync('examples/check/sep-bad.html', 'utf8').split('\n');
+  const html = readFileSync('examples/__fixtures__/check/sep-bad.html', 'utf8').split('\n');
   const nnLine = html.findIndex((l) => l.includes('nn()')) + 1;
   ok(
     new RegExp(`sep-bad\\.html:${nnLine}:\\d+ - error TS\\d+: .*nn`).test(out),
     `check: template typo mapped to sep-bad.html:${nnLine}`
   );
 
-  const ts = readFileSync('examples/check/sep-bad.ts', 'utf8').split('\n');
+  const ts = readFileSync('examples/__fixtures__/check/sep-bad.ts', 'utf8').split('\n');
   const badLine = ts.findIndex((l) => l.includes("'not a number'")) + 1;
   ok(
     new RegExp(`sep-bad\\.ts:${badLine}:\\d+ - error TS\\d+:`).test(out),
@@ -97,15 +97,15 @@ const run = (...paths) =>
 /* ── child-component props: a parent's `<Card …>` is checked against the child's
       `setup` prop contract (resolved through the synthesized default export) ── */
 {
-  const good = run('examples/check/card.ts', 'examples/check/uses-card-good.ts');
+  const good = run('examples/__fixtures__/check/card.ts', 'examples/__fixtures__/check/uses-card-good.ts');
   ok(good.status === 0, `check: correct child props pass (exit ${good.status})`);
   ok(/no type errors/.test(good.stdout), 'check: well-typed <Card …> reports no errors');
 
-  const bad = run('examples/check/card.ts', 'examples/check/uses-card-bad.ts');
+  const bad = run('examples/__fixtures__/check/card.ts', 'examples/__fixtures__/check/uses-card-bad.ts');
   ok(bad.status === 1, `check: bad child props exit 1 (got ${bad.status})`);
   const out = bad.stdout + bad.stderr;
 
-  const html = readFileSync('examples/check/uses-card-bad.html', 'utf8').split('\n');
+  const html = readFileSync('examples/__fixtures__/check/uses-card-bad.html', 'utf8').split('\n');
   // `label={{it.count}}` — a number passed to a `string` prop → TS2322, mapped to .html
   const mismatchLine = html.findIndex((l) => l.includes('label={{it.count}}')) + 1;
   ok(
