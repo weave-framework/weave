@@ -8,7 +8,8 @@
     "strict": true,
     "noEmit": true,
     "verbatimModuleSyntax": false,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "plugins": [{ "name": "@weave/typescript-plugin" }]
   },
   "include": ["src"]
 }

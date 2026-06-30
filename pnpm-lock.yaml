@@ -32,6 +32,9 @@ importers:
       '@weave/store':
         specifier: workspace:*
         version: link:packages/store
+      '@weave/typescript-plugin':
+        specifier: workspace:*
+        version: link:packages/typescript-plugin
       esbuild:
         specifier: ^0.25.0
         version: 0.25.12
