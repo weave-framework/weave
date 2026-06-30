@@ -39,6 +39,7 @@
     "@weave/router": "workspace:*",
     "@weave/runtime": "workspace:*",
     "@weave/store": "workspace:*",
+    "@weave/typescript-plugin": "workspace:*",
     "esbuild": "^0.25.0",
     "eslint": "^10.6.0",
     "playwright": "^1.49.0",
