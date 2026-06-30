@@ -63,7 +63,12 @@ function walk(path: string, out: CustomElement[]): void {
     }
     return;
   }
-  if (!path.endsWith('.ts') || path.endsWith('.d.ts')) return;
+  // Skip generated artifacts (`*.gen.ts`, `*.d.ts`): they are build outputs, not
+  // authored components — and a `content.gen.ts` (docs markdown bundled as strings)
+  // can legitimately contain the literal text `export const tag = '…'` inside an
+  // example, which would otherwise be mis-discovered as a real custom element. The
+  // file-based route discovery skips `.gen.` for the same reason.
+  if (!path.endsWith('.ts') || path.endsWith('.d.ts') || path.endsWith('.gen.ts')) return;
   const src: string = readFileSync(path, 'utf8');
   const m: RegExpMatchArray | null = src.match(TAG_RE);
   if (!m) return;

@@ -146,6 +146,11 @@ export function weave(state: WeaveState, options: WeaveOptions = {}): Plugin {
 
       build.onLoad({ filter: /\.ts$/ }, async (args: OnLoadArgs) => {
         if (args.path.includes('node_modules')) return undefined;
+        // Generated modules (`*.gen.ts`) are never components — and one like a docs
+        // `content.gen.ts` (markdown bundled as strings) can contain the literal text
+        // `export const template`/`styles` inside an example, which would otherwise be
+        // mis-detected as a string-SFC component and compiled. Treat as an ordinary module.
+        if (args.path.endsWith('.gen.ts')) return undefined;
         const source: string = await readFile(args.path, 'utf8');
         const decl: ExtractedSources = extractSources(source);
 
