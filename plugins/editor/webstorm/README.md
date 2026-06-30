@@ -15,7 +15,7 @@ hover. Works for both `.weave` single-file components and the separate `.ts` + `
 In WebStorm: **Settings → Plugins → ⚙ (gear) → Install Plugin from Disk…** → pick the
 **latest** `weave-webstorm-*.zip` from this folder → **Restart**.
 
-- **`weave-webstorm-0.10.0.zip`** — current/complete: HTML syntax coloring, go-to-definition,
+- **`weave-webstorm-0.11.0.zip`** — current/complete: HTML syntax coloring, go-to-definition,
   hover, and red-squiggle diagnostics, plus the Weave logo. Verified working on WebStorm 261.
 - **`weave-webstorm-0.4.0.zip`** — minimal fallback (go-to-definition + hover only, plain text,
   no diagnostics). Use only if 0.10.0 misbehaves.
