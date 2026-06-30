@@ -46,6 +46,6 @@ export function setup(): ShellSetup {
     theme,
     toggleTheme,
     themeIcon,
-    repoUrl: 'https://github.com/aidasjosas/weave',
+    repoUrl: 'https://github.com/weave-framework/weave',
   };
 }

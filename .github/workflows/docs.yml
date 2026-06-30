@@ -8,17 +8,14 @@ name: Deploy docs
 # basename support in the router (not yet implemented). The SPA fallback (404.html)
 # is produced by docs/tools/postbuild.mjs.
 
-# Manual-only for now: hosting (Pages target / public mirror) is still undecided,
-# and GitHub Pages needs either a public repo or a paid plan for this private repo.
-# Re-enable the push trigger once that's settled.
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - 'packages/**'
+      - '.github/workflows/docs.yml'
   workflow_dispatch:
-  # push:
-  #   branches: [main]
-  #   paths:
-  #     - 'docs/**'
-  #     - 'packages/**'
-  #     - '.github/workflows/docs.yml'
 
 permissions:
   contents: read
