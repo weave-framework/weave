@@ -11,6 +11,9 @@ import { fileURLToPath } from 'node:url';
 
 const dist = join(dirname(fileURLToPath(import.meta.url)), '..', 'dist');
 const port = Number(process.env.PORT) || 8200;
+// Mimic a project sub-path host (user.github.io/weave/) when DOCS_BASE is set.
+let base = (process.env.DOCS_BASE || '/').replace(/\/+$/, '');
+if (base === '/') base = '';
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -22,7 +25,9 @@ const TYPES = {
 };
 
 createServer(async (req, res) => {
-  const url = decodeURIComponent((req.url || '/').split('?')[0]);
+  let url = decodeURIComponent((req.url || '/').split('?')[0]);
+  // Strip the sub-path base so /weave/main.js resolves to dist/main.js.
+  if (base && (url === base || url.startsWith(base + '/'))) url = url.slice(base.length) || '/';
   const rel = normalize(url).replace(/^(\.\.[/\\])+/, '');
   let file = join(dist, rel);
   try {

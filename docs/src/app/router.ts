@@ -5,12 +5,18 @@
  *
  *   index.*               → '/'
  *   learn/introduction.*  → '/learn/introduction'
- *   reference/runtime.*   → '/reference/runtime'
+ *   reference/[pkg].*      → '/reference/:pkg'
  *   [...rest].*           → '*'   (404 fallback)
  */
 
 import { createRouter, type Router } from '@weave/router';
 import { routes } from '../pages/routes.gen';
 
+// Base path for hosting under a sub-path (e.g. GitHub Pages project page). The
+// build's postbuild step injects a `<base href>` for that case; in dev it's absent,
+// so we default to root. setBasename normalizes '/weave/' → '/weave', '/' → ''.
+const baseHref: string =
+  (typeof document !== 'undefined' && document.querySelector('base')?.getAttribute('href')) || '/';
+
 export { routes };
-export const router: Router = createRouter(routes);
+export const router: Router = createRouter(routes, { basename: baseHref });

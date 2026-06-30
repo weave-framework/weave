@@ -47,6 +47,10 @@ jobs:
 
       - name: Build docs
         run: pnpm docs:build
+        env:
+          # Served under user.github.io/weave/ (project page). Drives <base href>
+          # + the router basename. Use "/" if you switch to a root host.
+          DOCS_BASE: /weave/
 
       - uses: actions/configure-pages@v5
 
