@@ -9,5 +9,5 @@ void Link;
 
 /** The docs landing page (route `/`). */
 export function setup(): HomeSetup {
-  return { repoUrl: 'https://github.com/aidasjosas/weave' };
+  return { repoUrl: 'https://github.com/weave-framework/weave' };
 }
