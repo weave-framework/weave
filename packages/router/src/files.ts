@@ -48,10 +48,31 @@ interface Tree {
 
 const emptyTree = (): Tree => ({ files: {}, dirs: {} });
 
-/** Order: static segments, then dynamic `:param`, then catch-all `*`. */
-function specificity(path: string): number {
-  if (path.startsWith('*')) return 2;
-  if (path.startsWith(':')) return 1;
+/** Per-segment specificity: a static segment (0) wins over `:param` (1) over `*` (2). */
+function segSpecificity(seg: string): number {
+  if (seg === '*' || seg.startsWith('*')) return 2;
+  if (seg.startsWith(':')) return 1;
+  return 0;
+}
+
+/**
+ * Compare two route paths so the more specific one sorts first — segment by segment,
+ * static before dynamic before catch-all. This must be segment-aware (not first-char)
+ * because routes are flattened into one list with full multi-segment paths: e.g.
+ * `reference/config` must precede `reference/:pkg` even though ':' < 'c' lexically.
+ */
+function compareRoutes(a: string, b: string): number {
+  const as: string[] = a.split('/');
+  const bs: string[] = b.split('/');
+  const len: number = Math.max(as.length, bs.length);
+  for (let i = 0; i < len; i++) {
+    const sa: string = as[i] ?? '';
+    const sb: string = bs[i] ?? '';
+    const da: number = segSpecificity(sa);
+    const db: number = segSpecificity(sb);
+    if (da !== db) return da - db; // more static segment wins at the first divergence
+    if (sa !== sb) return sa.localeCompare(sb);
+  }
   return 0;
 }
 
@@ -82,7 +103,7 @@ function convert(tree: Tree): FileRoute[] {
 }
 
 function sortRoutes(routes: FileRoute[]): FileRoute[] {
-  return routes.sort((a, b) => specificity(a.path) - specificity(b.path) || a.path.localeCompare(b.path));
+  return routes.sort((a, b) => compareRoutes(a.path, b.path));
 }
 
 /** Map a flat list of page-file specifiers to a nested {@link FileRoute} manifest. */
