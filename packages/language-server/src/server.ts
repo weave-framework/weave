@@ -19,6 +19,15 @@ import { create as createTypeScriptServices } from 'volar-service-typescript';
 import { create as createCssService } from 'volar-service-css';
 import { createWeaveLanguagePlugin } from './weave-language.js';
 
+// `@volar/language-core` console.warn's "languageId not found for <uri>" for every file an
+// editor hands us that isn't a Weave file (e.g. a plain `index.html` a client opens because
+// it matches `*.html`). It's harmless but spams the LSP console — drop just that one line.
+const origConsoleWarn = console.warn.bind(console);
+console.warn = (...args: unknown[]): void => {
+  if (typeof args[0] === 'string' && args[0].startsWith('languageId not found')) return;
+  origConsoleWarn(...args);
+};
+
 const connection: ReturnType<typeof createConnection> = createConnection();
 const server: ReturnType<typeof createServer> = createServer(connection);
 
