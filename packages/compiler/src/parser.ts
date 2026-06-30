@@ -610,7 +610,12 @@ class Parser {
   readAttrValue(): Exclude<AttrValue, null> {
     const c: string = this.peek();
     if (c === '{') {
-      const b: { expr: string; offset: number } = this.readBracedExpr();
+      // `{{ expr }}` is the canonical attribute/directive binding syntax (matches
+      // text interpolation). A single `{ expr }` is kept as a DEPRECATED fallback so
+      // templates that predate the unification keep working during the migration.
+      const b: { expr: string; offset: number } = this.src.startsWith('{{', this.pos)
+        ? this.readDoubleBracedExpr()
+        : this.readBracedExpr();
       return { kind: 'expr', expr: b.expr, offset: b.offset };
     }
     if (c === '"' || c === "'") return { kind: 'static', text: this.readQuoted(c) };
@@ -650,6 +655,30 @@ class Parser {
     if (depth !== 0) throw new ParseError('Unclosed { expression');
     const raw: string = this.src.slice(start, this.pos);
     this.pos++; // }
+    return { expr: raw.trim(), offset: start + (raw.length - raw.trimStart().length) };
+  }
+
+  /** Read a `{{ ... }}` expression, balancing inner braces and skipping string literals. */
+  readDoubleBracedExpr(): { expr: string; offset: number } {
+    this.pos += 2; // {{
+    const start: number = this.pos;
+    let depth: number = 0; // depth of inner (non-delimiting) braces
+    while (!this.eof()) {
+      const c: string = this.peek();
+      if (c === '"' || c === "'" || c === '`') {
+        this.skipString(c);
+        continue;
+      }
+      if (c === '{') depth++;
+      else if (c === '}') {
+        if (depth > 0) depth--;
+        else if (this.src[this.pos + 1] === '}') break; // closing }}
+      }
+      this.pos++;
+    }
+    if (this.eof()) throw new ParseError('Unclosed {{ expression');
+    const raw: string = this.src.slice(start, this.pos);
+    this.pos += 2; // }}
     return { expr: raw.trim(), offset: start + (raw.length - raw.trimStart().length) };
   }
 

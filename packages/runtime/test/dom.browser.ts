@@ -110,7 +110,7 @@ test('setRef assigns to a signal and to a callback', () => {
 });
 
 test('two independent bindings update independently (fine-grained)', () => {
-  // <p data-x={a}>{a}-{b}</p> compiled shape
+  // <p data-x={{a}}>{{a}}-{{b}}</p> compiled shape
   const tpl: HTMLTemplateElement = template('<p>x</p>');
   const root: Element = clone(tpl);
   // rebuild children: anchorA, "-", anchorB

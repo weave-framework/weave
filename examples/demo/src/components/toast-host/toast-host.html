@@ -5,14 +5,14 @@
     @for (t of toasts(); track t.id) {
       <div
         class="toast"
-        class:success={t.kind === 'success'}
-        class:error={t.kind === 'error'}
+        class:success={{t.kind === 'success'}}
+        class:error={{t.kind === 'error'}}
         role="status"
-        in:fly={enter}
-        out:fade={leave}
+        in:fly={{enter}}
+        out:fade={{leave}}
       >
         <span class="toast-msg">{{ t.message }}</span>
-        <button type="button" class="toast-x" aria-label="Dismiss" on:click={() => dismiss(t.id)}>×</button>
+        <button type="button" class="toast-x" aria-label="Dismiss" on:click={{() => dismiss(t.id)}}>×</button>
       </div>
     }
   </div>

@@ -5,13 +5,13 @@
   </header>
 
   <div class="stress-bar" role="group" aria-label="Benchmark operations">
-    <button type="button" data-op="create-1k" on:click={() => create(1000)}>Create 1,000</button>
-    <button type="button" data-op="create-10k" on:click={() => create(10000)}>Create 10,000</button>
-    <button type="button" data-op="append-1k" on:click={() => append(1000)}>Append 1,000</button>
-    <button type="button" data-op="update-10th" on:click={() => updateEvery10()}>Update every 10th</button>
-    <button type="button" data-op="swap" on:click={() => swapRows()}>Swap rows</button>
-    <button type="button" data-op="shuffle" on:click={() => shuffle()}>Shuffle</button>
-    <button type="button" data-op="clear" on:click={() => clear()}>Clear</button>
+    <button type="button" data-op="create-1k" on:click={{() => create(1000)}}>Create 1,000</button>
+    <button type="button" data-op="create-10k" on:click={{() => create(10000)}}>Create 10,000</button>
+    <button type="button" data-op="append-1k" on:click={{() => append(1000)}}>Append 1,000</button>
+    <button type="button" data-op="update-10th" on:click={{() => updateEvery10()}}>Update every 10th</button>
+    <button type="button" data-op="swap" on:click={{() => swapRows()}}>Swap rows</button>
+    <button type="button" data-op="shuffle" on:click={{() => shuffle()}}>Shuffle</button>
+    <button type="button" data-op="clear" on:click={{() => clear()}}>Clear</button>
   </div>
 
   <p class="stress-readout">
@@ -23,11 +23,11 @@
   <table class="stress-table">
     <tbody>
       @for (r of rows(); track r.id) {
-        <tr class:selected={selected() === r.id} on:click={() => select(r.id)}>
+        <tr class:selected={{selected() === r.id}} on:click={{() => select(r.id)}}>
           <td class="cell-id">{{ r.id }}</td>
           <td class="cell-label">{{ r.label }}</td>
           <td class="cell-remove">
-            <button type="button" class="remove" aria-label="Remove" on:click|stopPropagation={() => remove(r.id)}>✕</button>
+            <button type="button" class="remove" aria-label="Remove" on:click|stopPropagation={{() => remove(r.id)}}>✕</button>
           </td>
         </tr>
       } @empty {

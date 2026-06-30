@@ -34,7 +34,7 @@ Trys tavo reikalavimai, formavę planą:
 
 Esmė: **statinė struktūra „užkepama" į vieną klonuojamą `<template>` eilutę**, o dinaminiai mazgai pasiekiami kompiliavimo-metu apskaičiuotais keliais — **jokio runtime medžio apėjimo, jokio `typeof value==='function'` patikrinimo**.
 
-Pavyzdys — `<button on:click={inc}>clicks: {count}</button>` →
+Pavyzdys — `<button on:click={{inc}}>clicks: {{ count() }}</button>` →
 ```js
 import { signal } from '@weave/runtime';
 import { template, clone, child, listen, bindText } from '@weave/runtime/dom';
@@ -52,13 +52,13 @@ Statinis `{2+2}` → `setText(node,'4')`, be jokio effect. Reaktyvumo klasifikac
 ### Šablono kalba (Angular stiliaus blokai — dokumentas sako Angular `@if`/`@for` „sutikti gerai"; vartotojas Angular dev)
 - **Interpoliacija:** `{{ expr }}` (Angular). Signalai visada kviečiami su `()`: `{{ count() }}` (jokios auto-call magijos — kaip Angular signals).
 - **Neapdorotas HTML:** `{@html expr}` (XSS atsakomybė tavo).
-- **Binding'ai naudoja tikrą JS `{ }` viduje** — lieka tikras TypeScript, esbuild transpiliuoja ir `tsc` tikrina tiesiogiai (sąmoningai NE Angular `"expr()"` kabučių sublankalba, kuri priverstų statyti sunkiausią Angular dalį — išraiškų parserį + language service): atributas `id={x}` (boolean dingsta kai falsy), DOM property `.value={x}`, event `on:click={fn}` (+ modifikatoriai `on:click|preventDefault`), dvipusis `bind:value={sig}` (input/checkbox/radio/select/number, IME-saugu), klasė `class:done={cond}`, ref `ref={el}` / `bind:this`.
+- **Binding'ai naudoja tikrą JS `{{ }}` viduje (M10 — dvigubi skliaustai VISUR, kaip ir teksto interpoliacija)** — lieka tikras TypeScript, esbuild transpiliuoja ir `tsc` tikrina tiesiogiai (sąmoningai NE Angular `"expr()"` kabučių sublankalba, kuri priverstų statyti sunkiausią Angular dalį — išraiškų parserį + language service): atributas `id={{x}}` (boolean dingsta kai falsy), DOM property `.value={{x}}`, event `on:click={{fn}}` (+ modifikatoriai `on:click|preventDefault`), dvipusis `bind:value={{sig}}` (input/checkbox/radio/select/number, IME-saugu), klasė `class:done={{cond}}`, ref `ref={{el}}` / `bind:this`. **Vienas skliaustas `attr={x}` dar parsina'si kaip nudėvėtas (deprecated) fallback'as** — migracijos saugiklis; galutinis tikslas viena sintaksė. Priežastis dvigubiems: vienas `{` dažnas kaip literalas tekste/markup'e → dviprasmiškas; `{{ }}` retas → mažiau klaidų.
 - **Kontrolės srautas (Angular blokai):**
   - `@if (cond) { } @else if (cond) { } @else { }`, su rezultato aliasing `@if (expr; as alias) { … alias … }`.
   - `@for (item of items; track item.id) { } @empty { }`, su implicit `$index`, `$count`, `$first`, `$last`, `$even`, `$odd`.
   - `@switch (x) { @case ('a') { } @default { } }`.
   - `@let name = expr;` — šablono lokalus kintamasis.
-- **Komponentai ir slotai:** `<PascalCase prop={x} on:event={h}>vaikai</…>`; `<slot/>` default/named/scoped. Props per getterius (tingūs, chirurgiški); reaktyvaus prop destrukturizacija = kompiliavimo klaida.
+- **Komponentai ir slotai:** `<PascalCase prop={{x}} on:event={{h}}>vaikai</…>`; `<slot/>` default/named/scoped. Props per getterius (tingūs, chirurgiški); reaktyvaus prop destrukturizacija = kompiliavimo klaida.
 
 ### Runtime kontraktas (`@weave/runtime/dom`, mažytis)
 `template/clone/child/anchor/insert` · `setText/bindText · setAttr/bindAttr/bindProp · listen · setRef · bindValue` · `ifBlock/eachBlock/reconcileKeyed/slot` · `root/mountComponent`. Dauguma — v0.1 `dom.js` logikos ištraukos.

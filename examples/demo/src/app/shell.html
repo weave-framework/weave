@@ -9,8 +9,8 @@
 <main class="main">
   <!-- resetKey clears a caught route error when the path changes, so navigating
        away from a failed route recovers — without remounting the routed view. -->
-  <ErrorBoundary fallback={errorFallback} resetKey={path()}>
-    <RouterView router={router} transition={routeFade} transitionParams={routeFadeParams} />
+  <ErrorBoundary fallback={{errorFallback}} resetKey={{path()}}>
+    <RouterView router={{router}} transition={{routeFade}} transitionParams={{routeFadeParams}} />
   </ErrorBoundary>
 </main>
 <!-- The global task editor overlay (Portal + transitions); opened from anywhere. -->

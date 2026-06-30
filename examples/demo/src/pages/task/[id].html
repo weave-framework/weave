@@ -10,22 +10,22 @@
         <dt>Status</dt>
         <dd>{{ t.status }}</dd>
         <dt>Priority</dt>
-        <dd><weave-badge priority={t.priority}></weave-badge></dd>
+        <dd><weave-badge priority={{t.priority}}></weave-badge></dd>
         <dt>Assignee</dt>
         <dd>{{ t.assignee || 'Unassigned' }}</dd>
       </dl>
       @if (t.checklist && t.checklist.length) {
         <ul class="checklist-view">
           @for (c of t.checklist; track c.text) {
-            <li class:done={c.done}>
+            <li class:done={{c.done}}>
               <span class="mark">{{ c.done ? '✓' : '○' }}</span> {{ c.text }}
             </li>
           }
         </ul>
       }
-      <button class="ghost" on:click={toggleRaw}>{{ showRaw() ? 'Hide' : 'Show' }} raw JSON</button>
+      <button class="ghost" on:click={{toggleRaw}}>{{ showRaw() ? 'Hide' : 'Show' }} raw JSON</button>
       <!-- show={} keeps the node in the DOM and toggles display (B.9) -->
-      <pre class="raw" show={showRaw()}>{{ JSON.stringify(t, null, 2) }}</pre>
+      <pre class="raw" show={{showRaw()}}>{{ JSON.stringify(t, null, 2) }}</pre>
     </article>
   } @catch (e) {
     <p class="error">Couldn't load task "{{ id() }}". {{ String(e) }}</p>

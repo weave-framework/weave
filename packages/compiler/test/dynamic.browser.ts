@@ -29,15 +29,15 @@ function host(): HTMLElement {
 /* ──────────── show={expr} (v-show) ──────────── */
 
 test('show emits bindShow; w:element emits dynElement', () => {
-  const a: { code: string } = compileTemplate(`<div show={ok()}>x</div>`, { mode: 'module', scope: ['ok'] });
+  const a: { code: string } = compileTemplate(`<div show={{ok()}}>x</div>`, { mode: 'module', scope: ['ok'] });
   assert.ok(a.code.includes('bindShow('), a.code);
-  const b: { code: string } = compileTemplate(`<div><w:element this={tag()}>x</w:element></div>`, { mode: 'module', scope: ['tag'] });
+  const b: { code: string } = compileTemplate(`<div><w:element this={{tag()}}>x</w:element></div>`, { mode: 'module', scope: ['tag'] });
   assert.ok(b.code.includes('dynElement('), b.code);
 });
 
 test('show toggles display but keeps the element in the DOM', () => {
   const visible: Signal<boolean> = signal(true);
-  const el: HTMLElement = render(`<div show={visible()}>hi</div>`, { visible }, ['visible']) as HTMLElement;
+  const el: HTMLElement = render(`<div show={{visible()}}>hi</div>`, { visible }, ['visible']) as HTMLElement;
   host().appendChild(el);
   assert.equal(el.style.display, '', 'shown initially (no display override)');
 
@@ -51,7 +51,7 @@ test('show toggles display but keeps the element in the DOM', () => {
 
 test('show on a nested element', () => {
   const open: Signal<boolean> = signal(false);
-  const el: Element = render(`<div><span show={open()}>panel</span></div>`, { open }, ['open']);
+  const el: Element = render(`<div><span show={{open()}}>panel</span></div>`, { open }, ['open']);
   host().appendChild(el);
   const span: HTMLElement = el.querySelector('span') as HTMLElement;
   assert.equal(span.style.display, 'none');
@@ -62,7 +62,7 @@ test('show on a nested element', () => {
 /* ──────────── <w:element this={tag}> (dynamic element) ──────────── */
 
 test('renders an element of the given tag with children', () => {
-  const el: Element = render(`<div><w:element this={tag()}>content</w:element></div>`, { tag: signal('h1') }, ['tag']);
+  const el: Element = render(`<div><w:element this={{tag()}}>content</w:element></div>`, { tag: signal('h1') }, ['tag']);
   host().appendChild(el);
   const h1: HTMLHeadingElement | null = el.querySelector('h1');
   assert.ok(h1, 'created an <h1>');
@@ -71,7 +71,7 @@ test('renders an element of the given tag with children', () => {
 
 test('re-creates the element when the tag changes', () => {
   const tag: Signal<string> = signal('h1');
-  const el: Element = render(`<div><w:element this={tag()}>x</w:element></div>`, { tag }, ['tag']);
+  const el: Element = render(`<div><w:element this={{tag()}}>x</w:element></div>`, { tag }, ['tag']);
   host().appendChild(el);
   assert.ok(el.querySelector('h1') && !el.querySelector('h2'));
 
@@ -84,7 +84,7 @@ test('wires attributes, classes and events on the dynamic element', () => {
   const active: Signal<boolean> = signal(true);
   let clicks: number = 0;
   const el: Element = render(
-    `<div><w:element this={'button'} class:on={active()} on:click={() => bump()}>tap</w:element></div>`,
+    `<div><w:element this={{'button'}} class:on={{active()}} on:click={{() => bump()}}>tap</w:element></div>`,
     { active, bump: () => clicks++ },
     ['active', 'bump']
   );
@@ -102,7 +102,7 @@ test('wires attributes, classes and events on the dynamic element', () => {
 
 test('reactive content inside the dynamic element stays fine-grained', () => {
   const n: Signal<number> = signal(1);
-  const el: Element = render(`<div><w:element this={'p'}>n={{ n() }}</w:element></div>`, { n }, ['n']);
+  const el: Element = render(`<div><w:element this={{'p'}}>n={{ n() }}</w:element></div>`, { n }, ['n']);
   host().appendChild(el);
   assert.ok(el.textContent?.includes('n=1'));
   n.set(2);

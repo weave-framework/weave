@@ -3,9 +3,9 @@
      of the app's layout. -->
 <Portal to="body">
   @if (editor.isOpen()) {
-    <div class="tm-overlay" transition:fade={overlayFade} on:click={onBackdrop}>
-      <div class="tm-dialog" role="dialog" aria-modal="true" in:scale={dialogIn}>
-        <TaskForm editId={editor.editId()} onClose={editor.close} />
+    <div class="tm-overlay" transition:fade={{overlayFade}} on:click={{onBackdrop}}>
+      <div class="tm-dialog" role="dialog" aria-modal="true" in:scale={{dialogIn}}>
+        <TaskForm editId={{editor.editId()}} onClose={{editor.close}} />
       </div>
     </div>
   }

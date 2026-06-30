@@ -10,9 +10,9 @@ export function setup() {
 }
 </script>
 
-<button on:click={inc}>{{ coutn() }}</button>
+<button on:click={{inc}}>{{ coutn() }}</button>
 <span>{{ count().toFixedd(2) }}</span>
-<div use:tooltip={count()}></div>
+<div use:tooltip={{count()}}></div>
 @await (user) @then (u) { <b>{{ u.naem }}</b> }
 @snippet greet(name) { <i>{{ name }}</i> }
 @render (greet())

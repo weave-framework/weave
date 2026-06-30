@@ -8,7 +8,7 @@ export function setup() {
 }
 </script>
 
-<button on:click={inc}>count: {{ count() }}</button>
+<button on:click={{inc}}>count: {{ count() }}</button>
 
 <style>
 button {

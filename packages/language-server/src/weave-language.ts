@@ -21,6 +21,7 @@ import {
   type CodeInformation,
   type CodeMapping,
   type LanguagePlugin,
+  type SourceScript,
   type VirtualCode,
 } from '@volar/language-core';
 import type * as ts from 'typescript';
@@ -180,7 +181,7 @@ function buildTemplateRoot(uri: URI, snapshot: ts.IScriptSnapshot, ctx: CodegenC
     (m.source === 'template' ? rootMappings : scriptMappings).push(toMapping(m));
   }
 
-  const associated = ctx.getAssociatedScript(URI.file(tsPath));
+  const associated: SourceScript<URI> | undefined = ctx.getAssociatedScript(URI.file(tsPath));
   const scriptKey: unknown = associated?.id ?? URI.file(tsPath);
 
   const tsCode: VirtualCode = {

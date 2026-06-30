@@ -17,7 +17,7 @@ export function setup() {
 }
 </script>
 
-<button on:click={inc} use:autofocus use:tooltip={name()}>{{ name() }}: {{ count().toFixed(0) }}</button>
+<button on:click={{inc}} use:autofocus use:tooltip={{name()}}>{{ name() }}: {{ count().toFixed(0) }}</button>
 @for (it of items(); track it.id) {
   <span>{{ $index }}: {{ it.label }}</span>
 }

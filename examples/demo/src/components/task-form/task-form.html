@@ -1,12 +1,12 @@
 <section class="task-form">
   <h1 class="tf-title">{{ heading }}</h1>
 
-  <form class="tf-form" on:submit={onSubmit} novalidate>
+  <form class="tf-form" on:submit={{onSubmit}} novalidate>
     <!-- `use:control` binds value + touched + aria-invalid in one; the error text is
          all that's left to place by hand. -->
     <label class="field">
       <span class="label">Title</span>
-      <input type="text" autocomplete="off" placeholder="What needs doing?" use:control={fields.title} />
+      <input type="text" autocomplete="off" placeholder="What needs doing?" use:control={{fields.title}} />
       @if (fields.title.error()) {
         <span class="msg">{{ fields.title.error() }}</span>
       }
@@ -24,7 +24,7 @@
         type="text"
         autocomplete="off"
         placeholder="Team member (Aidas, Lina, Marek, Sofia)"
-        use:control={fields.assignee}
+        use:control={{fields.assignee}}
       />
       @if (fields.assignee.error()) {
         <span class="msg">{{ fields.assignee.error() }}</span>
@@ -35,9 +35,9 @@
       <!-- Status -->
       <label class="field">
         <span class="label">Status</span>
-        <select use:control={fields.status}>
+        <select use:control={{fields.status}}>
           @for (s of statuses; track s) {
-            <option value={s}>{{ s }}</option>
+            <option value={{s}}>{{ s }}</option>
           }
         </select>
       </label>
@@ -45,9 +45,9 @@
       <!-- Priority -->
       <label class="field">
         <span class="label">Priority</span>
-        <select use:control={fields.priority}>
+        <select use:control={{fields.priority}}>
           @for (p of priorities; track p) {
-            <option value={p}>{{ p }}</option>
+            <option value={{p}}>{{ p }}</option>
           }
         </select>
       </label>
@@ -59,9 +59,9 @@
       <legend>Checklist</legend>
       @for (item of checklist(); track item) {
         <div class="check-row">
-          <input type="checkbox" use:control={item.controls.done} />
-          <input type="text" class="check-text" placeholder="Acceptance criterion" use:control={item.controls.text} />
-          <button type="button" class="rm" on:click={() => removeItem(item)} aria-label="Remove item">×</button>
+          <input type="checkbox" use:control={{item.controls.done}} />
+          <input type="text" class="check-text" placeholder="Acceptance criterion" use:control={{item.controls.text}} />
+          <button type="button" class="rm" on:click={{() => removeItem(item)}} aria-label="Remove item">×</button>
           @if (item.controls.text.error()) {
             <span class="msg">{{ item.controls.text.error() }}</span>
           }
@@ -69,7 +69,7 @@
       } @empty {
         <p class="muted hint">No items yet.</p>
       }
-      <button type="button" class="ghost add" on:click={addItem}>+ Add item</button>
+      <button type="button" class="ghost add" on:click={{addItem}}>+ Add item</button>
     </fieldset>
 
     @if (form.formError()) {
@@ -80,8 +80,8 @@
     }
 
     <div class="actions">
-      <button type="button" class="ghost" on:click={onClose}>Cancel</button>
-      <button type="submit" class="primary" disabled={form.submitting()}>
+      <button type="button" class="ghost" on:click={{onClose}}>Cancel</button>
+      <button type="submit" class="primary" disabled={{form.submitting()}}>
         {{ form.submitting() ? 'Saving…' : (editId ? 'Save changes' : 'Create task') }}
       </button>
     </div>
