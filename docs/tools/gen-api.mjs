@@ -22,9 +22,13 @@ const outFile = join(here, '..', 'src', 'content', 'api.gen.ts');
 /** Packages to document, in display order. */
 const PKGS = [
   { key: 'runtime', title: '@weave/runtime', entry: 'packages/runtime/src/index.ts' },
+  // Secondary published entry points (package.json `exports`) — scanned separately
+  // because each TS program reads one entry. Route keys avoid `/` (use `-dom`).
+  { key: 'runtime-dom', title: '@weave/runtime/dom', entry: 'packages/runtime/src/dom.ts' },
   { key: 'router', title: '@weave/router', entry: 'packages/router/src/index.ts' },
   { key: 'store', title: '@weave/store', entry: 'packages/store/src/index.ts' },
   { key: 'forms', title: '@weave/forms', entry: 'packages/forms/src/index.ts' },
+  { key: 'forms-dom', title: '@weave/forms/dom', entry: 'packages/forms/src/dom.ts' },
   { key: 'i18n', title: '@weave/i18n', entry: 'packages/i18n/src/index.ts' },
   { key: 'data', title: '@weave/data', entry: 'packages/data/src/index.ts' },
 ];
@@ -122,7 +126,13 @@ function extract(pkg) {
     let returns = null;
 
     if (kind === 'function') {
-      signature = declSignature(decl);
+      // Emit EVERY overload signature, not just the first — overloaded exports
+      // (e.g. `resource`) otherwise hide all but one call shape. Overload
+      // declarations have no `body`; the implementation does.
+      const fnDecls = (real.declarations ?? []).filter((d) => ts.isFunctionDeclaration(d));
+      const overloadDecls = fnDecls.filter((d) => !d.body);
+      const sigDecls = overloadDecls.length ? overloadDecls : [decl];
+      signature = sigDecls.map(declSignature).join('\n');
       const type = checker.getTypeOfSymbolAtLocation(real, decl);
       const callSig = type.getCallSignatures()[0];
       if (callSig) {
@@ -146,7 +156,9 @@ function extract(pkg) {
     } else {
       // type / interface / class / enum — use the source declaration text.
       signature = declSignature(decl);
-      if (signature.length > 700) signature = signature.slice(0, 700) + '\n  // …';
+      // Generous cap: keep full interface/type bodies (earlier 700 silently cut
+      // off members like Group.submit / validateAsync). Only guard pathological size.
+      if (signature.length > 4000) signature = signature.slice(0, 4000) + '\n  // …';
     }
 
     symbols.push({ name, kind, anchor: slugify(name), signature, doc, params, returns });

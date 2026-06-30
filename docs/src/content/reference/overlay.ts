@@ -30,6 +30,13 @@ they explain the mental model these signatures assume. This page is the exhausti
 Import the reactive primitives from \`@weave/runtime\`; the DOM helpers the compiler emits (and a few you
 use directly, like \`Portal\`, \`ErrorBoundary\`, \`lazy\`, \`mountComponent\`) live in \`@weave/runtime/dom\`.`,
 
+  'runtime-dom': `The DOM-facing half of the runtime — a separate import (\`@weave/runtime/dom\`). Most entries here are
+operations the **compiler emits for you** from a template (you almost never call \`bindText\`, \`insert\`, \`eachBlock\`,
+etc. by hand). The handful you *do* use directly: \`Portal\` (render outside the layout), \`ErrorBoundary\` (catch
+render errors), \`lazy\` (code-split a component), \`mount\`/\`mountComponent\` (hand-written bootstrap), and
+\`defineComponent\`/\`defineCustomElement\`. See [Components](/learn/components), [Motion](/learn/motion), and
+[Custom elements & bootstrap](/learn/custom-elements).`,
+
   router: `The official client-side router — history-based and signal-driven, so any view that reads the path or
 query updates surgically on navigation. Routes are usually generated from the filesystem (see
 [Router](/learn/router)); the exports here are what you place, read, and navigate with.`,
@@ -40,6 +47,12 @@ no selectors, no reducers, no context plumbing. The whole package is one functio
   forms: `Signal-native form state and validation. A \`field\` is a writable signal plus derived
 \`error\`/\`valid\`/\`touched\`; \`group\`/\`form\` and \`fieldArray\` compose fields to any depth through one
 \`Control\` interface. Bind controls with \`use:control\` from \`@weave/forms/dom\`. See [Forms](/learn/forms).`,
+
+  'forms-dom': `The DOM binding for forms — a separate import (\`@weave/forms/dom\`). It exports the \`control\`
+directive used as \`use:control={{ field }}\`: it wires the input's value to the field both ways, marks the field
+\`touched\` on blur, and toggles \`aria-invalid\` (only when the field is **both** touched and invalid). It picks the
+right mechanism per element — text, number/range (numeric, caret-safe), checkbox, radio, and \`<select multiple>\`.
+See [Forms](/learn/forms).`,
 
   i18n: `Signal-native internationalization — an optional add-on that costs nothing until you call
 \`createI18n()\`. \`t('key')\` reads locale + message signals, so bindings re-translate the instant
@@ -284,6 +297,19 @@ email.valid();   // boolean (reactive)`,
   validate: (v) => v.password !== v.confirm ? { confirm: 'Passwords differ' } : null,
 });
 f.valid();   // true only when every child is valid AND no cross-field error`,
+    },
+  ],
+  // `form` is an exact alias of `group` — same signature, same behavior. Keyed
+  // separately so the example renders under the `form` heading too.
+  'forms/form': [
+    {
+      lang: 'ts',
+      code: `// 'form' and 'group' are the same function — pick whichever reads better.
+const login = form({
+  email: field('', [validators.required(), validators.email()]),
+  password: field('', [validators.required()]),
+});
+login.submit(async (values) => { await api.login(values); });`,
     },
   ],
   'forms/fieldArray': [

@@ -1,6 +1,6 @@
 # Templates
 
-A Weave template is HTML with a few superpowers. It's compiled — at build time it becomes direct DOM operations, so there's no template interpreter in the browser and nothing to diff. This page is the full tour of the syntax: text, bindings, directives, and control flow.
+A Weave template is HTML with a few superpowers. It's compiled — at build time it becomes direct DOM operations, so there's no template interpreter shipped to the browser and nothing to diff at runtime. Each binding updates exactly one node, attribute, or property. This page is the full tour of the syntax: text, attributes, events, two-way binding, refs, directives, and control flow.
 
 :::callout tip "One rule to remember: double braces"
 Every dynamic value in a template is wrapped in `{{ }}`. Text, attributes, events, bindings — all of them. A single brace (`attr={x}`) is a deliberate error, so there's never any guessing about which form an attribute uses.
@@ -8,92 +8,150 @@ Every dynamic value in a template is wrapped in `{{ }}`. Text, attributes, event
 
 ## Text interpolation
 
-`{{ expr }}` renders an expression as text. If the expression reads a signal, the text updates when that signal changes; if it doesn't, it's computed once.
+`{{ expr }}` renders an expression as text. If the expression reads a signal, the text updates when that signal changes; if it doesn't read any signal, it's computed once and never touched again.
 
-~~~html
+~~~html title="Text"
 <p>Hello, {{ name() }}!</p>
 <p>{{ 2 + 2 }}</p>
 <p>{{ user().email }}</p>
 ~~~
 
-Text is inserted as plain text content, never as HTML — so `{{ "<b>" }}` shows the literal characters `<b>`, it doesn't create a bold tag. That makes interpolation safe from injection by default.
+Text is always inserted as plain text content, never as HTML — so `{{ "<b>" }}` shows the literal characters `<b>`, it does not create a bold tag. That makes interpolation safe from injection by default; there is no `innerHTML`-style escape hatch in template syntax.
+
+A `null`, `undefined`, or `false` value renders as the empty string (handy for `{{ cond && label() }}`). Everything else is stringified with `String(...)`.
+
+### Escaping a literal `@`
+
+The `@` character starts a control-flow block. To write a literal `@` in text — for example to document the block keywords themselves — double it: `@@`. The parser emits a single `@` and does not treat what follows as a block.
+
+~~~html title="Literal @"
+<p>Use @@for to loop. Type your @@handle below.</p>
+~~~
+
+This only matters when the `@` is immediately followed by a block keyword (`@for`, `@if`, …). A stray `@` in prose (like an email address) is left alone.
 
 ## Attributes and properties
 
+Five forms cover everything you put on an element other than events and bindings:
+
 | Form | Example | What it does |
 |------|---------|--------------|
-| Static attribute | `<a href="/">` | A literal string attribute |
-| Dynamic attribute | `<a href={{ url() }}>` | Reactive attribute (removed when `null`/`false`) |
-| Property | `<input .value={{ text() }}>` | Sets a DOM *property*, not an attribute |
+| Static attribute | `<a href="/">` | A literal string attribute, set once |
+| Dynamic attribute | `<a href={{ url() }}>` | Reactive attribute; re-applied when the expression changes |
+| Property | `<input .value={{ text() }}>` | Sets a DOM *property* (`el.value`), not an attribute |
 | Class toggle | `<li class:done={{ isDone() }}>` | Adds/removes one class by truthiness |
-| Show | `<div show={{ open() }}>` | Toggles visibility via `display` (stays in DOM) |
+| Show | `<div show={{ open() }}>` | Toggles visibility via `display` (element stays in DOM) |
 
-~~~html
+~~~html title="Attributes"
 <button disabled={{ !canSubmit() }} class={{ statusClass() }}>Save</button>
 <li class:done={{ task().done }} class:urgent={{ task().priority === 'high' }}>…</li>
 <pre show={{ showRaw() }}>{{ JSON.stringify(data(), null, 2) }}</pre>
 ~~~
 
-`show` differs from `@if`: `show` keeps the element in the DOM and just hides it (cheap to toggle, keeps state); `@if` removes and recreates it (covered below).
+A few details worth knowing:
+
+- **Boolean-aware attributes.** A dynamic attribute whose value is `false`, `null`, or `undefined` is *removed* from the element; `true` sets it to the empty string (`disabled=""`); anything else is stringified. So `disabled={{ !canSubmit() }}` does the right thing automatically.
+- **Attribute vs property.** Most of the time the attribute form is what you want. Reach for the `.prop` form when the live DOM property and the attribute drift apart — `.value` on an `<input>` after the user has typed, `.checked`, `.indeterminate`, or any property that has no attribute mirror. The property form does no boolean-removal logic; it assigns the raw value.
+- **`class:name` vs `class`.** Use `class={{ ... }}` to drive the whole class string and `class:name={{ ... }}` to toggle a single class independently. They compose — a static `class="card"` plus `class:active={{ ... }}` works fine.
+
+`show` differs from `@if`: `show` keeps the element in the DOM and just flips `display` (cheap to toggle, preserves the element's state and any uncontrolled input), and it restores the element's own inline `display` when shown rather than clobbering it. `@if` removes and recreates the element (covered below).
 
 ## Events
 
-`on:event={{ handler }}` attaches a listener. The handler is a function — name it or write it inline:
+`on:event={{ handler }}` attaches a listener. The handler is a function — name it or write it inline. Handlers are never reactive (the listener is attached once), so pass the function itself, do not call it.
 
-~~~html
+~~~html title="Events"
 <button on:click={{ inc }}>+1</button>
 <button on:click={{ () => count.set(0) }}>Reset</button>
 <form on:submit={{ onSubmit }}>…</form>
 ~~~
 
-Chain **modifiers** with `|` after the event name:
+### Modifiers
 
-~~~html
+Chain **modifiers** with `|` after the event name. They come in two kinds, and you can mix them freely:
+
+~~~html title="Modifiers"
 <a on:click|preventDefault={{ go }}>Navigate</a>
 <button on:click|stopPropagation|preventDefault={{ edit }}>✎</button>
+<div on:click|self={{ onBackdrop }}>…</div>
+<button on:click|once|capture={{ handler }}>…</button>
+<div on:scroll|passive={{ onScroll }}>…</div>
 ~~~
 
-Common modifiers: `preventDefault`, `stopPropagation`, `capture`.
+| Modifier | Kind | What it does |
+|----------|------|--------------|
+| `preventDefault` | guard | Calls `e.preventDefault()` before your handler |
+| `stopPropagation` | guard | Calls `e.stopPropagation()` before your handler |
+| `self` | guard | Runs your handler only when `e.target === e.currentTarget` (the event fired *on* this element, not a descendant) |
+| `once` | listener option | The listener auto-removes after firing once (`{ once: true }`) |
+| `capture` | listener option | Listens in the capture phase, not bubble (`{ capture: true }`) |
+| `passive` | listener option | Promises never to call `preventDefault`, letting the browser scroll smoothly (`{ passive: true }`) |
+
+The **guard** modifiers wrap your handler in a tiny function that runs the guard, then calls you; `self` returns early without calling you when the target check fails. The **listener-option** modifiers are passed straight to `addEventListener`'s options object. That's the complete set — there are exactly six.
 
 ## Two-way binding
 
-`bind:` connects a form control to a **writable signal** — the signal drives the control, and user input writes the signal back. Pass the signal *by reference* (don't call it):
+`bind:` connects a form control to a **writable signal** — the signal drives the control, and user input writes the signal back. Pass the signal *by reference* (don't call it). The expression must resolve to a writable signal.
 
-~~~html
+~~~html title="bind:"
 <input bind:value={{ name }} />
+<textarea bind:value={{ bio }}></textarea>
 <input type="number" bind:value={{ age }} />
+<input type="range" bind:value={{ volume }} />
 <input type="checkbox" bind:checked={{ agreed }} />
 <input type="radio" name="size" value="L" bind:group={{ size }} />
 <select bind:value={{ choice }}>
   <option value="a">A</option>
   <option value="b">B</option>
 </select>
+<select multiple bind:value={{ picks }}>
+  <option value="x">X</option>
+  <option value="y">Y</option>
+</select>
 ~~~
 
-The compiler picks the right mechanism from the binding name and element: `bind:value` for text/number/range/select, `bind:checked` for a checkbox boolean, `bind:group` for radios (the signal holds the selected value). Text inputs are IME-safe — the value isn't overwritten mid-composition.
+The compiler picks the mechanism from the binding name; the runtime then specializes further based on the element and its `type`:
+
+| Binding | Element | Signal holds | Notes |
+|---------|---------|--------------|-------|
+| `bind:value` | text input, `<textarea>`, single `<select>` | a **string** | IME-composition-safe (see below) |
+| `bind:value` | `<input type="number">` / `type="range"` | a **number** | reads `valueAsNumber`, writes a number — not a string |
+| `bind:value` | `<select multiple>` | a **string array** | one entry per selected option; an empty selection is `[]` |
+| `bind:checked` | `<input type="checkbox">` | a **boolean** | mirrors the checkbox's checked state |
+| `bind:group` | `<input type="radio">` | the **selected value** | the signal holds the `value` of the chosen radio in the group |
+
+The signal is the source of truth. A few runtime guarantees worth knowing:
+
+- **Text inputs are IME-safe.** While the user is mid-composition (Chinese/Japanese/Korean input, etc.) the bound value is *not* overwritten, and the signal is written once composition ends — so the half-typed text isn't clobbered.
+- **No caret jump.** The DOM is only re-assigned when the value actually differs from what's already there, so the cursor stays put while typing.
+- **Numeric edits are forgiving.** Typing `1.` (momentarily `NaN`) won't get clobbered; the comparison is numeric.
+- **`<select>` self-heals.** Because `<option>`s are often inserted *after* the binding runs (static markup, an `@for`, or async data), and the browser auto-selects the first option of a freshly-populated select, the binding re-asserts the bound value once the current render settles — so the signal still wins.
 
 :::callout tip "Forms have an even shorter way"
 For validated forms you'll usually reach for the `use:control` directive from `@weave/forms/dom`, which binds value, touched state, and `aria-invalid` in one go. See [Forms](/learn/forms).
 :::
 
-## References
+## References: `ref` / `bind:this`
 
-Grab the actual DOM element with `ref` (or its alias `bind:this`) — handy for focus, measurement, or a third-party library:
+Grab the actual DOM element with `ref` (or its alias `bind:this` — they compile identically). Handy for focus, measurement, or handing the node to a third-party library. The target can be either a **signal** or a plain **callback**:
 
-~~~html
+~~~html title="ref"
 <input ref={{ inputEl }} />
+<canvas bind:this={{ (el) => setupChart(el) }}></canvas>
 ~~~
 
-~~~ts
+~~~ts title="ref — signal form"
 const inputEl = signal<Element | null>(null);
 onMount(() => (inputEl() as HTMLInputElement)?.focus());
 ~~~
 
+If you pass a writable signal, Weave calls `.set(el)` on it. If you pass a function, Weave calls it with the element. (Internally it checks for a `set` method to tell them apart.) The signal form is best when other code needs to read the element later; the callback form is best for fire-and-forget setup.
+
 ## Directives: `use:`
 
-`use:action={{ arg }}` runs a function on the element once it's inserted — the escape hatch for imperative DOM work, kept tidy and owner-scoped. An action is `(el, arg) => cleanup?`:
+`use:action={{ arg }}` runs a function on the element once it's inserted — the escape hatch for imperative DOM work, kept tidy and owner-scoped. An action is `(el, arg) => cleanup?`. It runs at `onMount` timing (the element is live in the document, so focus/measure/3rd-party init all work), and is skipped entirely if the region is torn down before that fires.
 
-~~~ts
+~~~ts title="Defining actions"
 import type { Action } from '@weave/runtime/dom';
 
 export const autofocus: Action = (el) => {
@@ -106,30 +164,32 @@ export const tooltip: Action<string> = (el, text) => {
 };
 ~~~
 
-~~~html
+~~~html title="Using actions"
 <input use:autofocus />
 <button use:tooltip={{ 'Delete forever' }}>🗑</button>
 ~~~
 
-For an arg that should react, pass a getter (`use:tip={{ () => label() }}`) and read it inside an `effect` in the action.
+Three tear-down options, all fired when the region unmounts: return a cleanup function, call `onDispose` inside the action, or create an `effect` (its disposal is tied to the element's region). For an argument that should *react*, pass a getter (`use:tip={{ () => label() }}`) and read it inside an `effect` in the action — the `arg` itself is passed once.
 
 ## Transitions: `transition:` / `in:` / `out:`
 
-Animate an element as it enters or leaves. `transition:` does both; `in:` only on enter; `out:` only on leave. Leave animations are awaited — a control-flow block waits for the outro before removing the node.
+Animate an element as it enters or leaves. `transition:` does both; `in:` only on enter; `out:` only on leave. Leave animations are **awaited** — a control-flow block (`@if`/`@for`/`@key`) plays the outro and waits for it before removing the node.
 
-~~~html
+~~~html title="Transitions"
 <div transition:fade>Fades both ways</div>
 <div in:scale={{ { duration: 150 } }}>Scales in</div>
 <aside out:fly={{ { x: 200 } }}>Flies out on removal</aside>
 ~~~
 
-Built-ins (`fade`, `fly`, `slide`, `scale`) come from `@weave/runtime`. Full treatment in [Motion](/learn/motion).
+The optional `={{ params }}` is re-read each time the transition plays. Built-ins (`fade`, `fly`, `slide`, `scale`) come from `@weave/runtime`. Full treatment in [Motion](/learn/motion).
 
 ## Control flow
 
+Control-flow blocks start with `@` and use `{ … }` for their bodies. Each block renders in its own ownership scope, so the effects inside it are disposed when that branch/row/region unmounts.
+
 ### @if / @else
 
-~~~html
+~~~html title="@if / @else if / @else"
 @if (loading()) {
   <p>Loading…</p>
 } @else if (error()) {
@@ -139,9 +199,9 @@ Built-ins (`fade`, `fly`, `slide`, `scale`) come from `@weave/runtime`. Full tre
 }
 ~~~
 
-Switching branches swaps the DOM; staying on the same branch leaves it untouched. The `; as` form binds the tested value to a name — perfect for null-narrowing:
+Switching branches swaps the DOM; staying on the same branch leaves it untouched (no remount). The `; as alias` form binds the tested value to a name on the leading branch — perfect for null-narrowing:
 
-~~~html
+~~~html title="@if … ; as alias"
 @if (currentUser(); as user) {
   <span>Signed in as {{ user.name }}</span>
 } @else {
@@ -151,9 +211,9 @@ Switching branches swaps the DOM; staying on the same branch leaves it untouched
 
 ### @for
 
-A keyed loop. Always give it a `track` expression — a stable, unique key per item — so Weave reuses nodes across reorders instead of rebuilding them:
+A keyed loop. Always give it a `track` expression — a stable, unique key per item — so Weave reuses nodes across reorders instead of rebuilding them. (If you omit `track`, the index is used as the key, which defeats reuse on reorder — only safe for static lists.)
 
-~~~html
+~~~html title="@for … track / @empty"
 @for (task of tasks(); track task.id) {
   <li>{{ task.title }}</li>
 } @empty {
@@ -161,16 +221,18 @@ A keyed loop. Always give it a `track` expression — a stable, unique key per i
 }
 ~~~
 
-`@empty` renders when the list is empty. Inside the body you get positional locals for free:
+`@empty` renders when the list is empty (and animates out via any `out:` transition when items arrive). Inside the body you get reactive positional locals for free — they update across reorders, not just on first render:
 
 | Local | Meaning |
 |-------|---------|
 | `$index` | 0-based position |
-| `$count` | total number of items |
-| `$first` / `$last` | boolean edges |
-| `$even` / `$odd` | boolean parity |
+| `$count` | total number of items in the list |
+| `$first` | `true` for the first item |
+| `$last` | `true` for the last item |
+| `$even` | `true` when `$index` is even |
+| `$odd` | `true` when `$index` is odd |
 
-~~~html
+~~~html title="Positional locals"
 @for (row of rows(); track row.id) {
   <tr class:alt={{ $odd }}>
     <td>{{ $index + 1 }}</td>
@@ -179,13 +241,13 @@ A keyed loop. Always give it a `track` expression — a stable, unique key per i
 }
 ~~~
 
-Reordering, inserting, and removing all happen with the minimum DOM moves — focus, scroll position, and input state in reused rows are preserved.
+Reordering, inserting, and removing all happen with the minimum DOM moves (a longest-increasing-subsequence reconcile) — focus, scroll position, and uncontrolled input state in reused rows are preserved.
 
-### @switch
+### @switch / @case / @default
 
-Equality-based branching (`===` against each `@case`):
+Equality-based branching — each `@case` is compared with `===` against the switch value, in order; `@default` is the fallthrough:
 
-~~~html
+~~~html title="@switch"
 @switch (status()) {
   @case ('pending') { <Spinner /> }
   @case ('done') { <Check /> }
@@ -193,36 +255,38 @@ Equality-based branching (`===` against each `@case`):
 }
 ~~~
 
+`@default` is optional; if nothing matches and there's no default, nothing renders.
+
 ### @let
 
-A local computed value, available to siblings after it:
+A local, reactive computed value, available to the siblings that come *after* it in the same block. It re-computes automatically when its inputs change.
 
-~~~html
+~~~html title="@let"
 @let fullName = user().first + ' ' + user().last;
 <h1>{{ fullName }}</h1>
 ~~~
 
-It re-computes automatically when its inputs change.
+Note the trailing `;` — `@let` is a single-statement declaration, not a `{ … }` block.
 
 ### @key
 
-Force a teardown-and-recreate when a value changes — fresh DOM, fresh state, mount work replayed:
+Force a teardown-and-recreate of the body whenever the keyed value changes — fresh DOM, fresh state, mount-time work replayed. While the key stays the same, the DOM is left untouched.
 
-~~~html
+~~~html title="@key"
 @key (userId()) {
   <UserProfile id={{ userId() }} />
 }
 ~~~
 
-Use it to reset a subtree on identity change (e.g. navigating between two users on the same route).
+Use it to reset a subtree on identity change — e.g. navigating between two users on the same route, where the component instance would otherwise be reused.
 
 ## Async blocks
 
 ### @defer
 
-Hold off rendering an expensive subtree until a trigger fires; show a `@placeholder` meanwhile:
+Hold off rendering an expensive subtree until a trigger fires; show a `@placeholder` meanwhile. The placeholder is optional, but some triggers need it (see below).
 
-~~~html
+~~~html title="@defer"
 @defer (on idle) {
   <BoardInsights />
 } @placeholder {
@@ -230,13 +294,35 @@ Hold off rendering an expensive subtree until a trigger fires; show a `@placehol
 }
 ~~~
 
-Triggers: `on idle`, `on viewport`, `on interaction`, `on hover`, `on timer(2000)`, `when ready()` (reactive), and `immediate`. `viewport`/`interaction`/`hover` watch the placeholder's element, so give them one. Pair `@defer` with [`lazy()`](/learn/router#code-splitting) to also code-split the chunk.
+There are seven triggers. Six are one-shot; only `when` is reactive (it re-evaluates and fires the first time it becomes truthy):
 
-### @await
+| Trigger | Fires when |
+|---------|-----------|
+| `when expr` | `expr` first becomes truthy (reactive) |
+| `on idle` | the browser is idle (`requestIdleCallback`, with a `setTimeout` fallback) |
+| `on viewport` | the placeholder scrolls into view (`IntersectionObserver`) |
+| `on interaction` | the user clicks or presses a key on the placeholder |
+| `on hover` | the pointer enters or focus moves into the placeholder |
+| `on timer(2000)` | the given number of milliseconds elapses |
+| `immediate` | right away — renders the content synchronously, no waiting |
 
-Render by the settle state of a Promise or a [`@weave/data` resource](/learn/recipes#fetching-data):
+~~~html title="Other @defer triggers"
+@defer (when ready()) { <Chart /> }
+@defer (on viewport) { <Heavy /> } @placeholder { <div class="ph"></div> }
+@defer (on timer(2000)) { <Banner /> }
+~~~
 
-~~~html
+:::callout info "viewport / interaction / hover need a placeholder"
+These three triggers watch the **placeholder element** — that's what gets observed for intersection, click, or hover. If there's no placeholder (nothing to observe), the trigger fires immediately. So always give those three a `@placeholder`.
+:::
+
+Pair `@defer` with [`lazy()`](/learn/router#code-splitting) to also code-split the deferred chunk — `@defer` gates *rendering*; `lazy()` gates *loading the code*.
+
+### @await / @then / @catch
+
+Render by the settle state of a Promise or a [`@weave/data` resource](/learn/recipes#fetching-data). The block right after `@await (src)` is the pending content; `@then (alias)` binds the resolved value; `@catch (alias)` binds the error. All three parts are optional, and the aliases are optional too.
+
+~~~html title="@await"
 @await (task) {
   <p>Loading task…</p>
 } @then (t) {
@@ -246,13 +332,13 @@ Render by the settle state of a Promise or a [`@weave/data` resource](/learn/rec
 }
 ~~~
 
-`@then (alias)` binds the resolved value; `@catch (alias)` binds the error. With a resource, a refetch flips it back to the pending branch automatically.
+The source is read **once** when the block mounts (a fresh Promise on every render would not be a useful dependency). With a plain Promise it settles once into then/catch. With a `@weave/data` resource it's driven reactively off the resource's loading/error/data signals, so a refetch flips it back to the pending branch automatically.
 
-## Snippets
+## Snippets: @snippet / @render
 
-A `@snippet` is a named, parameterized template fragment; `@render` invokes it. Reuse markup without a whole separate component, and even pass a snippet to a child as a prop:
+A `@snippet` is a named, parameterized template fragment; `@render` invokes it. Reuse markup without spinning up a whole separate component — and because the snippet name is just a template-local value, you can even pass it to a child as a prop.
 
-~~~html
+~~~html title="@snippet / @render"
 @snippet stat(label, value) {
   <div class="stat">
     <dt>{{ label }}</dt>
@@ -266,11 +352,19 @@ A `@snippet` is a named, parameterized template fragment; `@render` invokes it. 
 </dl>
 ~~~
 
+`@render (expr)` will render anything that resolves to a node, so it also works for a snippet passed in as a prop. The parameter names (`label`, `value` above) are plain locals inside the snippet body.
+
 ## Components and slots
 
-Capitalized tags are components; lowercase tags are DOM elements. Pass props with `{{ }}`, events with `on:`, and project markup through slots:
+A **capitalized** tag is a component; a **lowercase** tag is a DOM element. That casing is the whole distinction — `<Card>` is a component, `<card>` is an (unknown) HTML element.
 
-~~~html
+On a component tag, only three kinds of attribute are allowed:
+
+- **Static props** — `label="Save"`
+- **Dynamic props** — `task={{ t }}` (passed as a reactive getter, so the child re-reads through it)
+- **Events** — `on:select={{ choose }}` (forwarded to the child as an `onSelect` prop)
+
+~~~html title="Components and slots"
 <TaskCard task={{ t }} on:select={{ choose }} />
 
 <Card>
@@ -279,20 +373,24 @@ Capitalized tags are components; lowercase tags are DOM elements. Pass props wit
 </Card>
 ~~~
 
+:::callout info "Other bindings on a component are compile errors"
+`bind:`, `ref`/`bind:this`, `use:`, `class:`, `.prop`, `show`, and `transition:`/`in:`/`out:` are **not** allowed on a component tag — the compiler rejects them. Those directives target a real DOM element, and a component is an abstraction over (potentially many) elements. Put the directive on a plain element *inside* the component, or expose a prop. Project markup into the component through named or default `slot="…"`.
+:::
+
 The full story — props as reactive getters, callbacks up, named/fallback slots — is in [Components](/learn/components).
 
-## Dynamic elements
+## Dynamic elements: `<w:element>`
 
-When the *tag itself* is dynamic, use `<w:element this={{ tag }}>`. It rebuilds when the tag changes; all other attributes apply to the created element:
+When the *tag itself* is dynamic, use `<w:element this={{ tag }}>`. It rebuilds the element (disposing the old one's effects) whenever the tag string changes; all other attributes apply to the created element.
 
-~~~html
+~~~html title="<w:element>"
 <w:element this={{ 'h' + level() }}>{{ title }}</w:element>
 ~~~
 
-This renders `<h1>`…`<h6>` depending on `level()`.
+This renders `<h1>`…`<h6>` depending on `level()`. The same tag value across re-renders is deduped, so an unrelated re-render won't needlessly rebuild it.
 
 :::callout info "What you just learned"
-Every dynamic value uses `{{ }}`. Bind attributes/properties/classes/visibility, wire `on:` events with modifiers, two-way with `bind:`, and reach the DOM with `ref` and `use:`. Structure with `@if`/`@for`/`@switch`/`@let`/`@key`, go async with `@defer`/`@await`, reuse with `@snippet`/`@render`, compose with components + slots, and go dynamic with `<w:element>`.
+Every dynamic value uses `{{ }}` (and a literal `@` is escaped as `@@`). Bind attributes/properties/classes/visibility, wire `on:` events with all six modifiers (`preventDefault`, `stopPropagation`, `self`, `once`, `capture`, `passive`), go two-way with `bind:` (string / number / boolean / value / string-array depending on the control), and reach the DOM with `ref` (signal or callback) and `use:`. Structure with `@if` (incl. `; as`), `@for` (track, `@empty`, positional `$`-locals), `@switch`, `@let`, and `@key`; go async with `@defer` (seven triggers) and `@await`/`@then`/`@catch`; reuse with `@snippet`/`@render`; compose with components (capitalized tags — only static/dynamic props and `on:` events) and slots; and go dynamic with `<w:element>`.
 :::
 
-[Next: Reactivity in depth →](/learn/reactivity) · [Reference: template syntax →](/reference/runtime)
+[Next: Reactivity in depth →](/learn/reactivity) · [Reference: template syntax →](/reference/template-syntax)

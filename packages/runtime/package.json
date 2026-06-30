@@ -5,11 +5,38 @@
   "type": "module",
   "sideEffects": false,
   "main": "./src/index.ts",
+  "module": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
     "./dom": "./src/dom.ts"
   },
-  "files": ["src"],
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/weave-framework/weave.git",
+    "directory": "packages/runtime"
+  },
+  "publishConfig": {
+    "access": "public",
+    "main": "./dist/index.js",
+    "module": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js"
+      },
+      "./dom": {
+        "types": "./dist/dom.d.ts",
+        "import": "./dist/dom.js"
+      }
+    }
+  },
   "license": "MIT"
 }

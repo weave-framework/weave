@@ -3,14 +3,44 @@
   "version": "0.2.0",
   "description": "Weave official client router — signal-driven, history-based, with RouterView + Link. Zero third-party deps.",
   "type": "module",
-  "sideEffects": ["./src/index.ts"],
+  "sideEffects": [
+    "./src/index.ts",
+    "./dist/index.js"
+  ],
   "main": "./src/index.ts",
+  "module": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
     "./files": "./src/files.ts"
   },
-  "files": ["src"],
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/weave-framework/weave.git",
+    "directory": "packages/router"
+  },
+  "publishConfig": {
+    "access": "public",
+    "main": "./dist/index.js",
+    "module": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js"
+      },
+      "./files": {
+        "types": "./dist/files.d.ts",
+        "import": "./dist/files.js"
+      }
+    }
+  },
   "dependencies": {
     "@weave/runtime": "workspace:*"
   },

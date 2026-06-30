@@ -1,26 +1,49 @@
 {
   "name": "@weave/cli",
   "version": "0.2.0",
-  "description": "Weave CLI — esbuild plugin, `weave build`, `weave dev` (watch + live-reload), and `weave check`.",
+  "description": "Weave CLI — `weave build`, `weave dev` (watch + live-reload), `weave check`, `weave routes`.",
   "type": "module",
   "bin": {
     "weave": "./bin/weave.mjs"
   },
   "main": "./src/cli.ts",
-  "files": ["src", "bin"],
-  "dependencies": {
-    "@weave/check": "workspace:*",
-    "@weave/compiler": "workspace:*"
+  "types": "./src/cli.ts",
+  "exports": {
+    ".": "./src/cli.ts"
   },
-  "peerDependencies": {
-    "typescript": "^5.7.0",
-    "esbuild": "^0.25.0",
-    "sass": "^1.0.0"
+  "files": [
+    "dist",
+    "bin"
+  ],
+  "engines": {
+    "node": ">=18"
   },
-  "peerDependenciesMeta": {
-    "sass": {
-      "optional": true
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/weave-framework/weave.git",
+    "directory": "packages/cli"
+  },
+  "publishConfig": {
+    "access": "public",
+    "bin": {
+      "weave": "./bin/weave-dist.mjs"
+    },
+    "main": "./dist/cli.js",
+    "module": "./dist/cli.js",
+    "types": "./dist/cli.d.ts",
+    "exports": {
+      ".": {
+        "types": "./dist/cli.d.ts",
+        "import": "./dist/cli.js"
+      }
     }
+  },
+  "dependencies": {
+    "esbuild": "^0.25.0",
+    "typescript": "^5.7.0"
+  },
+  "optionalDependencies": {
+    "sass": "^1.0.0"
   },
   "license": "MIT"
 }
