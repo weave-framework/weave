@@ -1,4 +1,4 @@
-import { signal, effect, type Signal } from '@weave/runtime';
+import { signal, effect, type Signal } from '@weave-framework/runtime';
 import { highlight } from '../highlight/highlight';
 
 interface CodeBlockProps {

@@ -1,5 +1,5 @@
 /**
- * M7b proof: the shipped `@weave/cli` plugin drives both `weave build`
+ * M7b proof: the shipped `@weave-framework/cli` plugin drives both `weave build`
  * (one-shot bundle) and `weave dev` (watch + serve + live-reload), and the
  * output mounts + reacts + is scoped in a real browser.
  *

@@ -28,7 +28,7 @@ import {
   type Attr,
   type SnippetNode,
   type ComponentSourceLoc,
-} from '@weave/compiler';
+} from '@weave-framework/compiler';
 
 const FOR_VARS: string[] = ['$index', '$count', '$first', '$last', '$even', '$odd'];
 const HAS_SETUP: RegExp = /export\s+(?:async\s+)?function\s+setup\b|export\s+(?:const|let|var)\s+setup\b/;

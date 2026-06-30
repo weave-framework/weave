@@ -9,7 +9,7 @@ Normally a variable is silent. You set `x = 5`, and nothing else in your app kno
 You create one with `signal(initialValue)`. You read it by calling it like a function, and you change it with `.set(...)`:
 
 ~~~ts title="the basics"
-import { signal } from '@weave/runtime';
+import { signal } from '@weave-framework/runtime';
 
 const count = signal(0);
 
@@ -153,7 +153,7 @@ ping.set(0); // still notifies, every time
 Reading a signal inside an `effect` creates a living connection. The effect runs **once immediately**, then again every time something it read changes — and only then. You never list what it depends on; Weave figures that out by watching what you actually read.
 
 ~~~ts title="effect reacts on its own"
-import { signal, effect } from '@weave/runtime';
+import { signal, effect } from '@weave-framework/runtime';
 
 const count = signal(0);
 

@@ -1,4 +1,4 @@
-import { defineConfig } from '@weave/cli';
+import { defineConfig } from '@weave-framework/cli';
 
 export default defineConfig({
   root: 'src/app/app',     // root component — Weave generates the bootstrap

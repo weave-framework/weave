@@ -11,7 +11,7 @@ There's no `ngOnInit`, no `componentDidMount`, no `useEffect` ceremony. `setup` 
 When you need the real, mounted DOM — to focus an input, measure a box, start a chart library, or kick off a fetch — use `onMount`. It does **not** run synchronously inside `setup`. It schedules your callback on the next **microtask**, after the whole synchronous construct-and-mount pass has finished, so by the time it fires the nodes are in the document:
 
 ~~~ts title="board.ts"
-import { onMount } from '@weave/runtime';
+import { onMount } from '@weave-framework/runtime';
 
 export function setup() {
   onMount(() => void board.load()); // fetch after the DOM is live
@@ -26,7 +26,7 @@ A few things worth being precise about, because each is a real branch in the cod
 - **A returned cleanup ties to owner *disposal*, not to anything re-running.** If your callback returns a function, that function is registered via `onDispose` on the captured scope. It runs **once**, when the scope is disposed (unmount). It does **not** re-run — `onMount` fires exactly once, so its cleanup fires at most once.
 
 ~~~ts title="chart.ts"
-import { onMount } from '@weave/runtime';
+import { onMount } from '@weave-framework/runtime';
 
 export function setup(props: { data: number[] }) {
   let host: HTMLElement;
@@ -60,7 +60,7 @@ The recompute behaviour is the part people miss: an `onCleanup` registered insid
 Inside an `effect`, you have a third option that's really just `onCleanup` in disguise: **return a function from the effect body**. Weave pushes that returned function onto the same cleanup list, so it behaves exactly like `onCleanup` — runs before the next run and on dispose:
 
 ~~~ts title="modal.ts"
-import { effect, onCleanup } from '@weave/runtime';
+import { effect, onCleanup } from '@weave-framework/runtime';
 
 effect(() => {
   if (!isOpen()) return;
@@ -77,7 +77,7 @@ effect(() => {
 Returning a cleanup and calling `onCleanup` are equivalent — pick whichever reads better; don't do both for the same teardown or it'll run twice. For a teardown that belongs to the *component*, not to any one effect — say, you `provide`d something or opened a connection directly in `setup` — use `onDispose`:
 
 ~~~ts title="setup.ts"
-import { onDispose } from '@weave/runtime';
+import { onDispose } from '@weave-framework/runtime';
 
 export function setup() {
   const socket = openSocket();
@@ -99,7 +99,7 @@ Sometimes a value is needed deep in a subtree — the current user, a theme, a f
 `createContext<T>(defaultValue?)` makes an opaque, typed token. The token's *identity* (the object itself) is the lookup key — there are no string names to collide. The optional `defaultValue` is what `inject` hands back when nobody up the tree provided one:
 
 ~~~ts title="session.ts"
-import { createContext, type Context } from '@weave/runtime';
+import { createContext, type Context } from '@weave-framework/runtime';
 
 export interface Session { currentUser: string; }
 
@@ -114,7 +114,7 @@ If you call `createContext<T>()` with **no** argument, the default is `undefined
 `provide(ctx, value)` stores `value` for `ctx` on the **current owner scope**, visible to every descendant that injects the same token until that scope disposes. Call it in a component `setup` (or any active owner scope):
 
 ~~~ts title="shell.ts"
-import { provide } from '@weave/runtime';
+import { provide } from '@weave-framework/runtime';
 import { SessionContext } from './session';
 
 export function setup() {
@@ -134,7 +134,7 @@ Outcomes to know:
 `inject(ctx)` walks up the **owner chain** from the current scope, returning the first provided value it finds, or the token's default if it reaches the top without a hit:
 
 ~~~ts title="task-card.ts"
-import { inject } from '@weave/runtime';
+import { inject } from '@weave-framework/runtime';
 import { SessionContext, type Session } from '../../app/session';
 
 export function setup(props: { task: Task }) {
@@ -168,8 +168,8 @@ Everything above — automatic cleanup, `onMount`'s captured scope, `provide`/`i
 When exactly one instance should exist for the whole app — a cart, the board data, the current theme — use a [store](/learn/store). The factory runs once, lazily, on first use; everyone who calls the hook gets the same instance:
 
 ~~~ts
-import { store } from '@weave/store';
-import { signal } from '@weave/runtime';
+import { store } from '@weave-framework/store';
+import { signal } from '@weave-framework/runtime';
 
 export const useCart = store(() => {
   const items = signal<Item[]>([]);
@@ -257,4 +257,4 @@ export function setup() {
 The **owner tree** underpins all three. `onMount` runs on the next microtask in the scope active at registration, is skipped if that scope is already gone, and its returned cleanup runs once on unmount. The trap: **`onCleanup` needs a running computation** (and re-runs on every recompute), **`onDispose` needs an owner scope** (and runs once at unmount) — each is a *silent no-op* in the wrong place. **Context**: `provide` **throws** with no owner, `inject` **never throws** (it returns the default — and with no default + no provider you get `undefined` typed as `T`, so guard it); inject walks the parent chain, which is why it survives `@defer`. **DI** is just scope choice: `store()` for app-wide singletons, `provide`/`inject` for per-subtree instances. And inheritance becomes composition — factories, spreads, parameters, and composables.
 :::
 
-[Next: Router →](/learn/router) · [Reference: @weave/runtime →](/reference/runtime)
+[Next: Router →](/learn/router) · [Reference: @weave-framework/runtime →](/reference/runtime)

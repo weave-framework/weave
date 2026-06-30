@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * DEV bin (monorepo): bundle the typed CLI source on the fly (esbuild inlines
- * @weave/compiler/@weave/check; esbuild/typescript/sass stay external) and run it.
+ * @weave-framework/compiler/@weave-framework/check; esbuild/typescript/sass stay external) and run it.
  * Lets the CLI run from live `src/` with no build step during development.
  *
  * For the PUBLISHED package, package.json `publishConfig.bin` swaps this for

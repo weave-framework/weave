@@ -9,7 +9,7 @@
  *   [...rest].*           → '*'   (404 fallback)
  */
 
-import { createRouter, type Router } from '@weave/router';
+import { createRouter, type Router } from '@weave-framework/router';
 import { routes } from '../pages/routes.gen';
 
 // Base path for hosting under a sub-path (e.g. GitHub Pages project page). The

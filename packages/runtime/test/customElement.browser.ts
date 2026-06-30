@@ -1,7 +1,7 @@
 import { test, assert } from '../../../tools/harness.js';
-import { effect } from '@weave/runtime';
-import { defineComponent, defineCustomElement } from '@weave/runtime/dom';
-import type { Component } from '@weave/runtime/dom';
+import { effect } from '@weave-framework/runtime';
+import { defineComponent, defineCustomElement } from '@weave-framework/runtime/dom';
+import type { Component } from '@weave-framework/runtime/dom';
 
 /** A tiny component that greets `ctx.label` (reactive prop). */
 const Widget: Component = defineComponent((ctx) => {

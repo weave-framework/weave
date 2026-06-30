@@ -1,6 +1,6 @@
 import { test, assert } from '../../../tools/harness.js';
-import { fileToRoutes, emitRoutesModule } from '@weave/router';
-import type { FileRoute } from '@weave/router';
+import { fileToRoutes, emitRoutesModule } from '@weave-framework/router';
+import type { FileRoute } from '@weave-framework/router';
 
 /* ──────────── fileToRoutes: conventions ──────────── */
 
@@ -57,7 +57,7 @@ test('emits an eager module with imports + component refs', () => {
 
 test('emits a lazy module that code-splits each page', () => {
   const mod: string = emitRoutesModule([{ path: '', file: 'index.weave' }], { lazy: true });
-  assert.ok(mod.includes('import { lazy } from "@weave/runtime/dom";'), mod);
+  assert.ok(mod.includes('import { lazy } from "@weave-framework/runtime/dom";'), mod);
   assert.ok(mod.includes('lazy(() => import("./index.weave"))'), mod);
 });
 

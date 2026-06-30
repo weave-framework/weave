@@ -1,5 +1,5 @@
 /**
- * @weave/compiler — turns Weave templates into fine-grained DOM code.
+ * @weave-framework/compiler — turns Weave templates into fine-grained DOM code.
  * M3: templates, interpolation, attribute/event/prop/class/ref bindings.
  */
 export { compileTemplate, type CompileOptions } from './codegen.js';

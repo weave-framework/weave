@@ -1,6 +1,6 @@
 /**
  * Build the publishable CLI bundle: dist/cli.js (esbuild, ESM, Node). Inlines
- * @weave/compiler + @weave/check; esbuild/typescript/sass stay external (real
+ * @weave-framework/compiler + @weave-framework/check; esbuild/typescript/sass stay external (real
  * dependencies, resolved from the user's install). Type declarations are emitted
  * separately by `tsc -p tsconfig.build.json` (emitDeclarationOnly). Replaces the
  * old on-the-fly bundling the bin used to do at runtime.

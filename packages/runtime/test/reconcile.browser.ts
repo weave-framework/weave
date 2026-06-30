@@ -1,5 +1,5 @@
 import { test, assert } from '../../../tools/harness.js';
-import { reconcileKeyed, type Row } from '@weave/runtime/dom';
+import { reconcileKeyed, type Row } from '@weave-framework/runtime/dom';
 
 interface Item { id: number; text: string; }
 

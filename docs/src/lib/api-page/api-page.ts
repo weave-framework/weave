@@ -1,4 +1,4 @@
-import { signal, effect, type Signal } from '@weave/runtime';
+import { signal, effect, type Signal } from '@weave-framework/runtime';
 import CodeBlock from '../code-block/code-block';
 import { api, apiTitles, type ApiSymbol } from '../../content/api.gen';
 import { intros, examples, type ApiExample } from '../../content/reference/overlay';

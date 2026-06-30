@@ -7,7 +7,7 @@
 Use the typed helper for autocomplete and inline validation. `defineConfig` is an identity function — it returns its argument unchanged and exists purely so TypeScript checks and infers the shape:
 
 ~~~ts title="weave.config.ts"
-import { defineConfig } from '@weave/cli';
+import { defineConfig } from '@weave-framework/cli';
 
 export default defineConfig({
   root: 'src/app/shell',
@@ -38,7 +38,7 @@ The config is auto-discovered in the working directory, or pointed at explicitly
 If none of the four exist (and none was given via `--config`), `loadConfig` returns `null` and the CLI reports that no config was found. An explicit `--config <path>` that does not exist is also treated as "no config".
 
 :::callout info "How TS/JS configs are compiled"
-A `.ts`/`.js`/`.mjs` config is bundled with esbuild (`packages: 'external'`, so your `node_modules` stay external) and the `@weave/cli` import is shimmed to a tiny `defineConfig = (c) => c` identity. That keeps the whole CLI and esbuild out of the bundle, so loading the config is cheap. The result is imported from an in-memory `data:` URL — nothing is written to disk.
+A `.ts`/`.js`/`.mjs` config is bundled with esbuild (`packages: 'external'`, so your `node_modules` stay external) and the `@weave-framework/cli` import is shimmed to a tiny `defineConfig = (c) => c` identity. That keeps the whole CLI and esbuild out of the bundle, so loading the config is cheap. The result is imported from an in-memory `data:` URL — nothing is written to disk.
 :::
 
 ### Path resolution

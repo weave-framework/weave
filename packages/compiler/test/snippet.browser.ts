@@ -1,8 +1,8 @@
 import { test, assert } from '../../../tools/harness.js';
-import { signal, computed, effect, root, type Signal } from '@weave/runtime';
-import * as dom from '@weave/runtime/dom';
-import { compileTemplate, parseTemplate } from '@weave/compiler';
-import type { TemplateNode } from '@weave/compiler';
+import { signal, computed, effect, root, type Signal } from '@weave-framework/runtime';
+import * as dom from '@weave-framework/runtime/dom';
+import { compileTemplate, parseTemplate } from '@weave-framework/compiler';
+import type { TemplateNode } from '@weave-framework/compiler';
 
 const rt: typeof dom & {
   signal: typeof signal;

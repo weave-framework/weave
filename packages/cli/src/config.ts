@@ -4,7 +4,7 @@
  * entry stylesheets, and the component style language. The CLI reads it instead
  * of long `--out`/`--serve` flags.
  *
- * A `weave.config.ts` is compiled on the fly with esbuild (the `@weave/cli` import
+ * A `weave.config.ts` is compiled on the fly with esbuild (the `@weave-framework/cli` import
  * is shimmed to a tiny `defineConfig` identity, so nothing heavy is pulled in) and
  * imported via a `data:` URL — no temp file. A `weave.config.json` is parsed directly.
  */
@@ -102,12 +102,12 @@ async function importConfigModule(file: string): Promise<WeaveConfig> {
     packages: 'external', // keep node_modules external (resolved at import time)
     plugins: [
       {
-        // `import { defineConfig } from '@weave/cli'` → a tiny inline identity, so
+        // `import { defineConfig } from '@weave-framework/cli'` → a tiny inline identity, so
         // the config doesn't drag the whole CLI (and esbuild) into the bundle.
         name: 'weave-config-shim',
         setup(b: PluginBuild): void {
-          b.onResolve({ filter: /^@weave\/cli$/ }, () => ({
-            path: '@weave/cli',
+          b.onResolve({ filter: /^@weave-framework\/cli$/ }, () => ({
+            path: '@weave-framework/cli',
             namespace: 'weave-cli-shim',
           }));
           b.onLoad({ filter: /.*/, namespace: 'weave-cli-shim' }, () => ({

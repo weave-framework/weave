@@ -1,8 +1,8 @@
 import { test, assert } from '../../../tools/harness.js';
-import { signal, onMount, onDispose, createOwner, runInOwner, disposeOwner } from '@weave/runtime';
-import type { Signal, Owner } from '@weave/runtime';
-import { defineComponent, mountComponent } from '@weave/runtime/dom';
-import type { Component } from '@weave/runtime/dom';
+import { signal, onMount, onDispose, createOwner, runInOwner, disposeOwner } from '@weave-framework/runtime';
+import type { Signal, Owner } from '@weave-framework/runtime';
+import { defineComponent, mountComponent } from '@weave-framework/runtime/dom';
+import type { Component } from '@weave-framework/runtime/dom';
 
 /** Let queued onMount microtasks flush (FIFO — ours were enqueued earlier). */
 const tick = (): Promise<void> => new Promise<void>((r) => queueMicrotask(r));

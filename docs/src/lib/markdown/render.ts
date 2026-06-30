@@ -9,7 +9,7 @@
  *     registry — so an example on the page is the real, running component.
  */
 
-import { navigate } from '@weave/router';
+import { navigate } from '@weave-framework/router';
 import { inlineText, type Block, type Inline } from './parse';
 import { slugify } from '../util/slug';
 import { demos } from './registry';

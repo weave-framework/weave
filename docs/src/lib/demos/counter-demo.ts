@@ -1,4 +1,4 @@
-import { signal } from '@weave/runtime';
+import { signal } from '@weave-framework/runtime';
 
 interface CounterSetup {
   count: () => number;

@@ -104,7 +104,7 @@ export function generateEntry(
   };
   const lines: string[] = [`import Root from ${spec(rootComponent)};`];
   elements.forEach((ce, i) => lines.push(`import __ce${i} from ${spec(ce.file)};`));
-  lines.push('import { mountComponent, defineCustomElement } from "@weave/runtime/dom";');
+  lines.push('import { mountComponent, defineCustomElement } from "@weave-framework/runtime/dom";');
   // Register custom elements BEFORE mounting, so a tag is defined at first render.
   elements.forEach((ce, i) =>
     lines.push(`defineCustomElement(${JSON.stringify(ce.tag)}, __ce${i}, { props: ${JSON.stringify(ce.props)} });`)

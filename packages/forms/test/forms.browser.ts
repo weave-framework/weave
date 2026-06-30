@@ -1,5 +1,5 @@
 import { test, assert } from '../../../tools/harness.js';
-import { field, form, validators, type Field, type Group } from '@weave/forms';
+import { field, form, validators, type Field, type Group } from '@weave-framework/forms';
 
 test('field validates reactively (first failure wins)', () => {
   const email: Field<string> = field('', [validators.required(), validators.email()]);

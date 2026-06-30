@@ -1,5 +1,5 @@
 {
-  "name": "@weave/check",
+  "name": "@weave-framework/check",
   "version": "0.2.0",
   "description": "Weave template type-checking — virtual .ts generation + tsc, mapped back to source.",
   "type": "module",
@@ -39,7 +39,7 @@
     }
   },
   "dependencies": {
-    "@weave/compiler": "workspace:*"
+    "@weave-framework/compiler": "workspace:*"
   },
   "peerDependencies": {
     "typescript": "^5.7.0"

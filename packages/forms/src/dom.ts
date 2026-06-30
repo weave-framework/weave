@@ -1,13 +1,13 @@
 /**
- * @weave/forms/dom — the one DOM-touching part of the forms package: a `use:`
+ * @weave-framework/forms/dom — the one DOM-touching part of the forms package: a `use:`
  * directive that wires a {@link Field} to a single form control in one line.
  *
- * Kept out of the core (`@weave/forms`) so that `field`/`group`/`form` stay pure
+ * Kept out of the core (`@weave-framework/forms`) so that `field`/`group`/`form` stay pure
  * signal state, testable without a DOM. Import this only where you bind to inputs.
  */
 
-import { effect, type Signal } from '@weave/runtime';
-import { bindValue } from '@weave/runtime/dom';
+import { effect, type Signal } from '@weave-framework/runtime';
+import { bindValue } from '@weave-framework/runtime/dom';
 import type { Field } from './index';
 
 /**

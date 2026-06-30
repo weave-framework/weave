@@ -1,4 +1,4 @@
-import { signal } from '@weave/runtime';
+import { signal } from '@weave-framework/runtime';
 import CodeBlock from '../code-block/code-block';
 
 export interface CodeTab {

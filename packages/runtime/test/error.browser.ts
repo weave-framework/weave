@@ -1,6 +1,6 @@
 import { test, assert } from '../../../tools/harness.js';
-import { signal, effect, root, catchError, type Signal } from '@weave/runtime';
-import { mount, ErrorBoundary, type Component } from '@weave/runtime/dom';
+import { signal, effect, root, catchError, type Signal } from '@weave-framework/runtime';
+import { mount, ErrorBoundary, type Component } from '@weave-framework/runtime/dom';
 
 const tick = (): Promise<void> => new Promise<void>((r) => queueMicrotask(r));
 

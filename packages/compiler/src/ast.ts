@@ -17,7 +17,7 @@ export type TemplateNode =
 /**
  * Source offset of an expression's first character within the template string
  * passed to {@link parseTemplate}. Populated by the parser for every template
- * expression; consumed by `@weave/check` to map type errors back to the
+ * expression; consumed by `@weave-framework/check` to map type errors back to the
  * original `.weave`/`.html` line:col. Optional so codegen and existing callers
  * (which only read the expression text) are unaffected.
  */
@@ -96,7 +96,7 @@ export type DeferTrigger =
 
 /**
  * `@await (src) { pending } @then (val) { … } @catch (err) { … }` — render based on
- * the settle state of a Promise OR a `@weave/data` resource. All three parts are
+ * the settle state of a Promise OR a `@weave-framework/data` resource. All three parts are
  * optional; `@then`/`@catch` may bind an alias to the resolved value / error.
  */
 export interface AwaitNode {

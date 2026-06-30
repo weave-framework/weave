@@ -1,4 +1,4 @@
-import type { Component } from '@weave/runtime/dom';
+import type { Component } from '@weave-framework/runtime/dom';
 import CounterDemo from '../demos/counter-demo';
 
 /**

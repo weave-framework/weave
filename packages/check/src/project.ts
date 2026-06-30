@@ -8,7 +8,7 @@
 
 import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
-import { extractSources, classifyTemplate, faithfulTemplate, type ExtractedSources } from '@weave/compiler';
+import { extractSources, classifyTemplate, faithfulTemplate, type ExtractedSources } from '@weave-framework/compiler';
 import { buildVirtualSfc, buildVirtualSeparate, type Virtual } from './emit.js';
 import { runCheck, type Diagnostic } from './check.js';
 

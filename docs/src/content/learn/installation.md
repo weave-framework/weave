@@ -3,7 +3,7 @@
 This page takes you from an **empty computer** to a running Weave app. No prior framework experience needed — we'll name every step.
 
 :::callout info "Pre-1.0"
-Weave is pre-1.0. The packages are published on npm under the **`@weave/*`** scope (`@weave/runtime`, `@weave/cli`, …). APIs may still shift between minor versions; pin a version if you need stability.
+Weave is pre-1.0. The packages are published on npm under the **`@weave-framework/*`** scope (`@weave-framework/runtime`, `@weave-framework/cli`, …). APIs may still shift between minor versions; pin a version if you need stability.
 :::
 
 ## 1. Prerequisites
@@ -38,7 +38,7 @@ npm run dev      # or: pnpm dev / yarn dev
 Open the printed URL (default <http://localhost:5173>). You have a running Weave app with **live reload** — edit `src/app/app.html` and the page updates on save.
 
 :::callout tip "What you got"
-The scaffold is a tiny, complete project: a `weave.config.ts`, an HTML shell, one component (`src/app/app.{ts,html,css}`), and the `@weave/runtime` + `@weave/cli` dependencies wired up. That's the whole shape of a Weave app — the [Quick start](/learn/quick-start) walks through every line.
+The scaffold is a tiny, complete project: a `weave.config.ts`, an HTML shell, one component (`src/app/app.{ts,html,css}`), and the `@weave-framework/runtime` + `@weave-framework/cli` dependencies wired up. That's the whole shape of a Weave app — the [Quick start](/learn/quick-start) walks through every line.
 :::
 
 ## 3. Add Weave to an existing project (manual)
@@ -47,19 +47,19 @@ Prefer to wire it up yourself? Install the runtime and the CLI:
 
 ~~~bash
 # npm
-npm install @weave/runtime
-npm install -D @weave/cli
+npm install @weave-framework/runtime
+npm install -D @weave-framework/cli
 
 # pnpm
-pnpm add @weave/runtime
-pnpm add -D @weave/cli
+pnpm add @weave-framework/runtime
+pnpm add -D @weave-framework/cli
 
 # yarn
-yarn add @weave/runtime
-yarn add -D @weave/cli
+yarn add @weave-framework/runtime
+yarn add -D @weave-framework/cli
 ~~~
 
-Add the packages for the features you use as you go — `@weave/router`, `@weave/store`, `@weave/forms`, `@weave/i18n`, `@weave/data`. (`esbuild` and `typescript` come along automatically with `@weave/cli`; add `sass` only if you author `.scss`/`.sass` styles.)
+Add the packages for the features you use as you go — `@weave-framework/router`, `@weave-framework/store`, `@weave-framework/forms`, `@weave-framework/i18n`, `@weave-framework/data`. (`esbuild` and `typescript` come along automatically with `@weave-framework/cli`; add `sass` only if you author `.scss`/`.sass` styles.)
 
 Then create the four files that make up the smallest useful app:
 
@@ -76,7 +76,7 @@ my-app/
 **`weave.config.ts`** — point `root` at your top component and Weave wires up the rest:
 
 ~~~ts title="weave.config.ts"
-import { defineConfig } from '@weave/cli';
+import { defineConfig } from '@weave-framework/cli';
 
 export default defineConfig({
   root: 'src/app/app',     // root component (no extension)
@@ -109,7 +109,7 @@ Point `publicDir` at a dedicated folder (e.g. `public/`) rather than leaving it 
 **`src/app/app.ts`** and **`app.html`** — your first component (the [Quick start](/learn/quick-start) explains every line):
 
 ~~~ts title="src/app/app.ts"
-import { signal } from '@weave/runtime';
+import { signal } from '@weave-framework/runtime';
 
 export function setup() {
   const count = signal(0);

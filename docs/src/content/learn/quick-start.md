@@ -3,7 +3,7 @@
 Let's get something on screen. By the end of this page you'll have a running app, a component you wrote, and a feel for the loop: edit a file, see it live.
 
 :::callout info "First, get Weave running"
-This page assumes you've already got a project. If not, the quickest start is `npm create weave@latest my-app` (or pnpm/yarn) — see [Installation](/learn/installation), which also covers adding Weave to an existing project. Weave is **pre-1.0** (published on npm under the `@weave/*` scope), but the shapes on this page are stable.
+This page assumes you've already got a project. If not, the quickest start is `npm create weave@latest my-app` (or pnpm/yarn) — see [Installation](/learn/installation), which also covers adding Weave to an existing project. Weave is **pre-1.0** (published on npm under the `@weave-framework/*` scope), but the shapes on this page are stable.
 :::
 
 ## The shape of a project
@@ -28,7 +28,7 @@ A **component** is a `.ts` file that exports a `setup` function, paired with a s
 `weave.config.ts` tells the CLI where your app starts and how to build it. The most important field is `root`: point it at your top component and Weave generates the entry, mounts it, and wires everything up for you.
 
 ~~~ts title="weave.config.ts"
-import { defineConfig } from '@weave/cli';
+import { defineConfig } from '@weave-framework/cli';
 
 export default defineConfig({
   root: 'src/app/app',   // the root component (no extension)
@@ -64,7 +64,7 @@ Right — you don't write `<script src=…>` yourself. With `root` set, Weave ge
 The logic lives in `app.ts`. `setup` runs once when the component is created; it owns the component's state and returns the names the template can use.
 
 ~~~ts title="src/app/app.ts"
-import { signal } from '@weave/runtime';
+import { signal } from '@weave-framework/runtime';
 
 export function setup() {
   const count = signal(0);
@@ -119,7 +119,7 @@ weave routes   # generate file-based routes (see the Router page)
 Run `weave dev`, open the printed URL, and edit `app.html` — the page reloads on save. Change `count.set((n) => n + 1)` to `+ 2` and watch the counter jump by twos.
 
 :::callout tip "Running the CLI"
-With `@weave/cli` installed, the `weave` command is available through your package scripts (`npm run dev`) or `npx weave dev`. The scaffold sets up the `dev`/`build`/`check` scripts for you. See [Installation](/learn/installation) for the full setup.
+With `@weave-framework/cli` installed, the `weave` command is available through your package scripts (`npm run dev`) or `npx weave dev`. The scaffold sets up the `dev`/`build`/`check` scripts for you. See [Installation](/learn/installation) for the full setup.
 :::
 
 :::callout info "What you just learned"

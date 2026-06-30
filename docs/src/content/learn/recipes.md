@@ -1,13 +1,13 @@
 # Recipes
 
-A grab-bag of patterns that come up in real apps. Each is small, copyable, and built only from pieces you've already met — signals, components, and the official packages. Most of this page is the [`@weave/data`](/reference/data) surface, shown the way you'd actually reach for it.
+A grab-bag of patterns that come up in real apps. Each is small, copyable, and built only from pieces you've already met — signals, components, and the official packages. Most of this page is the [`@weave-framework/data`](/reference/data) surface, shown the way you'd actually reach for it.
 
 ## Fetching data
 
-`@weave/data`'s `resource()` turns an async fetch into reactive `data`/`loading`/`error` signals. It refetches whenever its source changes and cancels the in-flight request (via an `AbortController`) on change or unmount — so you never hand-write loading flags or race guards:
+`@weave-framework/data`'s `resource()` turns an async fetch into reactive `data`/`loading`/`error` signals. It refetches whenever its source changes and cancels the in-flight request (via an `AbortController`) on change or unmount — so you never hand-write loading flags or race guards:
 
 ~~~ts
-import { resource } from '@weave/data';
+import { resource } from '@weave-framework/data';
 import { api } from './api';
 
 export function setup(props: { params: { id: string } }) {
@@ -112,7 +112,7 @@ const todos = resource(
 `createClient()` is a thin, optional wrapper over `fetch`: base URL, default headers, JSON handling, an error hook, and a functional interceptor chain for auth/logging/retry — the zero-RxJS analog of Angular's `HttpInterceptorFn`. Its methods drop straight into a `resource` fetcher.
 
 ~~~ts title="data/api.ts"
-import { createClient, type Interceptor } from '@weave/data';
+import { createClient, type Interceptor } from '@weave-framework/data';
 
 const auth: Interceptor = (req, next) => {
   req.headers.set('Authorization', `Bearer ${token()}`);
@@ -236,7 +236,7 @@ A non-2xx response throws an `HttpError`. It's a real `Error` subclass carrying 
 Catch it and branch on the status — in a handler, or right in an `@catch`:
 
 ~~~ts
-import { HttpError } from '@weave/data';
+import { HttpError } from '@weave-framework/data';
 
 try {
   await api.post('/tasks', input);
@@ -270,7 +270,7 @@ try {
 Where `resource` is for reads, `action` is for writes (form submits, mutations) — the Weave analog of React's `useActionState`. It wraps an async function with reactive `pending`/`error`/`result`:
 
 ~~~ts
-import { action } from '@weave/data';
+import { action } from '@weave-framework/data';
 
 const save = action((input: NewTask) => api.post('/tasks', input));
 
@@ -334,7 +334,7 @@ Two ways, depending on taste.
 `reduce(current, update)` decides how each pending update is folded onto the value. **It defaults to replace** — `(_, u) => u` — so without a reducer, `value()` is just the most recent `add`. That's enough for a toggle:
 
 ~~~ts
-import { optimistic } from '@weave/data';
+import { optimistic } from '@weave-framework/data';
 
 export function setup() {
   const liked = optimistic(() => server.liked());   // default reducer = replace
@@ -423,8 +423,8 @@ Because the effects are created inside `setup`, they're owned by the component a
 Keep the input instant, defer the expensive work until typing settles, with `debounced`:
 
 ~~~ts
-import { signal, debounced } from '@weave/runtime';
-import { resource } from '@weave/data';
+import { signal, debounced } from '@weave-framework/runtime';
+import { resource } from '@weave-framework/data';
 
 export function setup() {
   const query = signal('');
@@ -449,4 +449,4 @@ The `|| false` makes an empty query a "not ready" source, so `resource` skips th
 - These all compose: a store full of `resource`s, an `action` behind a `form.submit`, an `ErrorBoundary` around a lazy route. When a pattern repeats, lift it into a composable. Everything is just signals underneath.
 :::
 
-[Back to the start: Introduction →](/learn/introduction) · [Reference: @weave/data →](/reference/data)
+[Back to the start: Introduction →](/learn/introduction) · [Reference: @weave-framework/data →](/reference/data)

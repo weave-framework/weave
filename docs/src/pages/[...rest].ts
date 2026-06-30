@@ -1,4 +1,4 @@
-import { Link } from '@weave/router';
+import { Link } from '@weave-framework/router';
 
 void Link;
 

@@ -41,10 +41,10 @@ The params expression is read **once, at play time**, by calling the transition 
 
 ## Built-in transitions
 
-Four ship in the box, importable from `@weave/runtime` (each is tree-shakeable — you only bundle what you import):
+Four ship in the box, importable from `@weave-framework/runtime` (each is tree-shakeable — you only bundle what you import):
 
 ~~~ts
-import { fade, fly, slide, scale } from '@weave/runtime';
+import { fade, fly, slide, scale } from '@weave-framework/runtime';
 ~~~
 
 Every built-in accepts the same three **common options**, plus its own params:
@@ -115,7 +115,7 @@ Collapses / expands the element's **height** (with `overflow: hidden`) while fad
 A transition directive resolves its function name through **component scope**, exactly like any other identifier in a template. So the name has to be reachable: either returned from `setup`, or imported at module scope in an SFC.
 
 ~~~ts
-import { fade, fly, slide, scale } from '@weave/runtime';
+import { fade, fly, slide, scale } from '@weave-framework/runtime';
 
 export function setup() {
   // expose them so the template can name them:
@@ -219,7 +219,7 @@ A transition is a function `(node, params) => config`. The config is the Svelte-
 So you write the function once and it reads correctly both ways: at the visible end (`t = 1`) the element is fully present; at the hidden end (`t = 0`) it's gone.
 
 ~~~ts
-import type { TransitionFn } from '@weave/runtime/dom';
+import type { TransitionFn } from '@weave-framework/runtime/dom';
 
 export const spinIn: TransitionFn<{ turns?: number }> = (node, { turns = 1 } = {}) => ({
   duration: 400,
@@ -244,4 +244,4 @@ The runtime sets the **start frame in a microtask, before paint** — so an ente
 `transition:`/`in:`/`out:` attach animations to an element; Weave plays the intro on mount and **awaits** the outro before removal — so `@if`/`@key`/`@for` removals animate out. Built-ins are `fade`/`scale` (`start`)/`fly` (`x`,`y`)/`slide` (height, measured at play time), all sharing `delay`/`duration`/`easing`. Params are a one-time **snapshot**, not reactive. A node holds **one** outro; an `in:`-only node leaves instantly. Animate routes via `<RouterView transition>` — **enter-only**; author a page `out:` for leaves. `<Portal>` renders modals/toasts outside the layout while keeping them logically in the tree (`to` resolves once, falling back to `body`). Write a custom transition as `(node, params) => { delay?, duration?, easing?, css?, tick? }`; prefer `css`, and `duration <= 0` is instant.
 :::
 
-[Next: Custom elements & bootstrap →](/learn/custom-elements) · [Reference: @weave/runtime →](/reference/runtime)
+[Next: Custom elements & bootstrap →](/learn/custom-elements) · [Reference: @weave-framework/runtime →](/reference/runtime)

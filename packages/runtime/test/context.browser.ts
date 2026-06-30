@@ -11,9 +11,9 @@ import {
   type Signal,
   type Context,
   type Owner,
-} from '@weave/runtime';
-import { defineComponent, ifBlock } from '@weave/runtime/dom';
-import type { Component } from '@weave/runtime/dom';
+} from '@weave-framework/runtime';
+import { defineComponent, ifBlock } from '@weave-framework/runtime/dom';
+import type { Component } from '@weave-framework/runtime/dom';
 
 test('inject reads the nearest provided value', () => {
   const Theme: Context<string> = createContext('light');

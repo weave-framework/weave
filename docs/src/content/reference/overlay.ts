@@ -27,10 +27,10 @@ If you're new, read [Thinking in signals](/learn/signals) and [Reactivity in dep
 they explain the mental model these signatures assume. This page is the exhaustive catalog.
 :::
 
-Import the reactive primitives from \`@weave/runtime\`; the DOM helpers the compiler emits (and a few you
-use directly, like \`Portal\`, \`ErrorBoundary\`, \`lazy\`, \`mountComponent\`) live in \`@weave/runtime/dom\`.`,
+Import the reactive primitives from \`@weave-framework/runtime\`; the DOM helpers the compiler emits (and a few you
+use directly, like \`Portal\`, \`ErrorBoundary\`, \`lazy\`, \`mountComponent\`) live in \`@weave-framework/runtime/dom\`.`,
 
-  'runtime-dom': `The DOM-facing half of the runtime — a separate import (\`@weave/runtime/dom\`). Most entries here are
+  'runtime-dom': `The DOM-facing half of the runtime — a separate import (\`@weave-framework/runtime/dom\`). Most entries here are
 operations the **compiler emits for you** from a template (you almost never call \`bindText\`, \`insert\`, \`eachBlock\`,
 etc. by hand). The handful you *do* use directly: \`Portal\` (render outside the layout), \`ErrorBoundary\` (catch
 render errors), \`lazy\` (code-split a component), \`mount\`/\`mountComponent\` (hand-written bootstrap), and
@@ -46,9 +46,9 @@ no selectors, no reducers, no context plumbing. The whole package is one functio
 
   forms: `Signal-native form state and validation. A \`field\` is a writable signal plus derived
 \`error\`/\`valid\`/\`touched\`; \`group\`/\`form\` and \`fieldArray\` compose fields to any depth through one
-\`Control\` interface. Bind controls with \`use:control\` from \`@weave/forms/dom\`. See [Forms](/learn/forms).`,
+\`Control\` interface. Bind controls with \`use:control\` from \`@weave-framework/forms/dom\`. See [Forms](/learn/forms).`,
 
-  'forms-dom': `The DOM binding for forms — a separate import (\`@weave/forms/dom\`). It exports the \`control\`
+  'forms-dom': `The DOM binding for forms — a separate import (\`@weave-framework/forms/dom\`). It exports the \`control\`
 directive used as \`use:control={{ field }}\`: it wires the input's value to the field both ways, marks the field
 \`touched\` on blur, and toggles \`aria-invalid\` (only when the field is **both** touched and invalid). It picks the
 right mechanism per element — text, number/range (numeric, caret-safe), checkbox, radio, and \`<select multiple>\`.
@@ -65,7 +65,7 @@ wrapper with a functional interceptor chain. See the [Recipes](/learn/recipes#fe
 
 /** Per-symbol examples, keyed by \`<pkg>/<symbolName>\`. */
 export const examples: Record<string, ApiExample[]> = {
-  /* ───────────── @weave/runtime ───────────── */
+  /* ───────────── @weave-framework/runtime ───────────── */
   'runtime/signal': [
     {
       lang: 'ts',
@@ -160,7 +160,7 @@ await tick(); // waits for microtask-queued work (onMount, boundary swaps) if yo
   'runtime/createContext': [
     {
       lang: 'ts',
-      code: `import { createContext, provide, inject } from '@weave/runtime';
+      code: `import { createContext, provide, inject } from '@weave-framework/runtime';
 
 export const ThemeContext = createContext<'light' | 'dark'>('light');
 
@@ -205,11 +205,11 @@ const q = debounced(query, 300); // trails query() by 300ms of quiet
     },
   ],
 
-  /* ───────────── @weave/router ───────────── */
+  /* ───────────── @weave-framework/router ───────────── */
   'router/createRouter': [
     {
       lang: 'ts',
-      code: `import { createRouter } from '@weave/router';
+      code: `import { createRouter } from '@weave-framework/router';
 import { routes } from '../pages/routes.gen';
 
 export const router = createRouter(routes);
@@ -220,7 +220,7 @@ export const router = createRouter(routes);
   'router/navigate': [
     {
       lang: 'ts',
-      code: `import { navigate } from '@weave/router';
+      code: `import { navigate } from '@weave-framework/router';
 const save = async () => { await store.create(input); navigate('/'); };`,
     },
   ],
@@ -245,7 +245,7 @@ const save = async () => { await store.create(input); navigate('/'); };`,
   'router/afterEach': [
     {
       lang: 'ts',
-      code: `import { afterEach } from '@weave/router';
+      code: `import { afterEach } from '@weave-framework/router';
 const off = afterEach(({ path }) => { document.title = titleFor(path); });
 // off() to unsubscribe`,
     },
@@ -253,17 +253,17 @@ const off = afterEach(({ path }) => { document.title = titleFor(path); });
   'router/currentQuery': [
     {
       lang: 'ts',
-      code: `import { currentQuery } from '@weave/router';
+      code: `import { currentQuery } from '@weave-framework/router';
 const tab = () => currentQuery().tab ?? 'overview'; // reactive`,
     },
   ],
 
-  /* ───────────── @weave/store ───────────── */
+  /* ───────────── @weave-framework/store ───────────── */
   'store/store': [
     {
       lang: 'ts',
-      code: `import { store } from '@weave/store';
-import { signal, computed } from '@weave/runtime';
+      code: `import { store } from '@weave-framework/store';
+import { signal, computed } from '@weave-framework/runtime';
 
 export const useCart = store(() => {
   const items = signal<Item[]>([]);
@@ -275,11 +275,11 @@ const cart = useCart(); // same instance everywhere`,
     },
   ],
 
-  /* ───────────── @weave/forms ───────────── */
+  /* ───────────── @weave-framework/forms ───────────── */
   'forms/field': [
     {
       lang: 'ts',
-      code: `import { field, validators } from '@weave/forms';
+      code: `import { field, validators } from '@weave-framework/forms';
 
 const email = field('', [validators.required(), validators.email()]);
 email.value.set('a@b.com');
@@ -334,11 +334,11 @@ const even = (n: number) => (n % 2 === 0 ? null : 'Must be even');`,
     },
   ],
 
-  /* ───────────── @weave/i18n ───────────── */
+  /* ───────────── @weave-framework/i18n ───────────── */
   'i18n/createI18n': [
     {
       lang: 'ts',
-      code: `import { createI18n } from '@weave/i18n';
+      code: `import { createI18n } from '@weave-framework/i18n';
 
 export const i18n = createI18n({
   lang: 'en',
@@ -353,7 +353,7 @@ export const i18n = createI18n({
   'i18n/t': [
     {
       lang: 'ts',
-      code: `import { t } from '@weave/i18n';
+      code: `import { t } from '@weave-framework/i18n';
 t('hello', { name: 'Ada' });                 // bare → current snapshot
 const greeting = computed(() => t('hello', { name: name() })); // tracked → re-translates`,
     },
@@ -361,16 +361,16 @@ const greeting = computed(() => t('hello', { name: name() })); // tracked → re
   'i18n/setLocale': [
     {
       lang: 'ts',
-      code: `import { setLocale } from '@weave/i18n';
+      code: `import { setLocale } from '@weave-framework/i18n';
 await setLocale('lt'); // lazy-loads the language (+ fallback), then every t() binding updates`,
     },
   ],
 
-  /* ───────────── @weave/data ───────────── */
+  /* ───────────── @weave-framework/data ───────────── */
   'data/resource': [
     {
       lang: 'ts',
-      code: `import { resource } from '@weave/data';
+      code: `import { resource } from '@weave-framework/data';
 
 const task = resource(
   () => props.params.id,                         // source — refetch when it changes
@@ -384,7 +384,7 @@ task.refetch();  // re-run with the current source`,
   'data/action': [
     {
       lang: 'ts',
-      code: `import { action } from '@weave/data';
+      code: `import { action } from '@weave-framework/data';
 
 const save = action((input: NewTask) => api.post('/tasks', input));
 await save.run(input);
@@ -394,7 +394,7 @@ save.pending();  // true while in flight; only the latest run updates the signal
   'data/optimistic': [
     {
       lang: 'ts',
-      code: `import { optimistic } from '@weave/data';
+      code: `import { optimistic } from '@weave-framework/data';
 
 const liked = optimistic(() => server.liked());  // base getter
 liked.add(true);                 // show instantly
@@ -404,7 +404,7 @@ await server.setLiked(true);     // base changes → overlay clears automaticall
   'data/createClient': [
     {
       lang: 'ts',
-      code: `import { createClient } from '@weave/data';
+      code: `import { createClient } from '@weave-framework/data';
 
 export const api = createClient({
   baseUrl: '/api',

@@ -34,12 +34,12 @@ no default export` plus template-only "unused import" warnings), add the plugin 
 // tsconfig.json
 {
   "compilerOptions": {
-    "plugins": [{ "name": "@weave/typescript-plugin" }]
+    "plugins": [{ "name": "@weave-framework/typescript-plugin" }]
   }
 }
 ```
 
-…and make sure `@weave/typescript-plugin` is installed (a dependency in your project, so it resolves
+…and make sure `@weave-framework/typescript-plugin` is installed (a dependency in your project, so it resolves
 from `node_modules`). Then **restart the TypeScript service** (or the IDE). Unlike VS Code — which
 injects the plugin automatically via the extension — WebStorm requires this tsconfig entry.
 
@@ -50,7 +50,7 @@ injects the plugin automatically via the extension — WebStorm requires this ts
 - A Weave `.html` template (one with a sibling component `.ts`) is switched to a dedicated
   non-XML language so WebStorm stops flagging it as broken HTML; ordinary `.html` files are
   untouched. The plugin picks up your project's TypeScript automatically.
-- The **`.ts`-side fixes** come from the separate **`@weave/typescript-plugin`** (see the section
+- The **`.ts`-side fixes** come from the separate **`@weave-framework/typescript-plugin`** (see the section
   above — it must be wired into `tsconfig.json`).
 
 > Built from the private source in `editor/webstorm/` with Gradle. This folder holds only

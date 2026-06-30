@@ -8,10 +8,10 @@
     "check": "weave check"
   },
   "dependencies": {
-    "@weave/runtime": "^0.2.0"
+    "@weave-framework/runtime": "^0.2.0"
   },
   "devDependencies": {
-    "@weave/cli": "^0.2.0",
+    "@weave-framework/cli": "^0.2.0",
     "typescript": "^5.7.0"
   }
 }

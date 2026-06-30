@@ -1,5 +1,5 @@
 /**
- * @weave/i18n — signal-native internationalization. Zero third-party deps.
+ * @weave-framework/i18n — signal-native internationalization. Zero third-party deps.
  *
  * An *optional* add-on: the runtime never depends on it, so if an app doesn't
  * `createI18n()` it pays nothing. When it does, translation is just another
@@ -17,7 +17,7 @@
  * date come from {@link formatMessage} (see `./icu`), all on native `Intl`.
  */
 
-import { signal, createContext, inject, type Signal, type Context } from '@weave/runtime';
+import { signal, createContext, inject, type Signal, type Context } from '@weave-framework/runtime';
 import { formatMessage, type FormatParams } from './icu.js';
 
 export type { FormatParams } from './icu.js';
@@ -106,7 +106,7 @@ function resolve(messages: Messages | undefined, key: string): string | undefine
 
 /**
  * Create an i18n instance. By default it becomes the global one, so a bare
- * `import { t } from '@weave/i18n'` resolves to it; pass `global: false` for a
+ * `import { t } from '@weave-framework/i18n'` resolves to it; pass `global: false` for a
  * standalone instance you wire up via {@link I18nContext}.
  */
 export function createI18n(config: I18nConfig): I18n {

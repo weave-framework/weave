@@ -1,4 +1,4 @@
-import { defineConfig } from '@weave/cli';
+import { defineConfig } from '@weave-framework/cli';
 
 /**
  * Weave documentation site — built WITH Weave itself (dogfooding). A static SPA

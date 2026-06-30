@@ -1,5 +1,5 @@
-import { onMount } from '@weave/runtime';
-import { navigate } from '@weave/router';
+import { onMount } from '@weave-framework/runtime';
+import { navigate } from '@weave-framework/router';
 
 /** `/learn` → redirect to the section's first page. Lets the top-bar "Learn"
  *  link target the section root while still landing on real content. */

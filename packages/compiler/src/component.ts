@@ -63,7 +63,7 @@ export function compileComponent(src: ComponentSource, opts: ComponentOptions = 
 
   const code: string = [
     script.trim(),
-    'import { defineComponent } from "@weave/runtime/dom";',
+    'import { defineComponent } from "@weave-framework/runtime/dom";',
     renderBody,
     `export default defineComponent(${setupArg});`,
   ]
@@ -74,7 +74,7 @@ export function compileComponent(src: ComponentSource, opts: ComponentOptions = 
 }
 
 /**
- * Location-faithful SFC split for `@weave/check`. Unlike {@link parseSfc}, the
+ * Location-faithful SFC split for `@weave-framework/check`. Unlike {@link parseSfc}, the
  * returned `template` keeps the SFC's exact character offsets: the `<script>`
  * and `<style>` blocks are *blanked* (every non-newline char → a space, newlines
  * kept) rather than removed, so an offset reported by {@link parseTemplate} maps

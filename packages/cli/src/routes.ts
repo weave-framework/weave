@@ -4,8 +4,8 @@ import { readdirSync, writeFileSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 // Import the DOM-free subpath so the node CLI tsconfig never reaches into the
 // router's runtime (DOM) code — these are pure string functions.
-import { fileToRoutes, emitRoutesModule } from '@weave/router/files';
-import type { FileRoute } from '@weave/router/files';
+import { fileToRoutes, emitRoutesModule } from '@weave-framework/router/files';
+import type { FileRoute } from '@weave-framework/router/files';
 
 const PAGE: RegExp = /\.(weave|tsx?|jsx?)$/;
 // The generated module + sibling templates/styles are not pages — skip them so a

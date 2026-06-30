@@ -1,7 +1,7 @@
 import { test, assert } from '../../../tools/harness.js';
-import { createOwner, runInOwner, type Owner } from '@weave/runtime';
-import { field, form, validators, type Field, type Group } from '@weave/forms';
-import { control } from '@weave/forms/dom';
+import { createOwner, runInOwner, type Owner } from '@weave-framework/runtime';
+import { field, form, validators, type Field, type Group } from '@weave-framework/forms';
+import { control } from '@weave-framework/forms/dom';
 
 const wait = (ms: number): Promise<void> => new Promise<void>((r) => setTimeout(r, ms));
 

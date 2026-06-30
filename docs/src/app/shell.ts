@@ -1,5 +1,5 @@
-import { signal } from '@weave/runtime';
-import { RouterView, Link, currentPath, type Router } from '@weave/router';
+import { signal } from '@weave-framework/runtime';
+import { RouterView, Link, currentPath, type Router } from '@weave-framework/router';
 import { sections, type NavSection, type NavGroup } from '../nav';
 import { router } from './router';
 import SearchBox from '../lib/search/search-box';

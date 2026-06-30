@@ -1,5 +1,5 @@
 /**
- * Publish the @weave/* packages (+ create-weave) to npm, in dependency order.
+ * Publish the @weave-framework/* packages (+ create-weave) to npm, in dependency order.
  *
  * REQUIRES: you are logged in to npm (`npm login`) with rights to the @weave
  * scope/org, and the @weave org exists on npm with public publishing enabled.
@@ -38,7 +38,7 @@ for (const p of ORDER) {
   process.stdout.write(`\n▶ pnpm ${args.join(' ')}  (packages/${p})\n`);
   const r = spawnSync('pnpm', args, { cwd: join(repo, 'packages', p), stdio: 'inherit', shell: process.platform === 'win32' });
   if (r.status !== 0) {
-    process.stderr.write(`\n✖ publish failed for @weave/${p === 'create-weave' ? '' : ''}${p} (exit ${r.status}). Fix and re-run; already-published packages will be skipped by npm.\n`);
+    process.stderr.write(`\n✖ publish failed for @weave-framework/${p === 'create-weave' ? '' : ''}${p} (exit ${r.status}). Fix and re-run; already-published packages will be skipped by npm.\n`);
     process.exit(r.status ?? 1);
   }
 }

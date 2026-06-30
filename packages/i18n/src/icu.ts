@@ -1,5 +1,5 @@
 /**
- * @weave/i18n — message formatter. Zero dependencies (native `Intl` only).
+ * @weave-framework/i18n — message formatter. Zero dependencies (native `Intl` only).
  *
  * A compact, self-contained ICU MessageFormat subset — the in-house answer to
  * transloco's `messageformat` plugin, with no third-party code (rule #1). It

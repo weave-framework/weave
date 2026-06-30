@@ -6,7 +6,7 @@ import { generateRoutes } from './routes.js';
 import { loadConfig } from './config.js';
 import type { ResolvedConfig } from './config.js';
 import { discoverCustomElements, generateEntry, type CustomElement } from './entry.js';
-import { checkProject, type Diagnostic } from '@weave/check';
+import { checkProject, type Diagnostic } from '@weave-framework/check';
 
 function flag(args: string[], name: string): string | undefined {
   const i: number = args.indexOf(name);

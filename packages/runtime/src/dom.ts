@@ -1,5 +1,5 @@
 /**
- * @weave/runtime/dom — the tiny runtime the compiler targets.
+ * @weave-framework/runtime/dom — the tiny runtime the compiler targets.
  *
  * These helpers create real DOM once and wire fine-grained signal bindings.
  * There is no Virtual DOM and no tree diffing: each helper updates exactly one
@@ -846,7 +846,7 @@ function arm(
 
 /* ──────────────────────────── await ──────────────────────────── */
 
-/** Minimal shape of a `@weave/data` resource that `awaitBlock` can drive directly. */
+/** Minimal shape of a `@weave-framework/data` resource that `awaitBlock` can drive directly. */
 interface ResourceLike {
   loading: () => boolean;
   error: () => unknown;
@@ -864,7 +864,7 @@ function isResource(x: unknown): x is ResourceLike {
 
 /**
  * `@await` — render by the settle state of the `source`, which may be a
- * `@weave/data` **resource** (driven reactively off its `loading`/`error`/`data`
+ * `@weave-framework/data` **resource** (driven reactively off its `loading`/`error`/`data`
  * signals — a refetch shows `pending` again) or a bare **Promise** (or plain
  * value; wired once via `then`/`catch`). The three branch fns are optional;
  * `then`/`catch` receive the resolved value / error. Built on {@link ifBlock}, so

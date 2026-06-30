@@ -21,7 +21,7 @@ import type { CodeInformation, CodeMapping, LanguagePlugin, VirtualCode } from '
 // (the `typescript` field for TS-service integration).
 import type {} from '@volar/typescript';
 import type * as ts from 'typescript';
-import { buildVirtualSfc, buildVirtualSeparate, type Virtual, type WeaveMapping } from '@weave/check/emit';
+import { buildVirtualSfc, buildVirtualSeparate, type Virtual, type WeaveMapping } from '@weave-framework/check/emit';
 
 const HAS_SETUP: RegExp = /export\s+(?:async\s+)?function\s+setup\b|export\s+(?:const|let|var)\s+setup\b/;
 

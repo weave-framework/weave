@@ -1,6 +1,6 @@
 # Router
 
-`@weave/router` is the official client-side router — built in-house, signal-driven, zero third-party dependencies. The current path and query are signals, so any view that reads them updates surgically on navigation, with no reload.
+`@weave-framework/router` is the official client-side router — built in-house, signal-driven, zero third-party dependencies. The current path and query are signals, so any view that reads them updates surgically on navigation, with no reload.
 
 Routes are an ordered tree of `{ path, component?, guard?, redirect?, children? }` objects. Matching produces a *chain* of matches (layout → … → leaf); the top `<RouterView>` renders the chain's first component, and each nested `<RouterView>` renders the next, discovering its depth through context. Everything below grounds out in those two ideas.
 
@@ -42,7 +42,7 @@ Generated routes are sorted so the **most specific** route wins, compared **segm
 Each page is just a component (a `setup` + template). On `weave build`/`dev`, Weave regenerates `routes.gen.ts` from the directory, and your `router.ts` is a three-liner over it:
 
 ~~~ts title="src/app/router.ts"
-import { createRouter, type Router } from '@weave/router';
+import { createRouter, type Router } from '@weave-framework/router';
 import { routes } from '../pages/routes.gen';
 
 export const router: Router = createRouter(routes);
@@ -56,7 +56,7 @@ Generated routes code-split each page into its own chunk, loaded on demand. Comb
 
 ### The build-time API (`fileToRoutes` / `emitRoutesModule`)
 
-The CLI scans the directory; the actual transform is two pure, zero-dep functions you can call directly (e.g. in a custom build step). They are re-exported from `@weave/router`.
+The CLI scans the directory; the actual transform is two pure, zero-dep functions you can call directly (e.g. in a custom build step). They are re-exported from `@weave-framework/router`.
 
 **`fileToRoutes(files: string[]): FileRoute[]`** maps a flat list of file specifiers (relative, slash-separated, e.g. `task/[id].ts`) to a nested manifest. A `FileRoute` is `{ path: string; file?: string; children?: FileRoute[] }` — `file` is the page's source specifier (the emitter turns it into a component import). The folder/specificity rules above are applied here.
 
@@ -65,7 +65,7 @@ The CLI scans the directory; the actual transform is two pure, zero-dep function
 | Option | Default | Effect |
 |--------|---------|--------|
 | `lazy` | `false` | Code-split every page via `lazy(() => import(...))` instead of a static import |
-| `runtimeImport` | `'@weave/runtime/dom'` | Where `lazy` is imported from (only used when `lazy` is on) |
+| `runtimeImport` | `'@weave-framework/runtime/dom'` | Where `lazy` is imported from (only used when `lazy` is on) |
 | `importPrefix` | `'./'` | Prefix prepended to each `file` to form the import specifier |
 
 The emitter drops a `.ts`/`.tsx`/`.js`/`.jsx`/`.mjs`/`.cjs` extension from import specifiers (so the import resolves under both esbuild and `tsc`) but **keeps** `.weave` (the SFC loader needs the explicit extension).
@@ -163,7 +163,7 @@ Behaviour you can rely on:
 ### Programmatic navigation
 
 ~~~ts
-import { navigate, back } from '@weave/router';
+import { navigate, back } from '@weave-framework/router';
 
 const save = async () => { await store.create(input); navigate('/'); };
 const cancel = () => back();  // go back one history entry
@@ -184,7 +184,7 @@ const cancel = () => back();  // go back one history entry
 A matched page receives its accumulated path params on `props.params`; read the query reactively with `currentQuery()`:
 
 ~~~ts title="task/[id].ts"
-import { resource } from '@weave/data';
+import { resource } from '@weave-framework/data';
 import { api } from '../../data/api';
 
 export function setup(props: { params: { id: string } }) {
@@ -267,7 +267,7 @@ Async "can I enter?" checks fight lazy-loading and force the router to stall. We
 Register an `afterEach` hook for document titles, analytics, or focus — it runs after every navigation and returns an unsubscribe function:
 
 ~~~ts
-import { afterEach } from '@weave/router';
+import { afterEach } from '@weave-framework/router';
 
 const off = afterEach((nav) => {
   document.title = titleFor(nav.path);
@@ -295,7 +295,7 @@ Built-in scroll management is **on by default in the browser**. `setScrollHandli
 - On a plain push, it scrolls to the top.
 
 ~~~ts
-import { setScrollHandling } from '@weave/router';
+import { setScrollHandling } from '@weave-framework/router';
 
 setScrollHandling(false);  // take over scroll yourself
 ~~~
@@ -310,7 +310,7 @@ Lazy route chunks can be warmed ahead of navigation so the swap is instant:
 - **`prefetch(to)`** — a module-level helper that targets the **most recently created** router. This is what `<Link prefetch>` calls under the hood (on hover/focus). It's a no-op if no router exists or the chain isn't lazy.
 
 ~~~ts
-import { prefetch } from '@weave/router';
+import { prefetch } from '@weave-framework/router';
 
 prefetch('/reports');  // warm the most-recent router's /reports chunk
 ~~~
@@ -330,7 +330,7 @@ Pass a transition to the top `<RouterView>` to animate swaps. The entering view 
 Generated routes are already lazy. To lazy-load a route you define by hand, wrap the *component* in `lazy()` (remember: `lazy` is not a route key):
 
 ~~~ts
-import { lazy } from '@weave/runtime/dom';
+import { lazy } from '@weave-framework/runtime/dom';
 
 const routes = [
   { path: '/reports', component: lazy(() => import('./pages/reports')) },
@@ -343,7 +343,7 @@ The catch-all route (`path: '*'`, or the `[...rest]` file) renders when nothing 
 
 :::tabs
 ~~~ts title="[...rest].ts"
-import { currentPath } from '@weave/router';
+import { currentPath } from '@weave-framework/router';
 export function setup() {
   return { path: currentPath };
 }
@@ -364,7 +364,7 @@ If your app is served from `example.com/app/` instead of the root, tell the rout
 Two equivalent ways to set it:
 
 ~~~ts
-import { createRouter, setBasename } from '@weave/router';
+import { createRouter, setBasename } from '@weave-framework/router';
 
 // (a) as a createRouter option
 const router = createRouter(routes, { basename: '/app' });
@@ -377,7 +377,7 @@ setBasename('/app');
 
 ## Types reference
 
-All exported from `@weave/router`:
+All exported from `@weave-framework/router`:
 
 | Type | Shape |
 |------|-------|
@@ -396,4 +396,4 @@ All exported from `@weave/router`:
 Routes are an ordered tree of `{ path, component?, guard?, redirect?, children? }`, or come from the filesystem (page files are `.weave`/`.ts`/`.tsx`/`.js`/`.jsx`; `_layout` nests a folder, no-layout flattens it; routes sort by per-segment specificity). Place views with `<RouterView>` (top outlet drives URL-sync and transitions; nested outlets inject the router). Navigate with `<Link>` (active class, arbitrary prop pass-through, modifier-click bailout, basename-prefixed `href`) or `navigate()`/`back()` — there is **no** `replace()`. Guards are sync, receive a `RouteContext`, and return `true`/`false`/a path; a static `redirect` short-circuits before the guard; redirects are capped at 16 hops (an empty chain on a loop). The `Router` instance exposes `matched`/`chain`/`params`/`query`/`redirectTo`/`preload`; hook `afterEach` for the full `NavInfo`; prefetch via `<Link>`, `prefetch()`, or `router.preload()`; control scroll with `setScrollHandling`; serve under a sub-path with `basename`/`setBasename`.
 :::
 
-[Next: Store →](/learn/store) · [Reference: @weave/router →](/reference/router)
+[Next: Store →](/learn/store) · [Reference: @weave-framework/router →](/reference/router)

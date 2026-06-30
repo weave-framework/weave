@@ -1,5 +1,5 @@
 {
-  "name": "@weave/router",
+  "name": "@weave-framework/router",
   "version": "0.2.0",
   "description": "Weave official client router — signal-driven, history-based, with RouterView + Link. Zero third-party deps.",
   "type": "module",
@@ -42,7 +42,7 @@
     }
   },
   "dependencies": {
-    "@weave/runtime": "workspace:*"
+    "@weave-framework/runtime": "workspace:*"
   },
   "license": "MIT"
 }

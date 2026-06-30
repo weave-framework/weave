@@ -3,7 +3,7 @@
  * loader) → mounted + reactive in headless Chromium, with scoped CSS applied.
  *
  * The Weave esbuild plugin is inlined here (it mirrors the canonical
- * `compileComponent`/`parseSfc` loader). The dev server + a shipped `@weave/cli`
+ * `compileComponent`/`parseSfc` loader). The dev server + a shipped `@weave-framework/cli`
  * plugin package land in M7b.
  */
 import { build } from 'esbuild';
@@ -21,7 +21,7 @@ const ok = (cond, msg) => {
   console.log(`✔ ${msg}`);
 };
 
-// 1. Bundle @weave/compiler to JS so this Node script can call the loader.
+// 1. Bundle @weave-framework/compiler to JS so this Node script can call the loader.
 const tmp = mkdtempSync(join(tmpdir(), 'weave-build-'));
 const compilerJs = join(tmp, 'compiler.mjs');
 await build({

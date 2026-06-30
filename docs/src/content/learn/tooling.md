@@ -4,7 +4,7 @@ Weave ships its own toolchain — a single `weave` CLI for building, serving, ty
 
 ## Running the CLI
 
-Install `@weave/cli` as a dev dependency (the [scaffold](/learn/installation) does this for you), and the `weave` command is available in your project. Run it through your `package.json` scripts or `npx`:
+Install `@weave-framework/cli` as a dev dependency (the [scaffold](/learn/installation) does this for you), and the `weave` command is available in your project. Run it through your `package.json` scripts or `npx`:
 
 ~~~bash
 npm run dev        # if you have a "dev": "weave dev" script
@@ -128,7 +128,7 @@ One config file is the source of truth for the config-driven pipeline. Every opt
 Define it with the typed helper for autocomplete:
 
 ~~~ts title="weave.config.ts"
-import { defineConfig } from '@weave/cli';
+import { defineConfig } from '@weave-framework/cli';
 
 export default defineConfig({
   root: 'src/app/shell',
@@ -178,14 +178,14 @@ Install the **Weave** extension (`weave-language`). It registers the `.weave` an
 
 ### WebStorm / JetBrains
 
-Install the Weave plugin (it relies on the **LSP4IJ** plugin to host the language server). It maps `*.weave` and component `*.html` files to the Weave languages and registers the shared `@weave/language-server` for diagnostics and navigation.
+Install the Weave plugin (it relies on the **LSP4IJ** plugin to host the language server). It maps `*.weave` and component `*.html` files to the Weave languages and registers the shared `@weave-framework/language-server` for diagnostics and navigation.
 
 ### Under the hood
 
 Two pieces do the work, both reusing the same virtual-module machinery as `weave check`:
 
-- **`@weave/language-server`** — a Volar LSP server (TypeScript + CSS services) used by both editors. It reports template diagnostics on the `.html` side.
-- **`@weave/typescript-plugin`** — a tsserver plugin that takes over component `.ts` files (and `.weave` SFCs) so imports used only in templates aren't marked unused, and a parent's import of a child resolves the child's typed props.
+- **`@weave-framework/language-server`** — a Volar LSP server (TypeScript + CSS services) used by both editors. It reports template diagnostics on the `.html` side.
+- **`@weave-framework/typescript-plugin`** — a tsserver plugin that takes over component `.ts` files (and `.weave` SFCs) so imports used only in templates aren't marked unused, and a parent's import of a child resolves the child's typed props.
 
 :::callout info "What you just learned"
 One `weave` CLI does it all — invoked as `node packages/cli/bin/weave.mjs <cmd>` for now. The four commands are `dev` (watch + live-reload), `build` (static `dist/`), `check` (template + child-prop type-checking), and `routes` (file-based route gen). The big idea: a `weave.config.ts` switches `dev`/`build` into the full config-driven pipeline, while no config drops you into a bare legacy flag-driven one — and `dev` behaves quite differently between them (in-memory server vs esbuild's serve, port from config vs `--port`). Flags like `--config`, `--out`, `--serve`, `--port`, `--no-minify`, and `--eager` each belong to a specific command and pipeline. `styleLang` really compiles `css`/`scss`/`sass` differently, and editor support is a shared Volar server behind a VS Code extension and a WebStorm/LSP4IJ plugin.

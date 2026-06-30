@@ -10,10 +10,10 @@ import {
   createContext,
   provide,
   inject,
-} from '@weave/runtime';
-import type { Signal, Owner, Context } from '@weave/runtime';
-import * as dom from '@weave/runtime/dom';
-import { compileTemplate } from '@weave/compiler';
+} from '@weave-framework/runtime';
+import type { Signal, Owner, Context } from '@weave-framework/runtime';
+import * as dom from '@weave-framework/runtime/dom';
+import { compileTemplate } from '@weave-framework/compiler';
 
 const rt: typeof dom & {
   signal: typeof signal;
