@@ -49,7 +49,7 @@ const weave = {
 
 // 3. Build the example app.
 const result = await build({
-  entryPoints: ['examples/v2/main.ts'],
+  entryPoints: ['examples/__fixtures__/v2/main.ts'],
   bundle: true,
   format: 'iife',
   write: false,

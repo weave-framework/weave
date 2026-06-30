@@ -10,7 +10,7 @@
  *    injected shell so client routes survive a refresh.
  *
  *  - **legacy** (flag-driven): esbuild's own serve over a static `servedir`, writing
- *    the collected stylesheet to `outdir/app.css`. Kept for `examples/v2` + verify.
+ *    the collected stylesheet to `outdir/app.css`. Kept for `examples/__fixtures__/v2` + verify.
  *
  * Returns the build context so a caller (or test) can dispose it; the CLI keeps it running.
  */
