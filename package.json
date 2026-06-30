@@ -6,7 +6,6 @@
   "private": true,
   "scripts": {
     "test": "node tools/run-browser-tests.mjs",
-    "test:v01": "node --test \"test/**/*.test.mjs\"",
     "check": "node packages/cli/bin/weave.mjs check",
     "lint": "eslint .",
     "demo": "node packages/cli/bin/weave.mjs dev --config examples/demo/weave.config.ts",
