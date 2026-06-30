@@ -22,11 +22,11 @@ const useBase = base !== '/' && base !== '';
 if (useBase) {
   const indexPath = join(dist, 'index.html');
   let html = await readFile(indexPath, 'utf8');
-  // 1) Make the build's absolute asset refs relative so they respect <base>.
-  //    (Do this BEFORE injecting <base>, so the base href keeps its leading slash.)
+  // 1) Make all absolute asset refs relative so they resolve against <base>. This
+  //    also empties the source's placeholder `<base href="/">` → `<base href="">`.
   html = html.replace(/(href|src)="\/(?!\/)/g, '$1="');
-  // 2) Inject <base> right after <head> so relative URLs resolve under the sub-path.
-  html = html.replace(/<head>/, `<head>\n    <base href="${base}" />`);
+  // 2) Point <base> at the sub-path (the now-empty placeholder).
+  html = html.replace(/<base href="" \/>/, `<base href="${base}" />`);
   await writeFile(indexPath, html, 'utf8');
 }
 
