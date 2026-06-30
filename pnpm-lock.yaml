@@ -23,6 +23,9 @@ importers:
       '@weave/forms':
         specifier: workspace:*
         version: link:packages/forms
+      '@weave/i18n':
+        specifier: workspace:*
+        version: link:packages/i18n
       '@weave/router':
         specifier: workspace:*
         version: link:packages/router
@@ -109,6 +112,12 @@ importers:
         version: link:../runtime
 
   packages/forms:
+    dependencies:
+      '@weave/runtime':
+        specifier: workspace:*
+        version: link:../runtime
+
+  packages/i18n:
     dependencies:
       '@weave/runtime':
         specifier: workspace:*
