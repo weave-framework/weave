@@ -179,6 +179,7 @@ Native CSS **nesting** is scope-aware: the `&` parent reference and nested rules
 
 Component styles are for components. For genuinely global things — CSS variables, resets, the base `body` font, design tokens — list one or more entry stylesheets in `weave.config.ts`. The `styles` config is an **ordered array**: its entries are compiled and concatenated in order, **before** any component CSS, so your tokens are available everywhere and component rules can override the resets:
 
+:::tabs
 ~~~ts title="weave.config.ts"
 export default defineConfig({
   root: 'src/app/app',
@@ -186,7 +187,6 @@ export default defineConfig({
   styles: ['src/styles/main.scss'], // global, loaded first
 });
 ~~~
-
 ~~~scss title="src/styles/main.scss"
 :root {
   --surface: #0f1115;
@@ -198,6 +198,7 @@ export default defineConfig({
 * { box-sizing: border-box; }
 body { margin: 0; font-family: system-ui, sans-serif; color: var(--text); }
 ~~~
+:::
 
 A common, tidy split: **tokens and resets** go in the global stylesheet; **everything else** lives scoped next to its component and references the tokens via `var(--…)`.
 

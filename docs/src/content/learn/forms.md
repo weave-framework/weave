@@ -323,6 +323,7 @@ Because `field`, `group`, and `fieldArray` all share one `Control` interface, th
 
 `group.submit(handler)` builds a submit handler that owns the entire dance, so you wire exactly one thing on the `<form>`:
 
+:::tabs
 ~~~ts title="submit.ts"
 const onSubmit = taskForm.submit(async (values) => {
   await board.create(values); // values is the typed snapshot
@@ -331,7 +332,6 @@ const onSubmit = taskForm.submit(async (values) => {
 });
 return { form: taskForm, onSubmit };
 ~~~
-
 ~~~html title="submit.html"
 <form on:submit={{ onSubmit }} novalidate>
   …fields…
@@ -341,6 +341,7 @@ return { form: taskForm, onSubmit };
   </button>
 </form>
 ~~~
+:::
 
 :::callout info "Wire it on `<form on:submit>` — it needs `currentTarget`"
 The handler focuses the first invalid control by querying the form element, which it reads from the event's **`currentTarget`**. So attach it to the `<form>`'s `on:submit`, not to a button's `on:click`. (It captures `currentTarget` *synchronously* before awaiting, because the browser nulls it once dispatch ends.)

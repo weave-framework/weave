@@ -135,15 +135,16 @@ For validated forms you'll usually reach for the `use:control` directive from `@
 
 Grab the actual DOM element with `ref` (or its alias `bind:this` — they compile identically). Handy for focus, measurement, or handing the node to a third-party library. The target can be either a **signal** or a plain **callback**:
 
-~~~html title="ref"
+:::tabs
+~~~html title="template"
 <input ref={{ inputEl }} />
 <canvas bind:this={{ (el) => setupChart(el) }}></canvas>
 ~~~
-
-~~~ts title="ref — signal form"
+~~~ts title="signal form"
 const inputEl = signal<Element | null>(null);
 onMount(() => (inputEl() as HTMLInputElement)?.focus());
 ~~~
+:::
 
 If you pass a writable signal, Weave calls `.set(el)` on it. If you pass a function, Weave calls it with the element. (Internally it checks for a `set` method to tell them apart.) The signal form is best when other code needs to read the element later; the callback form is best for fire-and-forget setup.
 
@@ -151,6 +152,7 @@ If you pass a writable signal, Weave calls `.set(el)` on it. If you pass a funct
 
 `use:action={{ arg }}` runs a function on the element once it's inserted — the escape hatch for imperative DOM work, kept tidy and owner-scoped. An action is `(el, arg) => cleanup?`. It runs at `onMount` timing (the element is live in the document, so focus/measure/3rd-party init all work), and is skipped entirely if the region is torn down before that fires.
 
+:::tabs
 ~~~ts title="Defining actions"
 import type { Action } from '@weave-framework/runtime/dom';
 
@@ -163,11 +165,11 @@ export const tooltip: Action<string> = (el, text) => {
   return () => tip.destroy(); // cleanup runs on unmount
 };
 ~~~
-
 ~~~html title="Using actions"
 <input use:autofocus />
 <button use:tooltip={{ 'Delete forever' }}>🗑</button>
 ~~~
+:::
 
 Three tear-down options, all fired when the region unmounts: return a cleanup function, call `onDispose` inside the action, or create an `effect` (its disposal is tied to the element's region). For an argument that should *react*, pass a getter (`use:tip={{ () => label() }}`) and read it inside an `effect` in the action — the `arg` itself is passed once.
 
