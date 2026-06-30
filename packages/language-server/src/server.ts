@@ -25,6 +25,16 @@ const server: ReturnType<typeof createServer> = createServer(connection);
 connection.listen();
 
 connection.onInitialize((params) => {
+  // Some LSP clients (notably LSP4IJ) advertise `workspace/configuration` support but
+  // never answer the server's configuration requests. Volar awaits that answer before it
+  // computes push diagnostics, so template type errors never surface — while hover and
+  // go-to-definition (which don't need configuration) still work. We don't rely on any
+  // client settings, so drop the capability: Volar then resolves configuration to defaults
+  // immediately and diagnostics flow for every client.
+  if (params.capabilities.workspace) {
+    params.capabilities.workspace.configuration = false;
+  }
+
   const tsdkPath: string =
     (params.initializationOptions as { typescript?: { tsdk?: string } } | undefined)?.typescript
       ?.tsdk ?? 'typescript/lib';
