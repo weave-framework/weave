@@ -172,13 +172,43 @@ Pass one or more roots; with none, it defaults to `['src']`. Any error makes it 
 
 Weave has real IDE integration — red squiggles on type errors *inside templates*, hover, completion, go-to-definition, and rename across the `.ts`/`.html` boundary. It's powered by a shared [Volar](https://volarjs.dev) language server, so the same engine backs every editor.
 
+> **Where to get the plugins.** They are **not on the VS Code Marketplace or the JetBrains Marketplace yet** — you install them from a file. Download the latest build from the repo's [`plugins/editor/`](https://github.com/weave-framework/weave/tree/main/plugins/editor) folder:
+> - VS Code → [`plugins/editor/vscode/weave-language-0.5.0.vsix`](https://github.com/weave-framework/weave/tree/main/plugins/editor/vscode)
+> - WebStorm → [`plugins/editor/webstorm/weave-webstorm-0.13.0.zip`](https://github.com/weave-framework/weave/tree/main/plugins/editor/webstorm)
+>
+> (Use whatever the newest version in those folders is.)
+
 ### VS Code
 
-Install the **Weave** extension (`weave-language`). It registers the `.weave` and `weave-html` languages, ships the TextMate grammar for syntax highlighting, and wires the Weave TypeScript plugin into VS Code's TypeScript service. It activates on `.weave` files, and on `.html` files whose sibling `.ts` exports a `setup` — so your component templates light up automatically.
+1. Download the `.vsix` file (above).
+2. Install it — either from the terminal:
+   ```bash
+   code --install-extension weave-language-0.5.0.vsix
+   ```
+   …or from the UI: open the **Extensions** panel → click the **⋯** menu at the top → **Install from VSIX…** → pick the file.
+3. Reload VS Code (**Developer: Reload Window**, or just restart it).
+4. Open a component — a `.weave` file, or a `.html` template whose sibling `.ts` exports a `setup`. Type errors in the template now show red squiggles, and hover / go-to-definition work across the `.ts`↔`.html` boundary.
+
+That's it. The extension registers the `.weave` and `weave-html` languages, ships syntax highlighting, and wires the Weave TypeScript plugin into VS Code's TypeScript service automatically.
 
 ### WebStorm / JetBrains
 
-Install the Weave plugin (it relies on the **LSP4IJ** plugin to host the language server). It maps `*.weave` and component `*.html` files to the Weave languages and registers the shared `@weave-framework/language-server` for diagnostics and navigation.
+WebStorm needs **two** things — a host plugin and the Weave plugin:
+
+1. **Install LSP4IJ** (the Weave plugin runs on top of it): **Settings → Plugins → Marketplace**, search **LSP4IJ**, install, and let WebStorm restart.
+2. **Install the Weave plugin from disk:** **Settings → Plugins** → click the **⚙ gear icon** → **Install Plugin from Disk…** → pick the downloaded `weave-webstorm-*.zip` → restart when prompted.
+3. **Enable type-checking on the `.ts` side** (one-time per project): add the Weave TypeScript plugin to your `tsconfig.json` so WebStorm's own TypeScript service loads it —
+   ```json
+   {
+     "compilerOptions": {
+       "plugins": [{ "name": "@weave-framework/typescript-plugin" }]
+     }
+   }
+   ```
+   then **restart the TypeScript service** (**Settings → Languages & Frameworks → TypeScript**, or right-click a `.ts` file → *TypeScript → Restart TypeScript Service*).
+4. Open a `.weave` or component `.html` file — diagnostics, hover, and go-to-definition light up.
+
+> **Why the extra `tsconfig` step?** WebStorm only loads tsserver plugins listed in `tsconfig.json` (VS Code injects it for you). Without step 3 you'd get a spurious *"Module … has no default export"* error on component imports.
 
 ### Under the hood
 
@@ -188,7 +218,7 @@ Two pieces do the work, both reusing the same virtual-module machinery as `weave
 - **`@weave-framework/typescript-plugin`** — a tsserver plugin that takes over component `.ts` files (and `.weave` SFCs) so imports used only in templates aren't marked unused, and a parent's import of a child resolves the child's typed props.
 
 :::callout info "What you just learned"
-One `weave` CLI does it all — invoked as `node packages/cli/bin/weave.mjs <cmd>` for now. The four commands are `dev` (watch + live-reload), `build` (static `dist/`), `check` (template + child-prop type-checking), and `routes` (file-based route gen). The big idea: a `weave.config.ts` switches `dev`/`build` into the full config-driven pipeline, while no config drops you into a bare legacy flag-driven one — and `dev` behaves quite differently between them (in-memory server vs esbuild's serve, port from config vs `--port`). Flags like `--config`, `--out`, `--serve`, `--port`, `--no-minify`, and `--eager` each belong to a specific command and pipeline. `styleLang` really compiles `css`/`scss`/`sass` differently, and editor support is a shared Volar server behind a VS Code extension and a WebStorm/LSP4IJ plugin.
+One `weave` CLI does it all — once `@weave-framework/cli` is a dev dependency you run it as `weave <cmd>` (via `npm run`/`npx`). The four commands are `dev` (watch + live-reload), `build` (static `dist/`), `check` (template + child-prop type-checking), and `routes` (file-based route gen). The big idea: a `weave.config.ts` switches `dev`/`build` into the full config-driven pipeline, while no config drops you into a bare legacy flag-driven one — and `dev` behaves quite differently between them (in-memory server vs esbuild's serve, port from config vs `--port`). Flags like `--config`, `--out`, `--serve`, `--port`, `--no-minify`, and `--eager` each belong to a specific command and pipeline. `styleLang` really compiles `css`/`scss`/`sass` differently, and editor support is a shared Volar server behind a VS Code extension and a WebStorm/LSP4IJ plugin.
 :::
 
 [Next: Recipes →](/learn/recipes) · [Reference: configuration →](/reference/config) · [Installation →](/learn/installation)
