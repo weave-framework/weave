@@ -1,0 +1,32 @@
+.callout {
+  margin: 18px 0;
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  background: var(--surface);
+}
+
+.callout[data-kind='tip'] {
+  border-left-color: var(--green);
+}
+
+.callout[data-kind='warn'] {
+  border-left-color: var(--orange);
+}
+
+.callout-title {
+  margin: 0 0 6px;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.callout-body {
+  color: var(--fg-soft);
+  font-size: 14.5px;
+  line-height: 1.65;
+}
+
+.callout-body :global(p) {
+  margin: 0;
+}

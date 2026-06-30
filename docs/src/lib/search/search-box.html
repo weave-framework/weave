@@ -1,0 +1,37 @@
+<div class="search">
+  <input
+    class="search-input"
+    type="search"
+    placeholder="Search docs…"
+    aria-label="Search the docs"
+    bind:value={{ query }}
+    on:input={{ onInput }}
+    on:focus={{ onFocus }}
+    on:blur={{ onBlur }}
+    on:keydown={{ onKey }}
+  />
+
+  @if (hasResults()) {
+    <div class="panel">
+      @if (empty()) {
+        <p class="empty">No matches for “{{ query() }}”.</p>
+      }
+      @for (r of results(); track r.entry.path) {
+        <a
+          class="item"
+          class:active={{ isActive($index) }}
+          href={{ r.entry.path }}
+          on:click={{ (e) => { e.preventDefault(); go(r); } }}
+        >
+          <span class="item-main">
+            <span class="item-title">{{ r.entry.title }}</span>
+            @if (r.related) {
+              <span class="item-tag">related</span>
+            }
+          </span>
+          <span class="item-crumb">{{ r.entry.section }} · {{ r.entry.kind }}</span>
+        </a>
+      }
+    </div>
+  }
+</div>

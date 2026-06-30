@@ -1,0 +1,43 @@
+/* Syntax-highlight token classes. These spans are created in JS by the highlighter
+   (no component scope attribute), so the classes are global. */
+
+.tok-comment {
+  color: var(--tok-comment);
+  font-style: italic;
+}
+
+.tok-string {
+  color: var(--tok-string);
+}
+
+.tok-keyword {
+  color: var(--tok-keyword);
+}
+
+.tok-number {
+  color: var(--tok-number);
+}
+
+.tok-func {
+  color: var(--tok-func);
+}
+
+.tok-property {
+  color: var(--tok-property);
+}
+
+.tok-tag {
+  color: var(--tok-tag);
+}
+
+.tok-attr {
+  color: var(--tok-attr);
+}
+
+.tok-interp {
+  color: var(--tok-interp);
+}
+
+.tok-punct {
+  color: var(--tok-punct);
+}

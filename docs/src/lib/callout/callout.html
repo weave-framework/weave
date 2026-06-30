@@ -1,0 +1,6 @@
+<div class="callout" data-kind={{ kind() }}>
+  @if (hasTitle()) {
+    <p class="callout-title">{{ title() }}</p>
+  }
+  <div class="callout-body"><slot/></div>
+</div>
