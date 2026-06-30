@@ -4,7 +4,8 @@
     <p>There's no API reference for “{{ title() }}”.</p>
   } @else {
     <h1><code>{{ title() }}</code></h1>
-    <p class="api-count">{{ count() }} exports — generated from the source.</p>
+    <p class="api-count">{{ count() }} exports — generated from the source, with hand-written notes.</p>
+    <div class="api-intro" ref={{ introHost }}></div>
 
     @for (s of symbols(); track s.anchor) {
       <section class="api">
@@ -36,6 +37,13 @@
         @if (s.returns) {
           @if (s.returns.doc) {
             <p class="api-sub">Returns <span class="api-rdoc">{{ s.returns.doc }}</span></p>
+          }
+        }
+
+        @if (examplesFor(s.name).length) {
+          <p class="api-sub">Example</p>
+          @for (ex of examplesFor(s.name); track ex.code) {
+            <CodeBlock code={{ ex.code }} lang={{ ex.lang }} />
           }
         }
       </section>

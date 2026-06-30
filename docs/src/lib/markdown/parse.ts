@@ -23,6 +23,9 @@ export interface CodeTabData {
   code: string;
 }
 
+/** Column alignment from a table's delimiter row (`:--` / `--:` / `:--:`). */
+export type TableAlign = 'left' | 'right' | 'center' | null;
+
 export type Block =
   | { type: 'heading'; level: number; inline: Inline[] }
   | { type: 'paragraph'; inline: Inline[] }
@@ -32,7 +35,8 @@ export type Block =
   | { type: 'code'; lang: string; code: string }
   | { type: 'callout'; kind: string; title: string; children: Block[] }
   | { type: 'demo'; component: string }
-  | { type: 'tabs'; tabs: CodeTabData[] };
+  | { type: 'tabs'; tabs: CodeTabData[] }
+  | { type: 'table'; align: TableAlign[]; header: Inline[][]; rows: Inline[][][] };
 
 /** Flatten inline tokens to their plain text (for headings, anchors, snippets). */
 export function inlineText(nodes: Inline[]): string {
@@ -78,6 +82,17 @@ const UL_RE = /^\s*[-*]\s+(.*)$/;
 const OL_RE = /^\s*\d+\.\s+(.*)$/;
 const DIRECTIVE_RE = /^:::\s*(\w+)\s*(.*)$/;
 const TITLE_RE = /"([^"]*)"/;
+// A GFM table delimiter row: `|---|:--:|`, `--- | ---`, etc. Requires ≥2 columns
+// (one internal pipe group) so a bare `---` stays a thematic break, not a table.
+const TABLE_DELIM_RE = /^\s*\|?\s*:?-{1,}:?\s*(\|\s*:?-{1,}:?\s*)+\|?\s*$/;
+
+/** Split one table row into trimmed cells, honoring `\|` as a literal pipe. */
+function splitTableRow(line: string): string[] {
+  let s = line.trim();
+  if (s.startsWith('|')) s = s.slice(1);
+  if (s.endsWith('|')) s = s.slice(0, -1);
+  return s.split(/(?<!\\)\|/).map((c) => c.trim().replace(/\\\|/g, '|'));
+}
 
 /** Parse a markdown document into a block AST. */
 export function parse(src: string): Block[] {
@@ -176,6 +191,24 @@ export function parse(src: string): Block[] {
         i++;
       }
       blocks.push({ type: 'list', ordered, items });
+      continue;
+    }
+
+    // Table — a header row followed by a delimiter row (`|---|---|`).
+    if (line.includes('|') && i + 1 < lines.length && TABLE_DELIM_RE.test(lines[i + 1])) {
+      const header = splitTableRow(line).map((c) => parseInline(c));
+      const align: TableAlign[] = splitTableRow(lines[i + 1]).map((c) => {
+        const l = c.startsWith(':');
+        const r = c.endsWith(':');
+        return l && r ? 'center' : r ? 'right' : l ? 'left' : null;
+      });
+      i += 2;
+      const rows: Inline[][][] = [];
+      while (i < lines.length && lines[i].trim() && lines[i].includes('|') && !isBlockStart(lines[i])) {
+        rows.push(splitTableRow(lines[i]).map((c) => parseInline(c)));
+        i++;
+      }
+      blocks.push({ type: 'table', align, header, rows });
       continue;
     }
 

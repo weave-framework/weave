@@ -44,11 +44,39 @@ const learn: NavSection = {
       label: 'Getting started',
       items: [
         { label: 'Introduction', path: '/learn/introduction' },
-        { label: 'Thinking in signals', path: '/learn/signals' },
+        { label: 'Why Weave?', path: '/learn/why-weave' },
+        { label: 'Quick start', path: '/learn/quick-start' },
       ],
     },
-    // Future groups (Components, Templates, Reactivity, Styling, Routing, Store,
-    // Forms, i18n, Motion, Tooling, Recipes…) drop in here as content lands.
+    {
+      label: 'Core concepts',
+      items: [
+        { label: 'Thinking in signals', path: '/learn/signals' },
+        { label: 'Reactivity in depth', path: '/learn/reactivity' },
+        { label: 'Components', path: '/learn/components' },
+        { label: 'Templates', path: '/learn/templates' },
+        { label: 'Styling', path: '/learn/styling' },
+      ],
+    },
+    {
+      label: 'Building apps',
+      items: [
+        { label: 'Lifecycle, context & DI', path: '/learn/lifecycle-context-di' },
+        { label: 'Router', path: '/learn/router' },
+        { label: 'Store', path: '/learn/store' },
+        { label: 'Forms', path: '/learn/forms' },
+        { label: 'Internationalization', path: '/learn/i18n' },
+        { label: 'Motion', path: '/learn/motion' },
+      ],
+    },
+    {
+      label: 'Going further',
+      items: [
+        { label: 'Custom elements & bootstrap', path: '/learn/custom-elements' },
+        { label: 'Tooling & CLI', path: '/learn/tooling' },
+        { label: 'Recipes', path: '/learn/recipes' },
+      ],
+    },
   ],
 };
 
@@ -71,7 +99,13 @@ const reference: NavSection = {
         { label: '@weave/data', path: '/reference/data' },
       ],
     },
-    // @weave/cli, /check, template syntax, config — added as their pages are written.
+    {
+      label: 'Guides',
+      items: [
+        { label: 'Template syntax', path: '/reference/template-syntax' },
+        { label: 'Configuration', path: '/reference/config' },
+      ],
+    },
   ],
 };
 

@@ -1,11 +1,15 @@
-import { Link } from '@weave/router';
-import Callout from '../../lib/callout/callout';
+import DocPage from '../../lib/doc-page/doc-page';
+import { content } from '../../content/content.gen';
 
-// Referenced in introduction.html.
-void Link;
-void Callout;
+// `<DocPage>` is referenced in introduction.html.
+void DocPage;
 
-/** Learn → Introduction (route `/learn/introduction`). */
-export function setup(): Record<string, never> {
-  return {};
+interface IntroductionSetup {
+  source: string;
+}
+
+/** Learn → Introduction (route `/learn/introduction`). Content authored in
+ *  Markdown (src/content/learn/introduction.md) and rendered by <DocPage>. */
+export function setup(): IntroductionSetup {
+  return { source: content['learn/introduction'] ?? '' };
 }

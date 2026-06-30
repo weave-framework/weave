@@ -31,7 +31,7 @@ We love the frameworks that came before. React made components mainstream, Angul
 So what does Weave do *a little differently*?
 
 - **Signals all the way down.** Reactivity is one model, and it powers everything — from a single piece of text to the router. There's no second system to learn and no observables to bridge.
-- **Dependencies track themselves.** Things update when — and only when — what they depend on actually changes. Nothing to declare by hand, nothing to memoize, nothing to forget.
+- **Dependencies track themselves.** Things update when — and only when — what they depend on actually changes. Nothing to declare by hand, nothing to cache, nothing to forget.
 - **No Virtual DOM.** Your interface maps straight onto the page, so updates stay surgical and the runtime that ships stays genuinely small.
 - **Batteries included, not bolted on.** Routing, state, forms, translations, and motion are all first‑party and share the same reactive core — so they compose instead of competing.
 - **A real IDE citizen.** First‑class VS Code **and** WebStorm support, with the kind of editor experience you'd expect from a mature framework.
