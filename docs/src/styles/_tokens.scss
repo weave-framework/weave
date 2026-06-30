@@ -1,0 +1,65 @@
+/* Design tokens as CSS custom properties, so a single [data-theme] attribute on
+   <html> flips the whole site between dark (default) and light. */
+
+:root,
+[data-theme='dark'] {
+  color-scheme: dark;
+
+  --bg: #0f1115;
+  --bg-soft: #14171d;
+  --surface: #181c23;
+  --code-bg: #0c0e12;
+
+  --fg: #e7ebf0;
+  --fg-soft: #c2c9d2;
+  --muted: #8b94a3;
+
+  --border: #272d38;
+  --accent: #1e8cd2; /* logo blue */
+  --green: #69be46; /* logo green */
+  --orange: #f59b2d; /* logo orange */
+  --red: #d2051e; /* logo red */
+
+  --mono: ui-monospace, "SF Mono", "JetBrains Mono", "Fira Code", Menlo, Consolas, monospace;
+  --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+
+  /* Syntax-highlight token colors (dark). */
+  --tok-comment: #6b7686;
+  --tok-string: #9ccf6a;
+  --tok-keyword: #c792ea;
+  --tok-number: #f5a96a;
+  --tok-func: #5cb6f0;
+  --tok-property: #7fd4c1;
+  --tok-tag: #f07a82;
+  --tok-attr: #f5b86a;
+  --tok-interp: #5cb6f0;
+  --tok-punct: #8b94a3;
+}
+
+[data-theme='light'] {
+  color-scheme: light;
+
+  --bg: #ffffff;
+  --bg-soft: #f7f8fa;
+  --surface: #f1f3f6;
+  --code-bg: #f6f8fa;
+
+  --fg: #1a1f29;
+  --fg-soft: #3a424f;
+  --muted: #687180;
+
+  --border: #e2e6ec;
+  --accent: #1373b0;
+
+  /* Syntax-highlight token colors (light). */
+  --tok-comment: #8a93a0;
+  --tok-string: #3f8f2f;
+  --tok-keyword: #8b3fc9;
+  --tok-number: #b5651d;
+  --tok-func: #1373b0;
+  --tok-property: #0f8a76;
+  --tok-tag: #c0392b;
+  --tok-attr: #b5651d;
+  --tok-interp: #1373b0;
+  --tok-punct: #687180;
+}

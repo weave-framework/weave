@@ -1,0 +1,96 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+code {
+  font-family: var(--mono);
+}
+
+/* Inline code inside prose. */
+:not(pre) > code {
+  font-size: 0.88em;
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+/* Prose typography — applies to the doc content rendered by each page. */
+h1 {
+  font-size: 34px;
+  line-height: 1.2;
+  margin: 0 0 10px;
+  letter-spacing: -0.02em;
+}
+
+h2 {
+  font-size: 23px;
+  line-height: 1.3;
+  margin: 40px 0 12px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+h3 {
+  font-size: 18px;
+  margin: 28px 0 10px;
+}
+
+/* Leave room under the sticky top bar when jumping to an anchor. */
+h1,
+h2,
+h3,
+h4 {
+  scroll-margin-top: 76px;
+}
+
+p {
+  margin: 14px 0;
+  color: var(--fg-soft);
+}
+
+ul,
+ol {
+  margin: 14px 0;
+  padding-left: 22px;
+  color: var(--fg-soft);
+}
+
+li {
+  margin: 6px 0;
+}
+
+.lead {
+  font-size: 18px;
+  color: var(--fg-soft);
+}
+
+strong {
+  color: var(--fg);
+}

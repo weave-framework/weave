@@ -1,0 +1,41 @@
+.code-tabs {
+  margin: 16px 0;
+}
+
+.tab-row {
+  display: flex;
+  gap: 4px;
+  padding: 4px 4px 0;
+  border: 1px solid var(--border);
+  border-bottom: none;
+  border-radius: 10px 10px 0 0;
+  background: var(--surface);
+}
+
+.tab {
+  font: inherit;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  padding: 7px 12px;
+  border: none;
+  border-radius: 7px 7px 0 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.tab:hover {
+  color: var(--fg);
+}
+
+.tab.active {
+  background: var(--code-bg);
+  color: var(--fg);
+}
+
+/* The nested CodeBlock squares off its top corners to meet the tab row. */
+.code-tabs :global(.code-block) {
+  margin-top: 0;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}

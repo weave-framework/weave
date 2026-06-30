@@ -1,178 +1,71 @@
-# Weave 🧵
+<div align="center">
 
-**A fine-grained reactive UI framework.** Small, fast, no Virtual DOM, no build step required, TypeScript-first.
+<img src="assets/weave-logo.svg" alt="Weave" width="120" height="120" />
 
-Weave is the synthesis of [`framework-analize.docx`](../Downloads/framework-analize.docx) — a deep analysis of what developers love, tolerate, and want to fundamentally change about React, Next.js, Angular, Vue, and Svelte (State of JS / State of React / Stack Overflow 2024–2026). The analysis pointed in one direction; Weave is that direction, built.
+# Weave
 
-```js
-import { signal, computed, html, mount } from 'weave';
+**A fine‑grained reactive UI framework — signal‑native, tiny, and TypeScript‑first.**
 
-function Counter() {
-  const n = signal(0);
-  const parity = computed(() => (n() % 2 === 0 ? 'even' : 'odd'));
-  return html`
-    <button onclick=${() => n.set((v) => v + 1)}>
-      ${n} — it is ${parity}
-    </button>`;
-}
+*No Virtual DOM. No dependency arrays. No ceremony. Just the threads you need, woven tight.*
 
-mount(Counter(), document.body);
-```
+[📚 **Documentation**](https://aidasjosas.github.io/weave) · [🚀 Get started](https://aidasjosas.github.io/weave) · [🗺️ Roadmap](#-where-its-headed)
 
-When `n` changes, **only the number text node and the word `even`/`odd` are touched.** No component re-runs. No Virtual DOM diff. No dependency arrays. No `useMemo`.
+</div>
 
 ---
 
-## Why Weave exists — the analysis, answered
+## 👋 Welcome
 
-The document's central finding: *every* modern framework is converging on **signals** (fine-grained reactivity), and developers love each framework's core while resenting its newest layer. Weave starts from that conclusion instead of carrying the legacy.
+Whether you've just stumbled onto Weave or you've been threading along since the early commits — glad you're here.
 
-| What the analysis found developers want | Weave's answer |
-|---|---|
-| **"Everyone converges on signals"** — the #1 theme of 2025–2026 | Signals are *the* primitive. `signal` / `computed` / `effect` are the whole reactivity model. |
-| `useEffect` + dependency arrays — React's **#1 complaint (37%)** | `effect()` tracks dependencies **automatically**. There is no dependency array, ever. |
-| RxJS forced on Angular users — "Signals should take over the UI layer" | No RxJS, no observables. Just signals. |
-| Manual `useMemo` / `useCallback`; React Compiler trying to automate it | Unnecessary by construction — updates are already surgical, so there's nothing to memoize. |
-| Virtual DOM overhead; Svelte's ~1.6 kb runtime admired | **No Virtual DOM.** `html``` binds signals straight to real DOM nodes. ~3.6 kb gzipped for the *whole* framework. |
-| Boilerplate / ceremony (React), verbosity (Angular) | Five concepts total. No classes, no decorators, no `forwardRef`, no providers-of-providers. |
-| Built-in state management wanted (React wishlist) | `store()` — a lazy singleton of signals. Zero extra library. |
-| Official routing wanted (React wishlist) | `router()` built in — path params, 404 fallback, client-side `link()`. |
-| Single-File-Component ergonomics loved (Vue/Svelte) | Co-locate markup, logic, and styles in one function with `html``` + scoped `<style>`. |
-| Server/client boundary as magic strings hated (Next.js `'use client'`) | Boundaries are plain module imports, not stringly-typed directives. (SSR is on the roadmap; see *Scope*.) |
-| TypeScript-first **without** Angular's verbosity | Fully typed by inference. `signal<T>` flows everywhere. No decorators. |
-| Gentle learning curve (Vue's signature strength) | If you know `let x` and a template literal, you know Weave. |
-| Breaking-change fatigue (Next.js); "stabilization, not revolution" | Tiny, dependency-free, no compiler step that can break your build. |
+Weave is a UI framework built around one idea taken all the way: **the screen is a fabric, and reactivity is the thread.** When a value changes, Weave touches *only* the exact part of the page that depends on it. Nothing re‑renders wholesale. Nothing diffs a shadow copy of your UI. You describe your interface once, and from then on your signals do the talking.
+
+The result feels calm: state that updates exactly where it should, a runtime small enough to forget about, and tooling that treats you like a grown‑up. No mental bookkeeping, no “why did this re‑render,” no incantations to make it fast.
 
 ---
 
-## The five concepts
+## 🪡 Woven from the best threads
 
-That's the entire mental model. Everything else (router, store, lifecycle) is built from these.
+We love the frameworks that came before. React made components mainstream, Angular brought structure and a real toolchain, Vue made the on‑ramp gentle, Svelte showed how small a runtime can be, Solid proved signals could carry an entire UI. Weave isn't here to dunk on any of them — it's here to take the threads developers reached for again and again, and weave them into one coherent piece of cloth.
 
-### 1. `signal(value)` — reactive state
-```js
-const count = signal(0);
-count();            // read (and subscribe, if inside an effect/computed)
-count.set(5);       // write
-count.set(c => c+1) // update from previous
-count.peek();       // read without subscribing
-```
+So what does Weave do *a little differently*?
 
-### 2. `computed(fn)` — cached derived value
-```js
-const doubled = computed(() => count() * 2);
-```
-Lazy and glitch-free: recomputes only when a dependency actually changes, and a diamond dependency never recomputes twice for one update.
+- **Signals all the way down.** Reactivity is one model, and it powers everything — from a single piece of text to the router. There's no second system to learn and no observables to bridge.
+- **Dependencies track themselves.** Things update when — and only when — what they depend on actually changes. Nothing to declare by hand, nothing to memoize, nothing to forget.
+- **No Virtual DOM.** Your interface maps straight onto the page, so updates stay surgical and the runtime that ships stays genuinely small.
+- **Batteries included, not bolted on.** Routing, state, forms, translations, and motion are all first‑party and share the same reactive core — so they compose instead of competing.
+- **A real IDE citizen.** First‑class VS Code **and** WebStorm support, with the kind of editor experience you'd expect from a mature framework.
+- **Honest TypeScript.** Types flow through by inference, your editor understands your UI for free, and there's no decorator boilerplate to wade through.
 
-### 3. `effect(fn)` — automatic side effect
-```js
-effect(() => {
-  document.title = `Count: ${count()}`;
-  return () => {/* optional cleanup, runs before re-run and on dispose */};
-});
-```
-No dependency array. It re-runs when — and only when — something it read changes.
-
-### 4. `html\`...\`` — bind signals to real DOM
-```js
-html`<div class="box ${color}" onclick=${handler}>${count}</div>`
-```
-- An interpolated **function** is reactive (`count`, or `() => a() + b()`).
-- Any other value is set once.
-- `on*` → event listener. `.prop=${x}` → DOM property. Otherwise → attribute (booleans toggle presence).
-- Control flow: `when(cond, then, else)` and keyed `each(items, render, key)`.
-
-### 5. Components are just functions
-```js
-const Card = (props) => html`<div class="card">${props.title}</div>`;
-html`${Card({ title: 'Hi' })}`
-```
-No base class, no special return type. Compose by calling.
+None of this makes the others "wrong." It's a different set of trade‑offs — small, fast, signal‑native, low‑ceremony — for people who want exactly that.
 
 ---
 
-## Batteries included
+## 🗺️ Where it's headed
 
-**Store** — built-in state management, no extra dependency:
-```js
-import { store, signal, computed } from 'weave';
+Weave is pre‑1.0 and moving deliberately — *stabilization over revolution.* The core is real, tested, and dogfooded by a full demo app. What's next:
 
-export const useCart = store(() => {
-  const items = signal([]);
-  const total = computed(() => items().reduce((s, i) => s + i.price, 0));
-  return { items, total, add: (i) => items.set(xs => [...xs, i]) };
-});
-// anywhere: const cart = useCart();  // same singleton, reactive everywhere
-```
+- **Documentation site** — the home this README keeps pointing you toward (in progress).
+- **Server‑side rendering & hydration** — added when there's a real need, with a clean boundary rather than magic strings.
+- **Devtools** — a way to watch the fabric update live.
+- **More of everything** — the long tail of polish that turns a framework into a daily driver.
 
-**Router** — official, path params + 404:
-```js
-import { router, link } from 'weave';
-
-html`
-  <nav>${link('/', 'Home')} ${link('/user/7', 'User')}</nav>
-  <main>${router({
-    '/': Home,
-    '/user/:id': (p) => html`<h1>User ${p.id}</h1>`,
-    '*': NotFound,
-  })}</main>`;
-```
-
-**Lifecycle** — `onMount`, `onCleanup`, `createContext`.
+Ideas and contributions are welcome — the roadmap is a direction, not a fence.
 
 ---
 
-## Run it
+## 📚 Get started
 
-No build step. It's ES modules — open the demo directly:
+Installation, your first component, guides, and the complete API reference all live in the documentation:
 
-```bash
-node test/_server.mjs       # serves on http://localhost:5050
-# open http://localhost:5050/examples/index.html
-```
-
-The demo ([`examples/index.html`](examples/index.html)) is a counter, a store-backed todo app with a keyed list, and client-side routing — all in one file, zero tooling.
-
-## Test
-
-```bash
-npm install   # jsdom, dev-only — the framework itself has zero runtime deps
-npm test
-```
-
-27 tests cover the reactive core (including glitch-free diamonds, lazy memo propagation, dynamic dependencies, batching, cleanup) and the DOM/router/store layers against a real DOM.
+### → **[Read the documentation](https://aidasjosas.github.io/weave)**
 
 ---
 
-## Weave vs. the field
+## 🤝 A note on honesty
 
-| | React | Angular | Vue | Svelte | **Weave** |
-|---|---|---|---|---|---|
-| Reactivity | VDOM + hooks | RxJS + signals | signals (refs) | signals (runes) | **signals only** |
-| Dependency arrays | yes (`useEffect`) | — | no | no | **no** |
-| Virtual DOM | yes | no (change detection) | yes | no | **no** |
-| Manual memoization | `useMemo`/Compiler | — | rare | no | **never** |
-| Build step | effectively | yes | yes | yes | **yes (compiled)** ¹ |
-| Scoped CSS | no (CSS-in-JS) | yes | yes | yes | **yes** |
-| Template type-checking | JSX via TS | yes (template) | Volar | Svelte LS | **yes (planned)** ² |
-| Built-in router | no | yes | no (official lib) | SvelteKit | **yes** ² |
-| Built-in store | no | services | Pinia (lib) | stores | **yes** ² |
-| Runtime size (gzip) | ~45 kb | large | ~34 kb | ~1.6 kb | **target: Svelte-class** ³ |
-
-¹ **Weave is compiled** (`.weave` → esbuild). This is a deliberate trade-off, not a regression: an earlier prototype ran with no build step, but compiling is exactly what lets the runtime stay tiny and updates stay surgical (the same reason Svelte compiles). A `weave dev` server with watch + fast rebuilds is the intended workflow.
-² Router and store exist and are being re-ported to the compiled architecture; template type-checking ships with the type-aware milestone. See *Scope & honesty*.
-³ The compiled output is per-component fine-grained code over a small shared runtime. An exact gzipped figure is measured against an identical Svelte component before it is claimed here — no number is published until it's verified.
-
----
-
-## Scope & honesty
-
-This is **v0.1** — a real, tested framework that proves the thesis, not a 1.0 replacement for an ecosystem built over a decade. The analysis itself warns against "framework jumping," so here's the straight talk:
-
-- **What's real and working:** signals, computed, effects (all glitch-free and tested), the `html``` renderer with fine-grained text/attribute/property/event bindings, `when`/`each` keyed lists, components, lifecycle, context, the store, and the router — verified in a real browser and under 27 automated tests.
-- **On the roadmap, not built yet:** SSR / streaming with a clean (non-string) server boundary, an optional compiler for `.weave` single-file components with scoped styles, a devtools time-travel inspector, and a mobile target — these are exactly the gaps the analysis flagged across Svelte/Vue/Next, called out so they aren't oversold.
-- **The honest trade-off the document itself makes:** "Smart developers reach different conclusions from the same data." Weave optimizes for *small, fast, signal-native, low-ceremony*. If you need a vast hiring pool and a mature ecosystem **today**, that's still React's win — by design, not by accident.
+Weave optimizes for *small, fast, signal‑native, low‑ceremony.* If today you need the largest hiring pool and the deepest ecosystem on the planet, that's still React's win — and that's fine. Weave is for the projects where a tiny, predictable, signal‑first framework is exactly the right cloth. Pick the tool that fits the garment.
 
 ## License
 
-MIT.
+[MIT](LICENSE) — woven with care. 🧵

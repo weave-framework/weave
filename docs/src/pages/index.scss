@@ -1,0 +1,106 @@
+.hero {
+  text-align: center;
+  padding: 40px 0 12px;
+}
+
+.hero-logo {
+  filter: drop-shadow(0 6px 20px color-mix(in srgb, var(--accent) 30%, transparent));
+}
+
+.hero-title {
+  font-size: 56px;
+  margin: 14px 0 6px;
+  letter-spacing: -0.03em;
+}
+
+.hero-tagline {
+  font-size: 20px;
+  color: var(--fg);
+  font-weight: 500;
+  margin: 0 auto 10px;
+  max-width: 640px;
+}
+
+.hero-sub {
+  font-size: 16px;
+  color: var(--fg-soft);
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.hero-cta {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: 26px;
+}
+
+// The CTA buttons are `<Link>`s — their <a> is created in JS without the page's
+// scope attribute, so `:global()` (scoped by .hero-cta) is needed to style them.
+.hero-cta :global(.btn) {
+  font-size: 15px;
+  font-weight: 600;
+  padding: 11px 20px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+}
+
+.hero-cta :global(.btn:hover) {
+  text-decoration: none;
+}
+
+.hero-cta :global(.btn-primary) {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #0b0d11;
+}
+
+.hero-cta :global(.btn-primary:hover) {
+  filter: brightness(1.07);
+}
+
+.hero-cta :global(.btn-ghost) {
+  background: var(--surface);
+  color: var(--fg);
+}
+
+.hero-cta :global(.btn-ghost:hover) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.threads {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  margin-top: 56px;
+}
+
+.thread-card {
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-soft);
+}
+
+.thread-card h3 {
+  margin: 0 0 6px;
+  font-size: 16px;
+}
+
+.thread-card p {
+  margin: 0;
+  font-size: 14.5px;
+}
+
+@media (max-width: 720px) {
+  .threads {
+    grid-template-columns: 1fr;
+  }
+
+  .hero-title {
+    font-size: 44px;
+  }
+}

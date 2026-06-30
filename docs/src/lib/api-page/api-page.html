@@ -1,0 +1,44 @@
+<article class="doc api-doc">
+  @if (notFound()) {
+    <h1>Unknown package</h1>
+    <p>There's no API reference for “{{ title() }}”.</p>
+  } @else {
+    <h1><code>{{ title() }}</code></h1>
+    <p class="api-count">{{ count() }} exports — generated from the source.</p>
+
+    @for (s of symbols(); track s.anchor) {
+      <section class="api">
+        <h3 id={{ s.anchor }}>
+          <span class="api-kind" data-kind={{ s.kind }}>{{ s.kind }}</span>
+          <code class="api-name">{{ s.name }}</code>
+        </h3>
+
+        <CodeBlock code={{ s.signature }} lang="ts" />
+
+        @if (s.doc) {
+          <p class="api-prose">{{ s.doc }}</p>
+        }
+
+        @if (s.params.length) {
+          <p class="api-sub">Parameters</p>
+          <ul class="api-params">
+            @for (p of s.params; track p.name) {
+              <li>
+                <code class="api-pname">{{ p.name }}</code><span class="api-ptype">: {{ p.type }}</span>
+                @if (p.doc) {
+                  <span class="api-pdoc"> — {{ p.doc }}</span>
+                }
+              </li>
+            }
+          </ul>
+        }
+
+        @if (s.returns) {
+          @if (s.returns.doc) {
+            <p class="api-sub">Returns <span class="api-rdoc">{{ s.returns.doc }}</span></p>
+          }
+        }
+      </section>
+    }
+  }
+</article>

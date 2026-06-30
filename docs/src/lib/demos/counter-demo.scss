@@ -1,0 +1,35 @@
+.counter-demo {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.cd-primary {
+  font: inherit;
+  font-weight: 600;
+  padding: 9px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: #0b0d11;
+  cursor: pointer;
+}
+
+.cd-primary:hover {
+  filter: brightness(1.07);
+}
+
+.cd-ghost {
+  font: inherit;
+  padding: 9px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--fg);
+  cursor: pointer;
+}
+
+.cd-ghost:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}

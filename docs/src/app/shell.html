@@ -1,0 +1,36 @@
+<header class="topbar">
+  <Link to="/" class="brand">
+    <img class="brand-logo" src="/favicon.svg" alt="" width="24" height="24" />
+    <span class="brand-name">Weave</span>
+    <span class="brand-tag">docs</span>
+  </Link>
+
+  <nav class="sections">
+    @for (s of sections; track s.id) {
+      <Link to={{ s.basePath }} class="section-link" activeClass="active">{{ s.icon }} {{ s.label }}</Link>
+    }
+  </nav>
+
+  <div class="topbar-right">
+    <SearchBox />
+    <button class="icon-btn" type="button" on:click={{ toggleTheme }} aria-label="Toggle color theme">{{ themeIcon() }}</button>
+    <a class="icon-btn gh" href={{ repoUrl }} target="_blank" rel="noopener noreferrer">GitHub</a>
+  </div>
+</header>
+
+<div class="layout">
+  <aside class="sidebar">
+    @for (g of groups(); track g.label) {
+      <div class="nav-group">
+        <p class="nav-group-title">{{ g.label }}</p>
+        @for (it of g.items; track it.path) {
+          <Link to={{ it.path }} class="nav-link" activeClass="active">{{ it.label }}</Link>
+        }
+      </div>
+    }
+  </aside>
+
+  <main class="content">
+    <RouterView router={{ router }} />
+  </main>
+</div>

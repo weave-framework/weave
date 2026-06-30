@@ -1,0 +1,20 @@
+.doc {
+  max-width: 800px;
+}
+
+.doc :global(.next-link) {
+  font-weight: 600;
+}
+
+.doc :global(blockquote) {
+  margin: 16px 0;
+  padding: 2px 16px;
+  border-left: 3px solid var(--border);
+  color: var(--muted);
+}
+
+.doc :global(hr) {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 32px 0;
+}
