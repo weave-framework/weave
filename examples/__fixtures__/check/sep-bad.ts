@@ -1,4 +1,4 @@
-import { signal } from '@weave/runtime';
+import { signal } from '@weave-framework/runtime';
 
 export function setup() {
   const n = signal(0);

@@ -23,14 +23,14 @@ const ID_CHAR: RegExp = /[A-Za-z0-9_$]/;
 export type Binding =
   | { kind: 'ctx' } // setup() binding → ctx.<name>
   | { kind: 'call'; accessor: string } // template local → <accessor>()
-  | { kind: 'local' }; // a real lexical local — emit the bare name (used by `@weave/check`)
+  | { kind: 'local' }; // a real lexical local — emit the bare name (used by `@weave-framework/check`)
 
 export type Scope = Map<string, Binding>;
 
 /**
  * A maximal run of characters copied **verbatim** from the source expression
  * into the generated code, identical in both (so `len` applies to each side).
- * Used by `@weave/language-server` to build Volar's bidirectional source↔virtual
+ * Used by `@weave-framework/language-server` to build Volar's bidirectional source↔virtual
  * mappings: every source character is covered by exactly one segment, while
  * synthesized text (the `ctxRef.` prefix, an accessor `()`) is intentionally left
  * unmapped. Offsets are relative to the start of `expr` / `code` respectively.
@@ -54,7 +54,7 @@ export interface RewriteResult {
 
 /**
  * Rewrite `expr` against `scope`, prefixing ctx bindings with `ctxRef` (default
- * `ctx`, the runtime context object; `@weave/check` passes `__ctx`, its typed
+ * `ctx`, the runtime context object; `@weave-framework/check` passes `__ctx`, its typed
  * stand-in). Template locals emit either an accessor call (runtime) or the bare
  * name (`kind: 'local'`, the check pass where they are real lexical bindings).
  *

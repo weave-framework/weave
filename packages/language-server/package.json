@@ -1,5 +1,5 @@
 {
-  "name": "@weave/language-server",
+  "name": "@weave-framework/language-server",
   "version": "0.2.0",
   "description": "Weave language server — Volar-based IDE support (.weave + template type-checking) for VS Code and WebStorm.",
   "type": "module",
@@ -20,8 +20,8 @@
     "@volar/language-core": "^2.4.11",
     "@volar/language-server": "^2.4.11",
     "@volar/typescript": "^2.4.11",
-    "@weave/check": "workspace:*",
-    "@weave/compiler": "workspace:*",
+    "@weave-framework/check": "workspace:*",
+    "@weave-framework/compiler": "workspace:*",
     "volar-service-css": "^0.0.62",
     "volar-service-typescript": "^0.0.62",
     "vscode-uri": "^3.1.0"

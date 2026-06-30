@@ -1,5 +1,5 @@
 {
-  "name": "@weave/data",
+  "name": "@weave-framework/data",
   "version": "0.2.0",
   "description": "Weave data — signal-native async resources + a tiny fetch client. Zero third-party deps.",
   "type": "module",
@@ -34,7 +34,7 @@
     }
   },
   "dependencies": {
-    "@weave/runtime": "workspace:*"
+    "@weave-framework/runtime": "workspace:*"
   },
   "license": "MIT"
 }

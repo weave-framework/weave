@@ -1,6 +1,6 @@
 import { test, assert } from '../../../tools/harness.js';
-import { parseTemplate } from '@weave/compiler';
-import type { ElementNode, Attr } from '@weave/compiler';
+import { parseTemplate } from '@weave-framework/compiler';
+import type { ElementNode, Attr } from '@weave-framework/compiler';
 
 // M10 — template binding syntax is unified on DOUBLE braces everywhere. Attribute /
 // directive bindings are `attr={{ expr }}` (matching text interpolation `{{ expr }}`).

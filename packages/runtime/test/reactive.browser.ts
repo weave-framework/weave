@@ -1,6 +1,6 @@
 import { test, assert } from '../../../tools/harness.js';
-import { signal, computed, effect, batch, untrack, onCleanup, onMount, tick, root } from '@weave/runtime';
-import type { Signal, Computed } from '@weave/runtime';
+import { signal, computed, effect, batch, untrack, onCleanup, onMount, tick, root } from '@weave-framework/runtime';
+import type { Signal, Computed } from '@weave-framework/runtime';
 
 test('signal read/write', () => {
   const n: Signal<number> = signal(1);

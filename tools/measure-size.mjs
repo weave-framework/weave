@@ -68,7 +68,7 @@ const weave = {
 // runtime-full. This keeps "reactive-core" the reactive primitives only.
 const reactiveV2 = await bundleStdin(`export * from './packages/runtime/src/reactive.js';`);
 const runtimeV2 = await bundleStdin(
-  `export * from '@weave/runtime';\nexport * from '@weave/runtime/dom';`
+  `export * from '@weave-framework/runtime';\nexport * from '@weave-framework/runtime/dom';`
 );
 
 const counterApp = (

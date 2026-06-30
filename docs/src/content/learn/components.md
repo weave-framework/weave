@@ -8,7 +8,7 @@ Two sibling files, same base name:
 
 :::tabs
 ~~~ts title="task-card.ts"
-import { inject } from '@weave/runtime';
+import { inject } from '@weave-framework/runtime';
 import { useEditor, type EditorStore } from '../../stores/editor';
 import { SessionContext, type Session } from '../../app/session';
 import type { Task } from '../../data/types';
@@ -106,7 +106,7 @@ You don't have to split a component across files at all. A `.weave` file holds e
 
 ~~~html title="counter.weave"
 <script>
-  import { signal } from '@weave/runtime';
+  import { signal } from '@weave-framework/runtime';
   export function setup() {
     const n = signal(0);
     return { n, inc: () => n.set((v) => v + 1) };
@@ -290,4 +290,4 @@ Only what `setup` returns is visible to the template, and only props + `on:` eve
 A component is an optional `setup` (runs once, returns the template's names — may be omitted, `async`, or return nothing) + a template. Template and styles can come from a **sibling file**, an **inline string**, an **explicit file**, a **`styles` array**, or a **`.weave`** single file — and Weave fails loud on ambiguity (declaration *and* a sibling), a missing file, `${…}` in a backtick, or a non-static value. A tag is a child component iff it starts **uppercase**, and only static / `{{ }}` / `on:` attributes are legal on it. Props flow **down** as reactive getters (don't destructure); events flow **up** as callback props where `on:x` *is* `onX`; two-way means passing the **signal** itself. There's no default-props mechanism — default inside `setup`. A returned binding **shadows** a like-named prop. Slots project markup in (default, named, static `slot=`, whitespace-only falls back), and `@snippet`/`@render` reuse markup within a component.
 :::
 
-[Next: Templates →](/learn/templates) · [Reference: @weave/runtime →](/reference/runtime)
+[Next: Templates →](/learn/templates) · [Reference: @weave-framework/runtime →](/reference/runtime)

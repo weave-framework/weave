@@ -11,7 +11,7 @@
  *    maps (via `associatedScriptMappings`) back to the `.ts`, so go-to-definition
  *    on a template variable lands in the component file.
  *
- * One emitter (`@weave/check`) feeds both this server and `weave check`, so the
+ * One emitter (`@weave-framework/check`) feeds both this server and `weave check`, so the
  * editor and the CLI can never disagree about a template's types.
  */
 
@@ -32,8 +32,8 @@ import {
   buildVirtualSeparate,
   type Virtual,
   type WeaveMapping,
-} from '@weave/check/emit';
-import { parseSfcLoc, type ComponentSourceLoc } from '@weave/compiler';
+} from '@weave-framework/check/emit';
+import { parseSfcLoc, type ComponentSourceLoc } from '@weave-framework/compiler';
 
 /** Every mapped region gets the full set of language features. */
 const ALL_FEATURES: CodeInformation = {

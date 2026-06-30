@@ -1,7 +1,7 @@
 import { test, assert } from '../../../tools/harness.js';
-import { signal, computed, effect, root, type Signal } from '@weave/runtime';
-import * as dom from '@weave/runtime/dom';
-import { compileTemplate } from '@weave/compiler';
+import { signal, computed, effect, root, type Signal } from '@weave-framework/runtime';
+import * as dom from '@weave-framework/runtime/dom';
+import { compileTemplate } from '@weave-framework/compiler';
 
 // The runtime object the compiled (function-mode) code references as `rt`.
 const rt: typeof dom & {
@@ -263,7 +263,7 @@ test('module mode emits a real ES module', () => {
     mode: 'module',
     scope: ['count', 'inc'],
   });
-  assert.ok(code.includes("from \"@weave/runtime/dom\""), 'imports from runtime');
+  assert.ok(code.includes("from \"@weave-framework/runtime/dom\""), 'imports from runtime');
   assert.ok(code.includes('export default function render(ctx, slots)'), 'exports render');
   assert.ok(code.includes('bindText('), 'binds text');
   assert.ok(code.includes('listen('), 'wires event');

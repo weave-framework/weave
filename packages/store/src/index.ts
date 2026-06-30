@@ -1,5 +1,5 @@
 /**
- * @weave/store — built-in state management. Zero dependencies.
+ * @weave-framework/store — built-in state management. Zero dependencies.
  *
  * A store is just a lazily-instantiated singleton bag of signals + actions.
  * Because the state IS signals, any component that reads it updates surgically —

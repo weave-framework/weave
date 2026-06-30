@@ -7,8 +7,8 @@ import {
   linkedSignal,
   debounced,
   watch,
-} from '@weave/runtime';
-import type { Signal, Computed, Owner } from '@weave/runtime';
+} from '@weave-framework/runtime';
+import type { Signal, Computed, Owner } from '@weave-framework/runtime';
 
 const wait = (ms: number): Promise<void> => new Promise<void>((r) => setTimeout(r, ms));
 

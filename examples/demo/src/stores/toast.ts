@@ -7,8 +7,8 @@
  * also clears the timer, so a manual close can't leave a stray timeout firing later.
  */
 
-import { store } from '@weave/store';
-import { signal, type Signal } from '@weave/runtime';
+import { store } from '@weave-framework/store';
+import { signal, type Signal } from '@weave-framework/runtime';
 
 /** A single notification. `kind` drives the accent color in `<ToastHost>`. */
 export interface Toast {

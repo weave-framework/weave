@@ -1,6 +1,6 @@
 /**
  * Browser test runner: finds every `*.browser.ts` under packages/, bundles each
- * with esbuild (resolving @weave/* workspace imports), runs it in headless
+ * with esbuild (resolving @weave-framework/* workspace imports), runs it in headless
  * Chromium via Playwright, and reports pass/fail. Replaces jsdom entirely —
  * tests execute against a real DOM.
  */

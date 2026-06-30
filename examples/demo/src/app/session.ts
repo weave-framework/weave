@@ -4,7 +4,7 @@
  * insights panel — `inject`s it without prop-drilling through every layer between.
  */
 
-import { createContext, type Context } from '@weave/runtime';
+import { createContext, type Context } from '@weave-framework/runtime';
 
 export interface Session {
   /** The signed-in team member; cards they own get a "You" marker. */

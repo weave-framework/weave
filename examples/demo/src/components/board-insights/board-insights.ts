@@ -1,4 +1,4 @@
-import { computed, inject, type Computed } from '@weave/runtime';
+import { computed, inject, type Computed } from '@weave-framework/runtime';
 import { useBoard, type BoardStore } from '../../stores/board';
 import { SessionContext, type Session } from '../../app/session';
 import type { Priority } from '../../types';

@@ -1,6 +1,6 @@
-import { signal, type Signal } from '@weave/runtime';
-import { resource, type Resource } from '@weave/data';
-import { Link } from '@weave/router';
+import { signal, type Signal } from '@weave-framework/runtime';
+import { resource, type Resource } from '@weave-framework/data';
+import { Link } from '@weave-framework/router';
 import { api } from '../../data/api';
 import type { Task } from '../../types';
 

@@ -1,4 +1,4 @@
-import { inject } from '@weave/runtime';
+import { inject } from '@weave-framework/runtime';
 import { useEditor, type EditorStore } from '../../stores/editor';
 import { SessionContext, type Session } from '../../app/session';
 import type { Task } from '../../types';

@@ -1,11 +1,11 @@
 import { test, assert } from '../../../tools/harness.js';
-import { signal } from '@weave/runtime';
-import type { Signal } from '@weave/runtime';
+import { signal } from '@weave-framework/runtime';
+import type { Signal } from '@weave-framework/runtime';
 import {
   template, clone, child, anchor, insert,
   setText, bindText, setAttr, bindAttr, bindProp, bindClass,
   listen, setRef, mount,
-} from '@weave/runtime/dom';
+} from '@weave-framework/runtime/dom';
 
 function host(): HTMLElement {
   const el: HTMLDivElement = document.createElement('div');

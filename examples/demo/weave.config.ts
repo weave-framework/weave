@@ -1,4 +1,4 @@
-import { defineConfig } from '@weave/cli';
+import { defineConfig } from '@weave-framework/cli';
 
 /**
  * Weave Board demo — build/dev config (Angular-style: one file declares it all).

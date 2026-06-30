@@ -1,28 +1,28 @@
 # Publishing Weave to npm
 
-Weave ships to npm as scoped packages under **`@weave/*`** plus the **`create-weave`** scaffold. This is the maintainer checklist. The actual upload requires npm credentials and is a manual, deliberate step.
+Weave ships to npm as scoped packages under **`@weave-framework/*`** plus the **`create-weave`** scaffold. This is the maintainer checklist. The actual upload requires npm credentials and is a manual, deliberate step.
 
 ## What gets published
 
 In dependency order (the order `tools/publish-packages.mjs` uses):
 
-1. `@weave/runtime`
-2. `@weave/compiler`
-3. `@weave/store`
-4. `@weave/i18n`
-5. `@weave/data`
-6. `@weave/forms`
-7. `@weave/router`
-8. `@weave/check`
-9. `@weave/cli`
+1. `@weave-framework/runtime`
+2. `@weave-framework/compiler`
+3. `@weave-framework/store`
+4. `@weave-framework/i18n`
+5. `@weave-framework/data`
+6. `@weave-framework/forms`
+7. `@weave-framework/router`
+8. `@weave-framework/check`
+9. `@weave-framework/cli`
 10. `create-weave`
 
-Editor tooling (`@weave/language-server`, `@weave/typescript-plugin`) is **not** part of this flow — publish it on its own track if/when desired. The monorepo root, `examples/demo`, and `docs/` are private and never published.
+Editor tooling (`@weave-framework/language-server`, `@weave-framework/typescript-plugin`) is **not** part of this flow — publish it on its own track if/when desired. The monorepo root, `examples/demo`, and `docs/` are private and never published.
 
 ## How packages are built for publishing
 
 - **Library packages** (`runtime`, `router`, `store`, `forms`, `i18n`, `data`, `compiler`, `check`) compile via `tsc -p tsconfig.build.json` → `dist/` (`.js` + `.d.ts`, module structure preserved). Their `package.json` `exports`/`main`/`types` point at `dist/`; only `dist/` is in the published tarball (`files`).
-- **`@weave/cli`** emits declarations via `tsc` and bundles a runnable `dist/cli.js` via esbuild (`packages/cli/build.mjs`), inlining `@weave/compiler` + `@weave/check`. Its `bin` is a thin launcher importing `dist/cli.js` — no runtime bundling, no monorepo-layout assumptions. `esbuild` + `typescript` are real `dependencies`; `sass` is optional.
+- **`@weave-framework/cli`** emits declarations via `tsc` and bundles a runnable `dist/cli.js` via esbuild (`packages/cli/build.mjs`), inlining `@weave-framework/compiler` + `@weave-framework/check`. Its `bin` is a thin launcher importing `dist/cli.js` — no runtime bundling, no monorepo-layout assumptions. `esbuild` + `typescript` are real `dependencies`; `sass` is optional.
 - `workspace:*` inter-package deps are rewritten to the concrete version (`0.2.0`) automatically by `pnpm publish` at pack time.
 
 Build everything:

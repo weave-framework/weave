@@ -1,5 +1,5 @@
 import { test, assert } from '../../../tools/harness.js';
-import { createOwner, runInOwner, type Owner } from '@weave/runtime';
+import { createOwner, runInOwner, type Owner } from '@weave-framework/runtime';
 import {
   field,
   form,
@@ -9,7 +9,7 @@ import {
   type Field,
   type Group,
   type FieldArray,
-} from '@weave/forms';
+} from '@weave-framework/forms';
 
 /* ──────────────────────────── nested groups ──────────────────────────── */
 

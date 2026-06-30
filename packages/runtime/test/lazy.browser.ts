@@ -1,6 +1,6 @@
 import { test, assert } from '../../../tools/harness.js';
-import { defineComponent, mountComponent, lazy } from '@weave/runtime/dom';
-import type { Component } from '@weave/runtime/dom';
+import { defineComponent, mountComponent, lazy } from '@weave-framework/runtime/dom';
+import type { Component } from '@weave-framework/runtime/dom';
 
 /** Flush all microtasks (the loader promise settles across a few of them). */
 const settle = (): Promise<void> =>

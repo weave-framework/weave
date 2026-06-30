@@ -1,5 +1,5 @@
 {
-  "name": "@weave/i18n",
+  "name": "@weave-framework/i18n",
   "version": "0.2.0",
   "description": "Weave i18n — optional, signal-native translations with ICU plural/select. Zero third-party deps.",
   "type": "module",
@@ -34,7 +34,7 @@
     }
   },
   "dependencies": {
-    "@weave/runtime": "workspace:*"
+    "@weave-framework/runtime": "workspace:*"
   },
   "license": "MIT"
 }

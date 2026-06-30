@@ -26,8 +26,8 @@ import type { OnLoadArgs, OnLoadResult, Plugin, PluginBuild } from 'esbuild';
 import { readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import { compileComponent, parseSfc, extractSources, classifyTemplate, classifyStyle } from '@weave/compiler';
-import type { ComponentSource, ExtractedSources } from '@weave/compiler';
+import { compileComponent, parseSfc, extractSources, classifyTemplate, classifyStyle } from '@weave-framework/compiler';
+import type { ComponentSource, ExtractedSources } from '@weave-framework/compiler';
 import { compileStyleFileTracked, compileStyleSource, type StyleLang } from './styles.js';
 
 export interface WeaveState {

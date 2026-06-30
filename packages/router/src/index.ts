@@ -1,6 +1,6 @@
 /**
- * @weave/router — the official client router. Built in, not a third-party bolt-on.
- * Zero third-party dependencies (only `@weave/runtime`).
+ * @weave-framework/router — the official client router. Built in, not a third-party bolt-on.
+ * Zero third-party dependencies (only `@weave-framework/runtime`).
  *
  * History-based and signal-driven: the current path and query are signals, so any
  * view that reads them updates surgically on navigation. Routes are an ordered tree
@@ -15,12 +15,12 @@
  *
  * Guards are synchronous by design: they run inside the reactive resolution and read
  * signals (e.g. `isAuthed()`), so a route re-resolves automatically when auth changes.
- * Async data loading belongs in the component via `@weave/data`.
+ * Async data loading belongs in the component via `@weave-framework/data`.
  */
 
-import { signal, computed, effect, batch, getOwner, createContext, provide, inject } from '@weave/runtime';
-import type { Signal, Computed, Context } from '@weave/runtime';
-import { ifBlock, transition, type Component, type TransitionFn } from '@weave/runtime/dom';
+import { signal, computed, effect, batch, getOwner, createContext, provide, inject } from '@weave-framework/runtime';
+import type { Signal, Computed, Context } from '@weave-framework/runtime';
+import { ifBlock, transition, type Component, type TransitionFn } from '@weave-framework/runtime/dom';
 
 export type RouteParams = Record<string, string>;
 

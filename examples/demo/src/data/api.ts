@@ -1,12 +1,12 @@
 /**
  * Mock backend for the demo — an in-memory task "database" served through a fake
  * `fetch`. This lets the app run fully offline, yet still exercise the REAL
- * `@weave/data` stack: `createClient`, the functional interceptor chain
+ * `@weave-framework/data` stack: `createClient`, the functional interceptor chain
  * (auth + logging), and `resource`/`action` on top. Swapping `fetch` for the real
  * one is the only change a production app would make.
  */
 
-import { createClient, type Interceptor, type Client } from '@weave/data';
+import { createClient, type Interceptor, type Client } from '@weave-framework/data';
 import type { Task, NewTask } from '../types';
 
 /* ──────────────────────────── in-memory db ──────────────────────────── */

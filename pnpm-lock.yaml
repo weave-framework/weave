@@ -14,34 +14,34 @@ importers:
       '@types/node':
         specifier: ^22.0.0
         version: 22.20.0
-      '@weave/check':
+      '@weave-framework/check':
         specifier: workspace:*
         version: link:packages/check
-      '@weave/cli':
+      '@weave-framework/cli':
         specifier: workspace:*
         version: link:packages/cli
-      '@weave/compiler':
+      '@weave-framework/compiler':
         specifier: workspace:*
         version: link:packages/compiler
-      '@weave/data':
+      '@weave-framework/data':
         specifier: workspace:*
         version: link:packages/data
-      '@weave/forms':
+      '@weave-framework/forms':
         specifier: workspace:*
         version: link:packages/forms
-      '@weave/i18n':
+      '@weave-framework/i18n':
         specifier: workspace:*
         version: link:packages/i18n
-      '@weave/router':
+      '@weave-framework/router':
         specifier: workspace:*
         version: link:packages/router
-      '@weave/runtime':
+      '@weave-framework/runtime':
         specifier: workspace:*
         version: link:packages/runtime
-      '@weave/store':
+      '@weave-framework/store':
         specifier: workspace:*
         version: link:packages/store
-      '@weave/typescript-plugin':
+      '@weave-framework/typescript-plugin':
         specifier: workspace:*
         version: link:packages/typescript-plugin
       esbuild:
@@ -75,7 +75,7 @@ importers:
       '@vscode/vsce':
         specifier: ^3.0.0
         version: 3.9.2
-      '@weave/language-server':
+      '@weave-framework/language-server':
         specifier: workspace:*
         version: link:../../packages/language-server
       esbuild:
@@ -84,7 +84,7 @@ importers:
 
   packages/check:
     dependencies:
-      '@weave/compiler':
+      '@weave-framework/compiler':
         specifier: workspace:*
         version: link:../compiler
       typescript:
@@ -110,19 +110,19 @@ importers:
 
   packages/data:
     dependencies:
-      '@weave/runtime':
+      '@weave-framework/runtime':
         specifier: workspace:*
         version: link:../runtime
 
   packages/forms:
     dependencies:
-      '@weave/runtime':
+      '@weave-framework/runtime':
         specifier: workspace:*
         version: link:../runtime
 
   packages/i18n:
     dependencies:
-      '@weave/runtime':
+      '@weave-framework/runtime':
         specifier: workspace:*
         version: link:../runtime
 
@@ -137,10 +137,10 @@ importers:
       '@volar/typescript':
         specifier: ^2.4.11
         version: 2.4.28
-      '@weave/check':
+      '@weave-framework/check':
         specifier: workspace:*
         version: link:../check
-      '@weave/compiler':
+      '@weave-framework/compiler':
         specifier: workspace:*
         version: link:../compiler
       typescript:
@@ -158,7 +158,7 @@ importers:
 
   packages/router:
     dependencies:
-      '@weave/runtime':
+      '@weave-framework/runtime':
         specifier: workspace:*
         version: link:../runtime
 
@@ -174,10 +174,10 @@ importers:
       '@volar/typescript':
         specifier: ^2.4.11
         version: 2.4.28
-      '@weave/check':
+      '@weave-framework/check':
         specifier: workspace:*
         version: link:../check
-      '@weave/compiler':
+      '@weave-framework/compiler':
         specifier: workspace:*
         version: link:../compiler
       typescript:

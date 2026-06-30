@@ -4,8 +4,8 @@
  * modal itself lives once, in the app shell, and reads this state.
  */
 
-import { store } from '@weave/store';
-import { signal, type Signal } from '@weave/runtime';
+import { store } from '@weave-framework/store';
+import { signal, type Signal } from '@weave-framework/runtime';
 
 /** Closed, or open in create / edit mode. */
 type EditorState = null | { mode: 'new' } | { mode: 'edit'; id: string };

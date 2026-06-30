@@ -1,7 +1,7 @@
 /**
  * Static extraction of a component's template/styles *source declarations* from
  * its `.ts` script. Pure string work — no filesystem, no evaluation — so the dev
- * plugin, the one-shot build, `tools/verify-build.mjs`, and `@weave/check` can all
+ * plugin, the one-shot build, `tools/verify-build.mjs`, and `@weave-framework/check` can all
  * share one definition of the authoring contract. Lives in the compiler (the
  * shared base) to avoid a cli↔check dependency cycle.
  *
@@ -18,7 +18,7 @@
  * are build-time metadata: {@link extractSources} returns the script with them
  * **blanked** (same-length whitespace, newlines kept) so line numbers — and thus
  * error offsets — are preserved, exactly like `parseSfcLoc`. For an inline template
- * it also returns the value's `[start, end)` offsets, so `@weave/check` can build a
+ * it also returns the value's `[start, end)` offsets, so `@weave-framework/check` can build a
  * location-faithful template via {@link faithfulTemplate} and map diagnostics back
  * to the `.ts` line:col.
  */

@@ -32,7 +32,7 @@ export default defineConfig({
 When you need full control — register a service worker, set up a polyfill, mount somewhere unusual, register custom elements yourself — use `entry` instead of `root` and write the entry module by hand with `mountComponent`:
 
 ~~~ts title="src/main.ts"
-import { mountComponent } from '@weave/runtime/dom';
+import { mountComponent } from '@weave-framework/runtime/dom';
 import App from './app/app';
 
 mountComponent(App, '#app');
@@ -110,7 +110,7 @@ This inline string form is one of several ways to attach a template and styles t
 Outside the `root` bootstrap — when you use `entry`, or publish a widget as a library — call `defineCustomElement` directly:
 
 ~~~ts
-import { defineCustomElement } from '@weave/runtime/dom';
+import { defineCustomElement } from '@weave-framework/runtime/dom';
 import Badge from './badge';
 
 defineCustomElement('weave-badge', Badge, { props: ['priority'] });
@@ -131,4 +131,4 @@ Use the compiled form inside Weave (it's lighter and fully typed); reach for the
 The config declares exactly one of `root` (Weave generates the entry, mounts at `mount`, and auto-registers discovered custom elements) or `entry` (you hand-write the bootstrap with `mountComponent`, and `mount` is ignored). Export `const tag` (a hyphenated name) plus an optional `const props` to expose a component as a custom element that renders into light DOM and keeps scoped styles; each declared prop is a kebab-cased observed attribute **and** a camelCase JS property, both feeding one reactive signal. Auto-registration is fail-loud on duplicate or hyphen-less tags; `defineCustomElement` registers one by hand and is a no-op if the tag already exists. Use `<Badge/>` inside Weave, `<weave-badge>` at the boundary.
 :::
 
-[Next: Tooling & CLI →](/learn/tooling) · [Reference: @weave/runtime →](/reference/runtime)
+[Next: Tooling & CLI →](/learn/tooling) · [Reference: @weave-framework/runtime →](/reference/runtime)

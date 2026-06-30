@@ -1,5 +1,5 @@
-import { onMount } from '@weave/runtime';
-import { navigate } from '@weave/router';
+import { onMount } from '@weave-framework/runtime';
+import { navigate } from '@weave-framework/router';
 
 /** `/reference` → redirect to the section's first page. */
 export const template = '<p class="redirecting">Redirecting…</p>';

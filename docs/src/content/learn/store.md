@@ -22,8 +22,8 @@ export function store<T extends object>(factory: () => T): () => T {
 So `store(factory)` returns a *hook* — a zero-argument function. The `factory` you pass is also zero-argument. The first time you call the hook, the factory runs and its return value is cached; every call after that hands back that same cached value. Both functions take no arguments, by design: a store is a global singleton, so there's nothing to parameterize.
 
 ~~~ts
-import { store } from '@weave/store';
-import { signal, computed } from '@weave/runtime';
+import { store } from '@weave-framework/store';
+import { signal, computed } from '@weave-framework/runtime';
 
 export const useCart = store(() => {
   const items = signal<Item[]>([]);
@@ -104,8 +104,8 @@ Everything past this point is **application code** — patterns you build *with*
 Stores shine for server-backed data. Here's the shape of a board store: signals for state, a loader that fetches once, derived selectors, and mutations that update optimistically and roll back on failure.
 
 ~~~ts title="stores/board.ts"
-import { store } from '@weave/store';
-import { signal, computed } from '@weave/runtime';
+import { store } from '@weave-framework/store';
+import { signal, computed } from '@weave-framework/runtime';
 import { api } from '../data/api';
 
 export const useBoard = store(() => {
@@ -180,7 +180,7 @@ async function create(input: NewTask): Promise<Task> {
 }
 ~~~
 
-The UI reflects each `tasks.set` the instant it runs. (For a more declarative take on optimistic UI, `@weave/data` offers an [`optimistic`](/learn/recipes#optimistic-ui) helper — but as you can see, the store can do it with nothing but signals.)
+The UI reflects each `tasks.set` the instant it runs. (For a more declarative take on optimistic UI, `@weave-framework/data` offers an [`optimistic`](/learn/recipes#optimistic-ui) helper — but as you can see, the store can do it with nothing but signals.)
 
 ## Store, context, or a plain signal?
 
@@ -198,4 +198,4 @@ A useful hybrid: `provide()` a store-like object built in a parent's `setup` —
 `store<T extends object>(factory)` is the whole API: a lazy, app-wide singleton of signals + actions — no selectors, no reducers, no dispatch. The factory and the returned hook both take no arguments, and the factory must return an object. It runs once and caches via `instance ??= factory()` — so a factory that returns `null`/`undefined` will run again until it returns a real object. There's no reset or teardown; the instance lives for the module's lifetime (mind that in tests and HMR). Everything else — loaders, selectors, optimistic update + rollback — is plain signal code you write inside the factory. Reach for a store for app-wide state, `provide`/`inject` for per-subtree, and a local signal for one component.
 :::
 
-[Next: Forms →](/learn/forms) · [Reference: @weave/store →](/reference/store)
+[Next: Forms →](/learn/forms) · [Reference: @weave-framework/store →](/reference/store)

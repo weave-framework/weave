@@ -1,5 +1,5 @@
 {
-  "name": "@weave/forms",
+  "name": "@weave-framework/forms",
   "version": "0.2.0",
   "description": "Weave forms — signal-native field/form state + validation over bind:value. Zero third-party deps.",
   "type": "module",
@@ -39,7 +39,7 @@
     }
   },
   "dependencies": {
-    "@weave/runtime": "workspace:*"
+    "@weave-framework/runtime": "workspace:*"
   },
   "license": "MIT"
 }

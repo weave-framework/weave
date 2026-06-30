@@ -1,6 +1,6 @@
-import { provide, fade } from '@weave/runtime';
-import { RouterView, Link, currentPath, afterEach, type Router } from '@weave/router';
-import { ErrorBoundary, type TransitionFn } from '@weave/runtime/dom';
+import { provide, fade } from '@weave-framework/runtime';
+import { RouterView, Link, currentPath, afterEach, type Router } from '@weave-framework/router';
+import { ErrorBoundary, type TransitionFn } from '@weave-framework/runtime/dom';
 import { router } from './router';
 import { SessionContext } from './session';
 import TaskModal from '../components/task-modal/task-modal';

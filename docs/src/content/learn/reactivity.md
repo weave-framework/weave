@@ -22,7 +22,7 @@ The moment you call `signal.set(...)` (outside a `batch`), every dependent `effe
 A `signal` holds a value and announces every change. Create it, read it by calling it, write it with `.set`:
 
 ~~~ts title="The four ways to touch a signal"
-import { signal } from '@weave/runtime';
+import { signal } from '@weave-framework/runtime';
 
 const count = signal(0);
 
@@ -64,7 +64,7 @@ Calling the signal subscribes the current derivation to it. `peek()` reads the v
 A `computed` derives a new value from other signals. It's **lazy** (it only recomputes when you read it) and **cached** (it won't recompute until one of its real dependencies changes):
 
 ~~~ts title="A basic computed"
-import { signal, computed } from '@weave/runtime';
+import { signal, computed } from '@weave-framework/runtime';
 
 const first = signal('Ada');
 const last = signal('Lovelace');
@@ -126,7 +126,7 @@ This is the key contrast with `effect` (next): a computed's error goes *out to i
 An `effect` runs a function **immediately and synchronously** — before `effect(...)` even returns — and then again whenever anything it read changes. Use it to push reactive state *out* of the graph — into the console, `localStorage`, a canvas, a third-party widget:
 
 ~~~ts title="An effect runs now, then on every change"
-import { signal, effect } from '@weave/runtime';
+import { signal, effect } from '@weave-framework/runtime';
 
 const theme = signal('light');
 
@@ -151,7 +151,7 @@ Dependencies are tracked by *what you actually read each run*. Add a branch that
 If an effect sets up something that needs tearing down (a timer, a subscription, a listener), return a cleanup function — **or** call `onCleanup`. Either way, the cleanup runs **before each re-run** and **on disposal**:
 
 ~~~ts title="onCleanup vs returning a cleanup"
-import { signal, effect, onCleanup } from '@weave/runtime';
+import { signal, effect, onCleanup } from '@weave-framework/runtime';
 
 const room = signal('general');
 
@@ -200,7 +200,7 @@ effect(() => {
 The fix is to give the inner work its own ownership scope you can dispose — wrap it in [`root`](#root--a-disposable-scope) (or `createOwner` + `runInOwner`) and tear it down in a cleanup:
 
 ~~~ts title="The fix: own the inner scope and dispose it"
-import { effect, root, onCleanup } from '@weave/runtime';
+import { effect, root, onCleanup } from '@weave-framework/runtime';
 
 effect(() => {
   const id = userId();
@@ -218,7 +218,7 @@ Most of the time you simply don't nest effects — derive with `computed` instea
 Each `.set` flushes effects synchronously. When you change several signals at once and want dependent **effects** to run **once** after all of them, wrap the writes in `batch`:
 
 ~~~ts title="One flush instead of two"
-import { signal, batch, effect } from '@weave/runtime';
+import { signal, batch, effect } from '@weave-framework/runtime';
 
 const x = signal(0);
 const y = signal(0);
@@ -250,7 +250,7 @@ batch(() => {
 Inside a derivation, `untrack` runs a block of code **without** creating any dependencies — it nulls tracking entirely for the duration. It returns whatever the block returns:
 
 ~~~ts title="A whole block of un-subscribed reads"
-import { effect, untrack } from '@weave/runtime';
+import { effect, untrack } from '@weave-framework/runtime';
 
 effect(() => {
   const live = source();                     // subscribed: re-runs when `source` changes
@@ -276,7 +276,7 @@ Reactive updates are synchronous, so you usually don't await anything. But a few
 `tick()` does two things, in order: it **flushes any queued effects** (a no-op when you're not inside a `batch`), then it **awaits a microtask** so anything scheduled with `queueMicrotask` has run:
 
 ~~~ts title="Waiting for microtask-deferred work"
-import { tick } from '@weave/runtime';
+import { tick } from '@weave-framework/runtime';
 
 count.set(5);
 // The DOM text already says 5 here — updates are synchronous.
@@ -290,7 +290,7 @@ If you call it inside a `batch`, the queued effects flush first, then the microt
 `catchError(handler, fn)` runs `fn` inside a fresh child ownership scope whose **error boundary** is `handler`. Any error thrown — synchronously during `fn` itself, **or** later by an `effect` created inside `fn` — is routed to `handler` instead of propagating. This is the primitive that powers the `<ErrorBoundary>` component, and you can use it directly.
 
 ~~~ts title="catchError(handler, fn)"
-import { signal, catchError, effect } from '@weave/runtime';
+import { signal, catchError, effect } from '@weave-framework/runtime';
 
 const error = signal<unknown>(null);
 
@@ -325,7 +325,7 @@ Most of the time that's all you need to know. But the ownership machinery is pub
 `root(fn)` runs `fn` inside a **fresh root owner** and hands `fn` a `dispose` function. Whatever `fn` returns becomes `root`'s return value. Use it when you need a reactive scope that isn't tied to a component — and that you'll tear down yourself.
 
 ~~~ts title="root(fn) → result, with a dispose handle"
-import { root, effect } from '@weave/runtime';
+import { root, effect } from '@weave-framework/runtime';
 
 const view = root((dispose) => {
   effect(() => render(state())); // owned by this root
@@ -350,7 +350,7 @@ These are the lower-level handles `root` is built from. You rarely need them dir
 A typical hand-rolled scope looks like this — which is, in effect, what `root` does for you:
 
 ~~~ts title="The manual version of root"
-import { createOwner, runInOwner, disposeOwner, effect } from '@weave/runtime';
+import { createOwner, runInOwner, disposeOwner, effect } from '@weave-framework/runtime';
 
 const owner = createOwner();
 runInOwner(owner, () => {
@@ -373,7 +373,7 @@ Three small, tree-shakeable helpers cover patterns you'd otherwise hand-roll. Ea
 A signal you can set locally, but that gets **overwritten** every time its source changes. The classic use: "select the first item, but re-select when the list reloads."
 
 ~~~ts title="linkedSignal(source, opts?)"
-import { linkedSignal } from '@weave/runtime';
+import { linkedSignal } from '@weave-framework/runtime';
 
 const selected = linkedSignal(() => items()[0]);
 selected.set(items()[2]);  // local override — fine
@@ -395,7 +395,7 @@ That `equals` matters more than it looks: the reset only fires when the source's
 A **read-only** value that updates only after its source has been quiet for `ms` milliseconds. Perfect for search-as-you-type: the input stays instant, the expensive work waits for a pause.
 
 ~~~ts title="debounced(source, ms)"
-import { signal, debounced } from '@weave/runtime';
+import { signal, debounced } from '@weave-framework/runtime';
 
 const query = signal('');
 const debouncedQuery = debounced(query, 300); // lags `query` by 300ms of quiet
@@ -413,7 +413,7 @@ The exact behavior:
 An effect with an **explicit source** and access to the **old** value. It's `watch(source, cb, opts?)`:
 
 ~~~ts title="watch(source, cb, opts?)"
-import { signal, watch } from '@weave/runtime';
+import { signal, watch } from '@weave-framework/runtime';
 
 const userId = signal(1);
 

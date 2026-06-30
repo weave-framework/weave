@@ -92,14 +92,14 @@ const reference: NavSection = {
     {
       label: 'Packages',
       items: [
-        { label: '@weave/runtime', path: '/reference/runtime' },
-        { label: '@weave/runtime/dom', path: '/reference/runtime-dom' },
-        { label: '@weave/router', path: '/reference/router' },
-        { label: '@weave/store', path: '/reference/store' },
-        { label: '@weave/forms', path: '/reference/forms' },
-        { label: '@weave/forms/dom', path: '/reference/forms-dom' },
-        { label: '@weave/i18n', path: '/reference/i18n' },
-        { label: '@weave/data', path: '/reference/data' },
+        { label: '@weave-framework/runtime', path: '/reference/runtime' },
+        { label: '@weave-framework/runtime/dom', path: '/reference/runtime-dom' },
+        { label: '@weave-framework/router', path: '/reference/router' },
+        { label: '@weave-framework/store', path: '/reference/store' },
+        { label: '@weave-framework/forms', path: '/reference/forms' },
+        { label: '@weave-framework/forms/dom', path: '/reference/forms-dom' },
+        { label: '@weave-framework/i18n', path: '/reference/i18n' },
+        { label: '@weave-framework/data', path: '/reference/data' },
       ],
     },
     {

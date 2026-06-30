@@ -1,6 +1,6 @@
 /**
  * Weave codegen — turns a template AST into JS that creates DOM once and wires
- * fine-grained signal bindings via the `@weave/runtime/dom` helpers.
+ * fine-grained signal bindings via the `@weave-framework/runtime/dom` helpers.
  *
  * Static structure becomes hoisted `<template>` strings with `<!---->` comment
  * anchors at dynamic positions; dynamic nodes are reached by compile-time
@@ -29,8 +29,8 @@ export interface CompileOptions {
 }
 
 class Gen {
-  used: Set<string> = new Set<string>(); // @weave/runtime/dom helpers
-  usedCore: Set<string> = new Set<string>(); // @weave/runtime primitives (computed, …)
+  used: Set<string> = new Set<string>(); // @weave-framework/runtime/dom helpers
+  usedCore: Set<string> = new Set<string>(); // @weave-framework/runtime primitives (computed, …)
   templates: string[] = [];
   private tplN: number = 0;
   private fnN: number = 0;
@@ -65,7 +65,7 @@ class Gen {
 
 export function compileTemplate(input: string, options: CompileOptions = {}): { code: string } {
   const mode: 'module' | 'function' = options.mode ?? 'module';
-  const runtimeImport: string = options.runtimeImport ?? '@weave/runtime/dom';
+  const runtimeImport: string = options.runtimeImport ?? '@weave-framework/runtime/dom';
   const gen: Gen = new Gen(mode, options.scopeAttr, options.hostAttr);
 
   const ast: TemplateNode[] = parseTemplate(input);
@@ -79,7 +79,7 @@ export function compileTemplate(input: string, options: CompileOptions = {}): { 
 
   const domImport: string = `import { ${[...gen.used].sort().join(', ')} } from ${JSON.stringify(runtimeImport)};`;
   const coreImport: string = gen.usedCore.size
-    ? `import { ${[...gen.usedCore].sort().join(', ')} } from "@weave/runtime";\n`
+    ? `import { ${[...gen.usedCore].sort().join(', ')} } from "@weave-framework/runtime";\n`
     : '';
   const code: string = [domImport + '\n' + coreImport, ...gen.templates, `export default ${render}`].join('\n');
   return { code };

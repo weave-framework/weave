@@ -1,6 +1,6 @@
 import { test, assert } from '../../../tools/harness.js';
-import { signal, effect, root, type Signal } from '@weave/runtime';
-import { ifBlock, eachBlock, type ForContext } from '@weave/runtime/dom';
+import { signal, effect, root, type Signal } from '@weave-framework/runtime';
+import { ifBlock, eachBlock, type ForContext } from '@weave-framework/runtime/dom';
 
 function host(): { parent: HTMLElement; anchor: Comment } {
   const parent: HTMLDivElement = document.createElement('div');

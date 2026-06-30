@@ -128,7 +128,7 @@ The `@placeholder` is optional. Triggers:
 }
 ~~~
 
-Accepts a Promise, a `@weave/data` resource (a refetch re-shows the pending branch), or a plain value (settles immediately into `@then`). All three branches are optional. `@then (alias)` / `@catch (alias)` bind the resolved value / error to a local. The source is read once, untracked — a fresh Promise on each render is not treated as a dependency.
+Accepts a Promise, a `@weave-framework/data` resource (a refetch re-shows the pending branch), or a plain value (settles immediately into `@then`). All three branches are optional. `@then (alias)` / `@catch (alias)` bind the resolved value / error to a local. The source is read once, untracked — a fresh Promise on each render is not treated as a dependency.
 
 ## Snippets
 
@@ -169,5 +169,5 @@ Renders an element whose tag name is dynamic; it rebuilds (disposing the old ele
 In template **text**, a literal block keyword is escaped by doubling the `@`: write `@@for` to render the characters `@for`. A single `@` that is not a block keyword (as in an email address) is left untouched.
 
 :::callout info "See also"
-[Templates (guide)](/learn/templates) · [Components](/learn/components) · [Styling](/learn/styling) · [Motion](/learn/motion) · [@weave/runtime reference](/reference/runtime)
+[Templates (guide)](/learn/templates) · [Components](/learn/components) · [Styling](/learn/styling) · [Motion](/learn/motion) · [@weave-framework/runtime reference](/reference/runtime)
 :::

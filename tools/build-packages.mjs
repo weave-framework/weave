@@ -1,11 +1,11 @@
 /**
- * Build every publishable @weave/* package to its dist/ (the form that ships to
+ * Build every publishable @weave-framework/* package to its dist/ (the form that ships to
  * npm). Library packages emit via `tsc -p tsconfig.build.json` (.js + .d.ts,
  * module structure preserved); the CLI emits declarations via tsc and bundles
  * its runnable dist/cli.js via esbuild (see packages/cli/build.mjs).
  *
  * Order follows the @weave dependency graph so each package's deps are built
- * first (matters for tsc resolving @weave/* .d.ts from already-built dist).
+ * first (matters for tsc resolving @weave-framework/* .d.ts from already-built dist).
  *
  * Run: `node tools/build-packages.mjs` (or `pnpm build:packages`).
  * The actual `npm publish` is a separate, credentialed step (publish in this
@@ -36,11 +36,11 @@ for (const p of [...LIB_ORDER, 'cli']) {
 }
 
 for (const p of LIB_ORDER) {
-  run('npx', ['tsc', '-p', `packages/${p}/tsconfig.build.json`], `tsc build @weave/${p}`);
+  run('npx', ['tsc', '-p', `packages/${p}/tsconfig.build.json`], `tsc build @weave-framework/${p}`);
 }
 
 // CLI: declarations via tsc, runnable bundle via esbuild.
-run('npx', ['tsc', '-p', 'packages/cli/tsconfig.build.json'], 'tsc d.ts @weave/cli');
-run('node', ['packages/cli/build.mjs'], 'esbuild bundle @weave/cli');
+run('npx', ['tsc', '-p', 'packages/cli/tsconfig.build.json'], 'tsc d.ts @weave-framework/cli');
+run('node', ['packages/cli/build.mjs'], 'esbuild bundle @weave-framework/cli');
 
-process.stdout.write('\n✓ All @weave/* packages built to dist/\n');
+process.stdout.write('\n✓ All @weave-framework/* packages built to dist/\n');

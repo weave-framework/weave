@@ -1,5 +1,5 @@
 import { test, assert } from '../../../tools/harness.js';
-import { rewrite, ctxScope, childScope, type Scope, type RewriteSegment } from '@weave/compiler';
+import { rewrite, ctxScope, childScope, type Scope, type RewriteSegment } from '@weave-framework/compiler';
 
 /** Assert the verbatim invariant: each segment quotes identical text on both sides. */
 function assertVerbatim(expr: string, code: string, segments: RewriteSegment[]): void {

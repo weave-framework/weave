@@ -1,5 +1,5 @@
-import { signal, computed, type Signal, type Computed } from '@weave/runtime';
-import { navigate } from '@weave/router';
+import { signal, computed, type Signal, type Computed } from '@weave-framework/runtime';
+import { navigate } from '@weave-framework/router';
 import { entries } from './build-index';
 import { search, type Result } from './search';
 import { scrollToHash } from '../util/scroll';

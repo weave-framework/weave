@@ -1,5 +1,5 @@
 /**
- * @weave/check — template type-checking (M8).
+ * @weave-framework/check — template type-checking (M8).
  *
  * Generates a never-bundled virtual `.ts` per component (verbatim `setup` + a
  * synthesized `__weave__()` placing each template expression against

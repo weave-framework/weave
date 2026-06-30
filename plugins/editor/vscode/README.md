@@ -23,7 +23,7 @@ The `.vsix` bundles two halves:
 
 - **Language server** (`dist/server.cjs`) — the template side: type-checks template
   expressions against the component, kills HTML noise, powers hover/completion.
-- **TypeScript service plugin** (`node_modules/@weave/typescript-plugin/`) — the `.ts`
+- **TypeScript service plugin** (`node_modules/@weave-framework/typescript-plugin/`) — the `.ts`
   side: synthesizes the component's default export (no `TS1192`) and counts
   template-only imports as used, so component files stop showing red underlines.
 

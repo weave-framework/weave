@@ -1,7 +1,7 @@
 import { test, assert } from '../../../tools/harness.js';
-import { effect, signal, tick, fade } from '@weave/runtime';
-import type { Signal } from '@weave/runtime';
-import { mount, mountComponent, defineComponent, lazy, type Component } from '@weave/runtime/dom';
+import { effect, signal, tick, fade } from '@weave-framework/runtime';
+import type { Signal } from '@weave-framework/runtime';
+import { mount, mountComponent, defineComponent, lazy, type Component } from '@weave-framework/runtime/dom';
 import {
   createRouter,
   navigate,
@@ -11,8 +11,8 @@ import {
   RouterView,
   Link,
   prefetch,
-} from '@weave/router';
-import type { Router, Match } from '@weave/router';
+} from '@weave-framework/router';
+import type { Router, Match } from '@weave-framework/router';
 
 // Route "components" are plain Component functions returning a <span> (so they
 // are distinguishable from RouterView's own display:contents <div> host).

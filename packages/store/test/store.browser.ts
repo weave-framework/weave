@@ -1,7 +1,7 @@
 import { test, assert } from '../../../tools/harness.js';
-import { signal } from '@weave/runtime';
-import type { Signal } from '@weave/runtime';
-import { store } from '@weave/store';
+import { signal } from '@weave-framework/runtime';
+import type { Signal } from '@weave-framework/runtime';
+import { store } from '@weave-framework/store';
 
 interface Counter {
   n: Signal<number>;

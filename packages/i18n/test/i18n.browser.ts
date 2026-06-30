@@ -6,7 +6,7 @@ import {
   effect,
   provide,
   type Owner,
-} from '@weave/runtime';
+} from '@weave-framework/runtime';
 import {
   createI18n,
   t,
@@ -16,7 +16,7 @@ import {
   type I18n,
   type Messages,
   type TranslateFn,
-} from '@weave/i18n';
+} from '@weave-framework/i18n';
 
 const tick = (): Promise<void> => new Promise<void>((r) => setTimeout(r, 0));
 

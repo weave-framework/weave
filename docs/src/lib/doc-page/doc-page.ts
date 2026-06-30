@@ -1,4 +1,4 @@
-import { onMount, signal, type Signal } from '@weave/runtime';
+import { onMount, signal, type Signal } from '@weave-framework/runtime';
 import { parse } from '../markdown/parse';
 import { renderDoc } from '../markdown/render';
 import { scrollToHash } from '../util/scroll';

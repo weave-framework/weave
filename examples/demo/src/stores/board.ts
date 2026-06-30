@@ -7,8 +7,8 @@
  * the data lifecycle is owner-independent — the store outlives any one component.
  */
 
-import { store } from '@weave/store';
-import { signal, computed, type Signal, type Computed } from '@weave/runtime';
+import { store } from '@weave-framework/store';
+import { signal, computed, type Signal, type Computed } from '@weave-framework/runtime';
 import { api } from '../data/api';
 import type { Task, NewTask, Status } from '../types';
 

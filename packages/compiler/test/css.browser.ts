@@ -1,8 +1,8 @@
 import { test, assert } from '../../../tools/harness.js';
-import { signal, computed, effect, root } from '@weave/runtime';
-import * as dom from '@weave/runtime/dom';
-import { compileTemplate, compileComponent, scopeCss, scopeAttr, hostAttr, hashCss } from '@weave/compiler';
-import type { CompiledComponent } from '@weave/compiler';
+import { signal, computed, effect, root } from '@weave-framework/runtime';
+import * as dom from '@weave-framework/runtime/dom';
+import { compileTemplate, compileComponent, scopeCss, scopeAttr, hostAttr, hashCss } from '@weave-framework/compiler';
+import type { CompiledComponent } from '@weave-framework/compiler';
 
 const rt: typeof dom & {
   signal: typeof signal;

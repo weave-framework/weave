@@ -12,7 +12,7 @@
  * `routes.gen.ts` is regenerated on every `weave dev`/`build` and is git-ignored.
  */
 
-import { createRouter, type Router } from '@weave/router';
+import { createRouter, type Router } from '@weave-framework/router';
 import { routes } from '../pages/routes.gen';
 
 export { routes };

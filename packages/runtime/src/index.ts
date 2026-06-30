@@ -1,5 +1,5 @@
 /**
- * @weave/runtime — the reactive core. Zero dependencies.
+ * @weave-framework/runtime — the reactive core. Zero dependencies.
  * The DOM helpers live in the `./dom` entry point (added in M1).
  */
 export {

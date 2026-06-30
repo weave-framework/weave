@@ -5,7 +5,7 @@
  * All virtual files share one {@link ts.Program} (fast, and lets cross-component
  * imports resolve). A thin compiler-host shim serves each virtual module's text
  * from memory while delegating every other read (node_modules, libs) to disk —
- * so `@weave/runtime` and friends resolve through their normal package exports.
+ * so `@weave-framework/runtime` and friends resolve through their normal package exports.
  */
 
 import ts from 'typescript';

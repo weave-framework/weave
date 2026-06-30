@@ -1,5 +1,5 @@
-import { effect, fade, scale } from '@weave/runtime';
-import { Portal, type TransitionFn } from '@weave/runtime/dom';
+import { effect, fade, scale } from '@weave-framework/runtime';
+import { Portal, type TransitionFn } from '@weave-framework/runtime/dom';
 import TaskForm from '../task-form/task-form';
 import { useEditor, type EditorStore } from '../../stores/editor';
 

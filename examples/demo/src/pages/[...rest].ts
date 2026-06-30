@@ -1,4 +1,4 @@
-import { Link, currentPath } from '@weave/router';
+import { Link, currentPath } from '@weave-framework/router';
 
 // `<Link>` is used in [...rest].html.
 void Link;

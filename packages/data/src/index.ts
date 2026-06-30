@@ -1,5 +1,5 @@
 /**
- * @weave/data — signal-native async data. Zero third-party deps (native `fetch`).
+ * @weave-framework/data — signal-native async data. Zero third-party deps (native `fetch`).
  *
  * `resource(source, fetcher)` turns an async fetch into reactive `{ data, loading,
  * error }` signals: it refetches whenever `source` changes and cancels the
@@ -14,8 +14,8 @@
  * analog of Angular's `HttpInterceptorFn`, for auth/logging/retry/caching.
  */
 
-import { signal, effect, batch, onCleanup, watch } from '@weave/runtime';
-import type { Signal } from '@weave/runtime';
+import { signal, effect, batch, onCleanup, watch } from '@weave-framework/runtime';
+import type { Signal } from '@weave-framework/runtime';
 
 /* ──────────────────────────── resource ──────────────────────────── */
 

@@ -125,7 +125,7 @@ export function fileToRoutes(files: string[]): FileRoute[] {
 export interface EmitRoutesOptions {
   /** Code-split every page via `lazy(() => import(...))` instead of a static import. */
   lazy?: boolean;
-  /** Where `lazy` is imported from (default `@weave/runtime/dom`). */
+  /** Where `lazy` is imported from (default `@weave-framework/runtime/dom`). */
   runtimeImport?: string;
   /** Prefix prepended to each `file` to form the import specifier (default `./`). */
   importPrefix?: string;
@@ -166,7 +166,7 @@ export function emitRoutesModule(routes: FileRoute[], opts: EmitRoutesOptions = 
 
   const body: string = serialize(routes, '');
   const header: string = opts.lazy
-    ? `import { lazy } from ${JSON.stringify(opts.runtimeImport ?? '@weave/runtime/dom')};\n`
+    ? `import { lazy } from ${JSON.stringify(opts.runtimeImport ?? '@weave-framework/runtime/dom')};\n`
     : '';
   return `${header}${imports.join('\n')}${imports.length ? '\n' : ''}\nexport const routes = ${body};\n`;
 }

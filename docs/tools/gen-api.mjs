@@ -21,16 +21,16 @@ const outFile = join(here, '..', 'src', 'content', 'api.gen.ts');
 
 /** Packages to document, in display order. */
 const PKGS = [
-  { key: 'runtime', title: '@weave/runtime', entry: 'packages/runtime/src/index.ts' },
+  { key: 'runtime', title: '@weave-framework/runtime', entry: 'packages/runtime/src/index.ts' },
   // Secondary published entry points (package.json `exports`) — scanned separately
   // because each TS program reads one entry. Route keys avoid `/` (use `-dom`).
-  { key: 'runtime-dom', title: '@weave/runtime/dom', entry: 'packages/runtime/src/dom.ts' },
-  { key: 'router', title: '@weave/router', entry: 'packages/router/src/index.ts' },
-  { key: 'store', title: '@weave/store', entry: 'packages/store/src/index.ts' },
-  { key: 'forms', title: '@weave/forms', entry: 'packages/forms/src/index.ts' },
-  { key: 'forms-dom', title: '@weave/forms/dom', entry: 'packages/forms/src/dom.ts' },
-  { key: 'i18n', title: '@weave/i18n', entry: 'packages/i18n/src/index.ts' },
-  { key: 'data', title: '@weave/data', entry: 'packages/data/src/index.ts' },
+  { key: 'runtime-dom', title: '@weave-framework/runtime/dom', entry: 'packages/runtime/src/dom.ts' },
+  { key: 'router', title: '@weave-framework/router', entry: 'packages/router/src/index.ts' },
+  { key: 'store', title: '@weave-framework/store', entry: 'packages/store/src/index.ts' },
+  { key: 'forms', title: '@weave-framework/forms', entry: 'packages/forms/src/index.ts' },
+  { key: 'forms-dom', title: '@weave-framework/forms/dom', entry: 'packages/forms/src/dom.ts' },
+  { key: 'i18n', title: '@weave-framework/i18n', entry: 'packages/i18n/src/index.ts' },
+  { key: 'data', title: '@weave-framework/data', entry: 'packages/data/src/index.ts' },
 ];
 
 const compilerOptions = {
@@ -39,7 +39,7 @@ const compilerOptions = {
   moduleResolution: ts.ModuleResolutionKind.Bundler,
   allowImportingTsExtensions: true,
   baseUrl: repo,
-  paths: { '@weave/*': ['packages/*/src/index.ts'] },
+  paths: { '@weave-framework/*': ['packages/*/src/index.ts'] },
   noEmit: true,
   skipLibCheck: true,
   strict: true,

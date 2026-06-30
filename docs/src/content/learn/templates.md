@@ -128,7 +128,7 @@ The signal is the source of truth. A few runtime guarantees worth knowing:
 - **`<select>` self-heals.** Because `<option>`s are often inserted *after* the binding runs (static markup, an `@for`, or async data), and the browser auto-selects the first option of a freshly-populated select, the binding re-asserts the bound value once the current render settles — so the signal still wins.
 
 :::callout tip "Forms have an even shorter way"
-For validated forms you'll usually reach for the `use:control` directive from `@weave/forms/dom`, which binds value, touched state, and `aria-invalid` in one go. See [Forms](/learn/forms).
+For validated forms you'll usually reach for the `use:control` directive from `@weave-framework/forms/dom`, which binds value, touched state, and `aria-invalid` in one go. See [Forms](/learn/forms).
 :::
 
 ## References: `ref` / `bind:this`
@@ -152,7 +152,7 @@ If you pass a writable signal, Weave calls `.set(el)` on it. If you pass a funct
 `use:action={{ arg }}` runs a function on the element once it's inserted — the escape hatch for imperative DOM work, kept tidy and owner-scoped. An action is `(el, arg) => cleanup?`. It runs at `onMount` timing (the element is live in the document, so focus/measure/3rd-party init all work), and is skipped entirely if the region is torn down before that fires.
 
 ~~~ts title="Defining actions"
-import type { Action } from '@weave/runtime/dom';
+import type { Action } from '@weave-framework/runtime/dom';
 
 export const autofocus: Action = (el) => {
   (el as HTMLElement).focus();
@@ -181,7 +181,7 @@ Animate an element as it enters or leaves. `transition:` does both; `in:` only o
 <aside out:fly={{ { x: 200 } }}>Flies out on removal</aside>
 ~~~
 
-The optional `={{ params }}` is re-read each time the transition plays. Built-ins (`fade`, `fly`, `slide`, `scale`) come from `@weave/runtime`. Full treatment in [Motion](/learn/motion).
+The optional `={{ params }}` is re-read each time the transition plays. Built-ins (`fade`, `fly`, `slide`, `scale`) come from `@weave-framework/runtime`. Full treatment in [Motion](/learn/motion).
 
 ## Control flow
 
@@ -320,7 +320,7 @@ Pair `@defer` with [`lazy()`](/learn/router#code-splitting) to also code-split t
 
 ### @await / @then / @catch
 
-Render by the settle state of a Promise or a [`@weave/data` resource](/learn/recipes#fetching-data). The block right after `@await (src)` is the pending content; `@then (alias)` binds the resolved value; `@catch (alias)` binds the error. All three parts are optional, and the aliases are optional too.
+Render by the settle state of a Promise or a [`@weave-framework/data` resource](/learn/recipes#fetching-data). The block right after `@await (src)` is the pending content; `@then (alias)` binds the resolved value; `@catch (alias)` binds the error. All three parts are optional, and the aliases are optional too.
 
 ~~~html title="@await"
 @await (task) {
@@ -332,7 +332,7 @@ Render by the settle state of a Promise or a [`@weave/data` resource](/learn/rec
 }
 ~~~
 
-The source is read **once** when the block mounts (a fresh Promise on every render would not be a useful dependency). With a plain Promise it settles once into then/catch. With a `@weave/data` resource it's driven reactively off the resource's loading/error/data signals, so a refetch flips it back to the pending branch automatically.
+The source is read **once** when the block mounts (a fresh Promise on every render would not be a useful dependency). With a plain Promise it settles once into then/catch. With a `@weave-framework/data` resource it's driven reactively off the resource's loading/error/data signals, so a refetch flips it back to the pending branch automatically.
 
 ## Snippets: @snippet / @render
 

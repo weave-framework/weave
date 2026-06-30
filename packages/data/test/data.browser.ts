@@ -1,8 +1,8 @@
 import { test, assert } from '../../../tools/harness.js';
-import { signal, root } from '@weave/runtime';
-import type { Signal } from '@weave/runtime';
-import { resource, createClient, HttpError, action, optimistic } from '@weave/data';
-import type { Resource, Client, Action, Optimistic } from '@weave/data';
+import { signal, root } from '@weave-framework/runtime';
+import type { Signal } from '@weave-framework/runtime';
+import { resource, createClient, HttpError, action, optimistic } from '@weave-framework/data';
+import type { Resource, Client, Action, Optimistic } from '@weave-framework/data';
 
 /** Flush all pending microtasks (resource defers its fetch + chains two .then). */
 const tick = (): Promise<void> => new Promise<void>((r) => setTimeout(r, 0));

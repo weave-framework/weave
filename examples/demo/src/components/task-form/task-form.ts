@@ -1,4 +1,4 @@
-import { onMount } from '@weave/runtime';
+import { onMount } from '@weave-framework/runtime';
 import {
   field,
   form,
@@ -9,8 +9,8 @@ import {
   type Group,
   type FieldArray,
   type ValuesOf,
-} from '@weave/forms';
-import { control } from '@weave/forms/dom';
+} from '@weave-framework/forms';
+import { control } from '@weave-framework/forms/dom';
 import { useBoard, type BoardStore } from '../../stores/board';
 import { useToasts, type ToastStore } from '../../stores/toast';
 import { api } from '../../data/api';

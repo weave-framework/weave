@@ -9,7 +9,7 @@
     "noEmit": true,
     "verbatimModuleSyntax": false,
     "skipLibCheck": true,
-    "plugins": [{ "name": "@weave/typescript-plugin" }]
+    "plugins": [{ "name": "@weave-framework/typescript-plugin" }]
   },
   "include": ["src"]
 }

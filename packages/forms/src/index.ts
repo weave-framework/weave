@@ -1,5 +1,5 @@
 /**
- * @weave/forms — signal-native form state + validation. Zero dependencies.
+ * @weave-framework/forms — signal-native form state + validation. Zero dependencies.
  *
  * A `field` is a writable signal plus derived `error`/`valid`/`touched`, so a
  * template binds the value with `bind:value={f.value}` and reads errors with
@@ -13,7 +13,7 @@
  *   3. an async (`asyncValidate`) result — debounced + abortable (B.3).
  */
 
-import { signal, computed, effect, onCleanup, type Signal, type Computed } from '@weave/runtime';
+import { signal, computed, effect, onCleanup, type Signal, type Computed } from '@weave-framework/runtime';
 
 /** Return an error message for an invalid value, or `null` when valid. */
 export type Validator<T> = (value: T) => string | null;

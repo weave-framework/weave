@@ -9,7 +9,7 @@
  * no `tick()` round-trip needed.
  */
 
-import { signal, batch, type Signal } from '@weave/runtime';
+import { signal, batch, type Signal } from '@weave-framework/runtime';
 
 export interface Row {
   id: number;

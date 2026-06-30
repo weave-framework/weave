@@ -1,9 +1,9 @@
 import { test, assert } from '../../../tools/harness.js';
-import { signal, computed, effect, root, onDispose, type Signal, type Computed } from '@weave/runtime';
-import * as dom from '@weave/runtime/dom';
+import { signal, computed, effect, root, onDispose, type Signal, type Computed } from '@weave-framework/runtime';
+import * as dom from '@weave-framework/runtime/dom';
 import {
   compileTemplate, compileComponent, parseSfc, inferCtxNames, parseTemplate,
-} from '@weave/compiler';
+} from '@weave-framework/compiler';
 
 const rt: typeof dom & {
   signal: typeof signal;
@@ -205,7 +205,7 @@ test('compileComponent emits a defineComponent module + scoped CSS sharing one h
   const { code, css, hash } = compileComponent(
     {
       script:
-        'import { signal } from "@weave/runtime";\n' +
+        'import { signal } from "@weave-framework/runtime";\n' +
         'export function setup(){ const count = signal(0); const inc = () => count.set(n => n + 1); return { count, inc }; }',
       template: '<button on:click={{inc}}>{{ count() }}</button>',
       styles: 'button { color: red }',
