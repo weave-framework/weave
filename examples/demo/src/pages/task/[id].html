@@ -24,7 +24,7 @@
         </ul>
       }
       <button class="ghost" on:click={{toggleRaw}}>{{ showRaw() ? 'Hide' : 'Show' }} raw JSON</button>
-      <!-- show={} keeps the node in the DOM and toggles display (B.9) -->
+      <!-- show={{}} keeps the node in the DOM and toggles display (B.9) -->
       <pre class="raw" show={{showRaw()}}>{{ JSON.stringify(t, null, 2) }}</pre>
     </article>
   } @catch (e) {

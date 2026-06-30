@@ -7,7 +7,7 @@
 export const tag: string = 'weave-badge';
 export const props: string[] = ['priority'];
 
-export const template: string = `<span class="badge" data-priority={priority}>{{ priority }}</span>`;
+export const template: string = `<span class="badge" data-priority={{priority}}>{{ priority }}</span>`;
 
 export const styles: string = `
   .badge {

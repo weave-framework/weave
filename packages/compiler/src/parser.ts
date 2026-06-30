@@ -610,12 +610,13 @@ class Parser {
   readAttrValue(): Exclude<AttrValue, null> {
     const c: string = this.peek();
     if (c === '{') {
-      // `{{ expr }}` is the canonical attribute/directive binding syntax (matches
-      // text interpolation). A single `{ expr }` is kept as a DEPRECATED fallback so
-      // templates that predate the unification keep working during the migration.
-      const b: { expr: string; offset: number } = this.src.startsWith('{{', this.pos)
-        ? this.readDoubleBracedExpr()
-        : this.readBracedExpr();
+      // Attribute/directive bindings use double braces — `attr={{ expr }}` — matching
+      // text interpolation. One syntax everywhere (M10); a single `{` is rejected so
+      // the author can't accidentally fall back to the old form.
+      if (!this.src.startsWith('{{', this.pos)) {
+        throw new ParseError(`Attribute bindings use double braces: write {{ expr }}, not { expr } (at ${this.pos})`);
+      }
+      const b: { expr: string; offset: number } = this.readDoubleBracedExpr();
       return { kind: 'expr', expr: b.expr, offset: b.offset };
     }
     if (c === '"' || c === "'") return { kind: 'static', text: this.readQuoted(c) };
@@ -632,30 +633,6 @@ class Parser {
     const text: string = this.src.slice(start, this.pos);
     this.pos++; // closing quote
     return text;
-  }
-
-  /** Read a `{ ... }` expression, balancing braces and skipping string literals. */
-  readBracedExpr(): { expr: string; offset: number } {
-    this.pos++; // {
-    const start: number = this.pos;
-    let depth: number = 1;
-    while (!this.eof()) {
-      const c: string = this.peek();
-      if (c === '"' || c === "'" || c === '`') {
-        this.skipString(c);
-        continue;
-      }
-      if (c === '{') depth++;
-      else if (c === '}') {
-        depth--;
-        if (depth === 0) break;
-      }
-      this.pos++;
-    }
-    if (depth !== 0) throw new ParseError('Unclosed { expression');
-    const raw: string = this.src.slice(start, this.pos);
-    this.pos++; // }
-    return { expr: raw.trim(), offset: start + (raw.length - raw.trimStart().length) };
   }
 
   /** Read a `{{ ... }}` expression, balancing inner braces and skipping string literals. */

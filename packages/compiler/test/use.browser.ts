@@ -53,7 +53,7 @@ test('use: runs the action after insertion with the live element (not synchronou
   dispose();
 });
 
-test('use:action={arg} passes the argument through', async () => {
+test('use:action={{arg}} passes the argument through', async () => {
   let seen: unknown = undefined;
   const grab = (_el: Element, arg: unknown): void => {
     seen = arg;

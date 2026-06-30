@@ -1,5 +1,5 @@
 import { test, assert } from '../../../tools/harness.js';
-import { parseTemplate, compileTemplate } from '@weave/compiler';
+import { parseTemplate } from '@weave/compiler';
 import type { ElementNode, Attr } from '@weave/compiler';
 
 // M10 — template binding syntax is unified on DOUBLE braces everywhere. Attribute /
@@ -26,18 +26,15 @@ test('canonical: attribute binding uses {{ }}', () => {
   assert.equal((ev as { expr: string }).expr, 'inc');
 });
 
-test('deprecated single-brace fallback still parses to the same expr', () => {
-  assert.equal(exprOf('<div id={ name() }></div>'), 'name()');
-  // double and single produce identical generated code (fallback is exprwise-equal)
-  const dbl: string = compileTemplate('<button on:click={{inc}} disabled={{off()}}>x</button>', {
-    mode: 'function',
-    scope: ['inc', 'off'],
-  }).code;
-  const sgl: string = compileTemplate('<button on:click={inc} disabled={off()}>x</button>', {
-    mode: 'function',
-    scope: ['inc', 'off'],
-  }).code;
-  assert.equal(dbl, sgl, 'single-brace fallback compiles identically to {{ }}');
+test('single-brace attribute binding is rejected (one syntax — M10 step 5)', () => {
+  // The single-brace form is no longer accepted: bindings MUST use {{ }}.
+  let threw: boolean = false;
+  try {
+    parseTemplate('<div id={ name() }></div>');
+  } catch {
+    threw = true;
+  }
+  assert.ok(threw, 'a single-brace attribute binding should be a parse error');
 });
 
 test('{{ }} balances inner braces: arrow with an object argument', () => {
