@@ -197,18 +197,19 @@ And because component tags compile to a function call with a props object, **onl
 
 Sometimes a child should both read *and* write a parent's value. Don't invent a second event for that — just hand the child the **signal**, and it can read it (`sig()`) and set it (`sig.set(…)`):
 
-~~~html
+:::tabs
+~~~html title="parent"
 <!-- parent passes the writable signal, not its value -->
 <Stepper value={{ count }} />
 ~~~
-
-~~~ts
+~~~ts title="child (Stepper)"
 // child reads and writes the same signal
 export function setup(props: { value: Signal<number> }) {
   const inc = () => props.value.set((n) => n + 1);
   return { value: props.value, inc };
 }
 ~~~
+:::
 
 For form controls, the DOM-level `bind:value` does this against an `<input>` — covered in [Templates](/learn/templates#two-way-binding) and [Forms](/learn/forms).
 

@@ -39,17 +39,18 @@ export const useCart = store(() => {
 
 Consume it from anywhere — components, other stores, plain functions — and you get the one shared instance:
 
-~~~ts
+:::tabs
+~~~ts title="setup"
 export function setup() {
   const cart = useCart();
   return { cart };
 }
 ~~~
-
-~~~html
+~~~html title="template"
 <p>{{ cart.items().length }} items — {{ cart.total() }} €</p>
 <button on:click={{ cart.clear }}>Empty cart</button>
 ~~~
+:::
 
 A store is just a factory of signals — everything you already know about [signals](/learn/signals) and [computeds](/learn/reactivity) applies inside it. The `store` function itself adds nothing but the lazy-singleton wrapper.
 
@@ -143,15 +144,15 @@ Note the `loaded` flag and the `load()` function are ordinary closure variables 
 
 Trigger the load from a component's `onMount`, and read the rest reactively:
 
-~~~ts
+:::tabs
+~~~ts title="setup"
 export function setup() {
   const board = useBoard();
   onMount(() => void board.load());
   return { board };
 }
 ~~~
-
-~~~html
+~~~html title="template"
 @if (board.loading()) {
   <p>Loading…</p>
 } @else if (board.error()) {
@@ -160,6 +161,7 @@ export function setup() {
   <span>{{ board.counts().done }} / {{ board.counts().total }} done</span>
 }
 ~~~
+:::
 
 ## Optimistic mutations
 

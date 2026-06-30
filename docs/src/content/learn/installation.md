@@ -6,6 +6,15 @@ This page takes you from an **empty computer** to a running Weave app. No prior 
 Weave is pre-1.0. The packages are published on npm under the **`@weave-framework/*`** scope (`@weave-framework/runtime`, `@weave-framework/cli`, …). APIs may still shift between minor versions; pin a version if you need stability.
 :::
 
+:::callout tip "Can't find it via npm search?"
+npm's free-text search box doesn't surface **scoped** packages (`@weave-framework/*`), so searching for "weave-framework" won't list them — that's an npm search limitation, not a missing package. To browse or verify them:
+
+- **All packages in one place:** [npmjs.com/org/weave-framework](https://www.npmjs.com/org/weave-framework)
+- **A specific package:** `npm view @weave-framework/runtime` (or open `npmjs.com/package/@weave-framework/runtime`)
+
+You don't need to find them by hand anyway — `npm create weave@latest` (below) pulls in everything for you.
+:::
+
 ## 1. Prerequisites
 
 You need two things on your machine:
@@ -21,45 +30,84 @@ If you don't have Node: download the LTS installer from [nodejs.org](https://nod
 
 The quickest start is the scaffolder — it generates a ready-to-run project:
 
-~~~bash
+:::tabs
+~~~bash title="npm"
 npm create weave@latest my-app
-# or: pnpm create weave my-app
-# or: yarn create weave my-app
 ~~~
+~~~bash title="pnpm"
+pnpm create weave my-app
+~~~
+~~~bash title="yarn"
+yarn create weave my-app
+~~~
+:::
 
 Then install and start the dev server:
 
-~~~bash
+:::tabs
+~~~bash title="npm"
 cd my-app
-npm install      # or: pnpm install / yarn
-npm run dev      # or: pnpm dev / yarn dev
+npm install
+npm run dev
 ~~~
+~~~bash title="pnpm"
+cd my-app
+pnpm install
+pnpm dev
+~~~
+~~~bash title="yarn"
+cd my-app
+yarn
+yarn dev
+~~~
+:::
 
 Open the printed URL (default <http://localhost:5173>). You have a running Weave app with **live reload** — edit `src/app/app.html` and the page updates on save.
 
 :::callout tip "What you got"
-The scaffold is a tiny, complete project: a `weave.config.ts`, an HTML shell, one component (`src/app/app.{ts,html,css}`), and the `@weave-framework/runtime` + `@weave-framework/cli` dependencies wired up. That's the whole shape of a Weave app — the [Quick start](/learn/quick-start) walks through every line.
+The scaffold is a tiny, complete project: a `weave.config.ts`, an HTML shell, one component (`src/app/app.{ts,html,css}`), and **every first-party package wired up** — `@weave-framework/runtime` plus `router`, `store`, `forms`, `i18n`, and `data` (and `@weave-framework/cli` for tooling). They're all installed so a feature is there the moment you reach for it; anything you don't `import` is **tree-shaken out** of the build (zero bundle cost — see [the note below](#3-add-weave-to-an-existing-project-manual)). That's the whole shape of a Weave app — the [Quick start](/learn/quick-start) walks through every line.
 :::
 
 ## 3. Add Weave to an existing project (manual)
 
 Prefer to wire it up yourself? Install the runtime and the CLI:
 
-~~~bash
-# npm
+:::tabs
+~~~bash title="npm"
 npm install @weave-framework/runtime
 npm install -D @weave-framework/cli
-
-# pnpm
+~~~
+~~~bash title="pnpm"
 pnpm add @weave-framework/runtime
 pnpm add -D @weave-framework/cli
-
-# yarn
+~~~
+~~~bash title="yarn"
 yarn add @weave-framework/runtime
 yarn add -D @weave-framework/cli
 ~~~
+:::
 
-Add the packages for the features you use as you go — `@weave-framework/router`, `@weave-framework/store`, `@weave-framework/forms`, `@weave-framework/i18n`, `@weave-framework/data`. (`esbuild` and `typescript` come along automatically with `@weave-framework/cli`; add `sass` only if you author `.scss`/`.sass` styles.)
+:::callout info "pnpm 10+: approve the build scripts"
+On **pnpm 10 and newer**, `pnpm install` blocks dependency build scripts by default, so `esbuild` (pulled in by `@weave-framework/cli`) won't finish setting up — you'll see `Ignored build scripts` / `ERR_PNPM_IGNORED_BUILDS`. Run once:
+
+~~~bash
+pnpm approve-builds
+~~~
+
+and approve `esbuild` (and `@parcel/watcher`). Apps made with `npm create weave` skip this — the scaffold ships a `pnpm-workspace.yaml` that pre-approves them. npm and yarn are unaffected.
+:::
+
+Add the packages for the features you use as you go — `@weave-framework/router`, `@weave-framework/store`, `@weave-framework/forms`, `@weave-framework/i18n`, `@weave-framework/data`:
+
+~~~bash
+npm install @weave-framework/forms     # and/or router, store, i18n, data
+~~~
+
+(`esbuild` and `typescript` come along automatically with `@weave-framework/cli`; add `sass` only if you author `.scss`/`.sass` styles.)
+
+:::callout info "Installing a package costs nothing until you use it"
+`npm install` only puts a package on disk in `node_modules` — it doesn't touch your output. The build (esbuild, `bundle: true`) starts from your root component and follows the **`import` graph**, so only code you actually import is compiled into `dist/`. Every Weave package is **zero-dependency** and ships `"sideEffects": false`, so anything unused is **tree-shaken out** — an installed-but-unused package adds zero bytes to your bundle. That's exactly why the scaffold can install all of them up front: you get every feature within reach, and pay only for what you import. (Import a package you *haven't* installed and the build fails loudly with `Could not resolve` — never a silent surprise.)
+:::
 
 Then create the four files that make up the smallest useful app:
 
@@ -108,6 +156,7 @@ Point `publicDir` at a dedicated folder (e.g. `public/`) rather than leaving it 
 
 **`src/app/app.ts`** and **`app.html`** — your first component (the [Quick start](/learn/quick-start) explains every line):
 
+:::tabs
 ~~~ts title="src/app/app.ts"
 import { signal } from '@weave-framework/runtime';
 
@@ -117,13 +166,13 @@ export function setup() {
   return { count, inc };
 }
 ~~~
-
 ~~~html title="src/app/app.html"
 <main>
   <h1>Hello, Weave 🧵</h1>
   <button on:click={{ inc }}>clicked {{ count() }} times</button>
 </main>
 ~~~
+:::
 
 Add these scripts to your `package.json` and you're set:
 

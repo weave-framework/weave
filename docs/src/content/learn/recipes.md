@@ -235,7 +235,8 @@ A non-2xx response throws an `HttpError`. It's a real `Error` subclass carrying 
 
 Catch it and branch on the status — in a handler, or right in an `@catch`:
 
-~~~ts
+:::tabs
+~~~ts title="in a handler"
 import { HttpError } from '@weave-framework/data';
 
 try {
@@ -250,7 +251,6 @@ try {
   }
 }
 ~~~
-
 ~~~html title="in a template"
 @await (task) {
   <p>Loading…</p>
@@ -264,6 +264,7 @@ try {
   }
 }
 ~~~
+:::
 
 ## Mutations with action
 
@@ -372,13 +373,13 @@ Two pending `add`s here show *both* drafts at once (base + msg1 + msg2), where t
 
 Wrap a fragile subtree in `<ErrorBoundary>`: if it throws during render — or an effect inside it throws later — the boundary swaps to your `fallback(err, reset)` instead of letting the error take down the app. `reset()` re-renders the protected content:
 
-~~~html
+:::tabs
+~~~html title="template"
 <ErrorBoundary fallback={{ errorFallback }} resetKey={{ path() }}>
   <RouterView router={{ router }} />
 </ErrorBoundary>
 ~~~
-
-~~~ts
+~~~ts title="the fallback"
 const errorFallback = (err: unknown, reset: () => void) => {
   const div = document.createElement('div');
   div.className = 'route-error';
@@ -390,6 +391,7 @@ const errorFallback = (err: unknown, reset: () => void) => {
   return div;
 };
 ~~~
+:::
 
 The optional `resetKey` clears the error when it changes — `resetKey={{ path() }}` recovers automatically on navigation, without remounting the protected content.
 
@@ -422,7 +424,8 @@ Because the effects are created inside `setup`, they're owned by the component a
 
 Keep the input instant, defer the expensive work until typing settles, with `debounced`:
 
-~~~ts
+:::tabs
+~~~ts title="setup"
 import { signal, debounced } from '@weave-framework/runtime';
 import { resource } from '@weave-framework/data';
 
@@ -433,11 +436,11 @@ export function setup() {
   return { query, results };
 }
 ~~~
-
-~~~html
+~~~html title="template"
 <input bind:value={{ query }} placeholder="Search…" />
 @await (results) @then (rows) { <List items={{ rows }} /> }
 ~~~
+:::
 
 The `|| false` makes an empty query a "not ready" source, so `resource` skips the fetch until there's something to search — and because not-ready keeps the last `data`, the old results stay on screen while you clear the box.
 

@@ -114,7 +114,8 @@ Collapses / expands the element's **height** (with `overflow: hidden`) while fad
 
 A transition directive resolves its function name through **component scope**, exactly like any other identifier in a template. So the name has to be reachable: either returned from `setup`, or imported at module scope in an SFC.
 
-~~~ts
+:::tabs
+~~~ts title="setup"
 import { fade, fly, slide, scale } from '@weave-framework/runtime';
 
 export function setup() {
@@ -122,11 +123,11 @@ export function setup() {
   return { fade, fly, slide, scale, enter: { y: 16, duration: 180 } };
 }
 ~~~
-
-~~~html
+~~~html title="template"
 <div transition:fade>…</div>
 <li in:fly={{ enter }}>…</li>
 ~~~
+:::
 
 If the name doesn't resolve to a function in scope, it resolves to *nothing* and the directive can't run — so make sure it's exposed.
 
@@ -218,7 +219,8 @@ A transition is a function `(node, params) => config`. The config is the Svelte-
 
 So you write the function once and it reads correctly both ways: at the visible end (`t = 1`) the element is fully present; at the hidden end (`t = 0`) it's gone.
 
-~~~ts
+:::tabs
+~~~ts title="define"
 import type { TransitionFn } from '@weave-framework/runtime/dom';
 
 export const spinIn: TransitionFn<{ turns?: number }> = (node, { turns = 1 } = {}) => ({
@@ -227,10 +229,10 @@ export const spinIn: TransitionFn<{ turns?: number }> = (node, { turns = 1 } = {
   css: (t, u) => `transform: rotate(${u * turns * 360}deg) scale(${t}); opacity: ${t};`,
 });
 ~~~
-
-~~~html
+~~~html title="use"
 <div in:spinIn={{ { turns: 2 } }}>🎉</div>
 ~~~
+:::
 
 ### Prefer `css` over `tick`
 

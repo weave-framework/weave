@@ -10,6 +10,7 @@ You start an app one of two ways, chosen in `weave.config.ts`. They are **mutual
 
 Point `root` at your top component and Weave generates the entry module for you: it imports the root, registers every custom element it discovers, and mounts the root into the `mount` selector. You write no entry file and no `<script>` tag.
 
+:::tabs
 ~~~ts title="weave.config.ts"
 export default defineConfig({
   root: 'src/app/shell', // the top component
@@ -17,13 +18,13 @@ export default defineConfig({
   index: 'src/index.html',
 });
 ~~~
-
 ~~~html title="src/index.html"
 <body>
   <div id="app"></div>
   <!-- Weave injects the entry script + stylesheet here at build/dev time -->
 </body>
 ~~~
+:::
 
 `mount` is a CSS selector that defaults to `'#app'` when omitted. It applies **only** to the `root` bootstrap.
 
@@ -46,6 +47,7 @@ When you use `entry`, the config's `mount` is **ignored** — you choose the mou
 
 A Weave component can be published as a native custom element (Web Component) so plain HTML — or React, or Angular, or no framework at all — can use `<my-widget>`. Opt in by exporting a `tag` (and the props you want reflected) from the component:
 
+:::tabs
 ~~~ts title="components/badge/badge.ts"
 export const tag = 'weave-badge';       // the custom-element name — MUST contain a hyphen
 export const props = ['priority'];      // exposed as attributes + JS properties
@@ -54,10 +56,10 @@ export function setup(props: { priority: string }) {
   return { priority: () => props.priority };
 }
 ~~~
-
 ~~~html title="components/badge/badge.html"
 <span class="badge" data-priority={{ priority() }}>{{ priority() }}</span>
 ~~~
+:::
 
 - `export const tag` is a string literal and **must contain a hyphen** — that is the Custom Elements spec rule for author-defined names. A tag without a hyphen aborts the build (`must contain a hyphen`).
 - `export const props` is an array of prop-name string literals. It is optional; omit it (or leave it empty) for a custom element that takes no props. Each name listed here becomes both an observed attribute and a JS property (next section).
