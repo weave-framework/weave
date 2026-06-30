@@ -43,7 +43,7 @@ None of this makes the others "wrong." It's a different set of trade‑offs — 
 
 ## 🗺️ Where it's headed
 
-Weave is pre‑1.0 and moving deliberately — *stabilization over revolution.* The core is real, tested, and dogfooded by a full demo app. What's next:
+Weave's core is solid — signal-native, covered by a broad browser test suite, and dogfooded end to end by a complete demo app. It evolves deliberately, and one rule sits above the rest: *don't break your app.* Stability isn't a milestone we're waiting on — it's the priority today. On the near horizon:
 
 - **Documentation site** — the home this README keeps pointing you toward (in progress).
 - **Server‑side rendering & hydration** — added when there's a real need, with a clean boundary rather than magic strings.
@@ -62,9 +62,11 @@ Installation, your first component, guides, and the complete API reference all l
 
 ---
 
-## 🤝 A note on honesty
+## 🛡️ Built to be trusted
 
-Weave optimizes for *small, fast, signal‑native, low‑ceremony.* If today you need the largest hiring pool and the deepest ecosystem on the planet, that's still React's win — and that's fine. Weave is for the projects where a tiny, predictable, signal‑first framework is exactly the right cloth. Pick the tool that fits the garment.
+Weave is *small, fast, signal‑native, and low‑ceremony* — and built to hold up in serious codebases, not just demos. Its sharpest edge is the one large teams worry about most: **zero third‑party runtime dependencies.** No transitive packages, no audit scramble — a supply‑chain attack surface that's effectively nil. Pair that with performance that stays flat as the UI grows, first‑party routing, state, forms, and i18n that share one reactive core, and type‑checking that reaches all the way into your templates, and you get a framework that scales *with* a team, not against it.
+
+We won't oversell the young parts: SSR/hydration and devtools are on the roadmap, and the ecosystem is still growing. But the foundation is real and tested today — and it's aimed squarely at the work real applications demand.
 
 ## License
 
