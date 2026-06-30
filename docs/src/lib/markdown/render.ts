@@ -110,6 +110,32 @@ function renderBlock(b: Block): Node {
       }
       return Demo({}, { default: () => Comp() });
     }
+    case 'table': {
+      const table = document.createElement('table');
+      const thead = document.createElement('thead');
+      const htr = document.createElement('tr');
+      b.header.forEach((cell, c) => {
+        const th = document.createElement('th');
+        if (b.align[c]) th.style.textAlign = b.align[c] as string;
+        th.append(renderInline(cell));
+        htr.append(th);
+      });
+      thead.append(htr);
+      table.append(thead);
+      const tbody = document.createElement('tbody');
+      for (const row of b.rows) {
+        const tr = document.createElement('tr');
+        row.forEach((cell, c) => {
+          const td = document.createElement('td');
+          if (b.align[c]) td.style.textAlign = b.align[c] as string;
+          td.append(renderInline(cell));
+          tr.append(td);
+        });
+        tbody.append(tr);
+      }
+      table.append(tbody);
+      return table;
+    }
   }
 }
 
