@@ -1,0 +1,14 @@
+# pnpm pre-approves these dependencies' build scripts so `pnpm install` runs
+# without the interactive "Ignored build scripts" prompt. esbuild powers
+# `weave build`; @parcel/watcher powers `weave dev`'s file watching. Both are
+# trusted, widely-used packages. (npm and yarn run these automatically and
+# ignore this file.)
+#
+# `onlyBuiltDependencies` is the documented allow-list (pnpm 10+); `allowBuilds`
+# is pnpm 11's per-package form, which also overrides a stricter global config.
+onlyBuiltDependencies:
+  - esbuild
+  - '@parcel/watcher'
+allowBuilds:
+  esbuild: true
+  '@parcel/watcher': true
