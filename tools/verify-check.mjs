@@ -106,8 +106,8 @@ const run = (...paths) =>
   const out = bad.stdout + bad.stderr;
 
   const html = readFileSync('examples/check/uses-card-bad.html', 'utf8').split('\n');
-  // `label={it.count}` — a number passed to a `string` prop → TS2322, mapped to .html
-  const mismatchLine = html.findIndex((l) => l.includes('label={it.count}')) + 1;
+  // `label={{it.count}}` — a number passed to a `string` prop → TS2322, mapped to .html
+  const mismatchLine = html.findIndex((l) => l.includes('label={{it.count}}')) + 1;
   ok(
     new RegExp(`uses-card-bad\\.html:${mismatchLine}:\\d+ - error TS2322: .*not assignable`).test(out),
     `check: child prop type mismatch flagged at uses-card-bad.html:${mismatchLine}`

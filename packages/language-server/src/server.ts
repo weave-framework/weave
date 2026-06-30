@@ -27,7 +27,7 @@ const server: ReturnType<typeof createServer> = createServer(connection);
 // it matches `*.html`). It's harmless but spams the LSP console — drop just that one line.
 // NB: install this AFTER createConnection/createServer — vscode-languageserver replaces the
 // global console inside createConnection, so an earlier override would be clobbered.
-const forwardedWarn = console.warn.bind(console);
+const forwardedWarn: (...args: unknown[]) => void = console.warn.bind(console);
 console.warn = (...args: unknown[]): void => {
   if (typeof args[0] === 'string' && args[0].startsWith('languageId not found')) return;
   forwardedWarn(...args);

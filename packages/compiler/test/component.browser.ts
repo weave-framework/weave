@@ -28,7 +28,7 @@ function host(): HTMLElement {
 /* ──────────── auto-scope inference ──────────── */
 
 test('inferCtxNames collects free identifiers', () => {
-  const names: string[] = inferCtxNames(parseTemplate('<button on:click={inc}>{{ count() }}</button>'));
+  const names: string[] = inferCtxNames(parseTemplate('<button on:click={{inc}}>{{ count() }}</button>'));
   assert.deepEqual(names, ['count', 'inc']);
 });
 
@@ -37,7 +37,7 @@ test('inferCtxNames excludes JS globals', () => {
 });
 
 test('inferCtxNames excludes arrow parameters', () => {
-  const names: string[] = inferCtxNames(parseTemplate('<button on:click={() => count.set(n => n + 1)}>x</button>'));
+  const names: string[] = inferCtxNames(parseTemplate('<button on:click={{() => count.set(n => n + 1)}}>x</button>'));
   assert.deepEqual(names, ['count']);
 });
 
@@ -46,7 +46,7 @@ test('inferCtxNames collects the use: action name (and its arg)', () => {
   assert.deepEqual(inferCtxNames(parseTemplate('<div use:autofocus></div>')), ['autofocus']);
   // action + arg → both, arg deps included
   assert.deepEqual(
-    inferCtxNames(parseTemplate('<div use:tooltip={label()}></div>')),
+    inferCtxNames(parseTemplate('<div use:tooltip={{label()}}></div>')),
     ['label', 'tooltip']
   );
 });
@@ -93,7 +93,7 @@ test('a capitalized component named like a void element is not void', () => {
 /* ──────────── defineComponent runtime ──────────── */
 
 test('defineComponent wires setup + render and mounts/unmounts', () => {
-  const render: (ctx: unknown, slots?: unknown) => Node = compileRender('<button on:click={inc}>{{ count() }}</button>', ['count', 'inc']);
+  const render: (ctx: unknown, slots?: unknown) => Node = compileRender('<button on:click={{inc}}>{{ count() }}</button>', ['count', 'inc']);
   const Counter: dom.Component = dom.defineComponent(render as never, () => {
     const count: Signal<number> = signal(0);
     const inc = (): number => count.set((n) => n + 1);
@@ -165,7 +165,7 @@ test('a @for row can be a component (multi-node keyed row)', () => {
   );
   const items: Signal<{ id: number; text: string }[]> = signal([{ id: 1, text: 'a' }, { id: 2, text: 'b' }]);
   const { code } = compileTemplate(
-    '<ul>@for (it of items(); track it.id) { <Item text={it.text} /> }</ul>',
+    '<ul>@for (it of items(); track it.id) { <Item text={{it.text}} /> }</ul>',
     { mode: 'function', scope: ['items'] }
   );
   const body: string = code.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;');
@@ -207,7 +207,7 @@ test('compileComponent emits a defineComponent module + scoped CSS sharing one h
       script:
         'import { signal } from "@weave/runtime";\n' +
         'export function setup(){ const count = signal(0); const inc = () => count.set(n => n + 1); return { count, inc }; }',
-      template: '<button on:click={inc}>{{ count() }}</button>',
+      template: '<button on:click={{inc}}>{{ count() }}</button>',
       styles: 'button { color: red }',
     },
     { filename: 'counter' }

@@ -65,7 +65,7 @@ test('static interpolation uses setText (no reactivity)', () => {
 test('event binding wires a handler that mutates a signal', () => {
   const count: Signal<number> = signal(0);
   const inc = (): number => count.set((c) => c + 1);
-  const el: Element = render('<button on:click={inc}>{{ count() }}</button>', { count, inc }, ['count', 'inc']);
+  const el: Element = render('<button on:click={{inc}}>{{ count() }}</button>', { count, inc }, ['count', 'inc']);
   host().appendChild(el);
   assert.equal(el.textContent, '0');
   (el as HTMLButtonElement).click();
@@ -75,7 +75,7 @@ test('event binding wires a handler that mutates a signal', () => {
 
 test('inline arrow handler with member access rewrites only bindings', () => {
   const count: Signal<number> = signal(0);
-  const el: Element = render('<button on:click={() => count.set(n => n + 1)}>x</button>', { count }, ['count']);
+  const el: Element = render('<button on:click={{() => count.set(n => n + 1)}}>x</button>', { count }, ['count']);
   host().appendChild(el);
   (el as HTMLButtonElement).click();
   assert.equal(count(), 1);
@@ -84,7 +84,7 @@ test('inline arrow handler with member access rewrites only bindings', () => {
 test('dynamic attribute binds reactively (boolean + value)', () => {
   const disabled: Signal<boolean> = signal(true);
   const cls: Signal<string> = signal('a');
-  const el: Element = render('<input disabled={disabled()} class={cls()}>', { disabled, cls }, ['disabled', 'cls']);
+  const el: Element = render('<input disabled={{disabled()}} class={{cls()}}>', { disabled, cls }, ['disabled', 'cls']);
   assert.equal(el.hasAttribute('disabled'), true);
   assert.equal(el.getAttribute('class'), 'a');
   disabled.set(false);
@@ -95,7 +95,7 @@ test('dynamic attribute binds reactively (boolean + value)', () => {
 
 test('property binding (.value)', () => {
   const text: Signal<string> = signal('one');
-  const el: HTMLInputElement = render('<input .value={text()}>', { text }, ['text']) as HTMLInputElement;
+  const el: HTMLInputElement = render('<input .value={{text()}}>', { text }, ['text']) as HTMLInputElement;
   assert.equal(el.value, 'one');
   text.set('two');
   assert.equal(el.value, 'two');
@@ -103,7 +103,7 @@ test('property binding (.value)', () => {
 
 test('class: binding toggles', () => {
   const done: Signal<boolean> = signal(false);
-  const el: Element = render('<li class:done={done()}>x</li>', { done }, ['done']);
+  const el: Element = render('<li class:done={{done()}}>x</li>', { done }, ['done']);
   assert.equal(el.className, '');
   done.set(true);
   assert.equal(el.className, 'done');
@@ -112,7 +112,7 @@ test('class: binding toggles', () => {
 test('event modifier preventDefault wraps the handler', () => {
   let ran: boolean = false;
   const onSubmit = (): boolean => (ran = true);
-  const el: Element = render('<button on:click|preventDefault={onSubmit}>go</button>', { onSubmit }, ['onSubmit']);
+  const el: Element = render('<button on:click|preventDefault={{onSubmit}}>go</button>', { onSubmit }, ['onSubmit']);
   host().appendChild(el);
   const ev: MouseEvent = new MouseEvent('click', { cancelable: true });
   el.dispatchEvent(ev);
@@ -259,7 +259,7 @@ test('@let defines a reactive local', () => {
 });
 
 test('module mode emits a real ES module', () => {
-  const { code } = compileTemplate('<button on:click={inc}>clicks: {{ count() }}</button>', {
+  const { code } = compileTemplate('<button on:click={{inc}}>clicks: {{ count() }}</button>', {
     mode: 'module',
     scope: ['count', 'inc'],
   });
@@ -274,7 +274,7 @@ test('module mode emits a real ES module', () => {
 
 test('component renders with a prop', () => {
   const Child: (props: unknown, slots?: unknown) => Node = compileComponent('<span>{{ label }}</span>', ['label']);
-  const el: Element = render('<div><Child label={"hi"} /></div>', {}, [], { Child });
+  const el: Element = render('<div><Child label={{"hi"}} /></div>', {}, [], { Child });
   host().appendChild(el);
   assert.equal(el.querySelector('span')!.textContent, 'hi');
 });
@@ -282,7 +282,7 @@ test('component renders with a prop', () => {
 test('component prop is reactive (parent signal flows through the getter)', () => {
   const name: Signal<string> = signal('Ada');
   const Child: (props: unknown, slots?: unknown) => Node = compileComponent('<span>{{ label }}</span>', ['label']);
-  const el: Element = render('<div><Child label={name()} /></div>', { name }, ['name'], { Child });
+  const el: Element = render('<div><Child label={{name()}} /></div>', { name }, ['name'], { Child });
   host().appendChild(el);
   assert.equal(el.querySelector('span')!.textContent, 'Ada');
   name.set('Lin');
@@ -292,8 +292,8 @@ test('component prop is reactive (parent signal flows through the getter)', () =
 test('on:event prop fires the parent handler', () => {
   let got: number = 0;
   const handler = (): void => { got++; };
-  const Child: (props: unknown, slots?: unknown) => Node = compileComponent('<button on:click={onSelect}>x</button>', ['onSelect']);
-  const el: Element = render('<div><Child on:select={handler} /></div>', { handler }, ['handler'], { Child });
+  const Child: (props: unknown, slots?: unknown) => Node = compileComponent('<button on:click={{onSelect}}>x</button>', ['onSelect']);
+  const el: Element = render('<div><Child on:select={{handler}} /></div>', { handler }, ['handler'], { Child });
   host().appendChild(el);
   const btn: HTMLButtonElement = el.querySelector('button') as HTMLButtonElement;
   btn.click();
@@ -339,7 +339,7 @@ test('slot renders fallback when not provided', () => {
 });
 
 test('module mode references components by name and emits getter props', () => {
-  const { code } = compileTemplate('<div><Child x={v()} on:go={h} /></div>', {
+  const { code } = compileTemplate('<div><Child x={{v()}} on:go={{h}} /></div>', {
     mode: 'module',
     scope: ['v', 'h'],
   });

@@ -26,7 +26,7 @@ function fire(el: Element, type: 'input' | 'change'): void {
 
 test('bind:value text — two-way (signal ⇄ input)', () => {
   const name: Signal<string> = signal('alpha');
-  const el: HTMLInputElement = render('<input bind:value={name} />', { name }, ['name']) as HTMLInputElement;
+  const el: HTMLInputElement = render('<input bind:value={{name}} />', { name }, ['name']) as HTMLInputElement;
   assert.equal(el.value, 'alpha', 'signal seeds the input');
 
   name.set('beta');
@@ -39,7 +39,7 @@ test('bind:value text — two-way (signal ⇄ input)', () => {
 
 test('bind:value number — reads valueAsNumber', () => {
   const n: Signal<number> = signal(5);
-  const el: HTMLInputElement = render('<input type="number" bind:value={n} />', { n }, ['n']) as HTMLInputElement;
+  const el: HTMLInputElement = render('<input type="number" bind:value={{n}} />', { n }, ['n']) as HTMLInputElement;
   assert.equal(el.value, '5');
 
   n.set(10);
@@ -52,7 +52,7 @@ test('bind:value number — reads valueAsNumber', () => {
 
 test('bind:checked — boolean checkbox', () => {
   const on: Signal<boolean> = signal(true);
-  const el: HTMLInputElement = render('<input type="checkbox" bind:checked={on} />', { on }, ['on']) as HTMLInputElement;
+  const el: HTMLInputElement = render('<input type="checkbox" bind:checked={{on}} />', { on }, ['on']) as HTMLInputElement;
   assert.equal(el.checked, true, 'signal seeds checked');
 
   on.set(false);
@@ -66,8 +66,8 @@ test('bind:checked — boolean checkbox', () => {
 test('bind:group — radio selects by value', () => {
   const pick: Signal<string> = signal('a');
   const wrap: Element = render(
-    '<div><input type="radio" name="g" value="a" bind:group={pick} />' +
-      '<input type="radio" name="g" value="b" bind:group={pick} /></div>',
+    '<div><input type="radio" name="g" value="a" bind:group={{pick}} />' +
+      '<input type="radio" name="g" value="b" bind:group={{pick}} /></div>',
     { pick },
     ['pick']
   );
@@ -87,7 +87,7 @@ test('bind:group — radio selects by value', () => {
 test('bind:value select — single', () => {
   const sel: Signal<string> = signal('y');
   const el: HTMLSelectElement = render(
-    '<select bind:value={sel}><option value="x">X</option><option value="y">Y</option></select>',
+    '<select bind:value={{sel}}><option value="x">X</option><option value="y">Y</option></select>',
     { sel },
     ['sel']
   ) as HTMLSelectElement;
@@ -108,7 +108,7 @@ test('bind:value select — @for options: the signal wins over the browser auto-
   const opts: string[] = ['todo', 'doing', 'done'];
   const sel: Signal<string> = signal('done');
   const el: HTMLSelectElement = render(
-    '<select bind:value={sel}>@for (o of opts; track o) {<option value={o}>{{ o }}</option>}</select>',
+    '<select bind:value={{sel}}>@for (o of opts; track o) {<option value={{o}}>{{ o }}</option>}</select>',
     { sel, opts },
     ['sel', 'opts']
   ) as HTMLSelectElement;
@@ -127,7 +127,7 @@ test('bind:value select — @for options: the signal wins over the browser auto-
 
 test('bind:value text is IME-safe — no overwrite mid-composition', () => {
   const name: Signal<string> = signal('');
-  const el: HTMLInputElement = render('<input bind:value={name} />', { name }, ['name']) as HTMLInputElement;
+  const el: HTMLInputElement = render('<input bind:value={{name}} />', { name }, ['name']) as HTMLInputElement;
 
   el.dispatchEvent(new Event('compositionstart', { bubbles: true }));
   // a competing signal write must NOT clobber the half-composed text

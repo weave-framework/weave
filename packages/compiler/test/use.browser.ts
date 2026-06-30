@@ -58,7 +58,7 @@ test('use:action={arg} passes the argument through', async () => {
   const grab = (_el: Element, arg: unknown): void => {
     seen = arg;
   };
-  const { dispose } = mount('<div use:grab={opts}></div>', { grab, opts: { color: 'red' } }, ['grab', 'opts']);
+  const { dispose } = mount('<div use:grab={{opts}}></div>', { grab, opts: { color: 'red' } }, ['grab', 'opts']);
   await tick();
   assert.deepEqual(seen, { color: 'red' }, 'the arg expression value reaches the action');
   dispose();
@@ -87,7 +87,7 @@ test('reactive arg via getter — action wraps the read in an effect', async () 
       seen.push(get());
     });
   };
-  const { dispose } = mount('<div use:tip={() => text()}></div>', { tip, text }, ['tip', 'text']);
+  const { dispose } = mount('<div use:tip={{() => text()}}></div>', { tip, text }, ['tip', 'text']);
   await tick();
   assert.deepEqual(seen, ['hi'], 'effect ran once with the initial value');
 

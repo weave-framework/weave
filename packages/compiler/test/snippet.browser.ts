@@ -106,7 +106,7 @@ test('a snippet passed to a child component as a prop renders in the child', () 
   const Child: (props: Record<string, unknown>) => Node = child(`<section>@render (body('from-child'))</section>`, ['body']);
 
   const el: Element = render(
-    `<div>@snippet tpl(who) { <em>{{ who }}</em> } <Child body={tpl}/></div>`,
+    `<div>@snippet tpl(who) { <em>{{ who }}</em> } <Child body={{tpl}}/></div>`,
     {},
     [],
     { Child }

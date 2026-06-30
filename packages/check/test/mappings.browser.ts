@@ -72,7 +72,7 @@ test('mappings: control-flow and child props all map to template offsets', () =>
     '    <li>{{ n }}</li>',
     '  }',
     '</ul>',
-    '<Child label={title} />',
+    '<Child label={{title}} />',
   ].join('\n');
   const v: Virtual = buildVirtualSfc('Comp.weave', src);
   assertVerbatim(v);

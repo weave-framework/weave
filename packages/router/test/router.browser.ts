@@ -448,7 +448,7 @@ test('Link prefetches the target chunk on hover (once)', () => {
   assert.equal(loads, 1, 'warmed only once');
 });
 
-test('Link prefetch={false} does not warm on hover', () => {
+test('Link prefetch={{false}} does not warm on hover', () => {
   let loads: number = 0;
   createRouter([
     { path: '/np', component: lazy(() => { loads++; return Promise.resolve({ default: LazyPage }); }) },

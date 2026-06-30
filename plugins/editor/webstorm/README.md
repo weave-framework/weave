@@ -15,14 +15,16 @@ hover. Works for both `.weave` single-file components and the separate `.ts` + `
 In WebStorm: **Settings → Plugins → ⚙ (gear) → Install Plugin from Disk…** → pick the
 **latest** `weave-webstorm-*.zip` from this folder → **Restart**.
 
-- **`weave-webstorm-0.11.0.zip`** — current/complete: HTML syntax coloring, go-to-definition,
-  hover, and red-squiggle diagnostics, plus the Weave logo. Verified working on WebStorm 261.
+- **`weave-webstorm-0.12.0.zip`** — current/complete: HTML syntax coloring, go-to-definition,
+  hover, and red-squiggle diagnostics, plus the Weave logo. Built on the M10 unified `{{ }}`
+  binding syntax. Verified working on WebStorm 261.
 - **`weave-webstorm-0.4.0.zip`** — minimal fallback (go-to-definition + hover only, plain text,
-  no diagnostics). Use only if 0.10.0 misbehaves.
+  no diagnostics). Use only if 0.12.0 misbehaves.
 
-> Template type errors are flagged on `{{ expr }}` text bindings and `attr={expr}` attribute
-> bindings. A single brace in text content (`{x}`) is literal text in Weave, not a binding, so
-> it is correctly not type-checked.
+> Template type errors are flagged on `{{ expr }}` text bindings and `attr={{expr}}` attribute
+> bindings (M10 — double braces everywhere; a single-brace `attr={expr}` still parses as a
+> deprecated fallback). A single brace in text content (`{x}`) is literal text in Weave, not a
+> binding, so it is correctly not type-checked.
 
 ## What's inside
 
