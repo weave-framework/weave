@@ -128,6 +128,11 @@
       "types": "./src/bottom-sheet/bottom-sheet.ts",
       "import": "./src/bottom-sheet/bottom-sheet.ts"
     },
+    "./snackbar": {
+      "sass": "./src/styles/components/snackbar/_index.scss",
+      "types": "./src/snackbar/snackbar.ts",
+      "import": "./src/snackbar/snackbar.ts"
+    },
     "./cdk": {
       "types": "./src/cdk/index.ts",
       "import": "./src/cdk/index.ts"
@@ -270,6 +275,11 @@
         "sass": "./src/styles/components/bottom-sheet/_index.scss",
         "types": "./dist/bottom-sheet/bottom-sheet.d.ts",
         "import": "./dist/bottom-sheet/bottom-sheet.js"
+      },
+      "./snackbar": {
+        "sass": "./src/styles/components/snackbar/_index.scss",
+        "types": "./dist/snackbar/snackbar.d.ts",
+        "import": "./dist/snackbar/snackbar.js"
       },
       "./cdk": {
         "types": "./dist/cdk/index.d.ts",

@@ -1,0 +1,27 @@
+// snackbar — design tokens (schema). A bottom-anchored toast bar (inverted: ink bg, canvas
+// text) with an accent action. Forwarded by ./_index.scss.
+@use '../../ref' as ref;
+
+$tokens: (
+  color: (
+    background: ref.ref('color.ink'),
+    text: ref.ref('color.surface'),
+    // The action reads as an accent-tinted label on the dark bar.
+    action: ref.ref('color.accent'),
+  ),
+  size: (
+    // Inset from the viewport edges (the CDK anchors the bar to the bottom edge).
+    offset: 24px,
+    max-width: 480px,
+    radius: ref.ref('shape.radius'),
+    padding-y: 12px,
+    padding-x: 16px,
+    gap: 12px,
+    duration: ref.ref('motion.fast'),
+  ),
+  typography: (
+    font-size: 13px,
+    weight: 500,
+    action-weight: 600,
+  ),
+);

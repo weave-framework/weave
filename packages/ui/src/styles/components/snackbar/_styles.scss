@@ -1,0 +1,59 @@
+// snackbar — styles() mixin (class rules). An inverted (ink) bar anchored to the bottom
+// edge by the CDK overlay; its own margin insets it from the edge, and it slides up on open.
+// The action is an accent-tinted text button. Forwarded by ./_index.scss.
+
+@mixin styles() {
+  .weave-snackbar {
+    display: flex;
+    align-items: center;
+    gap: var(--weave-snackbar-gap);
+    box-sizing: border-box;
+    margin: var(--weave-snackbar-offset);
+    max-width: var(--weave-snackbar-max-width);
+    padding: var(--weave-snackbar-padding-y) var(--weave-snackbar-padding-x);
+    border-radius: var(--weave-snackbar-radius);
+    background: var(--weave-snackbar-background);
+    color: var(--weave-snackbar-text);
+    font-size: var(--weave-snackbar-font-size);
+    font-weight: var(--weave-snackbar-weight);
+    line-height: 1.4;
+    animation: weave-snackbar-in var(--weave-snackbar-duration) ease;
+  }
+
+  @keyframes weave-snackbar-in {
+    from {
+      transform: translateY(12px);
+      opacity: 0;
+    }
+
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+
+  .weave-snackbar__message {
+    flex: 1 1 auto;
+  }
+
+  // Accent text button (no fill) — reads on the dark bar.
+  .weave-snackbar__action {
+    flex: 0 0 auto;
+    border: 0;
+    background: transparent;
+    padding: 0;
+    margin-left: var(--weave-snackbar-gap);
+    color: var(--weave-snackbar-action);
+    font: inherit;
+    font-weight: var(--weave-snackbar-action-weight);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+  }
+
+  .weave-snackbar__action:hover,
+  .weave-snackbar__action:focus-visible {
+    text-decoration: underline;
+    outline: none;
+  }
+}

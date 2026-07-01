@@ -302,6 +302,16 @@ const cssSheetOverride = compile(
 check('bottom-sheet-overrides changes existing token', /--weave-bottom-sheet-max-width:\s*720px/.test(cssSheetOverride));
 check('bottom-sheet-overrides adds new token (auto-var)', /--weave-bottom-sheet-handle:\s*4px/.test(cssSheetOverride));
 
+/* ── snackbar built-in: cascade refs + literals + overrides (U3) ── */
+check('theme emits snackbar background referencing ink (inverted bar)', /--weave-snackbar-background:\s*var\(--weave-color-ink\)/.test(cssTheme));
+check('theme emits snackbar action referencing accent', /--weave-snackbar-action:\s*var\(--weave-color-accent\)/.test(cssTheme));
+check('theme emits snackbar offset literal', /--weave-snackbar-offset:\s*24px/.test(cssTheme));
+const cssSnackbarOverride = compile(
+  `@use '@weave-framework/ui' as weave;\n@include weave.snackbar-overrides((offset: 32px, shadow: 1px));`,
+);
+check('snackbar-overrides changes existing token', /--weave-snackbar-offset:\s*32px/.test(cssSnackbarOverride));
+check('snackbar-overrides adds new token (auto-var)', /--weave-snackbar-shadow:\s*1px/.test(cssSnackbarOverride));
+
 /* ── all-styles(): structural CSS by class ── */
 const cssStyles = compile(`@use '@weave-framework/ui' as weave;\n@include weave.all-styles();`);
 check('all-styles emits .weave-divider rule', /\.weave-divider\s*{/.test(cssStyles));
@@ -361,6 +371,8 @@ check('dialog content is the scroll region (flex:1, min-height:0, overflow-y:aut
 check('dialog header + actions are fixed (flex:0 0 auto) with dividers', /\.weave-dialog__header\s*{[\s\S]*?flex:\s*0 0 auto[\s\S]*?border-bottom:\s*1px solid var\(--weave-dialog-line\)/.test(cssStyles) && /\.weave-dialog__actions\s*{[\s\S]*?flex:\s*0 0 auto[\s\S]*?border-top:\s*1px solid var\(--weave-dialog-line\)/.test(cssStyles));
 check('all-styles emits .weave-bottom-sheet (top-only radius + slide-up keyframes)', /\.weave-bottom-sheet\s*{[\s\S]*?border-radius:\s*var\(--weave-bottom-sheet-radius\)\s*var\(--weave-bottom-sheet-radius\)\s*0\s*0/.test(cssStyles) && /@keyframes\s+weave-bottom-sheet-in/.test(cssStyles));
 check('bottom-sheet content scrolls (flex:1, min-height:0, overflow-y:auto)', /\.weave-bottom-sheet__content\s*{[\s\S]*?flex:\s*1 1 auto[\s\S]*?min-height:\s*0[\s\S]*?overflow-y:\s*auto/.test(cssStyles));
+check('all-styles emits .weave-snackbar inverted bar (ink bg) + slide-in keyframes', /\.weave-snackbar\s*{[\s\S]*?background:\s*var\(--weave-snackbar-background\)/.test(cssStyles) && /@keyframes\s+weave-snackbar-in/.test(cssStyles));
+check('snackbar action is an accent text button', /\.weave-snackbar__action\s*{[\s\S]*?color:\s*var\(--weave-snackbar-action\)/.test(cssStyles));
 
 /* ── example.scss: the docs-seed dev surface compiles end-to-end ── */
 let exampleOk = false;

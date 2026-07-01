@@ -1,0 +1,8 @@
+// Snackbar — a brief bottom toast. Behavior lives in snackbar.ts (snackbar(msg, opts) →
+// SnackbarRef; a bottom CDK overlay with no backdrop, auto-dismiss paused on hover/focus,
+// an optional action, live-announcer for SR, one-at-a-time queue); this is the visual: an
+// inverted (ink) bar inset from the bottom edge, sliding up, with an accent action button.
+//
+// Barrel — forwards the split partials ($tokens + the styles() mixin).
+@forward 'tokens';
+@forward 'styles';
