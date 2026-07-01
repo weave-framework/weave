@@ -211,6 +211,16 @@ const cssRadioOverride = compile(
 check('radio-overrides changes existing token', /--weave-radio-dot-size:\s*10px/.test(cssRadioOverride));
 check('radio-overrides adds new token (auto-var)', /--weave-radio-ring:\s*2px/.test(cssRadioOverride));
 
+/* ── slide-toggle built-in: cascade refs + literals + overrides ── */
+check('theme emits slide-toggle track-on referencing accent', /--weave-slide-toggle-track-on:\s*var\(--weave-color-accent\)/.test(cssTheme));
+check('theme emits slide-toggle knob-off referencing ink', /--weave-slide-toggle-knob-off:\s*var\(--weave-color-ink\)/.test(cssTheme));
+check('theme emits slide-toggle track-width literal', /--weave-slide-toggle-track-width:\s*42px/.test(cssTheme));
+const cssSlideToggleOverride = compile(
+  `@use '@weave-framework/ui' as weave;\n@include weave.slide-toggle-overrides((track-width: 48px, elevation: 1px));`,
+);
+check('slide-toggle-overrides changes existing token', /--weave-slide-toggle-track-width:\s*48px/.test(cssSlideToggleOverride));
+check('slide-toggle-overrides adds new token (auto-var)', /--weave-slide-toggle-elevation:\s*1px/.test(cssSlideToggleOverride));
+
 /* ── all-styles(): structural CSS by class ── */
 const cssStyles = compile(`@use '@weave-framework/ui' as weave;\n@include weave.all-styles();`);
 check('all-styles emits .weave-divider rule', /\.weave-divider\s*{/.test(cssStyles));
@@ -250,6 +260,8 @@ check('checkbox paints the box from the native :checked pseudo (no state class)'
 check('checkbox styles the tri-state :indeterminate mark', /\.weave-checkbox__input:indeterminate\s*\+\s*\.weave-checkbox__box::before\s*{[^}]*opacity:\s*1/.test(cssStyles));
 check('all-styles emits .weave-radio-group + circular __box rules', /\.weave-radio-group\s*{/.test(cssStyles) && /\.weave-radio__box\s*{[\s\S]*?border-radius:\s*50%/.test(cssStyles));
 check('radio reveals the dot from the native :checked pseudo (no state class)', /\.weave-radio__input:checked\s*\+\s*\.weave-radio__box::after\s*{[\s\S]*?scale\(1\)/.test(cssStyles));
+check('all-styles emits .weave-slide-toggle__track + knob rules', /\.weave-slide-toggle__track\s*{[\s\S]*?width:\s*var\(--weave-slide-toggle-track-width\)/.test(cssStyles) && /\.weave-slide-toggle__track::after\s*{/.test(cssStyles));
+check('slide-toggle slides the knob + swaps the track on :checked (no state class)', /\.weave-slide-toggle__input:checked\s*\+\s*\.weave-slide-toggle__track\s*{[^}]*background:\s*var\(--weave-slide-toggle-track-on\)/.test(cssStyles) && /\.weave-slide-toggle__input:checked\s*\+\s*\.weave-slide-toggle__track::after\s*{[\s\S]*?translatex/.test(cssStyles));
 
 /* ── example.scss: the docs-seed dev surface compiles end-to-end ── */
 let exampleOk = false;

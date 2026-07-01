@@ -1,0 +1,86 @@
+// slide-toggle — styles() mixin (class rules). Forwarded by ./_index.scss.
+@use '../../helpers' as helpers;
+
+@mixin styles() {
+  .weave-slide-toggle {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--weave-slide-toggle-gap);
+    cursor: pointer;
+
+    @content;
+  }
+
+  .weave-slide-toggle__input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    opacity: 0;
+    cursor: inherit;
+  }
+
+  .weave-slide-toggle__track {
+    position: relative;
+    flex: none;
+    box-sizing: border-box;
+    width: var(--weave-slide-toggle-track-width);
+    height: var(--weave-slide-toggle-track-height);
+    border-radius: var(--weave-slide-toggle-radius);
+    background: var(--weave-slide-toggle-track-off);
+    transition: background var(--weave-slide-toggle-duration) ease;
+  }
+
+  /* The knob — slides across when on. */
+  .weave-slide-toggle__track::after {
+    content: '';
+    position: absolute;
+    top: var(--weave-slide-toggle-knob-inset);
+    left: var(--weave-slide-toggle-knob-inset);
+    width: var(--weave-slide-toggle-knob-size);
+    height: var(--weave-slide-toggle-knob-size);
+    border-radius: var(--weave-slide-toggle-knob-radius);
+    background: var(--weave-slide-toggle-knob-off);
+    transition:
+      transform var(--weave-slide-toggle-duration) ease,
+      background var(--weave-slide-toggle-duration) ease;
+  }
+
+  .weave-slide-toggle__label {
+    font-size: var(--weave-slide-toggle-label-size);
+    color: var(--weave-slide-toggle-label-text);
+  }
+
+  /* On — accent track + white knob slid to the far side. */
+  .weave-slide-toggle__input:checked + .weave-slide-toggle__track {
+    background: var(--weave-slide-toggle-track-on);
+  }
+
+  .weave-slide-toggle__input:checked + .weave-slide-toggle__track::after {
+    transform: translateX(
+      calc(
+        var(--weave-slide-toggle-track-width) - var(--weave-slide-toggle-knob-size) - 2 *
+          var(--weave-slide-toggle-knob-inset)
+      )
+    );
+    background: var(--weave-slide-toggle-knob-on);
+  }
+
+  .weave-slide-toggle__input:focus-visible + .weave-slide-toggle__track {
+    @include helpers.focus-ring;
+  }
+
+  .weave-slide-toggle__input:disabled {
+    cursor: not-allowed;
+  }
+
+  .weave-slide-toggle__input:disabled + .weave-slide-toggle__track {
+    opacity: 0.5;
+  }
+
+  .weave-slide-toggle__input:disabled ~ .weave-slide-toggle__label {
+    color: var(--weave-slide-toggle-disabled-text);
+  }
+}

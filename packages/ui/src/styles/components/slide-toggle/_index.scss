@@ -1,0 +1,13 @@
+// Slide Toggle — a native `<input type=checkbox>` presented as a switch. Behavior lives
+// in slide-toggle.ts (two-way value + forms control binding; role=switch); this is the
+// visual.
+//
+// A 42×24 track (`field`→accent) with an 18px knob (`__track::after`) that slides across
+// `.16s` when on. State is the NATIVE input pseudo (`:checked` / `:focus-visible` /
+// `:disabled`), read off the visually-hidden input by the adjacent `__track` — no classes.
+//
+// Barrel — forwards the split partials ($tokens + the styles() mixin). Add another
+// concern as its own file and @forward it here.
+
+@forward 'tokens';
+@forward 'styles';

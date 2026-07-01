@@ -1,0 +1,24 @@
+// slide-toggle — design tokens (schema). Forwarded by ./_index.scss.
+@use '../../ref' as ref;
+
+$tokens: (
+  color: (
+    track-off: ref.ref('color.field'),
+    track-on: ref.ref('color.accent'),
+    knob-off: ref.ref('color.ink'),
+    // On-accent knob: a fixed white (accent is dark in Light + Dim).
+    knob-on: #fff,
+    label-text: ref.ref('color.ink'),
+    disabled-text: ref.ref('color.sub'),
+  ),
+  size: (
+    track-width: 42px,
+    track-height: 24px,
+    knob-size: 18px,
+    knob-inset: 3px,
+    radius: 3px,
+    knob-radius: 2px,
+    gap: 8px,
+    duration: 0.16s,
+  ),
+);
