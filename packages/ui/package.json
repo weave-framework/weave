@@ -25,6 +25,10 @@
       "sass": "./src/icon/_icon.scss",
       "types": "./src/icon/icon.ts",
       "import": "./src/icon/icon.ts"
+    },
+    "./cdk": {
+      "types": "./src/cdk/index.ts",
+      "import": "./src/cdk/index.ts"
     }
   },
   "files": [
@@ -62,6 +66,10 @@
         "sass": "./src/icon/_icon.scss",
         "types": "./dist/icon/icon.d.ts",
         "import": "./dist/icon/icon.js"
+      },
+      "./cdk": {
+        "types": "./dist/cdk/index.d.ts",
+        "import": "./dist/cdk/index.js"
       }
     }
   },
