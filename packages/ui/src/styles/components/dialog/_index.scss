@@ -1,0 +1,9 @@
+// Dialog — a centered modal panel. Behavior lives in dialog.ts (openDialog → DialogRef:
+// CDK overlay + dimming backdrop + blockScroll + focus-trap/restore + Esc/backdrop close);
+// this is the visual: a hairline flex-column panel with three regions — a fixed header
+// (optional), a vertically-scrolling content area (always), and a fixed actions row
+// (optional) — bounded so it never exceeds the viewport.
+//
+// Barrel — forwards the split partials ($tokens + the styles() mixin).
+@forward 'tokens';
+@forward 'styles';

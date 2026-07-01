@@ -1,0 +1,54 @@
+// dialog — styles() mixin (class rules). A hairline modal panel (surface + 1px line, NO
+// shadow) laid out as a flex column of three regions: a fixed header, a scrolling content
+// area, and a fixed actions row. The panel never exceeds the viewport (max-width/height),
+// so tall content scrolls INSIDE __content while header/actions stay put. Forwarded by
+// ./_index.scss.
+
+@mixin styles() {
+  .weave-dialog {
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+    width: var(--weave-dialog-width);
+    min-width: var(--weave-dialog-min-width);
+    // Never exceed the viewport — this clamp always wins over the inline width/height.
+    max-width: calc(100vw - 2 * var(--weave-dialog-margin));
+    max-height: calc(100vh - 2 * var(--weave-dialog-margin));
+    background: var(--weave-dialog-surface);
+    color: var(--weave-dialog-text);
+    border: 1px solid var(--weave-dialog-line);
+    border-radius: var(--weave-dialog-radius);
+    overflow: hidden; // clip the regions to the panel radius
+  }
+
+  // Header — fixed (doesn't scroll); only present when the dev supplies one.
+  .weave-dialog__header {
+    flex: 0 0 auto;
+    padding: var(--weave-dialog-padding);
+    border-bottom: 1px solid var(--weave-dialog-line);
+    font-size: var(--weave-dialog-title-size);
+    font-weight: var(--weave-dialog-title-weight);
+    line-height: 1.3;
+  }
+
+  // Content — always present; takes the remaining height and scrolls vertically.
+  // `min-height:0` lets the flex child shrink below its content size so the scroll engages.
+  .weave-dialog__content {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding: var(--weave-dialog-padding);
+    line-height: 1.5;
+  }
+
+  // Actions — fixed footer, right-aligned; only present when the dev supplies actions.
+  .weave-dialog__actions {
+    flex: 0 0 auto;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 8px;
+    padding: var(--weave-dialog-padding);
+    border-top: 1px solid var(--weave-dialog-line);
+  }
+}

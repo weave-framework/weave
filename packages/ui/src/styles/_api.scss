@@ -28,6 +28,7 @@
 @use 'components/overlay' as overlay;
 @use 'components/tooltip' as tooltip;
 @use 'components/menu' as menu;
+@use 'components/dialog' as dialog;
 
 $_builtins: (
   'divider': divider.$tokens,
@@ -51,6 +52,7 @@ $_builtins: (
   'overlay': overlay.$tokens,
   'tooltip': tooltip.$tokens,
   'menu': menu.$tokens,
+  'dialog': dialog.$tokens,
 );
 
 /* ───────────────────────── internal emit ───────────────────────── */
@@ -212,6 +214,10 @@ $_builtins: (
   @include overrides('menu', $map);
 }
 
+@mixin dialog-overrides($map) {
+  @include overrides('dialog', $map);
+}
+
 // Emit the structural CSS (class rules) for every built-in component.
 // Prefer per-component includes to keep CSS small; all-styles() is the convenience.
 @mixin all-styles() {
@@ -236,4 +242,5 @@ $_builtins: (
   @include overlay.styles();
   @include tooltip.styles();
   @include menu.styles();
+  @include dialog.styles();
 }

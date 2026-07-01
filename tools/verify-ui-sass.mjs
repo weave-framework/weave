@@ -283,6 +283,16 @@ const cssMenuOverride = compile(
 check('menu-overrides changes existing token', /--weave-menu-min-width:\s*220px/.test(cssMenuOverride));
 check('menu-overrides adds new token (auto-var)', /--weave-menu-elevation:\s*1px/.test(cssMenuOverride));
 
+/* ── dialog built-in: cascade refs + literals + overrides (U3) ── */
+check('theme emits dialog surface referencing surface', /--weave-dialog-surface:\s*var\(--weave-color-surface\)/.test(cssTheme));
+check('theme emits dialog width literal (default 560)', /--weave-dialog-width:\s*560px/.test(cssTheme));
+check('theme emits dialog margin literal', /--weave-dialog-margin:\s*16px/.test(cssTheme));
+const cssDialogOverride = compile(
+  `@use '@weave-framework/ui' as weave;\n@include weave.dialog-overrides((width: 640px, elevation: 1px));`,
+);
+check('dialog-overrides changes existing token', /--weave-dialog-width:\s*640px/.test(cssDialogOverride));
+check('dialog-overrides adds new token (auto-var)', /--weave-dialog-elevation:\s*1px/.test(cssDialogOverride));
+
 /* ── all-styles(): structural CSS by class ── */
 const cssStyles = compile(`@use '@weave-framework/ui' as weave;\n@include weave.all-styles();`);
 check('all-styles emits .weave-divider rule', /\.weave-divider\s*{/.test(cssStyles));
@@ -337,6 +347,9 @@ check('all-styles emits the hairline overlay panel (no shadow: 1px line + surfac
 check('all-styles emits .weave-tooltip bubble (non-interactive + fade-in keyframes)', /\.weave-tooltip\s*{[\s\S]*?pointer-events:\s*none[\s\S]*?background:\s*var\(--weave-tooltip-background\)/.test(cssStyles) && /@keyframes\s+weave-tooltip-in/.test(cssStyles));
 check('all-styles emits .weave-menu panel (overlay-panel chrome) + __item + __divider', /\.weave-menu\s*{[\s\S]*?background:\s*var\(--weave-overlay-surface\)[\s\S]*?border:\s*1px solid var\(--weave-overlay-line\)/.test(cssStyles) && /\.weave-menu__item\s*{/.test(cssStyles) && /\.weave-menu__divider\s*{/.test(cssStyles));
 check('menu item hover/focus tint comes from native pseudos, excluding disabled', /\.weave-menu__item:not\(:disabled\):hover,\s*\.weave-menu__item:focus\s*{[^}]*background:\s*var\(--weave-menu-item-hover\)/.test(cssStyles));
+check('all-styles emits .weave-dialog flex-column panel clamped to the viewport', /\.weave-dialog\s*{[\s\S]*?display:\s*flex[\s\S]*?flex-direction:\s*column[\s\S]*?max-width:\s*calc\(100vw - 2 \* var\(--weave-dialog-margin\)\)[\s\S]*?max-height:\s*calc\(100vh - 2 \* var\(--weave-dialog-margin\)\)/.test(cssStyles));
+check('dialog content is the scroll region (flex:1, min-height:0, overflow-y:auto)', /\.weave-dialog__content\s*{[\s\S]*?flex:\s*1 1 auto[\s\S]*?min-height:\s*0[\s\S]*?overflow-y:\s*auto/.test(cssStyles));
+check('dialog header + actions are fixed (flex:0 0 auto) with dividers', /\.weave-dialog__header\s*{[\s\S]*?flex:\s*0 0 auto[\s\S]*?border-bottom:\s*1px solid var\(--weave-dialog-line\)/.test(cssStyles) && /\.weave-dialog__actions\s*{[\s\S]*?flex:\s*0 0 auto[\s\S]*?border-top:\s*1px solid var\(--weave-dialog-line\)/.test(cssStyles));
 
 /* ── example.scss: the docs-seed dev surface compiles end-to-end ── */
 let exampleOk = false;

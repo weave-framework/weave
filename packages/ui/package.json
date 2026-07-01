@@ -114,6 +114,15 @@
       "types": "./src/menu/menu.ts",
       "import": "./src/menu/menu.ts"
     },
+    "./context-menu": {
+      "types": "./src/context-menu/context-menu.ts",
+      "import": "./src/context-menu/context-menu.ts"
+    },
+    "./dialog": {
+      "sass": "./src/styles/components/dialog/_index.scss",
+      "types": "./src/dialog/dialog.ts",
+      "import": "./src/dialog/dialog.ts"
+    },
     "./cdk": {
       "types": "./src/cdk/index.ts",
       "import": "./src/cdk/index.ts"
@@ -242,6 +251,15 @@
         "sass": "./src/styles/components/menu/_index.scss",
         "types": "./dist/menu/menu.d.ts",
         "import": "./dist/menu/menu.js"
+      },
+      "./context-menu": {
+        "types": "./dist/context-menu/context-menu.d.ts",
+        "import": "./dist/context-menu/context-menu.js"
+      },
+      "./dialog": {
+        "sass": "./src/styles/components/dialog/_index.scss",
+        "types": "./dist/dialog/dialog.d.ts",
+        "import": "./dist/dialog/dialog.js"
       },
       "./cdk": {
         "types": "./dist/cdk/index.d.ts",
