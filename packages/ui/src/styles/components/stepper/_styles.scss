@@ -1,0 +1,157 @@
+// stepper — styles() mixin (class rules). Forwarded by ./_index.scss.
+@use '../../helpers' as helpers;
+
+@mixin styles() {
+  .weave-stepper {
+    display: flex;
+    flex-direction: column;
+
+    @content;
+  }
+
+  .weave-stepper__header {
+    display: flex;
+    align-items: center;
+  }
+
+  .weave-stepper__step {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--weave-stepper-gap);
+    padding: 4px 2px;
+    border: 0;
+    background: transparent;
+    color: var(--weave-stepper-label);
+    font-family: inherit;
+    font-size: var(--weave-stepper-label-size);
+    font-weight: var(--weave-stepper-label-weight);
+    cursor: pointer;
+  }
+
+  .weave-stepper__step[aria-disabled='true'] {
+    cursor: not-allowed;
+  }
+
+  .weave-stepper__step:focus-visible {
+    @include helpers.focus-ring;
+    border-radius: var(--weave-stepper-radius);
+  }
+
+  // The numbered circle.
+  .weave-stepper__indicator {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    width: var(--weave-stepper-indicator-size);
+    height: var(--weave-stepper-indicator-size);
+    border-radius: 50%;
+    font-size: var(--weave-stepper-number-size);
+    line-height: 1;
+    transition:
+      background var(--weave-stepper-duration) ease,
+      border-color var(--weave-stepper-duration) ease,
+      color var(--weave-stepper-duration) ease;
+  }
+
+  // Upcoming — a bordered circle with a sub number + sub label (state via data-state).
+  .weave-stepper__step[data-state='upcoming'] .weave-stepper__indicator {
+    border: var(--weave-stepper-border-width) solid var(--weave-stepper-upcoming-border);
+    color: var(--weave-stepper-upcoming-text);
+  }
+
+  .weave-stepper__step[data-state='upcoming'] .weave-stepper__label {
+    color: var(--weave-stepper-label-upcoming);
+  }
+
+  // Active — accent fill with the number.
+  .weave-stepper__step[data-state='active'] .weave-stepper__indicator {
+    background: var(--weave-stepper-active-background);
+    color: var(--weave-stepper-on-accent);
+  }
+
+  // Done — accent fill with a ✓ (pure CSS rotated-L check), number hidden.
+  .weave-stepper__step[data-state='done'] .weave-stepper__indicator {
+    background: var(--weave-stepper-done-background);
+  }
+
+  .weave-stepper__step[data-state='done'] .weave-stepper__number {
+    display: none;
+  }
+
+  .weave-stepper__step[data-state='done'] .weave-stepper__indicator::after {
+    content: '';
+    width: 5px;
+    height: 9px;
+    margin-top: -2px;
+    border: solid var(--weave-stepper-on-accent);
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+  }
+
+  .weave-stepper__optional {
+    margin-left: 6px;
+    color: var(--weave-stepper-optional);
+    font-size: var(--weave-stepper-optional-size);
+  }
+
+  // Connector line between steps; accent once the step before it is done.
+  .weave-stepper__connector {
+    flex: 1 1 auto;
+    min-width: var(--weave-stepper-connector-min);
+    height: 1px;
+    margin: 0 6px;
+    background: var(--weave-stepper-connector);
+    transition: background var(--weave-stepper-duration) ease;
+  }
+
+  .weave-stepper__connector[data-state='done'] {
+    background: var(--weave-stepper-connector-done);
+  }
+
+  .weave-stepper__panel {
+    padding: var(--weave-stepper-panel-padding-y) 0;
+  }
+
+  .weave-stepper__actions {
+    display: flex;
+    gap: var(--weave-stepper-actions-gap);
+    margin-top: 8px;
+  }
+
+  // Self-contained nav buttons (no dependency on the Button component's classes).
+  .weave-stepper__back,
+  .weave-stepper__next {
+    padding: var(--weave-stepper-button-padding-y) var(--weave-stepper-button-padding-x);
+    border: 1px solid transparent;
+    border-radius: var(--weave-stepper-radius);
+    font: inherit;
+    font-weight: var(--weave-stepper-button-weight);
+    cursor: pointer;
+  }
+
+  .weave-stepper__back {
+    background: transparent;
+    border-color: var(--weave-stepper-button-border);
+    color: var(--weave-stepper-label);
+  }
+
+  .weave-stepper__next {
+    background: var(--weave-stepper-next-background);
+    color: var(--weave-stepper-next-text);
+  }
+
+  .weave-stepper__back:focus-visible,
+  .weave-stepper__next:focus-visible {
+    @include helpers.focus-ring;
+  }
+
+  .weave-stepper__back:disabled,
+  .weave-stepper__next:disabled {
+    background: var(--weave-stepper-button-disabled);
+    border-color: transparent;
+    color: var(--weave-stepper-disabled-text);
+    cursor: not-allowed;
+  }
+}

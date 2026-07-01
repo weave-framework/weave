@@ -153,6 +153,11 @@
       "types": "./src/tabs/tabs.ts",
       "import": "./src/tabs/tabs.ts"
     },
+    "./stepper": {
+      "sass": "./src/styles/components/stepper/_index.scss",
+      "types": "./src/stepper/stepper.ts",
+      "import": "./src/stepper/stepper.ts"
+    },
     "./cdk": {
       "types": "./src/cdk/index.ts",
       "import": "./src/cdk/index.ts"
@@ -320,6 +325,11 @@
         "sass": "./src/styles/components/tabs/_index.scss",
         "types": "./dist/tabs/tabs.d.ts",
         "import": "./dist/tabs/tabs.js"
+      },
+      "./stepper": {
+        "sass": "./src/styles/components/stepper/_index.scss",
+        "types": "./dist/stepper/stepper.d.ts",
+        "import": "./dist/stepper/stepper.js"
       },
       "./cdk": {
         "types": "./dist/cdk/index.d.ts",

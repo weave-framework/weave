@@ -350,6 +350,16 @@ const cssTabsOverride = compile(
 check('tabs-overrides changes existing token', /--weave-tabs-marker-size:\s*6px/.test(cssTabsOverride));
 check('tabs-overrides adds new token (auto-var)', /--weave-tabs-radius:\s*3px/.test(cssTabsOverride));
 
+/* ── stepper built-in: cascade refs + literals + overrides (U4) ── */
+check('theme emits stepper active-background referencing accent', /--weave-stepper-active-background:\s*var\(--weave-color-accent\)/.test(cssTheme));
+check('theme emits stepper indicator-size literal (26px)', /--weave-stepper-indicator-size:\s*26px/.test(cssTheme));
+check('theme emits stepper on-accent as a fixed light literal', /--weave-stepper-on-accent:\s*#fff/.test(cssTheme));
+const cssStepperOverride = compile(
+  `@use '@weave-framework/ui' as weave;\n@include weave.stepper-overrides((indicator-size: 30px, ring: 2px));`,
+);
+check('stepper-overrides changes existing token', /--weave-stepper-indicator-size:\s*30px/.test(cssStepperOverride));
+check('stepper-overrides adds new token (auto-var)', /--weave-stepper-ring:\s*2px/.test(cssStepperOverride));
+
 /* ── all-styles(): structural CSS by class ── */
 const cssStyles = compile(`@use '@weave-framework/ui' as weave;\n@include weave.all-styles();`);
 check('all-styles emits .weave-divider rule', /\.weave-divider\s*{/.test(cssStyles));
@@ -425,6 +435,10 @@ check('expansion region reveals via grid-template-rows 0fr→1fr', /\.weave-expa
 check('all-styles emits .weave-tabs list over a 1px rule', /\.weave-tabs__list\s*{[\s\S]*?border-bottom:\s*1px solid var\(--weave-tabs-line\)/.test(cssStyles));
 check('tabs active tab inks + paints the accent square (no sliding underline)', /\.weave-tabs__tab\[aria-selected=true\]\s*{[^}]*color:\s*var\(--weave-tabs-text-active\)/.test(cssStyles) && /\.weave-tabs__tab\[aria-selected=true\]::before\s*{[^}]*background:\s*var\(--weave-tabs-marker\)/.test(cssStyles));
 check('tabs reserves the marker square space on every tab (::before)', /\.weave-tabs__tab::before\s*{[\s\S]*?width:\s*var\(--weave-tabs-marker-size\)[\s\S]*?background:\s*transparent/.test(cssStyles));
+check('all-styles emits .weave-stepper circular indicator', /\.weave-stepper__indicator\s*{[\s\S]*?border-radius:\s*50%/.test(cssStyles));
+check('stepper paints states via [data-state]: active/done accent fill, upcoming bordered', /\.weave-stepper__step\[data-state=active\]\s+\.weave-stepper__indicator\s*{[^}]*background:\s*var\(--weave-stepper-active-background\)/.test(cssStyles) && /\.weave-stepper__step\[data-state=upcoming\]\s+\.weave-stepper__indicator\s*{[^}]*border:\s*var\(--weave-stepper-border-width\)/.test(cssStyles));
+check('stepper done step shows a pure-CSS ✓ (rotated-L) + hides the number', /\.weave-stepper__step\[data-state=done\]\s+\.weave-stepper__number\s*{[^}]*display:\s*none/.test(cssStyles) && /\.weave-stepper__step\[data-state=done\]\s+\.weave-stepper__indicator::after\s*{[\s\S]*?transform:\s*rotate\(45deg\)/.test(cssStyles));
+check('stepper connector goes accent once its step is done', /\.weave-stepper__connector\[data-state=done\]\s*{[^}]*background:\s*var\(--weave-stepper-connector-done\)/.test(cssStyles));
 
 /* ── example.scss: the docs-seed dev surface compiles end-to-end ── */
 let exampleOk = false;

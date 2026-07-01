@@ -36,6 +36,7 @@
 // U4 complex/data components.
 @use 'components/expansion' as expansion;
 @use 'components/tabs' as tabs;
+@use 'components/stepper' as stepper;
 
 $_builtins: (
   'divider': divider.$tokens,
@@ -66,6 +67,7 @@ $_builtins: (
   'autocomplete': autocomplete.$tokens,
   'expansion': expansion.$tokens,
   'tabs': tabs.$tokens,
+  'stepper': stepper.$tokens,
 );
 
 /* ───────────────────────── internal emit ───────────────────────── */
@@ -255,6 +257,10 @@ $_builtins: (
   @include overrides('tabs', $map);
 }
 
+@mixin stepper-overrides($map) {
+  @include overrides('stepper', $map);
+}
+
 // Emit the structural CSS (class rules) for every built-in component.
 // Prefer per-component includes to keep CSS small; all-styles() is the convenience.
 @mixin all-styles() {
@@ -286,4 +292,5 @@ $_builtins: (
   @include autocomplete.styles();
   @include expansion.styles();
   @include tabs.styles();
+  @include stepper.styles();
 }

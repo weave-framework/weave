@@ -1,0 +1,45 @@
+// stepper — design tokens (schema). Forwarded by ./_index.scss.
+@use '../../ref' as ref;
+
+$tokens: (
+  color: (
+    // Numbered circles: done = accent + ✓, active = accent + number, upcoming = bordered.
+    active-background: ref.ref('color.accent'),
+    done-background: ref.ref('color.accent'),
+    // On-accent glyphs are a fixed light literal (accent is dark in both Light + Dim,
+    // so surface/canvas wouldn't contrast) — same call as Badge.
+    on-accent: #fff,
+    upcoming-border: ref.ref('color.line'),
+    upcoming-text: ref.ref('color.sub'),
+    label: ref.ref('color.ink'),
+    label-upcoming: ref.ref('color.sub'),
+    optional: ref.ref('color.sub'),
+    connector: ref.ref('color.line'),
+    connector-done: ref.ref('color.accent'),
+    disabled-text: ref.ref('color.sub'),
+    // Back = outline button, Next = ink (primary) button.
+    next-background: ref.ref('color.ink'),
+    next-text: ref.ref('color.surface'),
+    button-border: ref.ref('color.line'),
+    button-disabled: ref.ref('color.field'),
+  ),
+  size: (
+    indicator-size: 26px,
+    gap: 10px,
+    connector-min: 24px,
+    border-width: 1.5px,
+    radius: ref.ref('shape.radius'),
+    panel-padding-y: 16px,
+    actions-gap: 8px,
+    button-padding-x: 16px,
+    button-padding-y: 8px,
+    duration: ref.ref('motion.fast'),
+  ),
+  typography: (
+    label-size: 13px,
+    label-weight: 500,
+    number-size: 12px,
+    optional-size: 10px,
+    button-weight: 500,
+  ),
+);

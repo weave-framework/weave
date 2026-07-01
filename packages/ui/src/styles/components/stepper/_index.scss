@@ -1,0 +1,14 @@
+// Stepper — a horizontal step-through (wizard). Behavior lives in stepper.ts (current-
+// index nav + linear gating + Back/Continue; panel contents appended on mount); this is
+// the visual.
+//
+// Numbered circles joined by connector lines, state via the NATIVE data attr (not a class):
+// [data-state=done] = accent fill + a pure-CSS ✓ (number hidden), [data-state=active] =
+// accent fill + number, [data-state=upcoming] = bordered circle. Connectors go accent once
+// the step before them is done.
+//
+// Barrel — forwards the split partials ($tokens + the styles() mixin). Add another
+// concern as its own file and @forward it here.
+
+@forward 'tokens';
+@forward 'styles';
