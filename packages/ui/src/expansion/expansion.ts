@@ -72,7 +72,7 @@ export const template: string =
   '<div class="weave-expansion__region" id={{ regionId(panel) }} role="region"' +
   ' aria-labelledby={{ headerId(panel) }} data-open={{ openAttr(panel) }}' +
   ' aria-hidden={{ hiddenAttr(panel) }} .inert={{ isClosed(panel) }}>' +
-  '<div class="weave-expansion__body"></div>' +
+  '<div class="weave-expansion__body"><div class="weave-expansion__content"></div></div>' +
   '</div>' +
   '</div>' +
   '}' +
@@ -152,7 +152,7 @@ export function setup(props: ExpansionProps): ExpansionContext {
   onMount(() => {
     const el: Element | null = host();
     if (!el) return;
-    const bodies: NodeListOf<HTMLElement> = el.querySelectorAll<HTMLElement>('.weave-expansion__body');
+    const bodies: NodeListOf<HTMLElement> = el.querySelectorAll<HTMLElement>('.weave-expansion__content');
     panels().forEach((panel, i) => {
       bodies[i]?.append(toNode(panel.body));
     });

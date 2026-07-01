@@ -82,22 +82,47 @@
     content: '\2212'; // minus sign (−), not a hyphen
   }
 
-  // Collapse/reveal via grid-template-rows 0fr→1fr — no JS height measurement.
+  // Collapse via grid-template-rows 0fr→1fr — no JS height measurement. The height
+  // change is instant: transitioning `fr` values is unreliable inside a flex column
+  // (Chrome resolves an animating `1fr` to 0 in an auto-height container), so the
+  // reveal is carried by a keyframe on the content instead (fades/slides in on open).
   .weave-expansion__region {
     display: grid;
     grid-template-rows: 0fr;
-    transition: grid-template-rows var(--weave-expansion-duration) ease;
   }
 
   .weave-expansion__region[data-open='true'] {
     grid-template-rows: 1fr;
   }
 
+  // The clip layer — no padding here, so the grid row collapses fully to 0 when
+  // closed (padding on the animating grid child would keep it from reaching 0).
   .weave-expansion__body {
-    overflow: hidden; // clip content while the row track collapses to 0
+    overflow: hidden;
     min-height: 0;
+  }
+
+  // The padded content sits inside the clip layer.
+  .weave-expansion__content {
     padding: var(--weave-expansion-body-padding-y) var(--weave-expansion-body-padding-x);
     color: var(--weave-expansion-text);
     font-size: var(--weave-expansion-body-size);
+  }
+
+  // Reveal on open (robust everywhere, unlike an fr transition).
+  .weave-expansion__region[data-open='true'] .weave-expansion__content {
+    animation: weave-expansion-reveal var(--weave-expansion-duration) ease;
+  }
+
+  @keyframes weave-expansion-reveal {
+    from {
+      opacity: 0;
+      transform: translateY(-4px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 }
