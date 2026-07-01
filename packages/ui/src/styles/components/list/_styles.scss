@@ -1,0 +1,69 @@
+// list — styles() mixin (class rules). Forwarded by ./_index.scss.
+@use '../../helpers' as helpers;
+
+@mixin styles() {
+  .weave-list {
+    display: flex;
+    flex-direction: column;
+
+    @content;
+  }
+
+  .weave-list__row {
+    display: flex;
+    align-items: center;
+    gap: var(--weave-list-padding-x);
+    min-height: var(--weave-list-row-height);
+    padding: var(--weave-list-padding-y) var(--weave-list-padding-x);
+    // A 2px accent left border appears only when selected; reserve the space now so
+    // selection doesn't shift the row content (transparent placeholder border).
+    border-left: var(--weave-list-marker-width) solid transparent;
+    color: var(--weave-list-text);
+    font-size: var(--weave-list-font-size);
+    font-weight: var(--weave-list-weight);
+    line-height: 1.3;
+    transition: background var(--weave-list-duration) ease;
+  }
+
+  // Hairline separators between rows (design: separate surfaces with a 1px line, no shadow).
+  .weave-list__row + .weave-list__row {
+    box-shadow: 0 -1px 0 var(--weave-list-divider);
+  }
+
+  // Only the selectable listbox rows are interactive.
+  .weave-list[role='listbox'] .weave-list__row {
+    cursor: pointer;
+  }
+
+  .weave-list[role='listbox'] .weave-list__row:hover {
+    background: var(--weave-list-hover);
+  }
+
+  .weave-list__row:focus-visible {
+    @include helpers.focus-ring;
+    outline-offset: -2px; // ring sits inside the row
+  }
+
+  .weave-list__title {
+    flex: 1;
+    min-width: 0;
+    @include helpers.truncate;
+  }
+
+  .weave-list__meta {
+    flex: none;
+    color: var(--weave-list-meta);
+    font-size: var(--weave-list-meta-font-size);
+  }
+
+  /* Selected — accentSoft tint + 2px accent left border (state via native ARIA attr). */
+  .weave-list__row[aria-selected='true'] {
+    background: var(--weave-list-selected-background);
+    border-left-color: var(--weave-list-selected-marker);
+  }
+
+  .weave-list__row[aria-disabled='true'] {
+    color: var(--weave-list-disabled-text);
+    cursor: not-allowed;
+  }
+}

@@ -1,0 +1,27 @@
+// list — design tokens (schema). Forwarded by ./_index.scss.
+@use '../../ref' as ref;
+
+$tokens: (
+  color: (
+    text: ref.ref('color.ink'),
+    meta: ref.ref('color.sub'),
+    hover: ref.ref('color.field'),
+    divider: ref.ref('color.line'),
+    // accentSoft = accent at ~12% alpha (the selected-row tint from the design).
+    selected-background: color-mix(in srgb, ref.ref('color.accent') 12%, transparent),
+    selected-marker: ref.ref('color.accent'),
+    disabled-text: ref.ref('color.sub'),
+  ),
+  size: (
+    row-height: 34px,
+    padding-x: 12px,
+    padding-y: 7px,
+    marker-width: 2px,
+    duration: ref.ref('motion.fast'),
+  ),
+  typography: (
+    font-size: 13px,
+    meta-font-size: 11px,
+    weight: 500,
+  ),
+);

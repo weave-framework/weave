@@ -51,6 +51,11 @@
       "types": "./src/toolbar/toolbar.ts",
       "import": "./src/toolbar/toolbar.ts"
     },
+    "./list": {
+      "sass": "./src/styles/components/list/_index.scss",
+      "types": "./src/list/list.ts",
+      "import": "./src/list/list.ts"
+    },
     "./cdk": {
       "types": "./src/cdk/index.ts",
       "import": "./src/cdk/index.ts"
@@ -116,6 +121,11 @@
         "sass": "./src/styles/components/toolbar/_index.scss",
         "types": "./dist/toolbar/toolbar.d.ts",
         "import": "./dist/toolbar/toolbar.js"
+      },
+      "./list": {
+        "sass": "./src/styles/components/list/_index.scss",
+        "types": "./dist/list/list.d.ts",
+        "import": "./dist/list/list.js"
       },
       "./cdk": {
         "types": "./dist/cdk/index.d.ts",

@@ -1,0 +1,12 @@
+// List — a vertical list of selectable rows. Behavior lives in list.ts (selection +
+// roving tabindex + typeahead via the CDK listKeyManager); this is the visual.
+//
+// Two modes off one class contract: role=listbox (selectable) rows are interactive,
+// role=list rows are plain. Selected state is the NATIVE ARIA attr, not a class:
+// [aria-selected=true] paints the accentSoft tint + a 2px accent left border.
+//
+// Barrel — forwards the split partials ($tokens + the styles() mixin). Add another
+// concern as its own file and @forward it here.
+
+@forward 'tokens';
+@forward 'styles';

@@ -14,6 +14,7 @@
 @use 'components/badge' as badge;
 @use 'components/card' as card;
 @use 'components/toolbar' as toolbar;
+@use 'components/list' as list-cmp;
 
 $_builtins: (
   'divider': divider.$tokens,
@@ -24,6 +25,7 @@ $_builtins: (
   'badge': badge.$tokens,
   'card': card.$tokens,
   'toolbar': toolbar.$tokens,
+  'list': list-cmp.$tokens,
 );
 
 /* ───────────────────────── internal emit ───────────────────────── */
@@ -133,6 +135,10 @@ $_builtins: (
   @include overrides('toolbar', $map);
 }
 
+@mixin list-overrides($map) {
+  @include overrides('list', $map);
+}
+
 // Emit the structural CSS (class rules) for every built-in component.
 // Prefer per-component includes to keep CSS small; all-styles() is the convenience.
 @mixin all-styles() {
@@ -144,4 +150,5 @@ $_builtins: (
   @include badge.styles();
   @include card.styles();
   @include toolbar.styles();
+  @include list-cmp.styles();
 }

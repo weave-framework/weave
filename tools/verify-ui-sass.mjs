@@ -151,6 +151,16 @@ const cssToolbarOverride = compile(
 check('toolbar-overrides changes existing token', /--weave-toolbar-height:\s*56px/.test(cssToolbarOverride));
 check('toolbar-overrides adds new token (auto-var)', /--weave-toolbar-elevation:\s*1px/.test(cssToolbarOverride));
 
+/* ── list built-in: cascade refs + accentSoft color-mix + literals + overrides ── */
+check('theme emits list selected-marker referencing accent', /--weave-list-selected-marker:\s*var\(--weave-color-accent\)/.test(cssTheme));
+check('theme emits list selected-background as accentSoft color-mix', /--weave-list-selected-background:\s*color-mix\(in srgb, var\(--weave-color-accent\) 12%, transparent\)/.test(cssTheme));
+check('theme emits list row-height literal', /--weave-list-row-height:\s*34px/.test(cssTheme));
+const cssListOverride = compile(
+  `@use '@weave-framework/ui' as weave;\n@include weave.list-overrides((row-height: 40px, gap: 8px));`,
+);
+check('list-overrides changes existing token', /--weave-list-row-height:\s*40px/.test(cssListOverride));
+check('list-overrides adds new token (auto-var)', /--weave-list-gap:\s*8px/.test(cssListOverride));
+
 /* ── all-styles(): structural CSS by class ── */
 const cssStyles = compile(`@use '@weave-framework/ui' as weave;\n@include weave.all-styles();`);
 check('all-styles emits .weave-divider rule', /\.weave-divider\s*{/.test(cssStyles));
@@ -174,6 +184,9 @@ check('card actions pin to the bottom (margin-top:auto)', /\.weave-card__actions
 check('all-styles emits .weave-toolbar rule', /\.weave-toolbar\s*{/.test(cssStyles));
 check('toolbar consumes height + bottom rule tokens', /\.weave-toolbar\s*{[\s\S]*?height:\s*var\(--weave-toolbar-height\)[\s\S]*?border-bottom:\s*1px solid var\(--weave-toolbar-border\)/.test(cssStyles));
 check('toolbar emits --ink + __spacer rules', /\.weave-toolbar--ink\s*{/.test(cssStyles) && /\.weave-toolbar__spacer\s*{[^}]*flex:\s*1/.test(cssStyles));
+check('all-styles emits .weave-list rule', /\.weave-list\s*{/.test(cssStyles));
+check('list styles the selected row via [aria-selected] (accentSoft + accent marker)', /\.weave-list__row\[aria-selected=true\]\s*{[\s\S]*?background:\s*var\(--weave-list-selected-background\)[\s\S]*?border-left-color:\s*var\(--weave-list-selected-marker\)/.test(cssStyles));
+check('list interactivity is scoped to the listbox role', /\.weave-list\[role=listbox\]\s+\.weave-list__row:hover/.test(cssStyles));
 
 /* ── example.scss: the docs-seed dev surface compiles end-to-end ── */
 let exampleOk = false;
