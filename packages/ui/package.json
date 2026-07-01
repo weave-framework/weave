@@ -46,6 +46,11 @@
       "types": "./src/card/card.ts",
       "import": "./src/card/card.ts"
     },
+    "./toolbar": {
+      "sass": "./src/styles/components/_toolbar.scss",
+      "types": "./src/toolbar/toolbar.ts",
+      "import": "./src/toolbar/toolbar.ts"
+    },
     "./cdk": {
       "types": "./src/cdk/index.ts",
       "import": "./src/cdk/index.ts"
@@ -106,6 +111,11 @@
         "sass": "./src/styles/components/_card.scss",
         "types": "./dist/card/card.d.ts",
         "import": "./dist/card/card.js"
+      },
+      "./toolbar": {
+        "sass": "./src/styles/components/_toolbar.scss",
+        "types": "./dist/toolbar/toolbar.d.ts",
+        "import": "./dist/toolbar/toolbar.js"
       },
       "./cdk": {
         "types": "./dist/cdk/index.d.ts",

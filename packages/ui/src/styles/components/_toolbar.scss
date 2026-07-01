@@ -1,0 +1,63 @@
+// Toolbar — a horizontal app bar. Behavior lives in toolbar.ts (container + class
+// forward); this is the visual. Keyline: 52px tall, surface bg, 1px line bottom rule,
+// NO shadow. A flex row; parts are the class contract the consumer composes:
+//   __start / __end   clusters (flex, gapped)
+//   __spacer          flex-grow gap that pushes __end to the right
+// --ink inverts to an ink bar; --sticky pins it to the top.
+
+@use '../ref' as ref;
+
+$tokens: (
+  color: (
+    background: ref.ref('color.surface'),
+    border: ref.ref('color.line'),
+    text: ref.ref('color.ink'),
+    ink-background: ref.ref('color.ink'),
+    ink-text: ref.ref('color.canvas'),
+  ),
+  size: (
+    height: 52px,
+    padding-x: 16px,
+    gap: 12px,
+  ),
+);
+
+@mixin styles() {
+  .weave-toolbar {
+    display: flex;
+    align-items: center;
+    gap: var(--weave-toolbar-gap);
+    box-sizing: border-box;
+    height: var(--weave-toolbar-height);
+    padding: 0 var(--weave-toolbar-padding-x);
+    background: var(--weave-toolbar-background);
+    color: var(--weave-toolbar-text);
+    border-bottom: 1px solid var(--weave-toolbar-border);
+
+    @content;
+  }
+
+  .weave-toolbar--ink {
+    background: var(--weave-toolbar-ink-background);
+    color: var(--weave-toolbar-ink-text);
+    border-bottom-color: transparent;
+  }
+
+  .weave-toolbar--sticky {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  /* The flexible gap — everything after it is pushed to the trailing edge. */
+  .weave-toolbar__spacer {
+    flex: 1 1 auto;
+  }
+
+  .weave-toolbar__start,
+  .weave-toolbar__end {
+    display: flex;
+    align-items: center;
+    gap: var(--weave-toolbar-gap);
+  }
+}

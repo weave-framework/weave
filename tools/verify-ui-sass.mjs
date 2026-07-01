@@ -141,6 +141,15 @@ const cssCardOverride = compile(
 check('card-overrides changes existing token', /--weave-card-padding:\s*20px/.test(cssCardOverride));
 check('card-overrides adds new token (auto-var)', /--weave-card-elevation:\s*1px/.test(cssCardOverride));
 
+/* ── toolbar built-in: cascade refs + literals + overrides ── */
+check('theme emits toolbar background referencing surface', /--weave-toolbar-background:\s*var\(--weave-color-surface\)/.test(cssTheme));
+check('theme emits toolbar height literal', /--weave-toolbar-height:\s*52px/.test(cssTheme));
+const cssToolbarOverride = compile(
+  `@use '@weave-framework/ui' as weave;\n@include weave.toolbar-overrides((height: 56px, elevation: 1px));`,
+);
+check('toolbar-overrides changes existing token', /--weave-toolbar-height:\s*56px/.test(cssToolbarOverride));
+check('toolbar-overrides adds new token (auto-var)', /--weave-toolbar-elevation:\s*1px/.test(cssToolbarOverride));
+
 /* ── all-styles(): structural CSS by class ── */
 const cssStyles = compile(`@use '@weave-framework/ui' as weave;\n@include weave.all-styles();`);
 check('all-styles emits .weave-divider rule', /\.weave-divider\s*{/.test(cssStyles));
@@ -161,6 +170,9 @@ check('all-styles emits .weave-card rule', /\.weave-card\s*{/.test(cssStyles));
 check('card consumes its surface + border tokens', /\.weave-card\s*{[\s\S]*?background:\s*var\(--weave-card-background\)[\s\S]*?border:\s*1px solid var\(--weave-card-border\)/.test(cssStyles));
 check('card emits its __title / __actions part rules', /\.weave-card__title\s*{/.test(cssStyles) && /\.weave-card__actions\s*{/.test(cssStyles));
 check('card actions pin to the bottom (margin-top:auto)', /\.weave-card__actions\s*{[^}]*margin-top:\s*auto/.test(cssStyles));
+check('all-styles emits .weave-toolbar rule', /\.weave-toolbar\s*{/.test(cssStyles));
+check('toolbar consumes height + bottom rule tokens', /\.weave-toolbar\s*{[\s\S]*?height:\s*var\(--weave-toolbar-height\)[\s\S]*?border-bottom:\s*1px solid var\(--weave-toolbar-border\)/.test(cssStyles));
+check('toolbar emits --ink + __spacer rules', /\.weave-toolbar--ink\s*{/.test(cssStyles) && /\.weave-toolbar__spacer\s*{[^}]*flex:\s*1/.test(cssStyles));
 
 /* ── example.scss: the docs-seed dev surface compiles end-to-end ── */
 let exampleOk = false;
