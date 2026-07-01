@@ -1,0 +1,21 @@
+// tooltip — design tokens (schema). A small inverted hint bubble (ink bg, surface text).
+// Forwarded by ./_index.scss.
+@use '../../ref' as ref;
+
+$tokens: (
+  color: (
+    background: ref.ref('color.ink'),
+    text: ref.ref('color.surface'),
+  ),
+  size: (
+    padding-x: 8px,
+    padding-y: 4px,
+    radius: ref.ref('shape.radius'),
+    max-width: 240px,
+    duration: ref.ref('motion.fast'),
+  ),
+  typography: (
+    font-size: 11px,
+    weight: 500,
+  ),
+);

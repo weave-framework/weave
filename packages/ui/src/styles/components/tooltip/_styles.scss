@@ -1,0 +1,29 @@
+// tooltip — styles() mixin (class rules). A small inverted bubble; the CDK overlay
+// positions it against the host. Never captures the pointer (must not block host hover);
+// fades in fast. Keyframes live inside styles() (same pattern as Ripple/Progress Bar).
+// Forwarded by ./_index.scss.
+
+@mixin styles() {
+  .weave-tooltip {
+    pointer-events: none;
+    max-width: var(--weave-tooltip-max-width);
+    padding: var(--weave-tooltip-padding-y) var(--weave-tooltip-padding-x);
+    border-radius: var(--weave-tooltip-radius);
+    background: var(--weave-tooltip-background);
+    color: var(--weave-tooltip-text);
+    font-size: var(--weave-tooltip-font-size);
+    font-weight: var(--weave-tooltip-weight);
+    line-height: 1.4;
+    animation: weave-tooltip-in var(--weave-tooltip-duration) ease;
+  }
+
+  @keyframes weave-tooltip-in {
+    from {
+      opacity: 0;
+    }
+
+    to {
+      opacity: 1;
+    }
+  }
+}

@@ -104,6 +104,11 @@
     "./overlay": {
       "sass": "./src/styles/components/overlay/_index.scss"
     },
+    "./tooltip": {
+      "sass": "./src/styles/components/tooltip/_index.scss",
+      "types": "./src/tooltip/tooltip.ts",
+      "import": "./src/tooltip/tooltip.ts"
+    },
     "./cdk": {
       "types": "./src/cdk/index.ts",
       "import": "./src/cdk/index.ts"
@@ -222,6 +227,11 @@
       },
       "./overlay": {
         "sass": "./src/styles/components/overlay/_index.scss"
+      },
+      "./tooltip": {
+        "sass": "./src/styles/components/tooltip/_index.scss",
+        "types": "./dist/tooltip/tooltip.d.ts",
+        "import": "./dist/tooltip/tooltip.js"
       },
       "./cdk": {
         "types": "./dist/cdk/index.d.ts",

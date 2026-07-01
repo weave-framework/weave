@@ -26,6 +26,7 @@
 @use 'components/chips' as chips;
 // Shared "core republic" (master §4.1): panel/backdrop chrome for every U3 overlay component.
 @use 'components/overlay' as overlay;
+@use 'components/tooltip' as tooltip;
 
 $_builtins: (
   'divider': divider.$tokens,
@@ -47,6 +48,7 @@ $_builtins: (
   'input': input.$tokens,
   'chips': chips.$tokens,
   'overlay': overlay.$tokens,
+  'tooltip': tooltip.$tokens,
 );
 
 /* ───────────────────────── internal emit ───────────────────────── */
@@ -200,6 +202,10 @@ $_builtins: (
   @include overrides('overlay', $map);
 }
 
+@mixin tooltip-overrides($map) {
+  @include overrides('tooltip', $map);
+}
+
 // Emit the structural CSS (class rules) for every built-in component.
 // Prefer per-component includes to keep CSS small; all-styles() is the convenience.
 @mixin all-styles() {
@@ -222,4 +228,5 @@ $_builtins: (
   @include input.styles();
   @include chips.styles();
   @include overlay.styles();
+  @include tooltip.styles();
 }

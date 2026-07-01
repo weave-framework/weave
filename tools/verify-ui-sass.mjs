@@ -263,6 +263,16 @@ const cssOverlayOverride = compile(
 check('overlay-overrides changes existing token', /--weave-overlay-radius:\s*6px/.test(cssOverlayOverride));
 check('overlay-overrides adds new token (auto-var)', /--weave-overlay-elevation:\s*2px/.test(cssOverlayOverride));
 
+/* ── tooltip built-in: cascade refs + literals + overrides (U3) ── */
+check('theme emits tooltip background referencing ink', /--weave-tooltip-background:\s*var\(--weave-color-ink\)/.test(cssTheme));
+check('theme emits tooltip text referencing surface', /--weave-tooltip-text:\s*var\(--weave-color-surface\)/.test(cssTheme));
+check('theme emits tooltip font-size literal', /--weave-tooltip-font-size:\s*11px/.test(cssTheme));
+const cssTooltipOverride = compile(
+  `@use '@weave-framework/ui' as weave;\n@include weave.tooltip-overrides((max-width: 320px, arrow: 4px));`,
+);
+check('tooltip-overrides changes existing token', /--weave-tooltip-max-width:\s*320px/.test(cssTooltipOverride));
+check('tooltip-overrides adds new token (auto-var)', /--weave-tooltip-arrow:\s*4px/.test(cssTooltipOverride));
+
 /* ── all-styles(): structural CSS by class ── */
 const cssStyles = compile(`@use '@weave-framework/ui' as weave;\n@include weave.all-styles();`);
 check('all-styles emits .weave-divider rule', /\.weave-divider\s*{/.test(cssStyles));
@@ -314,6 +324,7 @@ check('all-styles emits .weave-chips chip + remove rules', /\.weave-chips__chip\
 check('chips emits the dashed --add chip', /\.weave-chips__chip--add\s*{[^}]*border-style:\s*dashed/.test(cssStyles));
 check('all-styles emits the overlay backdrop scrim + transparent click-catcher', /\.weave-overlay-backdrop\s*{[^}]*background:\s*var\(--weave-overlay-backdrop\)/.test(cssStyles) && /\.weave-overlay-backdrop--transparent\s*{[^}]*background:\s*transparent/.test(cssStyles));
 check('all-styles emits the hairline overlay panel (no shadow: 1px line + surface)', /\.weave-overlay-panel\s*{[\s\S]*?background:\s*var\(--weave-overlay-surface\)[\s\S]*?border:\s*1px solid var\(--weave-overlay-line\)/.test(cssStyles) && !/\.weave-overlay-panel\s*{[^}]*box-shadow/.test(cssStyles));
+check('all-styles emits .weave-tooltip bubble (non-interactive + fade-in keyframes)', /\.weave-tooltip\s*{[\s\S]*?pointer-events:\s*none[\s\S]*?background:\s*var\(--weave-tooltip-background\)/.test(cssStyles) && /@keyframes\s+weave-tooltip-in/.test(cssStyles));
 
 /* ── example.scss: the docs-seed dev surface compiles end-to-end ── */
 let exampleOk = false;

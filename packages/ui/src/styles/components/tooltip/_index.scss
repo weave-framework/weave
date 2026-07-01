@@ -1,0 +1,8 @@
+// Tooltip — a hint bubble positioned against a host by the CDK overlay. Behavior lives
+// in tooltip.ts (the `use:tooltip` action — hover/focus open, flip positioning,
+// aria-describedby, Esc close); this is the visual: a small inverted (ink) bubble that
+// never captures the pointer and fades in fast.
+//
+// Barrel — forwards the split partials ($tokens + the styles() mixin).
+@forward 'tokens';
+@forward 'styles';
