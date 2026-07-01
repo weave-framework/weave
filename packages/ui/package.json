@@ -15,6 +15,11 @@
     },
     "./divider": {
       "sass": "./src/divider/_divider.scss"
+    },
+    "./ripple": {
+      "sass": "./src/ripple/_ripple.scss",
+      "types": "./src/ripple/ripple.ts",
+      "import": "./src/ripple/ripple.ts"
     }
   },
   "files": [
@@ -42,6 +47,11 @@
       },
       "./divider": {
         "sass": "./src/divider/_divider.scss"
+      },
+      "./ripple": {
+        "sass": "./src/ripple/_ripple.scss",
+        "types": "./dist/ripple/ripple.d.ts",
+        "import": "./dist/ripple/ripple.js"
       }
     }
   },

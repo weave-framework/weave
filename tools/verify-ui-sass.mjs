@@ -85,10 +85,16 @@ const cssScoped = compile(
 check('scoped override under selector', /\.compact\s*{\s*--weave-divider-thickness:\s*2px/.test(cssScoped));
 check('scoped override not at :root', !/:root/.test(cssScoped));
 
+/* ── ripple built-in: opacity literal + duration referencing motion ── */
+check('theme emits ripple opacity', /--weave-ripple-opacity:\s*0\.22/.test(cssTheme));
+check('theme emits ripple duration referencing motion', /--weave-ripple-duration:\s*var\(--weave-motion-ripple\)/.test(cssTheme));
+
 /* ── all-styles(): structural CSS by class ── */
 const cssStyles = compile(`@use '@weave-framework/ui' as weave;\n@include weave.all-styles();`);
 check('all-styles emits .weave-divider rule', /\.weave-divider\s*{/.test(cssStyles));
 check('divider rule consumes its token', /var\(--weave-divider-line\)/.test(cssStyles));
+check('all-styles emits .weave-ripple rule', /\.weave-ripple\s*{/.test(cssStyles));
+check('all-styles emits ripple keyframes', /@keyframes\s+weave-ripple/.test(cssStyles));
 
 console.log(`\n${'-'.repeat(40)}`);
 console.log(`ui-sass  pass ${pass}  fail ${fail}`);

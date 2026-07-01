@@ -1,0 +1,33 @@
+// Ripple — the click-feedback circle. Behavior lives in ripple.ts (a `use:` action);
+// this is the visual (tokens + the injected `.weave-ripple` element + keyframes).
+
+@use '../styles/ref' as ref;
+
+$tokens: (
+  color: (
+    opacity: 0.22,
+  ),
+  size: (
+    duration: ref.ref('motion.ripple'),
+    scale: 4,
+  ),
+);
+
+@mixin styles() {
+  @keyframes weave-ripple {
+    to {
+      transform: scale(var(--weave-ripple-scale));
+      opacity: 0;
+    }
+  }
+
+  .weave-ripple {
+    position: absolute;
+    border-radius: 50%;
+    background: currentColor;
+    opacity: var(--weave-ripple-opacity);
+    transform: scale(0);
+    pointer-events: none;
+    animation: weave-ripple var(--weave-ripple-duration) ease-out;
+  }
+}

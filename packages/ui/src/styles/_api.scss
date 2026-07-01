@@ -7,9 +7,11 @@
 // Built-in component register. Each entry: name → its grouped token schema.
 // New built-in components add themselves here (this is the "walk all republics" list).
 @use '../divider/divider' as divider;
+@use '../ripple/ripple' as ripple;
 
 $_builtins: (
   'divider': divider.$tokens,
+  'ripple': ripple.$tokens,
 );
 
 /* ───────────────────────── internal emit ───────────────────────── */
@@ -91,8 +93,13 @@ $_builtins: (
   @include overrides('divider', $map);
 }
 
+@mixin ripple-overrides($map) {
+  @include overrides('ripple', $map);
+}
+
 // Emit the structural CSS (class rules) for every built-in component.
 // Prefer per-component includes to keep CSS small; all-styles() is the convenience.
 @mixin all-styles() {
   @include divider.styles();
+  @include ripple.styles();
 }
