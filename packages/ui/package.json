@@ -163,6 +163,11 @@
       "types": "./src/slider/slider.ts",
       "import": "./src/slider/slider.ts"
     },
+    "./paginator": {
+      "sass": "./src/styles/components/paginator/_index.scss",
+      "types": "./src/paginator/paginator.ts",
+      "import": "./src/paginator/paginator.ts"
+    },
     "./cdk": {
       "types": "./src/cdk/index.ts",
       "import": "./src/cdk/index.ts"
@@ -340,6 +345,11 @@
         "sass": "./src/styles/components/slider/_index.scss",
         "types": "./dist/slider/slider.d.ts",
         "import": "./dist/slider/slider.js"
+      },
+      "./paginator": {
+        "sass": "./src/styles/components/paginator/_index.scss",
+        "types": "./dist/paginator/paginator.d.ts",
+        "import": "./dist/paginator/paginator.js"
       },
       "./cdk": {
         "types": "./dist/cdk/index.d.ts",

@@ -1,0 +1,130 @@
+// paginator — styles() mixin (class rules). Forwarded by ./_index.scss.
+@use '../../helpers' as helpers;
+
+@mixin styles() {
+  .weave-paginator {
+    display: flex;
+    align-items: center;
+    gap: var(--weave-paginator-gap);
+    flex-wrap: wrap;
+    color: var(--weave-paginator-text);
+    font-size: var(--weave-paginator-font-size);
+    font-weight: var(--weave-paginator-weight);
+  }
+
+  // Page + nav buttons share the square hit target.
+  .weave-paginator__page,
+  .weave-paginator__nav {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: var(--weave-paginator-button);
+    height: var(--weave-paginator-button);
+    padding: 0 6px;
+    border: 0;
+    border-radius: var(--weave-paginator-radius);
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+    transition: background var(--weave-paginator-duration) ease, color var(--weave-paginator-duration) ease;
+  }
+
+  .weave-paginator__page:not(:disabled):hover,
+  .weave-paginator__nav:not(:disabled):hover {
+    background: var(--weave-paginator-hover);
+  }
+
+  // Active page — ink fill (design). State via the native ARIA attr, not a class.
+  .weave-paginator__page[aria-current='page'] {
+    background: var(--weave-paginator-active-background);
+    color: var(--weave-paginator-active-text);
+  }
+
+  .weave-paginator__page:focus-visible,
+  .weave-paginator__nav:focus-visible,
+  .weave-paginator__size:focus-visible {
+    @include helpers.focus-ring;
+    outline-offset: -2px;
+  }
+
+  .weave-paginator__page:disabled,
+  .weave-paginator__nav:disabled {
+    color: var(--weave-paginator-disabled-text);
+    cursor: not-allowed;
+  }
+
+  .weave-paginator__nav {
+    font-size: 16px; // the ‹ › glyphs read a touch larger
+    line-height: 1;
+  }
+
+  .weave-paginator__ellipsis {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: var(--weave-paginator-button);
+    height: var(--weave-paginator-button);
+    color: var(--weave-paginator-disabled-text);
+  }
+
+  .weave-paginator__range {
+    margin-left: var(--weave-paginator-section-gap);
+    color: var(--weave-paginator-range);
+    font-size: var(--weave-paginator-range-size);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  // Manual "go to page" entry.
+  .weave-paginator__jump {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: var(--weave-paginator-section-gap);
+    color: var(--weave-paginator-range);
+    font-size: var(--weave-paginator-range-size);
+  }
+
+  .weave-paginator__jump-input {
+    width: var(--weave-paginator-input-width);
+    height: var(--weave-paginator-button);
+    padding: 0 6px;
+    border: 1px solid var(--weave-paginator-border);
+    border-radius: var(--weave-paginator-radius);
+    background: transparent;
+    color: var(--weave-paginator-input-text);
+    font: inherit;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .weave-paginator__jump-input:focus-visible {
+    outline: none;
+    border-color: var(--weave-color-accent);
+  }
+
+  // Optional page-size menu trigger (composes the Menu action).
+  .weave-paginator__size {
+    display: inline-flex;
+    align-items: center;
+    height: var(--weave-paginator-button);
+    margin-left: var(--weave-paginator-section-gap);
+    padding: 0 8px;
+    border: 1px solid var(--weave-paginator-border);
+    border-radius: var(--weave-paginator-radius);
+    background: transparent;
+    color: var(--weave-paginator-input-text);
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .weave-paginator__size::after {
+    content: '▾';
+    margin-left: 6px;
+    color: var(--weave-paginator-range);
+  }
+
+  .weave-paginator--disabled {
+    opacity: 0.6;
+  }
+}

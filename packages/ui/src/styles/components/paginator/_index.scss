@@ -1,0 +1,14 @@
+// Paginator — page navigation over a total item count. Behavior lives in paginator.ts
+// (windowed page run + prev/next + manual jump + optional page-size menu); this is the
+// visual.
+//
+// Prev/next arrows around a windowed run of page buttons (boundary pages + a sibling
+// window + ellipses); the active page takes the ink fill via the NATIVE ARIA attr
+// [aria-current=page] (not a class). A tabular-nums range label + a jump input + an
+// optional page-size trigger follow.
+//
+// Barrel — forwards the split partials ($tokens + the styles() mixin). Add another
+// concern as its own file and @forward it here.
+
+@forward 'tokens';
+@forward 'styles';

@@ -38,6 +38,7 @@
 @use 'components/tabs' as tabs;
 @use 'components/stepper' as stepper;
 @use 'components/slider' as slider;
+@use 'components/paginator' as paginator;
 
 $_builtins: (
   'divider': divider.$tokens,
@@ -70,6 +71,7 @@ $_builtins: (
   'tabs': tabs.$tokens,
   'stepper': stepper.$tokens,
   'slider': slider.$tokens,
+  'paginator': paginator.$tokens,
 );
 
 /* ───────────────────────── internal emit ───────────────────────── */
@@ -267,6 +269,10 @@ $_builtins: (
   @include overrides('slider', $map);
 }
 
+@mixin paginator-overrides($map) {
+  @include overrides('paginator', $map);
+}
+
 // Emit the structural CSS (class rules) for every built-in component.
 // Prefer per-component includes to keep CSS small; all-styles() is the convenience.
 @mixin all-styles() {
@@ -300,4 +306,5 @@ $_builtins: (
   @include tabs.styles();
   @include stepper.styles();
   @include slider.styles();
+  @include paginator.styles();
 }

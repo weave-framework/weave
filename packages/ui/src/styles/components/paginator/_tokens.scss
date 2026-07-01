@@ -1,0 +1,29 @@
+// paginator — design tokens (schema). Forwarded by ./_index.scss.
+@use '../../ref' as ref;
+
+$tokens: (
+  color: (
+    text: ref.ref('color.sub'),
+    // Active page = ink fill (design), on-ink glyph is a fixed light literal.
+    active-background: ref.ref('color.ink'),
+    active-text: ref.ref('color.surface'),
+    hover: ref.ref('color.field'),
+    border: ref.ref('color.line'),
+    range: ref.ref('color.sub'),
+    disabled-text: ref.ref('color.sub'),
+    input-text: ref.ref('color.ink'),
+  ),
+  size: (
+    button: 28px,
+    gap: 2px,
+    radius: ref.ref('shape.radius'),
+    input-width: 48px,
+    section-gap: 16px,
+    duration: ref.ref('motion.fast'),
+  ),
+  typography: (
+    font-size: 13px,
+    weight: 500,
+    range-size: 12px,
+  ),
+);
