@@ -231,6 +231,16 @@ const cssFormFieldOverride = compile(
 check('form-field-overrides changes existing token', /--weave-form-field-gap:\s*8px/.test(cssFormFieldOverride));
 check('form-field-overrides adds new token (auto-var)', /--weave-form-field-message-weight:\s*500/.test(cssFormFieldOverride));
 
+/* ── input built-in: cascade refs + literals + overrides ── */
+check('theme emits input focus referencing accent', /--weave-input-focus:\s*var\(--weave-color-accent\)/.test(cssTheme));
+check('theme emits input border referencing line', /--weave-input-border:\s*var\(--weave-color-line\)/.test(cssTheme));
+check('theme emits input font-size literal', /--weave-input-font-size:\s*13px/.test(cssTheme));
+const cssInputOverride = compile(
+  `@use '@weave-framework/ui' as weave;\n@include weave.input-overrides((gap: 6px, radius: 4px));`,
+);
+check('input-overrides changes existing token', /--weave-input-gap:\s*6px/.test(cssInputOverride));
+check('input-overrides adds new token (auto-var)', /--weave-input-radius:\s*4px/.test(cssInputOverride));
+
 /* ── all-styles(): structural CSS by class ── */
 const cssStyles = compile(`@use '@weave-framework/ui' as weave;\n@include weave.all-styles();`);
 check('all-styles emits .weave-divider rule', /\.weave-divider\s*{/.test(cssStyles));
@@ -274,6 +284,9 @@ check('all-styles emits .weave-slide-toggle__track + knob rules', /\.weave-slide
 check('slide-toggle slides the knob + swaps the track on :checked (no state class)', /\.weave-slide-toggle__input:checked\s*\+\s*\.weave-slide-toggle__track\s*{[^}]*background:\s*var\(--weave-slide-toggle-track-on\)/.test(cssStyles) && /\.weave-slide-toggle__input:checked\s*\+\s*\.weave-slide-toggle__track::after\s*{[\s\S]*?translatex/.test(cssStyles));
 check('all-styles emits .weave-form-field label + error rules', /\.weave-form-field__label\s*{[\s\S]*?text-transform:\s*uppercase/.test(cssStyles) && /\.weave-form-field__error\s*{[^}]*color:\s*var\(--weave-form-field-error\)/.test(cssStyles));
 check('form-field reddens the label in the --invalid state', /\.weave-form-field--invalid\s+\.weave-form-field__label\s*{[^}]*color:\s*var\(--weave-form-field-error\)/.test(cssStyles));
+check('all-styles emits .weave-input underline field', /\.weave-input\s*{[\s\S]*?border-bottom:\s*var\(--weave-input-border-width\)\s*solid\s*var\(--weave-input-border\)/.test(cssStyles));
+check('input focus swaps the underline to accent', /\.weave-input:focus-within\s*{[\s\S]*?border-bottom-color:\s*var\(--weave-input-focus\)/.test(cssStyles));
+check('input --invalid reddens the underline; empty prefix/suffix collapse', /\.weave-input--invalid\s*{[^}]*border-bottom-color:\s*var\(--weave-input-error\)/.test(cssStyles) && /\.weave-input__prefix--empty[\s\S]*?display:\s*none/.test(cssStyles));
 
 /* ── example.scss: the docs-seed dev surface compiles end-to-end ── */
 let exampleOk = false;

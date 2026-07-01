@@ -91,6 +91,11 @@
       "types": "./src/form-field/form-field.ts",
       "import": "./src/form-field/form-field.ts"
     },
+    "./input": {
+      "sass": "./src/styles/components/input/_index.scss",
+      "types": "./src/input/input.ts",
+      "import": "./src/input/input.ts"
+    },
     "./cdk": {
       "types": "./src/cdk/index.ts",
       "import": "./src/cdk/index.ts"
@@ -196,6 +201,11 @@
         "sass": "./src/styles/components/form-field/_index.scss",
         "types": "./dist/form-field/form-field.d.ts",
         "import": "./dist/form-field/form-field.js"
+      },
+      "./input": {
+        "sass": "./src/styles/components/input/_index.scss",
+        "types": "./dist/input/input.d.ts",
+        "import": "./dist/input/input.js"
       },
       "./cdk": {
         "types": "./dist/cdk/index.d.ts",

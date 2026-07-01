@@ -1,0 +1,103 @@
+// input — styles() mixin (class rules). Forwarded by ./_index.scss.
+
+@mixin styles() {
+  .weave-input {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--weave-input-gap);
+    width: 100%;
+    box-sizing: border-box;
+    border-bottom: var(--weave-input-border-width) solid var(--weave-input-border);
+    color: var(--weave-input-text);
+    transition:
+      border-color var(--weave-input-duration) ease,
+      box-shadow var(--weave-input-duration) ease;
+
+    @content;
+  }
+
+  /* Multiline aligns adornments to the first line, not the vertical centre. */
+  .weave-input--multiline {
+    align-items: flex-start;
+  }
+
+  /* Focus — accent border, thickened to ~2px with an inset shadow (no layout shift). */
+  .weave-input:focus-within {
+    border-bottom-color: var(--weave-input-focus);
+    box-shadow: inset 0 -1px 0 var(--weave-input-focus);
+  }
+
+  /* Error — red underline (driven by the bound control's touched-and-invalid state). */
+  .weave-input--invalid {
+    border-bottom-color: var(--weave-input-error);
+  }
+
+  .weave-input--invalid:focus-within {
+    border-bottom-color: var(--weave-input-error);
+    box-shadow: inset 0 -1px 0 var(--weave-input-error);
+  }
+
+  .weave-input__field {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    background: transparent;
+    font: inherit;
+    font-size: var(--weave-input-font-size);
+    color: inherit;
+    padding: var(--weave-input-padding-y) 0;
+    outline: none;
+  }
+
+  .weave-input__field::placeholder {
+    color: var(--weave-input-placeholder);
+  }
+
+  .weave-input__field:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+
+  textarea.weave-input__field {
+    resize: vertical;
+    line-height: 1.4;
+  }
+
+  /* Prefix / suffix — adornment text or icon; empty slots collapse (JS adds --empty). */
+  .weave-input__prefix,
+  .weave-input__suffix {
+    display: inline-flex;
+    align-items: center;
+    flex: none;
+    color: var(--weave-input-adornment);
+    font-size: var(--weave-input-font-size);
+  }
+
+  .weave-input__prefix--empty,
+  .weave-input__suffix--empty {
+    display: none;
+  }
+
+  /* Clear button — a lean × that reddens... no, tints toward ink on hover. */
+  .weave-input__clear {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    width: 18px;
+    height: 18px;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--weave-input-adornment);
+    font-size: 15px;
+    line-height: 1;
+    cursor: pointer;
+    transition: color var(--weave-input-duration) ease;
+  }
+
+  .weave-input__clear:hover {
+    color: var(--weave-input-text);
+  }
+}

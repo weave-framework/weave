@@ -1,0 +1,20 @@
+// input — design tokens (schema). Forwarded by ./_index.scss.
+@use '../../ref' as ref;
+
+$tokens: (
+  color: (
+    border: ref.ref('color.line'),
+    focus: ref.ref('color.accent'),
+    error: ref.ref('color.error'),
+    text: ref.ref('color.ink'),
+    placeholder: ref.ref('color.sub'),
+    adornment: ref.ref('color.sub'),
+  ),
+  size: (
+    padding-y: 6px,
+    gap: 8px,
+    border-width: 1.5px,
+    font-size: 13px,
+    duration: ref.ref('motion.fast'),
+  ),
+);

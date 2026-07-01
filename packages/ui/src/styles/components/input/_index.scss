@@ -1,0 +1,13 @@
+// Input — a native `<input>`/`<textarea>` as a Weave underline field. Behavior lives in
+// input.ts (value + forms binding, clearable, multiline, prefix/suffix slot collapse);
+// this is the visual.
+//
+// A flex row sharing one `border-bottom`: `__prefix` · `__field` · `__clear` · `__suffix`.
+// Focus → accent underline (inset shadow, no layout shift); `--invalid` → error underline
+// (off the bound control's state). Empty prefix/suffix collapse via `--empty` (JS-set).
+//
+// Barrel — forwards the split partials ($tokens + the styles() mixin). Add another
+// concern as its own file and @forward it here.
+
+@forward 'tokens';
+@forward 'styles';
