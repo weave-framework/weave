@@ -1,0 +1,82 @@
+// Button Toggle — a segmented control. Behavior lives in button-toggle.ts (selection
+// + roving tabindex via the CDK listKeyManager); this is the visual.
+//
+// A 1px-bordered container with border-left segment dividers; the selected segment
+// fills with ink + canvas text. Selected state is the NATIVE ARIA attr, not a class:
+// [aria-checked=true] (single/radio) and [aria-pressed=true] (multi).
+
+@use '../ref' as ref;
+@use '../helpers' as helpers;
+
+$tokens: (
+  color: (
+    border: ref.ref('color.line'),
+    text: ref.ref('color.ink'),
+    hover: ref.ref('color.field'),
+    selected-background: ref.ref('color.ink'),
+    selected-text: ref.ref('color.canvas'),
+    disabled-text: ref.ref('color.sub'),
+  ),
+  size: (
+    radius: ref.ref('shape.radius'),
+    padding-x: 12px,
+    padding-y: 7px,
+    duration: ref.ref('motion.fast'),
+  ),
+  typography: (
+    font-size: 13px,
+    weight: 600,
+  ),
+);
+
+@mixin styles() {
+  .weave-button-toggle {
+    display: inline-flex;
+    border: 1px solid var(--weave-button-toggle-border);
+    border-radius: var(--weave-button-toggle-radius);
+    overflow: hidden; // clip the segment corners to the container radius
+
+    @content;
+  }
+
+  .weave-button-toggle__segment {
+    appearance: none;
+    border: 0;
+    border-left: 1px solid var(--weave-button-toggle-border);
+    background: transparent;
+    color: var(--weave-button-toggle-text);
+    font-size: var(--weave-button-toggle-font-size);
+    font-weight: var(--weave-button-toggle-weight);
+    padding: var(--weave-button-toggle-padding-y) var(--weave-button-toggle-padding-x);
+    line-height: 1;
+    cursor: pointer;
+    transition:
+      background var(--weave-button-toggle-duration) ease,
+      color var(--weave-button-toggle-duration) ease;
+  }
+
+  .weave-button-toggle__segment:first-child {
+    border-left: 0;
+  }
+
+  .weave-button-toggle__segment:hover {
+    background: var(--weave-button-toggle-hover);
+  }
+
+  .weave-button-toggle__segment:focus-visible {
+    @include helpers.focus-ring;
+    outline-offset: -2px; // ring sits inside the hairline container
+  }
+
+  /* Selected — the accent-free ink fill (state via native ARIA attr, not a class). */
+  .weave-button-toggle__segment[aria-checked='true'],
+  .weave-button-toggle__segment[aria-pressed='true'] {
+    background: var(--weave-button-toggle-selected-background);
+    color: var(--weave-button-toggle-selected-text);
+  }
+
+  .weave-button-toggle__segment[disabled] {
+    color: var(--weave-button-toggle-disabled-text);
+    cursor: not-allowed;
+  }
+}

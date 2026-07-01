@@ -111,6 +111,16 @@ const cssButtonOverride = compile(
 check('button-overrides changes existing token', /--weave-button-radius:\s*6px/.test(cssButtonOverride));
 check('button-overrides adds new token (auto-var)', /--weave-button-elevation:\s*2px/.test(cssButtonOverride));
 
+/* ── button-toggle built-in: cascade ref + literals + overrides ── */
+check('theme emits button-toggle selected-background referencing ink', /--weave-button-toggle-selected-background:\s*var\(--weave-color-ink\)/.test(cssTheme));
+check('theme emits button-toggle border referencing line', /--weave-button-toggle-border:\s*var\(--weave-color-line\)/.test(cssTheme));
+check('theme emits button-toggle padding literal', /--weave-button-toggle-padding-x:\s*12px/.test(cssTheme));
+const cssBtnToggleOverride = compile(
+  `@use '@weave-framework/ui' as weave;\n@include weave.button-toggle-overrides((radius: 6px, gap: 2px));`,
+);
+check('button-toggle-overrides changes existing token', /--weave-button-toggle-radius:\s*6px/.test(cssBtnToggleOverride));
+check('button-toggle-overrides adds new token (auto-var)', /--weave-button-toggle-gap:\s*2px/.test(cssBtnToggleOverride));
+
 /* ── all-styles(): structural CSS by class ── */
 const cssStyles = compile(`@use '@weave-framework/ui' as weave;\n@include weave.all-styles();`);
 check('all-styles emits .weave-divider rule', /\.weave-divider\s*{/.test(cssStyles));
@@ -122,6 +132,8 @@ check('icon rule consumes its stroke token', /stroke-width:\s*var\(--weave-icon-
 check('all-styles emits .weave-button rule', /\.weave-button\s*{/.test(cssStyles));
 check('button rule consumes its background token', /background:\s*var\(--weave-button-background\)/.test(cssStyles));
 check('button emits a --variant modifier rule', /\.weave-button--outline\s*{/.test(cssStyles));
+check('all-styles emits .weave-button-toggle rule', /\.weave-button-toggle\s*{/.test(cssStyles));
+check('button-toggle styles the selected segment via [aria-checked]', /\.weave-button-toggle__segment\[aria-checked=true\]/.test(cssStyles));
 
 /* ── example.scss: the docs-seed dev surface compiles end-to-end ── */
 let exampleOk = false;

@@ -10,12 +10,14 @@
 @use 'components/ripple' as ripple;
 @use 'components/icon' as icon;
 @use 'components/button' as button;
+@use 'components/button-toggle' as button-toggle;
 
 $_builtins: (
   'divider': divider.$tokens,
   'ripple': ripple.$tokens,
   'icon': icon.$tokens,
   'button': button.$tokens,
+  'button-toggle': button-toggle.$tokens,
 );
 
 /* ───────────────────────── internal emit ───────────────────────── */
@@ -109,6 +111,10 @@ $_builtins: (
   @include overrides('button', $map);
 }
 
+@mixin button-toggle-overrides($map) {
+  @include overrides('button-toggle', $map);
+}
+
 // Emit the structural CSS (class rules) for every built-in component.
 // Prefer per-component includes to keep CSS small; all-styles() is the convenience.
 @mixin all-styles() {
@@ -116,4 +122,5 @@ $_builtins: (
   @include ripple.styles();
   @include icon.styles();
   @include button.styles();
+  @include button-toggle.styles();
 }
