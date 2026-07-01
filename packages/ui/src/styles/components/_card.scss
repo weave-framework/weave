@@ -88,10 +88,13 @@ $tokens: (
     color: var(--weave-card-meta-text);
   }
 
+  /* Actions sink to the bottom: in an equal-height row the content area takes the
+     slack and the action row stays pinned to the card's bottom edge (no dead gap
+     below it). When the card is only as tall as its content, `auto` collapses to 0. */
   .weave-card__actions {
     display: flex;
     gap: 8px;
     align-items: center;
-    margin-top: 4px;
+    margin-top: auto;
   }
 }

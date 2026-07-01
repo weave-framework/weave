@@ -160,6 +160,7 @@ check('badge emits the --dot variant rule', /\.weave-badge--dot\s+\.weave-badge_
 check('all-styles emits .weave-card rule', /\.weave-card\s*{/.test(cssStyles));
 check('card consumes its surface + border tokens', /\.weave-card\s*{[\s\S]*?background:\s*var\(--weave-card-background\)[\s\S]*?border:\s*1px solid var\(--weave-card-border\)/.test(cssStyles));
 check('card emits its __title / __actions part rules', /\.weave-card__title\s*{/.test(cssStyles) && /\.weave-card__actions\s*{/.test(cssStyles));
+check('card actions pin to the bottom (margin-top:auto)', /\.weave-card__actions\s*{[^}]*margin-top:\s*auto/.test(cssStyles));
 
 /* ── example.scss: the docs-seed dev surface compiles end-to-end ── */
 let exampleOk = false;
