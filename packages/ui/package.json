@@ -41,6 +41,11 @@
       "types": "./src/badge/badge.ts",
       "import": "./src/badge/badge.ts"
     },
+    "./card": {
+      "sass": "./src/styles/components/_card.scss",
+      "types": "./src/card/card.ts",
+      "import": "./src/card/card.ts"
+    },
     "./cdk": {
       "types": "./src/cdk/index.ts",
       "import": "./src/cdk/index.ts"
@@ -96,6 +101,11 @@
         "sass": "./src/styles/components/_badge.scss",
         "types": "./dist/badge/badge.d.ts",
         "import": "./dist/badge/badge.js"
+      },
+      "./card": {
+        "sass": "./src/styles/components/_card.scss",
+        "types": "./dist/card/card.d.ts",
+        "import": "./dist/card/card.js"
       },
       "./cdk": {
         "types": "./dist/cdk/index.d.ts",

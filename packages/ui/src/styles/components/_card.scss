@@ -1,0 +1,97 @@
+// Card — a surface panel. Behavior lives in card.ts (just a container + class forward);
+// this is the visual. Keyline: surface bg, 1px line border, radius 4px, NO shadow.
+//
+// The card is a vertical stack; parts are the class contract the consumer composes:
+//   __media   full-bleed image slot (bleeds past the card padding, clipped to radius)
+//   __title   heading row
+//   __body    text
+//   __actions text-button row (one typically a --marked Button)
+// --interactive adds a hover tint (make it actually clickable by wrapping a link/button).
+
+@use '../ref' as ref;
+
+$tokens: (
+  color: (
+    background: ref.ref('color.surface'),
+    border: ref.ref('color.line'),
+    hover: ref.ref('color.field'),
+    title-text: ref.ref('color.ink'),
+    body-text: ref.ref('color.ink'),
+    meta-text: ref.ref('color.sub'),
+  ),
+  size: (
+    radius: ref.ref('shape.radius'),
+    padding: 16px,
+    gap: 10px,
+    duration: ref.ref('motion.fast'),
+  ),
+  typography: (
+    title-size: 15px,
+    title-weight: 600,
+    body-size: 13px,
+  ),
+);
+
+@mixin styles() {
+  .weave-card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--weave-card-gap);
+    padding: var(--weave-card-padding);
+    background: var(--weave-card-background);
+    border: 1px solid var(--weave-card-border);
+    border-radius: var(--weave-card-radius);
+    overflow: hidden; // clip the full-bleed media to the radius
+    color: var(--weave-card-body-text);
+
+    @content;
+  }
+
+  .weave-card--interactive {
+    cursor: pointer;
+    transition: background var(--weave-card-duration) ease;
+  }
+
+  .weave-card--interactive:hover {
+    background: var(--weave-card-hover);
+  }
+
+  /* Media — bleeds to the card edges (cancels the padding) and to the top. */
+  .weave-card__media {
+    margin: calc(-1 * var(--weave-card-padding)) calc(-1 * var(--weave-card-padding)) 0;
+  }
+
+  .weave-card__media > *,
+  .weave-card__media img {
+    display: block;
+    width: 100%;
+  }
+
+  .weave-card__title {
+    margin: 0;
+    font-size: var(--weave-card-title-size);
+    font-weight: var(--weave-card-title-weight);
+    letter-spacing: -0.02em;
+    color: var(--weave-card-title-text);
+  }
+
+  .weave-card__body {
+    margin: 0;
+    font-size: var(--weave-card-body-size);
+    line-height: 1.5;
+    color: var(--weave-card-body-text);
+  }
+
+  /* Secondary/meta text inside a card. */
+  .weave-card__meta {
+    font-size: var(--weave-card-body-size);
+    color: var(--weave-card-meta-text);
+  }
+
+  .weave-card__actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-top: 4px;
+  }
+}

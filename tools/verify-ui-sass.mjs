@@ -131,6 +131,16 @@ const cssBadgeOverride = compile(
 check('badge-overrides changes existing token', /--weave-badge-min-size:\s*18px/.test(cssBadgeOverride));
 check('badge-overrides adds new token (auto-var)', /--weave-badge-offset:\s*2px/.test(cssBadgeOverride));
 
+/* ── card built-in: cascade refs (surface/line) + literals + overrides ── */
+check('theme emits card background referencing surface', /--weave-card-background:\s*var\(--weave-color-surface\)/.test(cssTheme));
+check('theme emits card border referencing line', /--weave-card-border:\s*var\(--weave-color-line\)/.test(cssTheme));
+check('theme emits card padding literal', /--weave-card-padding:\s*16px/.test(cssTheme));
+const cssCardOverride = compile(
+  `@use '@weave-framework/ui' as weave;\n@include weave.card-overrides((padding: 20px, elevation: 1px));`,
+);
+check('card-overrides changes existing token', /--weave-card-padding:\s*20px/.test(cssCardOverride));
+check('card-overrides adds new token (auto-var)', /--weave-card-elevation:\s*1px/.test(cssCardOverride));
+
 /* ── all-styles(): structural CSS by class ── */
 const cssStyles = compile(`@use '@weave-framework/ui' as weave;\n@include weave.all-styles();`);
 check('all-styles emits .weave-divider rule', /\.weave-divider\s*{/.test(cssStyles));
@@ -147,6 +157,9 @@ check('button-toggle styles the selected segment via [aria-checked]', /\.weave-b
 check('all-styles emits .weave-badge rule', /\.weave-badge\s*{/.test(cssStyles));
 check('badge mark consumes its background token', /\.weave-badge__mark[\s\S]*?background:\s*var\(--weave-badge-background\)/.test(cssStyles));
 check('badge emits the --dot variant rule', /\.weave-badge--dot\s+\.weave-badge__mark/.test(cssStyles));
+check('all-styles emits .weave-card rule', /\.weave-card\s*{/.test(cssStyles));
+check('card consumes its surface + border tokens', /\.weave-card\s*{[\s\S]*?background:\s*var\(--weave-card-background\)[\s\S]*?border:\s*1px solid var\(--weave-card-border\)/.test(cssStyles));
+check('card emits its __title / __actions part rules', /\.weave-card__title\s*{/.test(cssStyles) && /\.weave-card__actions\s*{/.test(cssStyles));
 
 /* ── example.scss: the docs-seed dev surface compiles end-to-end ── */
 let exampleOk = false;

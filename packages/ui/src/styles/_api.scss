@@ -12,6 +12,7 @@
 @use 'components/button' as button;
 @use 'components/button-toggle' as button-toggle;
 @use 'components/badge' as badge;
+@use 'components/card' as card;
 
 $_builtins: (
   'divider': divider.$tokens,
@@ -20,6 +21,7 @@ $_builtins: (
   'button': button.$tokens,
   'button-toggle': button-toggle.$tokens,
   'badge': badge.$tokens,
+  'card': card.$tokens,
 );
 
 /* ───────────────────────── internal emit ───────────────────────── */
@@ -121,6 +123,10 @@ $_builtins: (
   @include overrides('badge', $map);
 }
 
+@mixin card-overrides($map) {
+  @include overrides('card', $map);
+}
+
 // Emit the structural CSS (class rules) for every built-in component.
 // Prefer per-component includes to keep CSS small; all-styles() is the convenience.
 @mixin all-styles() {
@@ -130,4 +136,5 @@ $_builtins: (
   @include button.styles();
   @include button-toggle.styles();
   @include badge.styles();
+  @include card.styles();
 }
