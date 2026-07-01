@@ -184,6 +184,33 @@ importers:
         specifier: ^5.7.0
         version: 5.9.3
 
+  packages/ui:
+    dependencies:
+      '@weave-framework/runtime':
+        specifier: workspace:*
+        version: link:../runtime
+
+  packages/weave-framework:
+    dependencies:
+      '@weave-framework/data':
+        specifier: workspace:*
+        version: link:../data
+      '@weave-framework/forms':
+        specifier: workspace:*
+        version: link:../forms
+      '@weave-framework/i18n':
+        specifier: workspace:*
+        version: link:../i18n
+      '@weave-framework/router':
+        specifier: workspace:*
+        version: link:../router
+      '@weave-framework/runtime':
+        specifier: workspace:*
+        version: link:../runtime
+      '@weave-framework/store':
+        specifier: workspace:*
+        version: link:../store
+
 packages:
 
   '@azu/format-text@1.0.2':
