@@ -1,0 +1,35 @@
+// select — design tokens (schema). An underline trigger field (like Input) + a listbox
+// panel (reusing the shared overlay-panel chrome). Forwarded by ./_index.scss.
+@use '../../ref' as ref;
+
+$tokens: (
+  color: (
+    text: ref.ref('color.ink'),
+    placeholder: ref.ref('color.sub'),
+    border: ref.ref('color.line'),
+    focus: ref.ref('color.accent'),
+    error: ref.ref('color.error'),
+    chevron: ref.ref('color.sub'),
+    disabled-text: ref.ref('color.sub'),
+    option-hover: ref.ref('color.field'),
+    // Selected-row tint (the design's accent+12%).
+    option-selected: color-mix(in srgb, ref.ref('color.accent') 12%, transparent),
+    option-mark: ref.ref('color.accent'),
+    description: ref.ref('color.sub'),
+  ),
+  size: (
+    gap: 8px,
+    field-padding-y: 6px,
+    border-width: 1.5px,
+    radius: ref.ref('shape.radius'),
+    panel-max-height: 280px,
+    option-min-height: 32px,
+    option-padding-x: 12px,
+    duration: ref.ref('motion.fast'),
+  ),
+  typography: (
+    font-size: 13px,
+    description-size: 11px,
+    weight: 500,
+  ),
+);

@@ -133,6 +133,11 @@
       "types": "./src/snackbar/snackbar.ts",
       "import": "./src/snackbar/snackbar.ts"
     },
+    "./select": {
+      "sass": "./src/styles/components/select/_index.scss",
+      "types": "./src/select/select.ts",
+      "import": "./src/select/select.ts"
+    },
     "./cdk": {
       "types": "./src/cdk/index.ts",
       "import": "./src/cdk/index.ts"
@@ -280,6 +285,11 @@
         "sass": "./src/styles/components/snackbar/_index.scss",
         "types": "./dist/snackbar/snackbar.d.ts",
         "import": "./dist/snackbar/snackbar.js"
+      },
+      "./select": {
+        "sass": "./src/styles/components/select/_index.scss",
+        "types": "./dist/select/select.d.ts",
+        "import": "./dist/select/select.js"
       },
       "./cdk": {
         "types": "./dist/cdk/index.d.ts",

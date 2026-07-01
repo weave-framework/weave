@@ -1,0 +1,143 @@
+// select — styles() mixin. An underline trigger field (like Input) whose value/placeholder
+// sits left and a chevron right; focus swaps the underline to accent. The listbox panel
+// reuses the shared overlay-panel chrome; option rows carry a label + optional lighter
+// description, with hover/active/selected states off classes (selection = a class, since the
+// panel is portaled and there's no native pseudo). Forwarded by ./_index.scss.
+@use '../../helpers' as helpers;
+
+@mixin styles() {
+  .weave-select {
+    display: block;
+  }
+
+  .weave-select__field {
+    display: flex;
+    align-items: center;
+    gap: var(--weave-select-gap);
+    padding: var(--weave-select-field-padding-y) 0;
+    border-bottom: var(--weave-select-border-width) solid var(--weave-select-border);
+    color: var(--weave-select-text);
+    font-size: var(--weave-select-font-size);
+    font-weight: var(--weave-select-weight);
+    line-height: 1.4;
+    cursor: pointer;
+    transition: border-color var(--weave-select-duration) ease;
+  }
+
+  // Focus + open → accent underline (no layout shift; the border just recolours).
+  .weave-select__field:focus {
+    outline: none;
+    border-bottom-color: var(--weave-select-focus);
+    box-shadow: inset 0 -1px 0 0 var(--weave-select-focus);
+  }
+
+  .weave-select__value--placeholder {
+    color: var(--weave-select-placeholder);
+  }
+
+  .weave-select__spacer {
+    flex: 1 1 auto;
+  }
+
+  // A CSS down-caret.
+  .weave-select__chevron {
+    width: 0;
+    height: 0;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 5px solid var(--weave-select-chevron);
+    transition: transform var(--weave-select-duration) ease;
+  }
+
+  .weave-select__field[aria-expanded='true'] .weave-select__chevron {
+    transform: rotate(180deg);
+  }
+
+  // Empty prefix/suffix slots collapse (JS adds --empty), so the gap skips them.
+  .weave-select__prefix--empty,
+  .weave-select__suffix--empty {
+    display: none;
+  }
+
+  .weave-select__clear {
+    @include helpers.field-reset;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    color: var(--weave-select-placeholder);
+    cursor: pointer;
+  }
+
+  .weave-select__clear:hover {
+    color: var(--weave-select-text);
+  }
+
+  .weave-select--disabled .weave-select__field {
+    color: var(--weave-select-disabled-text);
+    cursor: default;
+  }
+
+  .weave-select--invalid .weave-select__field {
+    border-bottom-color: var(--weave-select-error);
+    box-shadow: inset 0 -1px 0 0 var(--weave-select-error);
+  }
+
+  /* ── the listbox panel ── */
+  .weave-select__panel {
+    @include helpers.overlay-panel;
+    max-height: var(--weave-select-panel-max-height);
+    overflow-y: auto;
+    padding: 4px 0;
+  }
+
+  .weave-select__option {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 1px;
+    min-height: var(--weave-select-option-min-height);
+    padding: 5px calc(var(--weave-select-option-padding-x) + 16px) 5px var(--weave-select-option-padding-x);
+    color: var(--weave-select-text);
+    font-size: var(--weave-select-font-size);
+    cursor: pointer;
+    transition: background var(--weave-select-duration) ease;
+  }
+
+  .weave-select__option--active {
+    background: var(--weave-select-option-hover);
+  }
+
+  .weave-select__option--selected {
+    background: var(--weave-select-option-selected);
+  }
+
+  // A check-mark on the selected option (single + multiple).
+  .weave-select__option--selected::after {
+    content: '';
+    position: absolute;
+    right: var(--weave-select-option-padding-x);
+    top: 50%;
+    width: 5px;
+    height: 9px;
+    margin-top: -6px;
+    border: solid var(--weave-select-option-mark);
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+  }
+
+  .weave-select__option[aria-disabled='true'] {
+    color: var(--weave-select-disabled-text);
+    cursor: default;
+  }
+
+  .weave-select__description {
+    font-size: var(--weave-select-description-size);
+    font-weight: 400;
+    line-height: 1.3;
+    color: var(--weave-select-description);
+  }
+}

@@ -312,6 +312,16 @@ const cssSnackbarOverride = compile(
 check('snackbar-overrides changes existing token', /--weave-snackbar-offset:\s*32px/.test(cssSnackbarOverride));
 check('snackbar-overrides adds new token (auto-var)', /--weave-snackbar-shadow:\s*1px/.test(cssSnackbarOverride));
 
+/* ── select built-in: cascade refs + literals + overrides (U3) ── */
+check('theme emits select focus referencing accent', /--weave-select-focus:\s*var\(--weave-color-accent\)/.test(cssTheme));
+check('theme emits select option-selected as an accent color-mix', /--weave-select-option-selected:\s*color-mix\(in srgb, var\(--weave-color-accent\) 12%, transparent\)/.test(cssTheme));
+check('theme emits select panel-max-height literal', /--weave-select-panel-max-height:\s*280px/.test(cssTheme));
+const cssSelectOverride = compile(
+  `@use '@weave-framework/ui' as weave;\n@include weave.select-overrides((panel-max-height: 320px, gap: 10px));`,
+);
+check('select-overrides changes existing token', /--weave-select-panel-max-height:\s*320px/.test(cssSelectOverride));
+check('select-overrides adds new token (auto-var)', /--weave-select-gap:\s*10px/.test(cssSelectOverride));
+
 /* ── all-styles(): structural CSS by class ── */
 const cssStyles = compile(`@use '@weave-framework/ui' as weave;\n@include weave.all-styles();`);
 check('all-styles emits .weave-divider rule', /\.weave-divider\s*{/.test(cssStyles));
@@ -374,6 +384,9 @@ check('all-styles emits .weave-bottom-sheet (top-only radius + slide-up keyframe
 check('bottom-sheet content scrolls (flex:1, min-height:0, overflow-y:auto)', /\.weave-bottom-sheet__content\s*{[\s\S]*?flex:\s*1 1 auto[\s\S]*?min-height:\s*0[\s\S]*?overflow-y:\s*auto/.test(cssStyles));
 check('all-styles emits .weave-snackbar inverted bar (ink bg) + slide-in keyframes', /\.weave-snackbar\s*{[\s\S]*?background:\s*var\(--weave-snackbar-background\)/.test(cssStyles) && /@keyframes\s+weave-snackbar-in/.test(cssStyles));
 check('snackbar action is an accent text button', /\.weave-snackbar__action\s*{[\s\S]*?color:\s*var\(--weave-snackbar-action\)/.test(cssStyles));
+check('all-styles emits .weave-select underline field + focus accent', /\.weave-select__field\s*{[\s\S]*?border-bottom:\s*var\(--weave-select-border-width\)\s*solid\s*var\(--weave-select-border\)/.test(cssStyles) && /\.weave-select__field:focus\s*{[\s\S]*?border-bottom-color:\s*var\(--weave-select-focus\)/.test(cssStyles));
+check('select panel reuses the overlay-panel chrome + scrolls', /\.weave-select__panel\s*{[\s\S]*?background:\s*var\(--weave-overlay-surface\)[\s\S]*?max-height:\s*var\(--weave-select-panel-max-height\)[\s\S]*?overflow-y:\s*auto/.test(cssStyles));
+check('select option selected tint + check-mark', /\.weave-select__option--selected\s*{[^}]*background:\s*var\(--weave-select-option-selected\)/.test(cssStyles) && /\.weave-select__option--selected::after\s*{/.test(cssStyles));
 
 /* ── example.scss: the docs-seed dev surface compiles end-to-end ── */
 let exampleOk = false;
