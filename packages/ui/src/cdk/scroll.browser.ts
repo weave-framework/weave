@@ -9,10 +9,12 @@ import {
   connectedPosition,
   type PositionStrategy,
   type PositionOrigin,
+  type ScrollStrategy,
+  type OverlayRef,
 } from '@weave-framework/ui/cdk';
 
 function content(): HTMLElement {
-  const el = document.createElement('div');
+  const el: HTMLDivElement = document.createElement('div');
   el.style.width = '40px';
   el.style.height = '20px';
   return el;
@@ -24,8 +26,8 @@ const scrollWin = (): void => {
 /* ─────────────────── dispatcher ─────────────────── */
 
 test('onScroll: fires subscribers on a window scroll and unsubscribes', () => {
-  let n = 0;
-  const off = onScroll(() => n++);
+  let n: number = 0;
+  const off: () => void = onScroll(() => n++);
   scrollWin();
   assert.equal(n, 1);
   scrollWin();
@@ -38,15 +40,15 @@ test('onScroll: fires subscribers on a window scroll and unsubscribes', () => {
 /* ─────────────────── strategies standalone ─────────────────── */
 
 test('noopScroll: enable/disable are inert', () => {
-  const s = noopScroll();
+  const s: ScrollStrategy = noopScroll();
   s.enable();
   s.disable();
   assert.ok(true);
 });
 
 test('blockScroll: locks body overflow on enable, restores on disable', () => {
-  const prev = document.body.style.overflow;
-  const s = blockScroll();
+  const prev: string = document.body.style.overflow;
+  const s: ScrollStrategy = blockScroll();
   s.enable();
   assert.equal(document.body.style.overflow, 'hidden');
   s.disable();
@@ -56,7 +58,7 @@ test('blockScroll: locks body overflow on enable, restores on disable', () => {
 /* ─────────────────── wired into an overlay ─────────────────── */
 
 test('closeScroll: detaches the overlay on scroll', () => {
-  const ref = createOverlay({ scrollStrategy: closeScroll });
+  const ref: OverlayRef = createOverlay({ scrollStrategy: closeScroll });
   ref.attach(content());
   assert.equal(ref.attached(), true);
   scrollWin();
@@ -65,9 +67,9 @@ test('closeScroll: detaches the overlay on scroll', () => {
 });
 
 test('repositionScroll: re-applies the position strategy on scroll', () => {
-  let applied = 0;
+  let applied: number = 0;
   const strategy: PositionStrategy = { apply: () => applied++ };
-  const ref = createOverlay({ positionStrategy: strategy, scrollStrategy: repositionScroll });
+  const ref: OverlayRef = createOverlay({ positionStrategy: strategy, scrollStrategy: repositionScroll });
   ref.attach(content());
   assert.equal(applied, 1, 'applied on attach');
   scrollWin();
@@ -76,19 +78,19 @@ test('repositionScroll: re-applies the position strategy on scroll', () => {
 });
 
 test('repositionScroll: detach disables it (no reposition after close)', () => {
-  let applied = 0;
-  const ref = createOverlay({ positionStrategy: { apply: () => applied++ }, scrollStrategy: repositionScroll });
+  let applied: number = 0;
+  const ref: OverlayRef = createOverlay({ positionStrategy: { apply: () => applied++ }, scrollStrategy: repositionScroll });
   ref.attach(content());
   ref.detach();
-  const at = applied;
+  const at: number = applied;
   scrollWin();
   assert.equal(applied, at, 'no reposition once detached');
   ref.dispose();
 });
 
 test('blockScroll: overlay enables on attach and restores on detach', () => {
-  const prev = document.body.style.overflow;
-  const ref = createOverlay({ scrollStrategy: blockScroll });
+  const prev: string = document.body.style.overflow;
+  const ref: OverlayRef = createOverlay({ scrollStrategy: blockScroll });
   ref.attach(content());
   assert.equal(document.body.style.overflow, 'hidden', 'locked while open');
   ref.detach();
@@ -97,8 +99,8 @@ test('blockScroll: overlay enables on attach and restores on detach', () => {
 });
 
 test('blockScroll: dispose also restores body scroll', () => {
-  const prev = document.body.style.overflow;
-  const ref = createOverlay({ scrollStrategy: blockScroll });
+  const prev: string = document.body.style.overflow;
+  const ref: OverlayRef = createOverlay({ scrollStrategy: blockScroll });
   ref.attach(content());
   ref.dispose();
   assert.equal(document.body.style.overflow, prev, 'restored on dispose');
@@ -109,11 +111,11 @@ test('scroll strategy composes with connected positioning', () => {
     getBoundingClientRect: () =>
       ({ x: 50, y: 50, left: 50, top: 50, right: 90, bottom: 70, width: 40, height: 20, toJSON: () => ({}) }) as DOMRect,
   };
-  const ref = createOverlay({
+  const ref: OverlayRef = createOverlay({
     positionStrategy: connectedPosition(origin, { positions: ['bottom-start'], autoUpdate: false }),
     scrollStrategy: closeScroll,
   });
-  const panel = ref.attach(content());
+  const panel: HTMLElement = ref.attach(content());
   assert.equal(parseInt(panel.style.top, 10), 70, 'positioned below origin');
   scrollWin();
   assert.equal(ref.attached(), false, 'closeScroll still fires alongside positioning');

@@ -52,7 +52,7 @@ export function listKeyManager<T>(items: () => T[], options: ListKeyManagerOptio
   const debounce: number = options.typeaheadDebounce ?? 500;
 
   const _index: Signal<number> = signal<number>(-1);
-  let buffer = '';
+  let buffer: string = '';
   let bufferTimer: ReturnType<typeof setTimeout> | null = null;
 
   const disabledAt = (i: number): boolean => skipDisabled && isDisabled(items()[i]);
@@ -62,7 +62,7 @@ export function listKeyManager<T>(items: () => T[], options: ListKeyManagerOptio
     const n: number = arr.length;
     if (n === 0) return -1;
     let i: number = from;
-    for (let count = 0; count < n; count++) {
+    for (let count: number = 0; count < n; count++) {
       i += step;
       if (i < 0 || i >= n) {
         if (!wrap) return -1;
@@ -105,7 +105,7 @@ export function listKeyManager<T>(items: () => T[], options: ListKeyManagerOptio
     const n: number = arr.length;
     if (n === 0) return false;
     const base: number = _index();
-    for (let k = startOffset; k < startOffset + n; k++) {
+    for (let k: number = startOffset; k < startOffset + n; k++) {
       const idx: number = (((base + k) % n) + n) % n;
       if (disabledAt(idx)) continue;
       if (getLabel(arr[idx]).toLowerCase().startsWith(search)) {

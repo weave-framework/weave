@@ -10,7 +10,7 @@ interface FakeMQL {
   _emit(v: boolean): void;
 }
 function fakeMQL(initial: boolean): FakeMQL {
-  const fns = new Set<() => void>();
+  const fns: Set<() => void> = new Set<() => void>();
   return {
     matches: initial,
     media: '',
@@ -24,13 +24,13 @@ function fakeMQL(initial: boolean): FakeMQL {
 }
 
 test('breakpointSignal: reflects the initial match and reacts to changes', () => {
-  const mql = fakeMQL(false);
-  const original = window.matchMedia;
+  const mql: FakeMQL = fakeMQL(false);
+  const original: typeof window.matchMedia = window.matchMedia;
   (window as unknown as { matchMedia: (q: string) => FakeMQL }).matchMedia = () => mql;
   try {
-    const narrow = breakpointSignal('(max-width: 899px)');
+    const narrow: () => boolean = breakpointSignal('(max-width: 899px)');
     const seen: boolean[] = [];
-    const stop = effect(() => {
+    const stop: () => void = effect(() => {
       seen.push(narrow());
     });
     assert.equal(narrow(), false, 'initial');

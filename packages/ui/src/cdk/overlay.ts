@@ -18,8 +18,8 @@ import { portal, type PortalHandle } from './portal.js';
 import type { ScrollStrategy, ScrollStrategyFactory } from './scroll.js';
 
 /** Base z-index for the overlay layer; each attach takes the next two slots (backdrop, panel). */
-const Z_BASE = 1000;
-let zCounter = 0;
+const Z_BASE: number = 1000;
+let zCounter: number = 0;
 
 /** A strategy that positions the panel element. The connected (flip/shift) strategy lands in `positioning.ts`. */
 export interface PositionStrategy {
@@ -132,7 +132,7 @@ export function createOverlay(config: OverlayConfig = {}): OverlayRef {
   addClasses(overlayElement, config.panelClass);
 
   let backdropElement: HTMLElement | null = null;
-  const backdropHandlers = new Set<(event: MouseEvent) => void>();
+  const backdropHandlers: Set<(event: MouseEvent) => void> = new Set<(event: MouseEvent) => void>();
   if (config.hasBackdrop) {
     backdropElement = document.createElement('div');
     backdropElement.className = 'weave-overlay-backdrop';
@@ -147,7 +147,7 @@ export function createOverlay(config: OverlayConfig = {}): OverlayRef {
   let panelPortal: PortalHandle | null = null;
   let backdropPortal: PortalHandle | null = null;
   let scroll: ScrollStrategy | null = null;
-  let disposed = false;
+  let disposed: boolean = false;
 
   function attach(content: Node | (() => Node)): HTMLElement {
     if (disposed) throw new Error('weave cdk overlay: cannot attach a disposed overlay');

@@ -57,7 +57,7 @@ export interface Route {
 // "internal" — written as if the app were at the origin root. `basename` is the
 // prefix the app is actually served under (default '' = root). It's stripped when
 // reading location and re-added when writing history, so nothing else changes.
-let basename = '';
+let basename: string = '';
 
 /** Normalize a base: strip a trailing slash; treat '' / '/' as "no base". */
 function normalizeBase(b: string): string {

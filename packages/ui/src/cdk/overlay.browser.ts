@@ -5,10 +5,11 @@ import {
   overlayContainer,
   globalPosition,
   type PositionStrategy,
+  type OverlayRef,
 } from '@weave-framework/ui/cdk';
 
-function content(text = 'panel'): HTMLElement {
-  const el = document.createElement('div');
+function content(text: string = 'panel'): HTMLElement {
+  const el: HTMLElement = document.createElement('div');
   el.textContent = text;
   return el;
 }
@@ -16,9 +17,9 @@ function content(text = 'panel'): HTMLElement {
 const z = (el: HTMLElement): number => parseInt(el.style.zIndex || '0', 10);
 
 test('overlay: attach inserts the panel into the shared container with the content', () => {
-  const ref = createOverlay();
-  const c = content('hello');
-  const panel = ref.attach(c);
+  const ref: OverlayRef = createOverlay();
+  const c: HTMLElement = content('hello');
+  const panel: HTMLElement = ref.attach(c);
   assert.equal(panel, ref.overlayElement);
   assert.equal(panel.parentElement, overlayContainer(), 'panel is in the overlay container');
   assert.equal(panel.textContent, 'hello');
@@ -27,8 +28,8 @@ test('overlay: attach inserts the panel into the shared container with the conte
 });
 
 test('overlay: the container is a single shared singleton in <body>', () => {
-  const a = createOverlay();
-  const b = createOverlay();
+  const a: OverlayRef = createOverlay();
+  const b: OverlayRef = createOverlay();
   a.attach(content('a'));
   b.attach(content('b'));
   assert.equal(overlayContainer(), a.overlayElement.parentElement);
@@ -39,8 +40,8 @@ test('overlay: the container is a single shared singleton in <body>', () => {
 });
 
 test('overlay: later overlays stack above earlier ones (monotonic z-index)', () => {
-  const a = createOverlay();
-  const b = createOverlay();
+  const a: OverlayRef = createOverlay();
+  const b: OverlayRef = createOverlay();
   a.attach(content());
   b.attach(content());
   assert.ok(z(b.overlayElement) > z(a.overlayElement), 'b panel above a panel');
@@ -49,22 +50,22 @@ test('overlay: later overlays stack above earlier ones (monotonic z-index)', () 
 });
 
 test('overlay: no backdrop by default', () => {
-  const ref = createOverlay();
+  const ref: OverlayRef = createOverlay();
   ref.attach(content());
   assert.equal(ref.backdropElement, null);
   ref.dispose();
 });
 
 test('overlay: hasBackdrop renders a backdrop below the panel and routes clicks', () => {
-  const ref = createOverlay({ hasBackdrop: true });
+  const ref: OverlayRef = createOverlay({ hasBackdrop: true });
   ref.attach(content());
-  const backdrop = ref.backdropElement!;
+  const backdrop: HTMLElement = ref.backdropElement!;
   assert.ok(backdrop, 'backdrop created');
   assert.equal(backdrop.parentElement, overlayContainer());
   assert.ok(z(ref.overlayElement) > z(backdrop), 'panel sits above its backdrop');
 
-  let clicks = 0;
-  const unsub = ref.onBackdropClick(() => clicks++);
+  let clicks: number = 0;
+  const unsub: () => void = ref.onBackdropClick(() => clicks++);
   backdrop.dispatchEvent(new MouseEvent('click', { bubbles: true }));
   assert.equal(clicks, 1, 'handler fired on backdrop click');
   unsub();
@@ -74,9 +75,9 @@ test('overlay: hasBackdrop renders a backdrop below the panel and routes clicks'
 });
 
 test('overlay: detach removes panel + backdrop and can re-attach', () => {
-  const ref = createOverlay({ hasBackdrop: true });
+  const ref: OverlayRef = createOverlay({ hasBackdrop: true });
   ref.attach(content('first'));
-  const backdrop = ref.backdropElement!;
+  const backdrop: HTMLElement = ref.backdropElement!;
   ref.detach();
   assert.equal(ref.overlayElement.parentElement, null, 'panel removed');
   assert.equal(backdrop.parentElement, null, 'backdrop removed');
@@ -90,7 +91,7 @@ test('overlay: detach removes panel + backdrop and can re-attach', () => {
 });
 
 test('overlay: attach replaces the previous content (single attach)', () => {
-  const ref = createOverlay();
+  const ref: OverlayRef = createOverlay();
   ref.attach(content('one'));
   ref.attach(content('two'));
   assert.equal(ref.overlayElement.textContent, 'two');
@@ -99,11 +100,11 @@ test('overlay: attach replaces the previous content (single attach)', () => {
 });
 
 test('overlay: dispose detaches and blocks further attach', () => {
-  const ref = createOverlay();
+  const ref: OverlayRef = createOverlay();
   ref.attach(content());
   ref.dispose();
   assert.equal(ref.attached(), false);
-  let threw = false;
+  let threw: boolean = false;
   try {
     ref.attach(content());
   } catch {
@@ -113,7 +114,7 @@ test('overlay: dispose detaches and blocks further attach', () => {
 });
 
 test('overlay: panelClass and backdropClass are applied', () => {
-  const ref = createOverlay({ hasBackdrop: true, panelClass: 'my-panel', backdropClass: ['b1', 'b2'] });
+  const ref: OverlayRef = createOverlay({ hasBackdrop: true, panelClass: 'my-panel', backdropClass: ['b1', 'b2'] });
   ref.attach(content());
   assert.ok(ref.overlayElement.classList.contains('my-panel'));
   assert.ok(ref.backdropElement!.classList.contains('b1') && ref.backdropElement!.classList.contains('b2'));
@@ -121,9 +122,9 @@ test('overlay: panelClass and backdropClass are applied', () => {
 });
 
 test('overlay: a custom position strategy is applied on attach and updatePosition', () => {
-  let applied = 0;
+  let applied: number = 0;
   const strategy: PositionStrategy = { apply: () => applied++ };
-  const ref = createOverlay({ positionStrategy: strategy });
+  const ref: OverlayRef = createOverlay({ positionStrategy: strategy });
   ref.attach(content());
   assert.equal(applied, 1, 'applied on attach');
   ref.updatePosition();
@@ -132,8 +133,8 @@ test('overlay: a custom position strategy is applied on attach and updatePositio
 });
 
 test('overlay: globalPosition centers by default (transform + 50%)', () => {
-  const ref = createOverlay({ positionStrategy: globalPosition() });
-  const panel = ref.attach(content());
+  const ref: OverlayRef = createOverlay({ positionStrategy: globalPosition() });
+  const panel: HTMLElement = ref.attach(content());
   assert.equal(panel.style.left, '50%');
   assert.equal(panel.style.top, '50%');
   assert.ok(panel.style.transform.includes('-50%'));
@@ -141,19 +142,19 @@ test('overlay: globalPosition centers by default (transform + 50%)', () => {
 });
 
 test('overlay: globalPosition can anchor to an edge instead of centering', () => {
-  const ref = createOverlay({
+  const ref: OverlayRef = createOverlay({
     positionStrategy: globalPosition({ centerHorizontally: false, centerVertically: false, top: '10px', left: '20px' }),
   });
-  const panel = ref.attach(content());
+  const panel: HTMLElement = ref.attach(content());
   assert.equal(panel.style.top, '10px');
   assert.equal(panel.style.left, '20px');
   ref.dispose();
 });
 
 test('overlay: attached() is reactive', async () => {
-  const ref = createOverlay();
+  const ref: OverlayRef = createOverlay();
   const seen: boolean[] = [];
-  const stop = effect(() => {
+  const stop: () => void = effect(() => {
     seen.push(ref.attached());
   });
   await Promise.resolve();
@@ -168,8 +169,8 @@ test('overlay: attached() is reactive', async () => {
 
 test('overlay: owner disposal tears the overlay down (no leak)', () => {
   const owner: Owner = createOwner();
-  const ref = runInOwner(owner, () => {
-    const r = createOverlay();
+  const ref: OverlayRef = runInOwner(owner, () => {
+    const r: OverlayRef = createOverlay();
     r.attach(content());
     return r;
   });

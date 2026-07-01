@@ -9,10 +9,12 @@ import {
   focusTrap,
   monitorFocus,
   focusOrigin,
+  type FocusTrap,
+  type FocusMonitorRef,
 } from '@weave-framework/ui/cdk';
 
 function mount(html: string): HTMLElement {
-  const host = document.createElement('div');
+  const host: HTMLDivElement = document.createElement('div');
   host.innerHTML = html;
   document.body.appendChild(host);
   return host;
@@ -22,23 +24,23 @@ const tick = (): Promise<void> => new Promise((r) => queueMicrotask(r));
 /* ─────────────────── interactivity ─────────────────── */
 
 test('interactivity: a plain button is focusable and tabbable', () => {
-  const host = mount('<button>ok</button>');
-  const btn = host.querySelector('button')!;
+  const host: HTMLElement = mount('<button>ok</button>');
+  const btn: HTMLButtonElement = host.querySelector('button')!;
   assert.equal(isFocusable(btn), true);
   assert.equal(isTabbable(btn), true);
   host.remove();
 });
 
 test('interactivity: a disabled control is neither focusable nor tabbable', () => {
-  const host = mount('<button disabled>no</button>');
-  const btn = host.querySelector('button')!;
+  const host: HTMLElement = mount('<button disabled>no</button>');
+  const btn: HTMLButtonElement = host.querySelector('button')!;
   assert.equal(isFocusable(btn), false);
   assert.equal(isTabbable(btn), false);
   host.remove();
 });
 
 test('interactivity: an anchor is focusable only with href', () => {
-  const host = mount('<a>no</a><a href="#x">yes</a>');
+  const host: HTMLElement = mount('<a>no</a><a href="#x">yes</a>');
   const [bare, linked] = Array.from(host.querySelectorAll('a'));
   assert.equal(isFocusable(bare), false);
   assert.equal(isTabbable(linked), true);
@@ -46,7 +48,7 @@ test('interactivity: an anchor is focusable only with href', () => {
 });
 
 test('interactivity: tabindex="-1" is focusable but NOT tabbable; tabindex="0" is both', () => {
-  const host = mount('<div tabindex="-1">a</div><div tabindex="0">b</div>');
+  const host: HTMLElement = mount('<div tabindex="-1">a</div><div tabindex="0">b</div>');
   const [neg, zero] = Array.from(host.querySelectorAll('div'));
   assert.equal(isFocusable(neg), true);
   assert.equal(isTabbable(neg), false);
@@ -56,14 +58,14 @@ test('interactivity: tabindex="-1" is focusable but NOT tabbable; tabindex="0" i
 });
 
 test('interactivity: display:none is not focusable (ancestor hidden too)', () => {
-  const host = mount('<div style="display:none"><button>x</button></div>');
-  const btn = host.querySelector('button')!;
+  const host: HTMLElement = mount('<div style="display:none"><button>x</button></div>');
+  const btn: HTMLButtonElement = host.querySelector('button')!;
   assert.equal(isFocusable(btn), false);
   host.remove();
 });
 
 test('interactivity: focusable/tabbable child queries return DOM order', () => {
-  const host = mount('<button>1</button><a href="#">2</a><input disabled><div tabindex="-1">3</div><input>');
+  const host: HTMLElement = mount('<button>1</button><a href="#">2</a><input disabled><div tabindex="-1">3</div><input>');
   assert.deepEqual(
     tabbableChildren(host).map((e) => e.tagName.toLowerCase()),
     ['button', 'a', 'input'],
@@ -75,16 +77,16 @@ test('interactivity: focusable/tabbable child queries return DOM order', () => {
 
 /* ─────────────────── focus-trap ─────────────────── */
 
-function tabKey(target: Element, shift = false): KeyboardEvent {
-  const e = new KeyboardEvent('keydown', { key: 'Tab', shiftKey: shift, bubbles: true, cancelable: true });
+function tabKey(target: Element, shift: boolean = false): KeyboardEvent {
+  const e: KeyboardEvent = new KeyboardEvent('keydown', { key: 'Tab', shiftKey: shift, bubbles: true, cancelable: true });
   target.dispatchEvent(e);
   return e;
 }
 
 test('focus-trap: activate focuses the first tabbable', () => {
-  const host = mount('<div class="trap"><button class="a">a</button><button class="b">b</button></div>');
-  const region = host.querySelector('.trap') as HTMLElement;
-  const trap = focusTrap(region);
+  const host: HTMLElement = mount('<div class="trap"><button class="a">a</button><button class="b">b</button></div>');
+  const region: HTMLElement = host.querySelector('.trap') as HTMLElement;
+  const trap: FocusTrap = focusTrap(region);
   trap.activate();
   assert.equal(document.activeElement, region.querySelector('.a'));
   trap.deactivate();
@@ -92,14 +94,14 @@ test('focus-trap: activate focuses the first tabbable', () => {
 });
 
 test('focus-trap: Tab at the last tabbable wraps to the first', () => {
-  const host = mount('<div class="trap"><button class="a">a</button><button class="b">b</button></div>');
-  const region = host.querySelector('.trap') as HTMLElement;
-  const a = region.querySelector('.a') as HTMLElement;
-  const b = region.querySelector('.b') as HTMLElement;
-  const trap = focusTrap(region);
+  const host: HTMLElement = mount('<div class="trap"><button class="a">a</button><button class="b">b</button></div>');
+  const region: HTMLElement = host.querySelector('.trap') as HTMLElement;
+  const a: HTMLElement = region.querySelector('.a') as HTMLElement;
+  const b: HTMLElement = region.querySelector('.b') as HTMLElement;
+  const trap: FocusTrap = focusTrap(region);
   trap.activate();
   b.focus();
-  const e = tabKey(b);
+  const e: KeyboardEvent = tabKey(b);
   assert.equal(e.defaultPrevented, true, 'Tab intercepted');
   assert.equal(document.activeElement, a, 'wrapped to first');
   trap.deactivate();
@@ -107,11 +109,11 @@ test('focus-trap: Tab at the last tabbable wraps to the first', () => {
 });
 
 test('focus-trap: Shift+Tab at the first wraps to the last', () => {
-  const host = mount('<div class="trap"><button class="a">a</button><button class="b">b</button></div>');
-  const region = host.querySelector('.trap') as HTMLElement;
-  const a = region.querySelector('.a') as HTMLElement;
-  const b = region.querySelector('.b') as HTMLElement;
-  const trap = focusTrap(region);
+  const host: HTMLElement = mount('<div class="trap"><button class="a">a</button><button class="b">b</button></div>');
+  const region: HTMLElement = host.querySelector('.trap') as HTMLElement;
+  const a: HTMLElement = region.querySelector('.a') as HTMLElement;
+  const b: HTMLElement = region.querySelector('.b') as HTMLElement;
+  const trap: FocusTrap = focusTrap(region);
   trap.activate();
   a.focus();
   tabKey(a, true);
@@ -121,12 +123,12 @@ test('focus-trap: Shift+Tab at the first wraps to the last', () => {
 });
 
 test('focus-trap: deactivate restores the previously-focused element', () => {
-  const host = mount('<button class="outside">out</button><div class="trap"><button class="a">a</button></div>');
-  const outside = host.querySelector('.outside') as HTMLElement;
-  const region = host.querySelector('.trap') as HTMLElement;
+  const host: HTMLElement = mount('<button class="outside">out</button><div class="trap"><button class="a">a</button></div>');
+  const outside: HTMLElement = host.querySelector('.outside') as HTMLElement;
+  const region: HTMLElement = host.querySelector('.trap') as HTMLElement;
   outside.focus();
   assert.equal(document.activeElement, outside);
-  const trap = focusTrap(region);
+  const trap: FocusTrap = focusTrap(region);
   trap.activate();
   assert.equal(document.activeElement, region.querySelector('.a'));
   trap.deactivate();
@@ -135,9 +137,9 @@ test('focus-trap: deactivate restores the previously-focused element', () => {
 });
 
 test('focus-trap: an empty region focuses the container itself', () => {
-  const host = mount('<div class="trap"></div>');
-  const region = host.querySelector('.trap') as HTMLElement;
-  const trap = focusTrap(region);
+  const host: HTMLElement = mount('<div class="trap"></div>');
+  const region: HTMLElement = host.querySelector('.trap') as HTMLElement;
+  const trap: FocusTrap = focusTrap(region);
   trap.activate();
   assert.equal(document.activeElement, region);
   assert.equal(region.getAttribute('tabindex'), '-1', 'made programmatically focusable');
@@ -148,9 +150,9 @@ test('focus-trap: an empty region focuses the container itself', () => {
 /* ─────────────────── focus-monitor ─────────────────── */
 
 test('focus-monitor: reports keyboard vs mouse origin', () => {
-  const host = mount('<button class="m">m</button>');
-  const btn = host.querySelector('.m') as HTMLElement;
-  const mon = monitorFocus(btn);
+  const host: HTMLElement = mount('<button class="m">m</button>');
+  const btn: HTMLElement = host.querySelector('.m') as HTMLElement;
+  const mon: FocusMonitorRef = monitorFocus(btn);
 
   document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab' }));
   btn.focus();
@@ -168,9 +170,9 @@ test('focus-monitor: reports keyboard vs mouse origin', () => {
 
 test('focus-monitor: a focus with no preceding interaction reads as program', async () => {
   await tick(); // let any prior modality clear
-  const host = mount('<button class="p">p</button>');
-  const btn = host.querySelector('.p') as HTMLElement;
-  const mon = monitorFocus(btn);
+  const host: HTMLElement = mount('<button class="p">p</button>');
+  const btn: HTMLElement = host.querySelector('.p') as HTMLElement;
+  const mon: FocusMonitorRef = monitorFocus(btn);
   btn.focus();
   assert.equal(mon.origin(), 'program');
   mon.stop();
@@ -178,9 +180,9 @@ test('focus-monitor: a focus with no preceding interaction reads as program', as
 });
 
 test('focus-monitor: focused() clears on blur and global focusOrigin() tracks', () => {
-  const host = mount('<button class="g">g</button>');
-  const btn = host.querySelector('.g') as HTMLElement;
-  const mon = monitorFocus(btn);
+  const host: HTMLElement = mount('<button class="g">g</button>');
+  const btn: HTMLElement = host.querySelector('.g') as HTMLElement;
+  const mon: FocusMonitorRef = monitorFocus(btn);
   document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab' }));
   btn.focus();
   assert.equal(mon.focused(), true);
@@ -192,10 +194,10 @@ test('focus-monitor: focused() clears on blur and global focusOrigin() tracks', 
 });
 
 test('focus-monitor: stop() via owner disposal', () => {
-  const host = mount('<button class="o">o</button>');
-  const btn = host.querySelector('.o') as HTMLElement;
+  const host: HTMLElement = mount('<button class="o">o</button>');
+  const btn: HTMLElement = host.querySelector('.o') as HTMLElement;
   const owner: Owner = createOwner();
-  const mon = runInOwner(owner, () => monitorFocus(btn));
+  const mon: FocusMonitorRef = runInOwner(owner, () => monitorFocus(btn));
   document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab' }));
   btn.focus();
   assert.equal(mon.focused(), true);

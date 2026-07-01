@@ -34,7 +34,7 @@ function focusContainer(container: HTMLElement): void {
 export function focusTrap(container: HTMLElement, options: FocusTrapOptions = {}): FocusTrap {
   const restoreFocus: boolean = options.restoreFocus !== false;
   let previouslyFocused: HTMLElement | null = null;
-  let active = false;
+  let active: boolean = false;
 
   const tabbables = (): HTMLElement[] => tabbableChildren(container);
 

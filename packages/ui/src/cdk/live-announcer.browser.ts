@@ -2,7 +2,7 @@ import { test, assert } from '../../../../tools/harness.js';
 import { announce, clearAnnouncer, liveAnnouncerElement } from '@weave-framework/ui/cdk';
 
 test('live-announcer: polite region is visually hidden with aria-live=polite', () => {
-  const el = liveAnnouncerElement('polite');
+  const el: HTMLElement = liveAnnouncerElement('polite');
   assert.equal(el.getAttribute('aria-live'), 'polite');
   assert.equal(el.getAttribute('aria-atomic'), 'true');
   assert.equal(el.parentElement, document.body);
@@ -16,7 +16,7 @@ test('live-announcer: announce sets the message text', () => {
 
 test('live-announcer: assertive uses the assertive region (role=alert)', () => {
   announce('Error saving', 'assertive');
-  const el = liveAnnouncerElement('assertive');
+  const el: HTMLElement = liveAnnouncerElement('assertive');
   assert.equal(el.getAttribute('aria-live'), 'assertive');
   assert.equal(el.getAttribute('role'), 'alert');
   assert.equal(el.textContent, 'Error saving');

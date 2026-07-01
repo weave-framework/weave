@@ -32,7 +32,13 @@ export function matchesBreakpoint(query: string): boolean {
 }
 
 /** Named media queries — Weave's `Narrow`/`Wide` (900px) plus convenience tiers. */
-export const Breakpoints = {
+export const Breakpoints: {
+  readonly Narrow: '(max-width: 899px)';
+  readonly Wide: '(min-width: 900px)';
+  readonly Handset: '(max-width: 599px)';
+  readonly Tablet: '(min-width: 600px) and (max-width: 1023px)';
+  readonly Desktop: '(min-width: 1024px)';
+} = {
   /** Weave `narrow` state (single-column reflow). */
   Narrow: '(max-width: 899px)',
   Wide: '(min-width: 900px)',

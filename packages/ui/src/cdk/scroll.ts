@@ -29,8 +29,8 @@ export type ScrollStrategyFactory = (ref: OverlayRef) => ScrollStrategy;
 /* ─────────────────── shared scroll dispatcher ─────────────────── */
 
 type Handler = () => void;
-const handlers = new Set<Handler>();
-let installed = false;
+const handlers: Set<Handler> = new Set<Handler>();
+let installed: boolean = false;
 
 function fanout(): void {
   for (const h of [...handlers]) h();

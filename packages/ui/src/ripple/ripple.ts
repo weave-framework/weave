@@ -23,13 +23,13 @@ export function ripple(host: HTMLElement, options: RippleOptions = {}): () => vo
   const onPointerDown = (event: PointerEvent): void => {
     if (options.disabled) return;
 
-    const rect = host.getBoundingClientRect();
-    const x = options.centered ? rect.width / 2 : event.clientX - rect.left;
-    const y = options.centered ? rect.height / 2 : event.clientY - rect.top;
+    const rect: DOMRect = host.getBoundingClientRect();
+    const x: number = options.centered ? rect.width / 2 : event.clientX - rect.left;
+    const y: number = options.centered ? rect.height / 2 : event.clientY - rect.top;
     // Radius reaches the farthest corner so the circle covers the whole host.
-    const radius = Math.hypot(Math.max(x, rect.width - x), Math.max(y, rect.height - y));
+    const radius: number = Math.hypot(Math.max(x, rect.width - x), Math.max(y, rect.height - y));
 
-    const span = document.createElement('span');
+    const span: HTMLSpanElement = document.createElement('span');
     span.className = 'weave-ripple';
     span.setAttribute('aria-hidden', 'true');
     span.style.left = `${x - radius}px`;
@@ -52,7 +52,7 @@ export function ripple(host: HTMLElement, options: RippleOptions = {}): () => vo
 // The ripple is absolutely positioned and must be clipped — nudge the host if the
 // author hasn't (also available as the `weave.ripple-host` mixin for authored styles).
 function ensureHost(host: HTMLElement): void {
-  const cs = getComputedStyle(host);
+  const cs: CSSStyleDeclaration = getComputedStyle(host);
   if (cs.position === 'static') host.style.position = 'relative';
   if (cs.overflow === 'visible') host.style.overflow = 'hidden';
 }

@@ -65,7 +65,7 @@ function compareRoutes(a: string, b: string): number {
   const as: string[] = a.split('/');
   const bs: string[] = b.split('/');
   const len: number = Math.max(as.length, bs.length);
-  for (let i = 0; i < len; i++) {
+  for (let i: number = 0; i < len; i++) {
     const sa: string = as[i] ?? '';
     const sb: string = bs[i] ?? '';
     const da: number = segSpecificity(sa);

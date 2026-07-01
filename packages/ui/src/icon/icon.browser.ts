@@ -21,6 +21,7 @@ import {
   spriteIcons,
   IconContext,
   type IconProps,
+  type IconRegistry,
 } from '@weave-framework/ui/icon';
 
 // The runtime object the compiled (function-mode) template references as `rt`.
@@ -32,8 +33,8 @@ const tick = (): Promise<void> => new Promise<void>((r) => queueMicrotask(r));
 /* ─────────────────────────── registry ─────────────────────────── */
 
 test('registry: built-in Lucide name resolves to a wrapped <svg>', () => {
-  const reg = createIconRegistry();
-  const svg = reg.resolve('search');
+  const reg: IconRegistry = createIconRegistry();
+  const svg: string | undefined = reg.resolve('search');
   assert.ok(svg, 'search resolves');
   assert.ok(svg!.startsWith('<svg'), 'wrapped in <svg>');
   assert.ok(svg!.includes('stroke="currentColor"'), 'Weave currentColor stroke');
@@ -41,43 +42,43 @@ test('registry: built-in Lucide name resolves to a wrapped <svg>', () => {
 });
 
 test('registry: an unknown name resolves to undefined', () => {
-  const reg = createIconRegistry();
+  const reg: IconRegistry = createIconRegistry();
   assert.equal(reg.resolve('definitely-not-an-icon'), undefined);
   assert.equal(reg.has('definitely-not-an-icon'), false);
   assert.equal(reg.has('menu'), true);
 });
 
 test('registry: register() overrides a name (and wraps inner geometry)', () => {
-  const reg = createIconRegistry();
+  const reg: IconRegistry = createIconRegistry();
   reg.register('search', '<path d="M0 0" />');
-  const svg = reg.resolve('search')!;
+  const svg: string = reg.resolve('search')!;
   assert.ok(svg.startsWith('<svg') && svg.includes('M0 0'), 'custom geometry used');
 });
 
 test('registry: a full <svg> from a source is passed through unwrapped', () => {
-  const reg = createIconRegistry({
+  const reg: IconRegistry = createIconRegistry({
     builtin: false,
     sources: [inlineIcons({ logo: '<svg viewBox="0 0 10 10"><rect/></svg>' })],
   });
-  const svg = reg.resolve('logo')!;
+  const svg: string = reg.resolve('logo')!;
   assert.ok(svg.includes('viewBox="0 0 10 10"'), 'kept the source viewBox');
   assert.equal(svg.match(/<svg/g)!.length, 1, 'not double-wrapped');
 });
 
 test('registry: sources are consulted before the built-in set (first hit wins)', () => {
-  const reg = createIconRegistry({ sources: [inlineIcons({ search: '<svg id="mine"></svg>' })] });
+  const reg: IconRegistry = createIconRegistry({ sources: [inlineIcons({ search: '<svg id="mine"></svg>' })] });
   assert.ok(reg.resolve('search')!.includes('id="mine"'), 'source overrides built-in');
   assert.ok(reg.resolve('menu'), 'built-in still available as fallback');
 });
 
 test('configureIcons() sets the global backing activeIcons()', () => {
-  const reg = configureIcons({ builtin: false, sources: [inlineIcons({ a: '<svg id="a"></svg>' })] });
+  const reg: IconRegistry = configureIcons({ builtin: false, sources: [inlineIcons({ a: '<svg id="a"></svg>' })] });
   assert.equal(activeIcons(), reg, 'global instance is active with no context');
 });
 
 test('IconContext overrides the global within a subtree', () => {
   configureIcons({ builtin: true }); // global
-  const scoped = createIconRegistry({ builtin: false, global: false });
+  const scoped: IconRegistry = createIconRegistry({ builtin: false, global: false });
   const owner: Owner = createOwner();
   runInOwner(owner, () => {
     provide(IconContext, scoped);
@@ -87,19 +88,19 @@ test('IconContext overrides the global within a subtree', () => {
 });
 
 test('registry: an async sprite source fills a reactive cache', async () => {
-  const original = globalThis.fetch;
+  const original: typeof fetch = globalThis.fetch;
   globalThis.fetch = (() =>
     Promise.resolve({
       text: () => Promise.resolve('<svg><symbol id="foo"><rect x="1" /></symbol></svg>'),
     })) as unknown as typeof fetch;
   try {
-    const reg = createIconRegistry({ builtin: false, sources: [spriteIcons('/sprite.svg')] });
+    const reg: IconRegistry = createIconRegistry({ builtin: false, sources: [spriteIcons('/sprite.svg')] });
     let seen: string | undefined;
-    const stop = effect(() => {
+    const stop: () => void = effect(() => {
       seen = reg.resolve('foo'); // tracked — re-runs when the fetch lands
     });
     assert.equal(seen, undefined, 'pending on first read');
-    for (let i = 0; i < 10 && seen === undefined; i++) await tick();
+    for (let i: number = 0; i < 10 && seen === undefined; i++) await tick();
     assert.ok(seen && seen.includes('rect'), 'reactively filled from the sprite');
     stop();
   } finally {
@@ -113,9 +114,9 @@ test('registry: an async sprite source fills a reactive cache', async () => {
 function mountIcon(props: IconProps): { el: HTMLElement; dispose: () => void } {
   const owner: Owner = createOwner();
   const el: HTMLElement = runInOwner(owner, () => {
-    const ctx = setup(props);
+    const ctx: ReturnType<typeof setup> = setup(props);
     const { code } = compileTemplate(template, { mode: 'function', scope: ['host'] });
-    const fn = new Function('ctx', 'rt', '_c', code) as (c: unknown, r: unknown, k: unknown) => HTMLElement;
+    const fn: (c: unknown, r: unknown, k: unknown) => HTMLElement = new Function('ctx', 'rt', '_c', code) as (c: unknown, r: unknown, k: unknown) => HTMLElement;
     return fn(ctx, rt, {});
   });
   document.body.appendChild(el);
@@ -126,7 +127,7 @@ test('component: renders the named icon inline as an <svg>, decorative by defaul
   configureIcons({ builtin: true });
   const { el, dispose } = mountIcon({ name: 'search' });
   await tick();
-  const host = el.classList.contains('weave-icon') ? el : (el.querySelector('.weave-icon') as HTMLElement);
+  const host: HTMLElement = el.classList.contains('weave-icon') ? el : (el.querySelector('.weave-icon') as HTMLElement);
   assert.ok(host, 'has the .weave-icon host');
   assert.ok(host.querySelector('svg'), 'inline <svg> rendered');
   assert.equal(host.getAttribute('aria-hidden'), 'true', 'decorative by default');
@@ -137,7 +138,7 @@ test('component: renders the named icon inline as an <svg>, decorative by defaul
 test('component: label makes it a labelled image (role=img + aria-label)', async () => {
   const { el, dispose } = mountIcon({ name: 'trash-2', label: 'Delete' });
   await tick();
-  const host = el as HTMLElement;
+  const host: HTMLElement = el as HTMLElement;
   assert.equal(host.getAttribute('role'), 'img');
   assert.equal(host.getAttribute('aria-label'), 'Delete');
   assert.equal(host.getAttribute('aria-hidden'), null, 'not hidden when labelled');
@@ -156,10 +157,10 @@ test('component: changing name re-renders in place', async () => {
   const props: IconProps = { get name() { return name(); } };
   const { el, dispose } = mountIcon(props);
   await tick();
-  const first = (el as HTMLElement).innerHTML;
+  const first: string = (el as HTMLElement).innerHTML;
   name.set('menu');
   await tick();
-  const second = (el as HTMLElement).innerHTML;
+  const second: string = (el as HTMLElement).innerHTML;
   assert.ok(second.includes('<svg'), 'still an svg after change');
   assert.notEqual(first, second, 'markup updated for the new name');
   dispose();

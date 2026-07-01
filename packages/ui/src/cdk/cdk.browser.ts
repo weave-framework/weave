@@ -60,7 +60,7 @@ test('bidi: direction defaults to ltr and setDirection updates it', () => {
 
 test('bidi: direction() is reactive — an effect re-runs on change', async () => {
   const seen: Direction[] = [];
-  const stop = effect(() => {
+  const stop: () => void = effect(() => {
     seen.push(direction());
   });
   await tick();

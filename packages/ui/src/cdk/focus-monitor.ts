@@ -15,7 +15,7 @@ import { isBrowser } from './platform.js';
 export type FocusOrigin = 'keyboard' | 'mouse' | 'touch' | 'program';
 
 let modality: FocusOrigin | null = null;
-let installed = false;
+let installed: boolean = false;
 const _origin: Signal<FocusOrigin | null> = signal<FocusOrigin | null>(null);
 
 function mark(origin: FocusOrigin): void {

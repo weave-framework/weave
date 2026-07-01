@@ -7,7 +7,7 @@
  * (`tabindex >= 0`). `getClientRects()` catches ancestor `display:none` too.
  */
 
-const NATIVE_FOCUSABLE = new Set(['input', 'select', 'textarea', 'button']);
+const NATIVE_FOCUSABLE: Set<string> = new Set(['input', 'select', 'textarea', 'button']);
 
 function isVisible(el: HTMLElement): boolean {
   if (el.hidden) return false;

@@ -137,7 +137,7 @@ export function connectedPosition(
 
   const _applied: Signal<ConnectedPosition | null> = signal<ConnectedPosition | null>(null);
   let currentEl: HTMLElement | null = null;
-  let listening = false;
+  let listening: boolean = false;
 
   function place(el: HTMLElement, pos: ConnectedPosition, rtl: boolean, vw: number, vh: number): Placement {
     const rect: DOMRect = origin.getBoundingClientRect();
