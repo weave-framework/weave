@@ -19,3 +19,6 @@ export * from './focus-trap.js';
 export * from './focus-monitor.js';
 export * from './live-announcer.js';
 export * from './key-manager.js';
+export * from './observers.js';
+export * from './breakpoints.js';
+export * from './clipboard.js';
