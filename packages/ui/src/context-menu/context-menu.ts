@@ -10,27 +10,45 @@
  * the menu core (roving focus, typeahead, Esc/click-away) and the `.weave-menu` visual — no
  * new styles. Zero-dep.
  */
-import { openMenuPanel, virtualOrigin, type MenuHandle, type MenuItem } from '../menu/menu-core.js';
+import {
+  openMenuPanel,
+  buildPositions,
+  virtualOrigin,
+  type MenuHandle,
+  type MenuItem,
+  type MenuPosition,
+} from '../menu/menu-core.js';
 
-export type { MenuItem } from '../menu/menu-core.js';
+export type { MenuItem, MenuPosition } from '../menu/menu-core.js';
+
+// Pointer-anchored fallback order (down-right first, then the other quadrants).
+const POINTER_POSITIONS: MenuPosition[] = ['bottom-start', 'top-start', 'bottom-end', 'top-end'];
 
 export interface ContextMenuOptions {
   items: MenuItem[];
   /** Called with the chosen item's `value` (the menu then closes). */
   onSelect: (value: string) => void;
+  /**
+   * Where the panel is anchored. **Omitted (default): at the pointer** (native right-click
+   * feel). **Set to a position** (`'bottom-start'`, `'top-end'`, `'bottom'`, … or an explicit
+   * anchor pair) → anchored to the **host object** at that position instead, so the menu
+   * always appears in the same spot regardless of where inside the host you clicked.
+   */
+  position?: MenuPosition;
 }
 
 /** Weave `use:` action: `(host, options) => cleanup`. */
 export function contextMenu(host: HTMLElement, options: ContextMenuOptions): () => void {
   let handle: MenuHandle | null = null;
 
-  function openAt(x: number, y: number, focusFirst: boolean): void {
+  // Anchor to the host at `position` when set; otherwise to the given pointer point.
+  function doOpen(focusFirst: boolean, pointer: { x: number; y: number } | null): void {
     handle?.close(false); // replace any open instance
+    const objectAnchored: boolean = options.position != null || pointer == null;
     handle = openMenuPanel({
-      origin: virtualOrigin(x, y),
+      origin: objectAnchored ? host : virtualOrigin(pointer!.x, pointer!.y),
       items: options.items,
-      // Flip around the pointer: prefer down-right, fall back to the other quadrants.
-      positions: ['bottom-start', 'top-start', 'bottom-end', 'top-end'],
+      positions: objectAnchored ? buildPositions(options.position, 'bottom-start') : POINTER_POSITIONS,
       focusFirst,
       onSelect: options.onSelect,
       onClose: (returnFocus: boolean): void => {
@@ -42,15 +60,15 @@ export function contextMenu(host: HTMLElement, options: ContextMenuOptions): () 
 
   const onContextMenu = (event: MouseEvent): void => {
     event.preventDefault();
-    openAt(event.clientX, event.clientY, false); // pointer open: nothing pre-highlighted
+    // Pointer open: nothing pre-highlighted (unless `position` re-anchors it to the host).
+    doOpen(false, { x: event.clientX, y: event.clientY });
   };
   const onKeydown = (event: KeyboardEvent): void => {
-    // Keyboard parity: the ContextMenu key or Shift+F10 opens anchored to the host, first
-    // item highlighted (there's no pointer to hover with).
+    // Keyboard parity: the ContextMenu key or Shift+F10 opens anchored to the host (no
+    // pointer), first item highlighted.
     if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
       event.preventDefault();
-      const r: DOMRect = host.getBoundingClientRect();
-      openAt(r.left + 4, r.top + 4, true);
+      doOpen(true, null);
     }
   };
 

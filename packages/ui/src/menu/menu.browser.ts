@@ -1,6 +1,7 @@
 import { test, assert } from '../../../../tools/harness.js';
-import { overlayContainer } from '@weave-framework/ui/cdk';
+import { overlayContainer, type ConnectedPosition } from '@weave-framework/ui/cdk';
 import { menu, type MenuItem, type MenuOptions } from '@weave-framework/ui/menu';
+import { buildPositions } from './menu-core.js';
 
 const ITEMS: MenuItem[] = [
   { value: 'edit', label: 'Edit' },
@@ -186,6 +187,29 @@ test('menu: a backdrop click closes the menu (does NOT return focus to the trigg
   backdrop.dispatchEvent(new MouseEvent('click', { bubbles: true }));
   assert.equal(panel(), null, 'closed on click-away');
   teardown(trigger, cleanup);
+});
+
+test('menu: buildPositions appends the opposite preset (flip) and passes explicit pairs through', () => {
+  assert.deepEqual(buildPositions(undefined, 'bottom-start'), ['bottom-start', 'top-start']);
+  assert.deepEqual(buildPositions('top-end', 'bottom-start'), ['top-end', 'bottom-end']);
+  assert.deepEqual(buildPositions('right', 'bottom-start'), ['right', 'left']);
+  const pair: ConnectedPosition = { originX: 'center', originY: 'bottom', overlayX: 'center', overlayY: 'top' };
+  assert.deepEqual(buildPositions(pair, 'bottom-start'), [pair]);
+});
+
+test('menu: position places the panel above a bottom-anchored trigger (top preset)', () => {
+  const trigger: HTMLButtonElement = document.createElement('button');
+  trigger.style.cssText = 'position:fixed; left:120px; top:300px; width:90px; height:34px';
+  document.body.appendChild(trigger);
+  const cleanup: () => void = menu(trigger, { items: ITEMS, onSelect: (): void => {}, position: 'top-start' });
+  trigger.click();
+  const wrapper: HTMLElement = panel()?.parentElement as HTMLElement;
+  const top: number = parseFloat(wrapper.style.top);
+  // top-start: panel's bottom edge sits on the trigger's top (300) → panel is above it.
+  assert.ok(top < 300, `panel is above the trigger (top ${top} < 300)`);
+  assert.ok(Math.abs(parseFloat(wrapper.style.left) - 120) < 2, 'left-aligned to the trigger');
+  cleanup();
+  trigger.remove();
 });
 
 test('menu: cleanup closes the panel and strips the trigger ARIA (no leak)', () => {

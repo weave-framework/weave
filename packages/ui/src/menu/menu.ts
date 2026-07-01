@@ -9,17 +9,20 @@
  * the shared menu core. The trigger carries `aria-haspopup=menu` + `aria-expanded`. The
  * visual is `menu.styles()` (the `--weave-menu-*` republic). Zero-dep.
  */
-import { openMenuPanel, type MenuHandle, type MenuItem } from './menu-core.js';
-import type { PositionName } from '../cdk/index.js';
+import { openMenuPanel, buildPositions, type MenuHandle, type MenuItem, type MenuPosition } from './menu-core.js';
 
-export type { MenuItem } from './menu-core.js';
+export type { MenuItem, MenuPosition } from './menu-core.js';
 
 export interface MenuOptions {
   items: MenuItem[];
   /** Called with the chosen item's `value` (the menu then closes). */
   onSelect: (value: string) => void;
-  /** Preferred anchor position; flips to the opposite on overflow. Default `'bottom-start'`. */
-  position?: PositionName;
+  /**
+   * Where the panel sits relative to the trigger; flips to the opposite on overflow.
+   * A preset (`'bottom-start'`, `'top'`, `'bottom-end'`, …) or an explicit anchor pair.
+   * Default `'bottom-start'` (below, left-aligned).
+   */
+  position?: MenuPosition;
 }
 
 /** Weave `use:` action: `(trigger, options) => cleanup`. */
@@ -34,7 +37,7 @@ export function menu(trigger: HTMLElement, options: MenuOptions): () => void {
     handle = openMenuPanel({
       origin: trigger,
       items: options.items,
-      positions: [options.position ?? 'bottom-start', 'top-start'],
+      positions: buildPositions(options.position, 'bottom-start'),
       focusFirst,
       onSelect: options.onSelect,
       onClose: (returnFocus: boolean): void => {

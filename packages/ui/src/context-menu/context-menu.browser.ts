@@ -97,6 +97,22 @@ test('context-menu: Shift+F10 opens the menu anchored to the host (keyboard pari
   teardown(host, cleanup);
 });
 
+test('context-menu: position anchors the panel to the host object, ignoring the pointer', () => {
+  const host: HTMLDivElement = document.createElement('div');
+  host.style.cssText = 'position:fixed; left:200px; top:120px; width:100px; height:40px';
+  document.body.appendChild(host);
+  const cleanup: () => void = contextMenu(host, { items: ITEMS, onSelect: (): void => {}, position: 'bottom-start' });
+  // Right-click far from the host — with `position` set the pointer is ignored.
+  host.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 900, clientY: 900 }));
+  const wrapper: HTMLElement = panel()?.parentElement as HTMLElement;
+  const left: number = parseFloat(wrapper.style.left);
+  const top: number = parseFloat(wrapper.style.top);
+  assert.ok(Math.abs(left - 200) < 2, `anchored to host left, not pointer (got ${left})`);
+  assert.ok(top >= 160 && top < 185, `just below the host bottom (160 = 120+40, got ${top})`);
+  cleanup();
+  host.remove();
+});
+
 test('context-menu: cleanup removes the listeners and closes any open panel', () => {
   const { host, cleanup } = mount();
   rightClick(host);
