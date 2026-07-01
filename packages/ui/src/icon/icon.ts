@@ -1,6 +1,6 @@
 /**
  * `<Icon>` — renders an inline SVG from the active icon registry (or a directly
- * supplied `svg` / `src`). Keyline: 18px, 1.4 hairline stroke, `currentColor` (so an
+ * supplied `svg` / `src`). Weave: 18px, 1.4 hairline stroke, `currentColor` (so an
  * icon takes its parent's text color). Lean DOM — a single host `<span>` whose
  * innerHTML is the SVG (Weave has no `{@html}`, so we set it via a ref + effect).
  *

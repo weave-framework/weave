@@ -48,7 +48,7 @@ test('matchesBreakpoint: non-reactive snapshot against real matchMedia', () => {
   assert.equal(matchesBreakpoint('(max-width: 0px)'), false, 'always-false query');
 });
 
-test('Breakpoints: Keyline narrow preset is 900px', () => {
+test('Breakpoints: Weave narrow preset is 900px', () => {
   assert.equal(Breakpoints.Narrow, '(max-width: 899px)');
   assert.equal(Breakpoints.Wide, '(min-width: 900px)');
 });

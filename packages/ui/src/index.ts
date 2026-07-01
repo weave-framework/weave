@@ -1,5 +1,5 @@
 /**
- * @weave-framework/ui — Weave UI component library (Keyline design system).
+ * @weave-framework/ui — Weave UI component library (Weave design system).
  *
  * The SCSS token engine + styles live under `src/styles` and per-component `.scss`
  * (consumed via `@use '@weave-framework/ui'`). JS component behaviors are exported

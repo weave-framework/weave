@@ -40,7 +40,7 @@ $_builtins: (
 
 /* ───────────────────────── public API ───────────────────────── */
 
-// One call: set the whole theme. $overrides is a partial map merged over Keyline
+// One call: set the whole theme. $overrides is a partial map merged over Weave
 // defaults (pass only what you change). Emits all global vars + all component vars.
 @mixin theme($overrides: ()) {
   $t: map.deep-merge(defaults.$light, $overrides);

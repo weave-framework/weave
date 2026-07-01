@@ -1,7 +1,7 @@
-// Button — Keyline actions. Behavior lives in button.ts (variant class + ripple +
+// Button — Weave actions. Behavior lives in button.ts (variant class + ripple +
 // native <button>); this is the visual (token schema + styles() rules).
 //
-// Variants (REAL Keyline, as --<variant>): default = Primary (ink fill, canvas text);
+// Variants (REAL Weave, as --<variant>): default = Primary (ink fill, canvas text);
 // --outline (1px ink border, inverts on hover); --marked (text + inset -2px accent);
 // --ghost (text, sub→ink on hover); --icon (34px square). Disabled via [disabled].
 

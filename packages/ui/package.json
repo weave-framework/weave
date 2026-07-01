@@ -1,7 +1,7 @@
 {
   "name": "@weave-framework/ui",
   "version": "0.2.0",
-  "description": "Weave UI — signal-native component library (Material+CDK equivalent) with the Keyline design system. Ships SCSS; zero third-party runtime deps.",
+  "description": "Weave UI — signal-native component library (Material+CDK equivalent) with the Weave design system. Ships SCSS; zero third-party runtime deps.",
   "type": "module",
   "sideEffects": false,
   "main": "./src/index.ts",

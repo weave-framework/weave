@@ -5,7 +5,7 @@
  *   <button use:ripple={{ { centered: true } }}>Enter-friendly</button>
  *
  * On pointerdown it appends an absolutely-positioned circle at the click point that
- * scales up and fades out (Keyline: currentColor, opacity .22, scale→4 over ~.55s),
+ * scales up and fades out (Weave: currentColor, opacity .22, scale→4 over ~.55s),
  * removed on animationend. The visual is driven by `ripple.styles()` (CSS + tokens);
  * this file is only the behavior. Respects prefers-reduced-motion. Zero-dep.
  */

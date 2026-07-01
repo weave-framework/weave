@@ -36,7 +36,7 @@ test('registry: built-in Lucide name resolves to a wrapped <svg>', () => {
   const svg = reg.resolve('search');
   assert.ok(svg, 'search resolves');
   assert.ok(svg!.startsWith('<svg'), 'wrapped in <svg>');
-  assert.ok(svg!.includes('stroke="currentColor"'), 'Keyline currentColor stroke');
+  assert.ok(svg!.includes('stroke="currentColor"'), 'Weave currentColor stroke');
   assert.ok(svg!.includes('circle'), 'contains the search glyph geometry');
 });
 

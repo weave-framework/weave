@@ -18,7 +18,7 @@ import { lucideIcons } from './lucide-icons.js';
 
 /**
  * Resolves an icon name to SVG markup — either a complete `<svg>…</svg>` or just the
- * inner geometry (paths/circles), which the registry wraps in the standard Keyline
+ * inner geometry (paths/circles), which the registry wraps in the standard Weave
  * `<svg>`. Returns `undefined` if this source doesn't know the name; may be async.
  */
 export type IconSource = (name: string) => string | undefined | Promise<string | undefined>;

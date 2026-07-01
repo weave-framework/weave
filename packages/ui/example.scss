@@ -4,7 +4,7 @@
 
 @use '@weave-framework/ui' as weave;
 
-// (1) One-call theme — a partial map; Keyline defaults fill everything you omit.
+// (1) One-call theme — a partial map; Weave defaults fill everything you omit.
 @include weave.theme(
   (
     color: (

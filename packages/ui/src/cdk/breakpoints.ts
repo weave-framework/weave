@@ -3,7 +3,7 @@
  * reactive (a component re-renders when the viewport crosses a breakpoint). SSR-safe:
  * `false` when there's no `matchMedia`. Auto-unsubscribes on owner disposal.
  *
- * Keyline's canonical breakpoint is **900px** (`narrow` — README §Responsive); the
+ * Weave's canonical breakpoint is **900px** (`narrow` — README §Responsive); the
  * convenience tiers are provided for apps that want finer control.
  */
 
@@ -31,9 +31,9 @@ export function matchesBreakpoint(query: string): boolean {
   return isBrowser && typeof matchMedia === 'function' ? matchMedia(query).matches : false;
 }
 
-/** Named media queries — Keyline's `Narrow`/`Wide` (900px) plus convenience tiers. */
+/** Named media queries — Weave's `Narrow`/`Wide` (900px) plus convenience tiers. */
 export const Breakpoints = {
-  /** Keyline `narrow` state (single-column reflow). */
+  /** Weave `narrow` state (single-column reflow). */
   Narrow: '(max-width: 899px)',
   Wide: '(min-width: 900px)',
   Handset: '(max-width: 599px)',

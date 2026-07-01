@@ -1,5 +1,5 @@
-// Keyline design tokens — the default Weave theme. Source of truth: the Keyline UI
-// design handoff (hifi values). Groups: color / text / shape / motion.
+// Weave design tokens — the default theme (hifi values, our own design system).
+// Groups: color / text / shape / motion.
 //
 // `$light` is the default. `$dim` is a partial (color-only) preset — spread it into
 // theme(): `@include weave.theme(weave.$dim);` for the Dim appearance.

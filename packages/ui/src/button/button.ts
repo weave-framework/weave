@@ -1,9 +1,9 @@
 /**
- * `<Button>` — a real native `<button>` with the Keyline variants, a ripple, and a
+ * `<Button>` — a real native `<button>` with the Weave variants, a ripple, and a
  * focus-visible ring. Content is projected (`<Button>Save</Button>`), so it carries
  * any label/icon. Lean DOM: one `<button>`, no wrappers.
  *
- * Variants (REAL Keyline): default = Primary (ink fill); `outline` (inverts on hover);
+ * Variants (REAL Weave): default = Primary (ink fill); `outline` (inverts on hover);
  * `marked` (2px accent underline); `ghost` (text only); `icon` (34px square — pass an
  * `<Icon>` and a `label` for the accessible name).
  *
@@ -23,7 +23,7 @@ import { ripple, type RippleOptions } from '../ripple/ripple.js';
 export type ButtonVariant = 'primary' | 'outline' | 'marked' | 'ghost' | 'icon';
 
 export interface ButtonProps {
-  /** Keyline variant. Default `'primary'` (no modifier class). */
+  /** Weave variant. Default `'primary'` (no modifier class). */
   variant?: ButtonVariant;
   /** Native button type. Default `'button'` (so it never submits by accident). */
   type?: 'button' | 'submit' | 'reset';
