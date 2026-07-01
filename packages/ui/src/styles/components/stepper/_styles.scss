@@ -18,6 +18,7 @@
     display: inline-flex;
     align-items: center;
     gap: var(--weave-stepper-gap);
+    min-width: 0; // allow the step to shrink so the header never overflows its box
     padding: 4px 2px;
     border: 0;
     background: transparent;
@@ -26,6 +27,14 @@
     font-size: var(--weave-stepper-label-size);
     font-weight: var(--weave-stepper-label-weight);
     cursor: pointer;
+  }
+
+  // The label shrinks + ellipsizes rather than pushing the header past its width.
+  .weave-stepper__label {
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
   }
 
   .weave-stepper__step[aria-disabled='true'] {

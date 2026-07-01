@@ -439,6 +439,7 @@ check('all-styles emits .weave-stepper circular indicator', /\.weave-stepper__in
 check('stepper paints states via [data-state]: active/done accent fill, upcoming bordered', /\.weave-stepper__step\[data-state=active\]\s+\.weave-stepper__indicator\s*{[^}]*background:\s*var\(--weave-stepper-active-background\)/.test(cssStyles) && /\.weave-stepper__step\[data-state=upcoming\]\s+\.weave-stepper__indicator\s*{[^}]*border:\s*var\(--weave-stepper-border-width\)/.test(cssStyles));
 check('stepper done step shows a pure-CSS ✓ (rotated-L) + hides the number', /\.weave-stepper__step\[data-state=done\]\s+\.weave-stepper__number\s*{[^}]*display:\s*none/.test(cssStyles) && /\.weave-stepper__step\[data-state=done\]\s+\.weave-stepper__indicator::after\s*{[\s\S]*?transform:\s*rotate\(45deg\)/.test(cssStyles));
 check('stepper connector goes accent once its step is done', /\.weave-stepper__connector\[data-state=done\]\s*{[^}]*background:\s*var\(--weave-stepper-connector-done\)/.test(cssStyles));
+check('stepper label truncates so the header never overflows its box', /\.weave-stepper__label\s*{[\s\S]*?min-width:\s*0[\s\S]*?text-overflow:\s*ellipsis/.test(cssStyles) && /\.weave-stepper__step\s*{[\s\S]*?min-width:\s*0/.test(cssStyles));
 
 /* ── example.scss: the docs-seed dev surface compiles end-to-end ── */
 let exampleOk = false;
