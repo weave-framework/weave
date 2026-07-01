@@ -1,0 +1,98 @@
+@use 'sass:map';
+@use 'sass:list';
+@use 'sass-utils';
+@use 'token-utils';
+@use 'theme/defaults';
+
+// Built-in component register. Each entry: name → its grouped token schema.
+// New built-in components add themselves here (this is the "walk all republics" list).
+@use '../divider/divider' as divider;
+
+$_builtins: (
+  'divider': divider.$tokens,
+);
+
+/* ───────────────────────── internal emit ───────────────────────── */
+
+// Emit global theme vars (--weave-<group>-<key>). $groups null = all groups.
+@mixin _globals($theme, $groups) {
+  @each $group, $tokens in $theme {
+    @if $groups == null or list.index($groups, $group) {
+      @each $key, $value in $tokens {
+        --weave-#{$group}-#{$key}: #{$value};
+      }
+    }
+  }
+}
+
+// Emit every built-in component's vars. $categories null = all categories.
+@mixin _components($categories) {
+  @each $name, $grouped in $_builtins {
+    @include token-utils.create-token-values($name, token-utils.flatten($grouped, $categories));
+  }
+}
+
+/* ───────────────────────── public API ───────────────────────── */
+
+// One call: set the whole theme. $overrides is a partial map merged over Keyline
+// defaults (pass only what you change). Emits all global vars + all component vars.
+@mixin theme($overrides: ()) {
+  $t: map.deep-merge(defaults.$light, $overrides);
+  @include sass-utils.current-selector-or-root() {
+    @include _globals($t, null);
+    @include _components(null);
+  }
+}
+
+// Partial recompile — only that concern's vars (global group + matching component category).
+@mixin colors($overrides: ()) {
+  $t: map.deep-merge(defaults.$light, $overrides);
+  @include sass-utils.current-selector-or-root() {
+    @include _globals($t, ('color'));
+    @include _components(('color'));
+  }
+}
+
+@mixin sizes($overrides: ()) {
+  $t: map.deep-merge(defaults.$light, $overrides);
+  @include sass-utils.current-selector-or-root() {
+    @include _globals($t, ('shape'));
+    @include _components(('size'));
+  }
+}
+
+@mixin typography($overrides: ()) {
+  $t: map.deep-merge(defaults.$light, $overrides);
+  @include sass-utils.current-selector-or-root() {
+    @include _globals($t, ('text'));
+    @include _components(('typography'));
+  }
+}
+
+// Register a component (built-in OR a dev's custom one) → emit its --weave-<name>-* vars.
+// $grouped is a grouped schema; values use ref('group.key') for theme refs, or literals.
+@mixin define($name, $grouped) {
+  @include sass-utils.current-selector-or-root() {
+    @include token-utils.create-token-values($name, token-utils.flatten($grouped, null));
+  }
+}
+
+// Override existing tokens + add new ones (one map). At root → global; in a selector → scoped.
+@mixin overrides($name, $map) {
+  @include sass-utils.current-selector-or-root() {
+    @each $key, $value in $map {
+      --weave-#{$name}-#{$key}: #{$value};
+    }
+  }
+}
+
+// Named per-component override (discoverable, Material-style). Built-ins get one each.
+@mixin divider-overrides($map) {
+  @include overrides('divider', $map);
+}
+
+// Emit the structural CSS (class rules) for every built-in component.
+// Prefer per-component includes to keep CSS small; all-styles() is the convenience.
+@mixin all-styles() {
+  @include divider.styles();
+}

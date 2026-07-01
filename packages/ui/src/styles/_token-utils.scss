@@ -1,0 +1,24 @@
+@use 'sass:map';
+@use 'sass:list';
+
+// Emit `--weave-<prefix>-<name>: <value>;` for every entry in a FLAT token map.
+@mixin create-token-values($prefix, $tokens) {
+  @each $name, $value in $tokens {
+    --weave-#{$prefix}-#{$name}: #{$value};
+  }
+}
+
+// Flatten a component's grouped schema — (color: (...), size: (...)) — into a flat
+// (name: value) map. If $categories is a list, keep only those groups (for partial
+// recompile, e.g. colors() → just the 'color' group).
+@function flatten($grouped, $categories: null) {
+  $out: ();
+  @each $category, $tokens in $grouped {
+    @if $categories == null or list.index($categories, $category) {
+      @each $name, $value in $tokens {
+        $out: map.set($out, $name, $value);
+      }
+    }
+  }
+  @return $out;
+}

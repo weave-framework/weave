@@ -1,0 +1,40 @@
+// Reusable style fragments for building your own component base ("bring-your-own-skin").
+// Reach for these instead of re-authoring primitives.
+
+@mixin focus-ring($color: var(--weave-color-accent), $width: 2px, $offset: 1px) {
+  outline: $width solid #{$color};
+  outline-offset: $offset;
+}
+
+// Host for a Ripple: the ripple circle is absolutely positioned and must be clipped.
+@mixin ripple-host() {
+  position: relative;
+  overflow: hidden;
+}
+
+@mixin truncate() {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+@mixin visually-hidden() {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+// Strip native form-control chrome so a wrapper can carry the visual.
+@mixin field-reset() {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  font: inherit;
+  color: inherit;
+}

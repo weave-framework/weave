@@ -1,0 +1,14 @@
+// Emit @content under the current selector if there is one, else under :root.
+//
+// This is what makes overrides scope: include a token mixin at the top level and
+// the vars land on :root (global); include it inside a selector and they land on
+// that selector only (scoped override / per-instance).
+@mixin current-selector-or-root() {
+  @if & {
+    @content;
+  } @else {
+    :root {
+      @content;
+    }
+  }
+}

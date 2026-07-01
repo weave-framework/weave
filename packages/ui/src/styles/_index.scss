@@ -1,0 +1,12 @@
+// Public SCSS entry: `@use '@weave-framework/ui' as weave;`
+//
+//   @include weave.theme(( color: (accent: #2f9e8f) ));  // set theme (partial override)
+//   @include weave.all-styles();                         // structural CSS for built-ins
+//   @include weave.divider-overrides(( thickness: 2px )); // tweak one component
+//   @include weave.define('rating', ( ... ));            // your own component
+//   .btn { @include weave.focus-ring; }                  // reusable helpers
+//   color: weave.ref('color.ink');                       // reference a theme var
+
+@forward 'api';
+@forward 'ref';
+@forward 'helpers';

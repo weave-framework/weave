@@ -1,0 +1,52 @@
+{
+  "name": "@weave-framework/ui",
+  "version": "0.2.0",
+  "description": "Weave UI — signal-native component library (Material+CDK equivalent) with the Keyline design system. Ships SCSS; zero third-party runtime deps.",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "sass": "./src/styles/_index.scss",
+      "types": "./src/index.ts",
+      "import": "./src/index.ts"
+    },
+    "./divider": {
+      "sass": "./src/divider/_divider.scss"
+    }
+  },
+  "files": [
+    "dist",
+    "src/**/*.scss"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/weave-framework/weave.git",
+    "directory": "packages/ui"
+  },
+  "publishConfig": {
+    "access": "public",
+    "main": "./dist/index.js",
+    "module": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+      ".": {
+        "sass": "./src/styles/_index.scss",
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js"
+      },
+      "./divider": {
+        "sass": "./src/divider/_divider.scss"
+      }
+    }
+  },
+  "dependencies": {
+    "@weave-framework/runtime": "workspace:*"
+  },
+  "license": "MIT"
+}

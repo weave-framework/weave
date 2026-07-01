@@ -1,0 +1,50 @@
+// Keyline design tokens — the default Weave theme. Source of truth: the Keyline UI
+// design handoff (hifi values). Groups: color / text / shape / motion.
+//
+// `$light` is the default. `$dim` is a partial (color-only) preset — spread it into
+// theme(): `@include weave.theme(weave.$dim);` for the Dim appearance.
+
+$light: (
+  color: (
+    canvas: #f4f5f7,
+    surface: #ffffff,
+    ink: #17181c,
+    sub: #71727a,
+    line: rgba(20, 22, 28, 0.16),
+    field: #ecedf0,
+    accent: #4c6286,
+    // semantic status
+    paid: #3e8e5a,
+    error: #c2403a,
+    neutral: #9a9ca3,
+  ),
+  text: (
+    base: 13px,
+    label: 10px,
+    display: 34px,
+  ),
+  shape: (
+    radius: 4px,
+  ),
+  motion: (
+    fast: 0.15s,
+    sheet: 0.26s,
+    ripple: 0.55s,
+  ),
+);
+
+// Dim appearance — color overrides only (text/shape/motion inherit from $light).
+$dim: (
+  color: (
+    canvas: #161719,
+    surface: #1e1f22,
+    ink: #ececee,
+    sub: #9a9ca3,
+    line: rgba(255, 255, 255, 0.14),
+    field: #2a2b2f,
+    accent: #4c6286,
+    paid: #3e8e5a,
+    error: #c2403a,
+    neutral: #9a9ca3,
+  ),
+);

@@ -1,0 +1,20 @@
+@use 'sass:string';
+
+// Internal: replace every occurrence of $search in $str with $replace.
+@function _replace($str, $search, $replace) {
+  $index: string.index($str, $search);
+  @if $index {
+    @return string.slice($str, 1, $index - 1) + $replace +
+      _replace(string.slice($str, $index + string.length($search)), $search, $replace);
+  }
+  @return $str;
+}
+
+// ref('color.ink') → var(--weave-color-ink)
+//
+// A component token whose value is a *theme reference* uses ref() so it points at
+// a global theme var — changing the theme cascades to every component. Literal
+// values (18px, 1px, etc.) are written as-is.
+@function ref($path) {
+  @return var(--weave-#{_replace($path, '.', '-')});
+}

@@ -1,0 +1,31 @@
+// Divider — a hairline rule. Keyline: 1px var(--line) horizontal; 1px×16px vertical.
+// Pure CSS (no behavior). Two-layer anatomy: token schema ($tokens) + styles() rules.
+
+@use '../styles/ref' as ref;
+
+$tokens: (
+  color: (
+    line: ref.ref('color.line'),
+  ),
+  size: (
+    thickness: 1px,
+    height: 16px, // vertical divider length
+  ),
+);
+
+@mixin styles() {
+  .weave-divider {
+    border: 0;
+    border-top: var(--weave-divider-thickness) solid var(--weave-divider-line);
+    margin: 0;
+    align-self: stretch;
+  }
+
+  .weave-divider--vertical {
+    border-top: 0;
+    border-left: var(--weave-divider-thickness) solid var(--weave-divider-line);
+    width: 0;
+    height: var(--weave-divider-height);
+    align-self: center;
+  }
+}
