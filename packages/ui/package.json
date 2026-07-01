@@ -14,20 +14,20 @@
       "import": "./src/index.ts"
     },
     "./divider": {
-      "sass": "./src/divider/_divider.scss"
+      "sass": "./src/styles/components/_divider.scss"
     },
     "./ripple": {
-      "sass": "./src/ripple/_ripple.scss",
+      "sass": "./src/styles/components/_ripple.scss",
       "types": "./src/ripple/ripple.ts",
       "import": "./src/ripple/ripple.ts"
     },
     "./icon": {
-      "sass": "./src/icon/_icon.scss",
+      "sass": "./src/styles/components/_icon.scss",
       "types": "./src/icon/icon.ts",
       "import": "./src/icon/icon.ts"
     },
     "./button": {
-      "sass": "./src/button/_button.scss",
+      "sass": "./src/styles/components/_button.scss",
       "types": "./src/button/button.ts",
       "import": "./src/button/button.ts"
     },
@@ -60,20 +60,20 @@
         "import": "./dist/index.js"
       },
       "./divider": {
-        "sass": "./src/divider/_divider.scss"
+        "sass": "./src/styles/components/_divider.scss"
       },
       "./ripple": {
-        "sass": "./src/ripple/_ripple.scss",
+        "sass": "./src/styles/components/_ripple.scss",
         "types": "./dist/ripple/ripple.d.ts",
         "import": "./dist/ripple/ripple.js"
       },
       "./icon": {
-        "sass": "./src/icon/_icon.scss",
+        "sass": "./src/styles/components/_icon.scss",
         "types": "./dist/icon/icon.d.ts",
         "import": "./dist/icon/icon.js"
       },
       "./button": {
-        "sass": "./src/button/_button.scss",
+        "sass": "./src/styles/components/_button.scss",
         "types": "./dist/button/button.d.ts",
         "import": "./dist/button/button.js"
       },

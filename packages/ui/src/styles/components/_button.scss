@@ -5,8 +5,8 @@
 // --outline (1px ink border, inverts on hover); --marked (text + inset -2px accent);
 // --ghost (text, sub→ink on hover); --icon (34px square). Disabled via [disabled].
 
-@use '../styles/ref' as ref;
-@use '../styles/helpers' as helpers;
+@use '../ref' as ref;
+@use '../helpers' as helpers;
 
 $tokens: (
   color: (

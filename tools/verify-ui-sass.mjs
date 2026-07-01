@@ -22,8 +22,9 @@ const importer = {
       return pathToFileURL(join(uiSrc, 'styles', '_index.scss'));
     }
     if (url.startsWith('@weave-framework/ui/')) {
+      // Component SCSS all lives under styles/components/ (behavior .ts stays per-folder).
       const sub = url.slice('@weave-framework/ui/'.length);
-      return pathToFileURL(join(uiSrc, sub, `_${sub}.scss`));
+      return pathToFileURL(join(uiSrc, 'styles', 'components', `_${sub}.scss`));
     }
     return null;
   },

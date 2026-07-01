@@ -6,10 +6,10 @@
 
 // Built-in component register. Each entry: name → its grouped token schema.
 // New built-in components add themselves here (this is the "walk all republics" list).
-@use '../divider/divider' as divider;
-@use '../ripple/ripple' as ripple;
-@use '../icon/icon' as icon;
-@use '../button/button' as button;
+@use 'components/divider' as divider;
+@use 'components/ripple' as ripple;
+@use 'components/icon' as icon;
+@use 'components/button' as button;
 
 $_builtins: (
   'divider': divider.$tokens,

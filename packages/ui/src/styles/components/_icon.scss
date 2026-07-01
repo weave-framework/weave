@@ -1,7 +1,7 @@
 // Icon — inline SVG at Weave scale (18px, 1.4 hairline stroke, currentColor).
 // Behavior lives in icon.ts; this is the token schema + the class contract.
 
-@use '../styles/ref' as ref;
+@use '../ref' as ref;
 
 $tokens: (
   size: (

@@ -1,7 +1,7 @@
 // Ripple — the click-feedback circle. Behavior lives in ripple.ts (a `use:` action);
 // this is the visual (tokens + the injected `.weave-ripple` element + keyframes).
 
-@use '../styles/ref' as ref;
+@use '../ref' as ref;
 
 $tokens: (
   color: (
