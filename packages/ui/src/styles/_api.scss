@@ -32,6 +32,7 @@
 @use 'components/bottom-sheet' as bottom-sheet;
 @use 'components/snackbar' as snackbar;
 @use 'components/select' as select;
+@use 'components/autocomplete' as autocomplete;
 
 $_builtins: (
   'divider': divider.$tokens,
@@ -59,6 +60,7 @@ $_builtins: (
   'bottom-sheet': bottom-sheet.$tokens,
   'snackbar': snackbar.$tokens,
   'select': select.$tokens,
+  'autocomplete': autocomplete.$tokens,
 );
 
 /* ───────────────────────── internal emit ───────────────────────── */
@@ -236,6 +238,10 @@ $_builtins: (
   @include overrides('select', $map);
 }
 
+@mixin autocomplete-overrides($map) {
+  @include overrides('autocomplete', $map);
+}
+
 // Emit the structural CSS (class rules) for every built-in component.
 // Prefer per-component includes to keep CSS small; all-styles() is the convenience.
 @mixin all-styles() {
@@ -264,4 +270,5 @@ $_builtins: (
   @include bottom-sheet.styles();
   @include snackbar.styles();
   @include select.styles();
+  @include autocomplete.styles();
 }

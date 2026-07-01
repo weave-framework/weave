@@ -1,0 +1,10 @@
+// Autocomplete — a text field with a suggestion listbox. Behavior lives in autocomplete.ts
+// (a Weave component: native input + CDK-overlay suggestion panel, static or async options
+// with field-mapping accessors + subtext, aria-autocomplete=list + activedescendant, forms
+// binding); this is the visual: an underline text field (like Input, with prefix/suffix/
+// clear) + a suggestion panel of option rows (label + optional lighter description) with an
+// active-highlight, plus an empty-results row.
+//
+// Barrel — forwards the split partials ($tokens + the styles() mixin).
+@forward 'tokens';
+@forward 'styles';
