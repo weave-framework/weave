@@ -17,3 +17,5 @@ export * from './scroll.js';
 export * from './interactivity.js';
 export * from './focus-trap.js';
 export * from './focus-monitor.js';
+export * from './live-announcer.js';
+export * from './key-manager.js';
