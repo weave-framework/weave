@@ -1,0 +1,76 @@
+// tabs — styles() mixin (class rules). Forwarded by ./_index.scss.
+@use '../../helpers' as helpers;
+
+@mixin styles() {
+  .weave-tabs {
+    display: flex;
+    flex-direction: column;
+
+    @content;
+  }
+
+  // The tab row sits over a 1px rule (design).
+  .weave-tabs__list {
+    display: flex;
+    border-bottom: 1px solid var(--weave-tabs-line);
+  }
+
+  .weave-tabs__tab {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--weave-tabs-gap);
+    padding: var(--weave-tabs-tab-padding-y) var(--weave-tabs-tab-padding-x);
+    border: 0;
+    background: transparent;
+    color: var(--weave-tabs-text);
+    font-family: inherit;
+    font-size: var(--weave-tabs-tab-size);
+    font-weight: var(--weave-tabs-tab-weight);
+    cursor: pointer;
+    transition: color var(--weave-tabs-duration) ease;
+  }
+
+  // The 5px accent square before the label — space is always reserved (transparent when
+  // inactive) so activating a tab never shifts its label. State via the ARIA attr.
+  .weave-tabs__tab::before {
+    content: '';
+    flex: none;
+    width: var(--weave-tabs-marker-size);
+    height: var(--weave-tabs-marker-size);
+    background: transparent;
+  }
+
+  .weave-tabs__tab[aria-selected='true'] {
+    color: var(--weave-tabs-text-active);
+  }
+
+  .weave-tabs__tab[aria-selected='true']::before {
+    background: var(--weave-tabs-marker);
+  }
+
+  // Subtle hover — ink the label (enabled tabs only).
+  .weave-tabs__tab:not([aria-disabled='true']):hover {
+    color: var(--weave-tabs-text-active);
+  }
+
+  .weave-tabs__tab[aria-disabled='true'] {
+    color: var(--weave-tabs-disabled-text);
+    cursor: not-allowed;
+  }
+
+  .weave-tabs__tab:focus-visible {
+    @include helpers.focus-ring;
+    outline-offset: -2px; // ring sits inside the tab
+  }
+
+  .weave-tabs__panel {
+    padding: var(--weave-tabs-panel-padding-y) 0;
+    color: var(--weave-tabs-panel-text);
+    font-size: var(--weave-tabs-panel-size);
+  }
+
+  .weave-tabs__panel:focus-visible {
+    @include helpers.focus-ring;
+    outline-offset: -2px;
+  }
+}

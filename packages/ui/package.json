@@ -148,6 +148,11 @@
       "types": "./src/expansion/expansion.ts",
       "import": "./src/expansion/expansion.ts"
     },
+    "./tabs": {
+      "sass": "./src/styles/components/tabs/_index.scss",
+      "types": "./src/tabs/tabs.ts",
+      "import": "./src/tabs/tabs.ts"
+    },
     "./cdk": {
       "types": "./src/cdk/index.ts",
       "import": "./src/cdk/index.ts"
@@ -310,6 +315,11 @@
         "sass": "./src/styles/components/expansion/_index.scss",
         "types": "./dist/expansion/expansion.d.ts",
         "import": "./dist/expansion/expansion.js"
+      },
+      "./tabs": {
+        "sass": "./src/styles/components/tabs/_index.scss",
+        "types": "./dist/tabs/tabs.d.ts",
+        "import": "./dist/tabs/tabs.js"
       },
       "./cdk": {
         "types": "./dist/cdk/index.d.ts",

@@ -1,0 +1,13 @@
+// Tabs — a tablist with one visible panel. Behavior lives in tabs.ts (active-index
+// selection + roving tabindex via the CDK listKeyManager; panel contents appended on
+// mount); this is the visual.
+//
+// A row of role=tab buttons over a 1px rule; the active tab inks and shows a 5px accent
+// square before its label (the Weave mark — no sliding underline). State rides the NATIVE
+// ARIA attr, not a class: [aria-selected=true] inks the tab + paints the ::before square.
+//
+// Barrel — forwards the split partials ($tokens + the styles() mixin). Add another
+// concern as its own file and @forward it here.
+
+@forward 'tokens';
+@forward 'styles';

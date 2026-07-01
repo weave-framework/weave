@@ -1,0 +1,28 @@
+// tabs — design tokens (schema). Forwarded by ./_index.scss.
+@use '../../ref' as ref;
+
+$tokens: (
+  color: (
+    // Inactive tabs are sub; the active tab inks + gets an accent square mark
+    // (design: "active = ink + 5px accent square before label; no sliding underline").
+    text: ref.ref('color.sub'),
+    text-active: ref.ref('color.ink'),
+    marker: ref.ref('color.accent'),
+    line: ref.ref('color.line'),
+    disabled-text: ref.ref('color.sub'),
+    panel-text: ref.ref('color.ink'),
+  ),
+  size: (
+    tab-padding-x: 14px,
+    tab-padding-y: 10px,
+    marker-size: 5px,
+    gap: 7px,
+    panel-padding-y: 14px,
+    duration: ref.ref('motion.fast'),
+  ),
+  typography: (
+    tab-size: 13px,
+    tab-weight: 500,
+    panel-size: 13px,
+  ),
+);

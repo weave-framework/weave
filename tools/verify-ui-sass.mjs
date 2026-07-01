@@ -340,6 +340,16 @@ const cssExpansionOverride = compile(
 check('expansion-overrides changes existing token', /--weave-expansion-header-height:\s*52px/.test(cssExpansionOverride));
 check('expansion-overrides adds new token (auto-var)', /--weave-expansion-gap:\s*8px/.test(cssExpansionOverride));
 
+/* ── tabs built-in: cascade refs + literals + overrides (U4) ── */
+check('theme emits tabs active text referencing ink', /--weave-tabs-text-active:\s*var\(--weave-color-ink\)/.test(cssTheme));
+check('theme emits tabs marker referencing accent', /--weave-tabs-marker:\s*var\(--weave-color-accent\)/.test(cssTheme));
+check('theme emits tabs marker-size literal (5px)', /--weave-tabs-marker-size:\s*5px/.test(cssTheme));
+const cssTabsOverride = compile(
+  `@use '@weave-framework/ui' as weave;\n@include weave.tabs-overrides((marker-size: 6px, radius: 3px));`,
+);
+check('tabs-overrides changes existing token', /--weave-tabs-marker-size:\s*6px/.test(cssTabsOverride));
+check('tabs-overrides adds new token (auto-var)', /--weave-tabs-radius:\s*3px/.test(cssTabsOverride));
+
 /* ── all-styles(): structural CSS by class ── */
 const cssStyles = compile(`@use '@weave-framework/ui' as weave;\n@include weave.all-styles();`);
 check('all-styles emits .weave-divider rule', /\.weave-divider\s*{/.test(cssStyles));
@@ -412,6 +422,9 @@ check('all-styles emits .weave-expansion accordion (1px border + header)', /\.we
 check('expansion tints the open header via [aria-expanded] (no state class)', /\.weave-expansion__header\[aria-expanded=true\]\s*{[^}]*background:\s*var\(--weave-expansion-header-open-background\)/.test(cssStyles));
 check('expansion marker flips +→− off aria-expanded', /\.weave-expansion__marker::after\s*{[^}]*content:\s*["']\+["']/.test(cssStyles) && /\.weave-expansion__header\[aria-expanded=true\]\s+\.weave-expansion__marker::after\s*{/.test(cssStyles));
 check('expansion region reveals via grid-template-rows 0fr→1fr', /\.weave-expansion__region\s*{[\s\S]*?grid-template-rows:\s*0fr/.test(cssStyles) && /\.weave-expansion__region\[data-open=true\]\s*{[^}]*grid-template-rows:\s*1fr/.test(cssStyles));
+check('all-styles emits .weave-tabs list over a 1px rule', /\.weave-tabs__list\s*{[\s\S]*?border-bottom:\s*1px solid var\(--weave-tabs-line\)/.test(cssStyles));
+check('tabs active tab inks + paints the accent square (no sliding underline)', /\.weave-tabs__tab\[aria-selected=true\]\s*{[^}]*color:\s*var\(--weave-tabs-text-active\)/.test(cssStyles) && /\.weave-tabs__tab\[aria-selected=true\]::before\s*{[^}]*background:\s*var\(--weave-tabs-marker\)/.test(cssStyles));
+check('tabs reserves the marker square space on every tab (::before)', /\.weave-tabs__tab::before\s*{[\s\S]*?width:\s*var\(--weave-tabs-marker-size\)[\s\S]*?background:\s*transparent/.test(cssStyles));
 
 /* ── example.scss: the docs-seed dev surface compiles end-to-end ── */
 let exampleOk = false;
