@@ -1,0 +1,25 @@
+// overlay — styles() mixin. The CDK stamps `weave-overlay-backdrop` on every backdrop
+// element (createOverlay), so styling that class here dims all modal backdrops centrally;
+// menus/selects pass the --transparent modifier for an invisible click-catcher. The panel
+// chrome is the reusable helpers.overlay-panel mixin, exposed as .weave-overlay-panel for
+// components that opt in (and for bring-your-own-skin). Forwarded by ./_index.scss.
+@use '../../helpers' as helpers;
+
+@mixin styles() {
+  // Dimming scrim behind modal panels (dialog / bottom-sheet).
+  .weave-overlay-backdrop {
+    background: var(--weave-overlay-backdrop);
+  }
+
+  // Invisible click-catcher for anchored panels (menu / select) — captures click-away
+  // + scroll without a visible dim.
+  .weave-overlay-backdrop--transparent {
+    background: transparent;
+  }
+
+  // Hairline panel chrome (no shadow — the Weave design separates surfaces with a 1px line
+  // + an opaque surface, never a drop shadow).
+  .weave-overlay-panel {
+    @include helpers.overlay-panel;
+  }
+}

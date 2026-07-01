@@ -101,6 +101,9 @@
       "types": "./src/chips/chips.ts",
       "import": "./src/chips/chips.ts"
     },
+    "./overlay": {
+      "sass": "./src/styles/components/overlay/_index.scss"
+    },
     "./cdk": {
       "types": "./src/cdk/index.ts",
       "import": "./src/cdk/index.ts"
@@ -216,6 +219,9 @@
         "sass": "./src/styles/components/chips/_index.scss",
         "types": "./dist/chips/chips.d.ts",
         "import": "./dist/chips/chips.js"
+      },
+      "./overlay": {
+        "sass": "./src/styles/components/overlay/_index.scss"
       },
       "./cdk": {
         "types": "./dist/cdk/index.d.ts",

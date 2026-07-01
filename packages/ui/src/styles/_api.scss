@@ -24,6 +24,8 @@
 @use 'components/form-field' as form-field;
 @use 'components/input' as input;
 @use 'components/chips' as chips;
+// Shared "core republic" (master §4.1): panel/backdrop chrome for every U3 overlay component.
+@use 'components/overlay' as overlay;
 
 $_builtins: (
   'divider': divider.$tokens,
@@ -44,6 +46,7 @@ $_builtins: (
   'form-field': form-field.$tokens,
   'input': input.$tokens,
   'chips': chips.$tokens,
+  'overlay': overlay.$tokens,
 );
 
 /* ───────────────────────── internal emit ───────────────────────── */
@@ -193,6 +196,10 @@ $_builtins: (
   @include overrides('chips', $map);
 }
 
+@mixin overlay-overrides($map) {
+  @include overrides('overlay', $map);
+}
+
 // Emit the structural CSS (class rules) for every built-in component.
 // Prefer per-component includes to keep CSS small; all-styles() is the convenience.
 @mixin all-styles() {
@@ -214,4 +221,5 @@ $_builtins: (
   @include form-field.styles();
   @include input.styles();
   @include chips.styles();
+  @include overlay.styles();
 }

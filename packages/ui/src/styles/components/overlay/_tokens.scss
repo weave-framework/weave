@@ -1,0 +1,21 @@
+// overlay — shared chrome tokens for every CDK-overlay panel (tooltip / menu / select /
+// autocomplete / dialog / bottom-sheet / snackbar). A "core republic" (master §4.1): its
+// own --weave-overlay-* vars, shared by all overlay components. Forwarded by ./_index.scss.
+@use '../../ref' as ref;
+
+$tokens: (
+  color: (
+    surface: ref.ref('color.surface'),
+    text: ref.ref('color.ink'),
+    line: ref.ref('color.line'),
+    // Modal dimming scrim — a fixed dark tone (a dim reads the same over Light or Dim
+    // content); override via overlay-overrides((backdrop: …)) to taste.
+    backdrop: rgba(20, 22, 28, 0.32),
+  ),
+  size: (
+    radius: ref.ref('shape.radius'),
+    min-width: 180px,
+    padding-y: 4px,
+    duration: ref.ref('motion.fast'),
+  ),
+);

@@ -1,0 +1,8 @@
+// Overlay — shared chrome for every CDK-overlay panel (a "core republic", master §4.1),
+// consumed by Tooltip / Menu / Select / Autocomplete / Dialog / Bottom Sheet / Snackbar.
+// No behavior (the CDK createOverlay/positioning owns that); this is only the panel +
+// backdrop visual + the --weave-overlay-* tokens shared across those components.
+//
+// Barrel — forwards the split partials ($tokens + the styles() mixin).
+@forward 'tokens';
+@forward 'styles';

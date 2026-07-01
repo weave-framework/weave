@@ -38,3 +38,15 @@
   font: inherit;
   color: inherit;
 }
+
+// Hairline overlay-panel chrome (menus, dialogs, dropdowns, tooltips): opaque surface +
+// 1px line + radius, NO drop shadow (the Weave design has none — a 1px line + an opaque
+// surface separate the panel from the page). Reuse for bring-your-own-skin panels.
+@mixin overlay-panel() {
+  box-sizing: border-box;
+  min-width: var(--weave-overlay-min-width);
+  background: var(--weave-overlay-surface);
+  color: var(--weave-overlay-text);
+  border: 1px solid var(--weave-overlay-line);
+  border-radius: var(--weave-overlay-radius);
+}

@@ -251,6 +251,18 @@ const cssChipsOverride = compile(
 check('chips-overrides changes existing token', /--weave-chips-radius:\s*4px/.test(cssChipsOverride));
 check('chips-overrides adds new token (auto-var)', /--weave-chips-elevation:\s*1px/.test(cssChipsOverride));
 
+/* ── overlay shared republic: cascade refs + literals + overrides (U3 foundation) ── */
+check('theme emits overlay surface referencing surface', /--weave-overlay-surface:\s*var\(--weave-color-surface\)/.test(cssTheme));
+check('theme emits overlay line referencing line', /--weave-overlay-line:\s*var\(--weave-color-line\)/.test(cssTheme));
+check('theme emits overlay radius referencing shape', /--weave-overlay-radius:\s*var\(--weave-shape-radius\)/.test(cssTheme));
+check('theme emits overlay backdrop scrim literal', /--weave-overlay-backdrop:\s*rgba\(20,\s*22,\s*28,\s*0\.32\)/.test(cssTheme));
+check('theme emits overlay min-width literal', /--weave-overlay-min-width:\s*180px/.test(cssTheme));
+const cssOverlayOverride = compile(
+  `@use '@weave-framework/ui' as weave;\n@include weave.overlay-overrides((radius: 6px, elevation: 2px));`,
+);
+check('overlay-overrides changes existing token', /--weave-overlay-radius:\s*6px/.test(cssOverlayOverride));
+check('overlay-overrides adds new token (auto-var)', /--weave-overlay-elevation:\s*2px/.test(cssOverlayOverride));
+
 /* ── all-styles(): structural CSS by class ── */
 const cssStyles = compile(`@use '@weave-framework/ui' as weave;\n@include weave.all-styles();`);
 check('all-styles emits .weave-divider rule', /\.weave-divider\s*{/.test(cssStyles));
@@ -300,6 +312,8 @@ check('input --invalid reddens the underline; empty prefix/suffix collapse', /\.
 check('input suppresses native number spinners + search clear', /::-webkit-inner-spin-button/.test(cssStyles) && /\[type=number\]\s*{[\s\S]*?appearance:\s*textfield/.test(cssStyles) && /::-webkit-search-cancel-button/.test(cssStyles));
 check('all-styles emits .weave-chips chip + remove rules', /\.weave-chips__chip\s*{[\s\S]*?border:\s*1px solid var\(--weave-chips-border\)/.test(cssStyles) && /\.weave-chips__remove\s*{/.test(cssStyles));
 check('chips emits the dashed --add chip', /\.weave-chips__chip--add\s*{[^}]*border-style:\s*dashed/.test(cssStyles));
+check('all-styles emits the overlay backdrop scrim + transparent click-catcher', /\.weave-overlay-backdrop\s*{[^}]*background:\s*var\(--weave-overlay-backdrop\)/.test(cssStyles) && /\.weave-overlay-backdrop--transparent\s*{[^}]*background:\s*transparent/.test(cssStyles));
+check('all-styles emits the hairline overlay panel (no shadow: 1px line + surface)', /\.weave-overlay-panel\s*{[\s\S]*?background:\s*var\(--weave-overlay-surface\)[\s\S]*?border:\s*1px solid var\(--weave-overlay-line\)/.test(cssStyles) && !/\.weave-overlay-panel\s*{[^}]*box-shadow/.test(cssStyles));
 
 /* ── example.scss: the docs-seed dev surface compiles end-to-end ── */
 let exampleOk = false;
