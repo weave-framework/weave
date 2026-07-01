@@ -53,6 +53,17 @@
     color: var(--weave-input-placeholder);
   }
 
+  /* Neutralise the browser autofill tint (blue/yellow box) so the field stays a
+     transparent underline. The 100000s transition defers the autofill background
+     indefinitely; text/caret keep the field colour. */
+  .weave-input__field:-webkit-autofill,
+  .weave-input__field:-webkit-autofill:hover,
+  .weave-input__field:-webkit-autofill:focus {
+    transition: background-color 100000s ease-in-out 0s;
+    -webkit-text-fill-color: var(--weave-input-text);
+    caret-color: var(--weave-input-text);
+  }
+
   /* Suppress native adornments Weave replaces or omits: the `type=search` clear (we
      ship our own `__clear`) and the `type=number` spinner buttons. */
   .weave-input__field::-webkit-search-cancel-button,
