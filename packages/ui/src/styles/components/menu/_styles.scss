@@ -30,7 +30,8 @@
   }
 
   // Hover AND the roving-focused row share the tint (focus is moved programmatically).
-  .weave-menu__item:hover,
+  // Disabled rows never tint — exclude them from :hover (they can't be focused anyway).
+  .weave-menu__item:not(:disabled):hover,
   .weave-menu__item:focus {
     background: var(--weave-menu-item-hover);
     outline: none;

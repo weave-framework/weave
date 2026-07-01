@@ -336,7 +336,7 @@ check('all-styles emits the overlay backdrop scrim + transparent click-catcher',
 check('all-styles emits the hairline overlay panel (no shadow: 1px line + surface)', /\.weave-overlay-panel\s*{[\s\S]*?background:\s*var\(--weave-overlay-surface\)[\s\S]*?border:\s*1px solid var\(--weave-overlay-line\)/.test(cssStyles) && !/\.weave-overlay-panel\s*{[^}]*box-shadow/.test(cssStyles));
 check('all-styles emits .weave-tooltip bubble (non-interactive + fade-in keyframes)', /\.weave-tooltip\s*{[\s\S]*?pointer-events:\s*none[\s\S]*?background:\s*var\(--weave-tooltip-background\)/.test(cssStyles) && /@keyframes\s+weave-tooltip-in/.test(cssStyles));
 check('all-styles emits .weave-menu panel (overlay-panel chrome) + __item + __divider', /\.weave-menu\s*{[\s\S]*?background:\s*var\(--weave-overlay-surface\)[\s\S]*?border:\s*1px solid var\(--weave-overlay-line\)/.test(cssStyles) && /\.weave-menu__item\s*{/.test(cssStyles) && /\.weave-menu__divider\s*{/.test(cssStyles));
-check('menu item hover/focus tint comes from native pseudos (no state class)', /\.weave-menu__item:hover,\s*\.weave-menu__item:focus\s*{[^}]*background:\s*var\(--weave-menu-item-hover\)/.test(cssStyles));
+check('menu item hover/focus tint comes from native pseudos, excluding disabled', /\.weave-menu__item:not\(:disabled\):hover,\s*\.weave-menu__item:focus\s*{[^}]*background:\s*var\(--weave-menu-item-hover\)/.test(cssStyles));
 
 /* ── example.scss: the docs-seed dev surface compiles end-to-end ── */
 let exampleOk = false;

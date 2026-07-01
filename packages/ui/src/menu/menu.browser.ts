@@ -33,6 +33,11 @@ const items = (): HTMLButtonElement[] =>
 const key = (el: EventTarget, k: string): void => {
   el.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true }));
 };
+// Open by keyboard (↓ on the trigger) — highlights the first item.
+const openByKeyboard = (trigger: HTMLElement): void => {
+  trigger.focus();
+  key(trigger, 'ArrowDown');
+};
 
 function teardown(trigger: HTMLElement, cleanup: () => void): void {
   cleanup();
@@ -65,10 +70,10 @@ test('menu: role=menu panel renders one menuitem per non-divider item + a separa
   teardown(trigger, cleanup);
 });
 
-test('menu: opening focuses the first item; menuitems are roving (tabindex -1)', () => {
+test('menu: a pointer open highlights nothing (focus rests on the panel)', () => {
   const { trigger, cleanup } = mount();
   trigger.click();
-  assert.equal(document.activeElement, items()[0], 'first item focused on open');
+  assert.equal(document.activeElement, panel(), 'focus is on the panel, not an item');
   assert.ok(
     items().every((b) => b.tabIndex === -1),
     'all menuitems tabindex -1 (roving via focus)',
@@ -76,9 +81,24 @@ test('menu: opening focuses the first item; menuitems are roving (tabindex -1)',
   teardown(trigger, cleanup);
 });
 
-test('menu: ArrowDown/Up move roving focus and skip the disabled item', () => {
+test('menu: a keyboard open highlights the first item', () => {
+  const { trigger, cleanup } = mount();
+  openByKeyboard(trigger);
+  assert.equal(document.activeElement, items()[0], 'first item focused on keyboard open');
+  teardown(trigger, cleanup);
+});
+
+test('menu: after a pointer open, the first ArrowDown steps in to the first item', () => {
   const { trigger, cleanup } = mount();
   trigger.click();
+  key(panel() as HTMLElement, 'ArrowDown');
+  assert.equal(document.activeElement, items()[0], 'first arrow highlights the first item');
+  teardown(trigger, cleanup);
+});
+
+test('menu: ArrowDown/Up move roving focus and skip the disabled item', () => {
+  const { trigger, cleanup } = mount();
+  openByKeyboard(trigger); // first item (Edit) highlighted
   const [edit, dup, del] = items().filter((b) => !b.disabled); // enabled order: Edit, Duplicate, Delete
   const p: HTMLElement = panel() as HTMLElement;
   assert.equal(document.activeElement, edit);
@@ -93,7 +113,7 @@ test('menu: ArrowDown/Up move roving focus and skip the disabled item', () => {
 
 test('menu: Home/End jump to the first/last enabled item', () => {
   const { trigger, cleanup } = mount();
-  trigger.click();
+  openByKeyboard(trigger);
   const enabled: HTMLButtonElement[] = items().filter((b) => !b.disabled);
   const p: HTMLElement = panel() as HTMLElement;
   key(p, 'End');
@@ -105,8 +125,8 @@ test('menu: Home/End jump to the first/last enabled item', () => {
 
 test('menu: Enter on the active item selects it and closes, returning focus to the trigger', () => {
   const { trigger, selected, cleanup } = mount();
-  trigger.click();
-  key(panel() as HTMLElement, 'ArrowDown'); // → Duplicate
+  openByKeyboard(trigger); // Edit highlighted
+  key(panel() as HTMLElement, 'ArrowDown'); // -> Duplicate
   key(panel() as HTMLElement, 'Enter');
   assert.deepEqual(selected, ['dup'], 'selected the active item');
   assert.equal(panel(), null, 'closed');
@@ -125,7 +145,7 @@ test('menu: clicking a menuitem selects its value and closes', () => {
 
 test('menu: typeahead jumps to the item starting with the typed letter', () => {
   const { trigger, cleanup } = mount();
-  trigger.click();
+  openByKeyboard(trigger);
   key(panel() as HTMLElement, 'd'); // Duplicate is first enabled starting with 'd'
   assert.equal(document.activeElement, items().find((b) => b.textContent === 'Duplicate'));
   teardown(trigger, cleanup);
