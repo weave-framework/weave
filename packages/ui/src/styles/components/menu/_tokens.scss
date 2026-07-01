@@ -9,6 +9,8 @@ $tokens: (
     // Hover / roving-active row tint.
     item-hover: ref.ref('color.field'),
     item-disabled: ref.ref('color.sub'),
+    // Subtext (description) under a row's label — lighter than the label.
+    item-description: ref.ref('color.sub'),
     divider: ref.ref('color.line'),
   ),
   size: (
@@ -21,5 +23,6 @@ $tokens: (
   typography: (
     font-size: 13px,
     weight: 500,
+    description-size: 11px,
   ),
 );

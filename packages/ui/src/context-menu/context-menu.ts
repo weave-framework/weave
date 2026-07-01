@@ -17,17 +17,21 @@ import {
   type MenuHandle,
   type MenuItem,
   type MenuPosition,
+  type OptionAccessors,
 } from '../menu/menu-core.js';
 
-export type { MenuItem, MenuPosition } from '../menu/menu-core.js';
+export type { MenuItem, MenuPosition, OptionAccessors } from '../menu/menu-core.js';
 
 // Pointer-anchored fallback order (down-right first, then the other quadrants).
 const POINTER_POSITIONS: MenuPosition[] = ['bottom-start', 'top-start', 'bottom-end', 'top-end'];
 
-export interface ContextMenuOptions {
-  items: MenuItem[];
-  /** Called with the chosen item's `value` (the menu then closes). */
-  onSelect: (value: string) => void;
+export interface ContextMenuOptions<T = MenuItem> extends OptionAccessors<T> {
+  /** The options — default shape, plain strings, or arbitrary objects (via `option*` accessors). */
+  items: T[];
+  /** Called with the chosen option (value string, or the whole object — see `emit`). */
+  onSelect: (selected: string | T) => void;
+  /** Is this option a hairline separator? Default: `item.divider`. */
+  isDivider?: (item: T) => boolean;
   /**
    * Where the panel is anchored. **Omitted (default): at the pointer** (native right-click
    * feel). **Set to a position** (`'bottom-start'`, `'top-end'`, `'bottom'`, … or an explicit
@@ -38,18 +42,24 @@ export interface ContextMenuOptions {
 }
 
 /** Weave `use:` action: `(host, options) => cleanup`. */
-export function contextMenu(host: HTMLElement, options: ContextMenuOptions): () => void {
+export function contextMenu<T = MenuItem>(host: HTMLElement, options: ContextMenuOptions<T>): () => void {
   let handle: MenuHandle | null = null;
 
   // Anchor to the host at `position` when set; otherwise to the given pointer point.
   function doOpen(focusFirst: boolean, pointer: { x: number; y: number } | null): void {
     handle?.close(false); // replace any open instance
     const objectAnchored: boolean = options.position != null || pointer == null;
-    handle = openMenuPanel({
+    handle = openMenuPanel<T>({
       origin: objectAnchored ? host : virtualOrigin(pointer!.x, pointer!.y),
       items: options.items,
       positions: objectAnchored ? buildPositions(options.position, 'bottom-start') : POINTER_POSITIONS,
       focusFirst,
+      isDivider: options.isDivider,
+      optionValue: options.optionValue,
+      optionLabel: options.optionLabel,
+      optionDescription: options.optionDescription,
+      optionDisabled: options.optionDisabled,
+      emit: options.emit,
       onSelect: options.onSelect,
       onClose: (returnFocus: boolean): void => {
         handle = null;

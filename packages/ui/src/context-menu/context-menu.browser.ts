@@ -8,13 +8,13 @@ const ITEMS: MenuItem[] = [
   { value: 'del', label: 'Delete' },
 ];
 
-function mount(): { host: HTMLDivElement; selected: string[]; cleanup: () => void } {
+function mount(): { host: HTMLDivElement; selected: Array<string | MenuItem>; cleanup: () => void } {
   const host: HTMLDivElement = document.createElement('div');
   host.tabIndex = 0; // focusable so focus-return is observable
   host.textContent = 'right-click me';
   document.body.appendChild(host);
-  const selected: string[] = [];
-  const cleanup: () => void = contextMenu(host, { items: ITEMS, onSelect: (v: string) => selected.push(v) });
+  const selected: Array<string | MenuItem> = [];
+  const cleanup: () => void = contextMenu(host, { items: ITEMS, onSelect: (v) => selected.push(v) });
   return { host, selected, cleanup };
 }
 

@@ -16,6 +16,15 @@ import {
   type PositionName,
   type PositionOrigin,
 } from '../cdk/index.js';
+import {
+  optLabel,
+  optDescription,
+  optDisabled,
+  emitSelection,
+  type OptionAccessors,
+} from '../shared/options.js';
+
+export type { OptionAccessors } from '../shared/options.js';
 
 /**
  * Where a panel sits relative to its object. Either a named preset (RTL-aware
@@ -53,21 +62,27 @@ export function buildPositions(position: MenuPosition | undefined, fallback: Pos
   return [position];
 }
 
+/**
+ * The default authored menu-item shape. Menus can also be driven by arbitrary objects `T`
+ * via {@link OptionAccessors} — then `value`/`label`/… are read through the accessors.
+ */
 export interface MenuItem {
-  /** Value passed to `onSelect`. */
+  /** Value emitted on select (default `emit`). */
   value: string;
   /** Visible label (also the typeahead text). */
   label: string;
+  /** Optional subtext under the label (smaller, lighter). */
+  description?: string;
   /** Greyed + skipped by keyboard nav; not selectable. */
   disabled?: boolean;
-  /** Render a hairline separator here instead of an item (value/label ignored). */
+  /** Render a hairline separator here instead of an item. */
   divider?: boolean;
 }
 
-export interface OpenMenuConfig {
+export interface OpenMenuConfig<T> extends OptionAccessors<T> {
   /** What the panel is anchored to — a trigger element, or a virtual point. */
   origin: PositionOrigin;
-  items: MenuItem[];
+  items: T[];
   /** Preferred positions in flip order (see {@link buildPositions}). */
   positions: MenuPosition[];
   /**
@@ -76,8 +91,10 @@ export interface OpenMenuConfig {
    * (matches native/Material menus), focus rests on the panel and the first arrow moves in.
    */
   focusFirst: boolean;
-  /** Called with the chosen item's `value` (the panel is already closing). */
-  onSelect: (value: string) => void;
+  /** Is this option a hairline separator (not selectable)? Default: `item.divider`. */
+  isDivider?: (item: T) => boolean;
+  /** Called with the chosen option (value string, or the whole object — see `emit`). */
+  onSelect: (selected: string | T) => void;
   /** Called after the panel is torn down. `returnFocus` = closed via keyboard/selection. */
   onClose?: (returnFocus: boolean) => void;
 }
@@ -92,17 +109,19 @@ export function virtualOrigin(x: number, y: number): PositionOrigin {
 }
 
 /** Open a menu panel. Returns a handle, or null if there's nothing selectable to show. */
-export function openMenuPanel(cfg: OpenMenuConfig): MenuHandle | null {
-  const enabled = (): MenuItem[] => cfg.items.filter((it) => !it.divider && !it.disabled);
+export function openMenuPanel<T>(cfg: OpenMenuConfig<T>): MenuHandle | null {
+  const isDivider = (item: T): boolean =>
+    cfg.isDivider ? cfg.isDivider(item) : Boolean((item as { divider?: unknown }).divider);
+  const enabled = (): T[] => cfg.items.filter((it) => !isDivider(it) && !optDisabled(it, cfg));
   if (enabled().length === 0) return null;
 
   let itemEls: HTMLButtonElement[] = []; // enabled items only, index-aligned with `enabled()`
   let closed: boolean = false;
-  const km: ListKeyManager<MenuItem> = listKeyManager<MenuItem>(enabled, {
+  const km: ListKeyManager<T> = listKeyManager<T>(enabled, {
     orientation: 'vertical',
     wrap: true,
     typeahead: true,
-    getLabel: (it) => it.label,
+    getLabel: (it) => optLabel(it, cfg),
   });
 
   const ref: OverlayRef = createOverlay({
@@ -123,9 +142,9 @@ export function openMenuPanel(cfg: OpenMenuConfig): MenuHandle | null {
     cfg.onClose?.(returnFocus);
   }
 
-  function select(value: string): void {
+  function select(item: T): void {
     close(true);
-    cfg.onSelect(value);
+    cfg.onSelect(emitSelection(item, cfg));
   }
 
   function onKeydown(event: KeyboardEvent): void {
@@ -136,8 +155,8 @@ export function openMenuPanel(cfg: OpenMenuConfig): MenuHandle | null {
     }
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
-      const it: MenuItem | null = km.activeItem();
-      if (it) select(it.value);
+      const it: T | null = km.activeItem();
+      if (it != null) select(it);
       return;
     }
     if (km.onKeydown(event)) {
@@ -150,7 +169,7 @@ export function openMenuPanel(cfg: OpenMenuConfig): MenuHandle | null {
   panel.className = 'weave-menu';
   panel.setAttribute('role', 'menu');
   for (const it of cfg.items) {
-    if (it.divider) {
+    if (isDivider(it)) {
       const sep: HTMLElement = document.createElement('div');
       sep.className = 'weave-menu__divider';
       sep.setAttribute('role', 'separator');
@@ -162,13 +181,23 @@ export function openMenuPanel(cfg: OpenMenuConfig): MenuHandle | null {
     btn.className = 'weave-menu__item';
     btn.setAttribute('role', 'menuitem');
     btn.tabIndex = -1; // roving: focus is moved programmatically
-    btn.textContent = it.label;
-    if (it.disabled) {
+    const label: HTMLElement = document.createElement('span');
+    label.className = 'weave-menu__label';
+    label.textContent = optLabel(it, cfg);
+    btn.appendChild(label);
+    const description: string | undefined = optDescription(it, cfg);
+    if (description) {
+      const desc: HTMLElement = document.createElement('span');
+      desc.className = 'weave-menu__description';
+      desc.textContent = description;
+      btn.appendChild(desc);
+    }
+    if (optDisabled(it, cfg)) {
       btn.disabled = true;
       btn.setAttribute('aria-disabled', 'true');
     } else {
       itemEls.push(btn);
-      btn.addEventListener('click', () => select(it.value));
+      btn.addEventListener('click', () => select(it));
     }
     panel.appendChild(btn);
   }

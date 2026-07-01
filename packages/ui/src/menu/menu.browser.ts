@@ -13,16 +13,16 @@ const ITEMS: MenuItem[] = [
 
 function mount(over: Partial<MenuOptions> = {}): {
   trigger: HTMLButtonElement;
-  selected: string[];
+  selected: Array<string | MenuItem>;
   cleanup: () => void;
 } {
   const trigger: HTMLButtonElement = document.createElement('button');
   trigger.textContent = 'Actions';
   document.body.appendChild(trigger);
-  const selected: string[] = [];
+  const selected: Array<string | MenuItem> = [];
   const cleanup: () => void = menu(trigger, {
     items: over.items ?? ITEMS,
-    onSelect: (v: string) => selected.push(v),
+    onSelect: (v) => selected.push(v),
     position: over.position,
   });
   return { trigger, selected, cleanup };
@@ -187,6 +187,73 @@ test('menu: a backdrop click closes the menu (does NOT return focus to the trigg
   backdrop.dispatchEvent(new MouseEvent('click', { bubbles: true }));
   assert.equal(panel(), null, 'closed on click-away');
   teardown(trigger, cleanup);
+});
+
+test('menu: an item description renders as a __label + __description subtext row', () => {
+  const trigger: HTMLButtonElement = document.createElement('button');
+  document.body.appendChild(trigger);
+  const cleanup: () => void = menu(trigger, {
+    items: [{ value: 'export', label: 'Export', description: 'Download as CSV' }],
+    onSelect: (): void => {},
+  });
+  trigger.click();
+  const item: HTMLElement = overlayContainer().querySelector('.weave-menu__item') as HTMLElement;
+  assert.equal(item.querySelector('.weave-menu__label')?.textContent, 'Export');
+  assert.equal(item.querySelector('.weave-menu__description')?.textContent, 'Download as CSV');
+  cleanup();
+  trigger.remove();
+});
+
+test('menu: custom option objects via accessors + emit:object returns the whole item', () => {
+  interface Row {
+    id: string;
+    name: string;
+    note: string;
+  }
+  const rows: Row[] = [
+    { id: 'u1', name: 'Ada', note: 'Owner' },
+    { id: 'u2', name: 'Grace', note: 'Admin' },
+  ];
+  const picked: Array<string | Row> = [];
+  const trigger: HTMLButtonElement = document.createElement('button');
+  document.body.appendChild(trigger);
+  const cleanup: () => void = menu<Row>(trigger, {
+    items: rows,
+    optionValue: (r) => r.id,
+    optionLabel: (r) => r.name,
+    optionDescription: (r) => r.note,
+    emit: 'object',
+    onSelect: (r) => picked.push(r),
+  });
+  trigger.click();
+  const items: HTMLButtonElement[] = Array.from(
+    overlayContainer().querySelectorAll('.weave-menu__item'),
+  ) as HTMLButtonElement[];
+  assert.equal(items[0].querySelector('.weave-menu__label')?.textContent, 'Ada');
+  assert.equal(items[0].querySelector('.weave-menu__description')?.textContent, 'Owner');
+  items[1].click();
+  assert.deepEqual(picked, [rows[1]], 'emit:object returns the whole row object');
+  cleanup();
+  trigger.remove();
+});
+
+test('menu: plain string options work with zero config (value = label = the string)', () => {
+  const picked: Array<string | string> = [];
+  const trigger: HTMLButtonElement = document.createElement('button');
+  document.body.appendChild(trigger);
+  const cleanup: () => void = menu<string>(trigger, {
+    items: ['Red', 'Green', 'Blue'],
+    onSelect: (v) => picked.push(v),
+  });
+  trigger.click();
+  const items: HTMLButtonElement[] = Array.from(
+    overlayContainer().querySelectorAll('.weave-menu__item'),
+  ) as HTMLButtonElement[];
+  assert.equal(items[0].querySelector('.weave-menu__label')?.textContent, 'Red');
+  items[2].click();
+  assert.deepEqual(picked, ['Blue'], 'string option emits itself as the value');
+  cleanup();
+  trigger.remove();
 });
 
 test('menu: buildPositions appends the opposite preset (flip) and passes explicit pairs through', () => {

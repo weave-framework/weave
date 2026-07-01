@@ -9,14 +9,25 @@
  * the shared menu core. The trigger carries `aria-haspopup=menu` + `aria-expanded`. The
  * visual is `menu.styles()` (the `--weave-menu-*` republic). Zero-dep.
  */
-import { openMenuPanel, buildPositions, type MenuHandle, type MenuItem, type MenuPosition } from './menu-core.js';
+import {
+  openMenuPanel,
+  buildPositions,
+  type MenuHandle,
+  type MenuItem,
+  type MenuPosition,
+  type OptionAccessors,
+} from './menu-core.js';
 
-export type { MenuItem, MenuPosition } from './menu-core.js';
+export type { MenuItem, MenuPosition, OptionAccessors } from './menu-core.js';
 
-export interface MenuOptions {
-  items: MenuItem[];
-  /** Called with the chosen item's `value` (the menu then closes). */
-  onSelect: (value: string) => void;
+export interface MenuOptions<T = MenuItem> extends OptionAccessors<T> {
+  /** The options — the default `{value,label,description?,disabled?,divider?}`, plain strings,
+   * or arbitrary objects (map their fields via the `option*` accessors). */
+  items: T[];
+  /** Called with the chosen option (value string, or the whole object — see `emit`). */
+  onSelect: (selected: string | T) => void;
+  /** Is this option a hairline separator? Default: `item.divider`. */
+  isDivider?: (item: T) => boolean;
   /**
    * Where the panel sits relative to the trigger; flips to the opposite on overflow.
    * A preset (`'bottom-start'`, `'top'`, `'bottom-end'`, …) or an explicit anchor pair.
@@ -26,7 +37,7 @@ export interface MenuOptions {
 }
 
 /** Weave `use:` action: `(trigger, options) => cleanup`. */
-export function menu(trigger: HTMLElement, options: MenuOptions): () => void {
+export function menu<T = MenuItem>(trigger: HTMLElement, options: MenuOptions<T>): () => void {
   let handle: MenuHandle | null = null;
 
   trigger.setAttribute('aria-haspopup', 'menu');
@@ -34,11 +45,17 @@ export function menu(trigger: HTMLElement, options: MenuOptions): () => void {
 
   function openMenu(focusFirst: boolean): void {
     if (handle) return;
-    handle = openMenuPanel({
+    handle = openMenuPanel<T>({
       origin: trigger,
       items: options.items,
       positions: buildPositions(options.position, 'bottom-start'),
       focusFirst,
+      isDivider: options.isDivider,
+      optionValue: options.optionValue,
+      optionLabel: options.optionLabel,
+      optionDescription: options.optionDescription,
+      optionDisabled: options.optionDisabled,
+      emit: options.emit,
       onSelect: options.onSelect,
       onClose: (returnFocus: boolean): void => {
         handle = null;
