@@ -452,6 +452,7 @@ check('stepper label truncates so the header never overflows its box', /\.weave-
 check('all-styles emits .weave-slider track + accent fill', /\.weave-slider__track\s*{[\s\S]*?height:\s*var\(--weave-slider-track-height\)[\s\S]*?background:\s*var\(--weave-slider-track\)/.test(cssStyles) && /\.weave-slider__fill\s*{[\s\S]*?background:\s*var\(--weave-slider-fill\)/.test(cssStyles));
 check('slider thumb is a 3×18 ink bar with a 5px accent cap (::after)', /\.weave-slider__thumb\s*{[\s\S]*?width:\s*var\(--weave-slider-thumb-width\)[\s\S]*?height:\s*var\(--weave-slider-thumb-height\)[\s\S]*?background:\s*var\(--weave-slider-thumb\)/.test(cssStyles) && /\.weave-slider__thumb::after\s*{[\s\S]*?background:\s*var\(--weave-slider-cap\)/.test(cssStyles));
 check('slider blocks page scroll during a pointer drag (touch-action:none)', /\.weave-slider\s*{[\s\S]*?touch-action:\s*none/.test(cssStyles));
+check('slider focus shows on the thumb (ring), not a box around the track', /\.weave-slider:focus-visible\s*{[^}]*outline:\s*none/.test(cssStyles) && /\.weave-slider:focus-visible\s+\.weave-slider__thumb\s*{[^}]*outline:\s*2px solid/.test(cssStyles));
 
 /* ── example.scss: the docs-seed dev surface compiles end-to-end ── */
 let exampleOk = false;

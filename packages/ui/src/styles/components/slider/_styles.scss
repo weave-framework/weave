@@ -54,9 +54,14 @@
     transform: translateX(-50%);
   }
 
+  // Focus shows on the thumb (a small ring around the handle), not a box around the whole
+  // track — the conventional slider focus indicator.
   .weave-slider:focus-visible {
+    outline: none;
+  }
+
+  .weave-slider:focus-visible .weave-slider__thumb {
     @include helpers.focus-ring;
-    border-radius: 2px;
   }
 
   // Invalid — the fill + cap redden (state via the --invalid modifier from the control).
