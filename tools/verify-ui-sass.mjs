@@ -273,6 +273,16 @@ const cssTooltipOverride = compile(
 check('tooltip-overrides changes existing token', /--weave-tooltip-max-width:\s*320px/.test(cssTooltipOverride));
 check('tooltip-overrides adds new token (auto-var)', /--weave-tooltip-arrow:\s*4px/.test(cssTooltipOverride));
 
+/* ── menu built-in: cascade refs + literals + overrides (U3) ── */
+check('theme emits menu item-hover referencing field', /--weave-menu-item-hover:\s*var\(--weave-color-field\)/.test(cssTheme));
+check('theme emits menu item-text referencing ink', /--weave-menu-item-text:\s*var\(--weave-color-ink\)/.test(cssTheme));
+check('theme emits menu item-height literal', /--weave-menu-item-height:\s*32px/.test(cssTheme));
+const cssMenuOverride = compile(
+  `@use '@weave-framework/ui' as weave;\n@include weave.menu-overrides((min-width: 220px, elevation: 1px));`,
+);
+check('menu-overrides changes existing token', /--weave-menu-min-width:\s*220px/.test(cssMenuOverride));
+check('menu-overrides adds new token (auto-var)', /--weave-menu-elevation:\s*1px/.test(cssMenuOverride));
+
 /* ── all-styles(): structural CSS by class ── */
 const cssStyles = compile(`@use '@weave-framework/ui' as weave;\n@include weave.all-styles();`);
 check('all-styles emits .weave-divider rule', /\.weave-divider\s*{/.test(cssStyles));
@@ -325,6 +335,8 @@ check('chips emits the dashed --add chip', /\.weave-chips__chip--add\s*{[^}]*bor
 check('all-styles emits the overlay backdrop scrim + transparent click-catcher', /\.weave-overlay-backdrop\s*{[^}]*background:\s*var\(--weave-overlay-backdrop\)/.test(cssStyles) && /\.weave-overlay-backdrop--transparent\s*{[^}]*background:\s*transparent/.test(cssStyles));
 check('all-styles emits the hairline overlay panel (no shadow: 1px line + surface)', /\.weave-overlay-panel\s*{[\s\S]*?background:\s*var\(--weave-overlay-surface\)[\s\S]*?border:\s*1px solid var\(--weave-overlay-line\)/.test(cssStyles) && !/\.weave-overlay-panel\s*{[^}]*box-shadow/.test(cssStyles));
 check('all-styles emits .weave-tooltip bubble (non-interactive + fade-in keyframes)', /\.weave-tooltip\s*{[\s\S]*?pointer-events:\s*none[\s\S]*?background:\s*var\(--weave-tooltip-background\)/.test(cssStyles) && /@keyframes\s+weave-tooltip-in/.test(cssStyles));
+check('all-styles emits .weave-menu panel (overlay-panel chrome) + __item + __divider', /\.weave-menu\s*{[\s\S]*?background:\s*var\(--weave-overlay-surface\)[\s\S]*?border:\s*1px solid var\(--weave-overlay-line\)/.test(cssStyles) && /\.weave-menu__item\s*{/.test(cssStyles) && /\.weave-menu__divider\s*{/.test(cssStyles));
+check('menu item hover/focus tint comes from native pseudos (no state class)', /\.weave-menu__item:hover,\s*\.weave-menu__item:focus\s*{[^}]*background:\s*var\(--weave-menu-item-hover\)/.test(cssStyles));
 
 /* ── example.scss: the docs-seed dev surface compiles end-to-end ── */
 let exampleOk = false;

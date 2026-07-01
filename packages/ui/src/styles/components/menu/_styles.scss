@@ -1,0 +1,49 @@
+// menu — styles() mixin (class rules). The panel reuses the shared overlay-panel chrome
+// (surface + 1px line + radius, no shadow); rows are lean full-width buttons whose
+// hover/roving-active state paints from the native :hover/:focus pseudo (no state class).
+// Forwarded by ./_index.scss.
+@use '../../helpers' as helpers;
+
+@mixin styles() {
+  .weave-menu {
+    @include helpers.overlay-panel;
+    min-width: var(--weave-menu-min-width);
+    padding: var(--weave-menu-padding-y) 0;
+    overflow: hidden; // clip rows to the panel radius
+  }
+
+  .weave-menu__item {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    height: var(--weave-menu-item-height);
+    padding: 0 var(--weave-menu-item-padding-x);
+    border: 0;
+    background: transparent;
+    color: var(--weave-menu-item-text);
+    font: inherit;
+    font-size: var(--weave-menu-font-size);
+    font-weight: var(--weave-menu-weight);
+    text-align: left;
+    cursor: pointer;
+    transition: background var(--weave-menu-duration) ease;
+  }
+
+  // Hover AND the roving-focused row share the tint (focus is moved programmatically).
+  .weave-menu__item:hover,
+  .weave-menu__item:focus {
+    background: var(--weave-menu-item-hover);
+    outline: none;
+  }
+
+  .weave-menu__item[disabled] {
+    color: var(--weave-menu-item-disabled);
+    cursor: default;
+  }
+
+  .weave-menu__divider {
+    height: 1px;
+    margin: var(--weave-menu-padding-y) 0;
+    background: var(--weave-menu-divider);
+  }
+}

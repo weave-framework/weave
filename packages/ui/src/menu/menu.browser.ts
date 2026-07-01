@@ -1,0 +1,180 @@
+import { test, assert } from '../../../../tools/harness.js';
+import { overlayContainer } from '@weave-framework/ui/cdk';
+import { menu, type MenuItem, type MenuOptions } from '@weave-framework/ui/menu';
+
+const ITEMS: MenuItem[] = [
+  { value: 'edit', label: 'Edit' },
+  { value: 'dup', label: 'Duplicate' },
+  { value: 'sep', label: '', divider: true },
+  { value: 'archive', label: 'Archive', disabled: true },
+  { value: 'del', label: 'Delete' },
+];
+
+function mount(over: Partial<MenuOptions> = {}): {
+  trigger: HTMLButtonElement;
+  selected: string[];
+  cleanup: () => void;
+} {
+  const trigger: HTMLButtonElement = document.createElement('button');
+  trigger.textContent = 'Actions';
+  document.body.appendChild(trigger);
+  const selected: string[] = [];
+  const cleanup: () => void = menu(trigger, {
+    items: over.items ?? ITEMS,
+    onSelect: (v: string) => selected.push(v),
+    position: over.position,
+  });
+  return { trigger, selected, cleanup };
+}
+
+const panel = (): HTMLElement | null => overlayContainer().querySelector('.weave-menu');
+const items = (): HTMLButtonElement[] =>
+  Array.from(overlayContainer().querySelectorAll('.weave-menu__item')) as HTMLButtonElement[];
+const key = (el: EventTarget, k: string): void => {
+  el.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true }));
+};
+
+function teardown(trigger: HTMLElement, cleanup: () => void): void {
+  cleanup();
+  trigger.remove();
+}
+
+test('menu: trigger carries aria-haspopup=menu and aria-expanded, toggled on open/close', () => {
+  const { trigger, cleanup } = mount();
+  assert.equal(trigger.getAttribute('aria-haspopup'), 'menu');
+  assert.equal(trigger.getAttribute('aria-expanded'), 'false');
+  trigger.click();
+  assert.equal(trigger.getAttribute('aria-expanded'), 'true', 'expanded after open');
+  assert.ok(panel(), 'panel is shown');
+  trigger.click();
+  assert.equal(trigger.getAttribute('aria-expanded'), 'false', 'collapsed after re-click');
+  assert.equal(panel(), null, 'panel removed');
+  teardown(trigger, cleanup);
+});
+
+test('menu: role=menu panel renders one menuitem per non-divider item + a separator', () => {
+  const { trigger, cleanup } = mount();
+  trigger.click();
+  assert.equal(panel()?.getAttribute('role'), 'menu');
+  // 4 real items (edit/dup/archive/del) + 1 separator; archive is disabled.
+  assert.equal(items().length, 4, 'four menuitem buttons');
+  assert.equal(overlayContainer().querySelectorAll('.weave-menu__divider').length, 1, 'one divider');
+  const archive: HTMLButtonElement = items().find((b) => b.textContent === 'Archive') as HTMLButtonElement;
+  assert.equal(archive.disabled, true, 'disabled item is a disabled button');
+  assert.equal(archive.getAttribute('aria-disabled'), 'true');
+  teardown(trigger, cleanup);
+});
+
+test('menu: opening focuses the first item; menuitems are roving (tabindex -1)', () => {
+  const { trigger, cleanup } = mount();
+  trigger.click();
+  assert.equal(document.activeElement, items()[0], 'first item focused on open');
+  assert.ok(
+    items().every((b) => b.tabIndex === -1),
+    'all menuitems tabindex -1 (roving via focus)',
+  );
+  teardown(trigger, cleanup);
+});
+
+test('menu: ArrowDown/Up move roving focus and skip the disabled item', () => {
+  const { trigger, cleanup } = mount();
+  trigger.click();
+  const [edit, dup, del] = items().filter((b) => !b.disabled); // enabled order: Edit, Duplicate, Delete
+  const p: HTMLElement = panel() as HTMLElement;
+  assert.equal(document.activeElement, edit);
+  key(p, 'ArrowDown');
+  assert.equal(document.activeElement, dup, 'down → Duplicate');
+  key(p, 'ArrowDown');
+  assert.equal(document.activeElement, del, 'down skips disabled Archive → Delete');
+  key(p, 'ArrowUp');
+  assert.equal(document.activeElement, dup, 'up → Duplicate');
+  teardown(trigger, cleanup);
+});
+
+test('menu: Home/End jump to the first/last enabled item', () => {
+  const { trigger, cleanup } = mount();
+  trigger.click();
+  const enabled: HTMLButtonElement[] = items().filter((b) => !b.disabled);
+  const p: HTMLElement = panel() as HTMLElement;
+  key(p, 'End');
+  assert.equal(document.activeElement, enabled[enabled.length - 1], 'End → last');
+  key(p, 'Home');
+  assert.equal(document.activeElement, enabled[0], 'Home → first');
+  teardown(trigger, cleanup);
+});
+
+test('menu: Enter on the active item selects it and closes, returning focus to the trigger', () => {
+  const { trigger, selected, cleanup } = mount();
+  trigger.click();
+  key(panel() as HTMLElement, 'ArrowDown'); // → Duplicate
+  key(panel() as HTMLElement, 'Enter');
+  assert.deepEqual(selected, ['dup'], 'selected the active item');
+  assert.equal(panel(), null, 'closed');
+  assert.equal(document.activeElement, trigger, 'focus returned to trigger');
+  teardown(trigger, cleanup);
+});
+
+test('menu: clicking a menuitem selects its value and closes', () => {
+  const { trigger, selected, cleanup } = mount();
+  trigger.click();
+  (items().find((b) => b.textContent === 'Delete') as HTMLButtonElement).click();
+  assert.deepEqual(selected, ['del']);
+  assert.equal(panel(), null, 'closed after click');
+  teardown(trigger, cleanup);
+});
+
+test('menu: typeahead jumps to the item starting with the typed letter', () => {
+  const { trigger, cleanup } = mount();
+  trigger.click();
+  key(panel() as HTMLElement, 'd'); // Duplicate is first enabled starting with 'd'
+  assert.equal(document.activeElement, items().find((b) => b.textContent === 'Duplicate'));
+  teardown(trigger, cleanup);
+});
+
+test('menu: Escape closes and returns focus to the trigger', () => {
+  const { trigger, cleanup } = mount();
+  trigger.click();
+  key(panel() as HTMLElement, 'Escape');
+  assert.equal(panel(), null, 'closed on Escape');
+  assert.equal(trigger.getAttribute('aria-expanded'), 'false');
+  assert.equal(document.activeElement, trigger, 'focus returned');
+  teardown(trigger, cleanup);
+});
+
+test('menu: ArrowDown on the closed trigger opens the menu (keyboard)', () => {
+  const { trigger, cleanup } = mount();
+  trigger.focus();
+  key(trigger, 'ArrowDown');
+  assert.ok(panel(), 'opened via ArrowDown');
+  assert.equal(document.activeElement, items()[0]);
+  teardown(trigger, cleanup);
+});
+
+test('menu: the backdrop is a transparent click-catcher (not a dimming scrim)', () => {
+  const { trigger, cleanup } = mount();
+  trigger.click();
+  const backdrop: HTMLElement = overlayContainer().querySelector('.weave-overlay-backdrop') as HTMLElement;
+  assert.ok(backdrop, 'a backdrop exists');
+  assert.ok(backdrop.classList.contains('weave-overlay-backdrop--transparent'), 'transparent variant');
+  teardown(trigger, cleanup);
+});
+
+test('menu: a backdrop click closes the menu (does NOT return focus to the trigger)', () => {
+  const { trigger, cleanup } = mount();
+  trigger.click();
+  const backdrop: HTMLElement = overlayContainer().querySelector('.weave-overlay-backdrop') as HTMLElement;
+  backdrop.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  assert.equal(panel(), null, 'closed on click-away');
+  teardown(trigger, cleanup);
+});
+
+test('menu: cleanup closes the panel and strips the trigger ARIA (no leak)', () => {
+  const { trigger, cleanup } = mount();
+  trigger.click();
+  assert.ok(panel());
+  cleanup();
+  assert.equal(panel(), null, 'panel gone after cleanup');
+  assert.equal(trigger.getAttribute('aria-haspopup'), null, 'aria-haspopup removed');
+  assert.equal(trigger.getAttribute('aria-expanded'), null, 'aria-expanded removed');
+  trigger.remove();
+});

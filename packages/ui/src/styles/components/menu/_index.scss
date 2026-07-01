@@ -1,0 +1,9 @@
+// Menu — a dropdown of action rows anchored under a trigger by the CDK overlay. Behavior
+// lives in menu.ts (the `use:menu` action — open/close, connectedPosition, roving focus via
+// listKeyManager + typeahead, Esc/Tab return focus, transparent click-away backdrop); this
+// is the visual: the shared overlay-panel chrome + lean full-width menuitem rows whose
+// hover/roving-active tint comes from the native :hover/:focus pseudo (no state class).
+//
+// Barrel — forwards the split partials ($tokens + the styles() mixin).
+@forward 'tokens';
+@forward 'styles';

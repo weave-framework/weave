@@ -109,6 +109,11 @@
       "types": "./src/tooltip/tooltip.ts",
       "import": "./src/tooltip/tooltip.ts"
     },
+    "./menu": {
+      "sass": "./src/styles/components/menu/_index.scss",
+      "types": "./src/menu/menu.ts",
+      "import": "./src/menu/menu.ts"
+    },
     "./cdk": {
       "types": "./src/cdk/index.ts",
       "import": "./src/cdk/index.ts"
@@ -232,6 +237,11 @@
         "sass": "./src/styles/components/tooltip/_index.scss",
         "types": "./dist/tooltip/tooltip.d.ts",
         "import": "./dist/tooltip/tooltip.js"
+      },
+      "./menu": {
+        "sass": "./src/styles/components/menu/_index.scss",
+        "types": "./dist/menu/menu.d.ts",
+        "import": "./dist/menu/menu.js"
       },
       "./cdk": {
         "types": "./dist/cdk/index.d.ts",

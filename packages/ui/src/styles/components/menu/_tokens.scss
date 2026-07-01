@@ -1,0 +1,25 @@
+// menu — design tokens (schema). A dropdown panel of action rows; the panel chrome comes
+// from the shared overlay republic (helpers.overlay-panel), these are the item tokens.
+// Forwarded by ./_index.scss.
+@use '../../ref' as ref;
+
+$tokens: (
+  color: (
+    item-text: ref.ref('color.ink'),
+    // Hover / roving-active row tint.
+    item-hover: ref.ref('color.field'),
+    item-disabled: ref.ref('color.sub'),
+    divider: ref.ref('color.line'),
+  ),
+  size: (
+    min-width: 180px,
+    padding-y: 4px,
+    item-height: 32px,
+    item-padding-x: 12px,
+    duration: ref.ref('motion.fast'),
+  ),
+  typography: (
+    font-size: 13px,
+    weight: 500,
+  ),
+);
