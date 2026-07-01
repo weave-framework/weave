@@ -33,6 +33,8 @@
 @use 'components/snackbar' as snackbar;
 @use 'components/select' as select;
 @use 'components/autocomplete' as autocomplete;
+// U4 complex/data components.
+@use 'components/expansion' as expansion;
 
 $_builtins: (
   'divider': divider.$tokens,
@@ -61,6 +63,7 @@ $_builtins: (
   'snackbar': snackbar.$tokens,
   'select': select.$tokens,
   'autocomplete': autocomplete.$tokens,
+  'expansion': expansion.$tokens,
 );
 
 /* ───────────────────────── internal emit ───────────────────────── */
@@ -242,6 +245,10 @@ $_builtins: (
   @include overrides('autocomplete', $map);
 }
 
+@mixin expansion-overrides($map) {
+  @include overrides('expansion', $map);
+}
+
 // Emit the structural CSS (class rules) for every built-in component.
 // Prefer per-component includes to keep CSS small; all-styles() is the convenience.
 @mixin all-styles() {
@@ -271,4 +278,5 @@ $_builtins: (
   @include snackbar.styles();
   @include select.styles();
   @include autocomplete.styles();
+  @include expansion.styles();
 }

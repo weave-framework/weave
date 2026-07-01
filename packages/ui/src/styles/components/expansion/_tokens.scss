@@ -1,0 +1,30 @@
+// expansion — design tokens (schema). Forwarded by ./_index.scss.
+@use '../../ref' as ref;
+
+$tokens: (
+  color: (
+    text: ref.ref('color.ink'),
+    marker: ref.ref('color.sub'),
+    divider: ref.ref('color.line'),
+    // Open header takes the field tint (design: "open header gets --field bg").
+    header-open-background: ref.ref('color.field'),
+    // Subtle hover — half-strength field so it reads under the open state.
+    header-hover-background: color-mix(in srgb, ref.ref('color.field') 55%, transparent),
+    disabled-text: ref.ref('color.sub'),
+  ),
+  size: (
+    radius: ref.ref('shape.radius'),
+    header-height: 44px,
+    padding-x: 14px,
+    padding-y: 10px,
+    body-padding-x: 14px,
+    body-padding-y: 12px,
+    marker-width: 16px,
+    duration: ref.ref('motion.fast'),
+  ),
+  typography: (
+    header-size: 13px,
+    header-weight: 600,
+    body-size: 13px,
+  ),
+);

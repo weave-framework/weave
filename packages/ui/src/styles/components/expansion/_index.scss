@@ -1,0 +1,14 @@
+// Expansion — an accordion of collapsible panels. Behavior lives in expansion.ts
+// (open-set + single/multi toggle + arrow-key header nav; bodies appended on mount);
+// this is the visual.
+//
+// A panel = a role=heading > <button> header (title + a +/- marker) toggling a
+// role=region body. Open/collapsed state rides the NATIVE ARIA attrs, not a class:
+// [aria-expanded=true] tints the header (--field) + flips the marker to −; the region
+// [data-open=true] animates via grid-template-rows 0fr→1fr (no JS height measure).
+//
+// Barrel — forwards the split partials ($tokens + the styles() mixin). Add another
+// concern as its own file and @forward it here.
+
+@forward 'tokens';
+@forward 'styles';

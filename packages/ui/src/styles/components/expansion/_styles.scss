@@ -1,0 +1,103 @@
+// expansion — styles() mixin (class rules). Forwarded by ./_index.scss.
+@use '../../helpers' as helpers;
+
+@mixin styles() {
+  .weave-expansion {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--weave-expansion-divider);
+    border-radius: var(--weave-expansion-radius);
+    overflow: hidden; // clip the rounded corners over the panels
+
+    @content;
+  }
+
+  // Hairline between panels (design: separate surfaces with a 1px line, no shadow).
+  .weave-expansion__panel + .weave-expansion__panel {
+    border-top: 1px solid var(--weave-expansion-divider);
+  }
+
+  .weave-expansion__heading {
+    margin: 0;
+  }
+
+  .weave-expansion__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    width: 100%;
+    min-height: var(--weave-expansion-header-height);
+    padding: var(--weave-expansion-padding-y) var(--weave-expansion-padding-x);
+    border: 0;
+    background: transparent;
+    color: var(--weave-expansion-text);
+    font-family: inherit;
+    font-size: var(--weave-expansion-header-size);
+    font-weight: var(--weave-expansion-header-weight);
+    text-align: left;
+    cursor: pointer;
+    transition: background var(--weave-expansion-duration) ease;
+  }
+
+  .weave-expansion__header:hover {
+    background: var(--weave-expansion-header-hover-background);
+  }
+
+  // Open header — the field tint (state via the native ARIA attr, no state class).
+  .weave-expansion__header[aria-expanded='true'] {
+    background: var(--weave-expansion-header-open-background);
+  }
+
+  .weave-expansion__header:focus-visible {
+    @include helpers.focus-ring;
+    outline-offset: -2px; // ring sits inside the header
+  }
+
+  .weave-expansion__header[aria-disabled='true'] {
+    color: var(--weave-expansion-disabled-text);
+    cursor: not-allowed;
+  }
+
+  .weave-expansion__title {
+    flex: 1;
+    min-width: 0;
+    @include helpers.truncate;
+  }
+
+  // The +/- marker (design), toggled purely off the header's aria-expanded state.
+  .weave-expansion__marker {
+    flex: none;
+    width: var(--weave-expansion-marker-width);
+    color: var(--weave-expansion-marker);
+    font-weight: 400;
+    text-align: center;
+  }
+
+  .weave-expansion__marker::after {
+    content: '+';
+  }
+
+  .weave-expansion__header[aria-expanded='true'] .weave-expansion__marker::after {
+    content: '\2212'; // minus sign (−), not a hyphen
+  }
+
+  // Collapse/reveal via grid-template-rows 0fr→1fr — no JS height measurement.
+  .weave-expansion__region {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows var(--weave-expansion-duration) ease;
+  }
+
+  .weave-expansion__region[data-open='true'] {
+    grid-template-rows: 1fr;
+  }
+
+  .weave-expansion__body {
+    overflow: hidden; // clip content while the row track collapses to 0
+    min-height: 0;
+    padding: var(--weave-expansion-body-padding-y) var(--weave-expansion-body-padding-x);
+    color: var(--weave-expansion-text);
+    font-size: var(--weave-expansion-body-size);
+  }
+}

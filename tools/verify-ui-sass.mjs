@@ -331,6 +331,15 @@ const cssAcOverride = compile(
 check('autocomplete-overrides changes existing token', /--weave-autocomplete-gap:\s*12px/.test(cssAcOverride));
 check('autocomplete-overrides adds new token (auto-var)', /--weave-autocomplete-shadow:\s*1px/.test(cssAcOverride));
 
+/* ── expansion built-in: cascade refs + literals + overrides (U4) ── */
+check('theme emits expansion header-open-background referencing field', /--weave-expansion-header-open-background:\s*var\(--weave-color-field\)/.test(cssTheme));
+check('theme emits expansion header-height literal', /--weave-expansion-header-height:\s*44px/.test(cssTheme));
+const cssExpansionOverride = compile(
+  `@use '@weave-framework/ui' as weave;\n@include weave.expansion-overrides((header-height: 52px, gap: 8px));`,
+);
+check('expansion-overrides changes existing token', /--weave-expansion-header-height:\s*52px/.test(cssExpansionOverride));
+check('expansion-overrides adds new token (auto-var)', /--weave-expansion-gap:\s*8px/.test(cssExpansionOverride));
+
 /* ── all-styles(): structural CSS by class ── */
 const cssStyles = compile(`@use '@weave-framework/ui' as weave;\n@include weave.all-styles();`);
 check('all-styles emits .weave-divider rule', /\.weave-divider\s*{/.test(cssStyles));
@@ -398,6 +407,10 @@ check('select panel reuses the overlay-panel chrome + scrolls', /\.weave-select_
 check('select option selected tint + check-mark', /\.weave-select__option--selected\s*{[^}]*background:\s*var\(--weave-select-option-selected\)/.test(cssStyles) && /\.weave-select__option--selected::after\s*{/.test(cssStyles));
 check('all-styles emits .weave-autocomplete underline field + focus-within accent', /\.weave-autocomplete\s*{[\s\S]*?border-bottom:\s*var\(--weave-autocomplete-border-width\)\s*solid\s*var\(--weave-autocomplete-border\)/.test(cssStyles) && /\.weave-autocomplete:focus-within\s*{[\s\S]*?border-bottom-color:\s*var\(--weave-autocomplete-focus\)/.test(cssStyles));
 check('autocomplete panel reuses overlay-panel chrome + scrolls + active option + empty row', /\.weave-autocomplete__panel\s*{[\s\S]*?background:\s*var\(--weave-overlay-surface\)[\s\S]*?overflow-y:\s*auto/.test(cssStyles) && /\.weave-autocomplete__option--active\s*{[^}]*background:\s*var\(--weave-autocomplete-option-hover\)/.test(cssStyles) && /\.weave-autocomplete__empty\s*{/.test(cssStyles));
+check('all-styles emits .weave-expansion accordion (1px border + header)', /\.weave-expansion\s*{[\s\S]*?border:\s*1px solid var\(--weave-expansion-divider\)/.test(cssStyles) && /\.weave-expansion__header\s*{/.test(cssStyles));
+check('expansion tints the open header via [aria-expanded] (no state class)', /\.weave-expansion__header\[aria-expanded=true\]\s*{[^}]*background:\s*var\(--weave-expansion-header-open-background\)/.test(cssStyles));
+check('expansion marker flips +→− off aria-expanded', /\.weave-expansion__marker::after\s*{[^}]*content:\s*["']\+["']/.test(cssStyles) && /\.weave-expansion__header\[aria-expanded=true\]\s+\.weave-expansion__marker::after\s*{/.test(cssStyles));
+check('expansion region reveals via grid-template-rows 0fr→1fr', /\.weave-expansion__region\s*{[\s\S]*?grid-template-rows:\s*0fr/.test(cssStyles) && /\.weave-expansion__region\[data-open=true\]\s*{[^}]*grid-template-rows:\s*1fr/.test(cssStyles));
 
 /* ── example.scss: the docs-seed dev surface compiles end-to-end ── */
 let exampleOk = false;

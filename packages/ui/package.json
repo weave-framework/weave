@@ -143,6 +143,11 @@
       "types": "./src/autocomplete/autocomplete.ts",
       "import": "./src/autocomplete/autocomplete.ts"
     },
+    "./expansion": {
+      "sass": "./src/styles/components/expansion/_index.scss",
+      "types": "./src/expansion/expansion.ts",
+      "import": "./src/expansion/expansion.ts"
+    },
     "./cdk": {
       "types": "./src/cdk/index.ts",
       "import": "./src/cdk/index.ts"
@@ -300,6 +305,11 @@
         "sass": "./src/styles/components/autocomplete/_index.scss",
         "types": "./dist/autocomplete/autocomplete.d.ts",
         "import": "./dist/autocomplete/autocomplete.js"
+      },
+      "./expansion": {
+        "sass": "./src/styles/components/expansion/_index.scss",
+        "types": "./dist/expansion/expansion.d.ts",
+        "import": "./dist/expansion/expansion.js"
       },
       "./cdk": {
         "types": "./dist/cdk/index.d.ts",
