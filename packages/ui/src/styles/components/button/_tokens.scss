@@ -12,7 +12,10 @@ $tokens: (
     // marked underline
     ghost-text: ref.ref('color.sub'),
     ghost-text-hover: ref.ref('color.ink'),
-    icon-hover: ref.ref('color.field'),
+    // Adaptive tint (a faint wash of the current text color) so an icon button's
+    // hover reads on ANY background — light surface or ink toolbar. Resolved at the
+    // use site, where currentColor = the button's inherited color.
+    icon-hover: color-mix(in srgb, currentColor 8%, transparent),
     disabled-background: ref.ref('color.field'),
     disabled-text: ref.ref('color.sub'),
   ),

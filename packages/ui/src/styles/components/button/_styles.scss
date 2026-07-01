@@ -74,13 +74,15 @@
     opacity: 1;
   }
 
-  /* Icon — 34px square, houses a single <Icon>. */
+  /* Icon — 34px square, houses a single <Icon>. The glyph inherits the surrounding
+     text color (ink on a light surface, canvas on an ink toolbar) so it's visible on
+     any background — never hard-code ink here. */
   .weave-button--icon {
     width: var(--weave-button-icon-size);
     height: var(--weave-button-icon-size);
     padding: 0;
     background: transparent;
-    color: var(--weave-button-background);
+    color: inherit;
   }
 
   .weave-button--icon:hover {
