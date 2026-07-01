@@ -26,6 +26,11 @@
       "types": "./src/icon/icon.ts",
       "import": "./src/icon/icon.ts"
     },
+    "./button": {
+      "sass": "./src/button/_button.scss",
+      "types": "./src/button/button.ts",
+      "import": "./src/button/button.ts"
+    },
     "./cdk": {
       "types": "./src/cdk/index.ts",
       "import": "./src/cdk/index.ts"
@@ -66,6 +71,11 @@
         "sass": "./src/icon/_icon.scss",
         "types": "./dist/icon/icon.d.ts",
         "import": "./dist/icon/icon.js"
+      },
+      "./button": {
+        "sass": "./src/button/_button.scss",
+        "types": "./dist/button/button.d.ts",
+        "import": "./dist/button/button.js"
       },
       "./cdk": {
         "types": "./dist/cdk/index.d.ts",

@@ -99,6 +99,17 @@ const cssIconOverride = compile(
 check('icon-overrides changes existing token', /--weave-icon-size:\s*20px/.test(cssIconOverride));
 check('icon-overrides adds new token (auto-var)', /--weave-icon-gap:\s*6px/.test(cssIconOverride));
 
+/* ── button built-in: cascade ref (color) + literals (size/typography) + overrides ── */
+check('theme emits button background referencing ink (cascade)', /--weave-button-background:\s*var\(--weave-color-ink\)/.test(cssTheme));
+check('theme emits button padding literal', /--weave-button-padding-x:\s*18px/.test(cssTheme));
+check('theme emits button weight literal', /--weave-button-weight:\s*600/.test(cssTheme));
+check('theme emits button duration referencing motion', /--weave-button-duration:\s*var\(--weave-motion-fast\)/.test(cssTheme));
+const cssButtonOverride = compile(
+  `@use '@weave-framework/ui' as weave;\n@include weave.button-overrides((radius: 6px, elevation: 2px));`,
+);
+check('button-overrides changes existing token', /--weave-button-radius:\s*6px/.test(cssButtonOverride));
+check('button-overrides adds new token (auto-var)', /--weave-button-elevation:\s*2px/.test(cssButtonOverride));
+
 /* ── all-styles(): structural CSS by class ── */
 const cssStyles = compile(`@use '@weave-framework/ui' as weave;\n@include weave.all-styles();`);
 check('all-styles emits .weave-divider rule', /\.weave-divider\s*{/.test(cssStyles));
@@ -107,6 +118,9 @@ check('all-styles emits .weave-ripple rule', /\.weave-ripple\s*{/.test(cssStyles
 check('all-styles emits ripple keyframes', /@keyframes\s+weave-ripple/.test(cssStyles));
 check('all-styles emits .weave-icon rule', /\.weave-icon\s*{/.test(cssStyles));
 check('icon rule consumes its stroke token', /stroke-width:\s*var\(--weave-icon-stroke\)/.test(cssStyles));
+check('all-styles emits .weave-button rule', /\.weave-button\s*{/.test(cssStyles));
+check('button rule consumes its background token', /background:\s*var\(--weave-button-background\)/.test(cssStyles));
+check('button emits a --variant modifier rule', /\.weave-button--outline\s*{/.test(cssStyles));
 
 /* ── example.scss: the docs-seed dev surface compiles end-to-end ── */
 let exampleOk = false;

@@ -9,11 +9,13 @@
 @use '../divider/divider' as divider;
 @use '../ripple/ripple' as ripple;
 @use '../icon/icon' as icon;
+@use '../button/button' as button;
 
 $_builtins: (
   'divider': divider.$tokens,
   'ripple': ripple.$tokens,
   'icon': icon.$tokens,
+  'button': button.$tokens,
 );
 
 /* ───────────────────────── internal emit ───────────────────────── */
@@ -103,10 +105,15 @@ $_builtins: (
   @include overrides('icon', $map);
 }
 
+@mixin button-overrides($map) {
+  @include overrides('button', $map);
+}
+
 // Emit the structural CSS (class rules) for every built-in component.
 // Prefer per-component includes to keep CSS small; all-styles() is the convenience.
 @mixin all-styles() {
   @include divider.styles();
   @include ripple.styles();
   @include icon.styles();
+  @include button.styles();
 }
