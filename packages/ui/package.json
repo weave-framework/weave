@@ -20,6 +20,11 @@
       "sass": "./src/ripple/_ripple.scss",
       "types": "./src/ripple/ripple.ts",
       "import": "./src/ripple/ripple.ts"
+    },
+    "./icon": {
+      "sass": "./src/icon/_icon.scss",
+      "types": "./src/icon/icon.ts",
+      "import": "./src/icon/icon.ts"
     }
   },
   "files": [
@@ -52,6 +57,11 @@
         "sass": "./src/ripple/_ripple.scss",
         "types": "./dist/ripple/ripple.d.ts",
         "import": "./dist/ripple/ripple.js"
+      },
+      "./icon": {
+        "sass": "./src/icon/_icon.scss",
+        "types": "./dist/icon/icon.d.ts",
+        "import": "./dist/icon/icon.js"
       }
     }
   },

@@ -1,0 +1,28 @@
+// Icon — inline SVG at Keyline scale (18px, 1.4 hairline stroke, currentColor).
+// Behavior lives in icon.ts; this is the token schema + the class contract.
+
+@use '../styles/ref' as ref;
+
+$tokens: (
+  size: (
+    size: 18px,
+    stroke: 1.4,
+  ),
+);
+
+@mixin styles() {
+  .weave-icon {
+    display: inline-flex;
+    width: var(--weave-icon-size);
+    height: var(--weave-icon-size);
+    flex: 0 0 auto;
+    line-height: 0;
+    color: inherit;
+  }
+
+  .weave-icon svg {
+    width: 100%;
+    height: 100%;
+    stroke-width: var(--weave-icon-stroke);
+  }
+}

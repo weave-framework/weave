@@ -8,10 +8,12 @@
 // New built-in components add themselves here (this is the "walk all republics" list).
 @use '../divider/divider' as divider;
 @use '../ripple/ripple' as ripple;
+@use '../icon/icon' as icon;
 
 $_builtins: (
   'divider': divider.$tokens,
   'ripple': ripple.$tokens,
+  'icon': icon.$tokens,
 );
 
 /* ───────────────────────── internal emit ───────────────────────── */
@@ -97,9 +99,14 @@ $_builtins: (
   @include overrides('ripple', $map);
 }
 
+@mixin icon-overrides($map) {
+  @include overrides('icon', $map);
+}
+
 // Emit the structural CSS (class rules) for every built-in component.
 // Prefer per-component includes to keep CSS small; all-styles() is the convenience.
 @mixin all-styles() {
   @include divider.styles();
   @include ripple.styles();
+  @include icon.styles();
 }

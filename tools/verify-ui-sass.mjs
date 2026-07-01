@@ -7,6 +7,7 @@
  * override lands only under its selector; colors() is a partial recompile.
  */
 import * as sass from 'sass';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 
@@ -89,12 +90,33 @@ check('scoped override not at :root', !/:root/.test(cssScoped));
 check('theme emits ripple opacity', /--weave-ripple-opacity:\s*0\.22/.test(cssTheme));
 check('theme emits ripple duration referencing motion', /--weave-ripple-duration:\s*var\(--weave-motion-ripple\)/.test(cssTheme));
 
+/* ── icon built-in: size + stroke literals; icon-overrides ── */
+check('theme emits icon size literal', /--weave-icon-size:\s*18px/.test(cssTheme));
+check('theme emits icon stroke literal', /--weave-icon-stroke:\s*1\.4/.test(cssTheme));
+const cssIconOverride = compile(
+  `@use '@weave-framework/ui' as weave;\n@include weave.icon-overrides((size: 20px, gap: 6px));`,
+);
+check('icon-overrides changes existing token', /--weave-icon-size:\s*20px/.test(cssIconOverride));
+check('icon-overrides adds new token (auto-var)', /--weave-icon-gap:\s*6px/.test(cssIconOverride));
+
 /* ── all-styles(): structural CSS by class ── */
 const cssStyles = compile(`@use '@weave-framework/ui' as weave;\n@include weave.all-styles();`);
 check('all-styles emits .weave-divider rule', /\.weave-divider\s*{/.test(cssStyles));
 check('divider rule consumes its token', /var\(--weave-divider-line\)/.test(cssStyles));
 check('all-styles emits .weave-ripple rule', /\.weave-ripple\s*{/.test(cssStyles));
 check('all-styles emits ripple keyframes', /@keyframes\s+weave-ripple/.test(cssStyles));
+check('all-styles emits .weave-icon rule', /\.weave-icon\s*{/.test(cssStyles));
+check('icon rule consumes its stroke token', /stroke-width:\s*var\(--weave-icon-stroke\)/.test(cssStyles));
+
+/* ── example.scss: the docs-seed dev surface compiles end-to-end ── */
+let exampleOk = false;
+try {
+  const css = compile(readFileSync(join(root, 'packages', 'ui', 'example.scss'), 'utf8'));
+  exampleOk = /--weave-color-accent:\s*#5b5bd6/.test(css) && /\.weave-icon\s*{/.test(css) && /\.dense\s*{\s*--weave-icon-size:\s*16px/.test(css);
+} catch (e) {
+  console.log(`  (example.scss threw: ${e.message})`);
+}
+check('example.scss compiles (theme + all-styles + scoped override)', exampleOk);
 
 console.log(`\n${'-'.repeat(40)}`);
 console.log(`ui-sass  pass ${pass}  fail ${fail}`);

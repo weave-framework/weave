@@ -1,0 +1,31 @@
+// The entire dev-facing surface of @weave-framework/ui, in three calls — a docs
+// seed and a smoke check (compiled by tools/verify-ui-sass.mjs). Compile this in
+// your app's own build with dart-sass; we ship SCSS, not pre-built CSS.
+
+@use '@weave-framework/ui' as weave;
+
+// (1) One-call theme — a partial map; Keyline defaults fill everything you omit.
+@include weave.theme(
+  (
+    color: (
+      accent: #5b5bd6,
+    ),
+    shape: (
+      radius: 3px,
+    ),
+  )
+);
+
+// (2) Structure — the class rules for the components you use. Prefer per-component
+//     includes (e.g. weave.icon-styles) to keep CSS lean; all-styles() is the
+//     batteries-included convenience.
+@include weave.all-styles();
+
+// (3) Scoped override — nest a *-overrides() call inside any selector.
+.dense {
+  @include weave.icon-overrides(
+    (
+      size: 16px,
+    )
+  );
+}
