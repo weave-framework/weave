@@ -71,6 +71,11 @@
       "types": "./src/progress-spinner/progress-spinner.ts",
       "import": "./src/progress-spinner/progress-spinner.ts"
     },
+    "./checkbox": {
+      "sass": "./src/styles/components/checkbox/_index.scss",
+      "types": "./src/checkbox/checkbox.ts",
+      "import": "./src/checkbox/checkbox.ts"
+    },
     "./cdk": {
       "types": "./src/cdk/index.ts",
       "import": "./src/cdk/index.ts"
@@ -156,6 +161,11 @@
         "sass": "./src/styles/components/progress-spinner/_index.scss",
         "types": "./dist/progress-spinner/progress-spinner.d.ts",
         "import": "./dist/progress-spinner/progress-spinner.js"
+      },
+      "./checkbox": {
+        "sass": "./src/styles/components/checkbox/_index.scss",
+        "types": "./dist/checkbox/checkbox.d.ts",
+        "import": "./dist/checkbox/checkbox.js"
       },
       "./cdk": {
         "types": "./dist/cdk/index.d.ts",

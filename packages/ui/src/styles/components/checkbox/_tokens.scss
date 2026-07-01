@@ -1,0 +1,25 @@
+// checkbox — design tokens (schema). Forwarded by ./_index.scss.
+@use '../../ref' as ref;
+
+$tokens: (
+  color: (
+    border: ref.ref('color.line'),
+    background: transparent,
+    checked-background: ref.ref('color.accent'),
+    // On-accent tick: a fixed white (accent is dark in Light + Dim, so surface/canvas
+    // wouldn't contrast) — same call as the badge.
+    mark: #fff,
+    label-text: ref.ref('color.ink'),
+    disabled-text: ref.ref('color.sub'),
+  ),
+  size: (
+    size: 20px,
+    radius: 3px,
+    border-width: 1.5px,
+    gap: 8px,
+    duration: ref.ref('motion.fast'),
+  ),
+  typography: (
+    label-size: 13px,
+  ),
+);

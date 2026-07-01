@@ -18,6 +18,7 @@
 @use 'components/grid-list' as grid-list;
 @use 'components/progress-bar' as progress-bar;
 @use 'components/progress-spinner' as progress-spinner;
+@use 'components/checkbox' as checkbox;
 
 $_builtins: (
   'divider': divider.$tokens,
@@ -32,6 +33,7 @@ $_builtins: (
   'grid-list': grid-list.$tokens,
   'progress-bar': progress-bar.$tokens,
   'progress-spinner': progress-spinner.$tokens,
+  'checkbox': checkbox.$tokens,
 );
 
 /* ───────────────────────── internal emit ───────────────────────── */
@@ -157,6 +159,10 @@ $_builtins: (
   @include overrides('progress-spinner', $map);
 }
 
+@mixin checkbox-overrides($map) {
+  @include overrides('checkbox', $map);
+}
+
 // Emit the structural CSS (class rules) for every built-in component.
 // Prefer per-component includes to keep CSS small; all-styles() is the convenience.
 @mixin all-styles() {
@@ -172,4 +178,5 @@ $_builtins: (
   @include grid-list.styles();
   @include progress-bar.styles();
   @include progress-spinner.styles();
+  @include checkbox.styles();
 }

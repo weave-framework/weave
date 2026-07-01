@@ -1,0 +1,13 @@
+// Checkbox — a native `<input type=checkbox>` with the Weave visual. Behavior lives in
+// checkbox.ts (two-way value + forms control binding + tri-state); this is the visual.
+//
+// A 20px box: off = transparent + 1.5px border, on = accent fill + a white ✓ (a rotated
+// border tick via `::after`), indeterminate = a mixed dash (`::before`). State is the
+// NATIVE input pseudo (`:checked` / `:indeterminate` / `:focus-visible` / `:disabled`),
+// read off the visually-hidden input by the adjacent `__box` — no state classes.
+//
+// Barrel — forwards the split partials ($tokens + the styles() mixin). Add another
+// concern as its own file and @forward it here.
+
+@forward 'tokens';
+@forward 'styles';

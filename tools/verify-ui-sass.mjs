@@ -191,6 +191,16 @@ const cssSpinnerOverride = compile(
 check('progress-spinner-overrides changes existing token', /--weave-progress-spinner-thickness:\s*3px/.test(cssSpinnerOverride));
 check('progress-spinner-overrides adds new token (auto-var)', /--weave-progress-spinner-diameter-large:\s*40px/.test(cssSpinnerOverride));
 
+/* ── checkbox built-in: cascade refs + literals + overrides ── */
+check('theme emits checkbox checked-background referencing accent', /--weave-checkbox-checked-background:\s*var\(--weave-color-accent\)/.test(cssTheme));
+check('theme emits checkbox border referencing line', /--weave-checkbox-border:\s*var\(--weave-color-line\)/.test(cssTheme));
+check('theme emits checkbox size literal', /--weave-checkbox-size:\s*20px/.test(cssTheme));
+const cssCheckboxOverride = compile(
+  `@use '@weave-framework/ui' as weave;\n@include weave.checkbox-overrides((size: 24px, gap: 10px));`,
+);
+check('checkbox-overrides changes existing token', /--weave-checkbox-size:\s*24px/.test(cssCheckboxOverride));
+check('checkbox-overrides adds new token (auto-var)', /--weave-checkbox-gap:\s*10px/.test(cssCheckboxOverride));
+
 /* ── all-styles(): structural CSS by class ── */
 const cssStyles = compile(`@use '@weave-framework/ui' as weave;\n@include weave.all-styles();`);
 check('all-styles emits .weave-divider rule', /\.weave-divider\s*{/.test(cssStyles));
@@ -225,6 +235,9 @@ check('progress-bar fill consumes its accent token', /\.weave-progress-bar__fill
 check('progress-bar emits the --indeterminate animation + keyframes', /\.weave-progress-bar--indeterminate\s+\.weave-progress-bar__fill\s*{[\s\S]*?animation:\s*weave-progress-bar-indet/.test(cssStyles) && /@keyframes\s+weave-progress-bar-indet/.test(cssStyles));
 check('all-styles emits .weave-progress-spinner ring (border-radius:50% + spin)', /\.weave-progress-spinner\s*{[\s\S]*?border-radius:\s*50%[\s\S]*?animation:\s*weave-progress-spinner-spin/.test(cssStyles) && /@keyframes\s+weave-progress-spinner-spin/.test(cssStyles));
 check('progress-spinner emits the --small size modifier', /\.weave-progress-spinner--small\s*{[^}]*width:\s*var\(--weave-progress-spinner-diameter-small\)/.test(cssStyles));
+check('all-styles emits .weave-checkbox + __box rules', /\.weave-checkbox\s*{/.test(cssStyles) && /\.weave-checkbox__box\s*{[\s\S]*?border:\s*var\(--weave-checkbox-border-width\)/.test(cssStyles));
+check('checkbox paints the box from the native :checked pseudo (no state class)', /\.weave-checkbox__input:checked\s*\+\s*\.weave-checkbox__box[\s\S]*?background:\s*var\(--weave-checkbox-checked-background\)/.test(cssStyles));
+check('checkbox styles the tri-state :indeterminate mark', /\.weave-checkbox__input:indeterminate\s*\+\s*\.weave-checkbox__box::before\s*{[^}]*opacity:\s*1/.test(cssStyles));
 
 /* ── example.scss: the docs-seed dev surface compiles end-to-end ── */
 let exampleOk = false;
