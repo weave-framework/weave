@@ -35,6 +35,10 @@
   appearance: none;
   background: transparent;
   border: 0;
+  // Suppress the browser's native focus outline — these custom fields show focus via
+  // the component's own accent underline (:focus-within), never a native box. Without
+  // this, a field built on field-reset (e.g. Autocomplete) shows a stray focus rectangle.
+  outline: none;
   font: inherit;
   color: inherit;
 }
