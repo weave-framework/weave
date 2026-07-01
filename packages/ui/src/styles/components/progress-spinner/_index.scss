@@ -1,0 +1,11 @@
+// Progress Spinner — an indeterminate spinning ring. Behavior lives in
+// progress-spinner.ts (the size flag + ARIA); this is the visual.
+//
+// A `field` ring with an accent top arc rotating `spin .8s linear infinite`. Two sizes
+// (default 26px, `--small` 18px). Pure CSS; `role=progressbar` with no aria-valuenow.
+//
+// Barrel — forwards the split partials ($tokens + the styles() mixin, which also
+// carries the @keyframes). Add another concern as its own file and @forward it here.
+
+@forward 'tokens';
+@forward 'styles';

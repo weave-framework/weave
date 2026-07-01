@@ -66,6 +66,11 @@
       "types": "./src/progress-bar/progress-bar.ts",
       "import": "./src/progress-bar/progress-bar.ts"
     },
+    "./progress-spinner": {
+      "sass": "./src/styles/components/progress-spinner/_index.scss",
+      "types": "./src/progress-spinner/progress-spinner.ts",
+      "import": "./src/progress-spinner/progress-spinner.ts"
+    },
     "./cdk": {
       "types": "./src/cdk/index.ts",
       "import": "./src/cdk/index.ts"
@@ -146,6 +151,11 @@
         "sass": "./src/styles/components/progress-bar/_index.scss",
         "types": "./dist/progress-bar/progress-bar.d.ts",
         "import": "./dist/progress-bar/progress-bar.js"
+      },
+      "./progress-spinner": {
+        "sass": "./src/styles/components/progress-spinner/_index.scss",
+        "types": "./dist/progress-spinner/progress-spinner.d.ts",
+        "import": "./dist/progress-spinner/progress-spinner.js"
       },
       "./cdk": {
         "types": "./dist/cdk/index.d.ts",

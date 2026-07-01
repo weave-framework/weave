@@ -1,0 +1,26 @@
+// progress-spinner — styles() mixin (class rules + keyframes). Forwarded by ./_index.scss.
+
+@mixin styles() {
+  .weave-progress-spinner {
+    box-sizing: border-box;
+    display: inline-block;
+    width: var(--weave-progress-spinner-diameter);
+    height: var(--weave-progress-spinner-diameter);
+    border: var(--weave-progress-spinner-thickness) solid var(--weave-progress-spinner-track);
+    border-top-color: var(--weave-progress-spinner-indicator);
+    border-radius: 50%;
+    animation: weave-progress-spinner-spin var(--weave-progress-spinner-duration) linear infinite;
+  }
+
+  /* Compact 18px ring. */
+  .weave-progress-spinner--small {
+    width: var(--weave-progress-spinner-diameter-small);
+    height: var(--weave-progress-spinner-diameter-small);
+  }
+
+  @keyframes weave-progress-spinner-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+}

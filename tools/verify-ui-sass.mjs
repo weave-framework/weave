@@ -181,6 +181,16 @@ const cssProgressBarOverride = compile(
 check('progress-bar-overrides changes existing token', /--weave-progress-bar-height:\s*6px/.test(cssProgressBarOverride));
 check('progress-bar-overrides adds new token (auto-var)', /--weave-progress-bar-buffer:\s*#ccc/.test(cssProgressBarOverride));
 
+/* ── progress-spinner built-in: cascade refs + literals + overrides ── */
+check('theme emits progress-spinner indicator referencing accent', /--weave-progress-spinner-indicator:\s*var\(--weave-color-accent\)/.test(cssTheme));
+check('theme emits progress-spinner track referencing field', /--weave-progress-spinner-track:\s*var\(--weave-color-field\)/.test(cssTheme));
+check('theme emits progress-spinner diameter literal', /--weave-progress-spinner-diameter:\s*26px/.test(cssTheme));
+const cssSpinnerOverride = compile(
+  `@use '@weave-framework/ui' as weave;\n@include weave.progress-spinner-overrides((thickness: 3px, diameter-large: 40px));`,
+);
+check('progress-spinner-overrides changes existing token', /--weave-progress-spinner-thickness:\s*3px/.test(cssSpinnerOverride));
+check('progress-spinner-overrides adds new token (auto-var)', /--weave-progress-spinner-diameter-large:\s*40px/.test(cssSpinnerOverride));
+
 /* ── all-styles(): structural CSS by class ── */
 const cssStyles = compile(`@use '@weave-framework/ui' as weave;\n@include weave.all-styles();`);
 check('all-styles emits .weave-divider rule', /\.weave-divider\s*{/.test(cssStyles));
@@ -213,6 +223,8 @@ check('grid-list emits the --accent tile modifier', /\.weave-grid-list__tile--ac
 check('all-styles emits .weave-progress-bar rule', /\.weave-progress-bar\s*{[\s\S]*?height:\s*var\(--weave-progress-bar-height\)/.test(cssStyles));
 check('progress-bar fill consumes its accent token', /\.weave-progress-bar__fill\s*{[\s\S]*?background:\s*var\(--weave-progress-bar-fill\)/.test(cssStyles));
 check('progress-bar emits the --indeterminate animation + keyframes', /\.weave-progress-bar--indeterminate\s+\.weave-progress-bar__fill\s*{[\s\S]*?animation:\s*weave-progress-bar-indet/.test(cssStyles) && /@keyframes\s+weave-progress-bar-indet/.test(cssStyles));
+check('all-styles emits .weave-progress-spinner ring (border-radius:50% + spin)', /\.weave-progress-spinner\s*{[\s\S]*?border-radius:\s*50%[\s\S]*?animation:\s*weave-progress-spinner-spin/.test(cssStyles) && /@keyframes\s+weave-progress-spinner-spin/.test(cssStyles));
+check('progress-spinner emits the --small size modifier', /\.weave-progress-spinner--small\s*{[^}]*width:\s*var\(--weave-progress-spinner-diameter-small\)/.test(cssStyles));
 
 /* ── example.scss: the docs-seed dev surface compiles end-to-end ── */
 let exampleOk = false;

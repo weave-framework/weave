@@ -1,0 +1,15 @@
+// progress-spinner — design tokens (schema). Forwarded by ./_index.scss.
+@use '../../ref' as ref;
+
+$tokens: (
+  color: (
+    track: ref.ref('color.field'),
+    indicator: ref.ref('color.accent'),
+  ),
+  size: (
+    diameter: 26px,
+    diameter-small: 18px,
+    thickness: 2px,
+    duration: 0.8s,
+  ),
+);

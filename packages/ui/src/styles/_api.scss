@@ -17,6 +17,7 @@
 @use 'components/list' as list-cmp;
 @use 'components/grid-list' as grid-list;
 @use 'components/progress-bar' as progress-bar;
+@use 'components/progress-spinner' as progress-spinner;
 
 $_builtins: (
   'divider': divider.$tokens,
@@ -30,6 +31,7 @@ $_builtins: (
   'list': list-cmp.$tokens,
   'grid-list': grid-list.$tokens,
   'progress-bar': progress-bar.$tokens,
+  'progress-spinner': progress-spinner.$tokens,
 );
 
 /* ───────────────────────── internal emit ───────────────────────── */
@@ -151,6 +153,10 @@ $_builtins: (
   @include overrides('progress-bar', $map);
 }
 
+@mixin progress-spinner-overrides($map) {
+  @include overrides('progress-spinner', $map);
+}
+
 // Emit the structural CSS (class rules) for every built-in component.
 // Prefer per-component includes to keep CSS small; all-styles() is the convenience.
 @mixin all-styles() {
@@ -165,4 +171,5 @@ $_builtins: (
   @include list-cmp.styles();
   @include grid-list.styles();
   @include progress-bar.styles();
+  @include progress-spinner.styles();
 }
