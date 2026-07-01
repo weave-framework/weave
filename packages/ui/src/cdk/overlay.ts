@@ -15,6 +15,7 @@
 
 import { signal, onDispose, type Signal } from '@weave-framework/runtime';
 import { portal, type PortalHandle } from './portal.js';
+import type { ScrollStrategy, ScrollStrategyFactory } from './scroll.js';
 
 /** Base z-index for the overlay layer; each attach takes the next two slots (backdrop, panel). */
 const Z_BASE = 1000;
@@ -79,6 +80,8 @@ export interface OverlayConfig {
   panelClass?: string | string[];
   /** How to position the panel. Default: centered {@link globalPosition}. */
   positionStrategy?: PositionStrategy;
+  /** How the overlay reacts to scroll (reposition/close/block/noop). Default: noop. */
+  scrollStrategy?: ScrollStrategyFactory;
 }
 
 export interface OverlayRef {
@@ -143,6 +146,7 @@ export function createOverlay(config: OverlayConfig = {}): OverlayRef {
   const _attached: Signal<boolean> = signal<boolean>(false);
   let panelPortal: PortalHandle | null = null;
   let backdropPortal: PortalHandle | null = null;
+  let scroll: ScrollStrategy | null = null;
   let disposed = false;
 
   function attach(content: Node | (() => Node)): HTMLElement {
@@ -163,10 +167,12 @@ export function createOverlay(config: OverlayConfig = {}): OverlayRef {
 
     strategy.apply(overlayElement);
     _attached.set(true);
+    scroll?.enable();
     return overlayElement;
   }
 
   function detach(): void {
+    scroll?.disable();
     panelPortal?.detach();
     backdropPortal?.detach();
     panelPortal = backdropPortal = null;
@@ -185,7 +191,7 @@ export function createOverlay(config: OverlayConfig = {}): OverlayRef {
   // Tie disposal to the surrounding owner scope (no-op outside one).
   onDispose(dispose);
 
-  return {
+  const ref: OverlayRef = {
     overlayElement,
     backdropElement,
     attach,
@@ -200,4 +206,8 @@ export function createOverlay(config: OverlayConfig = {}): OverlayRef {
       if (_attached()) strategy.apply(overlayElement);
     },
   };
+
+  // The scroll strategy needs the ref; build it now, before any attach happens.
+  scroll = config.scrollStrategy ? config.scrollStrategy(ref) : null;
+  return ref;
 }

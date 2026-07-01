@@ -13,3 +13,4 @@ export * from './bidi.js';
 export * from './portal.js';
 export * from './overlay.js';
 export * from './positioning.js';
+export * from './scroll.js';
