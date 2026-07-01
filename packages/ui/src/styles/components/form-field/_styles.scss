@@ -1,0 +1,39 @@
+// form-field — styles() mixin (class rules). Forwarded by ./_index.scss.
+
+@mixin styles() {
+  .weave-form-field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--weave-form-field-gap);
+
+    @content;
+  }
+
+  .weave-form-field__label {
+    font-size: var(--weave-form-field-label-size);
+    font-weight: var(--weave-form-field-label-weight);
+    text-transform: uppercase;
+    letter-spacing: var(--weave-form-field-label-tracking);
+    color: var(--weave-form-field-label);
+  }
+
+  .weave-form-field__control {
+    display: block;
+  }
+
+  .weave-form-field__hint {
+    font-size: var(--weave-form-field-message-size);
+    color: var(--weave-form-field-hint);
+  }
+
+  .weave-form-field__error {
+    font-size: var(--weave-form-field-message-size);
+    color: var(--weave-form-field-error);
+  }
+
+  /* Error state — the label reddens (the control's underline reddens off the
+     aria-invalid this field sets, styled by the control itself). */
+  .weave-form-field--invalid .weave-form-field__label {
+    color: var(--weave-form-field-error);
+  }
+}

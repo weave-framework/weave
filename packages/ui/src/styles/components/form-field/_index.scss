@@ -1,0 +1,13 @@
+// Form Field — the lean label/hint/error frame around a control. Behavior lives in
+// form-field.ts (auto-wires the slotted control's id/for/aria-describedby/aria-invalid,
+// and derives the error state); this is the visual.
+//
+// A column: `__label` (uppercase 10px) above, `__control` (the slot), and a
+// `__hint`/`__error` line (11px) below. In the error state the `--invalid` root turns the
+// label `error` red; the control's own underline reddens off the aria-invalid this sets.
+//
+// Barrel — forwards the split partials ($tokens + the styles() mixin). Add another
+// concern as its own file and @forward it here.
+
+@forward 'tokens';
+@forward 'styles';

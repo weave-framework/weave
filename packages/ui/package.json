@@ -86,6 +86,11 @@
       "types": "./src/slide-toggle/slide-toggle.ts",
       "import": "./src/slide-toggle/slide-toggle.ts"
     },
+    "./form-field": {
+      "sass": "./src/styles/components/form-field/_index.scss",
+      "types": "./src/form-field/form-field.ts",
+      "import": "./src/form-field/form-field.ts"
+    },
     "./cdk": {
       "types": "./src/cdk/index.ts",
       "import": "./src/cdk/index.ts"
@@ -186,6 +191,11 @@
         "sass": "./src/styles/components/slide-toggle/_index.scss",
         "types": "./dist/slide-toggle/slide-toggle.d.ts",
         "import": "./dist/slide-toggle/slide-toggle.js"
+      },
+      "./form-field": {
+        "sass": "./src/styles/components/form-field/_index.scss",
+        "types": "./dist/form-field/form-field.d.ts",
+        "import": "./dist/form-field/form-field.js"
       },
       "./cdk": {
         "types": "./dist/cdk/index.d.ts",

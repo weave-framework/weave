@@ -1,0 +1,19 @@
+// form-field — design tokens (schema). Forwarded by ./_index.scss.
+@use '../../ref' as ref;
+
+$tokens: (
+  color: (
+    label: ref.ref('color.sub'),
+    hint: ref.ref('color.sub'),
+    error: ref.ref('color.error'),
+  ),
+  size: (
+    gap: 6px,
+    label-size: 10px,
+    message-size: 11px,
+  ),
+  typography: (
+    label-weight: 600,
+    label-tracking: 0.14em,
+  ),
+);

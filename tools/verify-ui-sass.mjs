@@ -221,6 +221,16 @@ const cssSlideToggleOverride = compile(
 check('slide-toggle-overrides changes existing token', /--weave-slide-toggle-track-width:\s*48px/.test(cssSlideToggleOverride));
 check('slide-toggle-overrides adds new token (auto-var)', /--weave-slide-toggle-elevation:\s*1px/.test(cssSlideToggleOverride));
 
+/* ── form-field built-in: cascade refs + literals + overrides ── */
+check('theme emits form-field error referencing error color', /--weave-form-field-error:\s*var\(--weave-color-error\)/.test(cssTheme));
+check('theme emits form-field label referencing sub', /--weave-form-field-label:\s*var\(--weave-color-sub\)/.test(cssTheme));
+check('theme emits form-field label-size literal', /--weave-form-field-label-size:\s*10px/.test(cssTheme));
+const cssFormFieldOverride = compile(
+  `@use '@weave-framework/ui' as weave;\n@include weave.form-field-overrides((gap: 8px, message-weight: 500));`,
+);
+check('form-field-overrides changes existing token', /--weave-form-field-gap:\s*8px/.test(cssFormFieldOverride));
+check('form-field-overrides adds new token (auto-var)', /--weave-form-field-message-weight:\s*500/.test(cssFormFieldOverride));
+
 /* ── all-styles(): structural CSS by class ── */
 const cssStyles = compile(`@use '@weave-framework/ui' as weave;\n@include weave.all-styles();`);
 check('all-styles emits .weave-divider rule', /\.weave-divider\s*{/.test(cssStyles));
@@ -262,6 +272,8 @@ check('all-styles emits .weave-radio-group + circular __box rules', /\.weave-rad
 check('radio reveals the dot from the native :checked pseudo (no state class)', /\.weave-radio__input:checked\s*\+\s*\.weave-radio__box::after\s*{[\s\S]*?scale\(1\)/.test(cssStyles));
 check('all-styles emits .weave-slide-toggle__track + knob rules', /\.weave-slide-toggle__track\s*{[\s\S]*?width:\s*var\(--weave-slide-toggle-track-width\)/.test(cssStyles) && /\.weave-slide-toggle__track::after\s*{/.test(cssStyles));
 check('slide-toggle slides the knob + swaps the track on :checked (no state class)', /\.weave-slide-toggle__input:checked\s*\+\s*\.weave-slide-toggle__track\s*{[^}]*background:\s*var\(--weave-slide-toggle-track-on\)/.test(cssStyles) && /\.weave-slide-toggle__input:checked\s*\+\s*\.weave-slide-toggle__track::after\s*{[\s\S]*?translatex/.test(cssStyles));
+check('all-styles emits .weave-form-field label + error rules', /\.weave-form-field__label\s*{[\s\S]*?text-transform:\s*uppercase/.test(cssStyles) && /\.weave-form-field__error\s*{[^}]*color:\s*var\(--weave-form-field-error\)/.test(cssStyles));
+check('form-field reddens the label in the --invalid state', /\.weave-form-field--invalid\s+\.weave-form-field__label\s*{[^}]*color:\s*var\(--weave-form-field-error\)/.test(cssStyles));
 
 /* ── example.scss: the docs-seed dev surface compiles end-to-end ── */
 let exampleOk = false;
