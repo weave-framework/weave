@@ -96,6 +96,11 @@
       "types": "./src/input/input.ts",
       "import": "./src/input/input.ts"
     },
+    "./chips": {
+      "sass": "./src/styles/components/chips/_index.scss",
+      "types": "./src/chips/chips.ts",
+      "import": "./src/chips/chips.ts"
+    },
     "./cdk": {
       "types": "./src/cdk/index.ts",
       "import": "./src/cdk/index.ts"
@@ -206,6 +211,11 @@
         "sass": "./src/styles/components/input/_index.scss",
         "types": "./dist/input/input.d.ts",
         "import": "./dist/input/input.js"
+      },
+      "./chips": {
+        "sass": "./src/styles/components/chips/_index.scss",
+        "types": "./dist/chips/chips.d.ts",
+        "import": "./dist/chips/chips.js"
       },
       "./cdk": {
         "types": "./dist/cdk/index.d.ts",

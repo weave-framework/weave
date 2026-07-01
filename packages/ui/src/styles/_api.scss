@@ -23,6 +23,7 @@
 @use 'components/slide-toggle' as slide-toggle;
 @use 'components/form-field' as form-field;
 @use 'components/input' as input;
+@use 'components/chips' as chips;
 
 $_builtins: (
   'divider': divider.$tokens,
@@ -42,6 +43,7 @@ $_builtins: (
   'slide-toggle': slide-toggle.$tokens,
   'form-field': form-field.$tokens,
   'input': input.$tokens,
+  'chips': chips.$tokens,
 );
 
 /* ───────────────────────── internal emit ───────────────────────── */
@@ -187,6 +189,10 @@ $_builtins: (
   @include overrides('input', $map);
 }
 
+@mixin chips-overrides($map) {
+  @include overrides('chips', $map);
+}
+
 // Emit the structural CSS (class rules) for every built-in component.
 // Prefer per-component includes to keep CSS small; all-styles() is the convenience.
 @mixin all-styles() {
@@ -207,4 +213,5 @@ $_builtins: (
   @include slide-toggle.styles();
   @include form-field.styles();
   @include input.styles();
+  @include chips.styles();
 }

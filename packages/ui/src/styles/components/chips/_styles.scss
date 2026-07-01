@@ -1,0 +1,83 @@
+// chips — styles() mixin (class rules). Forwarded by ./_index.scss.
+@use '../../helpers' as helpers;
+
+@mixin styles() {
+  .weave-chips {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--weave-chips-gap);
+
+    @content;
+  }
+
+  .weave-chips__chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: var(--weave-chips-padding-y) var(--weave-chips-padding-x);
+    border: 1px solid var(--weave-chips-border);
+    border-radius: var(--weave-chips-radius);
+    background: transparent;
+    color: var(--weave-chips-text);
+    font-size: var(--weave-chips-font-size);
+    line-height: 1.4;
+  }
+
+  .weave-chips__chip:focus-visible {
+    @include helpers.focus-ring;
+  }
+
+  .weave-chips__label {
+    white-space: nowrap;
+  }
+
+  .weave-chips__remove {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    margin-right: -4px; // pull the × toward the chip edge
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--weave-chips-remove);
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+    transition:
+      color var(--weave-chips-duration) ease,
+      background var(--weave-chips-duration) ease;
+  }
+
+  .weave-chips__remove:hover:not(:disabled) {
+    color: var(--weave-chips-text);
+    background: var(--weave-chips-hover);
+  }
+
+  .weave-chips__remove:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+
+  /* The dashed "+ Add" chip — a real button. */
+  .weave-chips__chip--add {
+    gap: 4px;
+    border-style: dashed;
+    color: var(--weave-chips-add-text);
+    cursor: pointer;
+    font-family: inherit;
+    transition: background var(--weave-chips-duration) ease;
+  }
+
+  .weave-chips__chip--add:hover:not(:disabled) {
+    background: var(--weave-chips-hover);
+  }
+
+  .weave-chips__chip--add:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+}

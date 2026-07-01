@@ -241,6 +241,16 @@ const cssInputOverride = compile(
 check('input-overrides changes existing token', /--weave-input-gap:\s*6px/.test(cssInputOverride));
 check('input-overrides adds new token (auto-var)', /--weave-input-radius:\s*4px/.test(cssInputOverride));
 
+/* ── chips built-in: cascade refs + literals + overrides ── */
+check('theme emits chips border referencing line', /--weave-chips-border:\s*var\(--weave-color-line\)/.test(cssTheme));
+check('theme emits chips remove referencing sub', /--weave-chips-remove:\s*var\(--weave-color-sub\)/.test(cssTheme));
+check('theme emits chips radius literal', /--weave-chips-radius:\s*3px/.test(cssTheme));
+const cssChipsOverride = compile(
+  `@use '@weave-framework/ui' as weave;\n@include weave.chips-overrides((radius: 4px, elevation: 1px));`,
+);
+check('chips-overrides changes existing token', /--weave-chips-radius:\s*4px/.test(cssChipsOverride));
+check('chips-overrides adds new token (auto-var)', /--weave-chips-elevation:\s*1px/.test(cssChipsOverride));
+
 /* ── all-styles(): structural CSS by class ── */
 const cssStyles = compile(`@use '@weave-framework/ui' as weave;\n@include weave.all-styles();`);
 check('all-styles emits .weave-divider rule', /\.weave-divider\s*{/.test(cssStyles));
@@ -288,6 +298,8 @@ check('all-styles emits .weave-input underline field', /\.weave-input\s*{[\s\S]*
 check('input focus swaps the underline to accent', /\.weave-input:focus-within\s*{[\s\S]*?border-bottom-color:\s*var\(--weave-input-focus\)/.test(cssStyles));
 check('input --invalid reddens the underline; empty prefix/suffix collapse', /\.weave-input--invalid\s*{[^}]*border-bottom-color:\s*var\(--weave-input-error\)/.test(cssStyles) && /\.weave-input__prefix--empty[\s\S]*?display:\s*none/.test(cssStyles));
 check('input suppresses native number spinners + search clear', /::-webkit-inner-spin-button/.test(cssStyles) && /\[type=number\]\s*{[\s\S]*?appearance:\s*textfield/.test(cssStyles) && /::-webkit-search-cancel-button/.test(cssStyles));
+check('all-styles emits .weave-chips chip + remove rules', /\.weave-chips__chip\s*{[\s\S]*?border:\s*1px solid var\(--weave-chips-border\)/.test(cssStyles) && /\.weave-chips__remove\s*{/.test(cssStyles));
+check('chips emits the dashed --add chip', /\.weave-chips__chip--add\s*{[^}]*border-style:\s*dashed/.test(cssStyles));
 
 /* ── example.scss: the docs-seed dev surface compiles end-to-end ── */
 let exampleOk = false;

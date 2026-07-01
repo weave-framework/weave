@@ -1,0 +1,22 @@
+// chips — design tokens (schema). Forwarded by ./_index.scss.
+@use '../../ref' as ref;
+
+$tokens: (
+  color: (
+    border: ref.ref('color.line'),
+    text: ref.ref('color.ink'),
+    hover: ref.ref('color.field'),
+    remove: ref.ref('color.sub'),
+    add-text: ref.ref('color.sub'),
+  ),
+  size: (
+    radius: 3px,
+    padding-x: 10px,
+    padding-y: 4px,
+    gap: 8px,
+    duration: ref.ref('motion.fast'),
+  ),
+  typography: (
+    font-size: 12px,
+  ),
+);

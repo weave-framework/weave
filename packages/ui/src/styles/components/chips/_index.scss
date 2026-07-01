@@ -1,0 +1,12 @@
+// Chips — a removable tag list. Behavior lives in chips.ts (array value + forms binding,
+// remove via × / Backspace/Delete, arrow-nav via the CDK listKeyManager); this is the visual.
+//
+// Each chip is a 1px-bordered pill (radius 3px) = `__label` + a `×` `__remove` button; an
+// optional dashed `__chip--add` "+ Add" chip trails the list. Roving-tabindex group
+// (`role=group`); the remove button carries an `aria-label`.
+//
+// Barrel — forwards the split partials ($tokens + the styles() mixin). Add another
+// concern as its own file and @forward it here.
+
+@forward 'tokens';
+@forward 'styles';
