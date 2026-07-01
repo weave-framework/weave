@@ -1,0 +1,13 @@
+// Slider — a value over a range. Behavior lives in slider.ts (custom role=slider:
+// pointer-capture drag + Arrow/Home/End/Page keys + forms/signals binding); this is the
+// visual.
+//
+// A 2px --field track with an accent fill to the value; the thumb is a 3×18 ink bar
+// (positioned by an inline left:%) with a 5px accent cap (the Weave mark). State via
+// modifiers: --disabled dims + not-allowed, --invalid reddens the fill/cap.
+//
+// Barrel — forwards the split partials ($tokens + the styles() mixin). Add another
+// concern as its own file and @forward it here.
+
+@forward 'tokens';
+@forward 'styles';

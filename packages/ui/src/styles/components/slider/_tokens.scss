@@ -1,0 +1,21 @@
+// slider — design tokens (schema). Forwarded by ./_index.scss.
+@use '../../ref' as ref;
+
+$tokens: (
+  color: (
+    // 2px --field track, accent fill; thumb = an ink bar with a 5px accent cap (design).
+    track: ref.ref('color.field'),
+    fill: ref.ref('color.accent'),
+    thumb: ref.ref('color.ink'),
+    cap: ref.ref('color.accent'),
+    error: ref.ref('color.error'),
+  ),
+  size: (
+    height: 18px,
+    track-height: 2px,
+    thumb-width: 3px,
+    thumb-height: 18px,
+    cap-size: 5px,
+    duration: ref.ref('motion.fast'),
+  ),
+);

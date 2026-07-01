@@ -158,6 +158,11 @@
       "types": "./src/stepper/stepper.ts",
       "import": "./src/stepper/stepper.ts"
     },
+    "./slider": {
+      "sass": "./src/styles/components/slider/_index.scss",
+      "types": "./src/slider/slider.ts",
+      "import": "./src/slider/slider.ts"
+    },
     "./cdk": {
       "types": "./src/cdk/index.ts",
       "import": "./src/cdk/index.ts"
@@ -330,6 +335,11 @@
         "sass": "./src/styles/components/stepper/_index.scss",
         "types": "./dist/stepper/stepper.d.ts",
         "import": "./dist/stepper/stepper.js"
+      },
+      "./slider": {
+        "sass": "./src/styles/components/slider/_index.scss",
+        "types": "./dist/slider/slider.d.ts",
+        "import": "./dist/slider/slider.js"
       },
       "./cdk": {
         "types": "./dist/cdk/index.d.ts",

@@ -37,6 +37,7 @@
 @use 'components/expansion' as expansion;
 @use 'components/tabs' as tabs;
 @use 'components/stepper' as stepper;
+@use 'components/slider' as slider;
 
 $_builtins: (
   'divider': divider.$tokens,
@@ -68,6 +69,7 @@ $_builtins: (
   'expansion': expansion.$tokens,
   'tabs': tabs.$tokens,
   'stepper': stepper.$tokens,
+  'slider': slider.$tokens,
 );
 
 /* ───────────────────────── internal emit ───────────────────────── */
@@ -261,6 +263,10 @@ $_builtins: (
   @include overrides('stepper', $map);
 }
 
+@mixin slider-overrides($map) {
+  @include overrides('slider', $map);
+}
+
 // Emit the structural CSS (class rules) for every built-in component.
 // Prefer per-component includes to keep CSS small; all-styles() is the convenience.
 @mixin all-styles() {
@@ -293,4 +299,5 @@ $_builtins: (
   @include expansion.styles();
   @include tabs.styles();
   @include stepper.styles();
+  @include slider.styles();
 }

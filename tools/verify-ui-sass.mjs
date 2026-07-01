@@ -360,6 +360,15 @@ const cssStepperOverride = compile(
 check('stepper-overrides changes existing token', /--weave-stepper-indicator-size:\s*30px/.test(cssStepperOverride));
 check('stepper-overrides adds new token (auto-var)', /--weave-stepper-ring:\s*2px/.test(cssStepperOverride));
 
+/* ── slider built-in: cascade refs + literals + overrides (U4) ── */
+check('theme emits slider fill referencing accent', /--weave-slider-fill:\s*var\(--weave-color-accent\)/.test(cssTheme));
+check('theme emits slider thumb dims literals (3×18) + 5px cap', /--weave-slider-thumb-width:\s*3px/.test(cssTheme) && /--weave-slider-thumb-height:\s*18px/.test(cssTheme) && /--weave-slider-cap-size:\s*5px/.test(cssTheme));
+const cssSliderOverride = compile(
+  `@use '@weave-framework/ui' as weave;\n@include weave.slider-overrides((track-height: 4px, tick: 1px));`,
+);
+check('slider-overrides changes existing token', /--weave-slider-track-height:\s*4px/.test(cssSliderOverride));
+check('slider-overrides adds new token (auto-var)', /--weave-slider-tick:\s*1px/.test(cssSliderOverride));
+
 /* ── all-styles(): structural CSS by class ── */
 const cssStyles = compile(`@use '@weave-framework/ui' as weave;\n@include weave.all-styles();`);
 check('all-styles emits .weave-divider rule', /\.weave-divider\s*{/.test(cssStyles));
@@ -440,6 +449,9 @@ check('stepper paints states via [data-state]: active/done accent fill, upcoming
 check('stepper done step shows a pure-CSS ✓ (rotated-L) + hides the number', /\.weave-stepper__step\[data-state=done\]\s+\.weave-stepper__number\s*{[^}]*display:\s*none/.test(cssStyles) && /\.weave-stepper__step\[data-state=done\]\s+\.weave-stepper__indicator::after\s*{[\s\S]*?transform:\s*rotate\(45deg\)/.test(cssStyles));
 check('stepper connector goes accent once its step is done', /\.weave-stepper__connector\[data-state=done\]\s*{[^}]*background:\s*var\(--weave-stepper-connector-done\)/.test(cssStyles));
 check('stepper label truncates so the header never overflows its box', /\.weave-stepper__label\s*{[\s\S]*?min-width:\s*0[\s\S]*?text-overflow:\s*ellipsis/.test(cssStyles) && /\.weave-stepper__step\s*{[\s\S]*?min-width:\s*0/.test(cssStyles));
+check('all-styles emits .weave-slider track + accent fill', /\.weave-slider__track\s*{[\s\S]*?height:\s*var\(--weave-slider-track-height\)[\s\S]*?background:\s*var\(--weave-slider-track\)/.test(cssStyles) && /\.weave-slider__fill\s*{[\s\S]*?background:\s*var\(--weave-slider-fill\)/.test(cssStyles));
+check('slider thumb is a 3×18 ink bar with a 5px accent cap (::after)', /\.weave-slider__thumb\s*{[\s\S]*?width:\s*var\(--weave-slider-thumb-width\)[\s\S]*?height:\s*var\(--weave-slider-thumb-height\)[\s\S]*?background:\s*var\(--weave-slider-thumb\)/.test(cssStyles) && /\.weave-slider__thumb::after\s*{[\s\S]*?background:\s*var\(--weave-slider-cap\)/.test(cssStyles));
+check('slider blocks page scroll during a pointer drag (touch-action:none)', /\.weave-slider\s*{[\s\S]*?touch-action:\s*none/.test(cssStyles));
 
 /* ── example.scss: the docs-seed dev surface compiles end-to-end ── */
 let exampleOk = false;

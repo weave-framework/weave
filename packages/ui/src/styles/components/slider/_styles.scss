@@ -1,0 +1,72 @@
+// slider — styles() mixin (class rules). Forwarded by ./_index.scss.
+@use '../../helpers' as helpers;
+
+@mixin styles() {
+  .weave-slider {
+    position: relative;
+    display: flex;
+    align-items: center;
+    height: var(--weave-slider-height);
+    cursor: pointer;
+    touch-action: none; // let a pointer drag control the value, not scroll the page
+    user-select: none;
+
+    @content;
+  }
+
+  // 2px track (design).
+  .weave-slider__track {
+    position: relative;
+    width: 100%;
+    height: var(--weave-slider-track-height);
+    background: var(--weave-slider-track);
+    border-radius: calc(var(--weave-slider-track-height) / 2);
+  }
+
+  // Accent fill to the value (width set inline).
+  .weave-slider__fill {
+    position: absolute;
+    inset: 0 auto 0 0;
+    height: 100%;
+    background: var(--weave-slider-fill);
+    border-radius: inherit;
+  }
+
+  // Thumb = a 3×18 ink bar (positioned by an inline left:%), centred on the value.
+  .weave-slider__thumb {
+    position: absolute;
+    top: 50%;
+    width: var(--weave-slider-thumb-width);
+    height: var(--weave-slider-thumb-height);
+    background: var(--weave-slider-thumb);
+    transform: translate(-50%, -50%);
+  }
+
+  // …with a 5px accent cap on top (the Weave mark).
+  .weave-slider__thumb::after {
+    content: '';
+    position: absolute;
+    top: calc(var(--weave-slider-cap-size) / -2);
+    left: 50%;
+    width: var(--weave-slider-cap-size);
+    height: var(--weave-slider-cap-size);
+    background: var(--weave-slider-cap);
+    transform: translateX(-50%);
+  }
+
+  .weave-slider:focus-visible {
+    @include helpers.focus-ring;
+    border-radius: 2px;
+  }
+
+  // Invalid — the fill + cap redden (state via the --invalid modifier from the control).
+  .weave-slider--invalid .weave-slider__fill,
+  .weave-slider--invalid .weave-slider__thumb::after {
+    background: var(--weave-slider-error);
+  }
+
+  .weave-slider--disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+}
