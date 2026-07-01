@@ -121,6 +121,16 @@ const cssBtnToggleOverride = compile(
 check('button-toggle-overrides changes existing token', /--weave-button-toggle-radius:\s*6px/.test(cssBtnToggleOverride));
 check('button-toggle-overrides adds new token (auto-var)', /--weave-button-toggle-gap:\s*2px/.test(cssBtnToggleOverride));
 
+/* ── badge built-in: cascade ref (accent) + literals + overrides ── */
+check('theme emits badge background referencing accent', /--weave-badge-background:\s*var\(--weave-color-accent\)/.test(cssTheme));
+check('theme emits badge dot referencing error', /--weave-badge-dot:\s*var\(--weave-color-error\)/.test(cssTheme));
+check('theme emits badge min-size literal', /--weave-badge-min-size:\s*15px/.test(cssTheme));
+const cssBadgeOverride = compile(
+  `@use '@weave-framework/ui' as weave;\n@include weave.badge-overrides((min-size: 18px, offset: 2px));`,
+);
+check('badge-overrides changes existing token', /--weave-badge-min-size:\s*18px/.test(cssBadgeOverride));
+check('badge-overrides adds new token (auto-var)', /--weave-badge-offset:\s*2px/.test(cssBadgeOverride));
+
 /* ── all-styles(): structural CSS by class ── */
 const cssStyles = compile(`@use '@weave-framework/ui' as weave;\n@include weave.all-styles();`);
 check('all-styles emits .weave-divider rule', /\.weave-divider\s*{/.test(cssStyles));
@@ -134,6 +144,9 @@ check('button rule consumes its background token', /background:\s*var\(--weave-b
 check('button emits a --variant modifier rule', /\.weave-button--outline\s*{/.test(cssStyles));
 check('all-styles emits .weave-button-toggle rule', /\.weave-button-toggle\s*{/.test(cssStyles));
 check('button-toggle styles the selected segment via [aria-checked]', /\.weave-button-toggle__segment\[aria-checked=true\]/.test(cssStyles));
+check('all-styles emits .weave-badge rule', /\.weave-badge\s*{/.test(cssStyles));
+check('badge mark consumes its background token', /\.weave-badge__mark[\s\S]*?background:\s*var\(--weave-badge-background\)/.test(cssStyles));
+check('badge emits the --dot variant rule', /\.weave-badge--dot\s+\.weave-badge__mark/.test(cssStyles));
 
 /* ── example.scss: the docs-seed dev surface compiles end-to-end ── */
 let exampleOk = false;

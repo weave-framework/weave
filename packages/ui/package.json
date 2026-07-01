@@ -36,6 +36,11 @@
       "types": "./src/button-toggle/button-toggle.ts",
       "import": "./src/button-toggle/button-toggle.ts"
     },
+    "./badge": {
+      "sass": "./src/styles/components/_badge.scss",
+      "types": "./src/badge/badge.ts",
+      "import": "./src/badge/badge.ts"
+    },
     "./cdk": {
       "types": "./src/cdk/index.ts",
       "import": "./src/cdk/index.ts"
@@ -86,6 +91,11 @@
         "sass": "./src/styles/components/_button-toggle.scss",
         "types": "./dist/button-toggle/button-toggle.d.ts",
         "import": "./dist/button-toggle/button-toggle.js"
+      },
+      "./badge": {
+        "sass": "./src/styles/components/_badge.scss",
+        "types": "./dist/badge/badge.d.ts",
+        "import": "./dist/badge/badge.js"
       },
       "./cdk": {
         "types": "./dist/cdk/index.d.ts",
