@@ -53,6 +53,25 @@
     color: var(--weave-input-placeholder);
   }
 
+  /* Suppress native adornments Weave replaces or omits: the `type=search` clear (we
+     ship our own `__clear`) and the `type=number` spinner buttons. */
+  .weave-input__field::-webkit-search-cancel-button,
+  .weave-input__field::-webkit-search-decoration {
+    appearance: none;
+    -webkit-appearance: none;
+  }
+
+  .weave-input__field::-webkit-outer-spin-button,
+  .weave-input__field::-webkit-inner-spin-button {
+    margin: 0;
+    -webkit-appearance: none;
+  }
+
+  .weave-input__field[type='number'] {
+    appearance: textfield;
+    -moz-appearance: textfield;
+  }
+
   .weave-input__field:disabled {
     cursor: not-allowed;
     opacity: 0.6;

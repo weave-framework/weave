@@ -287,6 +287,7 @@ check('form-field reddens the label in the --invalid state', /\.weave-form-field
 check('all-styles emits .weave-input underline field', /\.weave-input\s*{[\s\S]*?border-bottom:\s*var\(--weave-input-border-width\)\s*solid\s*var\(--weave-input-border\)/.test(cssStyles));
 check('input focus swaps the underline to accent', /\.weave-input:focus-within\s*{[\s\S]*?border-bottom-color:\s*var\(--weave-input-focus\)/.test(cssStyles));
 check('input --invalid reddens the underline; empty prefix/suffix collapse', /\.weave-input--invalid\s*{[^}]*border-bottom-color:\s*var\(--weave-input-error\)/.test(cssStyles) && /\.weave-input__prefix--empty[\s\S]*?display:\s*none/.test(cssStyles));
+check('input suppresses native number spinners + search clear', /::-webkit-inner-spin-button/.test(cssStyles) && /\[type=number\]\s*{[\s\S]*?appearance:\s*textfield/.test(cssStyles) && /::-webkit-search-cancel-button/.test(cssStyles));
 
 /* ── example.scss: the docs-seed dev surface compiles end-to-end ── */
 let exampleOk = false;
