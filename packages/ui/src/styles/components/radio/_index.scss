@@ -1,0 +1,14 @@
+// Radio — a single-select group of native `<input type=radio>`. Behavior lives in
+// radio.ts (value + forms binding; native `name` gives arrow-nav + roving for free);
+// this is the visual.
+//
+// Each radio is a 20px circle: off = 1.5px ring, on = accent ring + an 8px accent dot
+// (a scaled `__box::after`). State is the NATIVE input pseudo (`:checked` /
+// `:focus-visible` / `:disabled`), read off the visually-hidden input — no state classes.
+// The container is `.weave-radio-group` (role=radiogroup); each item is `.weave-radio`.
+//
+// Barrel — forwards the split partials ($tokens + the styles() mixin). Add another
+// concern as its own file and @forward it here.
+
+@forward 'tokens';
+@forward 'styles';

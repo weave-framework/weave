@@ -19,6 +19,7 @@
 @use 'components/progress-bar' as progress-bar;
 @use 'components/progress-spinner' as progress-spinner;
 @use 'components/checkbox' as checkbox;
+@use 'components/radio' as radio;
 
 $_builtins: (
   'divider': divider.$tokens,
@@ -34,6 +35,7 @@ $_builtins: (
   'progress-bar': progress-bar.$tokens,
   'progress-spinner': progress-spinner.$tokens,
   'checkbox': checkbox.$tokens,
+  'radio': radio.$tokens,
 );
 
 /* ───────────────────────── internal emit ───────────────────────── */
@@ -163,6 +165,10 @@ $_builtins: (
   @include overrides('checkbox', $map);
 }
 
+@mixin radio-overrides($map) {
+  @include overrides('radio', $map);
+}
+
 // Emit the structural CSS (class rules) for every built-in component.
 // Prefer per-component includes to keep CSS small; all-styles() is the convenience.
 @mixin all-styles() {
@@ -179,4 +185,5 @@ $_builtins: (
   @include progress-bar.styles();
   @include progress-spinner.styles();
   @include checkbox.styles();
+  @include radio.styles();
 }

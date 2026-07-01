@@ -201,6 +201,16 @@ const cssCheckboxOverride = compile(
 check('checkbox-overrides changes existing token', /--weave-checkbox-size:\s*24px/.test(cssCheckboxOverride));
 check('checkbox-overrides adds new token (auto-var)', /--weave-checkbox-gap:\s*10px/.test(cssCheckboxOverride));
 
+/* ── radio built-in: cascade refs + literals + overrides ── */
+check('theme emits radio dot referencing accent', /--weave-radio-dot:\s*var\(--weave-color-accent\)/.test(cssTheme));
+check('theme emits radio border referencing line', /--weave-radio-border:\s*var\(--weave-color-line\)/.test(cssTheme));
+check('theme emits radio dot-size literal', /--weave-radio-dot-size:\s*8px/.test(cssTheme));
+const cssRadioOverride = compile(
+  `@use '@weave-framework/ui' as weave;\n@include weave.radio-overrides((dot-size: 10px, ring: 2px));`,
+);
+check('radio-overrides changes existing token', /--weave-radio-dot-size:\s*10px/.test(cssRadioOverride));
+check('radio-overrides adds new token (auto-var)', /--weave-radio-ring:\s*2px/.test(cssRadioOverride));
+
 /* ── all-styles(): structural CSS by class ── */
 const cssStyles = compile(`@use '@weave-framework/ui' as weave;\n@include weave.all-styles();`);
 check('all-styles emits .weave-divider rule', /\.weave-divider\s*{/.test(cssStyles));
@@ -238,6 +248,8 @@ check('progress-spinner emits the --small size modifier', /\.weave-progress-spin
 check('all-styles emits .weave-checkbox + __box rules', /\.weave-checkbox\s*{/.test(cssStyles) && /\.weave-checkbox__box\s*{[\s\S]*?border:\s*var\(--weave-checkbox-border-width\)/.test(cssStyles));
 check('checkbox paints the box from the native :checked pseudo (no state class)', /\.weave-checkbox__input:checked\s*\+\s*\.weave-checkbox__box[\s\S]*?background:\s*var\(--weave-checkbox-checked-background\)/.test(cssStyles));
 check('checkbox styles the tri-state :indeterminate mark', /\.weave-checkbox__input:indeterminate\s*\+\s*\.weave-checkbox__box::before\s*{[^}]*opacity:\s*1/.test(cssStyles));
+check('all-styles emits .weave-radio-group + circular __box rules', /\.weave-radio-group\s*{/.test(cssStyles) && /\.weave-radio__box\s*{[\s\S]*?border-radius:\s*50%/.test(cssStyles));
+check('radio reveals the dot from the native :checked pseudo (no state class)', /\.weave-radio__input:checked\s*\+\s*\.weave-radio__box::after\s*{[\s\S]*?scale\(1\)/.test(cssStyles));
 
 /* ── example.scss: the docs-seed dev surface compiles end-to-end ── */
 let exampleOk = false;

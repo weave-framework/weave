@@ -1,0 +1,92 @@
+// radio — styles() mixin (class rules). Forwarded by ./_index.scss.
+@use '../../helpers' as helpers;
+
+@mixin styles() {
+  .weave-radio-group {
+    display: inline-flex;
+    flex-direction: column;
+    gap: var(--weave-radio-group-gap);
+
+    @content;
+  }
+
+  .weave-radio {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--weave-radio-gap);
+    cursor: pointer;
+  }
+
+  /* The real input overlays the whole label (opacity 0) — keyboard/pointer reachable,
+     native radio grouping intact — while the __box carries the visual. */
+  .weave-radio__input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    opacity: 0;
+    cursor: inherit;
+  }
+
+  .weave-radio__box {
+    position: relative;
+    flex: none;
+    box-sizing: border-box;
+    width: var(--weave-radio-size);
+    height: var(--weave-radio-size);
+    border: var(--weave-radio-border-width) solid var(--weave-radio-border);
+    border-radius: 50%;
+    background: var(--weave-radio-background);
+    transition: border-color var(--weave-radio-duration) ease;
+  }
+
+  /* The dot — scales in when selected. */
+  .weave-radio__box::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: var(--weave-radio-dot-size);
+    height: var(--weave-radio-dot-size);
+    border-radius: 50%;
+    background: var(--weave-radio-dot);
+    transform: translate(-50%, -50%) scale(0);
+    opacity: 0;
+    transition:
+      transform var(--weave-radio-duration) ease,
+      opacity var(--weave-radio-duration) ease;
+  }
+
+  .weave-radio__label {
+    font-size: var(--weave-radio-label-size);
+    color: var(--weave-radio-label-text);
+  }
+
+  /* Selected — accent ring + dot (state via the native :checked pseudo, no class). */
+  .weave-radio__input:checked + .weave-radio__box {
+    border-color: var(--weave-radio-checked-border);
+  }
+
+  .weave-radio__input:checked + .weave-radio__box::after {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+
+  .weave-radio__input:focus-visible + .weave-radio__box {
+    @include helpers.focus-ring;
+  }
+
+  .weave-radio__input:disabled {
+    cursor: not-allowed;
+  }
+
+  .weave-radio__input:disabled + .weave-radio__box {
+    opacity: 0.5;
+  }
+
+  .weave-radio__input:disabled ~ .weave-radio__label {
+    color: var(--weave-radio-disabled-text);
+  }
+}

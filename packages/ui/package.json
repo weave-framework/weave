@@ -76,6 +76,11 @@
       "types": "./src/checkbox/checkbox.ts",
       "import": "./src/checkbox/checkbox.ts"
     },
+    "./radio": {
+      "sass": "./src/styles/components/radio/_index.scss",
+      "types": "./src/radio/radio.ts",
+      "import": "./src/radio/radio.ts"
+    },
     "./cdk": {
       "types": "./src/cdk/index.ts",
       "import": "./src/cdk/index.ts"
@@ -166,6 +171,11 @@
         "sass": "./src/styles/components/checkbox/_index.scss",
         "types": "./dist/checkbox/checkbox.d.ts",
         "import": "./dist/checkbox/checkbox.js"
+      },
+      "./radio": {
+        "sass": "./src/styles/components/radio/_index.scss",
+        "types": "./dist/radio/radio.d.ts",
+        "import": "./dist/radio/radio.js"
       },
       "./cdk": {
         "types": "./dist/cdk/index.d.ts",
