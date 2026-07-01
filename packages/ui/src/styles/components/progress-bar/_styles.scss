@@ -1,0 +1,39 @@
+// progress-bar — styles() mixin (class rules + keyframes). Forwarded by ./_index.scss.
+
+@mixin styles() {
+  .weave-progress-bar {
+    position: relative;
+    overflow: hidden;
+    width: 100%;
+    height: var(--weave-progress-bar-height);
+    background: var(--weave-progress-bar-track);
+    border-radius: var(--weave-progress-bar-radius);
+  }
+
+  .weave-progress-bar__fill {
+    position: relative;
+    left: 0;
+    width: 0;
+    height: 100%;
+    background: var(--weave-progress-bar-fill);
+    border-radius: inherit;
+    transition: width var(--weave-progress-bar-duration) ease;
+  }
+
+  /* Indeterminate — a fixed-width segment slides across; the width is keyframe-driven,
+     so no inline width and no transition. */
+  .weave-progress-bar--indeterminate .weave-progress-bar__fill {
+    width: var(--weave-progress-bar-segment);
+    transition: none;
+    animation: weave-progress-bar-indet var(--weave-progress-bar-indet-duration) ease-in-out infinite;
+  }
+
+  @keyframes weave-progress-bar-indet {
+    0% {
+      left: calc(-1 * var(--weave-progress-bar-segment));
+    }
+    100% {
+      left: 100%;
+    }
+  }
+}

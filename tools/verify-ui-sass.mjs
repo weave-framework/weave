@@ -171,6 +171,16 @@ const cssGridListOverride = compile(
 check('grid-list-overrides changes existing token', /--weave-grid-list-min-tile:\s*120px/.test(cssGridListOverride));
 check('grid-list-overrides adds new token (auto-var)', /--weave-grid-list-ratio:\s*1\.5/.test(cssGridListOverride));
 
+/* ── progress-bar built-in: cascade refs + literals + overrides ── */
+check('theme emits progress-bar fill referencing accent', /--weave-progress-bar-fill:\s*var\(--weave-color-accent\)/.test(cssTheme));
+check('theme emits progress-bar track referencing field', /--weave-progress-bar-track:\s*var\(--weave-color-field\)/.test(cssTheme));
+check('theme emits progress-bar height literal', /--weave-progress-bar-height:\s*4px/.test(cssTheme));
+const cssProgressBarOverride = compile(
+  `@use '@weave-framework/ui' as weave;\n@include weave.progress-bar-overrides((height: 6px, buffer: #ccc));`,
+);
+check('progress-bar-overrides changes existing token', /--weave-progress-bar-height:\s*6px/.test(cssProgressBarOverride));
+check('progress-bar-overrides adds new token (auto-var)', /--weave-progress-bar-buffer:\s*#ccc/.test(cssProgressBarOverride));
+
 /* ── all-styles(): structural CSS by class ── */
 const cssStyles = compile(`@use '@weave-framework/ui' as weave;\n@include weave.all-styles();`);
 check('all-styles emits .weave-divider rule', /\.weave-divider\s*{/.test(cssStyles));
@@ -200,6 +210,9 @@ check('list interactivity is scoped to the listbox role', /\.weave-list\[role=li
 check('all-styles emits .weave-grid-list rule (auto-fill grid)', /\.weave-grid-list\s*{[\s\S]*?grid-template-columns:\s*repeat\(auto-fill, minmax\(var\(--weave-grid-list-min-tile\), 1fr\)\)/.test(cssStyles));
 check('grid-list tile is a square (aspect-ratio:1)', /\.weave-grid-list__tile\s*{[\s\S]*?aspect-ratio:\s*1/.test(cssStyles));
 check('grid-list emits the --accent tile modifier', /\.weave-grid-list__tile--accent\s*{[^}]*background:\s*var\(--weave-grid-list-accent-background\)/.test(cssStyles));
+check('all-styles emits .weave-progress-bar rule', /\.weave-progress-bar\s*{[\s\S]*?height:\s*var\(--weave-progress-bar-height\)/.test(cssStyles));
+check('progress-bar fill consumes its accent token', /\.weave-progress-bar__fill\s*{[\s\S]*?background:\s*var\(--weave-progress-bar-fill\)/.test(cssStyles));
+check('progress-bar emits the --indeterminate animation + keyframes', /\.weave-progress-bar--indeterminate\s+\.weave-progress-bar__fill\s*{[\s\S]*?animation:\s*weave-progress-bar-indet/.test(cssStyles) && /@keyframes\s+weave-progress-bar-indet/.test(cssStyles));
 
 /* ── example.scss: the docs-seed dev surface compiles end-to-end ── */
 let exampleOk = false;

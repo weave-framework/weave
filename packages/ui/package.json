@@ -61,6 +61,11 @@
       "types": "./src/grid-list/grid-list.ts",
       "import": "./src/grid-list/grid-list.ts"
     },
+    "./progress-bar": {
+      "sass": "./src/styles/components/progress-bar/_index.scss",
+      "types": "./src/progress-bar/progress-bar.ts",
+      "import": "./src/progress-bar/progress-bar.ts"
+    },
     "./cdk": {
       "types": "./src/cdk/index.ts",
       "import": "./src/cdk/index.ts"
@@ -136,6 +141,11 @@
         "sass": "./src/styles/components/grid-list/_index.scss",
         "types": "./dist/grid-list/grid-list.d.ts",
         "import": "./dist/grid-list/grid-list.js"
+      },
+      "./progress-bar": {
+        "sass": "./src/styles/components/progress-bar/_index.scss",
+        "types": "./dist/progress-bar/progress-bar.d.ts",
+        "import": "./dist/progress-bar/progress-bar.js"
       },
       "./cdk": {
         "types": "./dist/cdk/index.d.ts",

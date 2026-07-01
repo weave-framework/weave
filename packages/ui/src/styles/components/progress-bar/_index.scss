@@ -1,0 +1,11 @@
+// Progress Bar — a thin horizontal progress indicator. Behavior lives in
+// progress-bar.ts (value clamping + the indeterminate flag + ARIA); this is the visual.
+//
+// A 4px field track with an accent fill: determinate drives the fill width inline
+// (0–100%), indeterminate slides a fixed-width segment via the indet keyframes.
+//
+// Barrel — forwards the split partials ($tokens + the styles() mixin, which also
+// carries the @keyframes). Add another concern as its own file and @forward it here.
+
+@forward 'tokens';
+@forward 'styles';

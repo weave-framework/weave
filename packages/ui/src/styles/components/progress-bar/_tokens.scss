@@ -1,0 +1,17 @@
+// progress-bar — design tokens (schema). Forwarded by ./_index.scss.
+@use '../../ref' as ref;
+
+$tokens: (
+  color: (
+    track: ref.ref('color.field'),
+    fill: ref.ref('color.accent'),
+  ),
+  size: (
+    height: 4px,
+    radius: 2px,
+    duration: ref.ref('motion.fast'),
+    // The indeterminate sliding segment: its width + travel speed.
+    segment: 40%,
+    indet-duration: 1.4s,
+  ),
+);
