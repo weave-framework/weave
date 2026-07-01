@@ -14,3 +14,6 @@ export * from './portal.js';
 export * from './overlay.js';
 export * from './positioning.js';
 export * from './scroll.js';
+export * from './interactivity.js';
+export * from './focus-trap.js';
+export * from './focus-monitor.js';
