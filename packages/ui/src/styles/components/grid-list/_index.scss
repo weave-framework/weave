@@ -1,0 +1,12 @@
+// Grid List — a responsive grid of square tiles. Behavior lives in grid-list.ts (a thin
+// container that forwards `class`); this is the visual.
+//
+// `repeat(auto-fill, minmax(min-tile, 1fr))` with 1px gaps that read as hairlines (the
+// container's line background shows through), one `__tile--accent` tile optionally filled.
+// Pure CSS — reflows to the container width with no JS.
+//
+// Barrel — forwards the split partials ($tokens + the styles() mixin). Add another
+// concern as its own file and @forward it here.
+
+@forward 'tokens';
+@forward 'styles';

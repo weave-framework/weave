@@ -161,6 +161,16 @@ const cssListOverride = compile(
 check('list-overrides changes existing token', /--weave-list-row-height:\s*40px/.test(cssListOverride));
 check('list-overrides adds new token (auto-var)', /--weave-list-gap:\s*8px/.test(cssListOverride));
 
+/* ── grid-list built-in: cascade refs + literals + overrides ── */
+check('theme emits grid-list accent-background referencing accent', /--weave-grid-list-accent-background:\s*var\(--weave-color-accent\)/.test(cssTheme));
+check('theme emits grid-list min-tile literal', /--weave-grid-list-min-tile:\s*96px/.test(cssTheme));
+check('theme emits grid-list gap literal', /--weave-grid-list-gap:\s*1px/.test(cssTheme));
+const cssGridListOverride = compile(
+  `@use '@weave-framework/ui' as weave;\n@include weave.grid-list-overrides((min-tile: 120px, ratio: 1.5));`,
+);
+check('grid-list-overrides changes existing token', /--weave-grid-list-min-tile:\s*120px/.test(cssGridListOverride));
+check('grid-list-overrides adds new token (auto-var)', /--weave-grid-list-ratio:\s*1\.5/.test(cssGridListOverride));
+
 /* ── all-styles(): structural CSS by class ── */
 const cssStyles = compile(`@use '@weave-framework/ui' as weave;\n@include weave.all-styles();`);
 check('all-styles emits .weave-divider rule', /\.weave-divider\s*{/.test(cssStyles));
@@ -187,6 +197,9 @@ check('toolbar emits --ink + __spacer rules', /\.weave-toolbar--ink\s*{/.test(cs
 check('all-styles emits .weave-list rule', /\.weave-list\s*{/.test(cssStyles));
 check('list styles the selected row via [aria-selected] (accentSoft + accent marker)', /\.weave-list__row\[aria-selected=true\]\s*{[\s\S]*?background:\s*var\(--weave-list-selected-background\)[\s\S]*?border-left-color:\s*var\(--weave-list-selected-marker\)/.test(cssStyles));
 check('list interactivity is scoped to the listbox role', /\.weave-list\[role=listbox\]\s+\.weave-list__row:hover/.test(cssStyles));
+check('all-styles emits .weave-grid-list rule (auto-fill grid)', /\.weave-grid-list\s*{[\s\S]*?grid-template-columns:\s*repeat\(auto-fill, minmax\(var\(--weave-grid-list-min-tile\), 1fr\)\)/.test(cssStyles));
+check('grid-list tile is a square (aspect-ratio:1)', /\.weave-grid-list__tile\s*{[\s\S]*?aspect-ratio:\s*1/.test(cssStyles));
+check('grid-list emits the --accent tile modifier', /\.weave-grid-list__tile--accent\s*{[^}]*background:\s*var\(--weave-grid-list-accent-background\)/.test(cssStyles));
 
 /* ── example.scss: the docs-seed dev surface compiles end-to-end ── */
 let exampleOk = false;

@@ -1,0 +1,18 @@
+// grid-list — design tokens (schema). Forwarded by ./_index.scss.
+@use '../../ref' as ref;
+
+$tokens: (
+  color: (
+    // The 1px gaps show this through — the container background reads as hairlines.
+    border: ref.ref('color.line'),
+    tile-background: ref.ref('color.surface'),
+    tile-text: ref.ref('color.ink'),
+    accent-background: ref.ref('color.accent'),
+    accent-text: ref.ref('color.canvas'),
+  ),
+  size: (
+    min-tile: 96px,
+    gap: 1px,
+    radius: ref.ref('shape.radius'),
+  ),
+);

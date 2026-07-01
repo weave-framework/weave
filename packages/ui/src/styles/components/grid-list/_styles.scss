@@ -1,0 +1,31 @@
+// grid-list — styles() mixin (class rules). Forwarded by ./_index.scss.
+
+@mixin styles() {
+  .weave-grid-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(var(--weave-grid-list-min-tile), 1fr));
+    gap: var(--weave-grid-list-gap);
+    // The gaps + outer frame are the same 1px line; tiles paint over it, so the grid
+    // reads as hairline-separated cells with no drop shadow (the Weave surface style).
+    background: var(--weave-grid-list-border);
+    border: var(--weave-grid-list-gap) solid var(--weave-grid-list-border);
+    border-radius: var(--weave-grid-list-radius);
+    overflow: hidden; // clip the tile corners to the container radius
+
+    @content;
+  }
+
+  .weave-grid-list__tile {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    aspect-ratio: 1;
+    background: var(--weave-grid-list-tile-background);
+    color: var(--weave-grid-list-tile-text);
+  }
+
+  .weave-grid-list__tile--accent {
+    background: var(--weave-grid-list-accent-background);
+    color: var(--weave-grid-list-accent-text);
+  }
+}

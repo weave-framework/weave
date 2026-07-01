@@ -15,6 +15,7 @@
 @use 'components/card' as card;
 @use 'components/toolbar' as toolbar;
 @use 'components/list' as list-cmp;
+@use 'components/grid-list' as grid-list;
 
 $_builtins: (
   'divider': divider.$tokens,
@@ -26,6 +27,7 @@ $_builtins: (
   'card': card.$tokens,
   'toolbar': toolbar.$tokens,
   'list': list-cmp.$tokens,
+  'grid-list': grid-list.$tokens,
 );
 
 /* ───────────────────────── internal emit ───────────────────────── */
@@ -139,6 +141,10 @@ $_builtins: (
   @include overrides('list', $map);
 }
 
+@mixin grid-list-overrides($map) {
+  @include overrides('grid-list', $map);
+}
+
 // Emit the structural CSS (class rules) for every built-in component.
 // Prefer per-component includes to keep CSS small; all-styles() is the convenience.
 @mixin all-styles() {
@@ -151,4 +157,5 @@ $_builtins: (
   @include card.styles();
   @include toolbar.styles();
   @include list-cmp.styles();
+  @include grid-list.styles();
 }

@@ -56,6 +56,11 @@
       "types": "./src/list/list.ts",
       "import": "./src/list/list.ts"
     },
+    "./grid-list": {
+      "sass": "./src/styles/components/grid-list/_index.scss",
+      "types": "./src/grid-list/grid-list.ts",
+      "import": "./src/grid-list/grid-list.ts"
+    },
     "./cdk": {
       "types": "./src/cdk/index.ts",
       "import": "./src/cdk/index.ts"
@@ -126,6 +131,11 @@
         "sass": "./src/styles/components/list/_index.scss",
         "types": "./dist/list/list.d.ts",
         "import": "./dist/list/list.js"
+      },
+      "./grid-list": {
+        "sass": "./src/styles/components/grid-list/_index.scss",
+        "types": "./dist/grid-list/grid-list.d.ts",
+        "import": "./dist/grid-list/grid-list.js"
       },
       "./cdk": {
         "types": "./dist/cdk/index.d.ts",
