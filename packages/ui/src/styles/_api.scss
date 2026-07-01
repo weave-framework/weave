@@ -29,6 +29,7 @@
 @use 'components/tooltip' as tooltip;
 @use 'components/menu' as menu;
 @use 'components/dialog' as dialog;
+@use 'components/bottom-sheet' as bottom-sheet;
 
 $_builtins: (
   'divider': divider.$tokens,
@@ -53,6 +54,7 @@ $_builtins: (
   'tooltip': tooltip.$tokens,
   'menu': menu.$tokens,
   'dialog': dialog.$tokens,
+  'bottom-sheet': bottom-sheet.$tokens,
 );
 
 /* ───────────────────────── internal emit ───────────────────────── */
@@ -218,6 +220,10 @@ $_builtins: (
   @include overrides('dialog', $map);
 }
 
+@mixin bottom-sheet-overrides($map) {
+  @include overrides('bottom-sheet', $map);
+}
+
 // Emit the structural CSS (class rules) for every built-in component.
 // Prefer per-component includes to keep CSS small; all-styles() is the convenience.
 @mixin all-styles() {
@@ -243,4 +249,5 @@ $_builtins: (
   @include tooltip.styles();
   @include menu.styles();
   @include dialog.styles();
+  @include bottom-sheet.styles();
 }

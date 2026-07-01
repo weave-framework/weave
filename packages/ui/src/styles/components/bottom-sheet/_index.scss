@@ -1,0 +1,9 @@
+// Bottom Sheet — a full-width modal docked to the bottom edge. Behavior lives in
+// bottom-sheet.ts (openBottomSheet → BottomSheetRef; shares the modal core with Dialog —
+// CDK overlay + dimming backdrop + blockScroll + focus-trap/restore + Esc/backdrop close +
+// the three regions); this is the visual: a hairline sheet capped in width/height, top-only
+// radius, sliding up on open, with a scrolling content region.
+//
+// Barrel — forwards the split partials ($tokens + the styles() mixin).
+@forward 'tokens';
+@forward 'styles';

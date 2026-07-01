@@ -1,0 +1,24 @@
+// bottom-sheet — design tokens (schema). A full-width modal docked to the bottom edge; the
+// backdrop dim comes from the shared overlay republic. Forwarded by ./_index.scss.
+@use '../../ref' as ref;
+
+$tokens: (
+  color: (
+    surface: ref.ref('color.surface'),
+    text: ref.ref('color.ink'),
+    line: ref.ref('color.line'),
+  ),
+  size: (
+    // Cap the sheet's height so it never covers the whole screen; content scrolls inside.
+    max-height: 72vh,
+    // Wide-screen comfort cap (the sheet centers rather than spanning ultra-wide displays).
+    max-width: 640px,
+    radius: ref.ref('shape.radius'),
+    padding: 20px,
+    duration: ref.ref('motion.sheet'),
+  ),
+  typography: (
+    title-size: 15px,
+    title-weight: 600,
+  ),
+);

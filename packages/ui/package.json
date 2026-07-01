@@ -123,6 +123,11 @@
       "types": "./src/dialog/dialog.ts",
       "import": "./src/dialog/dialog.ts"
     },
+    "./bottom-sheet": {
+      "sass": "./src/styles/components/bottom-sheet/_index.scss",
+      "types": "./src/bottom-sheet/bottom-sheet.ts",
+      "import": "./src/bottom-sheet/bottom-sheet.ts"
+    },
     "./cdk": {
       "types": "./src/cdk/index.ts",
       "import": "./src/cdk/index.ts"
@@ -260,6 +265,11 @@
         "sass": "./src/styles/components/dialog/_index.scss",
         "types": "./dist/dialog/dialog.d.ts",
         "import": "./dist/dialog/dialog.js"
+      },
+      "./bottom-sheet": {
+        "sass": "./src/styles/components/bottom-sheet/_index.scss",
+        "types": "./dist/bottom-sheet/bottom-sheet.d.ts",
+        "import": "./dist/bottom-sheet/bottom-sheet.js"
       },
       "./cdk": {
         "types": "./dist/cdk/index.d.ts",

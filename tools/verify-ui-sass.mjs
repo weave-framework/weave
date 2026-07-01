@@ -293,6 +293,15 @@ const cssDialogOverride = compile(
 check('dialog-overrides changes existing token', /--weave-dialog-width:\s*640px/.test(cssDialogOverride));
 check('dialog-overrides adds new token (auto-var)', /--weave-dialog-elevation:\s*1px/.test(cssDialogOverride));
 
+/* ── bottom-sheet built-in: cascade refs + literals + overrides (U3) ── */
+check('theme emits bottom-sheet surface referencing surface', /--weave-bottom-sheet-surface:\s*var\(--weave-color-surface\)/.test(cssTheme));
+check('theme emits bottom-sheet max-height literal', /--weave-bottom-sheet-max-height:\s*72vh/.test(cssTheme));
+const cssSheetOverride = compile(
+  `@use '@weave-framework/ui' as weave;\n@include weave.bottom-sheet-overrides((max-width: 720px, handle: 4px));`,
+);
+check('bottom-sheet-overrides changes existing token', /--weave-bottom-sheet-max-width:\s*720px/.test(cssSheetOverride));
+check('bottom-sheet-overrides adds new token (auto-var)', /--weave-bottom-sheet-handle:\s*4px/.test(cssSheetOverride));
+
 /* ── all-styles(): structural CSS by class ── */
 const cssStyles = compile(`@use '@weave-framework/ui' as weave;\n@include weave.all-styles();`);
 check('all-styles emits .weave-divider rule', /\.weave-divider\s*{/.test(cssStyles));
@@ -350,6 +359,8 @@ check('menu item hover/focus tint comes from native pseudos, excluding disabled'
 check('all-styles emits .weave-dialog flex-column panel clamped to the viewport', /\.weave-dialog\s*{[\s\S]*?display:\s*flex[\s\S]*?flex-direction:\s*column[\s\S]*?max-width:\s*calc\(100vw - 2 \* var\(--weave-dialog-margin\)\)[\s\S]*?max-height:\s*calc\(100vh - 2 \* var\(--weave-dialog-margin\)\)/.test(cssStyles));
 check('dialog content is the scroll region (flex:1, min-height:0, overflow-y:auto)', /\.weave-dialog__content\s*{[\s\S]*?flex:\s*1 1 auto[\s\S]*?min-height:\s*0[\s\S]*?overflow-y:\s*auto/.test(cssStyles));
 check('dialog header + actions are fixed (flex:0 0 auto) with dividers', /\.weave-dialog__header\s*{[\s\S]*?flex:\s*0 0 auto[\s\S]*?border-bottom:\s*1px solid var\(--weave-dialog-line\)/.test(cssStyles) && /\.weave-dialog__actions\s*{[\s\S]*?flex:\s*0 0 auto[\s\S]*?border-top:\s*1px solid var\(--weave-dialog-line\)/.test(cssStyles));
+check('all-styles emits .weave-bottom-sheet (top-only radius + slide-up keyframes)', /\.weave-bottom-sheet\s*{[\s\S]*?border-radius:\s*var\(--weave-bottom-sheet-radius\)\s*var\(--weave-bottom-sheet-radius\)\s*0\s*0/.test(cssStyles) && /@keyframes\s+weave-bottom-sheet-in/.test(cssStyles));
+check('bottom-sheet content scrolls (flex:1, min-height:0, overflow-y:auto)', /\.weave-bottom-sheet__content\s*{[\s\S]*?flex:\s*1 1 auto[\s\S]*?min-height:\s*0[\s\S]*?overflow-y:\s*auto/.test(cssStyles));
 
 /* ── example.scss: the docs-seed dev surface compiles end-to-end ── */
 let exampleOk = false;

@@ -1,0 +1,61 @@
+// bottom-sheet — styles() mixin (class rules). A hairline modal docked to the bottom edge
+// (positioned by the CDK globalPosition: left:0/right:0/bottom:0), capped in width (centred
+// on wide screens via margin-inline:auto) and height (content scrolls inside). Top-only
+// corner radius, slides up on open. Same three-region layout as Dialog. Forwarded by
+// ./_index.scss.
+
+@mixin styles() {
+  .weave-bottom-sheet {
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+    // Capped + centred within the left:0/right:0 box the CDK sets.
+    max-width: var(--weave-bottom-sheet-max-width);
+    margin-inline: auto;
+    max-height: var(--weave-bottom-sheet-max-height);
+    background: var(--weave-bottom-sheet-surface);
+    color: var(--weave-bottom-sheet-text);
+    border: 1px solid var(--weave-bottom-sheet-line);
+    border-bottom: 0; // sits flush on the viewport's bottom edge
+    border-radius: var(--weave-bottom-sheet-radius) var(--weave-bottom-sheet-radius) 0 0;
+    overflow: hidden;
+    animation: weave-bottom-sheet-in var(--weave-bottom-sheet-duration) ease;
+  }
+
+  @keyframes weave-bottom-sheet-in {
+    from {
+      transform: translateY(100%);
+    }
+
+    to {
+      transform: translateY(0);
+    }
+  }
+
+  .weave-bottom-sheet__header {
+    flex: 0 0 auto;
+    padding: var(--weave-bottom-sheet-padding);
+    border-bottom: 1px solid var(--weave-bottom-sheet-line);
+    font-size: var(--weave-bottom-sheet-title-size);
+    font-weight: var(--weave-bottom-sheet-title-weight);
+    line-height: 1.3;
+  }
+
+  .weave-bottom-sheet__content {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding: var(--weave-bottom-sheet-padding);
+    line-height: 1.5;
+  }
+
+  .weave-bottom-sheet__actions {
+    flex: 0 0 auto;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 8px;
+    padding: var(--weave-bottom-sheet-padding);
+    border-top: 1px solid var(--weave-bottom-sheet-line);
+  }
+}
