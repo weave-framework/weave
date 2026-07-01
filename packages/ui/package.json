@@ -14,40 +14,40 @@
       "import": "./src/index.ts"
     },
     "./divider": {
-      "sass": "./src/styles/components/_divider.scss"
+      "sass": "./src/styles/components/divider/_index.scss"
     },
     "./ripple": {
-      "sass": "./src/styles/components/_ripple.scss",
+      "sass": "./src/styles/components/ripple/_index.scss",
       "types": "./src/ripple/ripple.ts",
       "import": "./src/ripple/ripple.ts"
     },
     "./icon": {
-      "sass": "./src/styles/components/_icon.scss",
+      "sass": "./src/styles/components/icon/_index.scss",
       "types": "./src/icon/icon.ts",
       "import": "./src/icon/icon.ts"
     },
     "./button": {
-      "sass": "./src/styles/components/_button.scss",
+      "sass": "./src/styles/components/button/_index.scss",
       "types": "./src/button/button.ts",
       "import": "./src/button/button.ts"
     },
     "./button-toggle": {
-      "sass": "./src/styles/components/_button-toggle.scss",
+      "sass": "./src/styles/components/button-toggle/_index.scss",
       "types": "./src/button-toggle/button-toggle.ts",
       "import": "./src/button-toggle/button-toggle.ts"
     },
     "./badge": {
-      "sass": "./src/styles/components/_badge.scss",
+      "sass": "./src/styles/components/badge/_index.scss",
       "types": "./src/badge/badge.ts",
       "import": "./src/badge/badge.ts"
     },
     "./card": {
-      "sass": "./src/styles/components/_card.scss",
+      "sass": "./src/styles/components/card/_index.scss",
       "types": "./src/card/card.ts",
       "import": "./src/card/card.ts"
     },
     "./toolbar": {
-      "sass": "./src/styles/components/_toolbar.scss",
+      "sass": "./src/styles/components/toolbar/_index.scss",
       "types": "./src/toolbar/toolbar.ts",
       "import": "./src/toolbar/toolbar.ts"
     },
@@ -80,40 +80,40 @@
         "import": "./dist/index.js"
       },
       "./divider": {
-        "sass": "./src/styles/components/_divider.scss"
+        "sass": "./src/styles/components/divider/_index.scss"
       },
       "./ripple": {
-        "sass": "./src/styles/components/_ripple.scss",
+        "sass": "./src/styles/components/ripple/_index.scss",
         "types": "./dist/ripple/ripple.d.ts",
         "import": "./dist/ripple/ripple.js"
       },
       "./icon": {
-        "sass": "./src/styles/components/_icon.scss",
+        "sass": "./src/styles/components/icon/_index.scss",
         "types": "./dist/icon/icon.d.ts",
         "import": "./dist/icon/icon.js"
       },
       "./button": {
-        "sass": "./src/styles/components/_button.scss",
+        "sass": "./src/styles/components/button/_index.scss",
         "types": "./dist/button/button.d.ts",
         "import": "./dist/button/button.js"
       },
       "./button-toggle": {
-        "sass": "./src/styles/components/_button-toggle.scss",
+        "sass": "./src/styles/components/button-toggle/_index.scss",
         "types": "./dist/button-toggle/button-toggle.d.ts",
         "import": "./dist/button-toggle/button-toggle.js"
       },
       "./badge": {
-        "sass": "./src/styles/components/_badge.scss",
+        "sass": "./src/styles/components/badge/_index.scss",
         "types": "./dist/badge/badge.d.ts",
         "import": "./dist/badge/badge.js"
       },
       "./card": {
-        "sass": "./src/styles/components/_card.scss",
+        "sass": "./src/styles/components/card/_index.scss",
         "types": "./dist/card/card.d.ts",
         "import": "./dist/card/card.js"
       },
       "./toolbar": {
-        "sass": "./src/styles/components/_toolbar.scss",
+        "sass": "./src/styles/components/toolbar/_index.scss",
         "types": "./dist/toolbar/toolbar.d.ts",
         "import": "./dist/toolbar/toolbar.js"
       },

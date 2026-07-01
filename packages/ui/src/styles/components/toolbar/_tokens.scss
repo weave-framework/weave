@@ -1,0 +1,17 @@
+// toolbar — design tokens (schema). Forwarded by ./_index.scss.
+@use '../../ref' as ref;
+
+$tokens: (
+  color: (
+    background: ref.ref('color.surface'),
+    border: ref.ref('color.line'),
+    text: ref.ref('color.ink'),
+    ink-background: ref.ref('color.ink'),
+    ink-text: ref.ref('color.canvas'),
+  ),
+  size: (
+    height: 52px,
+    padding-x: 16px,
+    gap: 12px,
+  ),
+);

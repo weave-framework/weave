@@ -1,0 +1,24 @@
+// card — design tokens (schema). Forwarded by ./_index.scss.
+@use '../../ref' as ref;
+
+$tokens: (
+  color: (
+    background: ref.ref('color.surface'),
+    border: ref.ref('color.line'),
+    hover: ref.ref('color.field'),
+    title-text: ref.ref('color.ink'),
+    body-text: ref.ref('color.ink'),
+    meta-text: ref.ref('color.sub'),
+  ),
+  size: (
+    radius: ref.ref('shape.radius'),
+    padding: 16px,
+    gap: 10px,
+    duration: ref.ref('motion.fast'),
+  ),
+  typography: (
+    title-size: 15px,
+    title-weight: 600,
+    body-size: 13px,
+  ),
+);

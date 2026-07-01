@@ -1,26 +1,4 @@
-// Toolbar — a horizontal app bar. Behavior lives in toolbar.ts (container + class
-// forward); this is the visual. Keyline: 52px tall, surface bg, 1px line bottom rule,
-// NO shadow. A flex row; parts are the class contract the consumer composes:
-//   __start / __end   clusters (flex, gapped)
-//   __spacer          flex-grow gap that pushes __end to the right
-// --ink inverts to an ink bar; --sticky pins it to the top.
-
-@use '../ref' as ref;
-
-$tokens: (
-  color: (
-    background: ref.ref('color.surface'),
-    border: ref.ref('color.line'),
-    text: ref.ref('color.ink'),
-    ink-background: ref.ref('color.ink'),
-    ink-text: ref.ref('color.canvas'),
-  ),
-  size: (
-    height: 52px,
-    padding-x: 16px,
-    gap: 12px,
-  ),
-);
+// toolbar — styles() mixin (class rules). Forwarded by ./_index.scss.
 
 @mixin styles() {
   .weave-toolbar {

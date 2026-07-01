@@ -1,0 +1,8 @@
+// Divider — a hairline rule. Weave: 1px var(--line) horizontal; 1px×16px vertical.
+// Pure CSS (no behavior). Two-layer anatomy: token schema ($tokens) + styles() rules.
+//
+// Barrel — forwards the split partials ($tokens + the styles() mixin). Add another
+// concern as its own file (e.g. _keyframes.scss) and @forward it here.
+
+@forward 'tokens';
+@forward 'styles';

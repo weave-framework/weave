@@ -1,0 +1,8 @@
+// Ripple — the click-feedback circle. Behavior lives in ripple.ts (a `use:` action);
+// this is the visual (tokens + the injected `.weave-ripple` element + keyframes).
+//
+// Barrel — forwards the split partials ($tokens + the styles() mixin). Add another
+// concern as its own file (e.g. _keyframes.scss) and @forward it here.
+
+@forward 'tokens';
+@forward 'styles';

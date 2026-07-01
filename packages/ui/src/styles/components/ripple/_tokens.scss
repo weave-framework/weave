@@ -1,0 +1,12 @@
+// ripple — design tokens (schema). Forwarded by ./_index.scss.
+@use '../../ref' as ref;
+
+$tokens: (
+  color: (
+    opacity: 0.22,
+  ),
+  size: (
+    duration: ref.ref('motion.ripple'),
+    scale: 4,
+  ),
+);

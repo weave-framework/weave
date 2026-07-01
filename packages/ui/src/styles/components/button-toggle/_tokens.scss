@@ -1,0 +1,23 @@
+// button-toggle — design tokens (schema). Forwarded by ./_index.scss.
+@use '../../ref' as ref;
+
+$tokens: (
+  color: (
+    border: ref.ref('color.line'),
+    text: ref.ref('color.ink'),
+    hover: ref.ref('color.field'),
+    selected-background: ref.ref('color.ink'),
+    selected-text: ref.ref('color.canvas'),
+    disabled-text: ref.ref('color.sub'),
+  ),
+  size: (
+    radius: ref.ref('shape.radius'),
+    padding-x: 12px,
+    padding-y: 7px,
+    duration: ref.ref('motion.fast'),
+  ),
+  typography: (
+    font-size: 13px,
+    weight: 600,
+  ),
+);

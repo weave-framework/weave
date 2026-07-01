@@ -1,0 +1,27 @@
+// badge — design tokens (schema). Forwarded by ./_index.scss.
+@use '../../ref' as ref;
+
+$tokens: (
+  color: (
+    background: ref.ref('color.accent'),
+    // on-accent text is fixed white (accent is dark in both themes)
+    text: #ffffff,
+    dot: ref.ref('color.error'),
+    tag-border: ref.ref('color.line'),
+    tag-text: ref.ref('color.sub'),
+  ),
+  size: (
+    min-size: 15px,
+    dot-size: 6px,
+    padding-x: 5px,
+    radius: 999px,
+    font-size: 10px,
+    tag-radius: ref.ref('shape.radius'),
+    tag-padding-x: 6px,
+    tag-padding-y: 2px,
+    tag-font-size: 10px,
+  ),
+  typography: (
+    weight: 600,
+  ),
+);

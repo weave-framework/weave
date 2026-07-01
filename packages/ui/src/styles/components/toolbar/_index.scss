@@ -1,0 +1,12 @@
+// Toolbar — a horizontal app bar. Behavior lives in toolbar.ts (container + class
+// forward); this is the visual. Keyline: 52px tall, surface bg, 1px line bottom rule,
+// NO shadow. A flex row; parts are the class contract the consumer composes:
+//   __start / __end   clusters (flex, gapped)
+//   __spacer          flex-grow gap that pushes __end to the right
+// --ink inverts to an ink bar; --sticky pins it to the top.
+//
+// Barrel — forwards the split partials ($tokens + the styles() mixin). Add another
+// concern as its own file (e.g. _keyframes.scss) and @forward it here.
+
+@forward 'tokens';
+@forward 'styles';

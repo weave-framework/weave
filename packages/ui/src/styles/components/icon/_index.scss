@@ -1,0 +1,8 @@
+// Icon — inline SVG at Weave scale (18px, 1.4 hairline stroke, currentColor).
+// Behavior lives in icon.ts; this is the token schema + the class contract.
+//
+// Barrel — forwards the split partials ($tokens + the styles() mixin). Add another
+// concern as its own file (e.g. _keyframes.scss) and @forward it here.
+
+@forward 'tokens';
+@forward 'styles';

@@ -1,0 +1,12 @@
+// Badge — a small status mark. Behavior lives in badge.ts (variant + position + a11y);
+// this is the visual. Three variants:
+//   count (default) — an accent pill (min 15px, white text) over the top corner of a host.
+//   --dot            — a 6px status-red dot over the corner (no text).
+//   --tag            — a standalone outline label ("New"); not overlaid, no positioned mark.
+// Corner via --bottom / --start modifiers (default top-end).
+//
+// Barrel — forwards the split partials ($tokens + the styles() mixin). Add another
+// concern as its own file (e.g. _keyframes.scss) and @forward it here.
+
+@forward 'tokens';
+@forward 'styles';

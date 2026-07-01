@@ -1,0 +1,12 @@
+// divider — design tokens (schema). Forwarded by ./_index.scss.
+@use '../../ref' as ref;
+
+$tokens: (
+  color: (
+    line: ref.ref('color.line'),
+  ),
+  size: (
+    thickness: 1px,
+    height: 16px, // vertical divider length
+  ),
+);

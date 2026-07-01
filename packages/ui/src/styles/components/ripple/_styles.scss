@@ -1,17 +1,4 @@
-// Ripple — the click-feedback circle. Behavior lives in ripple.ts (a `use:` action);
-// this is the visual (tokens + the injected `.weave-ripple` element + keyframes).
-
-@use '../ref' as ref;
-
-$tokens: (
-  color: (
-    opacity: 0.22,
-  ),
-  size: (
-    duration: ref.ref('motion.ripple'),
-    scale: 4,
-  ),
-);
+// ripple — styles() mixin (class rules). Forwarded by ./_index.scss.
 
 @mixin styles() {
   @keyframes weave-ripple {

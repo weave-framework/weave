@@ -1,0 +1,15 @@
+// Card — a surface panel. Behavior lives in card.ts (just a container + class forward);
+// this is the visual. Keyline: surface bg, 1px line border, radius 4px, NO shadow.
+//
+// The card is a vertical stack; parts are the class contract the consumer composes:
+//   __media   full-bleed image slot (bleeds past the card padding, clipped to radius)
+//   __title   heading row
+//   __body    text
+//   __actions text-button row (one typically a --marked Button)
+// --interactive adds a hover tint (make it actually clickable by wrapping a link/button).
+//
+// Barrel — forwards the split partials ($tokens + the styles() mixin). Add another
+// concern as its own file (e.g. _keyframes.scss) and @forward it here.
+
+@forward 'tokens';
+@forward 'styles';

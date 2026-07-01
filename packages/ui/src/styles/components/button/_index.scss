@@ -1,0 +1,12 @@
+// Button — Weave actions. Behavior lives in button.ts (variant class + ripple +
+// native <button>); this is the visual (token schema + styles() rules).
+//
+// Variants (REAL Weave, as --<variant>): default = Primary (ink fill, canvas text);
+// --outline (1px ink border, inverts on hover); --marked (text + inset -2px accent);
+// --ghost (text, sub→ink on hover); --icon (34px square). Disabled via [disabled].
+//
+// Barrel — forwards the split partials ($tokens + the styles() mixin). Add another
+// concern as its own file (e.g. _keyframes.scss) and @forward it here.
+
+@forward 'tokens';
+@forward 'styles';

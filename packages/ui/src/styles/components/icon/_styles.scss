@@ -1,14 +1,4 @@
-// Icon — inline SVG at Weave scale (18px, 1.4 hairline stroke, currentColor).
-// Behavior lives in icon.ts; this is the token schema + the class contract.
-
-@use '../ref' as ref;
-
-$tokens: (
-  size: (
-    size: 18px,
-    stroke: 1.4,
-  ),
-);
+// icon — styles() mixin (class rules). Forwarded by ./_index.scss.
 
 @mixin styles() {
   .weave-icon {
