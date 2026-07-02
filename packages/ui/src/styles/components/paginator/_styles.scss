@@ -12,45 +12,14 @@
     font-weight: var(--weave-paginator-weight);
   }
 
-  // Page + nav buttons share the square hit target.
+  // Page + nav buttons ARE the Button component (active = primary ink fill, others =
+  // ghost). The paginator only makes them a compact square hit target — Button owns the
+  // colours / hover / focus / disabled / active-fill.
   .weave-paginator__page,
   .weave-paginator__nav {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
     min-width: var(--weave-paginator-button);
     height: var(--weave-paginator-button);
     padding: 0 var(--weave-paginator-button-padding-x);
-    border: 0;
-    border-radius: var(--weave-paginator-radius);
-    background: transparent;
-    color: inherit;
-    font: inherit;
-    cursor: pointer;
-    transition: background var(--weave-paginator-duration) ease, color var(--weave-paginator-duration) ease;
-  }
-
-  .weave-paginator__page:not(:disabled):hover,
-  .weave-paginator__nav:not(:disabled):hover {
-    background: var(--weave-paginator-hover);
-  }
-
-  // Active page — ink fill (design). State via the native ARIA attr, not a class.
-  .weave-paginator__page[aria-current='page'] {
-    background: var(--weave-paginator-active-background);
-    color: var(--weave-paginator-active-text);
-  }
-
-  .weave-paginator__page:focus-visible,
-  .weave-paginator__nav:focus-visible {
-    @include helpers.focus-ring;
-    outline-offset: -2px;
-  }
-
-  .weave-paginator__page:disabled,
-  .weave-paginator__nav:disabled {
-    color: var(--weave-paginator-disabled-text);
-    cursor: not-allowed;
   }
 
   .weave-paginator__nav {

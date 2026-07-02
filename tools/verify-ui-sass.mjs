@@ -370,7 +370,7 @@ check('slider-overrides changes existing token', /--weave-slider-track-height:\s
 check('slider-overrides adds new token (auto-var)', /--weave-slider-tick:\s*1px/.test(cssSliderOverride));
 
 /* ── paginator built-in: cascade refs + literals + overrides (U4) ── */
-check('theme emits paginator active-background referencing ink', /--weave-paginator-active-background:\s*var\(--weave-color-ink\)/.test(cssTheme));
+check('theme emits paginator range referencing sub', /--weave-paginator-range:\s*var\(--weave-color-sub\)/.test(cssTheme));
 check('theme emits paginator button size literal (28px)', /--weave-paginator-button:\s*28px/.test(cssTheme));
 const cssPaginatorOverride = compile(
   `@use '@weave-framework/ui' as weave;\n@include weave.paginator-overrides((button: 32px, elevation: 1px));`,
@@ -462,7 +462,7 @@ check('slider thumb is a 3×18 ink bar with a 5px accent cap (::after)', /\.weav
 check('slider blocks page scroll during a pointer drag (touch-action:none)', /\.weave-slider\s*{[\s\S]*?touch-action:\s*none/.test(cssStyles));
 check('slider focus shows on the thumb (ring), not a box around the track', /\.weave-slider:focus-visible\s*{[^}]*outline:\s*none/.test(cssStyles) && /\.weave-slider:focus-visible\s+\.weave-slider__thumb\s*{[^}]*outline:\s*2px solid/.test(cssStyles));
 check('all-styles emits .weave-paginator page + nav buttons', /\.weave-paginator__page,\s*\.weave-paginator__nav\s*{[\s\S]*?min-width:\s*var\(--weave-paginator-button\)/.test(cssStyles));
-check('paginator active page takes the ink fill via [aria-current=page]', /\.weave-paginator__page\[aria-current=page\]\s*{[^}]*background:\s*var\(--weave-paginator-active-background\)/.test(cssStyles));
+check('paginator page/nav buttons ARE Button (only compact sizing here, no re-created fill)', /\.weave-paginator__page,\s*\.weave-paginator__nav\s*{[^}]*min-width:\s*var\(--weave-paginator-button\)/.test(cssStyles) && !/\.weave-paginator__page\[aria-current=page\]/.test(cssStyles));
 check('paginator emits the ellipsis + tabular-nums range; jump field IS the composed Input (width only)', /\.weave-paginator__ellipsis\s*{/.test(cssStyles) && /\.weave-paginator__range\s*{[\s\S]*?font-variant-numeric:\s*tabular-nums/.test(cssStyles) && /\.weave-paginator__jump-field\s*{[^}]*width:\s*var\(--weave-paginator-jump-width\)/.test(cssStyles) && !/\.weave-paginator__jump-input\s*{/.test(cssStyles));
 
 /* ── example.scss: the docs-seed dev surface compiles end-to-end ── */

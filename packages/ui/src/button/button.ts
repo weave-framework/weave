@@ -31,6 +31,8 @@ export interface ButtonProps {
   disabled?: boolean;
   /** Accessible name. Required for an icon-only (`variant="icon"`) button. */
   label?: string;
+  /** `aria-current` (e.g. `'page'` for a paginator's active page button). */
+  ariaCurrent?: string;
   /** Extra classes, forwarded onto the host `<button>`. */
   class?: string;
 }
@@ -39,13 +41,14 @@ export interface ButtonProps {
 // component-level `on:X` handlers to the rendered root `<button>`.
 export const template: string =
   '<button class={{ classes() }} type={{ type() }} disabled={{ disabled() }}' +
-  ' aria-label={{ label() }} use:ripple={{ rippleOptions }}><slot></slot></button>';
+  ' aria-label={{ label() }} aria-current={{ ariaCurrent() }} use:ripple={{ rippleOptions }}><slot></slot></button>';
 
 export interface ButtonContext {
   classes: () => string;
   type: () => string;
   disabled: () => boolean;
   label: () => string | undefined;
+  ariaCurrent: () => string | undefined;
   rippleOptions: RippleOptions;
   ripple: typeof ripple;
 }
@@ -62,6 +65,7 @@ export function setup(props: ButtonProps): ButtonContext {
     type: (): string => props.type ?? 'button',
     disabled: (): boolean => !!props.disabled,
     label: (): string | undefined => props.label,
+    ariaCurrent: (): string | undefined => props.ariaCurrent,
     // Ripple reads `disabled` at pointerdown time, so a disabled button never ripples.
     rippleOptions: {
       get disabled(): boolean {

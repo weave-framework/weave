@@ -63,18 +63,18 @@ type PageCell = number | 'ellipsis';
 
 export const template: string =
   '<nav class={{ rootClass() }} ref={{ host }} aria-label={{ navLabel() }}>' +
-  '<button class="weave-paginator__nav" type="button" aria-label="Previous page"' +
-  ' disabled={{ prevDisabled() }} on:click={{ prev }}>‹</button>' +
+  '<Button variant="ghost" class="weave-paginator__nav" label="Previous page"' +
+  ' disabled={{ prevDisabled() }} on:click={{ prev }}>‹</Button>' +
   '@for (cell of cells(); track $index) {' +
   '@if (isPage(cell)) {' +
-  '<button class="weave-paginator__page" type="button" aria-label={{ pageLabel(cell) }}' +
-  ' aria-current={{ pageCurrent(cell) }} disabled={{ isDisabled() }}' +
-  ' on:click={{ () => goTo(cell) }}>{{ cell }}</button>' +
+  '<Button variant={{ pageVariant(cell) }} class="weave-paginator__page" label={{ pageLabel(cell) }}' +
+  ' ariaCurrent={{ pageCurrent(cell) }} disabled={{ isDisabled() }}' +
+  ' on:click={{ () => goTo(cell) }}>{{ cell }}</Button>' +
   '}' +
   '@if (!isPage(cell)) {<span class="weave-paginator__ellipsis" aria-hidden="true">…</span>}' +
   '}' +
-  '<button class="weave-paginator__nav" type="button" aria-label="Next page"' +
-  ' disabled={{ nextDisabled() }} on:click={{ next }}>›</button>' +
+  '<Button variant="ghost" class="weave-paginator__nav" label="Next page"' +
+  ' disabled={{ nextDisabled() }} on:click={{ next }}>›</Button>' +
   '@if (showRange()) {<span class="weave-paginator__range">{{ rangeText() }}</span>}' +
   '@if (showJump()) {' +
   '<span class="weave-paginator__jump">' +
@@ -97,6 +97,7 @@ export interface PaginatorContext {
   isPage: (cell: PageCell) => boolean;
   pageLabel: (cell: PageCell) => string;
   pageCurrent: (cell: PageCell) => string | undefined;
+  pageVariant: (cell: PageCell) => string;
   isDisabled: () => boolean;
   goTo: (page: number) => void;
   prev: () => void;
@@ -189,6 +190,8 @@ export function setup(props: PaginatorProps): PaginatorContext {
     isPage: (cell): boolean => typeof cell === 'number',
     pageLabel: (cell): string => `Go to page ${cell}`,
     pageCurrent: (cell): string | undefined => (cell === currentPage() ? 'page' : undefined),
+    // Active page = the Button's ink-fill primary variant; others = ghost.
+    pageVariant: (cell): string => (cell === currentPage() ? 'primary' : 'ghost'),
     isDisabled: (): boolean => disabled(),
     goTo: (page): void => goToIndex(page - 1),
     prev: (): void => goToIndex(pageIndex() - 1),

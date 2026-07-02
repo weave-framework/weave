@@ -1,13 +1,11 @@
-// paginator — design tokens (schema). Forwarded by ./_index.scss.
+// paginator — design tokens (schema). Page + nav buttons ARE the Button component
+// (colours/hover/active-fill are Button's), so only layout/spacing + the extra parts
+// (range label, jump width, page-size width) are tokenized here. Forwarded by ./_index.scss.
 @use '../../ref' as ref;
 
 $tokens: (
   color: (
     text: ref.ref('color.sub'),
-    // Active page = ink fill (design), on-ink glyph is a fixed light literal.
-    active-background: ref.ref('color.ink'),
-    active-text: ref.ref('color.surface'),
-    hover: ref.ref('color.field'),
     range: ref.ref('color.sub'),
     disabled-text: ref.ref('color.sub'),
   ),
@@ -15,13 +13,11 @@ $tokens: (
     button: 28px,
     button-padding-x: 6px,
     gap: 2px,
-    radius: ref.ref('shape.radius'),
     section-gap: 16px,
     jump-gap: 6px,
     jump-width: 56px,
     size-width: 116px,
     disabled-opacity: 0.6,
-    duration: ref.ref('motion.fast'),
   ),
   typography: (
     font-size: 13px,

@@ -13,12 +13,13 @@ import { compileTemplate } from '@weave-framework/compiler';
 import { setup, template, type PaginatorProps, type PaginatorContext, type PageEvent } from '@weave-framework/ui/paginator';
 import * as InputMod from '@weave-framework/ui/input';
 import * as SelectMod from '@weave-framework/ui/select';
+import * as ButtonMod from '@weave-framework/ui/button';
 import { toComponent } from '../internal/compose.js';
 
 const rt: typeof dom & { signal: typeof signal; effect: typeof effect } = { ...dom, signal, effect };
 
 const SCOPE: string[] = [
-  'host', 'rootClass', 'navLabel', 'cells', 'isPage', 'pageLabel', 'pageCurrent', 'isDisabled',
+  'host', 'rootClass', 'navLabel', 'cells', 'isPage', 'pageLabel', 'pageCurrent', 'pageVariant', 'isDisabled',
   'goTo', 'prev', 'next', 'prevDisabled', 'nextDisabled', 'showRange', 'rangeText', 'showJump',
   'jumpLabel', 'jumpValue', 'pageCount', 'currentPage', 'onJumpKeydown', 'hasSizeOptions',
   'sizeOptions', 'sizeValue', 'onSizeChange',
@@ -46,8 +47,12 @@ function mount(props: PaginatorProps): Mounted {
       r: unknown,
       k: unknown
     ) => HTMLElement;
-    // Jump field IS the Input component, page-size IS the Select — provide them as children.
-    return fn(ctx, rt, { Input: toComponent(InputMod as never), Select: toComponent(SelectMod as never) });
+    // Page/nav buttons are <Button>, the jump field <Input>, the page-size <Select>.
+    return fn(ctx, rt, {
+      Button: toComponent(ButtonMod as never),
+      Input: toComponent(InputMod as never),
+      Select: toComponent(SelectMod as never),
+    });
   });
   document.body.appendChild(nav);
   const q = <T extends Element>(s: string): T[] => Array.from(nav.querySelectorAll<T>(s));
