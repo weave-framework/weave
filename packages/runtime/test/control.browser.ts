@@ -1,6 +1,6 @@
 import { test, assert } from '../../../tools/harness.js';
 import { signal, effect, root, type Signal } from '@weave-framework/runtime';
-import { ifBlock, eachBlock, type ForContext } from '@weave-framework/runtime/dom';
+import { ifBlock, eachBlock, defineComponent, type ForContext } from '@weave-framework/runtime/dom';
 
 function host(): { parent: HTMLElement; anchor: Comment } {
   const parent: HTMLDivElement = document.createElement('div');
@@ -97,4 +97,64 @@ test('eachBlock disposes removed rows (no leak)', () => {
   assert.deepEqual([...alive].sort(), [1, 3], 'removed row torn down');
   dispose();
   assert.deepEqual([...alive], [], 'all rows torn down on dispose');
+});
+
+test('a component does not leak its setup signal reads to an enclosing effect (M1)', () => {
+  const s: Signal<number> = signal(0);
+  const Comp: (props?: Record<string, unknown>, slots?: Record<string, () => Node>) => Node = defineComponent(
+    () => document.createElement('div'),
+    () => {
+      s(); // setup reads a signal
+      return {};
+    },
+  );
+  let outerRuns: number = 0;
+  root(() => {
+    effect(() => {
+      outerRuns++;
+      Comp({}, {}); // instantiate the component inside the effect
+    });
+  });
+  assert.equal(outerRuns, 1, 'the enclosing effect ran once');
+  s.set(1);
+  assert.equal(outerRuns, 1, 'a signal read only in child setup must not re-run the parent effect');
+});
+
+test("eachBlock coalesces a row's positional writes into one recompute (M2)", () => {
+  interface Row {
+    id: number;
+    v: string;
+  }
+  const { anchor } = host();
+  const list: Signal<Row[]> = signal<Row[]>([
+    { id: 1, v: 'a' },
+    { id: 2, v: 'b' },
+  ]);
+  let runs: number = 0;
+  root(() => {
+    eachBlock<Row>(
+      anchor,
+      () => list(),
+      (r) => r.id,
+      (ctx: ForContext<Row>) => {
+        const el: HTMLElement = document.createElement('span');
+        effect(() => {
+          // reads TWO of the row's signals — both change on the reorder+edit below
+          el.textContent = `${ctx.item().v}${ctx.index()}`;
+          runs++;
+        });
+        return el;
+      },
+    );
+  });
+  const initial: number = runs; // one run per row = 2
+  // reorder AND change each item's value → item signal + index signal both change per reused row
+  list.set([
+    { id: 2, v: 'B' },
+    { id: 1, v: 'A' },
+  ]);
+  const delta: number = runs - initial;
+  // batched: each reused row recomputes once (→ 2). unbatched: the item write and the index write
+  // flush separately, so a binding reading both recomputes twice per row (→ 4).
+  assert.ok(delta <= 2, `expected each reused row to recompute once (<=2), got ${delta}`);
 });

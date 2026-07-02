@@ -9,6 +9,16 @@
 > releases here. Publishing itself is a separate, explicit step (the `/publish` skill /
 > `pnpm publish:packages`) — committing/pushing does **not** publish or mirror.
 
+## 0.2.50 — 2026-07-02 (unpublished; on `main`, ahead of the 0.2.0 npm release)
+
+**reactivity performance**. **M1** — block/component
+construction is now wrapped in `untrack`: `ifBlock`'s branch, `eachBlock`'s `renderRow`/`empty`, and every
+`defineComponent` instance, so a signal read *synchronously* during render no longer subscribes the enclosing
+block/effect (their own bindings self-subscribe) — an unrelated change won't re-run a whole `@for` reconcile or
+re-instantiate a component. **M2** — `eachBlock` wraps its per-row positional writes (`item`/`index`/`count`) in a
+single `batch`, so a binding that reads more than one recomputes once per reconcile instead of up to three times
+per row. Both have tests that fail without them. **959 tests green.**
+
 ## 0.2.49 — 2026-07-02 (unpublished; on `main`, ahead of the 0.2.0 npm release)
 
 **compiler rewrite robustness**. **H4** — the expression

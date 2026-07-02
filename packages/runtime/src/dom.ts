@@ -520,7 +520,9 @@ export function ifBlock(anchor: Comment, selector: () => (() => Node | null) | n
     clear();
     if (next) {
       owner = runInOwner(host, () => createOwner(null));
-      const node: Node | null = runInOwner(owner, () => next());
+      // Untrack branch construction — its bindings self-subscribe; a direct signal read during
+      // render must not tie this if-block effect to it (the selector is the only real dep). (M1)
+      const node: Node | null = runInOwner(owner, () => untrack(() => next()));
       // Read the parent at insert time, not construction: a `<Portal>` (or any
       // relocation) can move the anchor after this block is wired.
       nodes = node ? placeBefore(anchor.parentNode!, node, anchor) : [];
@@ -645,7 +647,7 @@ export function eachBlock<T>(
       removeRows();
       if (emptyRender && !emptyOwner) {
         emptyOwner = runInOwner(host, () => createOwner(null));
-        const node: Node = runInOwner(emptyOwner, () => emptyRender());
+        const node: Node = runInOwner(emptyOwner, () => untrack(() => emptyRender())); // (M1)
         emptyNodes = placeBefore(parent, node, anchor);
       }
       return;
@@ -666,7 +668,10 @@ export function eachBlock<T>(
         odd: () => indexSig() % 2 === 1,
       };
       const owner: Owner = runInOwner(host, () => createOwner(null));
-      const rendered: Node = runInOwner(owner, () => renderRow(ctx));
+      // Untrack the row construction: its own bindings create their own effects, so a signal read
+      // synchronously during render must NOT subscribe this block effect (else an unrelated change
+      // re-runs the whole @for reconcile). (M1)
+      const rendered: Node = runInOwner(owner, () => untrack(() => renderRow(ctx)));
       // A single-element row is tracked by that one node (the hot path). A fragment
       // row (component / multiple roots / text) has no stable single node — and its
       // node count can vary at runtime (e.g. a top-level @if inside) — so bracket it
@@ -694,12 +699,15 @@ export function eachBlock<T>(
       } as EachRow<T>;
     }) as EachRow<T>[];
 
-    // Refresh item + positional signals for every row (reused rows included),
-    // so immutable updates and reorders flow into the existing DOM.
-    rows.forEach((r, i) => {
-      r.itemSig.set(data[i] as T);
-      r.indexSig.set(i);
-      r.countSig.set(data.length);
+    // Refresh item + positional signals for every row (reused rows included), so immutable
+    // updates and reorders flow into the existing DOM. Batch so a row's three writes coalesce
+    // into ONE flush instead of three per row (a binding reading >1 of them recomputes once). (M2)
+    batch(() => {
+      rows.forEach((r, i) => {
+        r.itemSig.set(data[i] as T);
+        r.indexSig.set(i);
+        r.countSig.set(data.length);
+      });
     });
   });
   onDispose(() => {
@@ -943,8 +951,12 @@ export function defineComponent(
   return (props = {}, slots = {}) => {
     const owner: Owner = createOwner(); // _parent = surrounding owner (context chain)
     onDispose(() => disposeOwner(owner)); // surrounding scope disposes this instance
-    return runInOwner(owner, () => {
-      const bindings: Record<string, unknown> = setup ? setup(props) || {} : {};
+    // Untrack the whole instance construction: a component's reactivity comes from its own internal
+    // effects, so setup()/render() reading a signal must not subscribe an enclosing block/effect
+    // (which would re-instantiate the component on any unrelated change). (M1)
+    return runInOwner(owner, () =>
+      untrack(() => {
+        const bindings: Record<string, unknown> = setup ? setup(props) || {} : {};
       // Define bindings as OWN properties over `props` (on the prototype). Uses
       // descriptors, not assignment: `Object.assign` does a `[[Set]]`, which honours
       // a getter-only prop of the same name on the prototype and throws — so a binding
@@ -973,8 +985,9 @@ export function defineComponent(
           }
         }
       }
-      return node;
-    });
+        return node;
+      }),
+    );
   };
 }
 
