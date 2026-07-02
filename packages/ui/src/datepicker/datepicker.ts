@@ -46,6 +46,9 @@ export interface DatepickerProps {
   locale?: string;
   /** `Intl` options for the field's display format. Default `{ dateStyle: 'medium' }`. */
   displayFormat?: Intl.DateTimeFormatOptions;
+  /** Let the user type a date into the field (parsed via the adapter). Default false — the
+   *  design's field is a button trigger; `editable` swaps in a typeable input-as-combobox. */
+  editable?: boolean;
   /** Shown when nothing is selected. */
   placeholder?: string;
   /** Disable the control. */
@@ -66,32 +69,52 @@ export interface DatepickerProps {
 
 export const template: string =
   '<div class={{ rootClass() }} ref={{ root }}>' +
-  '<div class="weave-datepicker__field" ref={{ trigger }} role="combobox" tabindex={{ tabindex() }}' +
-  ' aria-haspopup="dialog" aria-expanded="false" aria-label={{ label() }} aria-required={{ ariaRequired() }}' +
-  ' aria-disabled={{ ariaDisabled() }} on:click={{ onFieldClick }} on:keydown={{ onTriggerKeydown }}>' +
-  '<span class={{ valueClass() }}>{{ displayText() }}</span>' +
+  '<div class="weave-datepicker__field" ref={{ trigger }} role={{ fieldRole() }} tabindex={{ tabindex() }}' +
+  ' aria-haspopup={{ fieldHaspopup() }} aria-expanded={{ fieldExpanded() }} aria-label={{ fieldLabel() }}' +
+  ' aria-required={{ ariaRequired() }} aria-disabled={{ ariaDisabled() }} on:click={{ onFieldClick }}' +
+  ' on:keydown={{ onTriggerKeydown }}>' +
+  '@if (editable()) {' +
+  '<input class="weave-datepicker__input" ref={{ input }} type="text" role="combobox" aria-haspopup="dialog"' +
+  '  aria-expanded={{ inputExpanded() }} aria-label={{ label() }} placeholder={{ placeholder() }} .disabled={{ isDisabled() }}' +
+  '  on:keydown={{ onInputKeydown }} on:blur={{ onInputBlur }} on:click={{ onInputClick }} />' +
+  '}' +
+  '@if (!editable()) {<span class={{ valueClass() }}>{{ displayText() }}</span>}' +
   '<span class="weave-datepicker__spacer"></span>' +
   '@if (showClear()) {' +
   '<button type="button" class="weave-datepicker__clear" tabindex="-1" aria-label={{ clearLabel() }} on:click={{ onClearClick }}>×</button>' +
   '}' +
-  '<span class="weave-datepicker__icon" aria-hidden="true"></span>' +
+  '@if (editable()) {<button type="button" class="weave-datepicker__icon-button" tabindex="-1" aria-label="Open calendar" on:click={{ onIconClick }}><span class="weave-datepicker__icon" aria-hidden="true"></span></button>}' +
+  '@if (!editable()) {<span class="weave-datepicker__icon" aria-hidden="true"></span>}' +
   '</div>' +
   '</div>';
 
 export interface DatepickerContext {
   root: Signal<HTMLElement | null>;
   trigger: Signal<HTMLElement | null>;
+  input: Signal<HTMLInputElement | null>;
   rootClass: () => string;
   valueClass: () => string;
   displayText: () => string;
+  editable: () => boolean;
+  fieldRole: () => string | undefined;
+  fieldHaspopup: () => string | undefined;
+  fieldExpanded: () => 'true' | 'false' | undefined;
+  inputExpanded: () => 'true' | 'false';
+  fieldLabel: () => string | undefined;
   tabindex: () => number;
+  isDisabled: () => boolean;
   label: () => string | undefined;
+  placeholder: () => string | undefined;
   ariaRequired: () => 'true' | undefined;
   ariaDisabled: () => 'true' | undefined;
   showClear: () => boolean;
   clearLabel: () => string;
   onFieldClick: () => void;
   onTriggerKeydown: (event: KeyboardEvent) => void;
+  onInputKeydown: (event: KeyboardEvent) => void;
+  onInputBlur: () => void;
+  onInputClick: (event: MouseEvent) => void;
+  onIconClick: (event: MouseEvent) => void;
   onClearClick: (event: MouseEvent) => void;
 }
 
@@ -101,8 +124,13 @@ export function setup(props: DatepickerProps): DatepickerContext {
   const id: number = ++_seq;
   const root: Signal<HTMLElement | null> = signal<HTMLElement | null>(null);
   const trigger: Signal<HTMLElement | null> = signal<HTMLElement | null>(null);
+  const input: Signal<HTMLInputElement | null> = signal<HTMLInputElement | null>(null);
   const open: Signal<boolean> = signal<boolean>(false);
+  const editable = (): boolean => !!props.editable;
+  const parseError: Signal<boolean> = signal<boolean>(false);
   const adapter: DateAdapter = props.adapter ?? createDateAdapter({ locale: props.locale });
+  // The element carrying combobox `aria-expanded` (the input in editable mode, else the field).
+  const comboEl = (): HTMLElement | null => (editable() ? input() : trigger());
 
   let overlay: OverlayRef | null = null;
   let panel: HTMLElement | null = null;
@@ -317,8 +345,7 @@ export function setup(props: DatepickerProps): DatepickerContext {
     });
     overlay.onBackdropClick(() => closePanel(false));
     overlay.attach(panel);
-    t.setAttribute('aria-expanded', 'true');
-    open.set(true);
+    open.set(true); // aria-expanded on the combobox is a reactive binding
     renderGrid();
     focusFocusedCell();
   }
@@ -327,42 +354,109 @@ export function setup(props: DatepickerProps): DatepickerContext {
     if (!open()) return;
     overlay?.detach();
     overlay = null;
-    trigger()?.setAttribute('aria-expanded', 'false');
     open.set(false);
     props.control?.touched?.set(true);
-    if (returnFocus) trigger()?.focus();
+    if (returnFocus) comboEl()?.focus();
   }
 
   const onFieldClick = (): void => {
+    if (editable()) return; // the input focuses for typing; the icon button opens the calendar
     if (open()) closePanel(true);
     else openPanel();
   };
 
   const onTriggerKeydown = (event: KeyboardEvent): void => {
-    if (isDisabled() || open()) return;
+    if (editable() || isDisabled() || open()) return; // the input owns keys in editable mode
     if (event.key === 'ArrowDown' || event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
       openPanel();
     }
   };
 
+  const formatValue = (v: Date): string => adapter.format(v, props.displayFormat ?? { dateStyle: 'medium' });
+
+  // Parse the typed text via the adapter: valid → commit (clamped) + normalise the display;
+  // empty → clear; unparseable → keep the text + flag a parse error (aria-invalid).
+  const parseInput = (): void => {
+    const el: HTMLInputElement | null = input();
+    if (!el) return;
+    const text: string = el.value.trim();
+    if (!text) {
+      parseError.set(false);
+      commit(null);
+      return;
+    }
+    const parsed: Date | null = adapter.parse(text);
+    if (parsed) {
+      const committed: Date = adapter.clamp(parsed, props.min, props.max);
+      parseError.set(false);
+      commit(committed);
+      el.value = formatValue(committed);
+    } else {
+      parseError.set(true); // keep the raw text; surface it as invalid
+    }
+  };
+
+  const onInputKeydown = (event: KeyboardEvent): void => {
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      if (!open()) openPanel();
+      return;
+    }
+    if (event.key === 'Enter') {
+      if (open()) return; // the calendar grid owns Enter while focus is inside it
+      event.preventDefault();
+      parseInput();
+      return;
+    }
+    if (event.key === 'Escape' && open()) {
+      event.preventDefault();
+      closePanel(true);
+    }
+  };
+
+  const onInputBlur = (): void => {
+    parseInput();
+    props.control?.touched?.set(true);
+  };
+  const onInputClick = (event: MouseEvent): void => {
+    event.stopPropagation(); // focus for typing; don't toggle the calendar
+  };
+  const onIconClick = (event: MouseEvent): void => {
+    event.stopPropagation();
+    if (open()) closePanel(true);
+    else openPanel();
+  };
+
   const onClearClick = (event: MouseEvent): void => {
     event.stopPropagation();
+    parseError.set(false);
     commit(null);
+    const el: HTMLInputElement | null = input();
+    if (el) el.value = '';
   };
+
+  // Keep the editable input's text in sync with the value when the user isn't typing.
+  effect(() => {
+    const v: Date | null = rawValue();
+    const el: HTMLInputElement | null = input();
+    if (editable() && el && document.activeElement !== el) {
+      el.value = v ? formatValue(v) : '';
+      parseError.set(false);
+    }
+  });
 
   // Re-render an open calendar when the external value changes (control/value).
   effect(() => {
     rawValue();
     if (open()) renderGrid();
   });
-  // Reflect forms validity on the trigger.
+  // Reflect forms validity + a parse error as aria-invalid on the combobox element.
   effect(() => {
-    const t: HTMLElement | null = trigger();
-    if (!t) return;
-    const c: DatepickerControl | undefined = props.control;
-    if (c && c.touched?.() && c.error?.()) t.setAttribute('aria-invalid', 'true');
-    else t.removeAttribute('aria-invalid');
+    const el: HTMLElement | null = comboEl();
+    if (!el) return;
+    if (invalidNow()) el.setAttribute('aria-invalid', 'true');
+    else el.removeAttribute('aria-invalid');
   });
 
   onDispose(() => {
@@ -370,16 +464,18 @@ export function setup(props: DatepickerProps): DatepickerContext {
     overlay = null;
   });
 
-  const invalidNow = (): boolean => {
+  function invalidNow(): boolean {
     const c: DatepickerControl | undefined = props.control;
-    return !!(c && c.touched?.() && c.error?.());
-  };
+    return parseError() || !!(c && c.touched?.() && c.error?.());
+  }
 
   return {
     root,
     trigger,
+    input,
     rootClass: (): string => {
       const parts: string[] = ['weave-datepicker'];
+      if (editable()) parts.push('weave-datepicker--editable');
       if (isDisabled()) parts.push('weave-datepicker--disabled');
       if (invalidNow()) parts.push('weave-datepicker--invalid');
       if (props.class) parts.push(props.class);
@@ -390,16 +486,28 @@ export function setup(props: DatepickerProps): DatepickerContext {
     displayText: (): string => {
       const v: Date | null = rawValue();
       if (!v) return props.placeholder ?? '';
-      return adapter.format(v, props.displayFormat ?? { dateStyle: 'medium' });
+      return formatValue(v);
     },
-    tabindex: (): number => (isDisabled() ? -1 : 0),
+    editable,
+    fieldRole: (): string | undefined => (editable() ? undefined : 'combobox'),
+    fieldHaspopup: (): string | undefined => (editable() ? undefined : 'dialog'),
+    fieldExpanded: (): 'true' | 'false' | undefined => (editable() ? undefined : open() ? 'true' : 'false'),
+    inputExpanded: (): 'true' | 'false' => (open() ? 'true' : 'false'),
+    fieldLabel: (): string | undefined => (editable() ? undefined : props.label),
+    tabindex: (): number => (editable() || isDisabled() ? -1 : 0),
+    isDisabled,
     label: (): string | undefined => props.label,
+    placeholder: (): string | undefined => props.placeholder,
     ariaRequired: (): 'true' | undefined => (props.required ? 'true' : undefined),
     ariaDisabled: (): 'true' | undefined => (isDisabled() ? 'true' : undefined),
     showClear: (): boolean => !!props.clearable && !isDisabled() && rawValue() != null,
     clearLabel: (): string => props.clearLabel ?? 'Clear',
     onFieldClick,
     onTriggerKeydown,
+    onInputKeydown,
+    onInputBlur,
+    onInputClick,
+    onIconClick,
     onClearClick,
   };
 }

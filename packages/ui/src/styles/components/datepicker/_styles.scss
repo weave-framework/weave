@@ -31,6 +31,33 @@
     color: var(--weave-datepicker-placeholder);
   }
 
+  // Editable text field (opt-in `editable`) — the input IS the combobox; underline is the
+  // field wrapper's (shared helper), so the input strips its own chrome.
+  .weave-datepicker__input {
+    @include helpers.field-reset;
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 0;
+    color: var(--weave-datepicker-text);
+  }
+
+  .weave-datepicker__input::placeholder {
+    color: var(--weave-datepicker-placeholder);
+  }
+
+  // Calendar-toggle button (editable mode) — wraps the icon glyph.
+  .weave-datepicker__icon-button {
+    @include helpers.field-reset;
+    display: inline-flex;
+    align-items: center;
+    flex: 0 0 auto;
+    cursor: pointer;
+  }
+
+  .weave-datepicker__icon-button:focus-visible {
+    @include helpers.focus-ring;
+  }
+
   .weave-datepicker__spacer {
     flex: 1 1 auto;
   }

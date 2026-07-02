@@ -9,6 +9,21 @@
 > releases here. Publishing itself is a separate, explicit step (the `/publish` skill /
 > `pnpm publish:packages`) — committing/pushing does **not** publish or mirror.
 
+## 0.2.42 — 2026-07-02 (unpublished; on `main`, ahead of the 0.2.0 npm release)
+
+**Datepicker text-entry** (opt-in `editable`) + the **U5 sub-plan** is written.
+
+### UI (`@weave-framework/ui`) — `./datepicker`
+- **`<Datepicker editable>`** — swaps the design's button trigger for a typeable **input-as-combobox** (role
+  moves to the input; the wrapper drops its role). Typing + Enter/blur **parses via the CDK `adapter.parse`** →
+  commits (clamped + normalised to the display format), OR flags **`aria-invalid`** + `--invalid` and keeps the
+  text. The calendar icon becomes a toggle button; ArrowDown opens the calendar; clear × empties. Default
+  (non-editable, the design's button) is unchanged. New `__input` + `__icon-button` styles.
+- Gates: **926 tests (+6); verify:ui-sass 284 (+1);** typecheck + `eslint .` clean.
+
+### Plan
+- **`UI-PLAN-U5.md`** written (Experimental milestone): Table column-resize · Menubar · Popover-edit.
+
 ## 0.2.41 — 2026-07-02 (unpublished; on `main`, ahead of the 0.2.0 npm release)
 
 **Tree reorder** + a `dropList` keyboard opt-out.

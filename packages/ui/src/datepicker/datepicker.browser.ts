@@ -43,6 +43,9 @@ function dateField(initial: Date | null): DatepickerControl {
   return { value: signal<Date | null | undefined>(initial), touched: signal(false), error: (): string | null => null };
 }
 const field = (m: Mounted): HTMLElement => m.root.querySelector('.weave-datepicker__field') as HTMLElement;
+const inputEl = (m: Mounted): HTMLInputElement => m.root.querySelector('.weave-datepicker__input') as HTMLInputElement;
+const iconButton = (m: Mounted): HTMLButtonElement => m.root.querySelector('.weave-datepicker__icon-button') as HTMLButtonElement;
+const inputKey = (m: Mounted, k: string): void => inputEl(m).dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: k }));
 const panel = (): HTMLElement | null => document.body.querySelector('.weave-datepicker__panel');
 const cells = (): HTMLButtonElement[] =>
   Array.from(document.body.querySelectorAll<HTMLButtonElement>('.weave-datepicker__cell:not(.weave-datepicker__cell--blank)'));
@@ -187,5 +190,61 @@ test('datepicker: value + onChange binding (uncontrolled forms convention)', asy
   field(m).click();
   cellByText('1').click();
   assert.ok(out && A.isSameDay(out as Date, A.create(2026, 5, 1)));
+  m.dispose();
+});
+
+/* ── editable (text entry via adapter.parse) ── */
+test('datepicker: editable renders a typeable combobox input (not a value span)', async () => {
+  const m: Mounted = await mount({ control: dateField(JUN15), editable: true, locale: 'en-US' });
+  const inp: HTMLInputElement = inputEl(m);
+  assert.ok(inp, 'an input field');
+  assert.equal(inp.getAttribute('role'), 'combobox');
+  assert.equal(field(m).hasAttribute('role'), false, 'the wrapper is no longer the combobox');
+  matchRe(inp.value, /Jun 15, 2026/);
+  assert.ok(!m.root.querySelector('.weave-datepicker__value'), 'no static value span in editable mode');
+  m.dispose();
+});
+
+test('datepicker: typing a valid date + Enter parses + commits (via the adapter)', async () => {
+  const ctl: DatepickerControl = dateField(null);
+  const m: Mounted = await mount({ control: ctl, editable: true, locale: 'en-US' });
+  inputEl(m).value = '2026-06-20'; // ISO fast-path
+  inputKey(m, 'Enter');
+  assert.ok(ctl.value() && A.isSameDay(ctl.value() as Date, A.create(2026, 5, 20)), 'committed Jun 20');
+  matchRe(inputEl(m).value, /Jun 20, 2026/, 'normalised to the display format');
+  m.dispose();
+});
+
+test('datepicker: typing an unparseable date flags aria-invalid + does not commit', async () => {
+  const ctl: DatepickerControl = dateField(null);
+  const m: Mounted = await mount({ control: ctl, editable: true, locale: 'en-US' });
+  inputEl(m).value = 'not a date';
+  inputKey(m, 'Enter');
+  assert.equal(ctl.value(), null, 'no commit on junk');
+  assert.equal(inputEl(m).getAttribute('aria-invalid'), 'true');
+  assert.ok(m.root.classList.contains('weave-datepicker--invalid'), '--invalid class set on the root');
+  m.dispose();
+});
+
+test('datepicker: editable — the icon button opens the calendar; ArrowDown opens too', async () => {
+  const m: Mounted = await mount({ control: dateField(JUN15), editable: true, locale: 'en-US' });
+  assert.equal(panel(), null);
+  iconButton(m).click();
+  assert.ok(panel(), 'icon opened the calendar');
+  assert.equal(inputEl(m).getAttribute('aria-expanded'), 'true');
+  cellByText('20').click(); // pick a day → fills the input
+  matchRe(inputEl(m).value, /Jun 20, 2026/);
+  assert.equal(panel(), null, 'closed after pick');
+  inputKey(m, 'ArrowDown');
+  assert.ok(panel(), 'ArrowDown reopened the calendar');
+  m.dispose();
+});
+
+test('datepicker: editable — empty text on blur clears the value', async () => {
+  const ctl: DatepickerControl = dateField(JUN15);
+  const m: Mounted = await mount({ control: ctl, editable: true, locale: 'en-US' });
+  inputEl(m).value = '';
+  inputEl(m).dispatchEvent(new FocusEvent('blur'));
+  assert.equal(ctl.value(), null, 'blur with empty text clears');
   m.dispose();
 });
