@@ -56,6 +56,24 @@
     font-size: var(--weave-list-meta-font-size);
   }
 
+  // Reorder drag handle — only this starts a drag (row clicks still select). touch-action:none
+  // so a touch-drag on the grip doesn't scroll the page.
+  .weave-list__drag-handle {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--weave-list-drag-handle-size);
+    color: var(--weave-list-drag-handle);
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+  }
+
+  .weave-list__drag-handle:active {
+    cursor: grabbing;
+  }
+
   /* Selected — accentSoft tint + 2px accent left border (state via native ARIA attr). */
   .weave-list__row[aria-selected='true'] {
     background: var(--weave-list-selected-background);

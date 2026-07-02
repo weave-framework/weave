@@ -11,12 +11,15 @@ $tokens: (
     selected-background: color-mix(in srgb, ref.ref('color.accent') 12%, transparent),
     selected-marker: ref.ref('color.accent'),
     disabled-text: ref.ref('color.sub'),
+    // The reorder drag handle (⠿ grip).
+    drag-handle: ref.ref('color.sub'),
   ),
   size: (
     row-height: 34px,
     padding-x: 12px,
     padding-y: 7px,
     marker-width: 2px,
+    drag-handle-size: 16px,
     duration: ref.ref('motion.fast'),
   ),
   typography: (

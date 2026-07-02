@@ -15,9 +15,10 @@ import { setup, template, type ListProps, type ListContext, type ListItem } from
 const rt: typeof dom & { signal: typeof signal; effect: typeof effect } = { ...dom, signal, effect };
 
 const SCOPE: string[] = [
-  'host', 'items', 'listClass', 'listRole', 'rowRole', 'label',
+  'host', 'items', 'listClass', 'listRole', 'rowRole', 'reorderable', 'label',
   'ariaSelected', 'ariaDisabled', 'tabindexFor', 'activate', 'onKeydown',
 ];
+const tick = (): Promise<void> => new Promise<void>((r) => queueMicrotask(r));
 
 function mount(props: ListProps): { list: HTMLElement; rows: HTMLElement[]; dispose: () => void } {
   const owner: Owner = createOwner();
@@ -201,6 +202,43 @@ test('non-selectable: clicking a row emits nothing and keyboard does not navigat
   rows[0].click();
   key(list, 'ArrowDown');
   assert.equal(calls, 0, 'a plain list is inert');
+  dispose();
+});
+
+/* ─────────────────────────── reorder (CDK dropList) ─────────────────────────── */
+
+const dragPointer = (target: EventTarget, type: string, clientY: number): void => {
+  target.dispatchEvent(new PointerEvent(type, { bubbles: true, button: 0, pointerId: 1, clientX: 20, clientY }));
+};
+
+test('reorderable: renders a drag handle per row + a --reorderable class', async () => {
+  const { list, rows, dispose } = mount({ items: ROWS, reorderable: true });
+  await tick(); // onMount attaches the dropList
+  assert.ok(list.classList.contains('weave-list--reorderable'));
+  assert.ok(rows.every((r) => r.querySelector('.weave-list__drag-handle')), 'each row has a handle');
+  dispose();
+});
+
+test('reorderable: dragging a row handle past a sibling midpoint emits onReorder', async () => {
+  const drops: Array<{ previousIndex: number; currentIndex: number }> = [];
+  const { list, rows, dispose } = mount({ items: ROWS, reorderable: true, onReorder: (e) => drops.push(e) });
+  await tick();
+  const handle0: HTMLElement = rows[0].querySelector('.weave-list__drag-handle') as HTMLElement;
+  const r1: DOMRect = rows[1].getBoundingClientRect();
+  const pastRow1: number = r1.top + r1.height / 2 + 1; // just past row 1's midpoint
+  dragPointer(handle0, 'pointerdown', rows[0].getBoundingClientRect().top + 4);
+  dragPointer(list, 'pointermove', pastRow1);
+  dragPointer(list, 'pointerup', pastRow1);
+  assert.deepEqual(drops.at(-1), { previousIndex: 0, currentIndex: 1 }, 'moved item 0 to index 1');
+  dispose();
+});
+
+test('reorderable: a row-body click still selects (only the handle drags)', async () => {
+  let selected: string | undefined;
+  const { rows, dispose } = mount({ items: ROWS, reorderable: true, value: null, onChange: (v) => (selected = v) });
+  await tick();
+  rows[1].click(); // click on the row body, not the handle
+  assert.equal(selected, 'banana', 'row click selects; the handle is the only drag start');
   dispose();
 });
 

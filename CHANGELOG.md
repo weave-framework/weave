@@ -9,6 +9,17 @@
 > releases here. Publishing itself is a separate, explicit step (the `/publish` skill /
 > `pnpm publish:packages`) — committing/pushing does **not** publish or mirror.
 
+## 0.2.40 — 2026-07-02 (unpublished; on `main`, ahead of the 0.2.0 npm release)
+
+**List reorder** — drag-to-reorder rows (via the CDK `dropList`).
+
+### UI (`@weave-framework/ui`) — `./list`
+- **`<List reorderable onReorder>`** — a per-row `__drag-handle` (⠿ grip) wired via the CDK **`dropList`** with a
+  `handle` selector, so a row-body click still selects and only the handle starts a drag. Emits
+  `onReorder({ previousIndex, currentIndex })`; the List is controlled (the consumer reorders `items`). New handle
+  tokens + `touch-action: none`.
+- Gates: **917 tests (+3); verify:ui-sass 282 (+1);** typecheck + `eslint .` clean.
+
 ## 0.2.39 — 2026-07-02 (unpublished; on `main`, ahead of the 0.2.0 npm release)
 
 **Bottom Sheet drag-to-dismiss** — the U3-deferred gesture, now unblocked by the CDK Drag & Drop (§4.11).

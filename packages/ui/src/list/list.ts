@@ -20,8 +20,9 @@
  *   <List selectable={{ false }} items={{ rows }} />
  */
 
-import { signal, type Signal } from '@weave-framework/runtime';
+import { signal, onMount, type Signal } from '@weave-framework/runtime';
 import { listKeyManager, type ListKeyManager } from '../cdk/key-manager.js';
+import { dropList, type DropEvent } from '../cdk/drag-drop.js';
 
 export interface ListItem {
   /** The value this row carries (what `value`/`onChange` speak in). */
@@ -45,6 +46,10 @@ export interface ListProps {
   onChange?: (value: string) => void;
   /** Disable the whole list. */
   disabled?: boolean;
+  /** Show a per-row drag handle and let rows be reordered by dragging it (CDK `dropList`). */
+  reorderable?: boolean;
+  /** Called on a committed reorder — the consumer reorders `items` (List is controlled). */
+  onReorder?: (event: DropEvent) => void;
   /** Accessible name for the list. */
   label?: string;
   /** Extra classes, forwarded onto the container. */
@@ -58,6 +63,7 @@ export const template: string =
   '<div class="weave-list__row" role={{ rowRole() }} aria-selected={{ ariaSelected(item) }}' +
   ' aria-disabled={{ ariaDisabled(item) }} tabindex={{ tabindexFor(item) }}' +
   ' on:click={{ () => activate(item) }}>' +
+  '@if (reorderable()) {<span class="weave-list__drag-handle" aria-hidden="true">⠿</span>}' +
   '<span class="weave-list__title">{{ item.title }}</span>' +
   '@if (item.meta) {<span class="weave-list__meta">{{ item.meta }}</span>}' +
   '</div>' +
@@ -70,6 +76,7 @@ export interface ListContext {
   listClass: () => string;
   listRole: () => string;
   rowRole: () => string | undefined;
+  reorderable: () => boolean;
   label: () => string | undefined;
   ariaSelected: (item: ListItem) => string | undefined;
   ariaDisabled: (item: ListItem) => string | undefined;
@@ -83,6 +90,21 @@ export function setup(props: ListProps): ListContext {
 
   const items = (): ListItem[] => props.items ?? [];
   const selectable = (): boolean => props.selectable !== false;
+  const reorderable = (): boolean => !!props.reorderable;
+
+  // Reorder via the CDK dropList — only the drag handle starts a drag (row clicks still
+  // select). Committed drops emit onReorder; the consumer reorders `items` (controlled).
+  onMount(() => {
+    if (!props.reorderable) return;
+    const el: Element | null = host();
+    if (!el) return;
+    dropList(el as HTMLElement, {
+      itemSelector: '.weave-list__row',
+      handle: '.weave-list__drag-handle',
+      orientation: 'vertical',
+      onDrop: (event: DropEvent) => props.onReorder?.(event),
+    });
+  });
   const listDisabled = (): boolean => !!props.disabled;
   const isItemDisabled = (item: ListItem): boolean => listDisabled() || !!item.disabled;
   const isSelected = (item: ListItem): boolean => selectable() && props.value === item.value;
@@ -143,9 +165,15 @@ export function setup(props: ListProps): ListContext {
   return {
     host,
     items,
-    listClass: (): string => (props.class ? `weave-list ${props.class}` : 'weave-list'),
+    listClass: (): string => {
+      const parts: string[] = ['weave-list'];
+      if (reorderable()) parts.push('weave-list--reorderable');
+      if (props.class) parts.push(props.class);
+      return parts.join(' ');
+    },
     listRole: (): string => (selectable() ? 'listbox' : 'list'),
     rowRole: (): string | undefined => (selectable() ? 'option' : 'listitem'),
+    reorderable,
     label: (): string | undefined => props.label,
     ariaSelected: (item): string | undefined => (selectable() ? (isSelected(item) ? 'true' : 'false') : undefined),
     ariaDisabled: (item): string | undefined => (selectable() && isItemDisabled(item) ? 'true' : undefined),
