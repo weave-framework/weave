@@ -9,6 +9,17 @@
 > releases here. Publishing itself is a separate, explicit step (the `/publish` skill /
 > `pnpm publish:packages`) — committing/pushing does **not** publish or mirror.
 
+## 0.2.52 — 2026-07-02 (unpublished; on `main`, ahead of the 0.2.0 npm release)
+
+**polish + version sync**. Two low-risk correctness fixes
+(each with a test that fails without it): **numeric `bind:value`** compares with `Object.is`, not `!==`, so a
+NaN model value no longer always clobbers a mid-edit input (`NaN !== NaN` was always true); **`validators.pattern`**
+clones a `g`/`y` regex without those flags, so `.test()` is no longer stateful across calls (it alternated as
+`lastIndex` advanced). Also **synced the private root `package.json` to the lockstep version** (was `0.2.32`).
+Deferred (riskier behaviour changes, tracked for a dedicated pass): custom-element disconnect-on-move grace,
+`connectedPosition` listener cleanup between detach/attach, `dropList` unconditional `preventDefault`, ParseError
+line:col, first-memo `equals(undefined,…)`. **962 tests green. Phase A complete.**
+
 ## 0.2.51 — 2026-07-02 (unpublished; on `main`, ahead of the 0.2.0 npm release)
 
 **Icon SVG sanitization (security)**. **M5** — `<Icon>` now

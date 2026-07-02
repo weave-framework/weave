@@ -4,6 +4,14 @@ import { field, form, validators, type Field, type Group } from '@weave-framewor
 
 const wait = (ms: number): Promise<void> => new Promise<void>((r) => setTimeout(r, ms));
 
+test('validators.pattern with a /g regex is stateless across calls (A6)', () => {
+  // a global regex advances lastIndex across .test() calls → alternating results without the fix
+  const v: (s: string) => string | null = validators.pattern(/[a-z]+/g);
+  assert.equal(v('abc'), null, 'matches on the 1st call');
+  assert.equal(v('abc'), null, 'still matches on the 2nd call (no lastIndex drift)');
+  assert.equal(v('abc'), null, 'still matches on the 3rd call');
+});
+
 /* ──────────────────────────── cross-field ──────────────────────────── */
 
 test('cross-field: a field-keyed error attaches to that field and gates form validity', () => {

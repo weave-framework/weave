@@ -293,8 +293,9 @@ export function bindValue(el: Element, sig: Signal<unknown>, kind: 'value' | 'ch
       const set: Set<string> = new Set((Array.isArray(v) ? v : []).map(String));
       for (const opt of (el as HTMLSelectElement).options) opt.selected = set.has(opt.value);
     } else if (numeric) {
-      // compare numerically so typing "1." (NaN mid-edit) doesn't get clobbered
-      if (input.valueAsNumber !== v) input.value = v == null ? '' : String(v);
+      // compare numerically so typing "1." (NaN mid-edit) doesn't get clobbered. Object.is, not
+      // `!==`, so NaN === NaN holds (a bare `!==` is always true for NaN and would clobber). (A6)
+      if (!Object.is(input.valueAsNumber, v)) input.value = v == null ? '' : String(v);
     } else {
       const s: string = v == null ? '' : String(v);
       if (input.value !== s) input.value = s;
