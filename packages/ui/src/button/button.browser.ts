@@ -35,7 +35,7 @@ function mountButton(
     const ctx: ButtonContext = setup(props);
     const { code } = compileTemplate(template, {
       mode: 'function',
-      scope: ['classes', 'type', 'disabled', 'label', 'rippleOptions', 'ripple'],
+      scope: ['classes', 'type', 'disabled', 'label', 'onClick', 'rippleOptions', 'ripple'],
     });
     const make: MakeRender = new Function(
       'ctx',
