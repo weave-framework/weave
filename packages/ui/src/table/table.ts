@@ -123,7 +123,7 @@ export const template: string =
   '<button type="button" class="weave-table__expand-toggle" aria-label="Toggle row details"' +
   ' aria-expanded={{ ariaExpanded(row) }} on:click={{ () => toggleExpand(row) }}></button></td>}' +
   '@if (selectable()) {<td class="weave-table__cell weave-table__select weave-table__cell--sticky-start" style={{ selectStyle() }}>' +
-  '<Checkbox checked={{ isSelected(row) }} onChange={{ (e) => onRowToggle(row, e) }} label="Select row" /></td>}' +
+  '<Checkbox checked={{ isSelected(row) }} onChange={{ (checked) => toggleSelect(row, checked) }} label="Select row" /></td>}' +
   '@for (cell of cellsFor(row); track cell.key) {' +
   '<td class={{ cell.cls }} style={{ cell.style }}>@render (cell.node)</td>}' +
   '</tr>' +
@@ -149,10 +149,10 @@ export interface TableContext<T> {
   rowClass: (row: T) => string;
   ariaSelected: (row: T) => 'true' | 'false';
   isSelected: (row: T) => boolean;
-  onRowToggle: (row: T, e: unknown) => void;
+  toggleSelect: (row: T, checked: boolean) => void;
   allChecked: () => boolean;
   someChecked: () => boolean;
-  onSelectAll: (e: unknown) => void;
+  onSelectAll: (checked: boolean) => void;
   isExpanded: (row: T) => boolean;
   ariaExpanded: (row: T) => 'true' | 'false';
   rowExpanded: (row: T) => boolean;
@@ -266,11 +266,6 @@ export function setup<T = Record<string, unknown>>(props: TableProps<T>): TableC
 
   const asNode = (content: Node | string): Node => (typeof content === 'string' ? document.createTextNode(content) : content);
 
-  // The checked state behind a Checkbox onChange call — a boolean (its data API) or the DOM
-  // change Event (from the runtime's event auto-forward). Both are normalised to one boolean.
-  const checkedFrom = (e: unknown): boolean =>
-    typeof e === 'boolean' ? e : !!(e as { target?: { checked?: boolean } })?.target?.checked;
-
   const cellClassOf = (col: TableColumn<T>): string => {
     const parts: string[] = ['weave-table__cell'];
     if (col.numeric) parts.push('weave-table__cell--numeric');
@@ -304,12 +299,10 @@ export function setup<T = Record<string, unknown>>(props: TableProps<T>): TableC
     rowClass: (row: T): string => (expanded.isSelected(row) ? 'weave-table__row weave-table__row--expanded' : 'weave-table__row'),
     ariaSelected: (row: T): 'true' | 'false' => (selection.isSelected(row) ? 'true' : 'false'),
     isSelected: (row: T): boolean => selection.isSelected(row),
-    // The composed <Checkbox>'s onChange is invoked with a boolean (its data API) AND, via
-    // the runtime's event auto-forward, again with the DOM change Event. Both resolve to the
-    // SAME checked state, and select/deselect are idempotent — so the row lands in the right
-    // state regardless of how many times (or with which arg) onChange fires.
-    onRowToggle: (row: T, e: unknown): void => {
-      if (checkedFrom(e)) selection.select(row);
+    // The composed <Checkbox>'s onChange delivers the next checked state as a boolean (only
+    // real `on:X` events are auto-forwarded, so a data-callback prop fires exactly once).
+    toggleSelect: (row: T, checked: boolean): void => {
+      if (checked) selection.select(row);
       else selection.deselect(row);
     },
     allChecked: (): boolean => {
@@ -321,8 +314,8 @@ export function setup<T = Record<string, unknown>>(props: TableProps<T>): TableC
       const n: number = data.filter((r) => selection.isSelected(r)).length;
       return n > 0 && n < data.length;
     },
-    onSelectAll: (e: unknown): void => {
-      if (checkedFrom(e)) selection.setSelection(...rows());
+    onSelectAll: (checked: boolean): void => {
+      if (checked) selection.setSelection(...rows());
       else selection.clear();
     },
     isExpanded: (row: T): boolean => expanded.isSelected(row),

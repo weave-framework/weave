@@ -955,14 +955,21 @@ export function defineComponent(
       );
       const node: Node = render(ctx, slots);
       // Auto-forward component-level `on:X` handlers to the rendered root element. A
-      // `<Button on:click={{…}}>` compiles the handler to an `onClick` prop; attach it to
-      // the root so the consumer's listener fires — so a component never has to re-declare
-      // events just to be composable. Skips a key the component already consumed (a setup
-      // binding of the same name shadows it: the component wires that event itself).
+      // `<Button on:click={{…}}>` compiles the handler to an `onClick` prop AND records
+      // `on:click` in the hidden `$events` marker; attach only those to the root so the
+      // consumer's listener fires — a component never has to re-declare events just to be
+      // composable. Only `$events` keys are forwarded: a data-callback prop (`onChange`,
+      // `onInput`) consumed *inside* the child must NOT also be attached as a DOM listener,
+      // or it fires twice (once by the child, once by the bubbled DOM event). Skips a key
+      // the component already consumed (a setup binding of the same name shadows it: the
+      // component wires that event itself).
       if (node instanceof Element) {
-        for (const key of Object.keys(props)) {
-          if (/^on[A-Z]/.test(key) && !(key in bindings) && typeof props[key] === 'function') {
-            node.addEventListener(key.slice(2).toLowerCase(), props[key] as EventListener);
+        const events: unknown = props['$events'];
+        if (Array.isArray(events)) {
+          for (const key of events as string[]) {
+            if (!(key in bindings) && typeof props[key] === 'function') {
+              node.addEventListener(key.slice(2).toLowerCase(), props[key] as EventListener);
+            }
           }
         }
       }

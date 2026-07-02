@@ -345,7 +345,11 @@ function compileFragment(
     const anchorVar: string = nodeExpr(path);
 
     // Props: `x="s"` static, `x={expr}` lazy/reactive getter, `on:evt` → onEvt handler.
+    // Event handlers are ALSO recorded in a hidden `$events` marker so the runtime forwards
+    // ONLY real `on:X` events to the child root — a data-callback prop (`onChange={{…}}`,
+    // an `attr`, consumed inside the child) must not be auto-forwarded (double-invoked) too.
     const props: string[] = [];
+    const eventKeys: string[] = [];
     for (const attr of node.attrs) {
       switch (attr.type) {
         case 'static':
@@ -355,13 +359,17 @@ function compileFragment(
           // getter ⇒ the child re-reads through it, so the prop stays reactive
           props.push(`get ${propKey(attr.name)}() { return ${rewrite(attr.expr, sc).code}; }`);
           break;
-        case 'event':
-          props.push(`${propKey(onProp(attr.name))}: ${rewrite(attr.expr, sc).code}`);
+        case 'event': {
+          const k: string = onProp(attr.name);
+          props.push(`${propKey(k)}: ${rewrite(attr.expr, sc).code}`);
+          eventKeys.push(k);
           break;
+        }
         default:
           throw new Error(`'${attr.type}' binding on <${node.tag}> is not supported yet (M5: props + on:event only)`);
       }
     }
+    if (eventKeys.length) props.push(`'$events': [${eventKeys.map((k) => JSON.stringify(k)).join(', ')}]`);
 
     // Slots: group children by a static `slot="name"` (default otherwise); strip the attr.
     const groups: Map<string, TemplateNode[]> = new Map<string, TemplateNode[]>();

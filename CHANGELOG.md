@@ -9,6 +9,30 @@
 > releases here. Publishing itself is a separate, explicit step (the `/publish` skill /
 > `pnpm publish:packages`) — committing/pushing does **not** publish or mirror.
 
+## 0.2.31 — 2026-07-02 (unpublished; on `main`, ahead of the 0.2.0 npm release)
+
+Framework fix — composed-component event handlers no longer double-fire. This removes the
+Table selection workaround (idempotent select + bool-or-Event normalisation) and is the
+correct foundation for every future component that passes a data-callback prop to a child.
+
+### Compiler (`@weave-framework/compiler`)
+- A component tag now emits a hidden **`$events` marker** listing only its real `on:X`
+  event-attr prop keys (e.g. `<Checkbox on:click … onChange={{…}}>` → `$events: ['onClick']`,
+  `onChange` excluded). Data-callback props (`onChange`, `onInput`) are ordinary reactive
+  getters, not events.
+
+### Runtime (`@weave-framework/runtime`)
+- `defineComponent` now auto-forwards **only the `$events` keys** to the child root element
+  (previously it forwarded any `/^on[A-Z]/` function prop). A data-callback consumed *inside*
+  the child (e.g. Checkbox's `onChange`, fired by its own `on:change`) is no longer ALSO
+  attached as a bubbled DOM listener — so it fires exactly once instead of twice. `on:X`
+  forwarding (Button's click, etc.) and consume-by-name are both unchanged.
+
+### UI (`@weave-framework/ui`)
+- **Table selection simplified** now that the double-fire is gone: `toggleSelect(row, checked)`
+  + `onSelectAll(checked)` take a plain boolean; the `checkedFrom` bool-or-Event normaliser and
+  the idempotent-select workaround are removed.
+
 ## 0.2.30 — 2026-07-02 (unpublished; on `main`, ahead of the 0.2.0 npm release)
 
 Table — RULE #1 correctness: the selection checkboxes now COMPOSE the real Checkbox
