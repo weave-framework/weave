@@ -9,6 +9,25 @@
 > releases here. Publishing itself is a separate, explicit step (the `/publish` skill /
 > `pnpm publish:packages`) — committing/pushing does **not** publish or mirror.
 
+## 0.2.38 — 2026-07-02 (unpublished; on `main`, ahead of the 0.2.0 npm release)
+
+**Timepicker** — a time field + spinner popover (U4 §4.14, Phase D). **This completes U4.**
+
+### UI (`@weave-framework/ui`) — `./timepicker`
+- **`<Timepicker>`** — the design's spinner-column variant: a Select-style trigger field (shared `field-underline`
+  chrome) + clock icon opens a CDK-overlay panel of **hour ▲/▼ : minute ▲/▼** `role=spinbutton` columns + an
+  **AM/PM toggle** (12-hour locales). 12h vs 24h is derived from the locale (`use24` override); `step` (minutes,
+  default 5); `min`/`max` clamp the committed time.
+- **Value** — a neutral `{ hours, minutes }` (24-hour internal). Binding follows the Weave form convention
+  (`value`/`onChange` OR a `control`; touched-on-close; `aria-invalid`).
+- **Keyboard** — Arrow Up/Down per column (`aria-valuenow`/`-valuetext`), Esc close. **Deferred:** the interval-
+  listbox alternative, text-entry parsing, seconds.
+- Gates: **911 tests (+13); verify:ui-sass 280 (+5);** typecheck + `eslint .` clean.
+
+> **✅ U4 (Complex / data) COMPLETE** — 14 units: Expansion · Tabs · Stepper · Slider · Paginator · Sidenav · CDK
+> SelectionModel/DataSource · CDK Virtual Scroll · Table · Tree · CDK Drag&Drop · CDK Date-adapter · Datepicker ·
+> Timepicker. Next: U5 (Experimental), then U6 (harnesses + docs + gallery).
+
 ## 0.2.37 — 2026-07-02 (unpublished; on `main`, ahead of the 0.2.0 npm release)
 
 **Datepicker** — a date field + calendar popover (U4 §4.13, Phase D).

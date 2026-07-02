@@ -1,0 +1,9 @@
+// Timepicker — a time field + spinner popover. Behavior lives in timepicker.ts (trigger field
+// + a CDK-overlay panel of hour/minute spinbutton columns + an AM/PM toggle, per the design);
+// this is the visual. An underline trigger field (shared field-underline helper, like
+// Datepicker) with a clock icon; the panel reuses the overlay-panel chrome.
+//
+// Barrel — forwards the split partials ($tokens + the styles() mixin).
+
+@forward 'tokens';
+@forward 'styles';

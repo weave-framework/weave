@@ -1,0 +1,136 @@
+// timepicker — styles() mixin. An underline trigger field (shared field-underline helper) with
+// a clock icon; the panel reuses the overlay-panel chrome and lays out hour/minute spinner
+// columns (each a role=spinbutton with ▲/▼) + an AM/PM toggle. Forwarded by ./_index.scss.
+@use '../../helpers' as helpers;
+
+@mixin styles() {
+  .weave-timepicker {
+    display: block;
+  }
+
+  .weave-timepicker__field {
+    @include helpers.field-underline(
+      var(--weave-timepicker-border),
+      var(--weave-timepicker-focus),
+      var(--weave-timepicker-border-width)
+    );
+    display: flex;
+    align-items: center;
+    gap: var(--weave-timepicker-gap);
+    padding: var(--weave-timepicker-field-padding-y) 0;
+    color: var(--weave-timepicker-text);
+    font-size: var(--weave-timepicker-font-size);
+    font-weight: var(--weave-timepicker-weight);
+    line-height: 1.4;
+    cursor: pointer;
+  }
+
+  .weave-timepicker__value--placeholder {
+    color: var(--weave-timepicker-placeholder);
+  }
+
+  .weave-timepicker__spacer {
+    flex: 1 1 auto;
+  }
+
+  .weave-timepicker__clear {
+    @include helpers.clear-button(var(--weave-timepicker-placeholder), var(--weave-timepicker-text));
+  }
+
+  // A clock glyph (pure CSS: a ring with two hands).
+  .weave-timepicker__icon {
+    position: relative;
+    flex: 0 0 auto;
+    width: var(--weave-timepicker-icon-size);
+    height: var(--weave-timepicker-icon-size);
+    border: 1.5px solid var(--weave-timepicker-icon);
+    border-radius: 50%;
+  }
+
+  .weave-timepicker__icon::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 25%;
+    width: 1.5px;
+    height: 30%;
+    background: var(--weave-timepicker-icon);
+    transform: translateX(-50%);
+  }
+
+  .weave-timepicker--disabled .weave-timepicker__field {
+    color: var(--weave-timepicker-disabled-text);
+    cursor: default;
+  }
+
+  .weave-timepicker--invalid .weave-timepicker__field {
+    border-bottom-color: var(--weave-timepicker-error);
+    box-shadow: inset 0 -1px 0 0 var(--weave-timepicker-error);
+  }
+
+  /* ── spinner panel ── */
+  .weave-timepicker__panel {
+    @include helpers.overlay-panel;
+    display: flex;
+    align-items: center;
+    gap: var(--weave-timepicker-col-gap);
+    padding: var(--weave-timepicker-panel-padding);
+  }
+
+  .weave-timepicker__col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: var(--weave-timepicker-col-width);
+  }
+
+  .weave-timepicker__col:focus-visible {
+    @include helpers.focus-ring;
+  }
+
+  .weave-timepicker__col-value {
+    padding: 2px 0;
+    color: var(--weave-timepicker-text);
+    font-size: var(--weave-timepicker-value-size);
+    font-weight: var(--weave-timepicker-value-weight);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .weave-timepicker__spin {
+    @include helpers.field-reset;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--weave-timepicker-spin-size);
+    height: var(--weave-timepicker-spin-size);
+    color: var(--weave-timepicker-spin);
+    font-size: var(--weave-timepicker-spin-glyph-size);
+    cursor: pointer;
+  }
+
+  .weave-timepicker__spin:hover {
+    color: var(--weave-timepicker-spin-hover);
+  }
+
+  .weave-timepicker__colon {
+    color: var(--weave-timepicker-colon);
+    font-size: var(--weave-timepicker-colon-size);
+    font-weight: var(--weave-timepicker-value-weight);
+  }
+
+  .weave-timepicker__ampm {
+    @include helpers.field-reset;
+    margin-inline-start: var(--weave-timepicker-col-gap);
+    padding: var(--weave-timepicker-ampm-padding-y) var(--weave-timepicker-ampm-padding-x);
+    border: 1px solid var(--weave-timepicker-ampm-border);
+    border-radius: var(--weave-timepicker-radius);
+    color: var(--weave-timepicker-ampm-text);
+    font-size: var(--weave-timepicker-ampm-size);
+    font-weight: var(--weave-timepicker-ampm-weight);
+    cursor: pointer;
+  }
+
+  .weave-timepicker__ampm:focus-visible {
+    @include helpers.focus-ring;
+  }
+}

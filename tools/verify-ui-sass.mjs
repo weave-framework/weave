@@ -415,6 +415,14 @@ const cssDpOverride = compile(
 check('datepicker-overrides changes existing token', /--weave-datepicker-panel-width:\s*280px/.test(cssDpOverride));
 check('datepicker-overrides adds new token (auto-var)', /--weave-datepicker-elevation:\s*1px/.test(cssDpOverride));
 
+/* ── timepicker built-in: cascade refs + spinner tokens + overrides (U4) ── */
+check('theme emits timepicker spinner column width + focus ref', /--weave-timepicker-col-width:\s*42px/.test(cssTheme) && /--weave-timepicker-focus:\s*var\(--weave-color-accent\)/.test(cssTheme));
+const cssTpOverride = compile(
+  `@use '@weave-framework/ui' as weave;\n@include weave.timepicker-overrides((col-width: 50px, elevation: 1px));`,
+);
+check('timepicker-overrides changes existing token', /--weave-timepicker-col-width:\s*50px/.test(cssTpOverride));
+check('timepicker-overrides adds new token (auto-var)', /--weave-timepicker-elevation:\s*1px/.test(cssTpOverride));
+
 /* ── all-styles(): structural CSS by class ── */
 const cssStyles = compile(`@use '@weave-framework/ui' as weave;\n@include weave.all-styles();`);
 check('all-styles emits .weave-divider rule', /\.weave-divider\s*{/.test(cssStyles));
@@ -522,6 +530,10 @@ check('tree selected node = accentSoft tint + 2px accent left border (via [aria-
 /* ── datepicker (U4 §4.13): underline field + calendar grid, selected fill, today ring ── */
 check('all-styles emits .weave-datepicker field (shared underline) + calendar panel (overlay chrome)', /\.weave-datepicker__field\s*{[\s\S]*?border-bottom:\s*var\(--weave-datepicker-border-width\)/.test(cssStyles) && /\.weave-datepicker__panel\s*{[\s\S]*?width:\s*var\(--weave-datepicker-panel-width\)/.test(cssStyles));
 check('datepicker selected day = accent fill + white; today = inset accent ring', /\.weave-datepicker__cell--selected\s*{[\s\S]*?background:\s*var\(--weave-datepicker-selected-background\)[\s\S]*?color:\s*var\(--weave-datepicker-selected-text\)/.test(cssStyles) && /\.weave-datepicker__cell--today\s*{[\s\S]*?box-shadow:\s*inset 0 0 0 1px var\(--weave-datepicker-today-ring\)/.test(cssStyles));
+
+/* ── timepicker (U4 §4.14): underline field + spinner columns (▲/▼) + AM/PM toggle ── */
+check('all-styles emits .weave-timepicker field (shared underline) + spinner panel (overlay chrome, flex row)', /\.weave-timepicker__field\s*{[\s\S]*?border-bottom:\s*var\(--weave-timepicker-border-width\)/.test(cssStyles) && /\.weave-timepicker__panel\s*{[\s\S]*?display:\s*flex/.test(cssStyles));
+check('timepicker spinner column is a stacked ▲/value/▼ with tabular-nums value + AM/PM toggle', /\.weave-timepicker__col\s*{[\s\S]*?flex-direction:\s*column/.test(cssStyles) && /\.weave-timepicker__col-value\s*{[\s\S]*?font-variant-numeric:\s*tabular-nums/.test(cssStyles) && /\.weave-timepicker__ampm\s*{/.test(cssStyles));
 
 /* ── example.scss: the docs-seed dev surface compiles end-to-end ── */
 let exampleOk = false;

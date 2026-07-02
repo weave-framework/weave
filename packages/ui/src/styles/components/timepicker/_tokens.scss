@@ -1,0 +1,46 @@
+// timepicker — design tokens (schema). An underline trigger field (like Datepicker) + a
+// spinner popover: hour ▲/▼ : minute ▲/▼ columns + an AM/PM toggle (the design). Panel reuses
+// the shared overlay-panel chrome. Forwarded by ./_index.scss.
+@use '../../ref' as ref;
+
+$tokens: (
+  color: (
+    text: ref.ref('color.ink'),
+    placeholder: ref.ref('color.sub'),
+    border: ref.ref('color.line'),
+    focus: ref.ref('color.accent'),
+    error: ref.ref('color.error'),
+    icon: ref.ref('color.sub'),
+    disabled-text: ref.ref('color.sub'),
+    // Spinner.
+    spin: ref.ref('color.sub'),
+    spin-hover: ref.ref('color.accent'),
+    colon: ref.ref('color.sub'),
+    ampm-border: ref.ref('color.line'),
+    ampm-text: ref.ref('color.ink'),
+  ),
+  size: (
+    gap: 8px,
+    field-padding-y: 6px,
+    border-width: 1.5px,
+    radius: ref.ref('shape.radius'),
+    icon-size: 14px,
+    panel-padding: 12px,
+    col-gap: 6px,
+    col-width: 42px,
+    spin-size: 22px,
+    ampm-padding-x: 10px,
+    ampm-padding-y: 6px,
+    duration: ref.ref('motion.fast'),
+  ),
+  typography: (
+    font-size: 13px,
+    weight: 500,
+    value-size: 20px,
+    value-weight: 600,
+    colon-size: 20px,
+    spin-glyph-size: 10px,
+    ampm-size: 12px,
+    ampm-weight: 600,
+  ),
+);
