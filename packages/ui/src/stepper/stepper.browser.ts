@@ -11,6 +11,8 @@ import {
 import * as dom from '@weave-framework/runtime/dom';
 import { compileTemplate } from '@weave-framework/compiler';
 import { setup, template, type StepperProps, type StepperContext, type StepItem } from '@weave-framework/ui/stepper';
+import * as ButtonMod from '@weave-framework/ui/button';
+import { toComponent } from '../internal/compose.js';
 
 const rt: typeof dom & { signal: typeof signal; effect: typeof effect } = { ...dom, signal, effect };
 
@@ -43,16 +45,21 @@ function mount(props: StepperProps): Mounted {
       r: unknown,
       k: unknown
     ) => HTMLElement;
-    return fn(ctx, rt, {});
+    // The Back / Continue actions are the real Button component, provided as a child.
+    return fn(ctx, rt, { Button: toComponent(ButtonMod as never) });
   });
   document.body.appendChild(root);
+  // Back / Continue are now composed <Button>s (the two .weave-button in the actions row).
+  const navButtons: HTMLButtonElement[] = Array.from(
+    root.querySelectorAll<HTMLButtonElement>('.weave-stepper__actions .weave-button')
+  );
   return {
     root,
     steps: Array.from(root.querySelectorAll<HTMLButtonElement>('.weave-stepper__step')),
     panels: Array.from(root.querySelectorAll<HTMLElement>('.weave-stepper__panel')),
     connectors: Array.from(root.querySelectorAll<HTMLElement>('.weave-stepper__connector')),
-    back: root.querySelector<HTMLButtonElement>('.weave-stepper__back'),
-    next: root.querySelector<HTMLButtonElement>('.weave-stepper__next'),
+    back: navButtons[0] ?? null,
+    next: navButtons[1] ?? null,
     dispose: (): void => { disposeOwner(owner); root.remove(); },
   };
 }

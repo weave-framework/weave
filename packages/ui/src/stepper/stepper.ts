@@ -87,8 +87,8 @@ export const template: string =
   '}' +
   '@if (showNav()) {' +
   '<div class="weave-stepper__actions">' +
-  '<button class="weave-stepper__back" type="button" disabled={{ backDisabled() }} on:click={{ back }}>{{ backText() }}</button>' +
-  '<button class="weave-stepper__next" type="button" disabled={{ nextDisabled() }} on:click={{ next }}>{{ nextText() }}</button>' +
+  '<Button variant="outline" disabled={{ backDisabled() }} on:click={{ back }}>{{ backText() }}</Button>' +
+  '<Button disabled={{ nextDisabled() }} on:click={{ next }}>{{ nextText() }}</Button>' +
   '</div>' +
   '}' +
   '</div>';
