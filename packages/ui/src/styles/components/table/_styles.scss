@@ -10,8 +10,11 @@
     position: relative;
   }
 
+  // Scroll box for BOTH axes — a max-height (set inline) makes the body scroll vertically
+  // while the sticky header stays pinned to the box top; wide tables scroll horizontally
+  // while sticky columns stay pinned to the box edge.
   .weave-table__scroll {
-    overflow-x: auto;
+    overflow: auto;
   }
 
   .weave-table__grid {

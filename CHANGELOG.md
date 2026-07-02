@@ -9,6 +9,18 @@
 > releases here. Publishing itself is a separate, explicit step (the `/publish` skill /
 > `pnpm publish:packages`) — committing/pushing does **not** publish or mirror.
 
+## 0.2.29 — 2026-07-02 (unpublished; on `main`, ahead of the 0.2.0 npm release)
+
+Table follow-up — inner vertical scroll with a fixed header.
+
+### UI (`@weave-framework/ui`)
+- **`<Table maxHeight>`** — caps the body height so the `<tbody>` scrolls **vertically inside**
+  the table while the sticky header stays pinned (previously the header only stuck to the page
+  because the scroll box had `overflow-x` only). The scroll box is now `overflow: auto` (both
+  axes), so a `max-height` gives an inner vertical scroll and a wide table an inner horizontal
+  scroll — sticky header + sticky columns both pin to the scroll-box edges. Live-verified
+  (body scrolls 200px, header delta 0; sticky Order column offset; live show/hide columns).
+
 ## 0.2.28 — 2026-07-02 (unpublished; on `main`, ahead of the 0.2.0 npm release)
 
 U4 Phase C — the **Table**, the flagship data surface.

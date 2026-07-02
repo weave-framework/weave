@@ -84,6 +84,9 @@ export interface TableProps<T = Record<string, unknown>> {
   /** The detail content for an expanded row. */
   detail?: (row: T) => Node | string;
 
+  /** Cap the body height (number → px) — the `<tbody>` scrolls vertically inside while the
+   *  sticky header stays put. Omit for a table that grows to its content. */
+  maxHeight?: number | string;
   /** Accessible name for the table. */
   ariaLabel?: string;
   /** Shown when there are no rows. Default 'No data'. */
@@ -411,6 +414,9 @@ export function setup<T = Record<string, unknown>>(props: TableProps<T>): TableC
     if (!el) return;
     scrollEl = document.createElement('div');
     scrollEl.className = 'weave-table__scroll';
+    if (props.maxHeight != null) {
+      scrollEl.style.maxHeight = typeof props.maxHeight === 'number' ? `${props.maxHeight}px` : props.maxHeight;
+    }
     tableEl = document.createElement('table');
     tableEl.className = 'weave-table__grid';
     if (props.ariaLabel) tableEl.setAttribute('aria-label', props.ariaLabel);
