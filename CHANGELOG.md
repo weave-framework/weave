@@ -9,6 +9,24 @@
 > releases here. Publishing itself is a separate, explicit step (the `/publish` skill /
 > `pnpm publish:packages`) — committing/pushing does **not** publish or mirror.
 
+## 0.2.27 — 2026-07-02 (unpublished; on `main`, ahead of the 0.2.0 npm release)
+
+U4 Phase C — the **Virtual Scroll** headless engine.
+
+### UI CDK (`@weave-framework/ui/cdk`)
+- **`virtualScroll(options)`** (`cdk/virtual-scroll.ts`) — the rendered-window engine under
+  large Table/Tree bodies + long lists. Given a viewport element, a fixed `itemSize` and a
+  `total` (number or getter), it computes the buffered slice to render — `renderedRange()`
+  `[start, end)`, `scrollOffset()` (top spacer), `endOffset()` (bottom spacer), `totalSize()`
+  — all as signals; plus `scrollToIndex()`, `measure()`, `destroy()`. Fixed-size strategy
+  first (autosize is a follow-on). Built on the U1 `onScroll` dispatcher + `resizeSignal`
+  (ResizeObserver → viewport height); `renderedRange` is a `computed` with a start/end
+  equality guard so it only notifies when the window actually changes (not every scroll pixel).
+  Edge-cased: empty/short lists never produce negative ranges; the window clamps to `total`.
+- 11 headless tests (window math at scroll 0/mid/end, buffer overscan + top clamp, empty +
+  short lists, reactive total, sub-item-scroll stability, scrollToIndex clamp, ResizeObserver
+  recompute).
+
 ## 0.2.26 — 2026-07-02 (unpublished; on `main`, ahead of the 0.2.0 npm release)
 
 U4 Phase C (start) — two headless CDK data primitives, built before Table/Tree.

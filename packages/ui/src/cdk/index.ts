@@ -24,3 +24,4 @@ export * from './breakpoints.js';
 export * from './clipboard.js';
 export * from './selection-model.js';
 export * from './data-source.js';
+export * from './virtual-scroll.js';
