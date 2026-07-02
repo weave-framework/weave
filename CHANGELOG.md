@@ -9,6 +9,19 @@
 > releases here. Publishing itself is a separate, explicit step (the `/publish` skill /
 > `pnpm publish:packages`) — committing/pushing does **not** publish or mirror.
 
+## 0.2.44 — 2026-07-02 (unpublished; on `main`, ahead of the 0.2.0 npm release)
+
+**Menubar** — an app menu bar (WAI-ARIA menubar, U5 §5.2).
+
+### UI (`@weave-framework/ui`) — `./menubar`
+- **`<Menubar menus onSelect>`** — a `role=menubar` of top `<button role=menuitem>`s; each opens the **shared Menu
+  panel** (`menu-core.openMenuPanel`, so the panel chrome / roving / typeahead / Esc / backdrop are reused — RULE
+  #1, no new dropdown). Roving Left/Right/Home/End + typeahead; ArrowDown/Enter/Space open (focused on the first
+  item); click toggles; **Left/Right switch to the neighbour menu while one is open**; Esc closes + returns focus.
+  `onDispose` tears down any open dropdown. The dropdown reuses `.weave-menu`.
+- **Deferred:** nested submenus.
+- Gates: **938 tests (+9); verify:ui-sass 286 (+1);** typecheck + `eslint .` clean.
+
 ## 0.2.43 — 2026-07-02 (unpublished; on `main`, ahead of the 0.2.0 npm release)
 
 **Table column-resize** (U5 §5.1) + a `datepicker.browser.ts` typecheck fix.

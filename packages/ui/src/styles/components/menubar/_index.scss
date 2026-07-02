@@ -1,0 +1,9 @@
+// Menubar — an app menu bar (WAI-ARIA menubar). Behavior lives in menubar.ts (a role=menubar
+// of top items, each opening the shared Menu panel via menu-core; roving Left/Right +
+// ArrowDown-opens + Left/Right-switch-while-open + Esc); this is the bar visual only — the
+// dropdown reuses the `.weave-menu` panel.
+//
+// Barrel — forwards the split partials ($tokens + the styles() mixin).
+
+@forward 'tokens';
+@forward 'styles';

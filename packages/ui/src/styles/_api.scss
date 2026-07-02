@@ -44,6 +44,7 @@
 @use 'components/tree' as tree;
 @use 'components/datepicker' as datepicker;
 @use 'components/timepicker' as timepicker;
+@use 'components/menubar' as menubar;
 
 $_builtins: (
   'divider': divider.$tokens,
@@ -82,6 +83,7 @@ $_builtins: (
   'tree': tree.$tokens,
   'datepicker': datepicker.$tokens,
   'timepicker': timepicker.$tokens,
+  'menubar': menubar.$tokens,
 );
 
 /* ───────────────────────── internal emit ───────────────────────── */
@@ -303,6 +305,10 @@ $_builtins: (
   @include overrides('timepicker', $map);
 }
 
+@mixin menubar-overrides($map) {
+  @include overrides('menubar', $map);
+}
+
 // Emit the structural CSS (class rules) for every built-in component.
 // Prefer per-component includes to keep CSS small; all-styles() is the convenience.
 @mixin all-styles() {
@@ -342,4 +348,5 @@ $_builtins: (
   @include tree.styles();
   @include datepicker.styles();
   @include timepicker.styles();
+  @include menubar.styles();
 }

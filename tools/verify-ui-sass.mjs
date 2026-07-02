@@ -536,6 +536,9 @@ check('datepicker editable input strips its own chrome (shares the field underli
 /* ── tree reorder drag handle (U4 retrofit via CDK dropList) ── */
 check('tree emits a reorder drag handle (grab cursor, touch-action:none)', /\.weave-tree__drag-handle\s*{[\s\S]*?color:\s*var\(--weave-tree-drag-handle\)[\s\S]*?cursor:\s*grab[\s\S]*?touch-action:\s*none/.test(cssStyles));
 
+/* ── menubar (U5 §5.2): top bar items, open item tinted via [aria-expanded] ── */
+check('all-styles emits .weave-menubar bar + item (open item tinted via [aria-expanded])', /\.weave-menubar\s*{[\s\S]*?display:\s*flex/.test(cssStyles) && /\.weave-menubar__item\[aria-expanded=true\]\s*{[\s\S]*?background:\s*var\(--weave-menubar-item-open\)/.test(cssStyles));
+
 /* ── list reorder drag handle (U4 retrofit via CDK dropList) ── */
 check('list emits a reorder drag handle (grab cursor, touch-action:none)', /\.weave-list__drag-handle\s*{[\s\S]*?color:\s*var\(--weave-list-drag-handle\)[\s\S]*?cursor:\s*grab[\s\S]*?touch-action:\s*none/.test(cssStyles));
 

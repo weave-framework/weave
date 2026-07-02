@@ -1,6 +1,6 @@
 {
   "name": "@weave-framework/ui",
-  "version": "0.2.43",
+  "version": "0.2.44",
   "description": "Weave UI — signal-native component library (Material+CDK equivalent) with the Weave design system. Ships SCSS; zero third-party runtime deps.",
   "type": "module",
   "sideEffects": false,
@@ -192,6 +192,11 @@
       "sass": "./src/styles/components/timepicker/_index.scss",
       "types": "./src/timepicker/timepicker.ts",
       "import": "./src/timepicker/timepicker.ts"
+    },
+    "./menubar": {
+      "sass": "./src/styles/components/menubar/_index.scss",
+      "types": "./src/menubar/menubar.ts",
+      "import": "./src/menubar/menubar.ts"
     },
     "./cdk": {
       "types": "./src/cdk/index.ts",
@@ -400,6 +405,11 @@
         "sass": "./src/styles/components/timepicker/_index.scss",
         "types": "./dist/timepicker/timepicker.d.ts",
         "import": "./dist/timepicker/timepicker.js"
+      },
+      "./menubar": {
+        "sass": "./src/styles/components/menubar/_index.scss",
+        "types": "./dist/menubar/menubar.d.ts",
+        "import": "./dist/menubar/menubar.js"
       },
       "./cdk": {
         "types": "./dist/cdk/index.d.ts",

@@ -1,0 +1,41 @@
+// menubar — styles() mixin (class rules). A horizontal bar of text items; hover + open state
+// ride native/ARIA attrs ([aria-expanded], [aria-disabled]). The dropdown is the shared
+// `.weave-menu` panel (styled by the menu component). Forwarded by ./_index.scss.
+@use '../../helpers' as helpers;
+
+@mixin styles() {
+  .weave-menubar {
+    display: flex;
+    align-items: center;
+    gap: var(--weave-menubar-gap);
+  }
+
+  .weave-menubar__item {
+    @include helpers.field-reset;
+    padding: var(--weave-menubar-item-padding-y) var(--weave-menubar-item-padding-x);
+    border-radius: var(--weave-menubar-radius);
+    color: var(--weave-menubar-text);
+    font-size: var(--weave-menubar-font-size);
+    font-weight: var(--weave-menubar-weight);
+    cursor: pointer;
+    transition: background var(--weave-menubar-duration) ease;
+  }
+
+  .weave-menubar__item:not([aria-disabled='true']):hover {
+    background: var(--weave-menubar-item-hover);
+  }
+
+  // The open top item keeps the field tint (matches the dropdown being anchored to it).
+  .weave-menubar__item[aria-expanded='true'] {
+    background: var(--weave-menubar-item-open);
+  }
+
+  .weave-menubar__item[aria-disabled='true'] {
+    color: var(--weave-menubar-disabled-text);
+    cursor: default;
+  }
+
+  .weave-menubar__item:focus-visible {
+    @include helpers.focus-ring;
+  }
+}

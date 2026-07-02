@@ -1,0 +1,25 @@
+// menubar — design tokens (schema). The top bar row + text items; the dropdown reuses the
+// shared `.weave-menu` panel (menu-core), so nothing here styles the dropdown. Forwarded by
+// ./_index.scss.
+@use '../../ref' as ref;
+
+$tokens: (
+  color: (
+    text: ref.ref('color.ink'),
+    item-hover: ref.ref('color.field'),
+    // The open top item gets the same field tint (a subtle pressed state).
+    item-open: ref.ref('color.field'),
+    disabled-text: ref.ref('color.sub'),
+  ),
+  size: (
+    gap: 2px,
+    item-padding-x: 10px,
+    item-padding-y: 6px,
+    radius: ref.ref('shape.radius'),
+    duration: ref.ref('motion.fast'),
+  ),
+  typography: (
+    font-size: 13px,
+    weight: 500,
+  ),
+);
