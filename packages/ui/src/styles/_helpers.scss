@@ -43,6 +43,40 @@
   color: inherit;
 }
 
+// THE Weave field look — a hairline bottom border that swaps to accent on focus (no box,
+// no layout shift). The single source of the underline shared by Input + Select (and thus
+// Autocomplete, which composes Input) — include it, don't re-write it per component.
+@mixin field-underline($border, $focus, $width: 1.5px) {
+  border: 0;
+  border-bottom: #{$width} solid #{$border};
+  background: transparent;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+
+  &:focus,
+  &:focus-within {
+    outline: none;
+    border-bottom-color: #{$focus};
+    box-shadow: inset 0 -1px 0 #{$focus};
+  }
+}
+
+// THE Weave inline clear (×) button — the small round reset shared by Input + Select.
+@mixin clear-button($color, $hover, $size: 18px) {
+  @include field-reset;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: #{$size};
+  height: #{$size};
+  border-radius: 50%;
+  color: #{$color};
+  cursor: pointer;
+
+  &:hover {
+    color: #{$hover};
+  }
+}
+
 // Hairline overlay-panel chrome (menus, dialogs, dropdowns, tooltips): opaque surface +
 // 1px line + radius, NO drop shadow (the Weave design has none — a 1px line + an opaque
 // surface separate the panel from the page). Reuse for bring-your-own-skin panels.

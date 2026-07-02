@@ -11,24 +11,17 @@
   }
 
   .weave-select__field {
+    // THE shared Weave field underline (same helper as Input — one source, one look).
+    @include helpers.field-underline(var(--weave-select-border), var(--weave-select-focus), var(--weave-select-border-width));
     display: flex;
     align-items: center;
     gap: var(--weave-select-gap);
     padding: var(--weave-select-field-padding-y) 0;
-    border-bottom: var(--weave-select-border-width) solid var(--weave-select-border);
     color: var(--weave-select-text);
     font-size: var(--weave-select-font-size);
     font-weight: var(--weave-select-weight);
     line-height: 1.4;
     cursor: pointer;
-    transition: border-color var(--weave-select-duration) ease;
-  }
-
-  // Focus + open → accent underline (no layout shift; the border just recolours).
-  .weave-select__field:focus {
-    outline: none;
-    border-bottom-color: var(--weave-select-focus);
-    box-shadow: inset 0 -1px 0 0 var(--weave-select-focus);
   }
 
   .weave-select__value--placeholder {
@@ -60,19 +53,7 @@
   }
 
   .weave-select__clear {
-    @include helpers.field-reset;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 18px;
-    height: 18px;
-    border-radius: 50%;
-    color: var(--weave-select-placeholder);
-    cursor: pointer;
-  }
-
-  .weave-select__clear:hover {
-    color: var(--weave-select-text);
+    @include helpers.clear-button(var(--weave-select-placeholder), var(--weave-select-text));
   }
 
   .weave-select--disabled .weave-select__field {

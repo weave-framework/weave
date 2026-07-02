@@ -1,17 +1,16 @@
 // input — styles() mixin (class rules). Forwarded by ./_index.scss.
+@use '../../helpers' as helpers;
 
 @mixin styles() {
   .weave-input {
+    // THE shared Weave field underline (single source; Select uses the same helper).
+    @include helpers.field-underline(var(--weave-input-border), var(--weave-input-focus), var(--weave-input-border-width));
     display: inline-flex;
     align-items: center;
     gap: var(--weave-input-gap);
     width: 100%;
     box-sizing: border-box;
-    border-bottom: var(--weave-input-border-width) solid var(--weave-input-border);
     color: var(--weave-input-text);
-    transition:
-      border-color var(--weave-input-duration) ease,
-      box-shadow var(--weave-input-duration) ease;
 
     @content;
   }
@@ -19,12 +18,6 @@
   /* Multiline aligns adornments to the first line, not the vertical centre. */
   .weave-input--multiline {
     align-items: flex-start;
-  }
-
-  /* Focus — accent border, thickened to ~2px with an inset shadow (no layout shift). */
-  .weave-input:focus-within {
-    border-bottom-color: var(--weave-input-focus);
-    box-shadow: inset 0 -1px 0 var(--weave-input-focus);
   }
 
   /* Error — red underline (driven by the bound control's touched-and-invalid state). */
@@ -108,26 +101,11 @@
     display: none;
   }
 
-  /* Clear button — a lean × that reddens... no, tints toward ink on hover. */
+  /* Clear × — the shared Weave clear button (same as Select). */
   .weave-input__clear {
+    @include helpers.clear-button(var(--weave-input-adornment), var(--weave-input-text));
     flex: none;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0;
-    width: 18px;
-    height: 18px;
-    border: 0;
-    border-radius: 50%;
-    background: transparent;
-    color: var(--weave-input-adornment);
-    font-size: 15px;
+    font-size: var(--weave-input-clear-size);
     line-height: 1;
-    cursor: pointer;
-    transition: color var(--weave-input-duration) ease;
-  }
-
-  .weave-input__clear:hover {
-    color: var(--weave-input-text);
   }
 }
