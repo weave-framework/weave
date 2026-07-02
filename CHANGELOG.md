@@ -9,6 +9,32 @@
 > releases here. Publishing itself is a separate, explicit step (the `/publish` skill /
 > `pnpm publish:packages`) — committing/pushing does **not** publish or mirror.
 
+## 0.2.30 — 2026-07-02 (unpublished; on `main`, ahead of the 0.2.0 npm release)
+
+Table — RULE #1 correctness: the selection checkboxes now COMPOSE the real Checkbox
+component (not a restyled native input), which forced a rewrite of the Table to a
+template-based component.
+
+### UI (`@weave-framework/ui`)
+- **Table is now a template-based component** (was built imperatively). The rows are a keyed
+  `@for` over the sorted data, cells mount via `@render`, and — crucially — the selection
+  column **composes the real `<Checkbox>`** (full behaviour + one checkbox visual in the
+  library), exactly like Paginator composes `<Button>`. The earlier native-`<input>` +
+  `.weave-table__checkbox` restyle (a RULE #1 violation the user caught) is gone, along with
+  its tokens. A selectable Table therefore pulls in `@weave-framework/ui/checkbox` styles.
+- **Gotchas fixed along the way:**
+  - Nested `@for` (rows × columns) can't reference the outer row — the compiler names every
+    loop item `_row`, so the inner loop shadows it. Cells are pre-resolved per row into a
+    `cellsFor(row)` array so the inner `@for` only touches its own item.
+  - Rows are keyed by **object identity** (or `trackBy`), not index, so a sort reorders the
+    existing DOM by identity instead of stranding one-shot `@render` cell content.
+  - The composed `<Checkbox>`'s `onChange` fires **twice** (once as its data callback, once
+    via the runtime's event auto-forward to the child root). The Table's handlers read the
+    checkbox's actual checked state and use idempotent `select`/`deselect`/`setSelection` —
+    so the row lands in the right state regardless. `aria-expanded` is emitted as a string.
+- 13 browser tests (all green); `verify:ui-sass` 262; full typecheck + eslint clean.
+  Live-verified: select/deselect a row, select-all + indeterminate + uncheck, expand/collapse.
+
 ## 0.2.29 — 2026-07-02 (unpublished; on `main`, ahead of the 0.2.0 npm release)
 
 Table follow-up — inner vertical scroll with a fixed header.

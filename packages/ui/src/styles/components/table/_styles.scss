@@ -115,25 +115,15 @@
     z-index: 3;
   }
 
-  /* ── select + expand utility columns ── */
+  /* ── select + expand utility columns (fixed width set inline for sticky offsets) ── */
   .weave-table__select,
   .weave-table__expand {
-    width: 1%;
     text-align: center;
     white-space: nowrap;
   }
 
-  .weave-table__checkbox {
-    width: var(--weave-table-checkbox-size);
-    height: var(--weave-table-checkbox-size);
-    margin: 0;
-    accent-color: var(--weave-table-checkbox-accent);
-    cursor: pointer;
-  }
-
-  .weave-table__checkbox:focus-visible {
-    @include helpers.focus-ring;
-  }
+  // Selection checkboxes = the real Checkbox component's class contract (.weave-checkbox),
+  // rendered by table.ts — one checkbox visual across the library (no table-local restyle).
 
   .weave-table__expand-toggle {
     display: inline-flex;

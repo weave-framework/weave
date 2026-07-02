@@ -16,8 +16,6 @@ $tokens: (
     selected-background: color-mix(in srgb, ref.ref('color.accent') 12%, transparent),
     selected-marker: ref.ref('color.accent'),
     sort-arrow: ref.ref('color.accent'),
-    // Native checkbox accent (accent-color) — pragmatic native control in the grid.
-    checkbox-accent: ref.ref('color.accent'),
     // Expanded-row detail panel — a subtle inset tint.
     detail-background: ref.ref('color.field'),
     empty-text: ref.ref('color.sub'),
@@ -30,7 +28,6 @@ $tokens: (
     marker-width: 2px,
     // Gap between a sort header's label and its arrow.
     control-gap: 6px,
-    checkbox-size: 16px,
     expand-size: 20px,
     duration: ref.ref('motion.fast'),
   ),
