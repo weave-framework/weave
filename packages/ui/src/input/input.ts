@@ -61,6 +61,9 @@ export interface InputProps {
   clearable?: boolean;
   /** Accessible name for the clear button. Default 'Clear'. */
   clearLabel?: string;
+  /** Called on mount with the native field — lets a composer (e.g. Autocomplete) add
+   *  combobox ARIA / manage `aria-activedescendant` without re-creating the field. */
+  onInputRef?: (el: HTMLInputElement | HTMLTextAreaElement) => void;
   /** Extra classes, forwarded onto the field wrapper. */
   class?: string;
 }
@@ -126,6 +129,12 @@ export function setup(props: InputProps): InputContext {
     if (!el) return;
     if (invalid()) el.setAttribute('aria-invalid', 'true');
     else el.removeAttribute('aria-invalid');
+  });
+
+  // Hand the native field to a composer (Autocomplete) so it can add combobox ARIA.
+  onMount(() => {
+    const el: HTMLInputElement | HTMLTextAreaElement | null = input();
+    if (el) props.onInputRef?.(el);
   });
 
   // Empty prefix/suffix slots collapse, so the field has no dead gap (flex `gap` skips
