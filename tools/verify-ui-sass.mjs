@@ -531,6 +531,9 @@ check('tree selected node = accentSoft tint + 2px accent left border (via [aria-
 check('all-styles emits .weave-datepicker field (shared underline) + calendar panel (overlay chrome)', /\.weave-datepicker__field\s*{[\s\S]*?border-bottom:\s*var\(--weave-datepicker-border-width\)/.test(cssStyles) && /\.weave-datepicker__panel\s*{[\s\S]*?width:\s*var\(--weave-datepicker-panel-width\)/.test(cssStyles));
 check('datepicker selected day = accent fill + white; today = inset accent ring', /\.weave-datepicker__cell--selected\s*{[\s\S]*?background:\s*var\(--weave-datepicker-selected-background\)[\s\S]*?color:\s*var\(--weave-datepicker-selected-text\)/.test(cssStyles) && /\.weave-datepicker__cell--today\s*{[\s\S]*?box-shadow:\s*inset 0 0 0 1px var\(--weave-datepicker-today-ring\)/.test(cssStyles));
 
+/* ── bottom-sheet drag-to-dismiss handle (U4 retrofit via CDK Drag&Drop) ── */
+check('bottom-sheet emits a drag-to-dismiss grab handle (touch-action:none)', /\.weave-bottom-sheet__handle\s*{[\s\S]*?background:\s*var\(--weave-bottom-sheet-handle\)[\s\S]*?touch-action:\s*none/.test(cssStyles));
+
 /* ── timepicker (U4 §4.14): underline field + spinner columns (▲/▼) + AM/PM toggle ── */
 check('all-styles emits .weave-timepicker field (shared underline) + spinner panel (overlay chrome, flex row)', /\.weave-timepicker__field\s*{[\s\S]*?border-bottom:\s*var\(--weave-timepicker-border-width\)/.test(cssStyles) && /\.weave-timepicker__panel\s*{[\s\S]*?display:\s*flex/.test(cssStyles));
 check('timepicker spinner column is a stacked ▲/value/▼ with tabular-nums value + AM/PM toggle', /\.weave-timepicker__col\s*{[\s\S]*?flex-direction:\s*column/.test(cssStyles) && /\.weave-timepicker__col-value\s*{[\s\S]*?font-variant-numeric:\s*tabular-nums/.test(cssStyles) && /\.weave-timepicker__ampm\s*{/.test(cssStyles));

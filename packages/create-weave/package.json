@@ -1,6 +1,6 @@
 {
   "name": "create-weave",
-  "version": "0.2.38",
+  "version": "0.2.39",
   "description": "Scaffold a new Weave app — `npm create weave my-app` (also pnpm/yarn create).",
   "type": "module",
   "bin": {

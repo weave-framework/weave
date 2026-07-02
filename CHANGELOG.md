@@ -9,6 +9,16 @@
 > releases here. Publishing itself is a separate, explicit step (the `/publish` skill /
 > `pnpm publish:packages`) — committing/pushing does **not** publish or mirror.
 
+## 0.2.39 — 2026-07-02 (unpublished; on `main`, ahead of the 0.2.0 npm release)
+
+**Bottom Sheet drag-to-dismiss** — the U3-deferred gesture, now unblocked by the CDK Drag & Drop (§4.11).
+
+### UI (`@weave-framework/ui`) — `./bottom-sheet`
+- **`openBottomSheet({ dragToDismiss })`** (default true) — a top `__handle` grabber wired via the CDK
+  **`draggable`** (axis `y`): dragging the handle down translates the sheet; releasing past `max(80, 0.3·height)`
+  closes it, else it snaps back. New handle tokens + `touch-action: none`.
+- Gates: **914 tests (+3); verify:ui-sass 281 (+1);** typecheck + `eslint .` clean.
+
 ## 0.2.38 — 2026-07-02 (unpublished; on `main`, ahead of the 0.2.0 npm release)
 
 **Timepicker** — a time field + spinner popover (U4 §4.14, Phase D). **This completes U4.**

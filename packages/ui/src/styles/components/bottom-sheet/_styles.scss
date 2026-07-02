@@ -32,6 +32,22 @@
     }
   }
 
+  // Top grab-handle — drag it down to dismiss (touch-action:none so touch drags don't scroll).
+  .weave-bottom-sheet__handle {
+    flex: 0 0 auto;
+    width: var(--weave-bottom-sheet-handle-width);
+    height: var(--weave-bottom-sheet-handle-height);
+    margin: var(--weave-bottom-sheet-handle-top) auto 0;
+    border-radius: 999px; // structural full-pill
+    background: var(--weave-bottom-sheet-handle);
+    cursor: grab;
+    touch-action: none;
+  }
+
+  .weave-bottom-sheet__handle:active {
+    cursor: grabbing;
+  }
+
   .weave-bottom-sheet__header {
     flex: 0 0 auto;
     padding: var(--weave-bottom-sheet-padding);

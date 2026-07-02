@@ -7,8 +7,14 @@ $tokens: (
     surface: ref.ref('color.surface'),
     text: ref.ref('color.ink'),
     line: ref.ref('color.line'),
+    // The drag-to-dismiss grab handle.
+    handle: ref.ref('color.line'),
   ),
   size: (
+    // Grab-handle grabber bar (drag-to-dismiss).
+    handle-width: 36px,
+    handle-height: 4px,
+    handle-top: 8px,
     // Cap the sheet's height so it never covers the whole screen; content scrolls inside.
     max-height: 72vh,
     // Wide-screen comfort cap (the sheet centers rather than spanning ultra-wide displays).

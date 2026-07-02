@@ -79,6 +79,42 @@ test('bottom-sheet: Escape closes; dismissable:false ignores Escape + backdrop',
   locked.opener.remove();
 });
 
+const dragPointer = (target: EventTarget, type: string, clientY: number): void => {
+  target.dispatchEvent(new PointerEvent(type, { bubbles: true, button: 0, pointerId: 1, clientX: 50, clientY }));
+};
+
+test('bottom-sheet: dragging the grab handle down past the threshold dismisses it', async () => {
+  const { ref, opener } = openWith({ content: 'x' });
+  const handle: HTMLElement | null = region('handle');
+  assert.ok(handle, 'grab handle shown by default');
+  const p: Promise<unknown> = ref.afterClosed();
+  dragPointer(handle as HTMLElement, 'pointerdown', 0);
+  dragPointer(handle as HTMLElement, 'pointermove', 300);
+  dragPointer(handle as HTMLElement, 'pointerup', 300);
+  assert.equal(sheet(), null, 'dismissed after a long downward drag');
+  await p; // afterClosed resolves
+  opener.remove();
+});
+
+test('bottom-sheet: a short drag snaps back (stays open, transform cleared)', () => {
+  const { ref, opener } = openWith({ content: 'x' });
+  const handle: HTMLElement = region('handle') as HTMLElement;
+  dragPointer(handle, 'pointerdown', 0);
+  dragPointer(handle, 'pointermove', 15);
+  dragPointer(handle, 'pointerup', 15);
+  assert.ok(sheet(), 'still open after a small drag');
+  assert.equal(sheet()!.style.transform, '', 'snapped back to no transform');
+  ref.close();
+  opener.remove();
+});
+
+test('bottom-sheet: dragToDismiss:false shows no handle', () => {
+  const { ref, opener } = openWith({ content: 'x', dragToDismiss: false });
+  assert.equal(region('handle'), null, 'no grab handle');
+  ref.close();
+  opener.remove();
+});
+
 test('bottom-sheet: afterClosed resolves with the close result', async () => {
   const { ref, opener } = openWith({ content: 'x' });
   const p: Promise<unknown> = ref.afterClosed();
