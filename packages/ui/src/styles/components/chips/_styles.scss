@@ -14,14 +14,14 @@
   .weave-chips__chip {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--weave-chips-chip-gap);
     padding: var(--weave-chips-padding-y) var(--weave-chips-padding-x);
     border: 1px solid var(--weave-chips-border);
     border-radius: var(--weave-chips-radius);
     background: transparent;
     color: var(--weave-chips-text);
     font-size: var(--weave-chips-font-size);
-    line-height: 1.4;
+    line-height: var(--weave-chips-line-height);
   }
 
   .weave-chips__chip:focus-visible {
@@ -36,15 +36,15 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 16px;
-    height: 16px;
-    margin-right: -4px; // pull the × toward the chip edge
+    width: var(--weave-chips-remove-size);
+    height: var(--weave-chips-remove-size);
+    margin-right: var(--weave-chips-remove-nudge); // pull the × toward the chip edge
     padding: 0;
     border: 0;
     border-radius: 50%;
     background: transparent;
     color: var(--weave-chips-remove);
-    font-size: 14px;
+    font-size: var(--weave-chips-remove-font-size);
     line-height: 1;
     cursor: pointer;
     transition:
@@ -64,7 +64,7 @@
 
   /* The dashed "+ Add" chip — a real button. */
   .weave-chips__chip--add {
-    gap: 4px;
+    gap: var(--weave-chips-add-gap);
     border-style: dashed;
     color: var(--weave-chips-add-text);
     cursor: pointer;

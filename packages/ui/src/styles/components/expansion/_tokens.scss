@@ -15,6 +15,7 @@ $tokens: (
   size: (
     radius: ref.ref('shape.radius'),
     header-height: 44px,
+    header-gap: 12px,
     padding-x: 14px,
     padding-y: 10px,
     body-padding-x: 14px,
@@ -26,5 +27,6 @@ $tokens: (
     header-size: 13px,
     header-weight: 600,
     body-size: 13px,
+    marker-weight: 400,
   ),
 );

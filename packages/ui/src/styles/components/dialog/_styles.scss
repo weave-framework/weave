@@ -28,7 +28,7 @@
     border-bottom: 1px solid var(--weave-dialog-line);
     font-size: var(--weave-dialog-title-size);
     font-weight: var(--weave-dialog-title-weight);
-    line-height: 1.3;
+    line-height: var(--weave-dialog-title-line-height);
   }
 
   // Content — always present; takes the remaining height and scrolls vertically.
@@ -38,7 +38,7 @@
     min-height: 0;
     overflow-y: auto;
     padding: var(--weave-dialog-padding);
-    line-height: 1.5;
+    line-height: var(--weave-dialog-content-line-height);
   }
 
   // Actions — fixed footer, right-aligned; only present when the dev supplies actions.
@@ -47,7 +47,7 @@
     display: flex;
     justify-content: flex-end;
     align-items: center;
-    gap: 8px;
+    gap: var(--weave-dialog-actions-gap);
     padding: var(--weave-dialog-padding);
     border-top: 1px solid var(--weave-dialog-line);
   }

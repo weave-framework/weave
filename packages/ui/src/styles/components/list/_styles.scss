@@ -21,7 +21,7 @@
     color: var(--weave-list-text);
     font-size: var(--weave-list-font-size);
     font-weight: var(--weave-list-weight);
-    line-height: 1.3;
+    line-height: var(--weave-list-line-height);
     transition: background var(--weave-list-duration) ease;
   }
 

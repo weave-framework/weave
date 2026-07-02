@@ -16,7 +16,7 @@
     color: var(--weave-snackbar-text);
     font-size: var(--weave-snackbar-font-size);
     font-weight: var(--weave-snackbar-weight);
-    line-height: 1.4;
+    line-height: var(--weave-snackbar-line-height);
     animation: weave-snackbar-in var(--weave-snackbar-duration) ease;
   }
 

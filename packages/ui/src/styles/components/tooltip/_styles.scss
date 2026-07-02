@@ -13,7 +13,7 @@
     color: var(--weave-tooltip-text);
     font-size: var(--weave-tooltip-font-size);
     font-weight: var(--weave-tooltip-weight);
-    line-height: 1.4;
+    line-height: var(--weave-tooltip-line-height);
     animation: weave-tooltip-in var(--weave-tooltip-duration) ease;
   }
 

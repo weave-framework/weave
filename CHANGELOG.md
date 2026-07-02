@@ -9,6 +9,23 @@
 > releases here. Publishing itself is a separate, explicit step (the `/publish` skill /
 > `pnpm publish:packages`) — committing/pushing does **not** publish or mirror.
 
+## 0.2.24 — 2026-07-02 (unpublished; on `main`, ahead of the 0.2.0 npm release)
+
+Completes the RULE #1 tokenization pass — the last per-component spacing/typography
+literals now resolve from each component's own token schema (no hard-coded values left).
+
+### UI (`@weave-framework/ui`)
+- **Tokenized the remaining literals in 10 components** (chips, menu, dialog, bottom-sheet,
+  card, tooltip, snackbar, list, expansion, autocomplete): `line-height` (1.3/1.4/1.5),
+  `font-weight: 400` subtext weights, small `gap`/`padding-y` values, the chips × glyph
+  size + edge nudge, and the menu divider height — each now a `var(--weave-<c>-…)` backed by
+  a new key in the component's `_tokens.scss`. Structural constants (`0`, `100%`, `50%`,
+  `line-height: 1` resets, 1px hairline borders, keyframe transforms) stay literal, matching
+  the established convention. **Compiled CSS is byte-identical** (token value = former
+  literal) — `verify:ui-sass` 245 unchanged, confirming no visual change.
+- **✅ RULE #1 fully satisfied** across the UI library: every component composes the real
+  child components and every SCSS value flows from a token schema.
+
 ## 0.2.23 — 2026-07-02 (unpublished; on `main`, ahead of the 0.2.0 npm release)
 
 The U4 (complex/data) build **plus** a mid-milestone architecture correction — RULE #1:

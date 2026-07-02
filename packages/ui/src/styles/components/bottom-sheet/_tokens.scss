@@ -15,10 +15,13 @@ $tokens: (
     max-width: 640px,
     radius: ref.ref('shape.radius'),
     padding: 20px,
+    actions-gap: 8px,
     duration: ref.ref('motion.sheet'),
   ),
   typography: (
     title-size: 15px,
     title-weight: 600,
+    title-line-height: 1.3,
+    content-line-height: 1.5,
   ),
 );

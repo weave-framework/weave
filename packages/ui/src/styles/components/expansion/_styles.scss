@@ -25,7 +25,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
+    gap: var(--weave-expansion-header-gap);
     width: 100%;
     min-height: var(--weave-expansion-header-height);
     padding: var(--weave-expansion-padding-y) var(--weave-expansion-padding-x);
@@ -70,7 +70,7 @@
     flex: none;
     width: var(--weave-expansion-marker-width);
     color: var(--weave-expansion-marker);
-    font-weight: 400;
+    font-weight: var(--weave-expansion-marker-weight);
     text-align: center;
   }
 

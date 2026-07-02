@@ -18,11 +18,16 @@ $tokens: (
     padding-y: 4px,
     item-height: 32px,
     item-padding-x: 12px,
+    item-padding-y: 5px,
+    item-gap: 1px,
+    divider-height: 1px,
     duration: ref.ref('motion.fast'),
   ),
   typography: (
     font-size: 13px,
     weight: 500,
     description-size: 11px,
+    description-weight: 400,
+    description-line-height: 1.3,
   ),
 );

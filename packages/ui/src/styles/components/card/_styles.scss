@@ -46,7 +46,7 @@
   .weave-card__body {
     margin: 0;
     font-size: var(--weave-card-body-size);
-    line-height: 1.5;
+    line-height: var(--weave-card-body-line-height);
     color: var(--weave-card-body-text);
   }
 
@@ -61,7 +61,7 @@
      below it). When the card is only as tall as its content, `auto` collapses to 0. */
   .weave-card__actions {
     display: flex;
-    gap: 8px;
+    gap: var(--weave-card-actions-gap);
     align-items: center;
     margin-top: auto;
   }

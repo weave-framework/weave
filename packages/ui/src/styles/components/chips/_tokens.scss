@@ -14,9 +14,15 @@ $tokens: (
     padding-x: 10px,
     padding-y: 4px,
     gap: 8px,
+    chip-gap: 6px,
+    add-gap: 4px,
+    remove-size: 16px,
+    remove-nudge: -4px,
     duration: ref.ref('motion.fast'),
   ),
   typography: (
     font-size: 12px,
+    line-height: 1.4,
+    remove-font-size: 14px,
   ),
 );
