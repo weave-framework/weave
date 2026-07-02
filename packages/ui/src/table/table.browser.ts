@@ -242,6 +242,59 @@ test('table: ArrayDataSource + reactive signal source both drive the body', asyn
   m2.dispose();
 });
 
+/* ── column resize (U5) ── */
+const grip = (m: Mounted, key: string): HTMLElement =>
+  m.host.querySelector(`.weave-table__resize-grip[data-col="${key}"]`) as HTMLElement;
+const headWidth = (m: Mounted, key: string): string => {
+  const ths: HTMLElement[] = Array.from(m.host.querySelectorAll('thead th[scope="col"]'));
+  const idx: number = COLS.findIndex((c) => c.key === key);
+  return ths[idx]?.style.width ?? '';
+};
+const resizePointer = (target: EventTarget, type: string, clientX: number): void => {
+  target.dispatchEvent(new PointerEvent(type, { bubbles: true, button: 0, pointerId: 1, clientX, clientY: 10 }));
+};
+
+test('table: resizable columns get a separator grip; non-resizable do not', async () => {
+  const cols: TableColumn<Row>[] = [
+    { key: 'name', header: 'Name', width: 200, resizable: true },
+    { key: 'age', header: 'Age', width: 80 },
+  ];
+  const m: Mounted = await mount({ columns: cols, dataSource: ROWS });
+  const g: HTMLElement = grip(m, 'name');
+  assert.ok(g, 'resizable column has a grip');
+  assert.equal(g.getAttribute('role'), 'separator');
+  assert.equal(g.getAttribute('aria-orientation'), 'vertical');
+  assert.equal(m.host.querySelector('.weave-table__resize-grip[data-col="age"]'), null, 'non-resizable has none');
+  m.dispose();
+});
+
+test('table: keyboard Arrow resizes the column + emits onColumnResize', async () => {
+  const sizes: Array<{ key: string; width: number }> = [];
+  const cols: TableColumn<Row>[] = [{ key: 'name', header: 'Name', width: 200, resizable: true }];
+  const m: Mounted = await mount({ columns: cols, dataSource: ROWS, onColumnResize: (e) => sizes.push(e) });
+  grip(m, 'name').dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowRight' }));
+  assert.deepEqual(sizes.at(-1), { key: 'name', width: 216 }, '+16 step');
+  assert.equal(headWidth(m, 'name'), '216px', 'inline width updated');
+  grip(m, 'name').dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowLeft' }));
+  assert.deepEqual(sizes.at(-1), { key: 'name', width: 200 });
+  m.dispose();
+});
+
+test('table: dragging the grip resizes live + toggles [data-resizing]; min-width clamps', async () => {
+  const cols: TableColumn<Row>[] = [{ key: 'name', header: 'Name', width: 200, resizable: true, minWidth: 60 }];
+  const m: Mounted = await mount({ columns: cols, dataSource: ROWS });
+  const g: HTMLElement = grip(m, 'name');
+  resizePointer(g, 'pointerdown', 300);
+  assert.equal(m.host.getAttribute('data-resizing'), 'true', 'resizing flag on during drag');
+  resizePointer(g, 'pointermove', 340); // +40
+  assert.equal(headWidth(m, 'name'), '240px');
+  resizePointer(g, 'pointermove', 0); // way left → below min
+  assert.equal(headWidth(m, 'name'), '60px', 'clamped to minWidth');
+  resizePointer(g, 'pointerup', 0);
+  assert.equal(m.host.hasAttribute('data-resizing'), false, 'flag cleared on release');
+  m.dispose();
+});
+
 /* ── numeric ── */
 test('table: numeric column marks cells tabular + right-aligned', async () => {
   const m: Mounted = await mount({ columns: COLS, dataSource: ROWS });

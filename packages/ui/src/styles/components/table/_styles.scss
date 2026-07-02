@@ -70,6 +70,40 @@
     font-size: var(--weave-table-arrow-size);
   }
 
+  /* ── column resize grip (drag the header edge; keyboard on the separator) ── */
+  .weave-table__resize-grip {
+    position: absolute;
+    top: 0;
+    right: 0;
+    height: 100%;
+    width: var(--weave-table-resize-grip-width);
+    cursor: col-resize;
+    touch-action: none;
+    user-select: none;
+    outline: none;
+  }
+
+  // The visible hairline, centred in the (wider) hit area.
+  .weave-table__resize-grip::after {
+    content: '';
+    position: absolute;
+    top: 20%;
+    right: calc((var(--weave-table-resize-grip-width) - var(--weave-table-resize-grip-line)) / 2);
+    width: var(--weave-table-resize-grip-line);
+    height: 60%;
+    background: var(--weave-table-resize-grip);
+  }
+
+  .weave-table__resize-grip:hover::after,
+  .weave-table__resize-grip:focus-visible::after {
+    background: var(--weave-table-resize-grip-active);
+  }
+
+  // While dragging a grip, suppress text selection across the table.
+  .weave-table[data-resizing] {
+    user-select: none;
+  }
+
   /* ── body cells ── */
   .weave-table__cell {
     box-sizing: border-box;

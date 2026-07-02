@@ -9,6 +9,21 @@
 > releases here. Publishing itself is a separate, explicit step (the `/publish` skill /
 > `pnpm publish:packages`) — committing/pushing does **not** publish or mirror.
 
+## 0.2.43 — 2026-07-02 (unpublished; on `main`, ahead of the 0.2.0 npm release)
+
+**Table column-resize** (U5 §5.1) + a `datepicker.browser.ts` typecheck fix.
+
+### UI (`@weave-framework/ui`) — `./table`
+- **Column resize** — a per-column `resizable` (or table-level `resizableColumns`) puts a `role=separator` grip on
+  each resizable `<th>`. **Pointer** drag via the CDK `draggable` (axis x) sets a live width (clamped to `minWidth`,
+  default 48); **keyboard** Arrow Left/Right resize by 16px. Widths ride an internal signal (a controlled
+  `columnWidths` prop wins) so `widthCss` + the sticky-offset maths recompute reactively. Emits
+  `onColumnResize({ key, width })`; `[data-resizing]` marks the table during a drag. **Deferred:** double-click
+  auto-fit, column reorder.
+- **Fix:** `datepicker.browser.ts` had two test-only type errors (a `void` arrow returning a boolean; a 3-arg
+  `matchRe`) that slipped into `0.2.42` (committed after eslint but before `tsc`). Restored a clean typecheck.
+- Gates: **929 tests (+3); verify:ui-sass 285 (+1);** typecheck + `eslint .` clean.
+
 ## 0.2.42 — 2026-07-02 (unpublished; on `main`, ahead of the 0.2.0 npm release)
 
 **Datepicker text-entry** (opt-in `editable`) + the **U5 sub-plan** is written.

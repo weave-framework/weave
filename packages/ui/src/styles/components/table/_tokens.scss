@@ -16,6 +16,9 @@ $tokens: (
     selected-background: color-mix(in srgb, ref.ref('color.accent') 12%, transparent),
     selected-marker: ref.ref('color.accent'),
     sort-arrow: ref.ref('color.accent'),
+    // Column-resize grip: a hairline that lights to accent on hover/drag.
+    resize-grip: ref.ref('color.line'),
+    resize-grip-active: ref.ref('color.accent'),
     // Expanded-row detail panel — a subtle inset tint.
     detail-background: ref.ref('color.field'),
     empty-text: ref.ref('color.sub'),
@@ -29,6 +32,9 @@ $tokens: (
     // Gap between a sort header's label and its arrow.
     control-gap: 6px,
     expand-size: 20px,
+    // Column-resize grip: hit area + the visible hairline width.
+    resize-grip-width: 9px,
+    resize-grip-line: 2px,
     duration: ref.ref('motion.fast'),
   ),
   typography: (

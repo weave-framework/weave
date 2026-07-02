@@ -45,7 +45,9 @@ function dateField(initial: Date | null): DatepickerControl {
 const field = (m: Mounted): HTMLElement => m.root.querySelector('.weave-datepicker__field') as HTMLElement;
 const inputEl = (m: Mounted): HTMLInputElement => m.root.querySelector('.weave-datepicker__input') as HTMLInputElement;
 const iconButton = (m: Mounted): HTMLButtonElement => m.root.querySelector('.weave-datepicker__icon-button') as HTMLButtonElement;
-const inputKey = (m: Mounted, k: string): void => inputEl(m).dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: k }));
+const inputKey = (m: Mounted, k: string): void => {
+  inputEl(m).dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: k }));
+};
 const panel = (): HTMLElement | null => document.body.querySelector('.weave-datepicker__panel');
 const cells = (): HTMLButtonElement[] =>
   Array.from(document.body.querySelectorAll<HTMLButtonElement>('.weave-datepicker__cell:not(.weave-datepicker__cell--blank)'));
@@ -57,7 +59,7 @@ const gridKey = (k: string, shift: boolean = false): void => {
     .dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: k, shiftKey: shift }));
 };
 
-const matchRe = (s: string, re: RegExp): void => assert.ok(re.test(s), `${JSON.stringify(s)} matches ${re}`);
+const matchRe = (s: string, re: RegExp, msg?: string): void => assert.ok(re.test(s), msg ?? `${JSON.stringify(s)} matches ${re}`);
 
 const JUN15: Date = A.create(2026, 5, 15);
 

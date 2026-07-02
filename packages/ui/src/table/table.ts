@@ -18,8 +18,8 @@
  *   import Checkbox from '@weave-framework/ui/checkbox';   // composed — provide it to the build
  *   <Table columns={{ cols }} dataSource={{ rows }} selectable expandable />
  */
-import { signal, type Signal, type Computed } from '@weave-framework/runtime';
-import { selectionModel, isDataSource, type SelectionModel, type DataSource } from '../cdk/index.js';
+import { signal, onMount, type Signal, type Computed } from '@weave-framework/runtime';
+import { selectionModel, isDataSource, draggable, type SelectionModel, type DataSource } from '../cdk/index.js';
 
 export type SortDirection = 'asc' | 'desc';
 
@@ -44,6 +44,15 @@ export interface TableColumn<T> {
   hidden?: boolean;
   /** Column width (number → px). Required for a `sticky` column's offset maths. */
   width?: number | string;
+  /** Allow dragging this column's header grip to resize it (or set `resizableColumns`). */
+  resizable?: boolean;
+  /** Minimum width (px) when resizing. Default 48. */
+  minWidth?: number;
+}
+
+export interface ColumnResize {
+  key: string;
+  width: number;
 }
 
 export interface SortState {
@@ -74,6 +83,14 @@ export interface TableProps<T = Record<string, unknown>> {
 
   /** Cap the body height (number → px) — the body scrolls vertically, header stays. */
   maxHeight?: number | string;
+
+  /** Make every column resizable (per-column `resizable` overrides this). */
+  resizableColumns?: boolean;
+  /** Controlled column widths (px), keyed by column key — wins over internal + `column.width`. */
+  columnWidths?: Record<string, number>;
+  /** Called after a resize with the column key + its new width (px). */
+  onColumnResize?: (event: ColumnResize) => void;
+
   ariaLabel?: string;
   emptyText?: string;
   class?: string;
@@ -83,6 +100,8 @@ export interface TableProps<T = Record<string, unknown>> {
 const EXPAND_W: number = 40;
 const SELECT_W: number = 44;
 const DEFAULT_STICKY_W: number = 120;
+const DEFAULT_MIN_W: number = 48;
+const RESIZE_STEP: number = 16; // keyboard resize increment (px)
 
 /** A layout slot (synthetic or data column) for sticky-offset computation. */
 interface Slot {
@@ -114,6 +133,9 @@ export const template: string =
   '@if (col.sortable) {<button type="button" class={{ sortClass(col) }} on:click={{ () => cycleSort(col.key) }}>' +
   '@render (headNode(col))<span class="weave-table__sort-arrow" aria-hidden="true">{{ arrow(col) }}</span></button>}' +
   '@if (!col.sortable) {@render (headNode(col))}' +
+  '@if (isResizable(col)) {<span class="weave-table__resize-grip" role="separator" aria-orientation="vertical"' +
+  ' tabindex="0" aria-label={{ resizeLabel(col) }} data-col={{ col.key }}' +
+  ' on:keydown={{ (e) => onGripKeydown(col.key, e) }}></span>}' +
   '</th>}' +
   '</tr></thead>' +
   '<tbody class="weave-table__body">' +
@@ -164,6 +186,9 @@ export interface TableContext<T> {
   ariaSort: (col: TableColumn<T>) => 'ascending' | 'descending' | 'none';
   arrow: (col: TableColumn<T>) => string;
   cycleSort: (key: string) => void;
+  isResizable: (col: TableColumn<T>) => boolean;
+  resizeLabel: (col: TableColumn<T>) => string;
+  onGripKeydown: (key: string, event: KeyboardEvent) => void;
   cellsFor: (row: T) => CellView[];
   detailNode: (row: T) => Node;
   expandStyle: () => string;
@@ -232,7 +257,21 @@ export function setup<T = Record<string, unknown>>(props: TableProps<T>): TableC
 
   /* ── columns + sticky offsets (from widths — no DOM measurement) ── */
   const dataCols = (): TableColumn<T>[] => props.columns.filter((c) => !c.hidden);
-  const colW = (c: TableColumn<T>): number => (typeof c.width === 'number' ? c.width : DEFAULT_STICKY_W);
+
+  /* ── column resize: an internal width override (px), keyed by column ── */
+  const _widths: Signal<Record<string, number>> = signal<Record<string, number>>({});
+  const isResizable = (c: TableColumn<T>): boolean => c.resizable ?? !!props.resizableColumns;
+  const minW = (c: TableColumn<T>): number => c.minWidth ?? DEFAULT_MIN_W;
+  // Effective px width: controlled prop wins, then an internal resize override, then a numeric `width`.
+  const effWidth = (c: TableColumn<T>): number | undefined =>
+    props.columnWidths?.[c.key] ?? _widths()[c.key] ?? (typeof c.width === 'number' ? c.width : undefined);
+  const setWidth = (c: TableColumn<T>, width: number): void => {
+    const w: number = Math.max(minW(c), Math.round(width));
+    if (props.columnWidths === undefined) _widths.set({ ..._widths(), [c.key]: w });
+    props.onColumnResize?.({ key: c.key, width: w });
+  };
+
+  const colW = (c: TableColumn<T>): number => effWidth(c) ?? DEFAULT_STICKY_W;
   const slots = (): Slot[] => {
     const out: Slot[] = [];
     if (expandable()) out.push({ id: '__expand', width: EXPAND_W, sticky: 'start' });
@@ -255,9 +294,48 @@ export function setup<T = Record<string, unknown>>(props: TableProps<T>): TableC
   };
 
   const alignOf = (c: TableColumn<T>): string => c.align ?? (c.numeric ? 'end' : 'start');
-  const widthCss = (c: TableColumn<T>): string =>
-    c.width == null ? '' : `width:${typeof c.width === 'number' ? `${c.width}px` : c.width}`;
+  const widthCss = (c: TableColumn<T>): string => {
+    const eff: number | undefined = effWidth(c);
+    if (eff != null) return `width:${eff}px`;
+    return c.width == null ? '' : `width:${c.width}`; // a string width passes through
+  };
   const joinStyle = (...parts: string[]): string => parts.filter(Boolean).join(';');
+
+  /* ── resize interaction: pointer drag (CDK draggable) + keyboard on the grip ── */
+  const resizeCol = (key: string): TableColumn<T> | undefined => props.columns.find((c) => c.key === key);
+  let dragStartWidth: number = 0;
+  const onGripKeydown = (key: string, event: KeyboardEvent): void => {
+    const col: TableColumn<T> | undefined = resizeCol(key);
+    if (!col) return;
+    const cur: number = effWidth(col) ?? DEFAULT_STICKY_W;
+    if (event.key === 'ArrowLeft') {
+      setWidth(col, cur - RESIZE_STEP);
+      event.preventDefault();
+    } else if (event.key === 'ArrowRight') {
+      setWidth(col, cur + RESIZE_STEP);
+      event.preventDefault();
+    }
+  };
+
+  // Attach a pointer-drag to each header grip once the table is in the DOM.
+  onMount(() => {
+    const el: HTMLElement | null = host();
+    if (!el) return;
+    el.querySelectorAll<HTMLElement>('.weave-table__resize-grip').forEach((grip) => {
+      const key: string = grip.getAttribute('data-col') ?? '';
+      const col: TableColumn<T> | undefined = resizeCol(key);
+      if (!col) return;
+      draggable(grip, {
+        axis: 'x',
+        onStart: () => {
+          dragStartWidth = effWidth(col) ?? (grip.closest('th') as HTMLElement | null)?.offsetWidth ?? DEFAULT_STICKY_W;
+          el.setAttribute('data-resizing', 'true');
+        },
+        onMove: ({ dx }) => setWidth(col, dragStartWidth + dx),
+        onEnd: () => el.removeAttribute('data-resizing'),
+      });
+    });
+  });
 
   // Key rows by a stable id (trackBy) or by object identity — NOT by index, so a sort
   // reorders the existing DOM by identity (content stays with its row) instead of rebinding
@@ -340,6 +418,10 @@ export function setup<T = Record<string, unknown>>(props: TableProps<T>): TableC
       return s.direction === 'desc' ? '↓' : '↑';
     },
     cycleSort,
+    isResizable,
+    resizeLabel: (col: TableColumn<T>): string =>
+      `Resize ${typeof col.header === 'string' ? col.header : col.key} column`,
+    onGripKeydown,
     cellsFor: (row: T): CellView[] =>
       dataCols().map((col) => ({ key: col.key, cls: cellClassOf(col), style: cellStyleOf(col), node: cellNodeOf(row, col) })),
     detailNode: (row: T): Node => asNode(props.detail ? props.detail(row) : ''),
