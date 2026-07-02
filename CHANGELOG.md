@@ -9,6 +9,21 @@
 > releases here. Publishing itself is a separate, explicit step (the `/publish` skill /
 > `pnpm publish:packages`) — committing/pushing does **not** publish or mirror.
 
+## 0.2.32 — 2026-07-02 (unpublished; on `main`, ahead of the 0.2.0 npm release)
+
+Regression guard for the `0.2.31` double-fire fix. The existing suite passed the fix
+*independently* of it (the Table test only survived via idempotent select; the isolated
+Checkbox test never exercised the runtime forward loop) — so the fix was not actually pinned.
+
+### Compiler (`@weave-framework/compiler`) — `component.browser.ts`
+- **`defineComponent does NOT forward a data-callback prop (no double-fire)`** — composes a
+  child that consumes `onChange` via a setup binding fired by an inner `<input>`'s bubbling
+  `change` (mirrors Checkbox). Asserts it fires **once**. Verified it **fails (calls=2)** when
+  `defineComponent` is reverted to the old `/^on[A-Z]/` forward — a true guard.
+- **`defineComponent forwards a real on:X event to the child root`** — asserts `$events`-marked
+  events are still forwarded (guards the other direction — that the fix didn't break Button-style
+  composition).
+
 ## 0.2.31 — 2026-07-02 (unpublished; on `main`, ahead of the 0.2.0 npm release)
 
 Framework fix — composed-component event handlers no longer double-fire. This removes the

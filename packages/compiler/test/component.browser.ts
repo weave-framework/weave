@@ -140,6 +140,40 @@ test('a setup binding may shadow a like-named (getter-only) prop', () => {
   assert.equal(node.textContent, 'bye', 'reactive through the shadowing accessor');
 });
 
+test('defineComponent forwards a real on:X event to the child root', () => {
+  // `<Child on:click={{h}} />` compiles to an `onClick` prop + a `$events:['onClick']` marker.
+  // The runtime forwards only `$events` keys to the rendered root, so the consumer's listener
+  // fires from the root element even though the child never wires click itself.
+  let calls: number = 0;
+  const handler = (): void => { calls++; };
+  const render: (ctx: unknown, slots?: unknown) => Node = compileRender('<button>x</button>', []);
+  const Child: dom.Component = dom.defineComponent(render as never);
+  const node: Element = Child({ onClick: handler, '$events': ['onClick'] }, {}) as Element;
+  host().appendChild(node);
+  (node as HTMLButtonElement).click();
+  assert.equal(calls, 1, 'on:X forwarded to the root and fired');
+});
+
+test('defineComponent does NOT forward a data-callback prop (no double-fire)', () => {
+  // Regression for the composed-<Checkbox> double-fire. A data-callback prop (`onChange`, NOT
+  // an `on:X` event → absent from `$events`) is consumed INSIDE the child: an inner <input>'s
+  // change fires a setup binding that calls `props.onChange`. That change BUBBLES to the root
+  // <label>. If the runtime also auto-forwarded `onChange` to the root (the old behaviour), the
+  // bubbled event would invoke it a SECOND time. With the `$events` marker it must fire once.
+  let calls: number = 0;
+  const handler = (): void => { calls++; };
+  const render: (ctx: unknown, slots?: unknown) => Node =
+    compileRender('<label><input type="checkbox" on:change={{fire}} /></label>', ['fire']);
+  const Child: dom.Component = dom.defineComponent(render as never, (props) => ({
+    fire: () => (props.onChange as () => void)(),
+  }));
+  // No `$events` (onChange is a data prop, not an on:X event) — exactly what the compiler emits.
+  const node: Element = Child({ get onChange() { return handler; } }, {}) as Element;
+  host().appendChild(node);
+  (node.querySelector('input') as HTMLInputElement).click(); // toggles → bubbling `change`
+  assert.equal(calls, 1, 'data-callback fires once, not forwarded to the root as a DOM listener');
+});
+
 test('mountComponent disposes setup effects on unmount', () => {
   let disposed: boolean = false;
   const render: (ctx: unknown, slots?: unknown) => Node = compileRender('<p>{{ v() }}</p>', ['v']);
