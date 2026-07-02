@@ -536,6 +536,9 @@ check('datepicker editable input strips its own chrome (shares the field underli
 /* ── tree reorder drag handle (U4 retrofit via CDK dropList) ── */
 check('tree emits a reorder drag handle (grab cursor, touch-action:none)', /\.weave-tree__drag-handle\s*{[\s\S]*?color:\s*var\(--weave-tree-drag-handle\)[\s\S]*?cursor:\s*grab[\s\S]*?touch-action:\s*none/.test(cssStyles));
 
+/* ── popover-edit (U5 §5.3): overlay-panel chrome + a field sharing Input's underline ── */
+check('popover-edit panel = overlay chrome + input shares the field underline', /\.weave-popover-edit\s*{[\s\S]*?border:\s*1px solid var\(--weave-overlay-line\)/.test(cssStyles) && /\.weave-popover-edit__input\s*{[\s\S]*?border-bottom:\s*var\(--weave-popover-edit-border-width\)/.test(cssStyles));
+
 /* ── menubar (U5 §5.2): top bar items, open item tinted via [aria-expanded] ── */
 check('all-styles emits .weave-menubar bar + item (open item tinted via [aria-expanded])', /\.weave-menubar\s*{[\s\S]*?display:\s*flex/.test(cssStyles) && /\.weave-menubar__item\[aria-expanded=true\]\s*{[\s\S]*?background:\s*var\(--weave-menubar-item-open\)/.test(cssStyles));
 

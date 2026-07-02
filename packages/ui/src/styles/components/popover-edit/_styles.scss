@@ -1,0 +1,31 @@
+// popover-edit — styles() mixin (class rules). The inline-edit popover: overlay-panel chrome +
+// a text field sharing Input's underline (the shared field-underline helper). Forwarded by
+// ./_index.scss.
+@use '../../helpers' as helpers;
+
+@mixin styles() {
+  .weave-popover-edit {
+    @include helpers.overlay-panel;
+    min-width: var(--weave-popover-edit-min-width);
+    padding: var(--weave-popover-edit-padding);
+  }
+
+  .weave-popover-edit__input {
+    // field-reset first (strips chrome), then the shared underline wins the bottom border.
+    @include helpers.field-reset;
+    @include helpers.field-underline(
+      var(--weave-popover-edit-border),
+      var(--weave-popover-edit-focus),
+      var(--weave-popover-edit-border-width)
+    );
+    display: block;
+    width: 100%;
+    padding: var(--weave-popover-edit-field-padding-y) 0;
+    color: var(--weave-popover-edit-text);
+    font-size: var(--weave-popover-edit-font-size);
+  }
+
+  .weave-popover-edit__input::placeholder {
+    color: var(--weave-popover-edit-placeholder);
+  }
+}

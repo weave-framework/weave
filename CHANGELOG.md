@@ -9,6 +9,21 @@
 > releases here. Publishing itself is a separate, explicit step (the `/publish` skill /
 > `pnpm publish:packages`) — committing/pushing does **not** publish or mirror.
 
+## 0.2.45 — 2026-07-02 (unpublished; on `main`, ahead of the 0.2.0 npm release)
+
+**Popover-edit** — inline cell editing (U5 §5.3). **This completes U5.**
+
+### UI (`@weave-framework/ui`) — `./popover-edit`
+- **`popoverEdit(host, config)`** (a `use:popoverEdit` action) — click / Enter / F2 opens a **non-modal** CDK-overlay
+  editor (the U3 overlay-republic chrome) seeded from `config.value()`. **Enter and click-away commit**
+  (`onCommit`), **Esc cancels**; focus moves into the editor and back to the host. Default editor = a text field
+  sharing Input's `field-underline` (RULE #1); a custom `editor` factory (`{ element, read, focusTarget? }`)
+  supplies a Select/date/etc. `aria-haspopup=dialog`. **Deferred:** Table `column.editable` wiring, multi-cell edit.
+- Gates: **946 tests (+8); verify:ui-sass 287 (+1);** typecheck + `eslint .` clean.
+
+> **✅ U5 (Experimental) COMPLETE** — Table column-resize · Menubar · Popover-edit. (Dropped the standalone
+> "selection" widget — the U4 CDK `SelectionModel` already closes it.) Next: U6 (harnesses + docs + gallery).
+
 ## 0.2.44 — 2026-07-02 (unpublished; on `main`, ahead of the 0.2.0 npm release)
 
 **Menubar** — an app menu bar (WAI-ARIA menubar, U5 §5.2).

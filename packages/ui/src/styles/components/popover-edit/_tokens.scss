@@ -1,0 +1,21 @@
+// popover-edit — design tokens (schema). A small inline-edit popover: the shared overlay-panel
+// chrome + a text field sharing Input's underline. Forwarded by ./_index.scss.
+@use '../../ref' as ref;
+
+$tokens: (
+  color: (
+    text: ref.ref('color.ink'),
+    placeholder: ref.ref('color.sub'),
+    border: ref.ref('color.line'),
+    focus: ref.ref('color.accent'),
+  ),
+  size: (
+    padding: 8px,
+    min-width: 160px,
+    field-padding-y: 4px,
+    border-width: 1.5px,
+  ),
+  typography: (
+    font-size: 13px,
+  ),
+);

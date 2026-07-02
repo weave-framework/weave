@@ -1,0 +1,9 @@
+// Popover-edit — inline cell editing. Behavior lives in popover-edit.ts (a `use:popoverEdit`
+// action: click/Enter/F2 opens a non-modal editor popover; Enter/click-away commit, Esc
+// cancels); this is the visual — the overlay-panel chrome + a text field sharing Input's
+// underline.
+//
+// Barrel — forwards the split partials ($tokens + the styles() mixin).
+
+@forward 'tokens';
+@forward 'styles';

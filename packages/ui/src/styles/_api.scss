@@ -45,6 +45,7 @@
 @use 'components/datepicker' as datepicker;
 @use 'components/timepicker' as timepicker;
 @use 'components/menubar' as menubar;
+@use 'components/popover-edit' as popover-edit;
 
 $_builtins: (
   'divider': divider.$tokens,
@@ -84,6 +85,7 @@ $_builtins: (
   'datepicker': datepicker.$tokens,
   'timepicker': timepicker.$tokens,
   'menubar': menubar.$tokens,
+  'popover-edit': popover-edit.$tokens,
 );
 
 /* ───────────────────────── internal emit ───────────────────────── */
@@ -309,6 +311,10 @@ $_builtins: (
   @include overrides('menubar', $map);
 }
 
+@mixin popover-edit-overrides($map) {
+  @include overrides('popover-edit', $map);
+}
+
 // Emit the structural CSS (class rules) for every built-in component.
 // Prefer per-component includes to keep CSS small; all-styles() is the convenience.
 @mixin all-styles() {
@@ -349,4 +355,5 @@ $_builtins: (
   @include datepicker.styles();
   @include timepicker.styles();
   @include menubar.styles();
+  @include popover-edit.styles();
 }
