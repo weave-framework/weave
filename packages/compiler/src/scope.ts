@@ -99,10 +99,66 @@ export function rewrite(expr: string, scope: Scope, ctxRef: string = 'ctx'): Rew
   while (i < n) {
     const c: string = expr[i];
 
-    if (c === '"' || c === "'" || c === '`') {
+    if (c === '"' || c === "'") {
       const end: number = scanString(expr, i);
       copy(i, expr.slice(i, end));
       i = end;
+      continue;
+    }
+
+    if (c === '`') {
+      // Template literal: copy the literal spans verbatim but rewrite each `${ … }` interpolation,
+      // so a ctx/local binding inside `${ }` still resolves instead of being left a bare global. (H4)
+      copy(i, '`');
+      let k: number = i + 1;
+      while (k < n) {
+        const ch: string = expr[k];
+        if (ch === '\\') {
+          copy(k, expr.slice(k, k + 2));
+          k += 2;
+          continue;
+        }
+        if (ch === '`') {
+          copy(k, '`');
+          k++;
+          break;
+        }
+        if (ch === '$' && expr[k + 1] === '{') {
+          copy(k, '${');
+          k += 2;
+          const exprStart: number = k;
+          let depth: number = 1;
+          while (k < n && depth > 0) {
+            const mc: string = expr[k];
+            if (mc === '"' || mc === "'" || mc === '`') {
+              k = scanString(expr, k);
+              continue;
+            }
+            if (mc === '{') depth++;
+            else if (mc === '}') {
+              depth--;
+              if (depth === 0) break;
+            }
+            k++;
+          }
+          const sub: RewriteResult = rewrite(expr.slice(exprStart, k), scope, ctxRef);
+          if (sub.reactive) reactive = true;
+          // Splice the rewritten interpolation in WITH its segments (offset into this expr/out), so
+          // source coverage + the verbatim invariant hold through `${ … }` for editor tooling.
+          flush();
+          const genStart: number = out.length;
+          for (const s of sub.segments) segments.push({ src: exprStart + s.src, gen: genStart + s.gen, len: s.len });
+          out += sub.code;
+          if (expr[k] === '}') {
+            copy(k, '}');
+            k++;
+          }
+          continue;
+        }
+        copy(k, ch);
+        k++;
+      }
+      i = k;
       continue;
     }
 
@@ -114,6 +170,13 @@ export function rewrite(expr: string, scope: Scope, ctxRef: string = 'ctx'): Rew
       const binding: Binding | undefined = scope.get(name);
 
       if (binding && !isProperty) {
+        // `{ name }` object shorthand must expand to `{ name: <value> }` — a bare `{ ctx.name }` /
+        // `{ accessor() }` is a syntax error. Detect a shorthand key: between `{`|`,` and `,`|`}`. (H4)
+        if (binding.kind !== 'local') {
+          const prev: string = lastNonSpace(out);
+          const next: string = firstNonSpaceFrom(expr, j);
+          if ((prev === '{' || prev === ',') && (next === ',' || next === '}')) insert(`${name}: `);
+        }
         if (binding.kind === 'ctx') {
           insert(`${ctxRef}.`);
           copy(i, name);
@@ -156,6 +219,14 @@ export function childScope(parent: Scope, locals: Record<string, string>): Scope
 
 function lastNonSpace(s: string): string {
   for (let i: number = s.length - 1; i >= 0; i--) {
+    if (!/\s/.test(s[i])) return s[i];
+  }
+  return '';
+}
+
+/** First non-whitespace character in `s` at or after `from` (''  if none). */
+function firstNonSpaceFrom(s: string, from: number): string {
+  for (let i: number = from; i < s.length; i++) {
     if (!/\s/.test(s[i])) return s[i];
   }
   return '';
@@ -229,8 +300,46 @@ export function freeIdentifiers(expr: string): string[] {
   const n: number = expr.length;
   while (i < n) {
     const c: string = expr[i];
-    if (c === '"' || c === "'" || c === '`') {
+    if (c === '"' || c === "'") {
       i = scanString(expr, i);
+      continue;
+    }
+    if (c === '`') {
+      // Walk the template literal; recurse into each `${ … }` so identifiers there are collected too. (H4)
+      let k: number = i + 1;
+      while (k < n) {
+        const ch: string = expr[k];
+        if (ch === '\\') {
+          k += 2;
+          continue;
+        }
+        if (ch === '`') {
+          k++;
+          break;
+        }
+        if (ch === '$' && expr[k + 1] === '{') {
+          k += 2;
+          const start: number = k;
+          let depth: number = 1;
+          while (k < n && depth > 0) {
+            const mc: string = expr[k];
+            if (mc === '"' || mc === "'" || mc === '`') {
+              k = scanString(expr, k);
+              continue;
+            }
+            if (mc === '{') depth++;
+            else if (mc === '}') {
+              depth--;
+              if (depth === 0) break;
+            }
+            k++;
+          }
+          for (const id of freeIdentifiers(expr.slice(start, k))) out.add(id);
+          continue;
+        }
+        k++;
+      }
+      i = k;
       continue;
     }
     if (ID_START.test(c)) {

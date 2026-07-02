@@ -94,6 +94,35 @@ test('rewrite: runtime accessor (call) leaves the synthesized call unmapped', ()
   assert.ok(done, 'the .done tail should remain mapped');
 });
 
+test('rewrite: bindings inside a template literal ${ } are resolved (H4)', () => {
+  const expr: string = '`Hi ${name}, you have ${count} left`';
+  const r: ReturnType<typeof rewrite> = rewrite(expr, ctxScope(['name', 'count']), '__ctx');
+  assert.equal(r.code, '`Hi ${__ctx.name}, you have ${__ctx.count} left`');
+  assert.equal(r.reactive, true);
+  assertVerbatim(expr, r.code, r.segments);
+  assertFullSourceCoverage(expr, r.segments);
+});
+
+test('rewrite: a literal quote-string inside ${ } is left alone', () => {
+  const expr: string = '`${ok ? "yes" : "no"}`';
+  const r: ReturnType<typeof rewrite> = rewrite(expr, ctxScope(['ok']), '__ctx');
+  assert.equal(r.code, '`${__ctx.ok ? "yes" : "no"}`');
+  assertVerbatim(expr, r.code, r.segments);
+  assertFullSourceCoverage(expr, r.segments);
+});
+
+test('rewrite: object shorthand expands to key: value (H4)', () => {
+  assert.equal(rewrite('{ name }', ctxScope(['name']), '__ctx').code, '{ name: __ctx.name }');
+  assert.equal(rewrite('{ a, b }', ctxScope(['a', 'b']), '__ctx').code, '{ a: __ctx.a, b: __ctx.b }');
+  // a real property value (`key: expr`) is NOT treated as shorthand
+  assert.equal(rewrite('{ id: x }', ctxScope(['x']), '__ctx').code, '{ id: __ctx.x }');
+});
+
+test('rewrite: object shorthand with a runtime accessor expands too', () => {
+  const scope: Scope = childScope(new Map(), { todo: '$todo' });
+  assert.equal(rewrite('{ todo }', scope).code, '{ todo: $todo() }');
+});
+
 test('rewrite: code output is unchanged vs the pre-segment behavior (regression guard)', () => {
   // A spread of shapes; `code` must match the historical contract exactly.
   assert.equal(rewrite('a ? b : c', ctxScope(['a', 'b', 'c']), '__ctx').code, '__ctx.a ? __ctx.b : __ctx.c');

@@ -9,6 +9,17 @@
 > releases here. Publishing itself is a separate, explicit step (the `/publish` skill /
 > `pnpm publish:packages`) — committing/pushing does **not** publish or mirror.
 
+## 0.2.49 — 2026-07-02 (unpublished; on `main`, ahead of the 0.2.0 npm release)
+
+**compiler rewrite robustness**. **H4** — the expression
+rewriter now (a) resolves bindings inside a template literal's `${ … }` (so `` {{ `Hi ${name}` }} `` becomes
+`` `Hi ${ctx.name}` `` instead of leaving `name` a bare global — spliced in WITH source-map segments), and
+(b) expands object shorthand, so `{{ { name } }}` emits `{ name: ctx.name }` instead of the invalid `{ ctx.name }`;
+`freeIdentifiers` scans `${ … }` too, so auto-scope infers those names. **M4** — `inferCtxNames`' `declared` set is
+now **per-scope, not global**: a `@for` item / `@let` / `@if (… as x)` / await-alias / snippet-param name is
+subtracted only within its own block, so the same name used as component data elsewhere is still inferred as ctx
+(snippet names stay template-wide via a pre-pass). Both have tests that fail without them. **957 tests green.**
+
 ## 0.2.48 — 2026-07-02 (unpublished; on `main`, ahead of the 0.2.0 npm release)
 
 **Select reactivity + parser strings**. **H3** — `Select` no

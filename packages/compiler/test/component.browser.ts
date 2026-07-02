@@ -58,6 +58,15 @@ test('inferCtxNames excludes @for item, $vars, and @let names', () => {
   assert.deepEqual(l, ['n']);
 });
 
+test('inferCtxNames: a name used outside a @for is still ctx even if a loop shadows it (M4)', () => {
+  // `item` is component data in the heading AND, separately, a loop var inside @for — the loop's
+  // block-local binding must not erase the ctx usage elsewhere (declared is per-scope, not global).
+  const names: string[] = inferCtxNames(
+    parseTemplate('<h1>{{ item }}</h1><ul>@for (item of items(); track item.id) { <li>{{ item.t }}</li> }</ul>'),
+  );
+  assert.deepEqual(names, ['item', 'items']);
+});
+
 test('a comment between elements does not shift child-index paths', () => {
   // Regression: the parser split the whitespace around a skipped comment into two
   // adjacent text nodes. The browser merges them when the emitted template HTML is
