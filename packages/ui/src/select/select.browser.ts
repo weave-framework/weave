@@ -253,3 +253,23 @@ test('select: prefix/suffix slots render (and empty ones collapse)', async () =>
   assert.ok(suffix.classList.contains('weave-select__suffix--empty'), 'empty suffix collapses');
   dispose();
 });
+
+test('select: the open panel reflects options that change live (async load) — H3', () => {
+  const opts: Signal<Opt[]> = signal<Opt[]>([{ value: 'a', label: 'Apple' }]);
+  const { field, dispose } = mount({
+    get options(): Opt[] {
+      return opts();
+    },
+  } as SelectProps<Opt>);
+  field.click();
+  assert.equal(options().length, 1, 'initial option shown');
+  // options change while the panel is OPEN (e.g. an async fetch resolves) → panel re-renders live
+  opts.set([
+    { value: 'a', label: 'Apple' },
+    { value: 'b', label: 'Banana' },
+    { value: 'c', label: 'Cherry' },
+  ]);
+  assert.equal(options().length, 3, 'panel re-rendered with the new options');
+  assert.ok(optByText('Cherry'), 'the newly-loaded option is present');
+  dispose();
+});

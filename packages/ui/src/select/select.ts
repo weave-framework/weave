@@ -171,11 +171,11 @@ export function setup<T = { value: string; label: string }>(props: SelectProps<T
     if (activeVal == null) t?.removeAttribute('aria-activedescendant');
   }
 
-  function buildListbox(): HTMLElement {
-    const box: HTMLElement = document.createElement('div');
-    box.className = 'weave-select__panel';
-    box.setAttribute('role', 'listbox');
-    if (props.multiple) box.setAttribute('aria-multiselectable', 'true');
+  // (Re)populate a listbox element's option nodes from the CURRENT `props.options`. Reading
+  // `props.options` here means an effect that calls this while the panel is open re-tracks the list,
+  // so async-loaded / edited options reflect live (and every re-open renders fresh) — H3.
+  function renderOptions(box: HTMLElement): void {
+    box.textContent = '';
     optionEls.clear();
     for (const o of props.options) {
       const v: string = optValue(o, props);
@@ -206,7 +206,14 @@ export function setup<T = { value: string; label: string }>(props: SelectProps<T
       }
       box.appendChild(opt);
     }
-    return box;
+  }
+
+  function buildListbox(): HTMLElement {
+    const box: HTMLElement = document.createElement('div');
+    box.className = 'weave-select__panel';
+    box.setAttribute('role', 'listbox');
+    if (props.multiple) box.setAttribute('aria-multiselectable', 'true');
+    return box; // options are filled by the reactive effect once the panel opens
   }
 
   function openPanel(seedActive: boolean): void {
@@ -281,6 +288,15 @@ export function setup<T = { value: string; label: string }>(props: SelectProps<T
   effect(() => {
     currentSelection();
     if (open()) syncSelected();
+  });
+  // Keep the OPEN panel's options in sync with a changing `options` (async loads / edits) and
+  // render fresh on every open — `renderOptions` reads `props.options`, tracked while open. (H3)
+  effect(() => {
+    if (open() && listbox) {
+      renderOptions(listbox);
+      syncSelected();
+      syncActive();
+    }
   });
   effect(() => {
     const t: HTMLElement | null = trigger();

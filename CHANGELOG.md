@@ -9,6 +9,15 @@
 > releases here. Publishing itself is a separate, explicit step (the `/publish` skill /
 > `pnpm publish:packages`) — committing/pushing does **not** publish or mirror.
 
+## 0.2.48 — 2026-07-02 (unpublished; on `main`, ahead of the 0.2.0 npm release)
+
+**Select reactivity + parser strings**. **H3** — `Select` no
+longer builds its option listbox once and caches it; a reactive effect (re)renders the open panel's options from
+the current `props.options`, so async-loaded or edited options reflect live and every re-open renders fresh (mirrors
+`Autocomplete`). **M3** — text interpolation now uses the same brace-balanced, string-aware scan as attribute
+`{{ }}`, so a literal `}}` inside a string (`{{ fn("}}") }}`) or an inner object literal no longer cuts the
+expression short at a naive `indexOf('}}')`. Both fixes have tests that fail without them. **952 tests green.**
+
 ## 0.2.47 — 2026-07-02 (unpublished; on `main`, ahead of the 0.2.0 npm release)
 
 **reactive-core hardening**. Two verified core fixes,

@@ -438,13 +438,10 @@ class Parser {
   }
 
   readInterp(): { expr: string; offset: number } {
-    this.pos += 2; // {{
-    const start: number = this.pos;
-    const end: number = this.src.indexOf('}}', this.pos);
-    if (end === -1) throw new ParseError('Unclosed {{ interpolation');
-    this.pos = end + 2;
-    const raw: string = this.src.slice(start, end);
-    return { expr: raw.trim(), offset: start + (raw.length - raw.trimStart().length) };
+    // Text interpolation uses the same brace-balanced, string-aware scan as attribute `{{ }}`, so a
+    // literal `}}` inside a string (`{{ fn("}}") }}`) or an inner object literal doesn't cut it short
+    // at a naive `indexOf('}}')`. (M3)
+    return this.readDoubleBracedExpr();
   }
 
   skipComment(): void {
