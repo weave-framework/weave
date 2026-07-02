@@ -112,7 +112,10 @@ function run(c: Computation): void {
     error = e;
   } finally {
     listener = prev;
-    c.state = CLEAN;
+    // On throw, a memo must NOT stay CLEAN caching a stale value (fail-loud): leave it DIRTY so the
+    // next read recomputes (and re-throws, or succeeds once the cause is fixed). Effects go back to
+    // CLEAN — leaving an effect DIRTY would make `markDirty` early-return and never re-queue it.
+    c.state = threw && c.isMemo ? DIRTY : CLEAN;
   }
   if (threw) {
     // Effects route to the nearest error boundary; a memo propagates to its reader.
@@ -207,6 +210,17 @@ export function computed<T>(fn: () => T, opts: { equals?: (a: T, b: T) => boolea
     cleanups: [],
   };
   c.update = () => updateIfNecessary(c);
+  // Tie the memo to the owner active at creation: on unmount, detach it from its sources (so a
+  // long-lived signal — router / i18n / store — stops holding the memo and its closure alive) and
+  // run its cleanups. Reset to DIRTY so a read after disposal recomputes and re-links (Solid semantics).
+  const owner: Owner | null = currentOwner;
+  if (owner) {
+    owner._disposers.push(() => {
+      dispose(c);
+      unlink(c);
+      c.state = DIRTY;
+    });
+  }
   return () => {
     updateIfNecessary(c);
     track(c);

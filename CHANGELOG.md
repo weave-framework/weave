@@ -9,6 +9,17 @@
 > releases here. Publishing itself is a separate, explicit step (the `/publish` skill /
 > `pnpm publish:packages`) — committing/pushing does **not** publish or mirror.
 
+## 0.2.47 — 2026-07-02 (unpublished; on `main`, ahead of the 0.2.0 npm release)
+
+**reactive-core hardening**. Two verified core fixes,
+each with a test that fails without it: **H1** — `computed()` now registers an owner-disposer, so a memo reading a
+long-lived signal (router / i18n / store / `@let`) is detached (`unlink` + cleanups) on unmount instead of leaking
+its subscription (and closure) forever; reads after disposal recompute and re-link (Solid semantics). **H2** — a
+memo that throws is now left `DIRTY` instead of silently `CLEAN`, so the next read recomputes (and re-throws, or
+succeeds once fixed) rather than returning a stale value — restoring fail-loud. Investigated **M8** (runaway-loop
+guard): not reachable — `markDirty`'s DIRTY-guard + eager synchronous flush already terminate mutual/self cycles;
+added a loop-safety regression test, no hot-path guard. `packages/runtime/src/reactive.ts`. **949 tests green.**
+
 ## 0.2.46 — 2026-07-02 (unpublished; on `main`, ahead of the 0.2.0 npm release)
 
 **Session wrap-up (docs).** No code change — added a cross-cutting **UI Library (U0–U5)** section to `NOTES.md`

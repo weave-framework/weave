@@ -214,3 +214,65 @@ test('synchronous reactive updates are already applied before tick', async () =>
   await tick(); // nothing pending — still resolves
   assert.equal(seen, 3);
 });
+
+// ── A1 — reactive-core hardening (H1 leak · H2 fail-loud · M8 runaway guard) ──
+
+test('computed disposes with its owner — no leaked subscription (H1)', () => {
+  const src: Signal<number> = signal(0); // long-lived, outlives the owner below
+  let cleaned: number = 0;
+  let disposeRoot: () => void = () => {};
+  root((d) => {
+    disposeRoot = d;
+    const m: Computed<number> = computed(() => {
+      onCleanup(() => cleaned++);
+      return src();
+    });
+    m(); // read to activate: links `m` into `src.observers` and registers the cleanup
+    return d;
+  });
+  assert.equal(cleaned, 0, 'cleanup has not run yet');
+  disposeRoot();
+  // Without the fix, computed() never registered an owner-disposer, so disposing the owner runs no
+  // cleanup and leaves `m` in `src.observers` forever. The cleanup firing proves the memo is torn down.
+  assert.equal(cleaned, 1, 'disposing the owner tore the memo down');
+});
+
+test('a throwing memo does not cache a stale value (H2 — fail-loud)', () => {
+  const boom: Signal<boolean> = signal(true);
+  const m: Computed<number> = computed(() => {
+    if (boom()) throw new Error('boom');
+    return 42;
+  });
+  let threw: number = 0;
+  try {
+    m();
+  } catch {
+    threw++;
+  }
+  assert.equal(threw, 1, 'first read throws');
+  // Second read must recompute and throw again — NOT silently return a stale (undefined) value.
+  try {
+    m();
+  } catch {
+    threw++;
+  }
+  assert.equal(threw, 2, 'second read re-throws instead of returning stale');
+  boom.set(false); // fix the cause → next read recomputes cleanly
+  assert.equal(m(), 42, 'recomputes once the cause is resolved');
+});
+
+test('mutual effects settle synchronously without hanging (loop-safety)', () => {
+  // A written signal is flushed eagerly, so the writing effect runs *nested* while the reading effect
+  // is still DIRTY — `markDirty` then early-returns and the cycle terminates instead of looping. This
+  // guards that property (the audit's "runaway" M8 is not reachable through normal signal/effect use).
+  let settled: boolean = false;
+  root(() => {
+    const x: Signal<number> = signal(0);
+    const y: Signal<number> = signal(0);
+    effect(() => y.set(x() + 1)); // reads x, writes y
+    effect(() => x.set(y() + 1)); // reads y, writes x
+    x.set(5); // nudge the mutual pair
+    settled = true; // only reached if the writes settled rather than hanging
+  });
+  assert.ok(settled, 'mutual effect writes settle instead of looping forever');
+});
