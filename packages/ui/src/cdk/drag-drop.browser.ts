@@ -154,6 +154,23 @@ test('drag-drop: keyboard — Escape cancels a lift without an onDrop', () => {
   l.remove();
 });
 
+test('drag-drop: keyboard:false ignores Space (host owns the keys); pointer still works', () => {
+  const l: ListFixture = makeList(4);
+  const drops: DropEvent[] = [];
+  const owner: Owner = createOwner();
+  const ref: DropListRef = runInOwner(owner, () => dropList(l.container, { keyboard: false, onDrop: (e) => drops.push(e) }));
+  l.items[0].focus();
+  key(l.items[0], ' '); // Space is NOT intercepted → no lift
+  assert.equal(ref.dragging(), false, 'no keyboard lift when keyboard:false');
+  // pointer drag still reorders
+  pointer('pointerdown', l.items[0], 20);
+  pointer('pointermove', l.container, 130);
+  pointer('pointerup', l.container, 130);
+  assert.deepEqual(drops.at(-1), { previousIndex: 0, currentIndex: 2 });
+  disposeOwner(owner);
+  l.remove();
+});
+
 /* ── destroy ── */
 test('drag-drop: destroy removes listeners (a later pointerdown is inert)', () => {
   const l: ListFixture = makeList(3);

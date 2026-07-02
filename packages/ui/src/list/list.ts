@@ -102,6 +102,7 @@ export function setup(props: ListProps): ListContext {
       itemSelector: '.weave-list__row',
       handle: '.weave-list__drag-handle',
       orientation: 'vertical',
+      keyboard: false, // the listbox owns Space/Arrows (selection + roving) — pointer-drag only
       onDrop: (event: DropEvent) => props.onReorder?.(event),
     });
   });

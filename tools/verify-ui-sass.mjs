@@ -531,6 +531,9 @@ check('tree selected node = accentSoft tint + 2px accent left border (via [aria-
 check('all-styles emits .weave-datepicker field (shared underline) + calendar panel (overlay chrome)', /\.weave-datepicker__field\s*{[\s\S]*?border-bottom:\s*var\(--weave-datepicker-border-width\)/.test(cssStyles) && /\.weave-datepicker__panel\s*{[\s\S]*?width:\s*var\(--weave-datepicker-panel-width\)/.test(cssStyles));
 check('datepicker selected day = accent fill + white; today = inset accent ring', /\.weave-datepicker__cell--selected\s*{[\s\S]*?background:\s*var\(--weave-datepicker-selected-background\)[\s\S]*?color:\s*var\(--weave-datepicker-selected-text\)/.test(cssStyles) && /\.weave-datepicker__cell--today\s*{[\s\S]*?box-shadow:\s*inset 0 0 0 1px var\(--weave-datepicker-today-ring\)/.test(cssStyles));
 
+/* ── tree reorder drag handle (U4 retrofit via CDK dropList) ── */
+check('tree emits a reorder drag handle (grab cursor, touch-action:none)', /\.weave-tree__drag-handle\s*{[\s\S]*?color:\s*var\(--weave-tree-drag-handle\)[\s\S]*?cursor:\s*grab[\s\S]*?touch-action:\s*none/.test(cssStyles));
+
 /* ── list reorder drag handle (U4 retrofit via CDK dropList) ── */
 check('list emits a reorder drag handle (grab cursor, touch-action:none)', /\.weave-list__drag-handle\s*{[\s\S]*?color:\s*var\(--weave-list-drag-handle\)[\s\S]*?cursor:\s*grab[\s\S]*?touch-action:\s*none/.test(cssStyles));
 

@@ -9,6 +9,18 @@
 > releases here. Publishing itself is a separate, explicit step (the `/publish` skill /
 > `pnpm publish:packages`) — committing/pushing does **not** publish or mirror.
 
+## 0.2.41 — 2026-07-02 (unpublished; on `main`, ahead of the 0.2.0 npm release)
+
+**Tree reorder** + a `dropList` keyboard opt-out.
+
+### UI (`@weave-framework/ui`) — `./tree`, `./cdk`
+- **`<Tree reorderable onReorder>`** — a per-node `__drag-handle` via the CDK **`dropList`** (`handle` selector, so
+  node clicks still select/expand). `onReorder({ previousIndex, currentIndex })` — indices over the **visible** node
+  order (`visible()[i].node`); the consumer applies it. (Hierarchy-aware reparenting is a deferred refinement.)
+- **CDK `dropList` — new `keyboard?: boolean`** (default true). List + Tree pass `keyboard: false` so the
+  listbox/tree keeps Space/Arrows for selection + roving (dropList's Space-to-lift would otherwise hijack them).
+- Gates: **921 tests (+4); verify:ui-sass 283 (+1);** typecheck + `eslint .` clean.
+
 ## 0.2.40 — 2026-07-02 (unpublished; on `main`, ahead of the 0.2.0 npm release)
 
 **List reorder** — drag-to-reorder rows (via the CDK `dropList`).

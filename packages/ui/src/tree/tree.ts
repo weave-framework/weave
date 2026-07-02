@@ -19,8 +19,8 @@
  *   import Tree from '@weave-framework/ui/tree';
  *   <Tree nodes={{ roots }} selectable defaultExpanded={{ [roots[0]] }} />
  */
-import { signal, type Signal } from '@weave-framework/runtime';
-import { selectionModel, listKeyManager, type SelectionModel, type ListKeyManager } from '../cdk/index.js';
+import { signal, onMount, type Signal } from '@weave-framework/runtime';
+import { selectionModel, listKeyManager, dropList, type SelectionModel, type ListKeyManager, type DropEvent } from '../cdk/index.js';
 
 /** A node's rendered content: a factory over the node + its 1-based level. */
 export type TreeNodeContent<N> = (node: N, level: number) => Node | string;
@@ -67,6 +67,13 @@ export interface TreeProps<N = unknown> {
   /** Identity comparator for selection + expansion (default `===`). */
   compareWith?: (a: N, b: N) => boolean;
 
+  /* ── reorder (CDK dropList) ── */
+  /** Show a per-node drag handle and let nodes be reordered by dragging it. */
+  reorderable?: boolean;
+  /** Called on a committed reorder — indices are over the **visible** node order
+   *  (`visible()[i].node`); the consumer applies it to its model. */
+  onReorder?: (event: DropEvent) => void;
+
   /** Accessible name for the tree. */
   ariaLabel?: string;
   /** Extra classes, forwarded onto the container. */
@@ -96,6 +103,7 @@ export const template: string =
   ' aria-expanded={{ expandedAttr(n) }} aria-selected={{ selectedAttr(n) }}' +
   ' tabindex={{ tabindexFor(n) }} style={{ indentStyle(n) }}' +
   ' on:click={{ () => onActivate(n) }}>' +
+  '@if (reorderable()) {<span class="weave-tree__drag-handle" aria-hidden="true">⠿</span>}' +
   '<span class={{ toggleClass(n) }} aria-hidden="true" on:click={{ (e) => onToggle(n, e) }}></span>' +
   '<span class="weave-tree__content">@render (contentNode(n))</span>' +
   '</div>' +
@@ -106,6 +114,7 @@ export interface TreeContext<N> {
   host: Signal<HTMLElement | null>;
   rootClass: () => string;
   ariaLabel: () => string | undefined;
+  reorderable: () => boolean;
   visible: () => FlatNode<N>[];
   expandedAttr: (n: FlatNode<N>) => 'true' | 'false' | undefined;
   selectedAttr: (n: FlatNode<N>) => 'true' | 'false' | undefined;
@@ -327,10 +336,32 @@ export function setup<N = unknown>(props: TreeProps<N>): TreeContext<N> {
     }
   };
 
+  // Reorder via the CDK dropList — only the drag handle starts a drag (node clicks still
+  // select/expand); keyboard is off (the tree owns Arrows/Space). Drops emit onReorder with
+  // indices over the visible order; the consumer applies it to its model.
+  onMount(() => {
+    if (!props.reorderable) return;
+    const el: HTMLElement | null = host();
+    if (!el) return;
+    dropList(el, {
+      itemSelector: '.weave-tree__node',
+      handle: '.weave-tree__drag-handle',
+      orientation: 'vertical',
+      keyboard: false,
+      onDrop: (event: DropEvent) => props.onReorder?.(event),
+    });
+  });
+
   return {
     host,
-    rootClass: (): string => (props.class ? `weave-tree ${props.class}` : 'weave-tree'),
+    rootClass: (): string => {
+      const parts: string[] = ['weave-tree'];
+      if (props.reorderable) parts.push('weave-tree--reorderable');
+      if (props.class) parts.push(props.class);
+      return parts.join(' ');
+    },
     ariaLabel: (): string | undefined => props.ariaLabel,
+    reorderable: (): boolean => !!props.reorderable,
     visible,
     expandedAttr: (n: FlatNode<N>): 'true' | 'false' | undefined =>
       n.expandable ? (isExpandedNode(n.node) ? 'true' : 'false') : undefined,

@@ -13,9 +13,12 @@ $tokens: (
     // accentSoft = accent at ~12% alpha (the selected-row tint from the design).
     selected-background: color-mix(in srgb, ref.ref('color.accent') 12%, transparent),
     selected-marker: ref.ref('color.accent'),
+    // The reorder drag handle (⠿ grip).
+    drag-handle: ref.ref('color.sub'),
   ),
   size: (
     node-height: 34px,
+    drag-handle-size: 16px,
     node-padding-x: 10px,
     node-padding-y: 6px,
     // Per-level indentation (design: depth × 18px).

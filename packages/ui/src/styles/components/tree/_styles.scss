@@ -78,4 +78,22 @@
     white-space: nowrap;
     text-overflow: ellipsis;
   }
+
+  // Reorder drag handle — only this starts a drag (node clicks still select/expand).
+  // touch-action:none so a touch-drag on the grip doesn't scroll.
+  .weave-tree__drag-handle {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--weave-tree-drag-handle-size);
+    color: var(--weave-tree-drag-handle);
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+  }
+
+  .weave-tree__drag-handle:active {
+    cursor: grabbing;
+  }
 }

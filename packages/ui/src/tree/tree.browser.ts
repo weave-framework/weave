@@ -239,6 +239,45 @@ test('tree: Enter/Space activates the focused node (selects when selectable)', a
   m.dispose();
 });
 
+/* ── reorder (CDK dropList) ── */
+const dragPointer = (target: EventTarget, type: string, clientY: number): void => {
+  target.dispatchEvent(new PointerEvent(type, { bubbles: true, button: 0, pointerId: 1, clientX: 20, clientY }));
+};
+
+test('tree: reorderable renders a per-node drag handle + a --reorderable class', async () => {
+  const m: Mounted<FileNode> = await mount<FileNode>({ ...NESTED, reorderable: true });
+  assert.ok(m.host.classList.contains('weave-tree--reorderable'));
+  assert.ok(nodes(m).every((n) => n.querySelector('.weave-tree__drag-handle')), 'each node has a handle');
+  m.dispose();
+});
+
+test('tree: dragging a node handle past a sibling emits onReorder (visible order)', async () => {
+  const drops: Array<{ previousIndex: number; currentIndex: number }> = [];
+  const m: Mounted<FileNode> = await mount<FileNode>({
+    ...NESTED,
+    defaultExpanded: [TREE[0]],
+    reorderable: true,
+    onReorder: (e) => drops.push(e),
+  });
+  const vis: HTMLElement[] = nodes(m); // [src, index.ts, ui, README.md]
+  const handle: HTMLElement = vis[1].querySelector('.weave-tree__drag-handle') as HTMLElement;
+  const r2: DOMRect = vis[2].getBoundingClientRect();
+  const y: number = r2.top + r2.height / 2 + 1; // just past node 2's midpoint
+  dragPointer(handle, 'pointerdown', vis[1].getBoundingClientRect().top + 4);
+  dragPointer(m.host, 'pointermove', y);
+  dragPointer(m.host, 'pointerup', y);
+  assert.deepEqual(drops.at(-1), { previousIndex: 1, currentIndex: 2 }, 'index.ts moved down one');
+  m.dispose();
+});
+
+test('tree: Space/Enter still selects when reorderable (dropList keyboard is off)', async () => {
+  const m: Mounted<FileNode> = await mount<FileNode>({ ...NESTED, defaultExpanded: [TREE[0]], reorderable: true, selectable: true });
+  press(m, 'ArrowDown'); // focus → node 1 (index.ts)
+  press(m, 'Enter');
+  assert.equal(nodes(m)[1].getAttribute('aria-selected'), 'true', 'Enter selects; no keyboard-drag hijack');
+  m.dispose();
+});
+
 /* ── content render fn ── */
 test('tree: a node render fn mounts arbitrary content', async () => {
   const m: Mounted<FileNode> = await mount<FileNode>({

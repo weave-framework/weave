@@ -176,6 +176,9 @@ export interface DropListOptions {
   orientation?: DragOrientation;
   /** Disable reordering (boolean or a reactive getter). */
   disabled?: boolean | (() => boolean);
+  /** Keyboard DnD (Space lift → Arrows → Space drop). Default true — set false when the host
+   *  already binds Space/Arrows (e.g. a listbox/tree that selects on Space). */
+  keyboard?: boolean;
   /** Called on a committed reorder. */
   onDrop: (event: DropEvent) => void;
 }
@@ -316,18 +319,19 @@ export function dropList(container: HTMLElement, options: DropListOptions): Drop
     }
   };
 
+  const useKeyboard: boolean = options.keyboard !== false;
   container.addEventListener('pointerdown', onPointerDown);
   container.addEventListener('pointermove', onPointerMove);
   container.addEventListener('pointerup', onPointerUp);
   container.addEventListener('pointercancel', onPointerUp);
-  container.addEventListener('keydown', onKeyDown);
+  if (useKeyboard) container.addEventListener('keydown', onKeyDown);
 
   const destroy = (): void => {
     container.removeEventListener('pointerdown', onPointerDown);
     container.removeEventListener('pointermove', onPointerMove);
     container.removeEventListener('pointerup', onPointerUp);
     container.removeEventListener('pointercancel', onPointerUp);
-    container.removeEventListener('keydown', onKeyDown);
+    if (useKeyboard) container.removeEventListener('keydown', onKeyDown);
   };
   onDispose(destroy);
 
