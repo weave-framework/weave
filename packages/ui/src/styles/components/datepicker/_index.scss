@@ -1,0 +1,10 @@
+// Datepicker — a date field + calendar popover. Behavior lives in datepicker.ts (trigger
+// field + a CDK-overlay calendar grid, all date math via the CDK Date adapter); this is the
+// visual. An underline trigger field (shared field-underline helper, like Select) with a
+// calendar icon; the calendar reuses the overlay-panel chrome and lays out a 7-col month grid
+// where the selected day = accent fill + white and today = an inset accent ring.
+//
+// Barrel — forwards the split partials ($tokens + the styles() mixin).
+
+@forward 'tokens';
+@forward 'styles';

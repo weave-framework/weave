@@ -406,6 +406,15 @@ const cssTreeOverride = compile(
 check('tree-overrides changes existing token', /--weave-tree-indent:\s*24px/.test(cssTreeOverride));
 check('tree-overrides adds new token (auto-var)', /--weave-tree-elevation:\s*1px/.test(cssTreeOverride));
 
+/* ── datepicker built-in: cascade refs + selected/today calendar tokens + overrides (U4) ── */
+check('theme emits datepicker selected-day fill (accent) + today ring', /--weave-datepicker-selected-background:\s*var\(--weave-color-accent\)/.test(cssTheme) && /--weave-datepicker-today-ring:\s*var\(--weave-color-accent\)/.test(cssTheme));
+check('theme emits datepicker panel-width literal (236px)', /--weave-datepicker-panel-width:\s*236px/.test(cssTheme));
+const cssDpOverride = compile(
+  `@use '@weave-framework/ui' as weave;\n@include weave.datepicker-overrides((panel-width: 280px, elevation: 1px));`,
+);
+check('datepicker-overrides changes existing token', /--weave-datepicker-panel-width:\s*280px/.test(cssDpOverride));
+check('datepicker-overrides adds new token (auto-var)', /--weave-datepicker-elevation:\s*1px/.test(cssDpOverride));
+
 /* ── all-styles(): structural CSS by class ── */
 const cssStyles = compile(`@use '@weave-framework/ui' as weave;\n@include weave.all-styles();`);
 check('all-styles emits .weave-divider rule', /\.weave-divider\s*{/.test(cssStyles));
@@ -509,6 +518,10 @@ check('table sticky columns are position:sticky; expand chevron rotates on [aria
 check('all-styles emits .weave-tree node indented by depth (indent × --weave-tree-depth)', /\.weave-tree__node\s*{[\s\S]*?padding-inline-start:\s*calc\(\s*var\(--weave-tree-node-padding-x\)\s*\+\s*var\(--weave-tree-indent\)\s*\*\s*var\(--weave-tree-depth,\s*0\)\s*\)/.test(cssStyles));
 check('tree disclosure marker rotates on [aria-expanded]', /\.weave-tree__toggle::before\s*{[\s\S]*?content:\s*["']▸["']/.test(cssStyles) && /\.weave-tree__node\[aria-expanded=true\]\s*\.weave-tree__toggle::before\s*{[\s\S]*?transform:\s*rotate\(90deg\)/.test(cssStyles));
 check('tree selected node = accentSoft tint + 2px accent left border (via [aria-selected])', /\.weave-tree__node\[aria-selected=true\]\s*{[\s\S]*?background:\s*var\(--weave-tree-selected-background\)[\s\S]*?border-inline-start-color:\s*var\(--weave-tree-selected-marker\)/.test(cssStyles));
+
+/* ── datepicker (U4 §4.13): underline field + calendar grid, selected fill, today ring ── */
+check('all-styles emits .weave-datepicker field (shared underline) + calendar panel (overlay chrome)', /\.weave-datepicker__field\s*{[\s\S]*?border-bottom:\s*var\(--weave-datepicker-border-width\)/.test(cssStyles) && /\.weave-datepicker__panel\s*{[\s\S]*?width:\s*var\(--weave-datepicker-panel-width\)/.test(cssStyles));
+check('datepicker selected day = accent fill + white; today = inset accent ring', /\.weave-datepicker__cell--selected\s*{[\s\S]*?background:\s*var\(--weave-datepicker-selected-background\)[\s\S]*?color:\s*var\(--weave-datepicker-selected-text\)/.test(cssStyles) && /\.weave-datepicker__cell--today\s*{[\s\S]*?box-shadow:\s*inset 0 0 0 1px var\(--weave-datepicker-today-ring\)/.test(cssStyles));
 
 /* ── example.scss: the docs-seed dev surface compiles end-to-end ── */
 let exampleOk = false;

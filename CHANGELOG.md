@@ -9,6 +9,24 @@
 > releases here. Publishing itself is a separate, explicit step (the `/publish` skill /
 > `pnpm publish:packages`) — committing/pushing does **not** publish or mirror.
 
+## 0.2.37 — 2026-07-02 (unpublished; on `main`, ahead of the 0.2.0 npm release)
+
+**Datepicker** — a date field + calendar popover (U4 §4.13, Phase D).
+
+### UI (`@weave-framework/ui`) — `./datepicker`
+- **`<Datepicker>`** — a Select-style trigger field (shares Input's `field-underline` chrome; the design's field is
+  a button trigger) with a calendar icon, opening a **CDK-overlay calendar** (non-modal — transparent backdrop +
+  Esc). Calendar = a `role=grid` month view: ‹/› month nav, a locale weekday header (reordered by `firstDayOfWeek`),
+  `role=gridcell` day buttons — **selected = accent fill + white, today = an inset accent ring**.
+- **Keyboard:** Arrows (day), PageUp/Down (month), Shift+PageUp/Down (year), Home/End (week edges), Enter/Space
+  (select), Esc (close + return focus). All date math via the CDK **Date adapter**; `min`/`max` + a `dateFilter`
+  predicate disable cells.
+- **Binding:** the Weave form convention — `value` (`Date | null`) + `onChange`, OR a `control` `Field<Date>`
+  (touched-on-close, `aria-invalid`). Compose with `<FormField>` for label/hint/error.
+- **Deferred (noted):** text-entry parsing (the `adapter.parse` is ready — a cheap follow-up), date-range,
+  year-picker view.
+- Gates: **898 tests (+12); verify:ui-sass 275 (+6);** typecheck + `eslint .` clean.
+
 ## 0.2.36 — 2026-07-02 (unpublished; on `main`, ahead of the 0.2.0 npm release)
 
 **CDK Date adapter** — the zero-dep date model under the pickers (U4 §4.12, Phase D).

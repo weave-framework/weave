@@ -1,0 +1,176 @@
+// datepicker — styles() mixin. An underline trigger field (shared field-underline helper,
+// like Select) with a calendar icon; the calendar panel reuses the overlay-panel chrome and
+// lays out a 7-col month grid. Selected day = accent fill + white; today = inset accent ring;
+// state rides ARIA attrs / classes (the panel is portaled — no native pseudo). Forwarded by
+// ./_index.scss.
+@use '../../helpers' as helpers;
+
+@mixin styles() {
+  .weave-datepicker {
+    display: block;
+  }
+
+  .weave-datepicker__field {
+    @include helpers.field-underline(
+      var(--weave-datepicker-border),
+      var(--weave-datepicker-focus),
+      var(--weave-datepicker-border-width)
+    );
+    display: flex;
+    align-items: center;
+    gap: var(--weave-datepicker-gap);
+    padding: var(--weave-datepicker-field-padding-y) 0;
+    color: var(--weave-datepicker-text);
+    font-size: var(--weave-datepicker-font-size);
+    font-weight: var(--weave-datepicker-weight);
+    line-height: 1.4;
+    cursor: pointer;
+  }
+
+  .weave-datepicker__value--placeholder {
+    color: var(--weave-datepicker-placeholder);
+  }
+
+  .weave-datepicker__spacer {
+    flex: 1 1 auto;
+  }
+
+  .weave-datepicker__clear {
+    @include helpers.clear-button(var(--weave-datepicker-placeholder), var(--weave-datepicker-text));
+  }
+
+  // A small calendar glyph (pure CSS: a bordered box with a filled header bar).
+  .weave-datepicker__icon {
+    position: relative;
+    flex: 0 0 auto;
+    width: var(--weave-datepicker-icon-size);
+    height: var(--weave-datepicker-icon-size);
+    border: 1.5px solid var(--weave-datepicker-icon);
+    border-radius: 2px;
+  }
+
+  .weave-datepicker__icon::before {
+    content: '';
+    position: absolute;
+    inset: -1.5px -1.5px auto -1.5px;
+    height: 3px;
+    background: var(--weave-datepicker-icon);
+    border-radius: 2px 2px 0 0;
+  }
+
+  .weave-datepicker--disabled .weave-datepicker__field {
+    color: var(--weave-datepicker-disabled-text);
+    cursor: default;
+  }
+
+  .weave-datepicker--invalid .weave-datepicker__field {
+    border-bottom-color: var(--weave-datepicker-error);
+    box-shadow: inset 0 -1px 0 0 var(--weave-datepicker-error);
+  }
+
+  /* ── calendar panel ── */
+  .weave-datepicker__panel {
+    @include helpers.overlay-panel;
+    width: var(--weave-datepicker-panel-width);
+    padding: var(--weave-datepicker-panel-padding);
+  }
+
+  .weave-datepicker__nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+  }
+
+  .weave-datepicker__nav-button {
+    @include helpers.field-reset;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--weave-datepicker-nav-size);
+    height: var(--weave-datepicker-nav-size);
+    border-radius: 50%;
+    color: var(--weave-datepicker-nav);
+    cursor: pointer;
+  }
+
+  .weave-datepicker__nav-button:hover {
+    color: var(--weave-datepicker-nav-hover);
+    background: var(--weave-datepicker-cell-hover);
+  }
+
+  .weave-datepicker__nav-button:focus-visible {
+    @include helpers.focus-ring;
+  }
+
+  .weave-datepicker__month-label {
+    font-size: var(--weave-datepicker-month-label-size);
+    font-weight: var(--weave-datepicker-month-label-weight);
+    color: var(--weave-datepicker-text);
+  }
+
+  .weave-datepicker__weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    margin-bottom: 2px;
+  }
+
+  .weave-datepicker__weekday {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: var(--weave-datepicker-cell-size);
+    color: var(--weave-datepicker-weekday);
+    font-size: var(--weave-datepicker-weekday-size);
+    font-weight: 400;
+  }
+
+  .weave-datepicker__row {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+  }
+
+  .weave-datepicker__cell {
+    @include helpers.field-reset;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--weave-datepicker-cell-size);
+    height: var(--weave-datepicker-cell-size);
+    margin: 1px auto;
+    border-radius: var(--weave-datepicker-cell-radius);
+    color: var(--weave-datepicker-cell-text);
+    font-size: var(--weave-datepicker-cell-size);
+    cursor: pointer;
+  }
+
+  // A non-day slot (leading/trailing blank).
+  .weave-datepicker__cell--blank {
+    cursor: default;
+  }
+
+  .weave-datepicker__cell:not(:disabled):not(.weave-datepicker__cell--selected):hover {
+    background: var(--weave-datepicker-cell-hover);
+  }
+
+  .weave-datepicker__cell:focus-visible {
+    @include helpers.focus-ring($offset: -1px);
+  }
+
+  // Today = an inset accent ring (design).
+  .weave-datepicker__cell--today {
+    box-shadow: inset 0 0 0 1px var(--weave-datepicker-today-ring);
+  }
+
+  // Selected = accent fill + white (design) — wins over today's ring.
+  .weave-datepicker__cell--selected {
+    background: var(--weave-datepicker-selected-background);
+    color: var(--weave-datepicker-selected-text);
+    box-shadow: none;
+  }
+
+  .weave-datepicker__cell--disabled {
+    color: var(--weave-datepicker-disabled-text);
+    cursor: default;
+  }
+}
