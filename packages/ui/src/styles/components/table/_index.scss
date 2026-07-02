@@ -1,0 +1,14 @@
+// Table — the flagship data surface. Behavior lives in table.ts (column-def + DataSource,
+// sortable headers, row selection + expansion via CDK SelectionModel, sticky header +
+// columns, show/hide, built imperatively so cells can be arbitrary nodes and the body stays
+// reactive); this is the visual.
+//
+// A real <table> in an overflow-x:auto scroll box. Hairline separators (box-shadow, no
+// borders/shadow), compact rows, sticky header (+ optional sticky columns), and accent as a
+// mark: the sort arrow, the 2px accent left border + accentSoft tint on a selected row.
+// State rides native attrs — [aria-sort] / [aria-selected] / [aria-expanded].
+//
+// Barrel — forwards the split partials ($tokens + the styles() mixin).
+
+@forward 'tokens';
+@forward 'styles';

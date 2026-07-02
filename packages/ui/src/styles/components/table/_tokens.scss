@@ -1,0 +1,44 @@
+// table — design tokens (schema). A hairline data grid: compact rows, sticky header,
+// accent-as-a-mark (sort arrow, 2px selected-row border, accentSoft tint). Forwarded by
+// ./_index.scss.
+@use '../../ref' as ref;
+
+$tokens: (
+  color: (
+    surface: ref.ref('color.surface'),
+    text: ref.ref('color.ink'),
+    // Header labels: inactive = sub, active sort column = ink.
+    header-text: ref.ref('color.sub'),
+    header-active: ref.ref('color.ink'),
+    line: ref.ref('color.line'),
+    row-hover: ref.ref('color.field'),
+    // accentSoft = accent at ~12% alpha (the selected-row tint from the design).
+    selected-background: color-mix(in srgb, ref.ref('color.accent') 12%, transparent),
+    selected-marker: ref.ref('color.accent'),
+    sort-arrow: ref.ref('color.accent'),
+    // Native checkbox accent (accent-color) — pragmatic native control in the grid.
+    checkbox-accent: ref.ref('color.accent'),
+    // Expanded-row detail panel — a subtle inset tint.
+    detail-background: ref.ref('color.field'),
+    empty-text: ref.ref('color.sub'),
+  ),
+  size: (
+    row-height: 34px,
+    cell-padding-x: 12px,
+    cell-padding-y: 7px,
+    // 2px accent left border on the selected row (reserved transparent otherwise).
+    marker-width: 2px,
+    // Gap between a sort header's label and its arrow.
+    control-gap: 6px,
+    checkbox-size: 16px,
+    expand-size: 20px,
+    duration: ref.ref('motion.fast'),
+  ),
+  typography: (
+    font-size: 13px,
+    header-size: 12px,
+    header-weight: 600,
+    line-height: 1.3,
+    arrow-size: 12px,
+  ),
+);

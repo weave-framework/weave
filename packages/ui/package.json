@@ -1,6 +1,6 @@
 {
   "name": "@weave-framework/ui",
-  "version": "0.2.27",
+  "version": "0.2.28",
   "description": "Weave UI — signal-native component library (Material+CDK equivalent) with the Weave design system. Ships SCSS; zero third-party runtime deps.",
   "type": "module",
   "sideEffects": false,
@@ -172,6 +172,11 @@
       "sass": "./src/styles/components/sidenav/_index.scss",
       "types": "./src/sidenav/sidenav.ts",
       "import": "./src/sidenav/sidenav.ts"
+    },
+    "./table": {
+      "sass": "./src/styles/components/table/_index.scss",
+      "types": "./src/table/table.ts",
+      "import": "./src/table/table.ts"
     },
     "./cdk": {
       "types": "./src/cdk/index.ts",
@@ -360,6 +365,11 @@
         "sass": "./src/styles/components/sidenav/_index.scss",
         "types": "./dist/sidenav/sidenav.d.ts",
         "import": "./dist/sidenav/sidenav.js"
+      },
+      "./table": {
+        "sass": "./src/styles/components/table/_index.scss",
+        "types": "./dist/table/table.d.ts",
+        "import": "./dist/table/table.js"
       },
       "./cdk": {
         "types": "./dist/cdk/index.d.ts",

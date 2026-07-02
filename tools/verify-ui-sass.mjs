@@ -388,6 +388,15 @@ const cssSidenavOverride = compile(
 check('sidenav-overrides changes existing token', /--weave-sidenav-width:\s*280px/.test(cssSidenavOverride));
 check('sidenav-overrides adds new token (auto-var)', /--weave-sidenav-elevation:\s*1px/.test(cssSidenavOverride));
 
+/* ── table built-in: cascade refs + accentSoft selected tint + literals + overrides (U4) ── */
+check('theme emits table selected tint (accentSoft color-mix)', /--weave-table-selected-background:\s*color-mix\(in srgb, var\(--weave-color-accent\) 12%, transparent\)/.test(cssTheme));
+check('theme emits table row-height literal (34px)', /--weave-table-row-height:\s*34px/.test(cssTheme));
+const cssTableOverride = compile(
+  `@use '@weave-framework/ui' as weave;\n@include weave.table-overrides((row-height: 40px, elevation: 1px));`,
+);
+check('table-overrides changes existing token', /--weave-table-row-height:\s*40px/.test(cssTableOverride));
+check('table-overrides adds new token (auto-var)', /--weave-table-elevation:\s*1px/.test(cssTableOverride));
+
 /* ── all-styles(): structural CSS by class ── */
 const cssStyles = compile(`@use '@weave-framework/ui' as weave;\n@include weave.all-styles();`);
 check('all-styles emits .weave-divider rule', /\.weave-divider\s*{/.test(cssStyles));
@@ -479,6 +488,13 @@ check('paginator emits the ellipsis + tabular-nums range; jump field IS the comp
 check('all-styles emits .weave-sidenav shell (relative flex, drawer + content)', /\.weave-sidenav\s*{[\s\S]*?position:\s*relative[\s\S]*?display:\s*flex/.test(cssStyles) && /\.weave-sidenav__drawer\s*{[\s\S]*?width:\s*var\(--weave-sidenav-width\)/.test(cssStyles) && /\.weave-sidenav__content\s*{/.test(cssStyles));
 check('sidenav backdrop scrim consumes the (overlay-reused) token + toggles on --backdrop', /\.weave-sidenav__backdrop\s*{[\s\S]*?background:\s*var\(--weave-sidenav-backdrop\)[\s\S]*?pointer-events:\s*none/.test(cssStyles) && /\.weave-sidenav--backdrop\s*\.weave-sidenav__backdrop\s*{[\s\S]*?opacity:\s*1/.test(cssStyles));
 check('sidenav emits the three mode modifiers (side pushes / over floats via transform)', /\.weave-sidenav--side:not\(\.weave-sidenav--opened\)\s*\.weave-sidenav__drawer\s*{[\s\S]*?margin-inline-start:\s*calc\(-1 \* var\(--weave-sidenav-width\)\)/.test(cssStyles) && /\.weave-sidenav--over\s*\.weave-sidenav__drawer[\s\S]*?transform:\s*translatex\(-100%\)/.test(cssStyles) && /\.weave-sidenav--push\.weave-sidenav--opened\s*\.weave-sidenav__content\s*{[\s\S]*?margin-inline-start:\s*var\(--weave-sidenav-width\)/.test(cssStyles));
+
+/* ── table (U4 §4.9): real <table> grid, sticky header, hairline rows, selection mark ── */
+check('all-styles emits .weave-table grid (separate borders, scroll box)', /\.weave-table__scroll\s*{[\s\S]*?overflow-x:\s*auto/.test(cssStyles) && /\.weave-table__grid\s*{[\s\S]*?border-collapse:\s*separate/.test(cssStyles));
+check('table header cell is sticky-top with a hairline (no shadow)', /\.weave-table__header-cell\s*{[\s\S]*?position:\s*sticky[\s\S]*?top:\s*0[\s\S]*?box-shadow:\s*0 1px 0 var\(--weave-table-line\)/.test(cssStyles));
+check('table body cell = hairline row separator + numeric tabular-nums', /\.weave-table__cell\s*{[\s\S]*?box-shadow:\s*0 -1px 0 var\(--weave-table-line\)/.test(cssStyles) && /\.weave-table__cell--numeric\s*{[\s\S]*?font-variant-numeric:\s*tabular-nums/.test(cssStyles));
+check('table selected row = accentSoft tint + 2px accent left border (via [aria-selected])', /\.weave-table__row\[aria-selected=true\]\s*>\s*\.weave-table__cell\s*{[\s\S]*?background:\s*var\(--weave-table-selected-background\)/.test(cssStyles) && /\.weave-table__row\[aria-selected=true\]\s*>\s*\.weave-table__cell:first-child\s*{[\s\S]*?border-left-color:\s*var\(--weave-table-selected-marker\)/.test(cssStyles));
+check('table sticky columns are position:sticky; expand chevron rotates on [aria-expanded]', /\.weave-table__cell--sticky-start,\s*\.weave-table__cell--sticky-end\s*{[\s\S]*?position:\s*sticky/.test(cssStyles) && /\.weave-table__expand-toggle\[aria-expanded=true\]::before\s*{[\s\S]*?transform:\s*rotate\(90deg\)/.test(cssStyles));
 
 /* ── example.scss: the docs-seed dev surface compiles end-to-end ── */
 let exampleOk = false;

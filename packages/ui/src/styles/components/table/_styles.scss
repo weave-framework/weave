@@ -1,0 +1,175 @@
+// table — styles() mixin (class rules). A real <table> (thead/tbody/th/td) in an
+// overflow-x:auto scroll box: sticky header, optional sticky columns, hairline row
+// separators (box-shadow, no borders/shadow), compact rows, accent-as-a-mark selection.
+// State rides native attrs ([aria-sort], [aria-selected], [aria-expanded]). Forwarded by
+// ./_index.scss.
+@use '../../helpers' as helpers;
+
+@mixin styles() {
+  .weave-table {
+    position: relative;
+  }
+
+  .weave-table__scroll {
+    overflow-x: auto;
+  }
+
+  .weave-table__grid {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    background: var(--weave-table-surface);
+    color: var(--weave-table-text);
+    font-size: var(--weave-table-font-size);
+    line-height: var(--weave-table-line-height);
+  }
+
+  /* ── header ── */
+  .weave-table__header-cell {
+    position: sticky;
+    top: 0;
+    z-index: 2; // above scrolling body rows
+    box-sizing: border-box;
+    padding: var(--weave-table-cell-padding-y) var(--weave-table-cell-padding-x);
+    background: var(--weave-table-surface);
+    color: var(--weave-table-header-text);
+    font-size: var(--weave-table-header-size);
+    font-weight: var(--weave-table-header-weight);
+    text-align: left;
+    white-space: nowrap;
+    box-shadow: 0 1px 0 var(--weave-table-line); // hairline under the header
+  }
+
+  .weave-table__sort {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--weave-table-control-gap);
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .weave-table__sort--active {
+    color: var(--weave-table-header-active);
+  }
+
+  .weave-table__sort:focus-visible {
+    @include helpers.focus-ring;
+  }
+
+  .weave-table__sort-arrow {
+    display: inline-block;
+    width: 1em;
+    color: var(--weave-table-sort-arrow);
+    font-size: var(--weave-table-arrow-size);
+  }
+
+  /* ── body cells ── */
+  .weave-table__cell {
+    box-sizing: border-box;
+    padding: var(--weave-table-cell-padding-y) var(--weave-table-cell-padding-x);
+    box-shadow: 0 -1px 0 var(--weave-table-line); // hairline row separator (no borders)
+    white-space: nowrap;
+  }
+
+  .weave-table__cell--numeric {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  // Reserve the selected-row marker space on the first cell so selecting never shifts content.
+  .weave-table__row > .weave-table__cell:first-child {
+    border-left: var(--weave-table-marker-width) solid transparent;
+  }
+
+  .weave-table__row:hover > .weave-table__cell {
+    background: var(--weave-table-row-hover);
+  }
+
+  /* ── selection (native ARIA attr, no state class) ── */
+  .weave-table__row[aria-selected='true'] > .weave-table__cell {
+    background: var(--weave-table-selected-background);
+  }
+
+  .weave-table__row[aria-selected='true'] > .weave-table__cell:first-child {
+    border-left-color: var(--weave-table-selected-marker);
+  }
+
+  /* ── sticky columns (offsets set inline by JS) ── */
+  .weave-table__cell--sticky-start,
+  .weave-table__cell--sticky-end {
+    position: sticky;
+    z-index: 1;
+    background: var(--weave-table-surface);
+  }
+
+  // Sticky header cells sit at the corner — above both the sticky body columns and rows.
+  .weave-table__header-cell.weave-table__cell--sticky-start,
+  .weave-table__header-cell.weave-table__cell--sticky-end {
+    z-index: 3;
+  }
+
+  /* ── select + expand utility columns ── */
+  .weave-table__select,
+  .weave-table__expand {
+    width: 1%;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  .weave-table__checkbox {
+    width: var(--weave-table-checkbox-size);
+    height: var(--weave-table-checkbox-size);
+    margin: 0;
+    accent-color: var(--weave-table-checkbox-accent);
+    cursor: pointer;
+  }
+
+  .weave-table__checkbox:focus-visible {
+    @include helpers.focus-ring;
+  }
+
+  .weave-table__expand-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--weave-table-expand-size);
+    height: var(--weave-table-expand-size);
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--weave-table-header-text);
+    cursor: pointer;
+  }
+
+  .weave-table__expand-toggle::before {
+    content: '\25B8'; // ▸
+    display: inline-block;
+    transition: transform var(--weave-table-duration) ease;
+  }
+
+  .weave-table__expand-toggle[aria-expanded='true']::before {
+    transform: rotate(90deg);
+  }
+
+  .weave-table__expand-toggle:focus-visible {
+    @include helpers.focus-ring;
+  }
+
+  /* ── expanded detail row ── */
+  .weave-table__detail-cell {
+    padding: var(--weave-table-cell-padding-y) var(--weave-table-cell-padding-x);
+    background: var(--weave-table-detail-background);
+    box-shadow: 0 -1px 0 var(--weave-table-line);
+  }
+
+  /* ── empty state ── */
+  .weave-table__empty {
+    padding: var(--weave-table-cell-padding-y) var(--weave-table-cell-padding-x);
+    color: var(--weave-table-empty-text);
+    text-align: center;
+  }
+}

@@ -9,6 +9,34 @@
 > releases here. Publishing itself is a separate, explicit step (the `/publish` skill /
 > `pnpm publish:packages`) — committing/pushing does **not** publish or mirror.
 
+## 0.2.28 — 2026-07-02 (unpublished; on `main`, ahead of the 0.2.0 npm release)
+
+U4 Phase C — the **Table**, the flagship data surface.
+
+### UI (`@weave-framework/ui`)
+- **New `<Table>` component** (`@weave-framework/ui/table`) — a real `<table>` (native
+  `<thead>/<tbody>/<th scope=col>/<td>` semantics) driven by a **column-def + DataSource**
+  API. Built imperatively in `setup()` (cells are arbitrary `Node`s and the body is reactive
+  over data/sort/selection/expansion — text interpolation carries neither), styled by the
+  Weave design (hairline rows, compact 34px, accent-as-a-mark).
+- **Sort headers:** sortable `<th>` = a `<button>` cycling asc→desc→none (asc↔desc with
+  `disableClear`), sets `aria-sort`, shows the accent arrow, single active column; emits
+  `onSort` **and** convenience client-side sort for array/signal sources (a custom DataSource
+  owns its own order).
+- **Row selection** via the CDK `SelectionModel`: leading checkbox column, header
+  select-all + indeterminate, `single`/`multiple`, `aria-selected` on the `<tr>` + accentSoft
+  tint + 2px accent left border; `onSelectionChange` / bring-your-own model.
+- **Beyond the base plan (user-requested):** **sticky columns** (`column.sticky: 'start'|'end'`,
+  any column, computed offsets; the select/expand columns auto-stick), **show/hide columns**
+  (`column.hidden`, reactive when `columns` is bound), and **expandable detail rows**
+  (`expandable` + `detail(row)`, chevron toggle + full-width detail `<tr>`, expansion state in
+  its own `SelectionModel`). Sticky header + hairline separators + tabular-nums numeric cells.
+- **Virtual body:** plain-scroll in v1; the CDK `virtualScroll` hook is ready for the
+  follow-on. `./table` subpath (JS + SCSS).
+- 13 browser tests (structure, node cells, sort cycle + client-sort + `aria-sort`, selection +
+  select-all + indeterminate + single, expandable, show/hide, sticky column, ArrayDataSource +
+  reactive signal source, numeric); `verify:ui-sass` 262 (+9). Live-verified in the gallery.
+
 ## 0.2.27 — 2026-07-02 (unpublished; on `main`, ahead of the 0.2.0 npm release)
 
 U4 Phase C — the **Virtual Scroll** headless engine.
