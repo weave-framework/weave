@@ -440,7 +440,7 @@ class Parser {
   readInterp(): { expr: string; offset: number } {
     // Text interpolation uses the same brace-balanced, string-aware scan as attribute `{{ }}`, so a
     // literal `}}` inside a string (`{{ fn("}}") }}`) or an inner object literal doesn't cut it short
-    // at a naive `indexOf('}}')`. (M3)
+    // at a naive `indexOf('}}')`.
     return this.readDoubleBracedExpr();
   }
 
@@ -608,7 +608,7 @@ class Parser {
     const c: string = this.peek();
     if (c === '{') {
       // Attribute/directive bindings use double braces — `attr={{ expr }}` — matching
-      // text interpolation. One syntax everywhere (M10); a single `{` is rejected so
+      // text interpolation. One syntax everywhere; a single `{` is rejected so
       // the author can't accidentally fall back to the old form.
       if (!this.src.startsWith('{{', this.pos)) {
         throw new ParseError(`Attribute bindings use double braces: write {{ expr }}, not { expr } (at ${this.pos})`);

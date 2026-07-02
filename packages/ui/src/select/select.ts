@@ -290,7 +290,7 @@ export function setup<T = { value: string; label: string }>(props: SelectProps<T
     if (open()) syncSelected();
   });
   // Keep the OPEN panel's options in sync with a changing `options` (async loads / edits) and
-  // render fresh on every open — `renderOptions` reads `props.options`, tracked while open. (H3)
+  // render fresh on every open — `renderOptions` reads `props.options`, tracked while open.
   effect(() => {
     if (open() && listbox) {
       renderOptions(listbox);

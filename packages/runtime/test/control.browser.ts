@@ -99,7 +99,7 @@ test('eachBlock disposes removed rows (no leak)', () => {
   assert.deepEqual([...alive], [], 'all rows torn down on dispose');
 });
 
-test('a component does not leak its setup signal reads to an enclosing effect (M1)', () => {
+test('a component does not leak its setup signal reads to an enclosing effect', () => {
   const s: Signal<number> = signal(0);
   const Comp: (props?: Record<string, unknown>, slots?: Record<string, () => Node>) => Node = defineComponent(
     () => document.createElement('div'),
@@ -120,7 +120,7 @@ test('a component does not leak its setup signal reads to an enclosing effect (M
   assert.equal(outerRuns, 1, 'a signal read only in child setup must not re-run the parent effect');
 });
 
-test("eachBlock coalesces a row's positional writes into one recompute (M2)", () => {
+test("eachBlock coalesces a row's positional writes into one recompute", () => {
   interface Row {
     id: number;
     v: string;

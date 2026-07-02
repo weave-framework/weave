@@ -108,7 +108,7 @@ export function rewrite(expr: string, scope: Scope, ctxRef: string = 'ctx'): Rew
 
     if (c === '`') {
       // Template literal: copy the literal spans verbatim but rewrite each `${ … }` interpolation,
-      // so a ctx/local binding inside `${ }` still resolves instead of being left a bare global. (H4)
+      // so a ctx/local binding inside `${ }` still resolves instead of being left a bare global.
       copy(i, '`');
       let k: number = i + 1;
       while (k < n) {
@@ -171,7 +171,7 @@ export function rewrite(expr: string, scope: Scope, ctxRef: string = 'ctx'): Rew
 
       if (binding && !isProperty) {
         // `{ name }` object shorthand must expand to `{ name: <value> }` — a bare `{ ctx.name }` /
-        // `{ accessor() }` is a syntax error. Detect a shorthand key: between `{`|`,` and `,`|`}`. (H4)
+        // `{ accessor() }` is a syntax error. Detect a shorthand key: between `{`|`,` and `,`|`}`.
         if (binding.kind !== 'local') {
           const prev: string = lastNonSpace(out);
           const next: string = firstNonSpaceFrom(expr, j);
@@ -305,7 +305,7 @@ export function freeIdentifiers(expr: string): string[] {
       continue;
     }
     if (c === '`') {
-      // Walk the template literal; recurse into each `${ … }` so identifiers there are collected too. (H4)
+      // Walk the template literal; recurse into each `${ … }` so identifiers there are collected too.
       let k: number = i + 1;
       while (k < n) {
         const ch: string = expr[k];

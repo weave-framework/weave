@@ -217,7 +217,7 @@ test('synchronous reactive updates are already applied before tick', async () =>
 
 // ── A1 — reactive-core hardening (H1 leak · H2 fail-loud · M8 runaway guard) ──
 
-test('computed disposes with its owner — no leaked subscription (H1)', () => {
+test('computed disposes with its owner — no leaked subscription', () => {
   const src: Signal<number> = signal(0); // long-lived, outlives the owner below
   let cleaned: number = 0;
   let disposeRoot: () => void = () => {};

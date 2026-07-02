@@ -379,7 +379,7 @@ export const validators: {
       (v ?? '').length > n ? msg ?? `Must be at most ${n} characters` : null,
   pattern: (re: RegExp, msg = 'Invalid format'): Validator<string> => {
     // A `g`/`y` regex is stateful across `.test()` (advancing `lastIndex` → alternating results).
-    // Clone once without those flags so the validator is deterministic per call. (A6)
+    // Clone once without those flags so the validator is deterministic per call.
     const stable: RegExp = re.global || re.sticky ? new RegExp(re.source, re.flags.replace(/[gy]/g, '')) : re;
     return (v) => (stable.test(v ?? '') ? null : msg);
   },

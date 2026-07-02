@@ -294,7 +294,7 @@ export function bindValue(el: Element, sig: Signal<unknown>, kind: 'value' | 'ch
       for (const opt of (el as HTMLSelectElement).options) opt.selected = set.has(opt.value);
     } else if (numeric) {
       // compare numerically so typing "1." (NaN mid-edit) doesn't get clobbered. Object.is, not
-      // `!==`, so NaN === NaN holds (a bare `!==` is always true for NaN and would clobber). (A6)
+      // `!==`, so NaN === NaN holds (a bare `!==` is always true for NaN and would clobber).
       if (!Object.is(input.valueAsNumber, v)) input.value = v == null ? '' : String(v);
     } else {
       const s: string = v == null ? '' : String(v);
@@ -522,7 +522,7 @@ export function ifBlock(anchor: Comment, selector: () => (() => Node | null) | n
     if (next) {
       owner = runInOwner(host, () => createOwner(null));
       // Untrack branch construction — its bindings self-subscribe; a direct signal read during
-      // render must not tie this if-block effect to it (the selector is the only real dep). (M1)
+      // render must not tie this if-block effect to it (the selector is the only real dep).
       const node: Node | null = runInOwner(owner, () => untrack(() => next()));
       // Read the parent at insert time, not construction: a `<Portal>` (or any
       // relocation) can move the anchor after this block is wired.
@@ -552,7 +552,7 @@ export function dynElement(
       thunk = t
         ? () => {
             // A dynamic tag is attacker-influenceable; a `<script>` created + inserted here would
-            // execute. Refuse it loudly rather than build an executable element. (M5)
+            // execute. Refuse it loudly rather than build an executable element.
             if (t.toLowerCase() === 'script') {
               throw new Error(`Weave: <w:element> refuses to create a <script> element (it would execute).`);
             }
@@ -653,7 +653,7 @@ export function eachBlock<T>(
       removeRows();
       if (emptyRender && !emptyOwner) {
         emptyOwner = runInOwner(host, () => createOwner(null));
-        const node: Node = runInOwner(emptyOwner, () => untrack(() => emptyRender())); // (M1)
+        const node: Node = runInOwner(emptyOwner, () => untrack(() => emptyRender())); //
         emptyNodes = placeBefore(parent, node, anchor);
       }
       return;
@@ -676,7 +676,7 @@ export function eachBlock<T>(
       const owner: Owner = runInOwner(host, () => createOwner(null));
       // Untrack the row construction: its own bindings create their own effects, so a signal read
       // synchronously during render must NOT subscribe this block effect (else an unrelated change
-      // re-runs the whole @for reconcile). (M1)
+      // re-runs the whole @for reconcile).
       const rendered: Node = runInOwner(owner, () => untrack(() => renderRow(ctx)));
       // A single-element row is tracked by that one node (the hot path). A fragment
       // row (component / multiple roots / text) has no stable single node — and its
@@ -707,7 +707,7 @@ export function eachBlock<T>(
 
     // Refresh item + positional signals for every row (reused rows included), so immutable
     // updates and reorders flow into the existing DOM. Batch so a row's three writes coalesce
-    // into ONE flush instead of three per row (a binding reading >1 of them recomputes once). (M2)
+    // into ONE flush instead of three per row (a binding reading >1 of them recomputes once).
     batch(() => {
       rows.forEach((r, i) => {
         r.itemSig.set(data[i] as T);
@@ -959,7 +959,7 @@ export function defineComponent(
     onDispose(() => disposeOwner(owner)); // surrounding scope disposes this instance
     // Untrack the whole instance construction: a component's reactivity comes from its own internal
     // effects, so setup()/render() reading a signal must not subscribe an enclosing block/effect
-    // (which would re-instantiate the component on any unrelated change). (M1)
+    // (which would re-instantiate the component on any unrelated change).
     return runInOwner(owner, () =>
       untrack(() => {
         const bindings: Record<string, unknown> = setup ? setup(props) || {} : {};

@@ -166,7 +166,7 @@ test('component: changing name re-renders in place', async () => {
   dispose();
 });
 
-test('component: an untrusted svg is sanitized — on* / <script> / <foreignObject> stripped (M5)', async () => {
+test('component: an untrusted svg is sanitized — on* / <script> / <foreignObject> stripped', async () => {
   const { el, dispose } = mountIcon({
     svg: '<svg id="x" onload="_x=1"><script>_x=2</script><foreignObject><b>hi</b></foreignObject><circle r="1"/></svg>',
   });

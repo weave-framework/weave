@@ -74,7 +74,7 @@ test('unclosed {{ in an attribute throws', () => {
   assert.ok(threw, 'an unclosed {{ attribute should be a parse error');
 });
 
-test('text interpolation balances a }} inside a string literal (M3)', () => {
+test('text interpolation balances a }} inside a string literal', () => {
   // a naive indexOf('}}') would cut the expression short at the `}}` inside the string
   const [p] = parseTemplate('<p>{{ fn("}}") }}</p>') as ElementNode[];
   const node: { type: string; expr: string } = p.children[0] as { type: string; expr: string };
@@ -82,7 +82,7 @@ test('text interpolation balances a }} inside a string literal (M3)', () => {
   assert.equal(node.expr, 'fn("}}")');
 });
 
-test('text interpolation balances an inner object literal (M3)', () => {
+test('text interpolation balances an inner object literal', () => {
   const [p] = parseTemplate('<p>{{ ({ a: 1 }).a }}</p>') as ElementNode[];
   const node: { type: string; expr: string } = p.children[0] as { type: string; expr: string };
   assert.equal(node.type, 'interp');

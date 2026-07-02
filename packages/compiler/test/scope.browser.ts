@@ -94,7 +94,7 @@ test('rewrite: runtime accessor (call) leaves the synthesized call unmapped', ()
   assert.ok(done, 'the .done tail should remain mapped');
 });
 
-test('rewrite: bindings inside a template literal ${ } are resolved (H4)', () => {
+test('rewrite: bindings inside a template literal ${ } are resolved', () => {
   const expr: string = '`Hi ${name}, you have ${count} left`';
   const r: ReturnType<typeof rewrite> = rewrite(expr, ctxScope(['name', 'count']), '__ctx');
   assert.equal(r.code, '`Hi ${__ctx.name}, you have ${__ctx.count} left`');
@@ -111,7 +111,7 @@ test('rewrite: a literal quote-string inside ${ } is left alone', () => {
   assertFullSourceCoverage(expr, r.segments);
 });
 
-test('rewrite: object shorthand expands to key: value (H4)', () => {
+test('rewrite: object shorthand expands to key: value', () => {
   assert.equal(rewrite('{ name }', ctxScope(['name']), '__ctx').code, '{ name: __ctx.name }');
   assert.equal(rewrite('{ a, b }', ctxScope(['a', 'b']), '__ctx').code, '{ a: __ctx.a, b: __ctx.b }');
   // a real property value (`key: expr`) is NOT treated as shorthand

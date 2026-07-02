@@ -57,7 +57,7 @@ export function inferCtxNames(nodes: TemplateNode[]): string[] {
 
   // A name a block *declares* (`@for` item + `$` vars, `@let`, `@if (… as x)`, `@then`/`@catch` alias,
   // snippet params) is subtracted ONLY within that block's scope — `declared` is per-scope, not global,
-  // so the same name used elsewhere as component data is still inferred as ctx. (M4)
+  // so the same name used elsewhere as component data is still inferred as ctx.
   const add = (expr: string | undefined, declared: Set<string>): void => {
     if (!expr) return;
     for (const id of freeIdentifiers(expr)) {

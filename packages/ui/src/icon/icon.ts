@@ -61,7 +61,7 @@ function scrubSvg(el: Element): void {
  * Sanitize an SVG string before it goes into `innerHTML` (zero-dep, native `DOMParser`). Parsed as
  * `image/svg+xml`, so nothing executes during parsing; `<script>`/`<foreignObject>`, every `on*`
  * event-handler attribute, and `javascript:` URLs are removed. Returns '' for non-SVG / malformed
- * input. Guards the `svg`/`src` inputs (a `<svg onload=…>` would otherwise run on insertion). (M5)
+ * input. Guards the `svg`/`src` inputs (a `<svg onload=…>` would otherwise run on insertion).
  */
 export function sanitizeSvg(markup: string): string {
   if (!markup) return '';
@@ -108,7 +108,7 @@ export function setup(props: IconProps): { host: Signal<Element | null> } {
     void fetch(url)
       .then((r) => r.text())
       .then((txt) => {
-        if (alive) el.innerHTML = sanitizeSvg(txt); // remote SVG is untrusted — sanitize (M5)
+        if (alive) el.innerHTML = sanitizeSvg(txt); // remote SVG is untrusted — sanitize
       });
     return () => {
       alive = false;

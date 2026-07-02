@@ -4,7 +4,7 @@ import { field, form, validators, type Field, type Group } from '@weave-framewor
 
 const wait = (ms: number): Promise<void> => new Promise<void>((r) => setTimeout(r, ms));
 
-test('validators.pattern with a /g regex is stateless across calls (A6)', () => {
+test('validators.pattern with a /g regex is stateless across calls', () => {
   // a global regex advances lastIndex across .test() calls → alternating results without the fix
   const v: (s: string) => string | null = validators.pattern(/[a-z]+/g);
   assert.equal(v('abc'), null, 'matches on the 1st call');

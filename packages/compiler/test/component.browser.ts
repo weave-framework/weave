@@ -58,7 +58,7 @@ test('inferCtxNames excludes @for item, $vars, and @let names', () => {
   assert.deepEqual(l, ['n']);
 });
 
-test('inferCtxNames: a name used outside a @for is still ctx even if a loop shadows it (M4)', () => {
+test('inferCtxNames: a name used outside a @for is still ctx even if a loop shadows it', () => {
   // `item` is component data in the heading AND, separately, a loop var inside @for — the loop's
   // block-local binding must not erase the ctx usage elsewhere (declared is per-scope, not global).
   const names: string[] = inferCtxNames(
