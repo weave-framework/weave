@@ -9,6 +9,21 @@
 > releases here. Publishing itself is a separate, explicit step (the `/publish` skill /
 > `pnpm publish:packages`) — committing/pushing does **not** publish or mirror.
 
+## 0.2.36 — 2026-07-02 (unpublished; on `main`, ahead of the 0.2.0 npm release)
+
+**CDK Date adapter** — the zero-dep date model under the pickers (U4 §4.12, Phase D).
+
+### UI (`@weave-framework/ui`) — `./cdk`
+- **`createDateAdapter({ locale?, firstDayOfWeek? }) → DateAdapter`** — native `Date` + `Intl` only (rule #1, no
+  date library). Neutral value type = a plain **local-midnight `Date`**.
+- Arithmetic: create/clone/today; add days/months/years (**overflow-clamped** — Jan 31 + 1 month → Feb 28/29;
+  DST-safe); start/end of month + days-in-month (leap-year correct, incl. 1900/2000); compare / isSameDay / clamp.
+- `format` via `Intl.DateTimeFormat`; **`parse`** = ISO `yyyy-mm-dd` fast-path + the locale's numeric field order
+  (from `formatToParts`), **rejecting overflow** (Feb 30 → null) + expanding 2-digit years.
+- Calendar helpers: locale `firstDayOfWeek` (`Intl.Locale` weekInfo, override-able), `getDayOfWeekNames` /
+  `getMonthNames` (JS order). **Deferred:** custom parse masks, non-Gregorian calendars.
+- Gates: **886 tests (+13); verify:ui-sass 269 (unchanged — headless);** typecheck + `eslint .` clean.
+
 ## 0.2.35 — 2026-07-02 (unpublished; on `main`, ahead of the 0.2.0 npm release)
 
 **CDK Drag & Drop** — the headless pointer-drag + reorder engine (U4 §4.11, Phase D).
