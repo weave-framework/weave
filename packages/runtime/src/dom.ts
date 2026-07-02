@@ -550,6 +550,11 @@ export function dynElement(
       lastTag = t;
       thunk = t
         ? () => {
+            // A dynamic tag is attacker-influenceable; a `<script>` created + inserted here would
+            // execute. Refuse it loudly rather than build an executable element. (M5)
+            if (t.toLowerCase() === 'script') {
+              throw new Error(`Weave: <w:element> refuses to create a <script> element (it would execute).`);
+            }
             const el: HTMLElement = document.createElement(t);
             build(el);
             return el;

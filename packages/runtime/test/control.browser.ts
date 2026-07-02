@@ -1,6 +1,6 @@
 import { test, assert } from '../../../tools/harness.js';
 import { signal, effect, root, type Signal } from '@weave-framework/runtime';
-import { ifBlock, eachBlock, defineComponent, type ForContext } from '@weave-framework/runtime/dom';
+import { ifBlock, eachBlock, defineComponent, dynElement, type ForContext } from '@weave-framework/runtime/dom';
 
 function host(): { parent: HTMLElement; anchor: Comment } {
   const parent: HTMLDivElement = document.createElement('div');
@@ -157,4 +157,17 @@ test("eachBlock coalesces a row's positional writes into one recompute (M2)", ()
   // batched: each reused row recomputes once (→ 2). unbatched: the item write and the index write
   // flush separately, so a binding reading both recomputes twice per row (→ 4).
   assert.ok(delta <= 2, `expected each reused row to recompute once (<=2), got ${delta}`);
+});
+
+test('dynElement refuses to create a <script> tag (M5 security)', () => {
+  const { anchor } = host();
+  let threw: boolean = false;
+  try {
+    root(() => {
+      dynElement(anchor, () => 'script', () => {});
+    });
+  } catch {
+    threw = true;
+  }
+  assert.ok(threw, 'a dynamic <script> element is rejected, not built');
 });

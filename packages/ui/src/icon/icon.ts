@@ -39,6 +39,39 @@ export interface IconProps {
   label?: string;
 }
 
+const FORBIDDEN_SVG_TAGS: Set<string> = new Set(['script', 'foreignobject']);
+
+/** Recursively strip active content: `on*` handlers, `javascript:` URLs, forbidden elements. */
+function scrubSvg(el: Element): void {
+  for (const attr of [...el.attributes]) {
+    const name: string = attr.name.toLowerCase();
+    if (name.startsWith('on')) {
+      el.removeAttribute(attr.name);
+    } else if ((name === 'href' || name === 'xlink:href' || name === 'src') && /^\s*javascript:/i.test(attr.value)) {
+      el.removeAttribute(attr.name);
+    }
+  }
+  for (const child of [...el.children]) {
+    if (FORBIDDEN_SVG_TAGS.has(child.tagName.toLowerCase())) child.remove();
+    else scrubSvg(child);
+  }
+}
+
+/**
+ * Sanitize an SVG string before it goes into `innerHTML` (zero-dep, native `DOMParser`). Parsed as
+ * `image/svg+xml`, so nothing executes during parsing; `<script>`/`<foreignObject>`, every `on*`
+ * event-handler attribute, and `javascript:` URLs are removed. Returns '' for non-SVG / malformed
+ * input. Guards the `svg`/`src` inputs (a `<svg onload=…>` would otherwise run on insertion). (M5)
+ */
+export function sanitizeSvg(markup: string): string {
+  if (!markup) return '';
+  const doc: Document = new DOMParser().parseFromString(markup, 'image/svg+xml');
+  const root: Element | null = doc.documentElement;
+  if (!root || root.nodeName.toLowerCase() === 'parsererror' || doc.querySelector('parsererror')) return '';
+  scrubSvg(root);
+  return root.outerHTML;
+}
+
 export const template: string = `<span class="weave-icon" ref={{ host }}></span>`;
 
 export function setup(props: IconProps): { host: Signal<Element | null> } {
@@ -53,7 +86,7 @@ export function setup(props: IconProps): { host: Signal<Element | null> } {
     if (!props.src) {
       const markup: string | undefined =
         props.svg ?? (props.name ? registry.resolve(props.name) : undefined);
-      el.innerHTML = markup ?? '';
+      el.innerHTML = sanitizeSvg(markup ?? '');
     }
     if (props.label) {
       el.setAttribute('role', 'img');
@@ -75,7 +108,7 @@ export function setup(props: IconProps): { host: Signal<Element | null> } {
     void fetch(url)
       .then((r) => r.text())
       .then((txt) => {
-        if (alive) el.innerHTML = txt;
+        if (alive) el.innerHTML = sanitizeSvg(txt); // remote SVG is untrusted — sanitize (M5)
       });
     return () => {
       alive = false;

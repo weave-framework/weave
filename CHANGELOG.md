@@ -9,6 +9,15 @@
 > releases here. Publishing itself is a separate, explicit step (the `/publish` skill /
 > `pnpm publish:packages`) — committing/pushing does **not** publish or mirror.
 
+## 0.2.51 — 2026-07-02 (unpublished; on `main`, ahead of the 0.2.0 npm release)
+
+**Icon SVG sanitization (security)**. **M5** — `<Icon>` now
+sanitizes any SVG before it reaches `innerHTML` (both the `svg`/registry markup and a fetched `src`): a zero-dep
+`sanitizeSvg` parses it as `image/svg+xml` (nothing executes on parse) and strips `<script>`/`<foreignObject>`,
+every `on*` event-handler attribute, and `javascript:` URLs — closing a `<svg onload=…>` execution vector. Also,
+`<w:element this="…">` now refuses to build a `<script>` element (a dynamic tag is attacker-influenceable and would
+execute). Both have tests that fail without them. **961 tests green.**
+
 ## 0.2.50 — 2026-07-02 (unpublished; on `main`, ahead of the 0.2.0 npm release)
 
 **reactivity performance**. **M1** — block/component

@@ -165,3 +165,17 @@ test('component: changing name re-renders in place', async () => {
   assert.notEqual(first, second, 'markup updated for the new name');
   dispose();
 });
+
+test('component: an untrusted svg is sanitized — on* / <script> / <foreignObject> stripped (M5)', async () => {
+  const { el, dispose } = mountIcon({
+    svg: '<svg id="x" onload="_x=1"><script>_x=2</script><foreignObject><b>hi</b></foreignObject><circle r="1"/></svg>',
+  });
+  await tick();
+  const svg: SVGElement | null = (el as HTMLElement).querySelector('svg#x');
+  assert.ok(svg, 'the svg still renders');
+  assert.equal(svg!.getAttribute('onload'), null, 'on* handler attribute stripped');
+  assert.equal(svg!.querySelector('script'), null, '<script> removed');
+  assert.equal(svg!.querySelector('foreignObject'), null, '<foreignObject> removed');
+  assert.ok(svg!.querySelector('circle'), 'safe geometry kept');
+  dispose();
+});
