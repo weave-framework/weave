@@ -9,6 +9,26 @@
 > releases here. Publishing itself is a separate, explicit step (the `/publish` skill /
 > `pnpm publish:packages`) — committing/pushing does **not** publish or mirror.
 
+## 0.2.33 — 2026-07-02 (unpublished; on `main`, ahead of the 0.2.0 npm release)
+
+**Tree** — the WAI-ARIA `role=tree` hierarchy (U4 §4.10, Phase C).
+
+### UI (`@weave-framework/ui`) — `./tree`
+- **`<Tree>`** — a template-based hierarchical disclosure surface (keyed `@for` over the **visible flattened
+  nodes**, arbitrary content via `@render`). **Two data models:** *nested* (a `children` accessor, `node.children`
+  by default, recursed; descendants show only while expanded) or *flat* (pass `getLevel` → a DFS scan hides
+  descendants of collapsed nodes). Both emit `aria-level`/`-setsize`/`-posinset`.
+- **Expansion + selection** ride the CDK `SelectionModel` (expansion uncontrolled + `onExpandedChange`; selection
+  optional `selectable` single/multiple + `onSelectionChange` + `compareWith`; selected node = accentSoft tint +
+  2px accent left border, the List visual).
+- **Keyboard** = CDK `listKeyManager` (vertical, typeahead) for Up/Down/Home/End + a single roving tab stop, plus
+  **Right** (expand / step into first child) / **Left** (collapse / move to parent) / Enter-Space (activate).
+- Indent = an inline `--weave-tree-depth` custom prop × the `indent` token (design: depth × 18px); rotating ▸
+  disclosure marker (CSS `::before`). `./tree` subpath (JS + SCSS); `tree-overrides()` wired.
+- **Deferred (noted):** checkbox nodes + parent/child cascade, drag-reorder (Phase D DnD), virtual body, controlled
+  `expanded`.
+- Gates: **862 tests (+13); verify:ui-sass 269 (+5);** typecheck (all 12 pkgs) + `eslint .` clean.
+
 ## 0.2.32 — 2026-07-02 (unpublished; on `main`, ahead of the 0.2.0 npm release)
 
 Regression guard for the `0.2.31` double-fire fix. The existing suite passed the fix

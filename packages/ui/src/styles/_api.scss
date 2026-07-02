@@ -41,6 +41,7 @@
 @use 'components/paginator' as paginator;
 @use 'components/sidenav' as sidenav;
 @use 'components/table' as table;
+@use 'components/tree' as tree;
 
 $_builtins: (
   'divider': divider.$tokens,
@@ -76,6 +77,7 @@ $_builtins: (
   'paginator': paginator.$tokens,
   'sidenav': sidenav.$tokens,
   'table': table.$tokens,
+  'tree': tree.$tokens,
 );
 
 /* ───────────────────────── internal emit ───────────────────────── */
@@ -285,6 +287,10 @@ $_builtins: (
   @include overrides('table', $map);
 }
 
+@mixin tree-overrides($map) {
+  @include overrides('tree', $map);
+}
+
 // Emit the structural CSS (class rules) for every built-in component.
 // Prefer per-component includes to keep CSS small; all-styles() is the convenience.
 @mixin all-styles() {
@@ -321,4 +327,5 @@ $_builtins: (
   @include paginator.styles();
   @include sidenav.styles();
   @include table.styles();
+  @include tree.styles();
 }

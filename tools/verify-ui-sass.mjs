@@ -397,6 +397,15 @@ const cssTableOverride = compile(
 check('table-overrides changes existing token', /--weave-table-row-height:\s*40px/.test(cssTableOverride));
 check('table-overrides adds new token (auto-var)', /--weave-table-elevation:\s*1px/.test(cssTableOverride));
 
+/* ── tree built-in: cascade refs + accentSoft selected tint + indent literal + overrides (U4) ── */
+check('theme emits tree selected tint (accentSoft color-mix)', /--weave-tree-selected-background:\s*color-mix\(in srgb, var\(--weave-color-accent\) 12%, transparent\)/.test(cssTheme));
+check('theme emits tree indent literal (18px)', /--weave-tree-indent:\s*18px/.test(cssTheme));
+const cssTreeOverride = compile(
+  `@use '@weave-framework/ui' as weave;\n@include weave.tree-overrides((indent: 24px, elevation: 1px));`,
+);
+check('tree-overrides changes existing token', /--weave-tree-indent:\s*24px/.test(cssTreeOverride));
+check('tree-overrides adds new token (auto-var)', /--weave-tree-elevation:\s*1px/.test(cssTreeOverride));
+
 /* ── all-styles(): structural CSS by class ── */
 const cssStyles = compile(`@use '@weave-framework/ui' as weave;\n@include weave.all-styles();`);
 check('all-styles emits .weave-divider rule', /\.weave-divider\s*{/.test(cssStyles));
@@ -495,6 +504,11 @@ check('table header cell is sticky-top with a hairline (no shadow)', /\.weave-ta
 check('table body cell = hairline row separator + numeric tabular-nums', /\.weave-table__cell\s*{[\s\S]*?box-shadow:\s*0 -1px 0 var\(--weave-table-line\)/.test(cssStyles) && /\.weave-table__cell--numeric\s*{[\s\S]*?font-variant-numeric:\s*tabular-nums/.test(cssStyles));
 check('table selected row = accentSoft tint + 2px accent left border (via [aria-selected])', /\.weave-table__row\[aria-selected=true\]\s*>\s*\.weave-table__cell\s*{[\s\S]*?background:\s*var\(--weave-table-selected-background\)/.test(cssStyles) && /\.weave-table__row\[aria-selected=true\]\s*>\s*\.weave-table__cell:first-child\s*{[\s\S]*?border-left-color:\s*var\(--weave-table-selected-marker\)/.test(cssStyles));
 check('table sticky columns are position:sticky; expand chevron rotates on [aria-expanded]', /\.weave-table__cell--sticky-start,\s*\.weave-table__cell--sticky-end\s*{[\s\S]*?position:\s*sticky/.test(cssStyles) && /\.weave-table__expand-toggle\[aria-expanded=true\]::before\s*{[\s\S]*?transform:\s*rotate\(90deg\)/.test(cssStyles));
+
+/* ── tree (U4 §4.10): indented treeitem rows, rotating ▸ marker, accent selection mark ── */
+check('all-styles emits .weave-tree node indented by depth (indent × --weave-tree-depth)', /\.weave-tree__node\s*{[\s\S]*?padding-inline-start:\s*calc\(\s*var\(--weave-tree-node-padding-x\)\s*\+\s*var\(--weave-tree-indent\)\s*\*\s*var\(--weave-tree-depth,\s*0\)\s*\)/.test(cssStyles));
+check('tree disclosure marker rotates on [aria-expanded]', /\.weave-tree__toggle::before\s*{[\s\S]*?content:\s*["']▸["']/.test(cssStyles) && /\.weave-tree__node\[aria-expanded=true\]\s*\.weave-tree__toggle::before\s*{[\s\S]*?transform:\s*rotate\(90deg\)/.test(cssStyles));
+check('tree selected node = accentSoft tint + 2px accent left border (via [aria-selected])', /\.weave-tree__node\[aria-selected=true\]\s*{[\s\S]*?background:\s*var\(--weave-tree-selected-background\)[\s\S]*?border-inline-start-color:\s*var\(--weave-tree-selected-marker\)/.test(cssStyles));
 
 /* ── example.scss: the docs-seed dev surface compiles end-to-end ── */
 let exampleOk = false;

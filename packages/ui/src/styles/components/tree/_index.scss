@@ -1,0 +1,13 @@
+// Tree — a hierarchical disclosure surface. Behavior lives in tree.ts (nested + flat data
+// models, a visible-flatten pass, expand/collapse + selection via the CDK SelectionModel,
+// roving keyboard via the CDK listKeyManager); this is the visual.
+//
+// A flat list of role=treeitem rows indented by depth (an inline --weave-tree-depth custom
+// prop × the indent token), a rotating ▸ disclosure marker, hairline hover, and accent as a
+// mark: the 2px accent left border + accentSoft tint on a selected node. State rides native
+// attrs — [aria-expanded] / [aria-selected].
+//
+// Barrel — forwards the split partials ($tokens + the styles() mixin).
+
+@forward 'tokens';
+@forward 'styles';

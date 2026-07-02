@@ -1,0 +1,81 @@
+// tree — styles() mixin (class rules). A flat list of role=treeitem rows, each indented by
+// its depth via an inline --weave-tree-depth custom prop; a rotating ▸ marker discloses
+// children; state rides native ARIA attrs ([aria-expanded], [aria-selected]). Forwarded by
+// ./_index.scss.
+@use '../../helpers' as helpers;
+
+@mixin styles() {
+  .weave-tree {
+    display: block;
+  }
+
+  .weave-tree__node {
+    display: flex;
+    align-items: center;
+    gap: var(--weave-tree-gap);
+    box-sizing: border-box;
+    min-height: var(--weave-tree-node-height);
+    padding-block: var(--weave-tree-node-padding-y);
+    padding-inline-end: var(--weave-tree-node-padding-x);
+    // Base padding + depth × indent (depth set inline per node).
+    padding-inline-start: calc(
+      var(--weave-tree-node-padding-x) + var(--weave-tree-indent) * var(--weave-tree-depth, 0)
+    );
+    // Reserve the selected marker so selecting never shifts content.
+    border-inline-start: var(--weave-tree-marker-width) solid transparent;
+    color: var(--weave-tree-text);
+    font-size: var(--weave-tree-font-size);
+    line-height: var(--weave-tree-line-height);
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .weave-tree__node:hover {
+    background: var(--weave-tree-row-hover);
+  }
+
+  .weave-tree__node:focus-visible {
+    @include helpers.focus-ring;
+  }
+
+  /* ── selection (native ARIA attr, no state class) ── */
+  .weave-tree__node[aria-selected='true'] {
+    background: var(--weave-tree-selected-background);
+    border-inline-start-color: var(--weave-tree-selected-marker);
+  }
+
+  /* ── disclosure marker ── */
+  .weave-tree__toggle {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--weave-tree-toggle-size);
+    height: var(--weave-tree-toggle-size);
+    color: var(--weave-tree-toggle);
+    font-size: var(--weave-tree-toggle-glyph);
+  }
+
+  .weave-tree__toggle::before {
+    content: '\25B8'; // ▸
+    display: inline-block;
+    transition: transform var(--weave-tree-duration) ease;
+  }
+
+  // A leaf keeps the toggle's width (so content aligns) but shows no glyph.
+  .weave-tree__toggle--leaf::before {
+    content: '';
+  }
+
+  .weave-tree__node[aria-expanded='true'] .weave-tree__toggle::before {
+    transform: rotate(90deg);
+  }
+
+  .weave-tree__content {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+}
