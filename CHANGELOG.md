@@ -9,6 +9,22 @@
 > releases here. Publishing itself is a separate, explicit step (the `/publish` skill /
 > `pnpm publish:packages`) — committing/pushing does **not** publish or mirror.
 
+## 0.2.35 — 2026-07-02 (unpublished; on `main`, ahead of the 0.2.0 npm release)
+
+**CDK Drag & Drop** — the headless pointer-drag + reorder engine (U4 §4.11, Phase D).
+
+### UI (`@weave-framework/ui`) — `./cdk`
+- **`draggable(el, opts)`** — standalone free-drag via pointer capture: an `offset()` signal (constrainable to one
+  `axis`), a `threshold` (click-vs-drag), a `handle`, and `onStart`/`onMove`/`onEnd`. The single-gesture case (the
+  Bottom Sheet's drag-to-dismiss).
+- **`dropList(container, opts)`** — a reorderable list: the **insertion index** = the count of non-dragged sibling
+  midpoints the pointer has crossed; `dragging()`/`activeIndex()`/`overIndex()` signals; `onDrop({previousIndex,
+  currentIndex})`. Full **keyboard DnD** (Space lift → Arrows move → Space drop, Escape cancel). Event delegation.
+- **`moveItemInArray(array, from, to)`** — immutable reorder applier (clamps `to`).
+- **Deferred (noted):** cross-list transfer (`connectedTo`), a drag-preview helper. Unblocks the U3 Bottom Sheet
+  drag-dismiss + reorderable List/Table-row/Tree.
+- Gates: **873 tests (+10); verify:ui-sass 269 (unchanged — headless);** typecheck + `eslint .` clean.
+
 ## 0.2.34 — 2026-07-02 (unpublished; on `main`, ahead of the 0.2.0 npm release)
 
 **Tree** — controlled `expanded` (follow-up to `0.2.33`).
