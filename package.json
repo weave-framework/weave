@@ -15,14 +15,9 @@
     "docs": "node docs/tools/gen-content.mjs && node docs/tools/gen-api.mjs && node packages/cli/bin/weave.mjs dev --config docs/weave.config.ts",
     "docs:build": "node docs/tools/gen-content.mjs && node docs/tools/gen-api.mjs && node packages/cli/bin/weave.mjs build --config docs/weave.config.ts && node docs/tools/postbuild.mjs",
     "docs:serve": "node docs/tools/serve-dist.mjs",
-    "verify:build": "node tools/verify-build.mjs",
-    "verify:cli": "node tools/verify-cli.mjs",
-    "verify:check": "node tools/verify-check.mjs",
     "verify:ui-sass": "node tools/verify-ui-sass.mjs",
     "build:ls": "node packages/language-server/build.mjs",
     "verify:ls": "node packages/language-server/build.mjs && node tools/verify-language-server.mjs && node tools/verify-ls-push-diagnostics.mjs",
-    "bench": "node tools/benchmark.mjs",
-    "size": "node tools/measure-size.mjs",
     "typecheck": "tsc --noEmit -p packages/runtime/tsconfig.json && tsc --noEmit -p packages/compiler/tsconfig.json && tsc --noEmit -p packages/check/tsconfig.json && tsc --noEmit -p packages/store/tsconfig.json && tsc --noEmit -p packages/router/tsconfig.json && tsc --noEmit -p packages/forms/tsconfig.json && tsc --noEmit -p packages/i18n/tsconfig.json && tsc --noEmit -p packages/data/tsconfig.json && tsc --noEmit -p packages/cli/tsconfig.json && tsc --noEmit -p packages/language-server/tsconfig.json && tsc --noEmit -p packages/typescript-plugin/tsconfig.json && tsc --noEmit -p packages/ui/tsconfig.json"
   },
   "keywords": [
