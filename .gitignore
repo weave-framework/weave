@@ -25,6 +25,7 @@ coverage/
 npm-debug.log*
 
 # Editor / OS
+.vscode/
 .DS_Store
 Thumbs.db
 .idea/

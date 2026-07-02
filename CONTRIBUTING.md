@@ -1,0 +1,77 @@
+# Contributing to Weave
+
+Thanks for your interest in improving Weave 🧵 — a signal-native, no-Virtual-DOM,
+zero-dependency front-end framework. Contributions of all sizes are welcome: bug
+reports, docs, tests, and code.
+
+## Ground rules (what makes a change land)
+
+Weave has a few hard, non-negotiable principles. A change that breaks one won't be merged:
+
+- **Zero runtime dependencies.** Everything is built in-house. Native `Intl` / DOM /
+  Web Animations are fine; a new third-party runtime dependency is not.
+- **One reactive model.** Signals all the way down (`signal` / `computed` / `effect`).
+  No Virtual DOM, no second paradigm.
+- **Compose, don't duplicate.** In `@weave-framework/ui`, build on the existing
+  components and CDK primitives; don't re-create a look-alike. Shared visuals live in
+  SCSS mixins; every value flows from a component's own design tokens.
+- **Fail loud, not silent.** Ambiguous input should error at parse/compile time with a
+  clear message rather than misbehave at runtime.
+- **A fix isn't done until a test fails without it.** Add a test that reproduces the bug
+  (or covers the feature) and would fail on `main` — then make it pass.
+
+## Getting started
+
+Prerequisites: **Node 22+** and **pnpm 11+**.
+
+```bash
+pnpm install                 # install the workspace
+pnpm test                    # run the full browser test suite (Playwright / Chromium)
+pnpm typecheck               # type-check every package
+pnpm lint                    # eslint .
+pnpm verify:ui-sass          # verify the UI token schemas compile
+```
+
+The repo is a pnpm workspace under `packages/`. The framework runtime, compiler, CLI,
+router, forms, store, i18n, data layer, and UI library are each their own package.
+
+## Making a change
+
+1. **Fork** the repository and create a branch off `main`.
+2. Make your change with a focused scope — one logical change per pull request.
+3. **Add or update tests** (`*.browser.ts`) so the change is covered and would fail
+   without it. Keep the suite green.
+4. Make sure `pnpm typecheck`, `pnpm lint`, and `pnpm test` all pass locally. CI runs the
+   same gates on your pull request.
+5. Match the surrounding code — naming, comment density, and idioms. New code should read
+   like the code already there.
+
+## Pull requests
+
+- Keep the PR description clear: what changed, why, and how it was verified.
+- Reference any related issue.
+- All CI checks must pass and the change needs a maintainer review before it can be merged.
+- Small, well-tested PRs are reviewed fastest.
+
+## Developer Certificate of Origin (sign-off)
+
+By contributing, you certify that you wrote the patch (or otherwise have the right to
+submit it) under the project's license — the [Developer Certificate of Origin](https://developercertificate.org/).
+Certify it by **signing off** each commit:
+
+```bash
+git commit -s -m "fix: ..."
+```
+
+This adds a `Signed-off-by: Your Name <you@example.com>` line to the commit message.
+
+## Reporting bugs & requesting features
+
+Open an issue using the templates. For a bug, include a minimal reproduction, what you
+expected, and what happened. For a feature, describe the use case first — the "why"
+matters more than the "how".
+
+## License
+
+By contributing, you agree that your contributions are licensed under the same license as
+the project (see [LICENSE](LICENSE)).
