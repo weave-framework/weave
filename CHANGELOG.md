@@ -9,6 +9,18 @@
 > releases here. Publishing itself is a separate, explicit step (the `/publish` skill /
 > `pnpm publish:packages`) — committing/pushing does **not** publish or mirror.
 
+## 0.2.34 — 2026-07-02 (unpublished; on `main`, ahead of the 0.2.0 npm release)
+
+**Tree** — controlled `expanded` (follow-up to `0.2.33`).
+
+### UI (`@weave-framework/ui`) — `./tree`
+- **`<Tree expanded>`** — expansion is now **controlled** (`expanded?` is the source of truth) OR **uncontrolled**
+  (`defaultExpanded`), the Tabs convention. When controlled, expand/collapse emit `onExpandedChange` **without
+  self-mutating** — the owner applies the next set. Pinned by a guard test (`no self-open — the prop still says
+  collapsed`). Added after review flagged that deferring it was wrong (cheap + the library's own binding
+  convention). No CSS change.
+- Gates: **863 tests (+1); verify:ui-sass 269 (unchanged);** typecheck + `eslint .` clean.
+
 ## 0.2.33 — 2026-07-02 (unpublished; on `main`, ahead of the 0.2.0 npm release)
 
 **Tree** — the WAI-ARIA `role=tree` hierarchy (U4 §4.10, Phase C).

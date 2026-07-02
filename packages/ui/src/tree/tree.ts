@@ -47,10 +47,12 @@ export interface TreeProps<N = unknown> {
   /** Stable node identity (default: object identity) — row keys + selection/expansion. */
   trackBy?: (node: N) => string | number;
 
-  /* ── expansion (uncontrolled + change callback) ── */
-  /** Nodes expanded initially. */
+  /* ── expansion (controlled `expanded` OR uncontrolled `defaultExpanded`) ── */
+  /** Controlled expanded set — when provided, it is the source of truth (pair with `onExpandedChange`). */
+  expanded?: N[];
+  /** Uncontrolled initial expanded set (ignored when `expanded` is provided). */
   defaultExpanded?: N[];
-  /** Called with the expanded set after every expand/collapse. */
+  /** Called with the next expanded set after every expand/collapse. */
   onExpandedChange?: (expanded: N[]) => void;
 
   /* ── selection ── */
@@ -155,15 +157,22 @@ export function setup<N = unknown>(props: TreeProps<N>): TreeContext<N> {
     props.label ? props.label(node) : String((node as { label?: unknown })?.label ?? node);
   const childrenOf = (node: N): N[] | undefined =>
     props.children ? props.children(node) : (node as { children?: N[] }).children;
+  const eqNode = (a: N, b: N): boolean => (props.compareWith ? props.compareWith(a, b) : a === b);
 
-  /* ── expansion + selection (CDK SelectionModel) ── */
+  /* ── expansion (controlled `expanded` OR uncontrolled `defaultExpanded`, Tabs convention) ── */
   const expandedModel: SelectionModel<N> = selectionModel<N>({
     multiple: true,
     initial: props.defaultExpanded,
     compareWith: props.compareWith,
   });
-  const isExpandedNode = (node: N): boolean => expandedModel.isSelected(node);
-  const emitExpanded = (): void => props.onExpandedChange?.(expandedModel.selected());
+  const expandedControlled = (): boolean => props.expanded !== undefined;
+  const currentExpanded = (): N[] => (expandedControlled() ? (props.expanded as N[]) : expandedModel.selected());
+  const isExpandedNode = (node: N): boolean => currentExpanded().some((e) => eqNode(e, node));
+  // Commit the next expanded set — mutate the internal model only when uncontrolled; always emit.
+  const setExpanded = (next: N[]): void => {
+    if (!expandedControlled()) expandedModel.setSelection(...next);
+    props.onExpandedChange?.(next);
+  };
 
   const selection: SelectionModel<N> =
     props.selection ??
@@ -218,8 +227,6 @@ export function setup<N = unknown>(props: TreeProps<N>): TreeContext<N> {
     getLabel: (n) => labelOf(n.node),
   });
 
-  const eqNode = (a: N, b: N): boolean => (props.compareWith ? props.compareWith(a, b) : a === b);
-
   // The single tabbable node: the one the keyboard moved to, else the selected one, else 0.
   const rovingIndex = (): number => {
     const active: number = manager.activeIndex();
@@ -248,18 +255,16 @@ export function setup<N = unknown>(props: TreeProps<N>): TreeContext<N> {
   };
 
   const toggleExpand = (n: FlatNode<N>): void => {
-    expandedModel.toggle(n.node);
-    emitExpanded();
+    const cur: N[] = currentExpanded();
+    setExpanded(isExpandedNode(n.node) ? cur.filter((e) => !eqNode(e, n.node)) : [...cur, n.node]);
   };
   const expand = (n: FlatNode<N>): void => {
     if (isExpandedNode(n.node)) return;
-    expandedModel.select(n.node);
-    emitExpanded();
+    setExpanded([...currentExpanded(), n.node]);
   };
   const collapse = (n: FlatNode<N>): void => {
     if (!isExpandedNode(n.node)) return;
-    expandedModel.deselect(n.node);
-    emitExpanded();
+    setExpanded(currentExpanded().filter((e) => !eqNode(e, n.node)));
   };
 
   const onActivate = (n: FlatNode<N>): void => {

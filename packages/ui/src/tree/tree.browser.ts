@@ -128,6 +128,26 @@ test('tree: a non-selectable folder toggles on row click (whole node)', async ()
   m.dispose();
 });
 
+test('tree: controlled expanded — the prop is the source of truth; toggles emit without self-mutating', async () => {
+  const expanded: ReturnType<typeof signal<FileNode[]>> = signal<FileNode[]>([]);
+  const emitted: string[][] = [];
+  const m: Mounted<FileNode> = await mount<FileNode>({
+    nodes: TREE,
+    label: (n) => n.name,
+    get expanded(): FileNode[] {
+      return expanded();
+    },
+    onExpandedChange: (e) => emitted.push(e.map((n) => n.id)),
+  });
+  assert.deepEqual(labels(m), ['src', 'README.md'], 'starts collapsed (controlled = [])');
+  byName(m, 'src').querySelector<HTMLElement>('.weave-tree__toggle')!.click();
+  assert.deepEqual(labels(m), ['src', 'README.md'], 'no self-open — the prop still says collapsed');
+  assert.deepEqual(emitted.at(-1), ['src'], 'but the change was emitted for the owner to apply');
+  expanded.set([TREE[0]]); // owner applies it → the tree reacts
+  assert.deepEqual(labels(m), ['src', 'index.ts', 'ui', 'README.md'], 'external state drove the expansion');
+  m.dispose();
+});
+
 /* ── flat model ── */
 test('tree: flat model (getLevel) flattens + hides descendants of collapsed nodes', async () => {
   const flat: TreeProps<FlatRow> = { nodes: FLAT, getLevel: (n) => n.depth, label: (n) => n.name };
