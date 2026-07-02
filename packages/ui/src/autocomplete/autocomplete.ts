@@ -67,44 +67,32 @@ export interface AutocompleteProps<T = { value: string; label: string }> extends
   class?: string;
 }
 
+// The field IS the Input component (Autocomplete = Input + a suggestion listbox). The
+// combobox ARIA + keyboard nav are attached to Input's native field via `onInputRef`;
+// the underline / clear / prefix-suffix / value binding / invalid state are all Input's.
 export const template: string =
-  '<div class={{ rootClass() }} ref={{ root }}>' +
-  '<span class="weave-autocomplete__prefix"><slot name="prefix"></slot></span>' +
-  '<input class="weave-autocomplete__field" ref={{ input }} type="text" role="combobox"' +
-  ' aria-autocomplete="list" aria-expanded="false" aria-haspopup="listbox"' +
-  ' placeholder={{ placeholder() }} .value={{ currentText() }} disabled={{ isDisabled() }}' +
-  ' required={{ isRequired() }} name={{ name() }} aria-label={{ label() }}' +
-  ' on:input={{ onNativeInput }} on:keydown={{ onKeydown }} on:blur={{ onBlur }} on:focus={{ onFocus }} />' +
-  '@if (showClear()) {' +
-  '<button type="button" class="weave-autocomplete__clear" tabindex="-1" aria-label={{ clearLabel() }} on:click={{ clear }}>×</button>' +
-  '}' +
-  '<span class="weave-autocomplete__suffix"><slot name="suffix"></slot></span>' +
-  '</div>';
+  '<Input class="weave-autocomplete" value={{ currentText() }} control={{ controlProp() }}' +
+  ' onInput={{ onCommit }} clearable={{ clearable() }} placeholder={{ placeholder() }}' +
+  ' disabled={{ isDisabled() }} required={{ isRequired() }} name={{ name() }} label={{ label() }}' +
+  ' onInputRef={{ bindInput }} />';
 
 export interface AutocompleteContext {
-  root: Signal<HTMLElement | null>;
-  input: Signal<HTMLInputElement | null>;
-  rootClass: () => string;
-  placeholder: () => string | undefined;
   currentText: () => string;
+  controlProp: () => AutocompleteControl | undefined;
+  onCommit: (value: string) => void;
+  clearable: () => boolean;
+  placeholder: () => string | undefined;
   isDisabled: () => boolean;
   isRequired: () => boolean;
   name: () => string | undefined;
   label: () => string | undefined;
-  showClear: () => boolean;
-  clearLabel: () => string;
-  onNativeInput: (event: Event) => void;
-  onKeydown: (event: KeyboardEvent) => void;
-  onBlur: () => void;
-  onFocus: () => void;
-  clear: () => void;
+  bindInput: (el: HTMLInputElement | HTMLTextAreaElement) => void;
 }
 
 let _seq: number = 0;
 
 export function setup<T = { value: string; label: string }>(props: AutocompleteProps<T>): AutocompleteContext {
   const id: number = ++_seq;
-  const root: Signal<HTMLElement | null> = signal<HTMLElement | null>(null);
   const input: Signal<HTMLInputElement | null> = signal<HTMLInputElement | null>(null);
   const open: Signal<boolean> = signal<boolean>(false);
   const results: Signal<T[]> = signal<T[]>([]);
@@ -237,19 +225,39 @@ export function setup<T = { value: string; label: string }>(props: AutocompleteP
   }
 
   function select(item: T): void {
-    commitText(optLabel(item, props));
+    const label: string = optLabel(item, props);
+    commitText(label);
+    const el: HTMLInputElement | null = input();
+    if (el) el.value = label; // reflect immediately (Input re-renders it from value/control too)
     props.onSelect?.(item);
     results.set([]);
     closePanel();
     void optValue(item, props); // value accessor available to consumers via onSelect(item)
   }
 
-  const onNativeInput = (event: Event): void => {
-    const text: string = (event.target as HTMLInputElement).value;
-    commitText(text);
+  // The value is Input's job (via value/control); this listener only drives the suggestions.
+  const onInputFetch = (): void => {
+    const text: string = input()?.value ?? '';
     fetchFor(text);
     if (text.length >= minChars()) openPanel();
     else closePanel();
+  };
+
+  // Compose Input: forward the consumer's onInput (no-control mode) and attach the
+  // combobox ARIA + keyboard nav to Input's native field once it's handed over.
+  const onCommit = (value: string): void => props.onInput?.(value);
+
+  const bindInput = (el: HTMLInputElement | HTMLTextAreaElement): void => {
+    const inp: HTMLInputElement = el as HTMLInputElement;
+    input.set(inp);
+    inp.setAttribute('role', 'combobox');
+    inp.setAttribute('aria-autocomplete', 'list');
+    inp.setAttribute('aria-haspopup', 'listbox');
+    inp.setAttribute('aria-expanded', 'false');
+    inp.addEventListener('input', onInputFetch);
+    inp.addEventListener('keydown', onKeydown);
+    inp.addEventListener('focus', onFocus);
+    inp.addEventListener('blur', onBlur);
   };
 
   const onFocus = (): void => {
@@ -295,72 +303,30 @@ export function setup<T = { value: string; label: string }>(props: AutocompleteP
     closePanel();
   };
 
-  const clear = (): void => {
-    commitText('');
-    results.set([]);
-    closePanel();
-    input()?.focus();
-  };
-
   // Re-render the panel whenever results change (async fills land here too).
   effect(() => {
     results();
     if (open()) renderResults();
   });
 
-  // Forms validity → aria-invalid on the input.
-  effect(() => {
-    const el: HTMLInputElement | null = input();
-    if (!el) return;
-    const c: AutocompleteControl | undefined = props.control;
-    if (c && c.touched?.() && c.error?.()) el.setAttribute('aria-invalid', 'true');
-    else el.removeAttribute('aria-invalid');
-  });
+  // Forms validity (aria-invalid + the --invalid underline) is the composed Input's job
+  // now — Autocomplete passes it the `control`, so Input reflects touched-and-invalid.
 
   onDispose(() => {
     overlay?.dispose();
     overlay = null;
   });
 
-  // Empty prefix/suffix slots collapse (no dead gap), like Input.
-  onMount(() => {
-    const el: HTMLElement | null = root();
-    if (!el) return;
-    for (const part of ['prefix', 'suffix']) {
-      const span: HTMLElement | null = el.querySelector<HTMLElement>(`.weave-autocomplete__${part}`);
-      if (span && !span.querySelector('*') && !(span.textContent ?? '').trim()) {
-        span.classList.add(`weave-autocomplete__${part}--empty`);
-      }
-    }
-  });
-
-  const invalidNow = (): boolean => {
-    const c: AutocompleteControl | undefined = props.control;
-    return !!(c && c.touched?.() && c.error?.());
-  };
-
   return {
-    root,
-    input,
-    rootClass: (): string => {
-      const parts: string[] = ['weave-autocomplete'];
-      if (isDisabled()) parts.push('weave-autocomplete--disabled');
-      if (invalidNow()) parts.push('weave-autocomplete--invalid');
-      if (props.class) parts.push(props.class);
-      return parts.join(' ');
-    },
-    placeholder: (): string | undefined => props.placeholder,
     currentText,
+    controlProp: (): AutocompleteControl | undefined => props.control,
+    onCommit,
+    clearable: (): boolean => !!props.clearable,
+    placeholder: (): string | undefined => props.placeholder,
     isDisabled,
     isRequired: (): boolean => !!props.required,
     name: (): string | undefined => props.name,
     label: (): string | undefined => props.label,
-    showClear: (): boolean => !!props.clearable && !isDisabled() && currentText().length > 0,
-    clearLabel: (): string => props.clearLabel ?? 'Clear',
-    onNativeInput,
-    onKeydown,
-    onBlur,
-    onFocus,
-    clear,
+    bindInput,
   };
 }

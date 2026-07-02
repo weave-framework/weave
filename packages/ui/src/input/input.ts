@@ -131,8 +131,9 @@ export function setup(props: InputProps): InputContext {
     else el.removeAttribute('aria-invalid');
   });
 
-  // Hand the native field to a composer (Autocomplete) so it can add combobox ARIA.
-  onMount(() => {
+  // Hand the native field to a composer (Autocomplete) so it can add combobox ARIA —
+  // synchronously as soon as the ref is set, so composed behavior is wired before use.
+  effect(() => {
     const el: HTMLInputElement | HTMLTextAreaElement | null = input();
     if (el) props.onInputRef?.(el);
   });
@@ -164,8 +165,16 @@ export function setup(props: InputProps): InputContext {
   };
 
   const clear = (): void => {
-    commit('');
-    input()?.focus();
+    const el: HTMLInputElement | HTMLTextAreaElement | null = input();
+    if (!el) {
+      commit('');
+      return;
+    }
+    // Fire a real `input` event so our own commit runs AND composers (Autocomplete)
+    // react to the cleared value (e.g. close their panel).
+    el.value = '';
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.focus();
   };
 
   return {

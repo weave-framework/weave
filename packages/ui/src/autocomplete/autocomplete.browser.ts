@@ -4,14 +4,16 @@ import * as dom from '@weave-framework/runtime/dom';
 import { compileTemplate } from '@weave-framework/compiler';
 import { overlayContainer } from '@weave-framework/ui/cdk';
 import { setup, template, type AutocompleteProps, type AutocompleteContext, type AutocompleteControl } from '@weave-framework/ui/autocomplete';
+import * as InputMod from '@weave-framework/ui/input';
+import { toComponent } from '../internal/compose.js';
 
 const rt: typeof dom & { signal: typeof signal; effect: typeof effect } = { ...dom, signal, effect };
 const tick = (): Promise<void> => new Promise<void>((r) => queueMicrotask(r));
 const wait = (ms: number): Promise<void> => new Promise<void>((r) => setTimeout(r, ms));
 
 const SCOPE: string[] = [
-  'root', 'input', 'rootClass', 'placeholder', 'currentText', 'isDisabled', 'isRequired', 'name', 'label',
-  'showClear', 'clearLabel', 'onNativeInput', 'onKeydown', 'onBlur', 'onFocus', 'clear',
+  'currentText', 'controlProp', 'onCommit', 'clearable', 'placeholder', 'isDisabled',
+  'isRequired', 'name', 'label', 'bindInput',
 ];
 
 interface Fruit {
@@ -52,12 +54,16 @@ function mount(props: AutocompleteProps<Fruit>): Mounted {
       '_c',
       code.replace('return render(ctx, {});', 'return render;'),
     ) as MakeRender;
-    return make(ctx, rt, {})(ctx, {});
+    // The field IS the composed Input; a component-root template renders a fragment, so
+    // grab its element before appending (append empties the fragment).
+    const node: Node = make(ctx, rt, { Input: toComponent(InputMod as never) })(ctx, {});
+    const el: HTMLElement = ((node as DocumentFragment).firstElementChild ?? node) as HTMLElement;
+    document.body.appendChild(node);
+    return el;
   });
-  document.body.appendChild(root);
   return {
     root,
-    input: root.querySelector('.weave-autocomplete__field') as HTMLInputElement,
+    input: root.querySelector('.weave-input__field') as HTMLInputElement,
     dispose: (): void => {
       disposeOwner(owner);
       root.remove();
@@ -212,9 +218,9 @@ test('autocomplete: a stale async response is ignored (only the latest query win
 
 test('autocomplete: clearable × empties the text and closes', () => {
   const control: Ctl = makeControl('apple');
-  const { root, input, dispose } = mount({ options: FRUITS, control, clearable: true });
-  const clear: HTMLElement = root.querySelector('.weave-autocomplete__clear') as HTMLElement;
-  assert.ok(clear, 'clear shown when non-empty');
+  const { root, dispose } = mount({ options: FRUITS, control, clearable: true });
+  const clear: HTMLElement = root.querySelector('.weave-input__clear') as HTMLElement;
+  assert.ok(clear, 'clear shown when non-empty (Input\'s ×)');
   clear.click();
   assert.equal(control.value(), '', 'text cleared');
   assert.equal(panel(), null);
@@ -226,7 +232,7 @@ test('autocomplete: invalid control adds --invalid + aria-invalid', async () => 
   const { root, input, dispose } = mount({ options: FRUITS, control });
   control.touched.set(true);
   await tick();
-  assert.ok(root.classList.contains('weave-autocomplete--invalid'));
+  assert.ok(root.classList.contains('weave-input--invalid'), 'the composed Input reflects invalid');
   assert.equal(input.getAttribute('aria-invalid'), 'true');
   dispose();
 });
