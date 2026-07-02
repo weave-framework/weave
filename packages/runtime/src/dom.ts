@@ -953,7 +953,20 @@ export function defineComponent(
         Object.create(props),
         Object.getOwnPropertyDescriptors(bindings)
       );
-      return render(ctx, slots);
+      const node: Node = render(ctx, slots);
+      // Auto-forward component-level `on:X` handlers to the rendered root element. A
+      // `<Button on:click={{…}}>` compiles the handler to an `onClick` prop; attach it to
+      // the root so the consumer's listener fires — so a component never has to re-declare
+      // events just to be composable. Skips a key the component already consumed (a setup
+      // binding of the same name shadows it: the component wires that event itself).
+      if (node instanceof Element) {
+        for (const key of Object.keys(props)) {
+          if (/^on[A-Z]/.test(key) && !(key in bindings) && typeof props[key] === 'function') {
+            node.addEventListener(key.slice(2).toLowerCase(), props[key] as EventListener);
+          }
+        }
+      }
+      return node;
     });
   };
 }

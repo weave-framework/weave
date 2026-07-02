@@ -31,22 +31,21 @@ export interface ButtonProps {
   disabled?: boolean;
   /** Accessible name. Required for an icon-only (`variant="icon"`) button. */
   label?: string;
-  /** Click handler — forwarded to the native button so `<Button on:click={{…}}>` works. */
-  onClick?: (event: MouseEvent) => void;
   /** Extra classes, forwarded onto the host `<button>`. */
   class?: string;
 }
 
+// `<Button on:click={{…}}>` works with no wiring here — defineComponent auto-forwards
+// component-level `on:X` handlers to the rendered root `<button>`.
 export const template: string =
   '<button class={{ classes() }} type={{ type() }} disabled={{ disabled() }}' +
-  ' aria-label={{ label() }} on:click={{ onClick }} use:ripple={{ rippleOptions }}><slot></slot></button>';
+  ' aria-label={{ label() }} use:ripple={{ rippleOptions }}><slot></slot></button>';
 
 export interface ButtonContext {
   classes: () => string;
   type: () => string;
   disabled: () => boolean;
   label: () => string | undefined;
-  onClick: (event: MouseEvent) => void;
   rippleOptions: RippleOptions;
   ripple: typeof ripple;
 }
@@ -63,8 +62,6 @@ export function setup(props: ButtonProps): ButtonContext {
     type: (): string => props.type ?? 'button',
     disabled: (): boolean => !!props.disabled,
     label: (): string | undefined => props.label,
-    // Forward the click to the consumer's handler (native `disabled` already blocks it).
-    onClick: (event: MouseEvent): void => props.onClick?.(event),
     // Ripple reads `disabled` at pointerdown time, so a disabled button never ripples.
     rippleOptions: {
       get disabled(): boolean {
