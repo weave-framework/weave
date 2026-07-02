@@ -1,0 +1,42 @@
+name: Publish to npm
+
+# Publishes every @weave-framework/* package (at the current lockstep version) to npm.
+# Trigger: MANUAL — go to Actions → "Publish to npm" → Run workflow. (You control WHEN a
+# release happens; a run publishes whatever version is committed in the packages.)
+# Optionally also fires when a v* tag is pushed.
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+  id-token: write # lets npm attach build provenance (supply-chain attestation)
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: 'https://registry.npmjs.org'
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Publish @weave-framework/* to npm
+        run: pnpm publish:packages
+        env:
+          # An npm "Automation" token (bypasses 2FA for CI), stored as the NPM_TOKEN repo secret.
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          # Signed provenance for each published package (needs id-token: write above).
+          NPM_CONFIG_PROVENANCE: 'true'
