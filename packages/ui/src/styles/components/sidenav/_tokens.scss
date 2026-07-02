@@ -1,0 +1,24 @@
+// sidenav — design tokens (schema). A layout shell: a drawer beside content, with side/over/
+// push modes. The `over` backdrop reuses the shared U3 overlay scrim tone. Forwarded by
+// ./_index.scss.
+@use '../../ref' as ref;
+
+$tokens: (
+  color: (
+    drawer-background: ref.ref('color.surface'),
+    // Hairline between the drawer and the content (design: separate surfaces with a 1px line).
+    drawer-line: ref.ref('color.line'),
+    // Modal dimming scrim in `over` mode — reuse the shared overlay republic's tone so every
+    // scrim in the library reads identically (override via overlay-overrides((backdrop: …))).
+    backdrop: var(--weave-overlay-backdrop),
+  ),
+  size: (
+    // Drawer width (design: ~230px off-canvas / 200px sticky — one token, consumer overrides).
+    width: 230px,
+    // Slide/push transition — reuse the sheet motion (a drawer slides like a bottom sheet).
+    duration: ref.ref('motion.sheet'),
+    // The over/push drawer stacks above the backdrop, which stacks above the content.
+    backdrop-z: 1,
+    drawer-z: 2,
+  ),
+);

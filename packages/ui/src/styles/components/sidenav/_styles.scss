@@ -1,0 +1,105 @@
+// sidenav — styles() mixin (class rules). A layout shell driven entirely by root modifier
+// classes (--side/--over/--push, --opened, --end, --backdrop) — no per-element state. The
+// drawer is in-flow (side, pushes content) or absolute (over/push, floats). Forwarded by
+// ./_index.scss.
+
+@mixin styles() {
+  .weave-sidenav {
+    position: relative;
+    display: flex;
+    overflow: hidden; // clip the off-canvas drawer when closed
+  }
+
+  .weave-sidenav__drawer {
+    box-sizing: border-box;
+    width: var(--weave-sidenav-width);
+    background: var(--weave-sidenav-drawer-background);
+    border-right: 1px solid var(--weave-sidenav-drawer-line);
+    overflow: auto;
+    transition:
+      transform var(--weave-sidenav-duration) ease,
+      margin var(--weave-sidenav-duration) ease;
+  }
+
+  .weave-sidenav__content {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: auto;
+    transition: margin var(--weave-sidenav-duration) ease;
+  }
+
+  // Dimming scrim — present but inert until `over` + opened toggles `--backdrop` on the root.
+  .weave-sidenav__backdrop {
+    position: absolute;
+    inset: 0;
+    z-index: var(--weave-sidenav-backdrop-z);
+    background: var(--weave-sidenav-backdrop);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--weave-sidenav-duration) ease;
+  }
+
+  .weave-sidenav--backdrop .weave-sidenav__backdrop {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  /* ── side: drawer is in flow and pushes the content ── */
+  .weave-sidenav--side .weave-sidenav__drawer {
+    flex: 0 0 var(--weave-sidenav-width);
+  }
+
+  // Closed side drawer slides out and yields its space (negative margin, not transform).
+  .weave-sidenav--side:not(.weave-sidenav--opened) .weave-sidenav__drawer {
+    margin-inline-start: calc(-1 * var(--weave-sidenav-width));
+  }
+
+  /* ── over / push: drawer floats over the content ── */
+  .weave-sidenav--over .weave-sidenav__drawer,
+  .weave-sidenav--push .weave-sidenav__drawer {
+    position: absolute;
+    inset-block: 0;
+    inset-inline-start: 0;
+    z-index: var(--weave-sidenav-drawer-z);
+    transform: translateX(-100%); // off-canvas when closed
+  }
+
+  .weave-sidenav--over.weave-sidenav--opened .weave-sidenav__drawer,
+  .weave-sidenav--push.weave-sidenav--opened .weave-sidenav__drawer {
+    transform: translateX(0);
+  }
+
+  // push additionally shifts the content over by the drawer width when open.
+  .weave-sidenav--push.weave-sidenav--opened .weave-sidenav__content {
+    margin-inline-start: var(--weave-sidenav-width);
+  }
+
+  /* ── end position: drawer docks to the inline-end edge ── */
+  .weave-sidenav--end .weave-sidenav__drawer {
+    order: 2;
+    border-right: 0;
+    border-left: 1px solid var(--weave-sidenav-drawer-line);
+  }
+
+  .weave-sidenav--end.weave-sidenav--side:not(.weave-sidenav--opened) .weave-sidenav__drawer {
+    margin-inline-start: 0;
+    margin-inline-end: calc(-1 * var(--weave-sidenav-width));
+  }
+
+  .weave-sidenav--end.weave-sidenav--over .weave-sidenav__drawer,
+  .weave-sidenav--end.weave-sidenav--push .weave-sidenav__drawer {
+    inset-inline-start: auto;
+    inset-inline-end: 0;
+    transform: translateX(100%);
+  }
+
+  .weave-sidenav--end.weave-sidenav--over.weave-sidenav--opened .weave-sidenav__drawer,
+  .weave-sidenav--end.weave-sidenav--push.weave-sidenav--opened .weave-sidenav__drawer {
+    transform: translateX(0);
+  }
+
+  .weave-sidenav--end.weave-sidenav--push.weave-sidenav--opened .weave-sidenav__content {
+    margin-inline-start: 0;
+    margin-inline-end: var(--weave-sidenav-width);
+  }
+}

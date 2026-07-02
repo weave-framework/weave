@@ -39,6 +39,7 @@
 @use 'components/stepper' as stepper;
 @use 'components/slider' as slider;
 @use 'components/paginator' as paginator;
+@use 'components/sidenav' as sidenav;
 
 $_builtins: (
   'divider': divider.$tokens,
@@ -72,6 +73,7 @@ $_builtins: (
   'stepper': stepper.$tokens,
   'slider': slider.$tokens,
   'paginator': paginator.$tokens,
+  'sidenav': sidenav.$tokens,
 );
 
 /* ───────────────────────── internal emit ───────────────────────── */
@@ -273,6 +275,10 @@ $_builtins: (
   @include overrides('paginator', $map);
 }
 
+@mixin sidenav-overrides($map) {
+  @include overrides('sidenav', $map);
+}
+
 // Emit the structural CSS (class rules) for every built-in component.
 // Prefer per-component includes to keep CSS small; all-styles() is the convenience.
 @mixin all-styles() {
@@ -307,4 +313,5 @@ $_builtins: (
   @include stepper.styles();
   @include slider.styles();
   @include paginator.styles();
+  @include sidenav.styles();
 }

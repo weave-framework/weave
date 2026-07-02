@@ -378,6 +378,16 @@ const cssPaginatorOverride = compile(
 check('paginator-overrides changes existing token', /--weave-paginator-button:\s*32px/.test(cssPaginatorOverride));
 check('paginator-overrides adds new token (auto-var)', /--weave-paginator-elevation:\s*1px/.test(cssPaginatorOverride));
 
+/* ── sidenav built-in: cascade refs + width literal + backdrop reuses the overlay scrim (U4) ── */
+check('theme emits sidenav drawer background referencing surface', /--weave-sidenav-drawer-background:\s*var\(--weave-color-surface\)/.test(cssTheme));
+check('theme emits sidenav width literal (230px)', /--weave-sidenav-width:\s*230px/.test(cssTheme));
+check('sidenav backdrop reuses the shared overlay scrim token (no duplicated tone)', /--weave-sidenav-backdrop:\s*var\(--weave-overlay-backdrop\)/.test(cssTheme));
+const cssSidenavOverride = compile(
+  `@use '@weave-framework/ui' as weave;\n@include weave.sidenav-overrides((width: 280px, elevation: 1px));`,
+);
+check('sidenav-overrides changes existing token', /--weave-sidenav-width:\s*280px/.test(cssSidenavOverride));
+check('sidenav-overrides adds new token (auto-var)', /--weave-sidenav-elevation:\s*1px/.test(cssSidenavOverride));
+
 /* ── all-styles(): structural CSS by class ── */
 const cssStyles = compile(`@use '@weave-framework/ui' as weave;\n@include weave.all-styles();`);
 check('all-styles emits .weave-divider rule', /\.weave-divider\s*{/.test(cssStyles));
@@ -464,6 +474,11 @@ check('slider focus shows on the thumb (ring), not a box around the track', /\.w
 check('all-styles emits .weave-paginator page + nav buttons', /\.weave-paginator__page,\s*\.weave-paginator__nav\s*{[\s\S]*?min-width:\s*var\(--weave-paginator-button\)/.test(cssStyles));
 check('paginator page/nav buttons ARE Button (only compact sizing here, no re-created fill)', /\.weave-paginator__page,\s*\.weave-paginator__nav\s*{[^}]*min-width:\s*var\(--weave-paginator-button\)/.test(cssStyles) && !/\.weave-paginator__page\[aria-current=page\]/.test(cssStyles));
 check('paginator emits the ellipsis + tabular-nums range; jump field IS the composed Input (width only)', /\.weave-paginator__ellipsis\s*{/.test(cssStyles) && /\.weave-paginator__range\s*{[\s\S]*?font-variant-numeric:\s*tabular-nums/.test(cssStyles) && /\.weave-paginator__jump-field\s*{[^}]*width:\s*var\(--weave-paginator-jump-width\)/.test(cssStyles) && !/\.weave-paginator__jump-input\s*{/.test(cssStyles));
+
+/* ── sidenav (U4 Phase B): drawer + content + backdrop shell, mode modifiers ── */
+check('all-styles emits .weave-sidenav shell (relative flex, drawer + content)', /\.weave-sidenav\s*{[\s\S]*?position:\s*relative[\s\S]*?display:\s*flex/.test(cssStyles) && /\.weave-sidenav__drawer\s*{[\s\S]*?width:\s*var\(--weave-sidenav-width\)/.test(cssStyles) && /\.weave-sidenav__content\s*{/.test(cssStyles));
+check('sidenav backdrop scrim consumes the (overlay-reused) token + toggles on --backdrop', /\.weave-sidenav__backdrop\s*{[\s\S]*?background:\s*var\(--weave-sidenav-backdrop\)[\s\S]*?pointer-events:\s*none/.test(cssStyles) && /\.weave-sidenav--backdrop\s*\.weave-sidenav__backdrop\s*{[\s\S]*?opacity:\s*1/.test(cssStyles));
+check('sidenav emits the three mode modifiers (side pushes / over floats via transform)', /\.weave-sidenav--side:not\(\.weave-sidenav--opened\)\s*\.weave-sidenav__drawer\s*{[\s\S]*?margin-inline-start:\s*calc\(-1 \* var\(--weave-sidenav-width\)\)/.test(cssStyles) && /\.weave-sidenav--over\s*\.weave-sidenav__drawer[\s\S]*?transform:\s*translatex\(-100%\)/.test(cssStyles) && /\.weave-sidenav--push\.weave-sidenav--opened\s*\.weave-sidenav__content\s*{[\s\S]*?margin-inline-start:\s*var\(--weave-sidenav-width\)/.test(cssStyles));
 
 /* ── example.scss: the docs-seed dev surface compiles end-to-end ── */
 let exampleOk = false;

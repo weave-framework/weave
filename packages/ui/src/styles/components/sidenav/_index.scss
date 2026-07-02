@@ -1,0 +1,14 @@
+// Sidenav — the responsive layout shell. Behavior lives in sidenav.ts (side/over/push
+// modes, responsive breakpoint auto-mode, controlled/uncontrolled open state, focus-trap
+// in over mode); this is the visual.
+//
+// A `__drawer` beside a `__content` (+ an `__backdrop` scrim), all driven by root modifier
+// classes: --side (drawer in flow, pushes content) / --over (drawer floats over + backdrop) /
+// --push (drawer floats + shifts content); --opened, --end (dock edge), --backdrop. No
+// per-element state class — the open/mode state rides the root modifiers.
+//
+// Barrel — forwards the split partials ($tokens + the styles() mixin). Add another concern
+// as its own file and @forward it here.
+
+@forward 'tokens';
+@forward 'styles';

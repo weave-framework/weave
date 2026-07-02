@@ -9,6 +9,27 @@
 > releases here. Publishing itself is a separate, explicit step (the `/publish` skill /
 > `pnpm publish:packages`) — committing/pushing does **not** publish or mirror.
 
+## 0.2.25 — 2026-07-02 (unpublished; on `main`, ahead of the 0.2.0 npm release)
+
+U4 Phase B — the **Sidenav** responsive layout shell.
+
+### UI (`@weave-framework/ui`)
+- **New `<Sidenav>` component** (`@weave-framework/ui/sidenav`) — a `__drawer` beside a
+  `__content` with three modes: **`side`** (drawer in flow, pushes content), **`over`**
+  (drawer floats over a dimming backdrop; a modal focus context — CDK focus-trap in, Esc +
+  backdrop-click close), **`push`** (drawer floats + shifts content). **Responsive:** omit
+  `mode` and it consumes the CDK `breakpointSignal` — below the Weave `Narrow` breakpoint
+  (900px) it auto-switches to over + closed, above to side + open. This fulfils the off-canvas
+  drawer deferred from the U2 Toolbar (a Toolbar hamburger toggles it).
+- **Open state** follows the Weave convention: controlled `opened` (getter) + `onOpenedChange`,
+  or uncontrolled `defaultOpened`; imperative `open()`/`close()`/`toggle()`/`opened()` exposed
+  via the `api` ref callback (like Input's `onInputRef`). Drawer edge via `position: 'start' | 'end'`.
+- **State rides root modifier classes** (`--side`/`--over`/`--push`, `--opened`, `--end`,
+  `--backdrop`) — no per-element state class. The `over` backdrop **reuses the shared overlay
+  scrim token** (`--weave-sidenav-backdrop: var(--weave-overlay-backdrop)`) so every scrim in
+  the library reads identically. Fully tokenized SCSS (RULE #1). 12 browser tests
+  (structure/modes/controlled/api/Esc/responsive/focus-trap); `verify:ui-sass` 253.
+
 ## 0.2.24 — 2026-07-02 (unpublished; on `main`, ahead of the 0.2.0 npm release)
 
 Completes the RULE #1 tokenization pass — the last per-component spacing/typography
