@@ -9,6 +9,12 @@
 > releases here. Publishing itself is a separate, explicit step (the `/publish` skill /
 > `pnpm publish:packages`) — committing/pushing does **not** publish or mirror.
 
+## 0.2.46 — 2026-07-02 (unpublished; on `main`, ahead of the 0.2.0 npm release)
+
+**Session wrap-up (docs).** No code change — added a cross-cutting **UI Library (U0–U5)** section to `NOTES.md`
+(the arc + the durable decisions/gotchas; per-milestone detail stays in `UI-PLAN-U<n>.md`), refreshed HANDOFF +
+the auto-memory. U4 + U5 complete; next is U6. Not published, not mirrored.
+
 ## 0.2.45 — 2026-07-02 (unpublished; on `main`, ahead of the 0.2.0 npm release)
 
 **Popover-edit** — inline cell editing (U5 §5.3). **This completes U5.**
