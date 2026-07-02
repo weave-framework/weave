@@ -22,3 +22,5 @@ export * from './key-manager.js';
 export * from './observers.js';
 export * from './breakpoints.js';
 export * from './clipboard.js';
+export * from './selection-model.js';
+export * from './data-source.js';

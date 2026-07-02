@@ -9,6 +9,24 @@
 > releases here. Publishing itself is a separate, explicit step (the `/publish` skill /
 > `pnpm publish:packages`) — committing/pushing does **not** publish or mirror.
 
+## 0.2.26 — 2026-07-02 (unpublished; on `main`, ahead of the 0.2.0 npm release)
+
+U4 Phase C (start) — two headless CDK data primitives, built before Table/Tree.
+
+### UI CDK (`@weave-framework/ui/cdk`)
+- **`selectionModel<T>(options)`** (`cdk/selection-model.ts`) — the signal-native selection
+  engine under Table rows / Tree nodes / List multi-select. `select`/`deselect`/`toggle`/
+  `setSelection`/`clear`, `single` vs `multiple`, an optional `compareWith` (object copies
+  match by key), reactive `selected()`/`count()`/`isEmpty()`/`isSelected()`, and an
+  `onChange` delta stream (`{ added, removed }`) that only fires on a real change. Zero DOM.
+- **`DataSource<T>` + `ArrayDataSource`** (`cdk/data-source.ts`) — the collection-viewer
+  contract a Table/Tree consumes so paging/sorting/filtering/virtualization can be swapped
+  without the component knowing: `connect(viewer?) → Computed<T[]>` (read-only signal) /
+  `disconnect()`. `ArrayDataSource` wraps a static array **or** a signal (reactive updates
+  propagate through `connect()`); `isDataSource()` guard. Signal-native, no RxJS.
+- 15 headless tests (single/multi transitions, no-op guards, `compareWith` identity, delta
+  payloads, reactivity; DataSource static + reactive-signal propagation + read-only view).
+
 ## 0.2.25 — 2026-07-02 (unpublished; on `main`, ahead of the 0.2.0 npm release)
 
 U4 Phase B — the **Sidenav** responsive layout shell.
