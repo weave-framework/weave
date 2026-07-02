@@ -17,7 +17,12 @@
  */
 
 import { signal, type Signal } from '@weave-framework/runtime';
-import { menu, type MenuOptions, type MenuItem } from '../menu/menu.js';
+
+/** A page-size option shown in the composed Select. */
+interface SizeOption {
+  value: string;
+  label: string;
+}
 
 export interface PageEvent {
   pageIndex: number;
@@ -74,14 +79,13 @@ export const template: string =
   '@if (showJump()) {' +
   '<span class="weave-paginator__jump">' +
   '<label class="weave-paginator__jump-label">{{ jumpLabel() }}</label>' +
-  '<input class="weave-paginator__jump-input" type="number" min="1" max={{ pageCount() }}' +
-  ' .value={{ currentPage() }} disabled={{ isDisabled() }} aria-label="Go to page"' +
-  ' on:keydown={{ onJumpKeydown }}>' +
+  '<Input type="number" value={{ jumpValue() }} disabled={{ isDisabled() }} label="Go to page"' +
+  ' class="weave-paginator__jump-field" on:keydown={{ onJumpKeydown }} />' +
   '</span>' +
   '}' +
   '@if (hasSizeOptions()) {' +
-  '<button class="weave-paginator__size" type="button" aria-label="Items per page"' +
-  ' disabled={{ isDisabled() }} use:menu={{ sizeMenuConfig }}>{{ sizeText() }}</button>' +
+  '<Select options={{ sizeOptions() }} value={{ sizeValue() }} onChange={{ onSizeChange }}' +
+  ' disabled={{ isDisabled() }} label="Items per page" class="weave-paginator__size" />' +
   '}' +
   '</nav>';
 
@@ -103,13 +107,14 @@ export interface PaginatorContext {
   rangeText: () => string;
   showJump: () => boolean;
   jumpLabel: () => string;
+  jumpValue: () => string;
   pageCount: () => number;
   currentPage: () => number;
   onJumpKeydown: (event: KeyboardEvent) => void;
   hasSizeOptions: () => boolean;
-  sizeText: () => string;
-  menu: typeof menu;
-  sizeMenuConfig: MenuOptions;
+  sizeOptions: () => SizeOption[];
+  sizeValue: () => string;
+  onSizeChange: (value: string) => void;
 }
 
 function range(start: number, end: number): number[] {
@@ -170,12 +175,6 @@ export function setup(props: PaginatorProps): PaginatorContext {
     props.onPage?.({ pageIndex: nextIndex, pageSize: size, length: length() });
   };
 
-  const sizeMenuConfig: MenuOptions = {
-    items: (props.pageSizeOptions ?? []).map((n) => ({ value: String(n), label: `${n} / page` })),
-    onSelect: (selected: string | MenuItem): void =>
-      changeSize(Number(typeof selected === 'string' ? selected : selected.value)),
-  };
-
   return {
     host,
     rootClass: (): string => {
@@ -206,18 +205,24 @@ export function setup(props: PaginatorProps): PaginatorContext {
     },
     showJump: (): boolean => props.showJump !== false,
     jumpLabel: (): string => props.jumpLabel ?? 'Go to',
+    jumpValue: (): string => String(currentPage()),
     pageCount,
     currentPage,
+    // The jump field is a composed <Input>; on Enter, read the typed value off the
+    // native input the event bubbled from and navigate (clamped).
     onJumpKeydown: (event): void => {
       if (event.key !== 'Enter') return;
-      const input: HTMLInputElement = event.target as HTMLInputElement;
-      const target: number = parseInt(input.value, 10);
+      const input: HTMLInputElement | null = (event.target as HTMLElement).closest('.weave-input')?.querySelector('input') ?? null;
+      const raw: string = input ? input.value : (event.target as HTMLInputElement).value;
+      const target: number = parseInt(raw, 10);
       if (Number.isFinite(target)) goToIndex(target - 1);
       event.preventDefault();
     },
     hasSizeOptions: (): boolean => (props.pageSizeOptions?.length ?? 0) > 0,
-    sizeText: (): string => `${pageSize()} / page`,
-    menu,
-    sizeMenuConfig,
+    // Page-size options + value for the composed <Select>.
+    sizeOptions: (): SizeOption[] =>
+      (props.pageSizeOptions ?? []).map((n) => ({ value: String(n), label: `${n} / page` })),
+    sizeValue: (): string => String(pageSize()),
+    onSizeChange: (value): void => changeSize(Number(value)),
   };
 }

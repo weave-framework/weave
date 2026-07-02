@@ -464,7 +464,7 @@ check('slider blocks page scroll during a pointer drag (touch-action:none)', /\.
 check('slider focus shows on the thumb (ring), not a box around the track', /\.weave-slider:focus-visible\s*{[^}]*outline:\s*none/.test(cssStyles) && /\.weave-slider:focus-visible\s+\.weave-slider__thumb\s*{[^}]*outline:\s*2px solid/.test(cssStyles));
 check('all-styles emits .weave-paginator page + nav buttons', /\.weave-paginator__page,\s*\.weave-paginator__nav\s*{[\s\S]*?min-width:\s*var\(--weave-paginator-button\)/.test(cssStyles));
 check('paginator active page takes the ink fill via [aria-current=page]', /\.weave-paginator__page\[aria-current=page\]\s*{[^}]*background:\s*var\(--weave-paginator-active-background\)/.test(cssStyles));
-check('paginator emits the ellipsis + tabular-nums range + jump input', /\.weave-paginator__ellipsis\s*{/.test(cssStyles) && /\.weave-paginator__range\s*{[\s\S]*?font-variant-numeric:\s*tabular-nums/.test(cssStyles) && /\.weave-paginator__jump-input\s*{/.test(cssStyles));
+check('paginator emits the ellipsis + tabular-nums range; jump field IS the composed Input (width only)', /\.weave-paginator__ellipsis\s*{/.test(cssStyles) && /\.weave-paginator__range\s*{[\s\S]*?font-variant-numeric:\s*tabular-nums/.test(cssStyles) && /\.weave-paginator__jump-field\s*{[^}]*width:\s*var\(--weave-paginator-jump-width\)/.test(cssStyles) && !/\.weave-paginator__jump-input\s*{/.test(cssStyles));
 
 /* ── example.scss: the docs-seed dev surface compiles end-to-end ── */
 let exampleOk = false;

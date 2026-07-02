@@ -20,7 +20,7 @@
     justify-content: center;
     min-width: var(--weave-paginator-button);
     height: var(--weave-paginator-button);
-    padding: 0 6px;
+    padding: 0 var(--weave-paginator-button-padding-x);
     border: 0;
     border-radius: var(--weave-paginator-radius);
     background: transparent;
@@ -42,8 +42,7 @@
   }
 
   .weave-paginator__page:focus-visible,
-  .weave-paginator__nav:focus-visible,
-  .weave-paginator__size:focus-visible {
+  .weave-paginator__nav:focus-visible {
     @include helpers.focus-ring;
     outline-offset: -2px;
   }
@@ -55,7 +54,7 @@
   }
 
   .weave-paginator__nav {
-    font-size: 16px; // the ‹ › glyphs read a touch larger
+    font-size: var(--weave-paginator-nav-glyph-size); // the ‹ › glyphs read a touch larger
     line-height: 1;
   }
 
@@ -76,55 +75,34 @@
     white-space: nowrap;
   }
 
-  // Manual "go to page" entry.
+  // Manual "go to page" entry — the field IS the Input component; this is only the
+  // label + a width for the composed <Input> (layout is the paginator's job).
   .weave-paginator__jump {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--weave-paginator-jump-gap);
     margin-left: var(--weave-paginator-section-gap);
     color: var(--weave-paginator-range);
     font-size: var(--weave-paginator-range-size);
   }
 
-  .weave-paginator__jump-input {
-    width: var(--weave-paginator-input-width);
-    height: var(--weave-paginator-button);
-    padding: 0 6px;
-    border: 1px solid var(--weave-paginator-border);
-    border-radius: var(--weave-paginator-radius);
-    background: transparent;
-    color: var(--weave-paginator-input-text);
-    font: inherit;
+  .weave-paginator__jump-field {
+    width: var(--weave-paginator-jump-width);
+  }
+
+  .weave-paginator__jump-field .weave-input__field {
+    text-align: center;
     font-variant-numeric: tabular-nums;
   }
 
-  .weave-paginator__jump-input:focus-visible {
-    outline: none;
-    border-color: var(--weave-color-accent);
-  }
-
-  // Optional page-size menu trigger (composes the Menu action).
+  // Optional page-size picker — the control IS the Select component; this just spaces +
+  // widths the composed <Select>.
   .weave-paginator__size {
-    display: inline-flex;
-    align-items: center;
-    height: var(--weave-paginator-button);
     margin-left: var(--weave-paginator-section-gap);
-    padding: 0 8px;
-    border: 1px solid var(--weave-paginator-border);
-    border-radius: var(--weave-paginator-radius);
-    background: transparent;
-    color: var(--weave-paginator-input-text);
-    font: inherit;
-    cursor: pointer;
-  }
-
-  .weave-paginator__size::after {
-    content: '▾';
-    margin-left: 6px;
-    color: var(--weave-paginator-range);
+    width: var(--weave-paginator-size-width);
   }
 
   .weave-paginator--disabled {
-    opacity: 0.6;
+    opacity: var(--weave-paginator-disabled-opacity);
   }
 }

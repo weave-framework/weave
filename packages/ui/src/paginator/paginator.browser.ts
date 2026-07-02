@@ -11,13 +11,17 @@ import {
 import * as dom from '@weave-framework/runtime/dom';
 import { compileTemplate } from '@weave-framework/compiler';
 import { setup, template, type PaginatorProps, type PaginatorContext, type PageEvent } from '@weave-framework/ui/paginator';
+import * as InputMod from '@weave-framework/ui/input';
+import * as SelectMod from '@weave-framework/ui/select';
+import { toComponent } from '../internal/compose.js';
 
 const rt: typeof dom & { signal: typeof signal; effect: typeof effect } = { ...dom, signal, effect };
 
 const SCOPE: string[] = [
   'host', 'rootClass', 'navLabel', 'cells', 'isPage', 'pageLabel', 'pageCurrent', 'isDisabled',
   'goTo', 'prev', 'next', 'prevDisabled', 'nextDisabled', 'showRange', 'rangeText', 'showJump',
-  'jumpLabel', 'pageCount', 'currentPage', 'onJumpKeydown', 'hasSizeOptions', 'sizeText', 'menu', 'sizeMenuConfig',
+  'jumpLabel', 'jumpValue', 'pageCount', 'currentPage', 'onJumpKeydown', 'hasSizeOptions',
+  'sizeOptions', 'sizeValue', 'onSizeChange',
 ];
 
 interface Mounted {
@@ -27,7 +31,7 @@ interface Mounted {
   pages: HTMLButtonElement[];
   range: HTMLElement | null;
   jump: HTMLInputElement | null;
-  size: HTMLButtonElement | null;
+  size: HTMLElement | null;
   sequence: () => string[];
   dispose: () => void;
 }
@@ -42,7 +46,8 @@ function mount(props: PaginatorProps): Mounted {
       r: unknown,
       k: unknown
     ) => HTMLElement;
-    return fn(ctx, rt, {});
+    // Jump field IS the Input component, page-size IS the Select — provide them as children.
+    return fn(ctx, rt, { Input: toComponent(InputMod as never), Select: toComponent(SelectMod as never) });
   });
   document.body.appendChild(nav);
   const q = <T extends Element>(s: string): T[] => Array.from(nav.querySelectorAll<T>(s));
@@ -52,8 +57,9 @@ function mount(props: PaginatorProps): Mounted {
     next: nav.querySelectorAll<HTMLButtonElement>('.weave-paginator__nav')[1],
     pages: q<HTMLButtonElement>('.weave-paginator__page'),
     range: nav.querySelector<HTMLElement>('.weave-paginator__range'),
-    jump: nav.querySelector<HTMLInputElement>('.weave-paginator__jump-input'),
-    size: nav.querySelector<HTMLButtonElement>('.weave-paginator__size'),
+    // The composed Input's native field / the composed Select's root.
+    jump: nav.querySelector<HTMLInputElement>('.weave-paginator__jump-field input'),
+    size: nav.querySelector<HTMLElement>('.weave-paginator__size'),
     // The ordered run of page numbers + ellipses (nav arrows excluded).
     sequence: (): string[] =>
       Array.from(nav.querySelectorAll<HTMLElement>('.weave-paginator__page, .weave-paginator__ellipsis')).map(
@@ -197,10 +203,11 @@ test('showJump={{false}} hides the input', () => {
 
 /* ─────────────────────────── page-size menu ─────────────────────────── */
 
-test('pageSizeOptions renders a size trigger; none hides it', () => {
+test('pageSizeOptions renders a composed Select showing the size; none hides it', () => {
   const { size, dispose } = mount(withPages(10, 0, { pageSizeOptions: [10, 25, 50] }));
-  assert.ok(size, 'size trigger shown when options are given');
-  assert.equal(size?.textContent?.replace('▾', '').trim(), '10 / page');
+  assert.ok(size, 'the page-size Select is shown when options are given');
+  assert.ok(size?.classList.contains('weave-select'), 'it IS the Select component');
+  assert.ok(size?.textContent?.includes('10 / page'), 'the trigger shows the current size');
   dispose();
   const none: Mounted = mount(withPages(10, 0));
   assert.equal(none.size, null);
