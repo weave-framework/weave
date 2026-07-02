@@ -38,16 +38,12 @@
       border-color var(--weave-checkbox-duration) ease;
   }
 
-  /* The ✓ tick — a rotated border "L", revealed when checked. */
+  /* The ✓ tick — the shared checkmark glyph, revealed when checked. */
   .weave-checkbox__box::after {
-    content: '';
+    @include helpers.checkmark(var(--weave-checkbox-mark));
     position: absolute;
     left: 50%;
     top: 46%;
-    width: 5px;
-    height: 9px;
-    border: solid var(--weave-checkbox-mark);
-    border-width: 0 2px 2px 0;
     transform: translate(-50%, -50%) rotate(45deg);
     opacity: 0;
     transition: opacity var(--weave-checkbox-duration) ease;

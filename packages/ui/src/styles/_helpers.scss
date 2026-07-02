@@ -60,6 +60,17 @@
   }
 }
 
+// THE Weave check ✓ — a rotated border-"L" glyph (pure CSS, no SVG), shared by Checkbox /
+// Select option / Stepper. Set `content` + shape here; the consumer positions + rotates it
+// (translate/rotate differ per use).
+@mixin checkmark($color, $width: 5px, $height: 9px, $thickness: 2px) {
+  content: '';
+  width: #{$width};
+  height: #{$height};
+  border: solid #{$color};
+  border-width: 0 #{$thickness} #{$thickness} 0;
+}
+
 // THE Weave inline clear (×) button — the small round reset shared by Input + Select.
 @mixin clear-button($color, $hover, $size: 18px) {
   @include field-reset;

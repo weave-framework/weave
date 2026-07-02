@@ -96,17 +96,13 @@
     background: var(--weave-select-option-selected);
   }
 
-  // A check-mark on the selected option (single + multiple).
+  // The shared checkmark glyph on the selected option (single + multiple).
   .weave-select__option--selected::after {
-    content: '';
+    @include helpers.checkmark(var(--weave-select-option-mark));
     position: absolute;
     right: var(--weave-select-option-padding-x);
     top: 50%;
-    width: 5px;
-    height: 9px;
     margin-top: -6px;
-    border: solid var(--weave-select-option-mark);
-    border-width: 0 2px 2px 0;
     transform: rotate(45deg);
   }
 

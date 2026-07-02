@@ -19,7 +19,7 @@
     align-items: center;
     gap: var(--weave-stepper-gap);
     min-width: 0; // allow the step to shrink so the header never overflows its box
-    padding: 4px 2px;
+    padding: var(--weave-stepper-step-padding-y) var(--weave-stepper-step-padding-x);
     border: 0;
     background: transparent;
     color: var(--weave-stepper-label);
@@ -90,17 +90,13 @@
   }
 
   .weave-stepper__step[data-state='done'] .weave-stepper__indicator::after {
-    content: '';
-    width: 5px;
-    height: 9px;
+    @include helpers.checkmark(var(--weave-stepper-on-accent), var(--weave-stepper-check-width), var(--weave-stepper-check-height));
     margin-top: -2px;
-    border: solid var(--weave-stepper-on-accent);
-    border-width: 0 2px 2px 0;
     transform: rotate(45deg);
   }
 
   .weave-stepper__optional {
-    margin-left: 6px;
+    margin-left: var(--weave-stepper-optional-gap);
     color: var(--weave-stepper-optional);
     font-size: var(--weave-stepper-optional-size);
   }
@@ -109,8 +105,8 @@
   .weave-stepper__connector {
     flex: 1 1 auto;
     min-width: var(--weave-stepper-connector-min);
-    height: 1px;
-    margin: 0 6px;
+    height: var(--weave-stepper-connector-height);
+    margin: 0 var(--weave-stepper-connector-gap);
     background: var(--weave-stepper-connector);
     transition: background var(--weave-stepper-duration) ease;
   }
@@ -123,44 +119,11 @@
     padding: var(--weave-stepper-panel-padding-y) 0;
   }
 
+  // The Back / Continue actions ARE the Button component (composed, not re-created) —
+  // this is just their layout row.
   .weave-stepper__actions {
     display: flex;
     gap: var(--weave-stepper-actions-gap);
-    margin-top: 8px;
-  }
-
-  // Self-contained nav buttons (no dependency on the Button component's classes).
-  .weave-stepper__back,
-  .weave-stepper__next {
-    padding: var(--weave-stepper-button-padding-y) var(--weave-stepper-button-padding-x);
-    border: 1px solid transparent;
-    border-radius: var(--weave-stepper-radius);
-    font: inherit;
-    font-weight: var(--weave-stepper-button-weight);
-    cursor: pointer;
-  }
-
-  .weave-stepper__back {
-    background: transparent;
-    border-color: var(--weave-stepper-button-border);
-    color: var(--weave-stepper-label);
-  }
-
-  .weave-stepper__next {
-    background: var(--weave-stepper-next-background);
-    color: var(--weave-stepper-next-text);
-  }
-
-  .weave-stepper__back:focus-visible,
-  .weave-stepper__next:focus-visible {
-    @include helpers.focus-ring;
-  }
-
-  .weave-stepper__back:disabled,
-  .weave-stepper__next:disabled {
-    background: var(--weave-stepper-button-disabled);
-    border-color: transparent;
-    color: var(--weave-stepper-disabled-text);
-    cursor: not-allowed;
+    margin-top: var(--weave-stepper-actions-margin);
   }
 }
