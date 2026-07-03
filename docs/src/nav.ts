@@ -22,7 +22,7 @@ export interface NavSection {
   id: string;
   /** Label shown in the top-bar switcher. */
   label: string;
-  /** A short glyph shown next to the label. */
+  /** A Lucide icon name shown before the label in the section switcher. */
   icon: string;
   /** URL prefix that selects this section (and its sidebar). */
   basePath: string;
@@ -36,7 +36,7 @@ export interface NavSection {
 const learn: NavSection = {
   id: 'learn',
   label: 'Learn',
-  icon: '🎓',
+  icon: 'graduation-cap',
   basePath: '/learn',
   home: '/learn/introduction',
   groups: [
@@ -85,7 +85,7 @@ const learn: NavSection = {
 const reference: NavSection = {
   id: 'reference',
   label: 'Reference',
-  icon: '📖',
+  icon: 'book-open',
   basePath: '/reference',
   home: '/reference/runtime',
   groups: [
@@ -117,7 +117,7 @@ const reference: NavSection = {
 const ui: NavSection = {
   id: 'ui',
   label: 'UI',
-  icon: '📦',
+  icon: 'package',
   basePath: '/ui',
   home: '/ui/theming',
   groups: [

@@ -1,4 +1,3 @@
-import '../lib/icons'; // register the extra chrome icons (sun/moon/github/copy) before any <Icon> renders
 import { signal } from '@weave-framework/runtime';
 import { RouterView, Link, navigate, currentPath, type Router } from '@weave-framework/router';
 import Toolbar from '@weave-framework/ui/toolbar';
@@ -14,8 +13,8 @@ interface ShellSetup {
   router: Router;
   /** Sidebar groups for whichever section the current path falls under. */
   groups: () => NavGroup[];
-  /** Section switcher options for the top-bar `<ButtonToggle>` (id → labelled segment). */
-  sectionOptions: { value: string; label: string }[];
+  /** Section switcher options for the top-bar `<ButtonToggle>` (id → icon + labelled segment). */
+  sectionOptions: { value: string; label: string; icon: string }[];
   /** The id of the section the current path falls under (drives the switcher's selected segment). */
   activeSectionId: () => string;
   /** Navigate to a section's landing route when its switcher segment is chosen. */
@@ -53,7 +52,7 @@ export function setup(): ShellSetup {
 
   const groups = (): NavGroup[] => current().groups;
 
-  const sectionOptions = sections.map((s) => ({ value: s.id, label: `${s.icon} ${s.label}` }));
+  const sectionOptions = sections.map((s) => ({ value: s.id, label: s.label, icon: s.icon }));
   const activeSectionId = (): string => current().id;
   const goToSection = (id: string | string[]): void => {
     const key: string = Array.isArray(id) ? id[0] : id;
