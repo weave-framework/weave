@@ -34,6 +34,8 @@ So what does Weave do *a little differently*?
 - **Dependencies track themselves.** Things update when — and only when — what they depend on actually changes. Nothing to declare by hand, nothing to cache, nothing to forget.
 - **No Virtual DOM.** Your interface maps straight onto the page, so updates stay surgical and the runtime that ships stays genuinely small.
 - **Batteries included, not bolted on.** Routing, state, forms, translations, and motion are all first‑party and share the same reactive core — so they compose instead of competing.
+- **A component library cut from the same cloth.** Buttons to data tables to date pickers — a complete set of UI components, themed by one token system and composed rather than duplicated. Not a bolt‑on kit: they're built on the same signals as everything else.
+- **Accessible by construction.** Those components are built to the WAI‑ARIA patterns — correct roles and state, full keyboard support, focus management, and reduced‑motion — so the hard parts of accessibility are handled before you write a line.
 - **A real IDE citizen.** First‑class VS Code **and** WebStorm support, with the kind of editor experience you'd expect from a mature framework.
 - **Honest TypeScript.** Types flow through by inference, your editor understands your UI for free, and there's no decorator boilerplate to wade through.
 
@@ -45,7 +47,7 @@ None of this makes the others "wrong." It's a different set of trade‑offs — 
 
 Weave's core is solid — signal-native, covered by a broad browser test suite, and dogfooded end to end by a complete demo app. It evolves deliberately, and one rule sits above the rest: *don't break your app.* Stability isn't a milestone we're waiting on — it's the priority today. On the near horizon:
 
-- **Documentation site** — the home this README keeps pointing you toward (in progress).
+- **Documentation site** — the home this README keeps pointing you toward: live today, and filling in component by component.
 - **Server‑side rendering & hydration** — added when there's a real need, with a clean boundary rather than magic strings.
 - **Devtools** — a way to watch the fabric update live.
 - **More of everything** — the long tail of polish that turns a framework into a daily driver.
@@ -64,7 +66,7 @@ Installation, your first component, guides, and the complete API reference all l
 
 ## 🛡️ Built to be trusted
 
-Weave is *small, fast, signal‑native, and low‑ceremony* — and built to hold up in serious codebases, not just demos. Its sharpest edge is the one large teams worry about most: **zero third‑party runtime dependencies.** No transitive packages, no audit scramble — a supply‑chain attack surface that's effectively nil. Pair that with performance that stays flat as the UI grows, first‑party routing, state, forms, and i18n that share one reactive core, and type‑checking that reaches all the way into your templates, and you get a framework that scales *with* a team, not against it.
+Weave is *small, fast, signal‑native, and low‑ceremony* — and built to hold up in serious codebases, not just demos. Its sharpest edge is the one large teams worry about most: **zero third‑party runtime dependencies.** No transitive packages, no audit scramble — a supply‑chain attack surface that's effectively nil. Pair that with performance that stays flat as the UI grows, first‑party routing, state, forms, and i18n that share one reactive core, a UI component library built to the WAI‑ARIA accessibility patterns, and type‑checking that reaches all the way into your templates, and you get a framework that scales *with* a team, not against it.
 
 We won't oversell the young parts: SSR/hydration and devtools are on the roadmap, and the ecosystem is still growing. But the foundation is real and tested today — and it's aimed squarely at the work real applications demand.
 
