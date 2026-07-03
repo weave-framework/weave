@@ -81,8 +81,12 @@ async function devInMemory(config: DevConfig): Promise<DevServer> {
   if (config.styles?.length) {
     const css: string = (await Promise.all(config.styles.map(compileStyleFile))).join('\n');
     if (css)
+      // Guard by a fixed id: if this banner is evaluated more than once (e.g. bundled into
+      // a lazily-loaded route chunk on SPA navigation), it would otherwise append a duplicate
+      // copy of the entire global stylesheet every time — the head balloons with identical
+      // ~100KB sheets and style recalc/devtools grind. Idempotent injection fixes that.
       banner = {
-        js: `(()=>{const s=document.createElement("style");s.textContent=${JSON.stringify(
+        js: `(()=>{const id="w-global-styles";if(document.getElementById(id))return;const s=document.createElement("style");s.id=id;s.textContent=${JSON.stringify(
           css
         )};document.head.appendChild(s);})();`,
       };

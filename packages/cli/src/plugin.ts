@@ -42,10 +42,26 @@ export interface WeaveOptions {
   dev?: boolean;
 }
 
-/** A `<style>`-injecting IIFE appended to a component module in dev mode. */
+/** A stable id derived from CSS text (djb2), so a `<style>` can be deduped. */
+function styleId(css: string): string {
+  let h = 5381;
+  for (let i = 0; i < css.length; i++) h = (Math.imul(h, 33) ^ css.charCodeAt(i)) | 0;
+  return 'w-css-' + (h >>> 0).toString(36);
+}
+
+/**
+ * A `<style>`-injecting IIFE appended to a component module in dev mode. Guarded by a
+ * content-hash id: a component module re-evaluated on SPA navigation (or re-imported)
+ * would otherwise append a *duplicate* `<style>` every time, so the head accumulates
+ * hundreds of identical sheets and style recalc grinds to a halt. The guard makes
+ * injection idempotent (a real style change gets a new hash → a new sheet).
+ */
 function cssInjector(css: string): string {
   if (!css) return '';
-  return `\n;(()=>{const s=document.createElement("style");s.textContent=${JSON.stringify(
+  const id: string = styleId(css);
+  return `\n;(()=>{const id=${JSON.stringify(
+    id
+  )};if(document.getElementById(id))return;const s=document.createElement("style");s.id=id;s.textContent=${JSON.stringify(
     css
   )};document.head.appendChild(s);})();\n`;
 }
