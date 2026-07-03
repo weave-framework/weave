@@ -9,6 +9,17 @@
 > releases here. Publishing itself is a separate, explicit step (the `/publish` skill /
 > `pnpm publish:packages`) — pushing code does **not** publish to npm.
 
+## 0.2.57 — 2026-07-03
+
+**U6 a11y audit — Batch A (foundational, `@weave-framework/ui`).** Audited the 17 foundational components (Button,
+Button-Toggle, Icon, Badge, Card, Toolbar, List, Grid-List, Progress-Bar/Spinner, Checkbox, Radio, Slide-Toggle,
+Form-Field, Input, Chips, Ripple) across roles/states, keyboard, and focus management: **all conformant** — no
+behavioural defects found (several speculative findings were verified against the source and rejected). Added a
+regression test pinning that `<ButtonToggle>`'s `aria-checked` tracks its bound value signal reactively after mount.
+The only genuine issues are reduced-motion (unguarded CSS animations/transitions) and a few RTL physical-property
+sites; both are batched into the upcoming centralized cross-cutting pass rather than fixed per-component. No
+behaviour change ships in this version.
+
 ## 0.2.56 — 2026-07-03
 
 **U6 a11y audit — start (`@weave-framework/ui`).** First unit of the structural accessibility audit (see

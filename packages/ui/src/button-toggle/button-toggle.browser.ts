@@ -72,6 +72,24 @@ test('single: the selected segment carries aria-checked=true, others false', () 
   dispose();
 });
 
+test('single: aria-checked tracks a reactive value signal (updates after mount)', () => {
+  const v: Signal<string> = signal<string>('list');
+  const { segments, dispose } = mount({
+    options: OPTS,
+    get value(): string {
+      return v();
+    },
+  });
+  assert.deepEqual(segments.map((s) => s.getAttribute('aria-checked')), ['true', 'false', 'false']);
+  v.set('map'); // change the bound value AFTER mount
+  assert.deepEqual(
+    segments.map((s) => s.getAttribute('aria-checked')),
+    ['false', 'false', 'true'],
+    'aria-checked reflects the new value reactively',
+  );
+  dispose();
+});
+
 test('single: roving tabindex — only the selected segment is tabbable', () => {
   const { segments, dispose } = mount({ options: OPTS, value: 'map' });
   assert.deepEqual(segments.map((s) => s.getAttribute('tabindex')), ['-1', '-1', '0']);
