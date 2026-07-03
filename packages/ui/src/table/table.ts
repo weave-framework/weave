@@ -15,7 +15,7 @@
  * scrolls vertically inside while the header stays). Virtual body is the noted follow-on.
  *
  *   import Table from '@weave-framework/ui/table';
- *   import Checkbox from '@weave-framework/ui/checkbox';   // composed — provide it to the build
+ *   import Checkbox from '@weave-framework/ui/checkbox';   // optional — the build auto-resolves the composed <Checkbox>
  *   <Table columns={{ cols }} dataSource={{ rows }} selectable expandable />
  */
 import { signal, onMount, type Signal, type Computed } from '@weave-framework/runtime';

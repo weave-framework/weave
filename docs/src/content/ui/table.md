@@ -75,7 +75,10 @@ sort your data:
 ## Selection
 
 `selectable={{ true }}` adds a leading checkbox column (composing the real [Checkbox](/ui/checkbox)) with a header
-select-all. `selectionMode` is `'single'` or `'multiple'`; `onSelectionChange` reports the selected rows:
+select-all. `selectionMode` is `'single'` or `'multiple'`; `onSelectionChange` reports the selected rows. The
+checkbox column is a real composed `<Checkbox>` — click the header to select or clear every row:
+
+:::demo table-demo
 
 ```html
 <Table columns={{ columns }} dataSource={{ rows }} selectable={{ true }} selectionMode={{ 'multiple' }} onSelectionChange={{ onSel }} />

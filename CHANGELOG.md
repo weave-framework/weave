@@ -9,6 +9,21 @@
 > releases here. Publishing itself is a separate, explicit step (the `/publish` skill /
 > `pnpm publish:packages`) — pushing code does **not** publish to npm.
 
+## 0.2.87 — 2026-07-03
+
+**Fix — composed child components resolve when nested inside `@if`/`@for` and documented as an import example
+(`@weave-framework/cli`).** `<Table selectable>` silently blanked the whole render: its selection column composes the
+real `<Checkbox>` (inside `@if`/`@for` blocks), but the child-import auto-resolver in the esbuild loader skipped
+wiring it, so the compiled module referenced a bare `Checkbox` and threw a swallowed `ReferenceError`. Root cause was
+in `importsBinding` — it scanned the component's **whole script including comments**, so Table's JSDoc usage example
+(`import Checkbox from '@weave-framework/ui/checkbox'`) was mistaken for a real import and the resolver assumed the
+child was already provided. It now scans a **comment-stripped** copy of the script (a small tokenizer that preserves
+string/template literals so a `//` inside a string is not treated as a comment), so a documented import example no
+longer suppresses auto-resolution. The compiler already collected nested PascalCase children correctly; an audit of
+every UI component confirmed Table→Checkbox was the only one affected. Pinned by a failing-first end-to-end test
+(`tools/verify-ui-compose.mjs`) that builds `<Table selectable>` through the real consumer loader and asserts the
+composed `<Checkbox>` selection column mounts. The docs `/ui/table` page's Selection section is now a live demo.
+
 ## 0.2.61 — 2026-07-03
 
 **U6 a11y audit — cross-cutting pass (reduced motion + RTL, `@weave-framework/ui`).** Completes the U6 accessibility
