@@ -10,6 +10,11 @@ import BadgeVariants from '../demos/ui/badge-variants';
 import BadgeMax from '../demos/ui/badge-max';
 import CardBasic from '../demos/ui/card-basic';
 import CardInteractive from '../demos/ui/card-interactive';
+import ButtonToggleSingle from '../demos/ui/button-toggle-single';
+import ButtonToggleMulti from '../demos/ui/button-toggle-multi';
+import ToolbarBasic from '../demos/ui/toolbar-basic';
+import RippleBasic from '../demos/ui/ripple-basic';
+import DividerBasic from '../demos/ui/divider-basic';
 
 /**
  * Live-demo registry: maps a `:::demo <key>` directive to a real Weave component.
@@ -31,4 +36,9 @@ export const demos: Record<string, Component> = {
   'badge-max': BadgeMax,
   'card-basic': CardBasic,
   'card-interactive': CardInteractive,
+  'button-toggle-single': ButtonToggleSingle,
+  'button-toggle-multi': ButtonToggleMulti,
+  'toolbar-basic': ToolbarBasic,
+  'ripple-basic': RippleBasic,
+  'divider-basic': DividerBasic,
 };

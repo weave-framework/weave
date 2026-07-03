@@ -125,9 +125,13 @@ const ui: NavSection = {
       label: 'Foundational',
       items: [
         { label: 'Button', path: '/ui/button' },
+        { label: 'Button Toggle', path: '/ui/button-toggle' },
         { label: 'Icon', path: '/ui/icon' },
         { label: 'Badge', path: '/ui/badge' },
         { label: 'Card', path: '/ui/card' },
+        { label: 'Toolbar', path: '/ui/toolbar' },
+        { label: 'Ripple', path: '/ui/ripple' },
+        { label: 'Divider', path: '/ui/divider' },
       ],
     },
   ],
