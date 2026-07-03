@@ -44,6 +44,8 @@ import SidenavDemo from '../demos/ui/sidenav-demo';
 import MenuDemo from '../demos/ui/menu-demo';
 import MenubarDemo from '../demos/ui/menubar-demo';
 import ContextMenuDemo from '../demos/ui/context-menu-demo';
+import TableDemo from '../demos/ui/table-demo';
+import TreeDemo from '../demos/ui/tree-demo';
 import AutocompleteBasic from '../demos/ui/autocomplete-basic';
 
 /**
@@ -101,4 +103,6 @@ export const demos: Record<string, Component> = {
   'menu-demo': MenuDemo,
   'menubar-demo': MenubarDemo,
   'context-menu-demo': ContextMenuDemo,
+  'table-demo': TableDemo,
+  'tree-demo': TreeDemo,
 };

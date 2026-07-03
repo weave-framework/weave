@@ -175,6 +175,13 @@ const ui: NavSection = {
       ],
     },
     {
+      label: 'Data',
+      items: [
+        { label: 'Table', path: '/ui/table' },
+        { label: 'Tree', path: '/ui/tree' },
+      ],
+    },
+    {
       label: 'Feedback & overlays',
       items: [
         { label: 'Dialog', path: '/ui/dialog' },
