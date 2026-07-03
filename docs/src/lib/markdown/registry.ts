@@ -27,6 +27,8 @@ import SelectBasic from '../demos/ui/select-basic';
 import SelectMultiple from '../demos/ui/select-multiple';
 import ChipsBasic from '../demos/ui/chips-basic';
 import SliderBasic from '../demos/ui/slider-basic';
+import DatepickerBasic from '../demos/ui/datepicker-basic';
+import TimepickerBasic from '../demos/ui/timepicker-basic';
 import AutocompleteBasic from '../demos/ui/autocomplete-basic';
 
 /**
@@ -67,4 +69,6 @@ export const demos: Record<string, Component> = {
   'chips-basic': ChipsBasic,
   'slider-basic': SliderBasic,
   'autocomplete-basic': AutocompleteBasic,
+  'datepicker-basic': DatepickerBasic,
+  'timepicker-basic': TimepickerBasic,
 };

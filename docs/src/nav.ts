@@ -148,6 +148,13 @@ const ui: NavSection = {
         { label: 'Slider', path: '/ui/slider' },
       ],
     },
+    {
+      label: 'Pickers',
+      items: [
+        { label: 'Datepicker', path: '/ui/datepicker' },
+        { label: 'Timepicker', path: '/ui/timepicker' },
+      ],
+    },
   ],
 };
 
