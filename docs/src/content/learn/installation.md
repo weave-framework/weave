@@ -168,7 +168,7 @@ export function setup() {
 ~~~
 ~~~html title="src/app/app.html"
 <main>
-  <h1>Hello, Weave 🧵</h1>
+  <h1>Hello, Weave</h1>
   <button on:click={{ inc }}>clicked {{ count() }} times</button>
 </main>
 ~~~

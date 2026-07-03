@@ -32,6 +32,17 @@ code {
   font-family: var(--mono);
 }
 
+/* Inline Lucide glyph in prose (`:icon[name]`) — sized to the text, currentColor stroke. */
+.inline-icon {
+  display: inline-flex;
+  vertical-align: -0.15em;
+}
+
+.inline-icon svg {
+  width: 1.05em;
+  height: 1.05em;
+}
+
 /* Inline code inside prose. */
 :not(pre) > code {
   font-size: 0.88em;

@@ -27,7 +27,7 @@ export function setup(props: { task: Task }) {
   @if (mine()) {
     <span class="mine">You</span>
   }
-  <button on:click={{ () => editor.open(task().id) }}>✎</button>
+  <button on:click={{ () => editor.open(task().id) }}>Edit</button>
 </article>
 ~~~
 :::

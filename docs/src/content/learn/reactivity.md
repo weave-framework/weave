@@ -98,7 +98,7 @@ A computed only runs its function **when something reads it**. Never read it, an
 
 ~~~ts title="Don't do this"
 const logged = computed(() => {
-  console.log('computing!'); // ⚠️ may NEVER print — nobody reads `logged`
+  console.log('computing!'); // may NEVER print — nobody reads `logged`
   return expensive(data());
 });
 // `logged` is never called → the body never runs → no log, no recompute.
@@ -188,10 +188,10 @@ The owner chain is set when the effect is *created* (it captures whatever owner 
 
 Here's a sharp edge worth a warning. If you create an `effect` **inside** another effect, the inner one is **not** owned by the outer one. It registers into whatever ownership scope was active when the *outer* effect was created — which is usually the component, not the outer effect. So every time the outer effect re-runs, it creates a *fresh* inner effect, and the old ones are never disposed. They leak.
 
-~~~ts title="⚠️ Leak: a new inner effect every re-run, none cleaned up"
+~~~ts title="Leak: a new inner effect every re-run, none cleaned up"
 effect(() => {
   const id = userId();      // outer re-runs when userId changes
-  effect(() => {            // ⚠️ a NEW inner effect each time — old ones leak
+  effect(() => {            // a NEW inner effect each time — old ones leak
     console.log(id, data());
   });
 });

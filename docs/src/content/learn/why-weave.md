@@ -43,8 +43,8 @@ Classes aren't forbidden — if you have one (a parser, a state machine, a third
 
 However deep you want to go, there's a path for it:
 
-- **🎓 Learn** — the section you're in. Friendly, narrative guides that build up one idea at a time, each with a live example you can click and copy. No prior framework experience assumed.
-- **📖 Reference** — the exhaustive catalog: every package, every export, every option and type, with examples. When you know *what* you want and just need the exact signature, start here.
+- :icon[graduation-cap] **Learn** — the section you're in. Friendly, narrative guides that build up one idea at a time, each with a live example you can click and copy. No prior framework experience assumed.
+- :icon[book-open] **Reference** — the exhaustive catalog: every package, every export, every option and type, with examples. When you know *what* you want and just need the exact signature, start here.
 
 You can jump between them freely — every Learn page links out to the relevant Reference, and back.
 

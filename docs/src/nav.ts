@@ -32,7 +32,7 @@ export interface NavSection {
   groups: NavGroup[];
 }
 
-/** 🎓 Learn — narrative, gentle, beginner-friendly. */
+/** Learn — narrative, gentle, beginner-friendly. */
 const learn: NavSection = {
   id: 'learn',
   label: 'Learn',
@@ -81,7 +81,7 @@ const learn: NavSection = {
   ],
 };
 
-/** 📖 Reference — exhaustive, per-package API. */
+/** Reference — exhaustive, per-package API. */
 const reference: NavSection = {
   id: 'reference',
   label: 'Reference',
@@ -112,7 +112,7 @@ const reference: NavSection = {
   ],
 };
 
-/** 📦 UI — the component library, documented exhaustively (every prop, state, and scenario).
+/** UI — the component library, documented exhaustively (every prop, state, and scenario).
  *  Data-driven groups; items are added as each component's page lands. */
 const ui: NavSection = {
   id: 'ui',

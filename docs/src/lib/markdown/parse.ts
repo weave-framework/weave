@@ -15,6 +15,7 @@ export type Inline =
   | { t: 'strong'; c: Inline[] }
   | { t: 'em'; c: Inline[] }
   | { t: 'code'; v: string }
+  | { t: 'icon'; name: string }
   | { t: 'link'; href: string; c: Inline[] };
 
 export interface CodeTabData {
@@ -43,13 +44,14 @@ export function inlineText(nodes: Inline[]): string {
   let s = '';
   for (const n of nodes) {
     if (n.t === 'text' || n.t === 'code') s += n.v;
+    else if (n.t === 'icon') continue; // decorative — no text contribution
     else s += inlineText(n.c);
   }
   return s;
 }
 
 const INLINE_RE =
-  /(\*\*([^*]+)\*\*)|(\*([^*]+)\*)|(`([^`]+)`)|(\[([^\]]+)\]\(([^)]+)\))/;
+  /(:icon\[([\w-]+)\])|(\*\*([^*]+)\*\*)|(\*([^*]+)\*)|(`([^`]+)`)|(\[([^\]]+)\]\(([^)]+)\))/;
 
 /** Parse a single line of inline markdown into a token list. */
 export function parseInline(src: string): Inline[] {
@@ -66,10 +68,11 @@ export function parseInline(src: string): Inline[] {
       break;
     }
     pushText(rest.slice(0, m.index));
-    if (m[1]) out.push({ t: 'strong', c: parseInline(m[2]) });
-    else if (m[3]) out.push({ t: 'em', c: parseInline(m[4]) });
-    else if (m[5]) out.push({ t: 'code', v: m[6] }); // raw — special chars preserved
-    else if (m[7]) out.push({ t: 'link', href: m[9], c: parseInline(m[8]) });
+    if (m[1]) out.push({ t: 'icon', name: m[2] });
+    else if (m[3]) out.push({ t: 'strong', c: parseInline(m[4]) });
+    else if (m[5]) out.push({ t: 'em', c: parseInline(m[6]) });
+    else if (m[7]) out.push({ t: 'code', v: m[8] }); // raw — special chars preserved
+    else if (m[9]) out.push({ t: 'link', href: m[11], c: parseInline(m[10]) });
     rest = rest.slice(m.index + m[0].length);
   }
   return out;

@@ -196,7 +196,7 @@ That's it. The extension registers the `.weave` and `weave-html` languages, ship
 WebStorm needs **two** things — a host plugin and the Weave plugin:
 
 1. **Install LSP4IJ** (the Weave plugin runs on top of it): **Settings → Plugins → Marketplace**, search **LSP4IJ**, install, and let WebStorm restart.
-2. **Install the Weave plugin from disk:** **Settings → Plugins** → click the **⚙ gear icon** → **Install Plugin from Disk…** → pick the downloaded `weave-webstorm-*.zip` → restart when prompted.
+2. **Install the Weave plugin from disk:** **Settings → Plugins** → click the **gear icon** → **Install Plugin from Disk…** → pick the downloaded `weave-webstorm-*.zip` → restart when prompted.
 3. **Enable type-checking on the `.ts` side** (one-time per project): add the Weave TypeScript plugin to your `tsconfig.json` so WebStorm's own TypeScript service loads it —
    ```json
    {

@@ -77,7 +77,7 @@ The markup lives in `app.html`. Read a signal with `{{ count() }}`; wire an even
 
 ~~~html title="src/app/app.html"
 <main class="app">
-  <h1>Hello, Weave 🧵</h1>
+  <h1>Hello, Weave</h1>
   <button on:click={{ inc }}>
     clicked {{ count() }} times
   </button>

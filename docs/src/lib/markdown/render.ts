@@ -16,6 +16,7 @@ import { demos } from './registry';
 import CodeTabs from '../code-tabs/code-tabs';
 import Callout from '../callout/callout';
 import Demo from '../demo/demo';
+import { activeIcons } from '@weave-framework/ui/icon';
 
 /** Friendly tab label for a lone code fence's language (e.g. `ts` → `TS`). */
 const LANG_LABELS: Record<string, string> = {
@@ -41,6 +42,15 @@ function renderInline(nodes: Inline[]): DocumentFragment {
     } else if (n.t === 'code') {
       const e = document.createElement('code');
       e.textContent = n.v; // literal — no entity issues
+      frag.append(e);
+    } else if (n.t === 'icon') {
+      // Inline Lucide glyph (`:icon[name]`) — the SVG from the shared registry, inheriting
+      // the surrounding text colour via currentColor. Decorative (the label follows it).
+      const e = document.createElement('span');
+      e.className = 'inline-icon';
+      e.setAttribute('aria-hidden', 'true');
+      const svg = activeIcons().resolve(n.name);
+      if (svg) e.innerHTML = svg;
       frag.append(e);
     } else if (n.t === 'link') {
       frag.append(renderLink(n.href, renderInline(n.c)));

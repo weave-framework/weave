@@ -230,7 +230,7 @@ export const spinIn: TransitionFn<{ turns?: number }> = (node, { turns = 1 } = {
 });
 ~~~
 ~~~html title="use"
-<div in:spinIn={{ { turns: 2 } }}>🎉</div>
+<div in:spinIn={{ { turns: 2 } }}>Spin</div>
 ~~~
 :::
 

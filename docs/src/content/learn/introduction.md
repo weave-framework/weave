@@ -22,8 +22,8 @@ Everything in Weave is built from one small idea called a **signal** — a value
 
 There are two ways to read these docs, and you can move between them freely:
 
-- **🎓 Learn** — the section you're in now. Friendly, narrative guides that teach concepts step by step, each with a live example.
-- **📖 Reference** — the exhaustive catalog: every package, function, option, and type, with examples for each.
+- :icon[graduation-cap] **Learn** — the section you're in now. Friendly, narrative guides that teach concepts step by step, each with a live example.
+- :icon[book-open] **Reference** — the exhaustive catalog: every package, function, option, and type, with examples for each.
 
 Every Learn page links out to the matching Reference, and back.
 

@@ -72,7 +72,7 @@ Chain **modifiers** with `|` after the event name. They come in two kinds, and y
 
 ~~~html title="Modifiers"
 <a on:click|preventDefault={{ go }}>Navigate</a>
-<button on:click|stopPropagation|preventDefault={{ edit }}>✎</button>
+<button on:click|stopPropagation|preventDefault={{ edit }}>Edit</button>
 <div on:click|self={{ onBackdrop }}>…</div>
 <button on:click|once|capture={{ handler }}>…</button>
 <div on:scroll|passive={{ onScroll }}>…</div>
@@ -167,7 +167,7 @@ export const tooltip: Action<string> = (el, text) => {
 ~~~
 ~~~html title="Using actions"
 <input use:autofocus />
-<button use:tooltip={{ 'Delete forever' }}>🗑</button>
+<button use:tooltip={{ 'Delete forever' }}>Delete</button>
 ~~~
 :::
 

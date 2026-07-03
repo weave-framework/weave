@@ -1,6 +1,6 @@
 # Checkbox
 
-A real `<input type="checkbox">` with the Weave look — a 20px box that fills accent with a white ✓ when on. The
+A real `<input type="checkbox">` with the Weave look — a 20px box that fills accent with a white checkmark when on. The
 native input stays for semantics, keyboard, and focus; the box you see is painted from its state. It also does
 tri-state ("mixed") for select-all patterns.
 
