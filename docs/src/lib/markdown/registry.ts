@@ -38,6 +38,9 @@ import TabsDemo from '../demos/ui/tabs-demo';
 import ExpansionDemo from '../demos/ui/expansion-demo';
 import ListDemo from '../demos/ui/list-demo';
 import GridListDemo from '../demos/ui/grid-list-demo';
+import StepperDemo from '../demos/ui/stepper-demo';
+import PaginatorDemo from '../demos/ui/paginator-demo';
+import SidenavDemo from '../demos/ui/sidenav-demo';
 import AutocompleteBasic from '../demos/ui/autocomplete-basic';
 
 /**
@@ -89,4 +92,7 @@ export const demos: Record<string, Component> = {
   'expansion-demo': ExpansionDemo,
   'list-demo': ListDemo,
   'grid-list-demo': GridListDemo,
+  'stepper-demo': StepperDemo,
+  'paginator-demo': PaginatorDemo,
+  'sidenav-demo': SidenavDemo,
 };

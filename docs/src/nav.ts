@@ -162,8 +162,11 @@ const ui: NavSection = {
     {
       label: 'Navigation & layout',
       items: [
+        { label: 'Sidenav', path: '/ui/sidenav' },
         { label: 'Tabs', path: '/ui/tabs' },
+        { label: 'Stepper', path: '/ui/stepper' },
         { label: 'Expansion Panel', path: '/ui/expansion' },
+        { label: 'Paginator', path: '/ui/paginator' },
         { label: 'List', path: '/ui/list' },
         { label: 'Grid List', path: '/ui/grid-list' },
       ],
