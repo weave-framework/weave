@@ -112,5 +112,21 @@ const reference: NavSection = {
   ],
 };
 
+/** 📦 UI — the component library, documented exhaustively (every prop, state, and scenario).
+ *  Data-driven groups; items are added as each component's page lands. */
+const ui: NavSection = {
+  id: 'ui',
+  label: 'UI',
+  icon: '📦',
+  basePath: '/ui',
+  home: '/ui/button',
+  groups: [
+    {
+      label: 'Foundational',
+      items: [{ label: 'Button', path: '/ui/button' }],
+    },
+  ],
+};
+
 /** The whole site's navigation. Add a section here to add a top-level area. */
-export const sections: NavSection[] = [learn, reference];
+export const sections: NavSection[] = [learn, reference, ui];

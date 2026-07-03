@@ -44,6 +44,9 @@ importers:
       '@weave-framework/typescript-plugin':
         specifier: workspace:*
         version: link:packages/typescript-plugin
+      '@weave-framework/ui':
+        specifier: workspace:*
+        version: link:packages/ui
       esbuild:
         specifier: ^0.25.0
         version: 0.25.12

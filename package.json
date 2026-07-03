@@ -1,6 +1,6 @@
 {
   "name": "weave-monorepo",
-  "version": "0.2.66",
+  "version": "0.2.67",
   "description": "Weave — fine-grained reactive, signal-native UI framework. Compiled, TypeScript-first, no Virtual DOM.",
   "type": "module",
   "private": true,
@@ -43,6 +43,7 @@
     "@weave-framework/runtime": "workspace:*",
     "@weave-framework/store": "workspace:*",
     "@weave-framework/typescript-plugin": "workspace:*",
+    "@weave-framework/ui": "workspace:*",
     "esbuild": "^0.25.0",
     "eslint": "^10.6.0",
     "playwright": "^1.49.0",
