@@ -1,21 +1,40 @@
 name: Publish to npm
 
-# Publishes every @weave-framework/* package (at the current lockstep version) to npm.
-# Trigger: MANUAL — go to Actions → "Publish to npm" → Run workflow. (You control WHEN a
-# release happens; a run publishes whatever version is committed in the packages.)
-# Optionally also fires when a v* tag is pushed.
+# Publishes every @weave-framework/* package (at the current lockstep version) to npm AND
+# creates a matching GitHub Release — but ONLY when the pushed commit is explicitly marked
+# for release. Mark it by putting [publish] anywhere in the commit message. Ordinary commits
+# (which still bump the version) are ignored, so nothing reaches npm until you say so.
+#
+#   git commit -m "release: U6 gallery + a11y audit [publish]"
+#   git push        →  npm publish  +  GitHub Release v0.2.XX
+#
+#   git commit -m "fix: tidy a token"
+#   git push        →  version bumped, npm stays silent
+#
+# The version comes from package.json (the lockstep version committed in that commit — no
+# tag to keep in sync). The Release notes body is the matching "## 0.2.XX" section of
+# RELEASE-NOTES.md, which you write (rename "## Unreleased") before the [publish] commit;
+# the Release also tags that commit v0.2.XX.
+#
+# There is also a manual escape hatch: Actions → "Publish to npm" → Run workflow publishes
+# the committed version to npm only (a manual run has no commit message, so it skips the
+# Release).
 on:
   workflow_dispatch:
   push:
-    tags:
-      - 'v*'
+    branches: [main]
 
 permissions:
-  contents: read
+  contents: write # create the GitHub Release (+ its tag) and read the repo
   id-token: write # lets npm attach build provenance (supply-chain attestation)
 
 jobs:
   publish:
+    # Gate: publish only on a [publish]-marked commit, or a manual dispatch (which has no
+    # head_commit, so the contains() is false — the workflow_dispatch check carries it).
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      contains(github.event.head_commit.message, '[publish]')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -33,6 +52,17 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
+      - name: Read lockstep version
+        id: v
+        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+
+      # Do this BEFORE publishing: if the RELEASE-NOTES.md section for this version is missing,
+      # the run fails here — before anything reaches npm — instead of shipping an empty Release.
+      # Skipped on a manual run (no Release step to feed).
+      - name: Extract release notes
+        if: github.event_name == 'push'
+        run: node tools/extract-release-notes.mjs "${{ steps.v.outputs.version }}" > release-notes.md
+
       - name: Publish @weave-framework/* to npm
         run: pnpm publish:packages
         env:
@@ -40,3 +70,15 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           # Signed provenance for each published package (needs id-token: write above).
           NPM_CONFIG_PROVENANCE: 'true'
+
+      # Only runs if the publish step above succeeded (a failed step stops the job), so a
+      # Release never appears without the packages actually landing on npm.
+      - name: Create GitHub Release
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "v${{ steps.v.outputs.version }}" \
+            --title "v${{ steps.v.outputs.version }}" \
+            --notes-file release-notes.md \
+            --target "${{ github.sha }}"

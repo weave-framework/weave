@@ -7,7 +7,7 @@
 > VS Code extension (`editor/vscode`) is versioned independently. **This version is exactly
 > what is published to npm** — bump it in the same commit as the change, and record notable
 > releases here. Publishing itself is a separate, explicit step (the `/publish` skill /
-> `pnpm publish:packages`) — committing/pushing does **not** publish or mirror.
+> `pnpm publish:packages`) — pushing code does **not** publish to npm.
 
 ## 0.2.52 — 2026-07-02 (unpublished; on `main`, ahead of the 0.2.0 npm release)
 

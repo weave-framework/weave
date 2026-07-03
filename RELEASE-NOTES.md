@@ -3,9 +3,16 @@
 Human-readable highlights, one section per release — everything notable that landed since
 the previous one. For the granular, per-version log see [CHANGELOG.md](CHANGELOG.md).
 
-## Unreleased
+## 0.2.53 — 2026-07-03
 
-Reliability, correctness, and security improvements across the core.
+Correctness, composition, and security hardening across the core — the first `@weave-framework/*`
+bump since the 0.2.0 npm release.
+
+### 🧩 Components
+- Component-level `on:X` handlers now auto-forward to the rendered root element, so
+  `<Button on:click={{…}}>` works with no event re-declaration inside the component.
+- A composed component's data-callback prop (e.g. a child's `onChange`) fires **exactly once** —
+  the earlier double-invoke (data callback *and* event auto-forward) is fixed.
 
 ### 🐛 Fixes
 
@@ -33,3 +40,9 @@ Reliability, correctness, and security improvements across the core.
 - `<Icon>` sanitizes SVG before rendering — event-handler attributes, `<script>`,
   `<foreignObject>`, and `javascript:` URLs are stripped. A dynamic `<w:element>` refuses to
   create a `<script>` element.
+
+### 📦 Scaffold (`create-weave`)
+- `npm create weave@latest` now includes every feature package (router, store, forms, i18n,
+  data) as a dependency — each is zero-dep and tree-shaken when unused, so there is no bundle
+  cost and no need to install a feature mid-project. The template ships a `pnpm-workspace.yaml`
+  that pre-approves the esbuild / parcel-watcher build scripts, so `pnpm install` doesn't prompt.
