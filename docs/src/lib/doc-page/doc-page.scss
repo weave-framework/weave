@@ -1,7 +1,4 @@
-.doc {
-  max-width: 800px;
-}
-
+// The article takes its parent's width (no reading-column cap) — full width follows the shell.
 .doc :global(.next-link) {
   font-weight: 600;
 }
