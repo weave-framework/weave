@@ -6,14 +6,20 @@ import Badge from '@weave-framework/ui/badge';
 import Icon from '@weave-framework/ui/icon';
 import Sidenav, { type SidenavApi } from '@weave-framework/ui/sidenav';
 import ButtonToggle from '@weave-framework/ui/button-toggle';
-import { sections, type NavSection, type NavGroup } from '../nav';
+import Expansion, { type ExpansionPanel } from '@weave-framework/ui/expansion';
+import { sections, type NavSection, type NavGroup, type NavItem } from '../nav';
 import { router } from './router';
 import SearchBox from '../lib/search/search-box';
 
 interface ShellSetup {
   router: Router;
-  /** Sidebar groups for whichever section the current path falls under. */
-  groups: () => NavGroup[];
+  /** A stable key for the sidebar accordion — re-mounts `<Expansion>` on a section change so
+   *  its (append-once) panel bodies rebuild for the new section. */
+  sidebarKey: () => string[];
+  /** The current section's groups as Expansion panels (body = the group's real `<Link>`s). */
+  sidebarPanels: () => ExpansionPanel[];
+  /** Every group id — the accordion's default-open set (all groups expanded initially). */
+  sidebarOpenIds: () => string[];
   /** Section switcher options for the top-bar `<ButtonToggle>` (id → icon + labelled segment). */
   sectionOptions: { value: string; label: string; icon: string }[];
   /** The id of the section the current path falls under (drives the switcher's selected segment). */
@@ -41,6 +47,7 @@ void Badge;
 void Icon;
 void Sidenav;
 void ButtonToggle;
+void Expansion;
 void SearchBox;
 
 const repoUrl: string = 'https://github.com/weave-framework/weave';
@@ -53,6 +60,27 @@ export function setup(): ShellSetup {
     sections.find((s) => currentPath().startsWith(s.basePath)) ?? sections[0];
 
   const groups = (): NavGroup[] => current().groups;
+
+  // Build a group's links as a Node for an Expansion body — composing the REAL router <Link>
+  // (a callable component returning an <a> with navigation + active state), not a re-created link.
+  const buildGroupLinks = (items: NavItem[]): Node => {
+    const box: HTMLElement = document.createElement('div');
+    box.className = 'nav-group-links';
+    for (const it of items) {
+      box.appendChild(
+        Link(
+          { to: it.path, class: 'nav-link', activeClass: 'active' },
+          { default: () => document.createTextNode(it.label) },
+        ) as Node,
+      );
+    }
+    return box;
+  };
+
+  const sidebarKey = (): string[] => [activeSectionId()];
+  const sidebarPanels = (): ExpansionPanel[] =>
+    groups().map((g) => ({ id: g.label, header: g.label, body: () => buildGroupLinks(g.items) }));
+  const sidebarOpenIds = (): string[] => groups().map((g) => g.label);
 
   const sectionOptions = sections.map((s) => ({ value: s.id, label: s.label, icon: s.icon }));
   const activeSectionId = (): string => current().id;
@@ -81,7 +109,9 @@ export function setup(): ShellSetup {
 
   return {
     router,
-    groups,
+    sidebarKey,
+    sidebarPanels,
+    sidebarOpenIds,
     sectionOptions,
     activeSectionId,
     goToSection,

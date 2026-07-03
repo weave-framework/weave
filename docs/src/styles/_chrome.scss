@@ -11,6 +11,8 @@ $topbar-h: var(--weave-toolbar-height, 52px);
   gap: 14px;
   padding: 0 20px;
   z-index: 20;
+  // Larger glyphs across the whole top bar (section switcher + theme/GitHub/hamburger).
+  --weave-icon-size: 24px;
   // Translucent, blurred bar over the page (two classes beat the component's single-class bg).
   background: color-mix(in srgb, var(--bg) 86%, transparent);
   backdrop-filter: blur(8px);
@@ -29,9 +31,24 @@ $topbar-h: var(--weave-toolbar-height, 52px);
   }
 }
 
-// Section switcher (<ButtonToggle class="sections">) sits just after the brand.
+// Section switcher (<ButtonToggle class="sections">) — restyled from the default segmented
+// "box" into light nav pills that match the sidebar's active links (accent-tint), so it sits
+// in the hairline top bar instead of reading as a heavy toggle. Uses the component's own
+// tokens; the segments become standalone rounded pills (no dividers, no clipped box).
 .sections {
   margin-left: 4px;
+  overflow: visible;
+  --weave-button-toggle-border: transparent;
+  // Same hover as the icon <Button>s: a subtle currentColor tint (grey when muted, accent
+  // when the section is active), so the whole top bar reacts to hover identically.
+  --weave-button-toggle-hover: color-mix(in srgb, currentColor 8%, transparent);
+  --weave-button-toggle-text: var(--fg-soft);
+  --weave-button-toggle-selected-background: transparent;
+  --weave-button-toggle-selected-text: var(--accent);
+}
+
+.sections .weave-button-toggle__segment {
+  border-radius: 8px;
 }
 
 /* ── Layout: <Sidenav class="layout"> — full width; the hamburger stays visible so the
@@ -44,21 +61,37 @@ $topbar-h: var(--weave-toolbar-height, 52px);
 }
 
 .sidebar {
-  padding: 24px 16px;
+  padding: 16px 12px;
 }
 
-.nav-group {
-  margin-bottom: 22px;
+// Sidebar accordion (<Expansion class="sidebar-nav">): strip the boxed look; each group's
+// header reads like the old uppercase section label + a +/- marker; its links fill the region.
+.sidebar-nav.weave-expansion {
+  border: 0;
+  border-radius: 0;
+  overflow: visible;
+  --weave-expansion-header-open-background: transparent;
+  --weave-expansion-header-hover-background: var(--surface);
+  --weave-expansion-marker: var(--muted);
 }
 
-.nav-group-title {
-  margin: 0 0 6px;
-  padding: 0 10px;
+.sidebar-nav .weave-expansion__panel + .weave-expansion__panel {
+  border-top: 0;
+}
+
+.sidebar-nav .weave-expansion__header {
+  min-height: 0;
+  padding: 8px 10px 4px;
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.6px;
   text-transform: uppercase;
   color: var(--muted);
+  border-radius: 7px;
+}
+
+.sidebar-nav .weave-expansion__content {
+  padding: 0 0 6px;
 }
 
 .nav-link {

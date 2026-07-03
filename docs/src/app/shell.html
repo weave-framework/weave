@@ -32,13 +32,13 @@
 
 <Sidenav class="layout" api={{ setNavApi }}>
   <nav slot="drawer" class="sidebar" aria-label="Documentation">
-    @for (g of groups(); track g.label) {
-      <div class="nav-group">
-        <p class="nav-group-title">{{ g.label }}</p>
-        @for (it of g.items; track it.path) {
-          <Link to={{ it.path }} class="nav-link" activeClass="active">{{ it.label }}</Link>
-        }
-      </div>
+    @for (sec of sidebarKey(); track sec) {
+      <Expansion
+        class="sidebar-nav"
+        panels={{ sidebarPanels() }}
+        defaultOpen={{ sidebarOpenIds() }}
+        headingLevel={{ 2 }}
+      />
     }
   </nav>
 
