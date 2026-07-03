@@ -169,12 +169,17 @@ export function rewrite(expr: string, scope: Scope, ctxRef: string = 'ctx'): Rew
       const isProperty: boolean = lastNonSpace(out) === '.';
       const binding: Binding | undefined = scope.get(name);
 
-      if (binding && !isProperty) {
+      // An explicit object-literal key (`{ key: … }` / `, key: …`) is a property name, not a
+      // reference — leave it verbatim, exactly like a `.member` property. (Shorthand `{ key }` is
+      // NOT matched here: `next` is `,`/`}`, so it still expands + rewrites below.)
+      const prev: string = lastNonSpace(out);
+      const next: string = firstNonSpaceFrom(expr, j);
+      const isObjectKey: boolean = (prev === '{' || prev === ',') && next === ':';
+
+      if (binding && !isProperty && !isObjectKey) {
         // `{ name }` object shorthand must expand to `{ name: <value> }` — a bare `{ ctx.name }` /
         // `{ accessor() }` is a syntax error. Detect a shorthand key: between `{`|`,` and `,`|`}`.
         if (binding.kind !== 'local') {
-          const prev: string = lastNonSpace(out);
-          const next: string = firstNonSpaceFrom(expr, j);
           if ((prev === '{' || prev === ',') && (next === ',' || next === '}')) insert(`${name}: `);
         }
         if (binding.kind === 'ctx') {
@@ -346,8 +351,13 @@ export function freeIdentifiers(expr: string): string[] {
       let j: number = i + 1;
       while (j < n && ID_CHAR.test(expr[j])) j++;
       const name: string = expr.slice(i, j);
-      const isProperty: boolean = lastNonSpace(expr.slice(0, i)) === '.';
-      if (!isProperty && !NON_CTX.has(name) && !params.has(name)) out.add(name);
+      const prev: string = lastNonSpace(expr.slice(0, i));
+      const next: string = firstNonSpaceFrom(expr, j);
+      const isProperty: boolean = prev === '.';
+      // An explicit object-literal key (`{ key: … }` / `, key: …`) is a property name, not component
+      // data — don't infer it as ctx. Shorthand `{ key }` (next is `,`/`}`) IS a value ref → kept.
+      const isObjectKey: boolean = (prev === '{' || prev === ',') && next === ':';
+      if (!isProperty && !isObjectKey && !NON_CTX.has(name) && !params.has(name)) out.add(name);
       i = j;
       continue;
     }

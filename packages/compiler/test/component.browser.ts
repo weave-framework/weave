@@ -51,6 +51,27 @@ test('inferCtxNames collects the use: action name (and its arg)', () => {
   );
 });
 
+test('inferCtxNames: an explicit object-literal key in a use: arg is not a ctx name', () => {
+  // Regression (dogfooding @weave-framework/ui ripple): `{ centered: true }`'s KEY was collected as
+  // ctx data, so the emitted arg became `{ ctx.centered: true }`. Only the action name is ctx here.
+  assert.deepEqual(inferCtxNames(parseTemplate('<div use:ripple={{ { centered: true } }}></div>')), ['ripple']);
+  // an explicit key with a ctx VALUE still collects the value (but never the key)
+  assert.deepEqual(
+    inferCtxNames(parseTemplate('<div use:ripple={{ { centered: active() } }}></div>')),
+    ['active', 'ripple']
+  );
+  // shorthand IS a value reference and must still be collected
+  assert.deepEqual(inferCtxNames(parseTemplate('<div use:ripple={{ { centered } }}></div>')), ['centered', 'ripple']);
+});
+
+test('compileComponent: an inline object-literal arg keeps its keys literal (not ctx.<key>)', () => {
+  const { code } = compileComponent({
+    template: '<div use:ripple={{ { centered: true } }}></div>',
+  });
+  assert.ok(code.includes('{ centered: true }'), `key must stay literal; got:\n${code}`);
+  assert.ok(!code.includes('ctx.centered'), `key must not be scope-prefixed; got:\n${code}`);
+});
+
 test('inferCtxNames excludes @for item, $vars, and @let names', () => {
   const f: string[] = inferCtxNames(parseTemplate('<ul>@for (it of items(); track it.id) { <li>{{ $index }}:{{ it.t }}</li> }</ul>'));
   assert.deepEqual(f, ['items']);

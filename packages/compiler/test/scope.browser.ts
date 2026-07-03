@@ -123,6 +123,32 @@ test('rewrite: object shorthand with a runtime accessor expands too', () => {
   assert.equal(rewrite('{ todo }', scope).code, '{ todo: $todo() }');
 });
 
+test('rewrite: an explicit object-literal key is never scope-prefixed', () => {
+  // The KEY of `{ key: value }` is a property name, not a reference — even when a ctx binding
+  // of the same name exists it must stay literal (regression: `use:ripple={{ { centered: true } }}`
+  // emitted `{ ctx.centered: true }`, invalid JS). The VALUE still rewrites normally.
+  assert.equal(rewrite('{ centered: true }', ctxScope(['centered']), '__ctx').code, '{ centered: true }');
+  assert.equal(rewrite('{ centered: on }', ctxScope(['centered', 'on']), '__ctx').code, '{ centered: __ctx.on }');
+  // second/later keys after a comma are keys too
+  assert.equal(
+    rewrite('{ a: 1, centered: true }', ctxScope(['a', 'centered']), '__ctx').code,
+    '{ a: 1, centered: true }'
+  );
+  const r: ReturnType<typeof rewrite> = rewrite('{ centered: true }', ctxScope(['centered']), '__ctx');
+  assertVerbatim('{ centered: true }', r.code, r.segments);
+  assertFullSourceCoverage('{ centered: true }', r.segments);
+});
+
+test('rewrite: shorthand still expands (not confused with an explicit key)', () => {
+  // The key/value distinction hinges on the char after the name (`:` = explicit key, `,`/`}` = shorthand).
+  assert.equal(rewrite('{ centered }', ctxScope(['centered']), '__ctx').code, '{ centered: __ctx.centered }');
+});
+
+test('rewrite: a ternary branch after `:` is not mistaken for an object key', () => {
+  // `x` follows `:` but the preceding non-space is `?`/an operand, not `{`/`,` — so it stays a value.
+  assert.equal(rewrite('ok ? y : x', ctxScope(['ok', 'y', 'x']), '__ctx').code, '__ctx.ok ? __ctx.y : __ctx.x');
+});
+
 test('rewrite: code output is unchanged vs the pre-segment behavior (regression guard)', () => {
   // A spread of shapes; `code` must match the historical contract exactly.
   assert.equal(rewrite('a ? b : c', ctxScope(['a', 'b', 'c']), '__ctx').code, '__ctx.a ? __ctx.b : __ctx.c');
