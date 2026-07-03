@@ -13,10 +13,16 @@ import { navigate } from '@weave-framework/router';
 import { inlineText, type Block, type Inline } from './parse';
 import { slugify } from '../util/slug';
 import { demos } from './registry';
-import CodeBlock from '../code-block/code-block';
 import CodeTabs from '../code-tabs/code-tabs';
 import Callout from '../callout/callout';
 import Demo from '../demo/demo';
+
+/** Friendly tab label for a lone code fence's language (e.g. `ts` → `TS`). */
+const LANG_LABELS: Record<string, string> = {
+  ts: 'TS', tsx: 'TSX', js: 'JS', jsx: 'JSX', html: 'HTML', scss: 'SCSS',
+  css: 'CSS', json: 'JSON', bash: 'Bash', sh: 'Shell', text: 'Text',
+};
+const langLabel = (lang: string): string => LANG_LABELS[lang] ?? lang.toUpperCase();
 
 /** Render inline tokens into a fragment of text + formatting nodes. */
 function renderInline(nodes: Inline[]): DocumentFragment {
@@ -93,7 +99,9 @@ function renderBlock(b: Block): Node {
     case 'hr':
       return document.createElement('hr');
     case 'code':
-      return CodeBlock({ code: b.code, lang: b.lang });
+      // Every code sample renders through the same Weave-UI Tabs — a lone snippet is a
+      // one-tab group whose label is its language (so the label never overlaps Copy).
+      return CodeTabs({ tabs: [{ label: langLabel(b.lang), lang: b.lang, code: b.code }] });
     case 'tabs':
       return CodeTabs({ tabs: b.tabs });
     case 'callout':

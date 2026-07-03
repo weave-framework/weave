@@ -1,3 +1,25 @@
+/* Code group — every code sample is a Weave-UI <Tabs class="code-group"> (rendered by the
+   Tabs component, so these are global). The Tabs supplies the frame + the tab-bar header
+   (language / filename); the <CodeBlock> body inside each panel is frameless. */
+.code-group.weave-tabs {
+  margin: 16px 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--code-bg);
+}
+
+.code-group .weave-tabs__list {
+  padding: 0 6px;
+  border-bottom-color: var(--border);
+  // A faint header band over the code background, so the tab bar reads as a header.
+  background: color-mix(in srgb, var(--fg) 4%, transparent);
+}
+
+.code-group .weave-tabs__panel {
+  padding: 0; // the CodeBlock/.pre owns the padding
+}
+
 /* Syntax-highlight token classes. These spans are created in JS by the highlighter
    (no component scope attribute), so the classes are global. */
 

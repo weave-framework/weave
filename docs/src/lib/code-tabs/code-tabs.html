@@ -1,8 +1,1 @@
-<div class="code-tabs">
-  <div class="tab-row" role="tablist">
-    @for (t of tabs(); track t.label) {
-      <button class="tab" type="button" class:active={{ isActive(t.label) }} on:click={{ () => select(t.label) }}>{{ t.label }}</button>
-    }
-  </div>
-  <CodeBlock code={{ current().code }} lang={{ current().lang }} />
-</div>
+<Tabs class="code-group" tabs={{ weaveTabs() }} />

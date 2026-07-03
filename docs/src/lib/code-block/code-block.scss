@@ -1,22 +1,10 @@
+// A code block is always the body of a <Tabs> panel (via <CodeTabs>), so it's frameless —
+// the outer border/radius comes from `.code-group` in _code.scss; here it just holds the
+// code area (its own dark background) and anchors the copy button. The language is the tab
+// label now, so there's no corner label to overlap the copy control.
 .code-block {
   position: relative;
-  margin: 16px 0;
-  border: 1px solid var(--border);
-  border-radius: 10px;
   background: var(--code-bg);
-  overflow: hidden;
-}
-
-.code-block::after {
-  content: attr(data-lang);
-  position: absolute;
-  top: 8px;
-  right: 56px;
-  font-size: 11px;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-  color: var(--muted);
-  pointer-events: none;
 }
 
 // The copy control is a real Weave-UI ghost <Button class="copy">; because that root is
