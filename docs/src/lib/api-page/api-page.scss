@@ -1,7 +1,4 @@
-.api-doc {
-  max-width: 820px;
-}
-
+// The API doc takes its parent's width (full-width like the rest of the content).
 .api-count {
   color: var(--muted);
   font-size: 14px;
