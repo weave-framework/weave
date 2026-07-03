@@ -1,6 +1,9 @@
 <div class="callout" data-kind={{ kind() }}>
-  @if (hasTitle()) {
-    <p class="callout-title">{{ title() }}</p>
-  }
-  <div class="callout-body"><slot/></div>
+  <Icon name={{ iconName() }} />
+  <div class="callout-main">
+    @if (hasTitle()) {
+      <p class="callout-title">{{ title() }}</p>
+    }
+    <div class="callout-body"><slot/></div>
+  </div>
 </div>

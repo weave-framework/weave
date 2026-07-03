@@ -1,24 +1,45 @@
+// A callout is a light tint of its flavour's colour, a subtle same-colour border, and a
+// matching (fully-saturated) icon. `--callout-color` is the one knob each kind sets; it also
+// cascades to the composed <Icon> (a custom property inherits through the DOM regardless of
+// style scope), so `:global(.callout-icon)` can read it.
 .callout {
+  --callout-color: var(--accent);
+  display: flex;
+  gap: 11px;
+  align-items: flex-start;
   margin: 18px 0;
-  padding: 14px 16px;
+  padding: 12px 14px;
   border-radius: 10px;
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--accent);
-  background: var(--surface);
+  border: 1px solid color-mix(in srgb, var(--callout-color) 28%, var(--border));
+  background: color-mix(in srgb, var(--callout-color) 7%, transparent);
 }
 
 .callout[data-kind='tip'] {
-  border-left-color: var(--green);
+  --callout-color: var(--green);
 }
 
 .callout[data-kind='warn'] {
-  border-left-color: var(--orange);
+  --callout-color: var(--orange);
+}
+
+// The <Icon> renders a `.weave-icon` (it doesn't forward `class`), so target it as a global
+// descendant of the callout. currentColor drives the SVG stroke → the icon is the flavour
+// colour, richer than the tint; `--callout-color` is inherited from `.callout`.
+.callout :global(.weave-icon) {
+  flex: none;
+  margin-top: 1px;
+  color: var(--callout-color);
+}
+
+.callout-main {
+  min-width: 0;
 }
 
 .callout-title {
-  margin: 0 0 6px;
+  margin: 0 0 4px;
   font-weight: 600;
   font-size: 14px;
+  color: var(--fg);
 }
 
 .callout-body {
