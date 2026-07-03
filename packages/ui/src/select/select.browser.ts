@@ -185,6 +185,33 @@ test('select: keyboard — ArrowDown opens, moves active (skipping disabled), En
   dispose();
 });
 
+test('select: aria-controls on the trigger resolves to the open listbox (M9)', () => {
+  const { field, dispose } = mount({ options: OPTS });
+  assert.equal(field.getAttribute('aria-controls'), null, 'no aria-controls while closed');
+  field.click();
+  const controls: string | null = field.getAttribute('aria-controls');
+  assert.ok(controls, 'aria-controls set when open');
+  const box: HTMLElement | null = panel();
+  assert.ok(box, 'panel open');
+  assert.equal(box?.id, controls, 'aria-controls points at the listbox id');
+  assert.equal(box?.getAttribute('role'), 'listbox', 'and it is the listbox');
+  key(field, 'Escape');
+  assert.equal(field.getAttribute('aria-controls'), null, 'aria-controls removed on close');
+  dispose();
+});
+
+test('select: Space selects the active option in the open listbox (M9)', () => {
+  const picked: Array<SelectValue<Opt>> = [];
+  const { field, dispose } = mount({ options: OPTS, onChange: (v) => picked.push(v) });
+  field.focus();
+  key(field, 'ArrowDown'); // opens, first active = United States
+  key(field, 'ArrowDown'); // → Lithuania
+  key(field, ' '); // Space selects the active option (Lithuania), not typeahead
+  assert.deepEqual(picked, ['lt'], 'Space selected the active option');
+  assert.equal(panel(), null, 'single-select closes after Space');
+  dispose();
+});
+
 test('select: Escape closes and marks the control touched', () => {
   const control: Ctl = makeControl(undefined);
   const { field, dispose } = mount({ options: OPTS, control });

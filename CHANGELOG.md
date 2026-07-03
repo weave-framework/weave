@@ -9,6 +9,16 @@
 > releases here. Publishing itself is a separate, explicit step (the `/publish` skill /
 > `pnpm publish:packages`) — pushing code does **not** publish to npm.
 
+## 0.2.56 — 2026-07-03
+
+**U6 a11y audit — start (`@weave-framework/ui`).** First unit of the structural accessibility audit (see
+`UI-PLAN-U6.md` / `UI-A11Y-AUDIT.md`): the pre-identified **M9 — Select** finding. The `<Select>` combobox trigger
+now exposes **`aria-controls`** pointing at its listbox (the listbox gained a stable `id`; the attribute is set on
+open and removed on close, since the popup is detached while closed), and **Space** now selects/toggles the active
+option in the open listbox exactly like Enter (WAI-ARIA APG listbox behaviour — previously Space only worked when no
+option was active). Two failing-first tests pin both. No visual/token change. The U6 scope is **structural a11y only**
+(roles/states, keyboard, focus, reduced-motion, RTL); contrast is consumer-owned and intentionally out of scope.
+
 ## 0.2.54 — 2026-07-03
 
 **Security hardening (CodeQL code-scanning).** Fixed the flagged findings on the published packages, no API or

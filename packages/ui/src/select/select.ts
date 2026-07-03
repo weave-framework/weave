@@ -210,6 +210,7 @@ export function setup<T = { value: string; label: string }>(props: SelectProps<T
 
   function buildListbox(): HTMLElement {
     const box: HTMLElement = document.createElement('div');
+    box.id = `weave-select-${id}-listbox`;
     box.className = 'weave-select__panel';
     box.setAttribute('role', 'listbox');
     if (props.multiple) box.setAttribute('aria-multiselectable', 'true');
@@ -228,6 +229,7 @@ export function setup<T = { value: string; label: string }>(props: SelectProps<T
     overlay.onBackdropClick(() => closePanel(false));
     overlay.attach(listbox);
     t.setAttribute('aria-expanded', 'true');
+    t.setAttribute('aria-controls', listbox.id); // APG: combobox controls its listbox popup
     open.set(true);
     syncSelected();
     // Seed the active option to the first selected (or first) when opening.
@@ -242,7 +244,9 @@ export function setup<T = { value: string; label: string }>(props: SelectProps<T
     if (!open()) return;
     overlay?.detach();
     overlay = null;
-    trigger()?.setAttribute('aria-expanded', 'false');
+    const t: HTMLElement | null = trigger();
+    t?.setAttribute('aria-expanded', 'false');
+    t?.removeAttribute('aria-controls'); // the listbox element is detached while closed
     open.set(false);
     props.control?.touched?.set(true);
     if (returnFocus) trigger()?.focus();
@@ -267,7 +271,9 @@ export function setup<T = { value: string; label: string }>(props: SelectProps<T
       closePanel(event.key === 'Escape');
       return;
     }
-    if (event.key === 'Enter' || (event.key === ' ' && !km.activeItem())) {
+    // In the open listbox, both Enter and Space select/toggle the active option (WAI-ARIA APG
+    // listbox behaviour) — Space is a selection key here, not typeahead.
+    if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
       const it: T | null = km.activeItem();
       if (it) toggleOption(it);
