@@ -26,7 +26,7 @@ import type { OnLoadArgs, OnLoadResult, Plugin, PluginBuild } from 'esbuild';
 import { readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import { compileComponent, parseSfc, extractSources, classifyTemplate, classifyStyle } from '@weave-framework/compiler';
+import { compileComponent, parseSfc, extractSources, classifyTemplate, classifyStyle, childImportCandidates } from '@weave-framework/compiler';
 import type { ComponentSource, ExtractedSources } from '@weave-framework/compiler';
 import { compileStyleFileTracked, compileStyleSource, type StyleLang } from './styles.js';
 
@@ -116,6 +116,65 @@ async function resolveStyles(
   return { css: compiled.css, files: compiled.files };
 }
 
+/** Does the component's own script already import a binding named `name`? (explicit wins). */
+function importsBinding(script: string | undefined, name: string): boolean {
+  if (!script) return false;
+  const word: RegExp = new RegExp(`\\b${name}\\b`);
+  const IMPORT: RegExp = /import\s+([^;]*?)\s+from\s+['"][^'"]+['"]/g;
+  let m: RegExpExecArray | null;
+  while ((m = IMPORT.exec(script)) !== null) {
+    if (word.test(m[1])) return true; // the binding section (before `from`) names it
+  }
+  return false;
+}
+
+/**
+ * Resolve a PascalCase child tag (`<Input>`) to a sibling component module by convention
+ * and return the extension-less specifier to import (e.g. `../input/input`). Probes the
+ * canonical layouts (dir-per-component, flat) for a `.ts`/`.weave` source; returns null
+ * when none exists so the caller can fail loud.
+ */
+function resolveChildModule(tag: string, dir: string): string | null {
+  for (const cand of childImportCandidates(tag)) {
+    for (const ext of ['.ts', '.weave']) {
+      if (existsSync(resolve(dir, cand + ext))) return cand;
+    }
+  }
+  return null;
+}
+
+/**
+ * Wire the PascalCase child tags a template composes (`<Input>`) to real imports. In
+ * module mode the compiled render references each tag as a bare identifier, so it must be
+ * in the emitted module's scope. If the component's own script already imports the name we
+ * leave it (explicit wins); otherwise we resolve a sibling component module by convention
+ * and prepend `import Tag from '…';`. An unresolvable tag fails loud — a silent miss would
+ * mount to a blank node (the child call throws a swallowed ReferenceError).
+ */
+function injectChildImports(
+  code: string,
+  components: string[],
+  dir: string,
+  script: string | undefined,
+  filename: string
+): string {
+  const imports: string[] = [];
+  for (const tag of components) {
+    if (importsBinding(script, tag)) continue;
+    const cand: string | null = resolveChildModule(tag, dir);
+    if (cand === null) {
+      throw new Error(
+        `weave: ${filename} composes <${tag}> but no import for it was found. ` +
+          `Import it in the component's script, or place its module at ${childImportCandidates(tag)
+            .map((c) => `${c}.ts`)
+            .join(' / ')} (relative to the component).`
+      );
+    }
+    imports.push(`import ${tag} from ${JSON.stringify(cand + '.js')};`);
+  }
+  return imports.length ? imports.join('\n') + '\n' + code : code;
+}
+
 export function weave(state: WeaveState, options: WeaveOptions = {}): Plugin {
   const styleLang: StyleLang = options.styleLang ?? 'css';
   const dev: boolean = options.dev ?? false;
@@ -140,8 +199,9 @@ export function weave(state: WeaveState, options: WeaveOptions = {}): Plugin {
         const styles: string | undefined = src.styles
           ? await compileStyleSource(src.styles, styleLang, dirname(args.path))
           : undefined;
-        const { code, css } = compileComponent({ ...src, styles }, { filename: args.path });
-        return emit(code, css, dirname(args.path));
+        const { code, css, components } = compileComponent({ ...src, styles }, { filename: args.path });
+        const wired: string = injectChildImports(code, components, dirname(args.path), src.script, args.path);
+        return emit(wired, css, dirname(args.path));
       });
 
       build.onLoad({ filter: /\.ts$/ }, async (args: OnLoadArgs) => {
@@ -173,14 +233,15 @@ export function weave(state: WeaveState, options: WeaveOptions = {}): Plugin {
           styleLang
         );
 
-        const { code, css } = compileComponent(
+        const { code, css, components } = compileComponent(
           { script: decl.script, template: template.text, styles: styles.css },
           { filename: args.path }
         );
+        const wired: string = injectChildImports(code, components, dir, decl.script, args.path);
         // Tell esbuild this module also depends on its template + style files, so a
         // template-only or style-only edit (which leaves the .ts untouched) still
         // triggers a watch-mode rebuild + live-reload.
-        return { ...emit(code, css, dir), watchFiles: [...template.files, ...styles.files] };
+        return { ...emit(wired, css, dir), watchFiles: [...template.files, ...styles.files] };
       });
     },
   };

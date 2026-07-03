@@ -13,7 +13,7 @@
  * passes directly.
  */
 
-import { compileTemplate } from './codegen.js';
+import { compileTemplate, type CompileResult } from './codegen.js';
 import { parseTemplate } from './parser.js';
 import { inferCtxNames } from './infer.js';
 import { scopeCss, scopeAttr, hostAttr, hashCss } from './css.js';
@@ -41,6 +41,12 @@ export interface CompiledComponent {
   css: string;
   /** The scope hash both halves share. */
   hash: string;
+  /**
+   * PascalCase child-component tags this component's template composes (`<Input>` →
+   * `"Input"`). The loader resolves each to a real `import` prepended to `code`, unless
+   * the component's own script already imports that name (see the plugin).
+   */
+  components: string[];
 }
 
 const HAS_SETUP: RegExp = /export\s+(?:async\s+)?function\s+setup\b|export\s+(?:const|let|var)\s+setup\b/;
@@ -53,7 +59,7 @@ export function compileComponent(src: ComponentSource, opts: ComponentOptions = 
   const scope: string[] = inferCtxNames(parseTemplate(src.template));
   // Stamp the `:host` root marker only when the styles actually use `:host` (else zero cost).
   const host: string | undefined = src.styles && /:host\b/.test(src.styles) ? hostAttr(hash) : undefined;
-  const compiled: { code: string } = compileTemplate(src.template, { mode: 'module', scope, scopeAttr: attr, hostAttr: host });
+  const compiled: CompileResult = compileTemplate(src.template, { mode: 'module', scope, scopeAttr: attr, hostAttr: host });
   // Demote the template module's default export to a local `render` we can wire up.
   const renderBody: string = compiled.code.replace('export default function render', 'function render');
 
@@ -70,7 +76,7 @@ export function compileComponent(src: ComponentSource, opts: ComponentOptions = 
     .filter(Boolean)
     .join('\n\n');
 
-  return { code, css, hash };
+  return { code, css, hash, components: compiled.components };
 }
 
 /**

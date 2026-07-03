@@ -27,6 +27,7 @@ import SelectBasic from '../demos/ui/select-basic';
 import SelectMultiple from '../demos/ui/select-multiple';
 import ChipsBasic from '../demos/ui/chips-basic';
 import SliderBasic from '../demos/ui/slider-basic';
+import AutocompleteBasic from '../demos/ui/autocomplete-basic';
 
 /**
  * Live-demo registry: maps a `:::demo <key>` directive to a real Weave component.
@@ -65,4 +66,5 @@ export const demos: Record<string, Component> = {
   'select-multiple': SelectMultiple,
   'chips-basic': ChipsBasic,
   'slider-basic': SliderBasic,
+  'autocomplete-basic': AutocompleteBasic,
 };

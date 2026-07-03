@@ -143,6 +143,7 @@ const ui: NavSection = {
         { label: 'Radio Group', path: '/ui/radio' },
         { label: 'Slide Toggle', path: '/ui/slide-toggle' },
         { label: 'Select', path: '/ui/select' },
+        { label: 'Autocomplete', path: '/ui/autocomplete' },
         { label: 'Chips', path: '/ui/chips' },
         { label: 'Slider', path: '/ui/slider' },
       ],

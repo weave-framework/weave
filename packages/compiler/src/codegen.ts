@@ -28,9 +28,21 @@ export interface CompileOptions {
   hostAttr?: string;
 }
 
+export interface CompileResult {
+  /** The generated code (an ES module in `module` mode, a `new Function` body in `function` mode). */
+  code: string;
+  /**
+   * PascalCase child-component tags the template references (`<Input>` → `"Input"`). In
+   * `module` mode these compile to bare identifiers the emitted module must have in scope;
+   * the loader resolves each to a real `import` (function mode injects them via `_c` instead).
+   */
+  components: string[];
+}
+
 class Gen {
   used: Set<string> = new Set<string>(); // @weave-framework/runtime/dom helpers
   usedCore: Set<string> = new Set<string>(); // @weave-framework/runtime primitives (computed, …)
+  usedComponents: Set<string> = new Set<string>(); // PascalCase child tags referenced in module mode
   templates: string[] = [];
   private tplN: number = 0;
   private fnN: number = 0;
@@ -49,8 +61,14 @@ class Gen {
     this.usedCore.add(name);
     return this.mode === 'function' ? `rt.${name}` : name;
   }
-  /** Reference a child component: from the `_c` map in function mode, bare (imported) in module mode. */
+  /**
+   * Reference a child component: from the `_c` map in function mode, bare (imported)
+   * in module mode. In module mode the bare identifier must be in the emitted module's
+   * scope — the loader resolves each recorded tag to a real `import` (see the plugin's
+   * child-import injection), or the component's own `<script>` imports it explicitly.
+   */
   Comp(name: string): string {
+    this.usedComponents.add(name); // the composed child tags, independent of resolution mode
     return this.mode === 'function' ? `_c.${name}` : name;
   }
   tpl(html: string): string {
@@ -63,7 +81,7 @@ class Gen {
   }
 }
 
-export function compileTemplate(input: string, options: CompileOptions = {}): { code: string } {
+export function compileTemplate(input: string, options: CompileOptions = {}): CompileResult {
   const mode: 'module' | 'function' = options.mode ?? 'module';
   const runtimeImport: string = options.runtimeImport ?? '@weave-framework/runtime/dom';
   const gen: Gen = new Gen(mode, options.scopeAttr, options.hostAttr);
@@ -71,10 +89,11 @@ export function compileTemplate(input: string, options: CompileOptions = {}): { 
   const ast: TemplateNode[] = parseTemplate(input);
   // isHost: the render fragment's top-level elements are the component's roots → `:host`.
   const render: string = compileFragment(gen, ast, ctxScope(options.scope ?? []), 'render', 'ctx, slots', true);
+  const components: string[] = [...gen.usedComponents];
 
   if (mode === 'function') {
     const body: string = [...gen.templates, render, 'return render(ctx, {});'].join('\n');
-    return { code: body };
+    return { code: body, components };
   }
 
   const domImport: string = `import { ${[...gen.used].sort().join(', ')} } from ${JSON.stringify(runtimeImport)};`;
@@ -82,7 +101,30 @@ export function compileTemplate(input: string, options: CompileOptions = {}): { 
     ? `import { ${[...gen.usedCore].sort().join(', ')} } from "@weave-framework/runtime";\n`
     : '';
   const code: string = [domImport + '\n' + coreImport, ...gen.templates, `export default ${render}`].join('\n');
-  return { code };
+  return { code, components };
+}
+
+/**
+ * PascalCase child-component tag → kebab-case module basename (`SlideToggle` → `slide-toggle`).
+ * Used by the loader to resolve a `<Foo>` tag to its sibling component module by convention.
+ */
+export function pascalToKebab(tag: string): string {
+  return tag
+    .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
+    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1-$2')
+    .toLowerCase();
+}
+
+/**
+ * Extension-less module specifiers to probe (in order) when resolving a PascalCase
+ * child tag to a sibling component module, relative to the parent component's directory.
+ * Covers the two canonical layouts: dir-per-component (`../foo/foo`, the ui library) and
+ * flat siblings (`./foo`), plus a nested `./foo/foo`. The loader appends a source
+ * extension to test existence and `.js` for the emitted import.
+ */
+export function childImportCandidates(tag: string): string[] {
+  const k: string = pascalToKebab(tag);
+  return [`../${k}/${k}`, `./${k}`, `./${k}/${k}`];
 }
 
 /** Compile a list of nodes into a `function name(param){…}` declaration. */
