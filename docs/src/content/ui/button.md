@@ -30,6 +30,33 @@ Reach for `<Button>` for anything the user *clicks to do something*: submit a fo
 action. If the thing navigates to another page, that's a link (`<a>` / router `<Link>`) wearing button styles, not
 a `<Button>` — keep the semantics honest and screen readers will thank you.
 
+## Basic usage
+
+The button at the top of this page is one line of template plus a few lines of setup — this is the exact code
+running above, nothing hidden:
+
+:::tabs
+~~~html title="app.html"
+<Button on:click={{ inc }}>Clicked {{ count() }} times</Button>
+~~~
+~~~ts title="app.ts"
+import { signal } from '@weave-framework/runtime';
+import Button from '@weave-framework/ui/button';
+
+export function setup() {
+  const count = signal(0);
+  // `inc` is our click handler; `count` is a signal the template reads.
+  const inc = () => count.set((n) => n + 1);
+  return { count, inc };
+}
+~~~
+:::
+
+Cause and effect: `on:click={{ inc }}` wires the button to the `inc` function; each click bumps the `count`
+signal; and because the template reads `count()`, the label re-renders itself. **`count` and `inc` are just names
+we returned from `setup`** — they're not special, call them whatever your app needs. Everything the template
+references (`inc`, `count`) is defined right there in `setup`; that's the whole contract.
+
 ## Variants
 
 The `variant` prop picks the look. The default is `primary` (the ink fill) — you only pass `variant` to get one
@@ -62,18 +89,21 @@ For the `icon` variant, project an icon and always give it a `label` — that be
 
 ## Events
 
-`<Button>` forwards native button events straight through — `on:click` is the one you'll use most. You write it
-on the component and it lands on the underlying `<button>` with no plumbing:
+`<Button>` forwards native button events straight through — `on:click` is the one you'll reach for most. You write
+it on the component and it lands on the underlying `<button>` with no plumbing. An `on:X` handler is **always a
+function you return from `setup`** — like the `inc` from [Basic usage](#basic-usage):
 
 ```html
-<Button on:click={{ save }}>Save</Button>
+<Button on:click={{ inc }}>Clicked {{ count() }} times</Button>
 ```
 
-The click demo at the top of the page is exactly this: `on:click` bound to a handler that bumps a signal.
+Any other native button event works the same way — `on:focus`, `on:blur`, `on:pointerdown`, … each one calls the
+function you bind to it.
 
 ## Content
 
-Whatever you put between the tags is projected into the button — a label, an icon, both:
+Whatever you put between the tags is projected into the button — a label, an icon, or both. (`<Icon>` is the
+library's own component, `import Icon from '@weave-framework/ui/icon'`.)
 
 ```html
 <Button>Save changes</Button>
@@ -88,12 +118,34 @@ a disabled button gives no feedback at all.
 
 :::demo button-disabled
 
-```html
-<Button disabled={{ isSaving() }} on:click={{ save }}>Save</Button>
-```
+The `disabled` prop takes a **reactive value** — a signal read — so the button flips itself as your state changes,
+with no manual DOM toggling. Here's the demo above in full, every name defined:
 
-Pass a reactive value (a signal read) and the button enables and disables itself as your state changes — no manual
-DOM toggling.
+:::tabs
+~~~html title="app.html"
+<Button disabled={{ disabled() }} on:click={{ hit }}>Submit ({{ count() }})</Button>
+<Button variant={{ 'ghost' }} on:click={{ toggle }}>{{ label() }}</Button>
+~~~
+~~~ts title="app.ts"
+import { signal } from '@weave-framework/runtime';
+import Button from '@weave-framework/ui/button';
+
+export function setup() {
+  const disabled = signal(true); // Submit starts disabled…
+  const count = signal(0);
+  return {
+    disabled,
+    count,
+    hit: () => count.set((n) => n + 1), // only fires while enabled
+    toggle: () => disabled.set((d) => !d), // the ghost button flips it
+    label: () => (disabled() ? 'Enable it' : 'Disable it'),
+  };
+}
+~~~
+:::
+
+Because `disabled={{ disabled() }}` reads the `disabled` signal, flipping that one value enables or disables the
+button — Weave updates the native attribute for you. Click **Enable it** and watch **Submit** come alive.
 
 ## Forms
 
@@ -105,12 +157,27 @@ Because it's a native button, `type` decides how it behaves inside a `<form>`:
 | `submit` | Submits the surrounding form (and triggers native validation). |
 | `reset` | Resets the surrounding form's fields. |
 
-```html
+:::tabs
+~~~html title="app.html"
 <form on:submit={{ onSubmit }}>
-  <!-- fields… -->
+  <!-- your fields… -->
   <Button type={{ 'submit' }}>Create account</Button>
 </form>
-```
+~~~
+~~~ts title="app.ts"
+import Button from '@weave-framework/ui/button';
+
+export function setup() {
+  // `onSubmit` is your own handler. `type="submit"` is what makes the button
+  // trigger it (and the browser's native validation) on click OR Enter.
+  const onSubmit = (e: Event) => {
+    e.preventDefault();
+    // …create the account…
+  };
+  return { onSubmit };
+}
+~~~
+:::
 
 That's the whole integration: no Weave-specific form binding on the button itself — the platform carries it.
 
