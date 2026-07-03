@@ -41,6 +41,9 @@ import GridListDemo from '../demos/ui/grid-list-demo';
 import StepperDemo from '../demos/ui/stepper-demo';
 import PaginatorDemo from '../demos/ui/paginator-demo';
 import SidenavDemo from '../demos/ui/sidenav-demo';
+import MenuDemo from '../demos/ui/menu-demo';
+import MenubarDemo from '../demos/ui/menubar-demo';
+import ContextMenuDemo from '../demos/ui/context-menu-demo';
 import AutocompleteBasic from '../demos/ui/autocomplete-basic';
 
 /**
@@ -95,4 +98,7 @@ export const demos: Record<string, Component> = {
   'stepper-demo': StepperDemo,
   'paginator-demo': PaginatorDemo,
   'sidenav-demo': SidenavDemo,
+  'menu-demo': MenuDemo,
+  'menubar-demo': MenubarDemo,
+  'context-menu-demo': ContextMenuDemo,
 };
