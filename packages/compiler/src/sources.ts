@@ -91,9 +91,38 @@ interface ParsedLiteral {
 function parseLiteral(src: string, i: number, kind: string): ParsedLiteral {
   i = skipWs(src, i);
   const c: string = src[i];
-  if (c === '"' || c === "'" || c === '`') return parseString(src, i);
+  if (c === '"' || c === "'" || c === '`') return parseConcat(src, i);
   if (c === '[') return parseArray(src, i);
   throw new Error(`weave: \`${kind}\` must be a static string${kind === 'styles' ? ' or array of strings' : ''}`);
+}
+
+/**
+ * Parse one or more string literals joined by `+` — a static concatenation like
+ * `'<button' + ' class="x">'` (how components often split a long template across lines
+ * for readability). Returns the joined value. The `innerStart`/`innerEnd` content range
+ * is only meaningful for a SINGLE literal (a faithful sub-range of a concatenation doesn't
+ * exist), so it is dropped once a `+` joins a second piece. A `+` followed by anything
+ * other than another string literal is a non-static template — fail loud.
+ */
+function parseConcat(src: string, i: number): ParsedLiteral {
+  const first: ParsedLiteral = parseString(src, i);
+  let value: string = first.value as string;
+  let end: number = first.end;
+  let single: boolean = true;
+  for (;;) {
+    const plus: number = skipWs(src, end);
+    if (src[plus] !== '+') break;
+    const nextStart: number = skipWs(src, plus + 1);
+    const c: string = src[nextStart];
+    if (c !== '"' && c !== "'" && c !== '`') {
+      throw new Error('weave: `template`/`styles` must be a static string — `+` may only join string literals');
+    }
+    const next: ParsedLiteral = parseString(src, nextStart);
+    value += next.value as string;
+    end = next.end;
+    single = false;
+  }
+  return single ? { value, end, innerStart: first.innerStart, innerEnd: first.innerEnd } : { value, end };
 }
 
 /** Parse one quoted string literal (any of `' " \``); rejects `${…}` in backticks. */
@@ -130,7 +159,7 @@ function parseArray(src: string, i: number): ParsedLiteral {
       j++;
       continue;
     }
-    const str: ParsedLiteral = parseString(src, j);
+    const str: ParsedLiteral = parseConcat(src, j);
     items.push(str.value as string);
     j = str.end;
   }

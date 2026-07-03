@@ -2,7 +2,7 @@ import { test, assert } from '../../../tools/harness.js';
 import { signal, computed, effect, root, onDispose, type Signal, type Computed } from '@weave-framework/runtime';
 import * as dom from '@weave-framework/runtime/dom';
 import {
-  compileTemplate, compileComponent, parseSfc, inferCtxNames, parseTemplate,
+  compileTemplate, compileComponent, parseSfc, inferCtxNames, parseTemplate, extractSources,
 } from '@weave-framework/compiler';
 
 const rt: typeof dom & {
@@ -242,6 +242,31 @@ test('parseSfc splits script / template / style', () => {
   assert.ok(script!.includes('export function setup'));
   assert.equal(template, '<button>{{ x() }}</button>');
   assert.ok(styles!.includes('color:red'));
+});
+
+test('extractSources joins a concatenated `template` string (multi-line + splits)', () => {
+  // Components often split a long template across lines with `+` for readability
+  // (every @weave-framework/ui component does). The static extractor must join them, or a
+  // consumer build sees a truncated `<button …` and fails with "Expected '>'".
+  const script: string =
+    "export const template: string =\n" +
+    "  '<button class={{ c() }}' +\n" +
+    "  ' disabled={{ d() }}>' +\n" +
+    "  '<slot></slot></button>';\n" +
+    'export function setup(){ return {}; }';
+  const { template } = extractSources(script);
+  assert.equal(template, '<button class={{ c() }} disabled={{ d() }}><slot></slot></button>');
+});
+
+test('extractSources rejects a non-static `+` join (fail loud)', () => {
+  const script: string = "export const template = '<div>' + title + '</div>';";
+  let message: string = '';
+  try {
+    extractSources(script);
+  } catch (e) {
+    message = e instanceof Error ? e.message : String(e);
+  }
+  assert.ok(/static string/.test(message), `expected a "static string" error, got: ${message || '(none)'}`);
 });
 
 test('compileComponent emits a defineComponent module + scoped CSS sharing one hash', () => {
