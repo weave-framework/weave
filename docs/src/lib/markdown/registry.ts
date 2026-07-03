@@ -4,6 +4,12 @@ import ButtonEvents from '../demos/ui/button-events';
 import ButtonVariants from '../demos/ui/button-variants';
 import ButtonDisabled from '../demos/ui/button-disabled';
 import ButtonConfirm from '../demos/ui/button-confirm';
+import IconBasic from '../demos/ui/icon-basic';
+import IconColor from '../demos/ui/icon-color';
+import BadgeVariants from '../demos/ui/badge-variants';
+import BadgeMax from '../demos/ui/badge-max';
+import CardBasic from '../demos/ui/card-basic';
+import CardInteractive from '../demos/ui/card-interactive';
 
 /**
  * Live-demo registry: maps a `:::demo <key>` directive to a real Weave component.
@@ -19,4 +25,10 @@ export const demos: Record<string, Component> = {
   'button-variants': ButtonVariants,
   'button-disabled': ButtonDisabled,
   'button-confirm': ButtonConfirm,
+  'icon-basic': IconBasic,
+  'icon-color': IconColor,
+  'badge-variants': BadgeVariants,
+  'badge-max': BadgeMax,
+  'card-basic': CardBasic,
+  'card-interactive': CardInteractive,
 };

@@ -123,7 +123,12 @@ const ui: NavSection = {
   groups: [
     {
       label: 'Foundational',
-      items: [{ label: 'Button', path: '/ui/button' }],
+      items: [
+        { label: 'Button', path: '/ui/button' },
+        { label: 'Icon', path: '/ui/icon' },
+        { label: 'Badge', path: '/ui/badge' },
+        { label: 'Card', path: '/ui/card' },
+      ],
     },
   ],
 };

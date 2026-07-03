@@ -126,7 +126,7 @@ library's own component, `import Icon from '@weave-framework/ui/icon'`.)
 
 ```html
 <Button>Save changes</Button>
-<Button><Icon name={{ 'download' }} /> Export</Button>
+<Button><Icon name={{ 'cloud-download' }} /> Export</Button>
 ```
 
 ## Disabled state
