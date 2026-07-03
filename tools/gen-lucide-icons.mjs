@@ -36,9 +36,19 @@ const NAMES = [
 
 const CDN = 'https://unpkg.com/lucide-static@latest/icons';
 
+// Strip HTML comments to a fixpoint — a single pass can leave a `<!--` behind
+// (e.g. `<!--<!-- -->-->`), which is an incomplete-sanitization shape.
+function stripComments(s) {
+  let prev;
+  do {
+    prev = s;
+    s = s.replace(/<!--[\s\S]*?-->/g, '');
+  } while (s !== prev);
+  return s;
+}
+
 function extractInner(svg) {
-  return svg
-    .replace(/<!--[\s\S]*?-->/g, '') // license comment
+  return stripComments(svg) // license comment(s)
     .replace(/<svg[\s\S]*?>/, '') // opening <svg …>
     .replace(/<\/svg>/, '') // closing </svg>
     .replace(/\s+/g, ' ') // collapse whitespace

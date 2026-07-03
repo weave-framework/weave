@@ -59,10 +59,12 @@ export interface Route {
 // reading location and re-added when writing history, so nothing else changes.
 let basename: string = '';
 
-/** Normalize a base: strip a trailing slash; treat '' / '/' as "no base". */
+/** Normalize a base: strip trailing slashes; treat '' / '/' as "no base". */
 function normalizeBase(b: string): string {
-  const t: string = b.replace(/\/+$/, '');
-  return t === '' || t === '/' ? '' : t;
+  // Non-regex trailing-slash trim (a `/\/+$/` regex is a polynomial-ReDoS shape).
+  let end: number = b.length;
+  while (end > 0 && b[end - 1] === '/') end--;
+  return b.slice(0, end);
 }
 
 /** location.pathname → internal path (drop the basename prefix). */

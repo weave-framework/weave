@@ -3,6 +3,16 @@
 Human-readable highlights, one section per release — everything notable that landed since
 the previous one. For the granular, per-version log see [CHANGELOG.md](CHANGELOG.md).
 
+## 0.2.54 — 2026-07-03
+
+Security hardening — resolves the code-scanning findings on the published packages. No API change.
+
+### 🔒 Security
+- `weave dev`'s static-file handler **rejects path traversal** — a requested asset that resolves outside the
+  served directory now returns 403 instead of reading the file.
+- Removed polynomial-backtracking regex shapes: the router's `basename` normalizer uses a plain trailing-slash
+  trim, and the compiler's `template`/`styles` extractor bounds its optional type-annotation match to one line.
+
 ## 0.2.53 — 2026-07-03
 
 Correctness, composition, and security hardening across the core — the first `@weave-framework/*`

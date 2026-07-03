@@ -19,7 +19,7 @@ import { context, type BuildContext, type Plugin, type PluginBuild, type BuildRe
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { mkdir, writeFile, readFile } from 'node:fs/promises';
-import { join, extname, relative, sep } from 'node:path';
+import { join, extname, relative, sep, isAbsolute } from 'node:path';
 import { weave, type WeaveState } from './plugin.js';
 import { entryPlugin, VIRTUAL_ENTRY } from './entry.js';
 import { compileStyleFile, type StyleLang } from './styles.js';
@@ -164,8 +164,17 @@ async function handleRequest(
 
   // A real asset path → static file from publicDir (favicons, manifest, …).
   if (extname(url)) {
+    // Guard against path traversal: the resolved file must stay inside servedir
+    // (a raw request like `/../../etc/passwd` must not escape the served root).
+    const target: string = join(config.servedir, url);
+    const rel: string = relative(config.servedir, target);
+    if (rel === '..' || rel.startsWith('..' + sep) || isAbsolute(rel)) {
+      res.writeHead(403);
+      res.end('Forbidden');
+      return;
+    }
     try {
-      const buf: Buffer = await readFile(join(config.servedir, url));
+      const buf: Buffer = await readFile(target);
       res.writeHead(200, { 'content-type': mime(url) });
       res.end(buf);
     } catch {

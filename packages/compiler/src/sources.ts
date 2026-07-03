@@ -36,7 +36,9 @@ export interface ExtractedSources {
 
 // Allow an optional type annotation (`: string`, `: string[]`, …) — the project's
 // lint requires one — between the name and `=`.
-const DECL: RegExp = /export\s+const\s+(template|styles)\s*(?::[^=]+)?=\s*/g;
+// The optional type annotation is bounded to a single line (`[^=\n]` not `[^=]`) so the
+// match can't scan across the whole script — avoids a polynomial-ReDoS backtracking shape.
+const DECL: RegExp = /export\s+const\s+(template|styles)\s*(?::[^=\n]+)?=\s*/g;
 
 /**
  * Pull the `template`/`styles` declarations out of a component script. Throws on a

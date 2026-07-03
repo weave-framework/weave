@@ -9,6 +9,23 @@
 > releases here. Publishing itself is a separate, explicit step (the `/publish` skill /
 > `pnpm publish:packages`) — pushing code does **not** publish to npm.
 
+## 0.2.54 — 2026-07-03
+
+**Security hardening (CodeQL code-scanning).** Fixed the flagged findings on the published packages, no API or
+behaviour change: the `weave dev` static-file handler now **rejects path traversal** (a requested asset that
+resolves outside `servedir` returns 403); the router's `basename` normalizer and the compiler's
+`template`/`styles` extractor drop **polynomial-ReDoS regex shapes** (non-regex trailing-slash trim; the optional
+type-annotation match is bounded to a single line); and the `gen-lucide-icons` build tool strips HTML comments to
+a **fixpoint**. The remaining CodeQL findings (compiler codegen constructing code from the developer's own
+compile-time source; `<Icon>` markup that is always run through `sanitizeSvg` before `innerHTML`) were reviewed as
+false positives and dismissed.
+
+## 0.2.53 — 2026-07-03 (first CI npm release since 0.2.0)
+
+Release automation: a `[publish]`-marked commit → GitHub Actions publishes all `@weave-framework/*` + `create-weave`
+to npm (provenance) and cuts a GitHub Release from `RELEASE-NOTES.md`. See `RELEASE-NOTES.md` for the highlights
+shipped in this release.
+
 ## 0.2.52 — 2026-07-02 (unpublished; on `main`, ahead of the 0.2.0 npm release)
 
 **polish + version sync**. Two low-risk correctness fixes
