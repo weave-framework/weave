@@ -29,15 +29,6 @@ $topbar-h: var(--weave-toolbar-height, 52px);
   }
 }
 
-.brand-tag {
-  font-weight: 500;
-  font-size: 13px;
-  color: var(--muted);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 1px 6px;
-}
-
 // Section switcher (<ButtonToggle class="sections">) sits just after the brand.
 .sections {
   margin-left: 4px;
