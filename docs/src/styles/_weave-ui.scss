@@ -1,0 +1,9 @@
+// Load the real @weave-framework/ui component styles. The docs dogfood the library, so
+// every UI demo renders with the actual component CSS a consumer would get.
+//
+//   theme()      — emits the token defaults (:root globals + per-component vars, Light).
+//   all-styles() — emits the structural CSS for every built-in component.
+@use 'pkg:@weave-framework/ui' as weave;
+
+@include weave.theme();
+@include weave.all-styles();

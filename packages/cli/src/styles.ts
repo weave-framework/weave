@@ -20,11 +20,20 @@ export function langFromExt(file: string): StyleLang {
   return 'css';
 }
 
-/** Compile a style FILE to CSS — `@use`/`@import` resolve relative to it. */
+/**
+ * A `pkg:` importer so stylesheets can pull a published package's Sass entry the standard
+ * way — `@use 'pkg:@weave-framework/ui'` resolves via that package's `sass`/`style` export
+ * condition (node_modules resolution). Without it, only relative `@use` paths work.
+ */
+function pkgImporters(sass: typeof import('sass')): import('sass').NodePackageImporter[] {
+  return [new sass.NodePackageImporter()];
+}
+
+/** Compile a style FILE to CSS — `@use`/`@import` resolve relative to it (+ `pkg:` packages). */
 export async function compileStyleFile(path: string): Promise<string> {
   if (langFromExt(path) === 'css') return readFile(path, 'utf8');
   const sass: typeof import('sass') = await import('sass'); // lazy — only when scss/sass is in play
-  return sass.compile(path).css; // sass infers scss vs indented from the extension
+  return sass.compile(path, { importers: pkgImporters(sass) }).css; // sass infers scss vs indented from the extension
 }
 
 /**
@@ -36,7 +45,7 @@ export async function compileStyleFile(path: string): Promise<string> {
 export async function compileStyleFileTracked(path: string): Promise<{ css: string; files: string[] }> {
   if (langFromExt(path) === 'css') return { css: await readFile(path, 'utf8'), files: [path] };
   const sass: typeof import('sass') = await import('sass');
-  const result: import('sass').CompileResult = sass.compile(path);
+  const result: import('sass').CompileResult = sass.compile(path, { importers: pkgImporters(sass) });
   const files: string[] = result.loadedUrls
     .filter((u: URL): boolean => u.protocol === 'file:')
     .map((u: URL): string => fileURLToPath(u));
@@ -54,5 +63,6 @@ export async function compileStyleSource(
   return sass.compileString(source, {
     syntax: lang === 'sass' ? 'indented' : 'scss',
     loadPaths: fromDir ? [fromDir] : [],
+    importers: pkgImporters(sass),
   }).css;
 }
