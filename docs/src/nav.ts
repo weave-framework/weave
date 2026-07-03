@@ -160,6 +160,15 @@ const ui: NavSection = {
       ],
     },
     {
+      label: 'Navigation & layout',
+      items: [
+        { label: 'Tabs', path: '/ui/tabs' },
+        { label: 'Expansion Panel', path: '/ui/expansion' },
+        { label: 'List', path: '/ui/list' },
+        { label: 'Grid List', path: '/ui/grid-list' },
+      ],
+    },
+    {
       label: 'Feedback & overlays',
       items: [
         { label: 'Dialog', path: '/ui/dialog' },

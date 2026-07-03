@@ -34,6 +34,10 @@ import ProgressSpinnerDemo from '../demos/ui/progress-spinner-demo';
 import TooltipDemo from '../demos/ui/tooltip-demo';
 import DialogDemo from '../demos/ui/dialog-demo';
 import SnackbarDemo from '../demos/ui/snackbar-demo';
+import TabsDemo from '../demos/ui/tabs-demo';
+import ExpansionDemo from '../demos/ui/expansion-demo';
+import ListDemo from '../demos/ui/list-demo';
+import GridListDemo from '../demos/ui/grid-list-demo';
 import AutocompleteBasic from '../demos/ui/autocomplete-basic';
 
 /**
@@ -81,4 +85,8 @@ export const demos: Record<string, Component> = {
   'tooltip-demo': TooltipDemo,
   'dialog-demo': DialogDemo,
   'snackbar-demo': SnackbarDemo,
+  'tabs-demo': TabsDemo,
+  'expansion-demo': ExpansionDemo,
+  'list-demo': ListDemo,
+  'grid-list-demo': GridListDemo,
 };
