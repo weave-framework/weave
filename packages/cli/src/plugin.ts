@@ -44,8 +44,8 @@ export interface WeaveOptions {
 
 /** A stable id derived from CSS text (djb2), so a `<style>` can be deduped. */
 function styleId(css: string): string {
-  let h = 5381;
-  for (let i = 0; i < css.length; i++) h = (Math.imul(h, 33) ^ css.charCodeAt(i)) | 0;
+  let h: number = 5381;
+  for (let i: number = 0; i < css.length; i++) h = (Math.imul(h, 33) ^ css.charCodeAt(i)) | 0;
   return 'w-css-' + (h >>> 0).toString(36);
 }
 

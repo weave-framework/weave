@@ -1,6 +1,6 @@
 {
   "name": "weave-framework",
-  "version": "0.2.105",
+  "version": "0.2.106",
   "description": "Weave — a fine-grained reactive, signal-native UI framework. Compiled, TypeScript-first, no Virtual DOM, zero third-party dependencies. This meta-package installs the framework; see the docs to get started.",
   "type": "module",
   "keywords": [
