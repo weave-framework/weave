@@ -1,0 +1,48 @@
+# Weave — public roadmap
+
+The substantial things we intend to build, and the things we have deliberately left out.
+
+**What belongs here:** whole features and multi-session efforts — a new subsystem, a cross-cutting
+capability, a milestone. Not individual bug fixes, polish, or a single component tweak; those live in the
+commit history and `CHANGELOG.md`.
+
+**How it stays honest:** this list is reviewed at **every release**. Anything a release finishes is removed
+here (it graduates to `CHANGELOG.md`); anything substantial we newly decide to defer is added. So an item on
+this list is a live intention, not a historical note.
+
+---
+
+## Planned — UI library
+
+- **Full RTL / bidirectional support.** Complete mirrored behavior under `dir="rtl"`: directional keyboard
+  (ArrowLeft/Right swap in horizontal widgets — Tabs, Stepper, Slider, Menubar), mirrored overlay positioning,
+  and sticky-offset/fill direction. The structural a11y pass already swapped the cheap physical→logical CSS
+  sites; this is the remaining behavioral (JS) half.
+- **Modal `inert` background.** When a modal overlay is open (Dialog, over-mode Sidenav), mark everything
+  behind it `inert` so assistive tech and pointer focus cannot reach the backdrop — completing the existing
+  focus-trap.
+- **Per-component documentation pages.** A reference page for every component on the docs site: API
+  (props/events), behavior notes, and usage examples alongside a live demo.
+- **Permanent live component gallery.** A hosted, always-current gallery of every component and its variants.
+- **UI testing harnesses** (`@weave-framework/ui/testing`). Ready-made utilities for consumers to drive and
+  assert Weave components in their own tests (open an overlay, exercise the keyboard map, check focus return).
+
+## Planned — framework
+
+- **Transition lifecycle callbacks.** `on:enterstart / enterend / leavestart / leaveend` — surface the four
+  transition moments the runtime already owns.
+- **DevTools.** An in-app inspector: component tree, live signal values, and a "who triggers whom" reactivity
+  graph.
+- **Forms v2.** Async validators with promise-settled `pending()`, `dirty()`, `fieldArray()`, and
+  schema-driven / nested forms.
+- **Router v2.** Typed route params inferred from the path, route-level data loaders, and View Transitions.
+
+---
+
+## Deliberately out of scope
+
+Not planned — these are conscious design choices, not omissions:
+
+- **SSR / hydration / streaming / RSC** — a separate future track, built only on real demand.
+- **A full animation system** beyond the transition callbacks above — CSS covers the rest.
+- **RxJS interop** — the reactive model is signal-native by design.
