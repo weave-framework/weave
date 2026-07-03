@@ -43,19 +43,13 @@ $topbar-h: var(--weave-toolbar-height, 52px);
   margin-left: 4px;
 }
 
-// Hamburger — hidden on wide screens (the drawer is always open in `side` mode there).
-.nav-toggle {
-  display: none;
-}
-
-/* ── Layout: <Sidenav class="layout"> ── */
+/* ── Layout: <Sidenav class="layout"> — full width; the hamburger stays visible so the
+   drawer can be collapsed/expanded on every screen size (side mode toggles too). ── */
 .weave-sidenav.layout {
   --weave-sidenav-width: #{$sidebar-w};
   // Match the old transparent sidebar (keep the 1px hairline the component draws).
   --weave-sidenav-drawer-background: transparent;
   height: calc(100vh - #{$topbar-h});
-  max-width: 1280px;
-  margin: 0 auto;
 }
 
 .sidebar {
@@ -101,14 +95,6 @@ $topbar-h: var(--weave-toolbar-height, 52px);
 }
 
 @media (max-width: 900px) {
-  .nav-toggle {
-    display: inline-flex;
-  }
-
-  .weave-sidenav.layout {
-    max-width: none;
-  }
-
   .content {
     padding: 28px 22px 80px;
   }
