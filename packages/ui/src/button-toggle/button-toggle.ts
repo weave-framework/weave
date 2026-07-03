@@ -28,6 +28,8 @@ export interface ButtonToggleOption {
   value: string;
   /** Visible text. Defaults to `value` when omitted. */
   label?: string;
+  /** Optional leading icon — a name in the active `<Icon>` registry (Lucide by default). */
+  icon?: string;
   /** Disable just this segment (skipped in keyboard nav, not selectable). */
   disabled?: boolean;
 }
@@ -56,7 +58,10 @@ export const template: string =
   '<button type="button" class="weave-button-toggle__segment" role={{ segmentRole() }}' +
   ' aria-checked={{ ariaChecked(opt) }} aria-pressed={{ ariaPressed(opt) }}' +
   ' tabindex={{ tabindexFor(opt) }} disabled={{ isOptionDisabled(opt) }}' +
-  ' on:click={{ () => activate(opt) }}>{{ opt.label ?? opt.value }}</button>' +
+  ' on:click={{ () => activate(opt) }}>' +
+  '@if (opt.icon) {<Icon name={{ opt.icon }} />}' +
+  '<span class="weave-button-toggle__label">{{ opt.label ?? opt.value }}</span>' +
+  '</button>' +
   '}' +
   '</div>';
 

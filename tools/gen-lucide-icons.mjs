@@ -32,6 +32,11 @@ const NAMES = [
   'truck',
   // component-essential (checkbox indeterminate, datepicker, timepicker)
   'calendar', 'clock',
+  // theme + chrome (docs top bar, code blocks, repo link)
+  // NB: Lucide dropped brand marks (no 'github'); use the neutral 'git-branch' for repos.
+  'sun', 'moon', 'git-branch', 'copy',
+  // section / nav glyphs
+  'graduation-cap', 'book-open', 'package',
 ];
 
 const CDN = 'https://unpkg.com/lucide-static@latest/icons';

@@ -14,6 +14,8 @@ $tokens: (
     radius: ref.ref('shape.radius'),
     padding-x: 12px,
     padding-y: 7px,
+    // Gap between a segment's optional leading icon and its label.
+    icon-gap: 6px,
     duration: ref.ref('motion.fast'),
   ),
   typography: (

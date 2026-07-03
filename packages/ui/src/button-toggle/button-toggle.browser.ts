@@ -10,6 +10,8 @@ import {
 } from '@weave-framework/runtime';
 import * as dom from '@weave-framework/runtime/dom';
 import { compileTemplate } from '@weave-framework/compiler';
+import * as IconMod from '@weave-framework/ui/icon';
+import { toComponent } from '../internal/compose.js';
 import {
   setup,
   template,
@@ -35,7 +37,9 @@ function mount(props: ButtonToggleProps): { group: HTMLElement; segments: HTMLBu
       r: unknown,
       k: unknown
     ) => HTMLElement;
-    return fn(ctx, rt, {});
+    // ButtonToggle composes <Icon> for a segment's optional leading icon (rendered only when
+    // an option has `icon`); provide it in the child map like a real build's `_c`.
+    return fn(ctx, rt, { Icon: toComponent(IconMod as never) });
   });
   document.body.appendChild(group);
   // Segments are stable (the option list doesn't change within a test), so query once.
@@ -53,6 +57,25 @@ const OPTS: ButtonToggleOption[] = [
 const key = (target: EventTarget, k: string): void => {
   target.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true }));
 };
+
+/* ─────────────────────────── optional per-segment icon ─────────────────────────── */
+
+test('icon: an option with `icon` renders a composed <Icon> before its label', () => {
+  const { segments, dispose } = mount({
+    options: [
+      { value: 'learn', label: 'Learn', icon: 'graduation-cap' },
+      { value: 'ref', label: 'Reference' },
+    ],
+    value: 'learn',
+  });
+  // The icon segment mounts a real <Icon> (span.weave-icon) and keeps its label text.
+  const iconEl: Element | null = segments[0].querySelector('.weave-icon');
+  assert.ok(iconEl, 'the icon option rendered a composed <Icon>');
+  assert.ok(segments[0].textContent?.includes('Learn'), 'the label text is preserved');
+  // An option without `icon` renders none.
+  assert.equal(segments[1].querySelector('.weave-icon'), null, 'the icon-less option has no <Icon>');
+  dispose();
+});
 
 /* ─────────────────────────── single-select (radiogroup) ─────────────────────────── */
 
