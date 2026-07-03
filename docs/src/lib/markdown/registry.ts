@@ -23,6 +23,10 @@ import RadioBasic from '../demos/ui/radio-basic';
 import SlideToggleBasic from '../demos/ui/slide-toggle-basic';
 import FormFieldBasic from '../demos/ui/form-field-basic';
 import FormFieldError from '../demos/ui/form-field-error';
+import SelectBasic from '../demos/ui/select-basic';
+import SelectMultiple from '../demos/ui/select-multiple';
+import ChipsBasic from '../demos/ui/chips-basic';
+import SliderBasic from '../demos/ui/slider-basic';
 
 /**
  * Live-demo registry: maps a `:::demo <key>` directive to a real Weave component.
@@ -57,4 +61,8 @@ export const demos: Record<string, Component> = {
   'slide-toggle-basic': SlideToggleBasic,
   'form-field-basic': FormFieldBasic,
   'form-field-error': FormFieldError,
+  'select-basic': SelectBasic,
+  'select-multiple': SelectMultiple,
+  'chips-basic': ChipsBasic,
+  'slider-basic': SliderBasic,
 };
