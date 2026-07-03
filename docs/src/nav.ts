@@ -134,6 +134,16 @@ const ui: NavSection = {
         { label: 'Divider', path: '/ui/divider' },
       ],
     },
+    {
+      label: 'Form controls',
+      items: [
+        { label: 'Input', path: '/ui/input' },
+        { label: 'Form Field', path: '/ui/form-field' },
+        { label: 'Checkbox', path: '/ui/checkbox' },
+        { label: 'Radio Group', path: '/ui/radio' },
+        { label: 'Slide Toggle', path: '/ui/slide-toggle' },
+      ],
+    },
   ],
 };
 

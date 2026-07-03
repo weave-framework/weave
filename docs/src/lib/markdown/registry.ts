@@ -15,6 +15,14 @@ import ButtonToggleMulti from '../demos/ui/button-toggle-multi';
 import ToolbarBasic from '../demos/ui/toolbar-basic';
 import RippleBasic from '../demos/ui/ripple-basic';
 import DividerBasic from '../demos/ui/divider-basic';
+import InputBasic from '../demos/ui/input-basic';
+import InputFeatures from '../demos/ui/input-features';
+import CheckboxBasic from '../demos/ui/checkbox-basic';
+import CheckboxTristate from '../demos/ui/checkbox-tristate';
+import RadioBasic from '../demos/ui/radio-basic';
+import SlideToggleBasic from '../demos/ui/slide-toggle-basic';
+import FormFieldBasic from '../demos/ui/form-field-basic';
+import FormFieldError from '../demos/ui/form-field-error';
 
 /**
  * Live-demo registry: maps a `:::demo <key>` directive to a real Weave component.
@@ -41,4 +49,12 @@ export const demos: Record<string, Component> = {
   'toolbar-basic': ToolbarBasic,
   'ripple-basic': RippleBasic,
   'divider-basic': DividerBasic,
+  'input-basic': InputBasic,
+  'input-features': InputFeatures,
+  'checkbox-basic': CheckboxBasic,
+  'checkbox-tristate': CheckboxTristate,
+  'radio-basic': RadioBasic,
+  'slide-toggle-basic': SlideToggleBasic,
+  'form-field-basic': FormFieldBasic,
+  'form-field-error': FormFieldError,
 };
