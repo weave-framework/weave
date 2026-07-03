@@ -159,6 +159,14 @@ const ui: NavSection = {
         { label: 'Timepicker', path: '/ui/timepicker' },
       ],
     },
+    {
+      label: 'Feedback & overlays',
+      items: [
+        { label: 'Progress Bar', path: '/ui/progress-bar' },
+        { label: 'Progress Spinner', path: '/ui/progress-spinner' },
+        { label: 'Tooltip', path: '/ui/tooltip' },
+      ],
+    },
   ],
 };
 

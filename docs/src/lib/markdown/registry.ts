@@ -29,6 +29,9 @@ import ChipsBasic from '../demos/ui/chips-basic';
 import SliderBasic from '../demos/ui/slider-basic';
 import DatepickerBasic from '../demos/ui/datepicker-basic';
 import TimepickerBasic from '../demos/ui/timepicker-basic';
+import ProgressBarDemo from '../demos/ui/progress-bar-demo';
+import ProgressSpinnerDemo from '../demos/ui/progress-spinner-demo';
+import TooltipDemo from '../demos/ui/tooltip-demo';
 import AutocompleteBasic from '../demos/ui/autocomplete-basic';
 
 /**
@@ -71,4 +74,7 @@ export const demos: Record<string, Component> = {
   'autocomplete-basic': AutocompleteBasic,
   'datepicker-basic': DatepickerBasic,
   'timepicker-basic': TimepickerBasic,
+  'progress-bar-demo': ProgressBarDemo,
+  'progress-spinner-demo': ProgressSpinnerDemo,
+  'tooltip-demo': TooltipDemo,
 };
