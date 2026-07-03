@@ -23,15 +23,14 @@ it drops an expanding, fading circle at the click point and cleans it up when th
 
 :::tabs
 ~~~html title="app.html"
-<div class="tile" use:ripple={{ opts }}>Click me</div>
+<div class="tile" use:ripple>Click me</div>
 ~~~
 ~~~ts title="app.ts"
-import { ripple, type RippleOptions } from '@weave-framework/ui/ripple';
+import { ripple } from '@weave-framework/ui/ripple';
 
 export function setup() {
-  // Return the action (so `use:` can find it) and its options object.
-  const opts: RippleOptions = {}; // defaults
-  return { ripple, opts };
+  // Return the action so `use:` can find it. With no argument it uses the defaults.
+  return { ripple };
 }
 ~~~
 :::
@@ -45,21 +44,22 @@ Pass options with `use:ripple={{ … }}`:
 | `centered` | `boolean` | `false` | Emanate from the host's centre instead of the pointer — good for keyboard activation. |
 | `disabled` | `boolean` | `false` | Suppress ripples without detaching the action. |
 
-Hold the options in `setup` and pass them by name (the same way `<Button>` configures its own ripple):
+Write the options inline as an object literal — the double braces are the `use:` binding delimiters wrapping a plain `{ … }` object:
 
 :::tabs
 ~~~html title="app.html"
-<div use:ripple={{ centered }}>Always ripples from the middle</div>
+<div use:ripple={{ { centered: true } }}>Always ripples from the middle</div>
 ~~~
 ~~~ts title="app.ts"
-import { ripple, type RippleOptions } from '@weave-framework/ui/ripple';
+import { ripple } from '@weave-framework/ui/ripple';
 
 export function setup() {
-  const centered: RippleOptions = { centered: true };
-  return { ripple, centered };
+  return { ripple };
 }
 ~~~
 :::
+
+Prefer a named `setup` value when the options are reactive or shared across several hosts (the same way `<Button>` configures its own ripple) — `use:ripple={{ opts }}` reads whatever `opts` holds.
 
 ## The host
 
