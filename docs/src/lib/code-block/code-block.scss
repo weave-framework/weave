@@ -19,24 +19,9 @@
   pointer-events: none;
 }
 
-// The copy control is a real Weave-UI ghost <Button>; these rules only pin it to the
-// corner and keep it legible over the code (surface backing + compact metrics).
-.copy.weave-button {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  z-index: 1;
-  min-height: 0;
-  padding: 3px 9px;
-  font-size: 12px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-}
-
-.copy.weave-button:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-}
+// The copy control is a real Weave-UI ghost <Button class="copy">; because that root is
+// rendered by the Button component (its own style scope), the rules that pin it to the
+// corner live globally in src/styles/_chrome.scss.
 
 .pre {
   margin: 0;

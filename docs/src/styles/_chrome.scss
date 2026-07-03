@@ -113,3 +113,41 @@ $topbar-h: var(--weave-toolbar-height, 52px);
     padding: 28px 22px 80px;
   }
 }
+
+/* ── Overrides for @weave-framework/ui roots the docs primitives compose ──
+   These target elements rendered by child UI components (<Card>/<Button>/<Input>),
+   which carry the component's own style scope — so a component-scoped rule can't reach
+   them. Global here, alongside the rest of the chrome. */
+
+// <Demo> frame — the live-example stage is a <Card class="demo"> with a dotted backdrop.
+.demo.weave-card {
+  position: relative;
+  margin: 16px 0;
+  padding: 28px 20px 22px;
+  background:
+    radial-gradient(circle at 1px 1px, var(--border) 1px, transparent 0) 0 0 / 18px 18px,
+    var(--bg-soft);
+}
+
+// <CodeBlock> copy control — a ghost <Button class="copy"> pinned to the corner.
+.code-block .copy.weave-button {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1;
+  min-height: 0;
+  padding: 3px 9px;
+  font-size: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+
+  &:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+}
+
+// <SearchBox> field — the composed <Input> sized for the top bar.
+.search .search-input.weave-input {
+  width: 220px;
+}

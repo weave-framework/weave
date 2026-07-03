@@ -2,11 +2,9 @@
   position: relative;
 }
 
-// The field is the real Weave-UI <Input> (underline variant, search-icon prefix); we
-// only size it for the top bar.
-.search-input.weave-input {
-  width: 220px;
-}
+// The field is the real Weave-UI <Input class="search-input"> (underline variant,
+// search-icon prefix). Because that root is rendered by the Input component (its own
+// style scope), its top-bar width lives globally in src/styles/_chrome.scss.
 
 .panel {
   position: absolute;

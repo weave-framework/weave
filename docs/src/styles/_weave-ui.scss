@@ -1,9 +1,28 @@
 // Load the real @weave-framework/ui component styles. The docs dogfood the library, so
-// every UI demo renders with the actual component CSS a consumer would get.
+// every UI element renders with the actual component CSS a consumer would get.
 //
-//   theme()      — emits the token defaults (:root globals + per-component vars, Light).
-//   all-styles() — emits the structural CSS for every built-in component.
+//   all-styles() — the structural CSS for every built-in component (theme-agnostic).
+//   theme()      — the token layer. We bind Weave-UI's global color tokens to the docs'
+//                  own CSS variables, so every component shares the exact docs palette and
+//                  flips between dark/light with [data-theme] automatically (no separate
+//                  per-theme UI block needed — the docs vars already switch).
 @use 'pkg:@weave-framework/ui' as weave;
 
-@include weave.theme();
 @include weave.all-styles();
+
+@include weave.theme(
+  (
+    color: (
+      canvas: var(--bg),
+      surface: var(--surface),
+      ink: var(--fg),
+      sub: var(--muted),
+      line: var(--border),
+      field: var(--bg-soft),
+      accent: var(--accent),
+      paid: var(--green),
+      error: var(--red),
+      neutral: var(--muted),
+    ),
+  )
+);
