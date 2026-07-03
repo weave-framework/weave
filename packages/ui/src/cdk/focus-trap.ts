@@ -12,6 +12,51 @@ export interface FocusTrapOptions {
   initialFocus?: 'first' | 'container' | HTMLElement;
   /** Restore focus to the previously-focused element on deactivate. Default true. */
   restoreFocus?: boolean;
+  /**
+   * Make everything outside the trapped region `inert` + `aria-hidden` on activate (true modal
+   * shielding: the background can't be reached by AT, pointer, or Tab), and restore on deactivate.
+   * Default false. Walks the container's ancestor chain to `<body>`, marking each level's other
+   * children — so it works whether the region is portaled near `<body>` (Dialog) or nested in the
+   * component tree (over-mode Sidenav). Elements already `inert` (e.g. an outer modal) are left
+   * untouched, so stacked modals restore correctly.
+   */
+  inertBackground?: boolean;
+  /**
+   * One element to leave interactive while {@link inertBackground} is on — typically the modal's
+   * backdrop, which is a sibling of the region and must still receive click-to-dismiss.
+   */
+  inertIgnore?: HTMLElement | null;
+}
+
+/**
+ * Shield everything outside `container` (modal background): walk from the container up to `<body>`,
+ * marking each ancestor's other element children `inert` + `aria-hidden`. Skips `ignore` (the
+ * backdrop) and anything already `inert`. Returns a restore fn that reverts exactly what it changed.
+ */
+function shieldBackground(container: HTMLElement, ignore: HTMLElement | null): () => void {
+  const changed: Array<{ el: HTMLElement; ariaAdded: boolean }> = [];
+  let node: HTMLElement | null = container;
+  const body: HTMLElement = document.body;
+  while (node && node !== body && node.parentElement) {
+    const parent: HTMLElement = node.parentElement;
+    for (const sib of Array.from(parent.children)) {
+      if (sib === node || !(sib instanceof HTMLElement)) continue;
+      if (ignore && (sib === ignore || sib.contains(ignore))) continue;
+      if (sib.hasAttribute('inert')) continue; // already shielded (outer modal) — don't clobber
+      const ariaAdded: boolean = !sib.hasAttribute('aria-hidden');
+      sib.setAttribute('inert', '');
+      if (ariaAdded) sib.setAttribute('aria-hidden', 'true');
+      changed.push({ el: sib, ariaAdded });
+    }
+    node = parent;
+  }
+  return (): void => {
+    for (const { el, ariaAdded } of changed) {
+      el.removeAttribute('inert');
+      if (ariaAdded) el.removeAttribute('aria-hidden');
+    }
+    changed.length = 0;
+  };
 }
 
 export interface FocusTrap {
@@ -35,6 +80,7 @@ export function focusTrap(container: HTMLElement, options: FocusTrapOptions = {}
   const restoreFocus: boolean = options.restoreFocus !== false;
   let previouslyFocused: HTMLElement | null = null;
   let active: boolean = false;
+  let releaseShield: (() => void) | null = null;
 
   const tabbables = (): HTMLElement[] => tabbableChildren(container);
 
@@ -85,6 +131,7 @@ export function focusTrap(container: HTMLElement, options: FocusTrapOptions = {}
       if (active) return;
       active = true;
       previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      if (options.inertBackground) releaseShield = shieldBackground(container, options.inertIgnore ?? null);
       container.addEventListener('keydown', onKeydown);
       focusInitial();
     },
@@ -92,6 +139,10 @@ export function focusTrap(container: HTMLElement, options: FocusTrapOptions = {}
       if (!active) return;
       active = false;
       container.removeEventListener('keydown', onKeydown);
+      // Un-shield BEFORE restoring focus — the opener lives in the background and can't be
+      // focused while still `inert`.
+      releaseShield?.();
+      releaseShield = null;
       if (restoreFocus && previouslyFocused && previouslyFocused.isConnected) previouslyFocused.focus();
       previouslyFocused = null;
     },

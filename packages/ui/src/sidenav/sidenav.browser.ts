@@ -186,3 +186,28 @@ test('over mode traps focus into the open drawer', async () => {
   assert.ok(m.drawer.contains(document.activeElement), 'focus moved into the drawer');
   m.dispose();
 });
+
+test('over mode shields the page content (inert + aria-hidden) while open, keeps backdrop clickable, clears on close', async () => {
+  const opened: Signal<boolean> = signal<boolean>(true);
+  const m: Mounted = mount(
+    {
+      mode: 'over',
+      get opened(): boolean {
+        return opened();
+      },
+      onOpenedChange: (v: boolean): void => {
+        opened.set(v);
+      },
+    },
+    { drawer: buttonNode('Link') },
+  );
+  await tick();
+  assert.ok(m.content.hasAttribute('inert'), 'page content is inert while the over-drawer is open');
+  assert.equal(m.content.getAttribute('aria-hidden'), 'true', 'page content is aria-hidden');
+  assert.ok(!m.backdrop.hasAttribute('inert'), 'backdrop stays clickable (it dismisses the drawer)');
+  opened.set(false);
+  await tick();
+  assert.ok(!m.content.hasAttribute('inert'), 'inert cleared when the drawer closes');
+  assert.ok(!m.content.hasAttribute('aria-hidden'), 'aria-hidden cleared when the drawer closes');
+  m.dispose();
+});

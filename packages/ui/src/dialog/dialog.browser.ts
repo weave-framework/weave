@@ -105,6 +105,24 @@ test('dialog: closing restores focus to the opener', () => {
   opener.remove();
 });
 
+test('dialog: opening shields the background (inert + aria-hidden), backdrop stays clickable, cleared on close', () => {
+  const bg: HTMLDivElement = document.createElement('div');
+  document.body.appendChild(bg);
+  const { ref, opener } = openWith({ content: 'x' });
+  // Background siblings of the overlay container become inert + aria-hidden (AT/pointer/Tab can't reach them)…
+  assert.ok(bg.hasAttribute('inert'), 'background app element is inert while the modal is open');
+  assert.equal(bg.getAttribute('aria-hidden'), 'true', 'background app element is aria-hidden');
+  assert.ok(opener.hasAttribute('inert'), 'the opener is shielded too');
+  // …but the backdrop stays interactive (it dismisses the dialog), and the panel itself is reachable.
+  assert.ok(!backdrop()?.hasAttribute('inert'), 'backdrop is NOT inert (still click-to-dismiss)');
+  assert.ok(!panel()?.hasAttribute('inert'), 'the dialog panel is not inert');
+  ref.close();
+  assert.ok(!bg.hasAttribute('inert'), 'inert cleared on close');
+  assert.ok(!bg.hasAttribute('aria-hidden'), 'aria-hidden cleared on close');
+  bg.remove();
+  opener.remove();
+});
+
 test('dialog: Escape closes a dismissable dialog', () => {
   const { ref, opener } = openWith({ content: 'x' });
   panel()!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));

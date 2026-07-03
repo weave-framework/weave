@@ -99,7 +99,12 @@ export function openModal(config: ModalConfig): ModalRef {
     positionStrategy: config.positionStrategy,
     scrollStrategy: blockScroll,
   });
-  const trap: FocusTrap = focusTrap(panel, { restoreFocus: true });
+  // Modal: shield the background (inert + aria-hidden) while open; keep the backdrop clickable.
+  const trap: FocusTrap = focusTrap(panel, {
+    restoreFocus: true,
+    inertBackground: true,
+    inertIgnore: ref.backdropElement,
+  });
 
   let closed: boolean = false;
   let result: unknown = undefined;

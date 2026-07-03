@@ -116,7 +116,13 @@ export function setup(props: SidenavProps): SidenavContext {
     const d: HTMLElement | null = drawer();
     const shouldTrap: boolean = mounted() && !!d && effectiveMode() === 'over' && opened();
     if (shouldTrap && !trapOn) {
-      trap ??= focusTrap(d as HTMLElement, { restoreFocus: true });
+      // Over-mode drawer is modal: shield the content/background, but keep the backdrop
+      // clickable (it closes the drawer). The backdrop is the drawer's sibling in the root.
+      trap ??= focusTrap(d as HTMLElement, {
+        restoreFocus: true,
+        inertBackground: true,
+        inertIgnore: (d as HTMLElement).nextElementSibling as HTMLElement | null,
+      });
       trap.activate();
       trapOn = true;
     } else if (!shouldTrap && trapOn) {
