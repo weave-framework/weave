@@ -1,0 +1,115 @@
+// Docs chrome — the app frame built from @weave-framework/ui (<Toolbar> + <Sidenav>).
+// These roots are rendered by the child UI components, so they carry the component's own
+// style scope, not the shell's — hence global selectors here (the docs are one app).
+
+$sidebar-w: 256px;
+// Fall back to 52px if the toolbar token isn't resolved for some reason.
+$topbar-h: var(--weave-toolbar-height, 52px);
+
+/* ── Top bar: <Toolbar class="topbar"> ── */
+.weave-toolbar.topbar {
+  gap: 14px;
+  padding: 0 20px;
+  z-index: 20;
+  // Translucent, blurred bar over the page (two classes beat the component's single-class bg).
+  background: color-mix(in srgb, var(--bg) 86%, transparent);
+  backdrop-filter: blur(8px);
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--fg);
+  font-weight: 700;
+  font-size: 17px;
+
+  &:hover {
+    text-decoration: none;
+  }
+}
+
+.brand-tag {
+  font-weight: 500;
+  font-size: 13px;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 1px 6px;
+}
+
+// Section switcher (<ButtonToggle class="sections">) sits just after the brand.
+.sections {
+  margin-left: 4px;
+}
+
+// Hamburger — hidden on wide screens (the drawer is always open in `side` mode there).
+.nav-toggle {
+  display: none;
+}
+
+/* ── Layout: <Sidenav class="layout"> ── */
+.weave-sidenav.layout {
+  --weave-sidenav-width: #{$sidebar-w};
+  // Match the old transparent sidebar (keep the 1px hairline the component draws).
+  --weave-sidenav-drawer-background: transparent;
+  height: calc(100vh - #{$topbar-h});
+  max-width: 1280px;
+  margin: 0 auto;
+}
+
+.sidebar {
+  padding: 24px 16px;
+}
+
+.nav-group {
+  margin-bottom: 22px;
+}
+
+.nav-group-title {
+  margin: 0 0 6px;
+  padding: 0 10px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.nav-link {
+  display: block;
+  padding: 6px 10px;
+  border-radius: 7px;
+  color: var(--fg-soft);
+  font-size: 14px;
+
+  &:hover {
+    color: var(--fg);
+    background: var(--surface);
+    text-decoration: none;
+  }
+
+  &.active {
+    color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+    font-weight: 600;
+  }
+}
+
+.content {
+  padding: 36px 48px 96px;
+}
+
+@media (max-width: 900px) {
+  .nav-toggle {
+    display: inline-flex;
+  }
+
+  .weave-sidenav.layout {
+    max-width: none;
+  }
+
+  .content {
+    padding: 28px 22px 80px;
+  }
+}

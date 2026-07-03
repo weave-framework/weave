@@ -1,25 +1,37 @@
-<header class="topbar">
+<Toolbar sticky={{ true }} class="topbar">
+  <Button variant={{ 'icon' }} label={{ 'Toggle navigation' }} class="nav-toggle" on:click={{ toggleNav }}>
+    <Icon name={{ 'menu' }} />
+  </Button>
+
   <Link to="/" class="brand">
     <img class="brand-logo" src="favicon.svg" alt="" width="24" height="24" />
     <span class="brand-name">Weave</span>
     <span class="brand-tag">docs</span>
   </Link>
 
-  <nav class="sections">
-    @for (s of sections; track s.id) {
-      <Link to={{ s.basePath }} class="section-link" activeClass="active">{{ s.icon }} {{ s.label }}</Link>
-    }
-  </nav>
+  <ButtonToggle
+    class="sections"
+    options={{ sectionOptions }}
+    value={{ activeSectionId() }}
+    onChange={{ goToSection }}
+    label={{ 'Documentation section' }}
+  />
 
-  <div class="topbar-right">
-    <SearchBox />
-    <button class="icon-btn" type="button" on:click={{ toggleTheme }} aria-label="Toggle color theme">{{ themeIcon() }}</button>
-    <a class="icon-btn gh" href={{ repoUrl }} target="_blank" rel="noopener noreferrer">GitHub</a>
-  </div>
-</header>
+  <span class="weave-toolbar__spacer"></span>
 
-<div class="layout">
-  <aside class="sidebar">
+  <SearchBox />
+
+  <Button variant={{ 'icon' }} label={{ 'Toggle color theme' }} on:click={{ toggleTheme }}>
+    <Icon name={{ themeIconName() }} />
+  </Button>
+
+  <Button variant={{ 'icon' }} label={{ 'Open the repository on GitHub' }} on:click={{ openRepo }}>
+    <Icon name={{ 'github' }} />
+  </Button>
+</Toolbar>
+
+<Sidenav class="layout" api={{ setNavApi }}>
+  <nav slot="drawer" class="sidebar" aria-label="Documentation">
     @for (g of groups(); track g.label) {
       <div class="nav-group">
         <p class="nav-group-title">{{ g.label }}</p>
@@ -28,9 +40,9 @@
         }
       </div>
     }
-  </aside>
+  </nav>
 
   <main class="content">
     <RouterView router={{ router }} />
   </main>
-</div>
+</Sidenav>

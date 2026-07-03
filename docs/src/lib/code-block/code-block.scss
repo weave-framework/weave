@@ -19,22 +19,21 @@
   pointer-events: none;
 }
 
-.copy {
+// The copy control is a real Weave-UI ghost <Button>; these rules only pin it to the
+// corner and keep it legible over the code (surface backing + compact metrics).
+.copy.weave-button {
   position: absolute;
   top: 8px;
   right: 8px;
   z-index: 1;
-  font: inherit;
-  font-size: 12px;
+  min-height: 0;
   padding: 3px 9px;
-  border-radius: 6px;
-  border: 1px solid var(--border);
+  font-size: 12px;
   background: var(--surface);
-  color: var(--fg);
-  cursor: pointer;
+  border: 1px solid var(--border);
 }
 
-.copy:hover {
+.copy.weave-button:hover {
   border-color: var(--accent);
   color: var(--accent);
 }

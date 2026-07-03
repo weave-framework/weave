@@ -1,9 +1,9 @@
-.demo {
+// The frame is a real Weave-UI <Card> (it supplies the 1px border + radius); these
+// rules add the doc-specific dotted backdrop and padding on top of the card surface.
+.demo.weave-card {
   position: relative;
   margin: 16px 0;
   padding: 28px 20px 22px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
   background:
     radial-gradient(circle at 1px 1px, var(--border) 1px, transparent 0) 0 0 / 18px 18px,
     var(--bg-soft);

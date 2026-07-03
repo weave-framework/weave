@@ -2,24 +2,10 @@
   position: relative;
 }
 
-.search-input {
-  font: inherit;
-  font-size: 13px;
+// The field is the real Weave-UI <Input> (underline variant, search-icon prefix); we
+// only size it for the top bar.
+.search-input.weave-input {
   width: 220px;
-  padding: 7px 11px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--fg);
-}
-
-.search-input::placeholder {
-  color: var(--muted);
-}
-
-.search-input:focus {
-  outline: none;
-  border-color: var(--accent);
 }
 
 .panel {

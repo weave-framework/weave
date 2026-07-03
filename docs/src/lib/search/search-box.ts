@@ -1,25 +1,31 @@
 import { signal, computed, type Signal, type Computed } from '@weave-framework/runtime';
 import { navigate } from '@weave-framework/router';
+import Input from '@weave-framework/ui/input';
+import Icon from '@weave-framework/ui/icon';
 import { entries } from './build-index';
 import { search, type Result } from './search';
 import { scrollToHash } from '../util/scroll';
 
+// Capitalized tags in the template resolve to these imports.
+void Input;
+void Icon;
+
 interface SearchBoxSetup {
   query: Signal<string>;
   results: Computed<Result[]>;
-  onInput: () => void;
-  onFocus: () => void;
-  onBlur: () => void;
-  onKey: (e: KeyboardEvent) => void;
+  setQuery: (value: string) => void;
+  wireField: (el: HTMLInputElement | HTMLTextAreaElement) => void;
   go: (r: Result) => void;
   isActive: (i: number) => boolean;
   hasResults: () => boolean;
   empty: () => boolean;
 }
 
-/** The docs search: a fuzzy, synonym-aware search box with a results dropdown and
- *  full keyboard navigation. Related/indirect hits are flagged so the user sees
- *  "what might be relevant", not just exact-word matches. */
+/** The docs search: a fuzzy, synonym-aware search box with a results dropdown and full
+ *  keyboard navigation. The field is the real Weave-UI `<Input>` (composed, with a search
+ *  icon prefix); its focus/blur/keyboard behaviour is wired onto the native field via
+ *  `onInputRef` — the same composition hook Autocomplete uses — while the results panel
+ *  stays bespoke (related/indirect hits are flagged, so it's "what might be relevant"). */
 export function setup(): SearchBoxSetup {
   const query = signal('');
   const open = signal(false);
@@ -27,10 +33,13 @@ export function setup(): SearchBoxSetup {
 
   const results = computed<Result[]>(() => (query().trim() ? search(entries, query()) : []));
 
-  const onInput = (): void => {
+  // Input's value binding calls this on every keystroke.
+  const setQuery = (value: string): void => {
+    query.set(value);
     open.set(true);
     active.set(0);
   };
+
   const onFocus = (): void => {
     if (query().trim()) open.set(true);
   };
@@ -64,9 +73,17 @@ export function setup(): SearchBoxSetup {
     }
   };
 
+  // Attach the panel's focus/blur/keyboard behaviour onto the composed Input's native
+  // field (Input owns the element; we only add listeners — no re-created field).
+  const wireField = (el: HTMLInputElement | HTMLTextAreaElement): void => {
+    el.addEventListener('focus', onFocus);
+    el.addEventListener('blur', onBlur);
+    el.addEventListener('keydown', onKey);
+  };
+
   const isActive = (i: number): boolean => active() === i;
   const hasResults = (): boolean => open() && query().trim().length > 0;
   const empty = (): boolean => hasResults() && results().length === 0;
 
-  return { query, results, onInput, onFocus, onBlur, onKey, go, isActive, hasResults, empty };
+  return { query, results, setQuery, wireField, go, isActive, hasResults, empty };
 }

@@ -1,5 +1,9 @@
 import { signal, effect, type Signal } from '@weave-framework/runtime';
+import Button from '@weave-framework/ui/button';
 import { highlight } from '../highlight/highlight';
+
+// `<Button>` is referenced in the template.
+void Button;
 
 interface CodeBlockProps {
   /** The source to display and copy. */

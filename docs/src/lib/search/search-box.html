@@ -1,15 +1,15 @@
 <div class="search">
-  <input
+  <Input
     class="search-input"
-    type="search"
-    placeholder="Search docs…"
-    aria-label="Search the docs"
-    bind:value={{ query }}
-    on:input={{ onInput }}
-    on:focus={{ onFocus }}
-    on:blur={{ onBlur }}
-    on:keydown={{ onKey }}
-  />
+    type={{ 'search' }}
+    placeholder={{ 'Search docs…' }}
+    label={{ 'Search the docs' }}
+    value={{ query() }}
+    onInput={{ setQuery }}
+    onInputRef={{ wireField }}
+  >
+    <Icon slot="prefix" name={{ 'search' }} />
+  </Input>
 
   @if (hasResults()) {
     <div class="panel">
