@@ -9,6 +9,15 @@
 > releases here. Publishing itself is a separate, explicit step (the `/publish` skill /
 > `pnpm publish:packages`) — pushing code does **not** publish to npm.
 
+## 0.2.60 — 2026-07-03
+
+**U6 a11y audit — Batch D (power-user, `@weave-framework/ui`).** Audited Menubar, Popover-edit, and the Table
+column-resize grip. One genuine fix, pinned by a failing-first test: the Table's `role="separator"` resize grip now
+exposes **`aria-valuenow`** (the current column width, reactive as you resize) and **`aria-valuemin`** (the
+min-width clamp) — the WAI-ARIA window-splitter values it was missing (`aria-valuemax` is intentionally omitted since
+a column has no hard maximum). Menubar and Popover-edit audited fully conformant (roles/states, keyboard, focus).
+Reduced-motion and RTL (arrow/drag direction) findings are batched into the centralized cross-cutting pass.
+
 ## 0.2.59 — 2026-07-03
 
 **U6 a11y audit — Batch C (complex/data, `@weave-framework/ui`).** Audited the 10 complex components (Tabs, Sidenav,

@@ -268,6 +268,16 @@ test('table: resizable columns get a separator grip; non-resizable do not', asyn
   m.dispose();
 });
 
+test('table: the resize grip exposes aria-valuenow (width) + aria-valuemin (APG separator)', async () => {
+  const cols: TableColumn<Row>[] = [{ key: 'name', header: 'Name', width: 200, resizable: true, minWidth: 60 }];
+  const m: Mounted = await mount({ columns: cols, dataSource: ROWS });
+  assert.equal(grip(m, 'name').getAttribute('aria-valuenow'), '200', 'valuenow = current width');
+  assert.equal(grip(m, 'name').getAttribute('aria-valuemin'), '60', 'valuemin = minWidth');
+  grip(m, 'name').dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowRight' }));
+  assert.equal(grip(m, 'name').getAttribute('aria-valuenow'), '216', 'valuenow tracks the resize');
+  m.dispose();
+});
+
 test('table: keyboard Arrow resizes the column + emits onColumnResize', async () => {
   const sizes: Array<{ key: string; width: number }> = [];
   const cols: TableColumn<Row>[] = [{ key: 'name', header: 'Name', width: 200, resizable: true }];

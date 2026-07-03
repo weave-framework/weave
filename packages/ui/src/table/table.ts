@@ -135,6 +135,7 @@ export const template: string =
   '@if (!col.sortable) {@render (headNode(col))}' +
   '@if (isResizable(col)) {<span class="weave-table__resize-grip" role="separator" aria-orientation="vertical"' +
   ' tabindex="0" aria-label={{ resizeLabel(col) }} data-col={{ col.key }}' +
+  ' aria-valuenow={{ gripValueNow(col) }} aria-valuemin={{ gripValueMin(col) }}' +
   ' on:keydown={{ (e) => onGripKeydown(col.key, e) }}></span>}' +
   '</th>}' +
   '</tr></thead>' +
@@ -188,6 +189,8 @@ export interface TableContext<T> {
   cycleSort: (key: string) => void;
   isResizable: (col: TableColumn<T>) => boolean;
   resizeLabel: (col: TableColumn<T>) => string;
+  gripValueNow: (col: TableColumn<T>) => string | undefined;
+  gripValueMin: (col: TableColumn<T>) => string;
   onGripKeydown: (key: string, event: KeyboardEvent) => void;
   cellsFor: (row: T) => CellView[];
   detailNode: (row: T) => Node;
@@ -421,6 +424,13 @@ export function setup<T = Record<string, unknown>>(props: TableProps<T>): TableC
     isResizable,
     resizeLabel: (col: TableColumn<T>): string =>
       `Resize ${typeof col.header === 'string' ? col.header : col.key} column`,
+    // APG window-splitter: the separator exposes its current width (once known — reactive on resize)
+    // and the min it can shrink to. No hard max, so aria-valuemax is intentionally omitted.
+    gripValueNow: (col: TableColumn<T>): string | undefined => {
+      const w: number | undefined = effWidth(col);
+      return w != null ? String(Math.round(w)) : undefined;
+    },
+    gripValueMin: (col: TableColumn<T>): string => String(minW(col)),
     onGripKeydown,
     cellsFor: (row: T): CellView[] =>
       dataCols().map((col) => ({ key: col.key, cls: cellClassOf(col), style: cellStyleOf(col), node: cellNodeOf(row, col) })),
