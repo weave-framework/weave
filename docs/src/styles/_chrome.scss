@@ -70,7 +70,9 @@ $topbar-h: var(--weave-toolbar-height, 52px);
   border: 0;
   border-radius: 0;
   overflow: visible;
-  --weave-expansion-header-open-background: transparent;
+  // A faint neutral band behind each (open-by-default) group title, so it reads as a header
+  // row instead of blending into the links below it.
+  --weave-expansion-header-open-background: color-mix(in srgb, var(--fg) 6%, transparent);
   --weave-expansion-header-hover-background: var(--surface);
   --weave-expansion-marker: var(--muted);
 }
