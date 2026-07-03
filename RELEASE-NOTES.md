@@ -3,6 +3,41 @@
 Human-readable highlights, one section per release — everything notable that landed since
 the previous one. For the granular, per-version log see [CHANGELOG.md](CHANGELOG.md).
 
+## 0.2.107 — 2026-07-04
+
+The first npm release since `0.2.53` — it bundles the full accessibility audit, new icon
+capabilities, several correctness/performance fixes, and the now-complete UI documentation.
+
+### ✨ Features
+- **`<ButtonToggle>` per-segment icon** — an option can carry an `icon` (`{ value, label, icon }`), rendered as a
+  composed `<Icon>` before the label.
+- **Built-in Lucide icon set grown to 53** — added `sun`, `moon`, `copy`, `git-branch`, `graduation-cap`,
+  `book-open`, `package`; every name works from `<Icon name="…">` with zero configuration.
+
+### ♿ Accessibility
+- A structural a11y audit across all 37 styled components (roles/states, keyboard, focus, reduced-motion, RTL) —
+  **7 test-pinned ARIA fixes**: `aria-controls` lifecycle on Select / Autocomplete / Datepicker, Timepicker
+  `aria-valuemin/max`, over-mode Sidenav `aria-modal`, Table resize-grip `aria-valuenow/min`, and Space-to-select
+  on the Select listbox.
+- A central `prefers-reduced-motion` mixin collapses every library transition/animation (including the infinite
+  Progress-Bar and Spinner loops) when the user prefers reduced motion.
+
+### 🐛 Fixes
+- Composed child components resolve correctly in a real consumer build — including a `<Checkbox>` nested inside
+  `@if`/`@for` (e.g. `<Table selectable>`) and the case where a JSDoc import example was mistaken for a real import.
+- Template interpolation no longer scope-prefixes the keys of an inline object literal.
+- `weave dev` no longer accumulates duplicate `<style>` tags across client-side navigation — style injection is
+  idempotent now (content-hashed id + skip-if-present), so long dev sessions stay responsive.
+
+### 🔒 Security
+- `weave dev`'s static-file handler rejects path traversal (403 instead of reading outside the served dir), and
+  polynomial-backtracking regex shapes were removed from the router basename normalizer and the compiler extractor.
+
+### 📚 Docs & packaging
+- The whole `@weave-framework/ui` component library is documented (38 component pages + a Styling/theming guide),
+  each with live demos importing the real component; the docs site itself now dogfoods the UI library for its own
+  chrome. Every package ships a README on npm.
+
 ## 0.2.54 — 2026-07-03
 
 Security hardening — resolves the code-scanning findings on the published packages. No API change.

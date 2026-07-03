@@ -18,11 +18,6 @@ this list is a live intention, not a historical note.
   (ArrowLeft/Right swap in horizontal widgets — Tabs, Stepper, Slider, Menubar), mirrored overlay positioning,
   and sticky-offset/fill direction. The structural a11y pass already swapped the cheap physical→logical CSS
   sites; this is the remaining behavioral (JS) half.
-- **Modal `inert` background.** When a modal overlay is open (Dialog, over-mode Sidenav), mark everything
-  behind it `inert` so assistive tech and pointer focus cannot reach the backdrop — completing the existing
-  focus-trap.
-- **Per-component documentation pages.** A reference page for every component on the docs site: API
-  (props/events), behavior notes, and usage examples alongside a live demo.
 - **Permanent live component gallery.** A hosted, always-current gallery of every component and its variants.
 - **UI testing harnesses** (`@weave-framework/ui/testing`). Ready-made utilities for consumers to drive and
   assert Weave components in their own tests (open an overlay, exercise the keyboard map, check focus return).
