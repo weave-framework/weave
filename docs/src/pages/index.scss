@@ -28,6 +28,8 @@
   margin: 0 auto;
 }
 
+// The CTAs are real Weave-UI <Button>s and the feature tiles are <Card>s now; these rules
+// only lay them out (the components own their own appearance).
 .hero-cta {
   display: flex;
   gap: 12px;
@@ -36,63 +38,11 @@
   margin-top: 26px;
 }
 
-// The CTA buttons are `<Link>`s — their <a> is created in JS without the page's
-// scope attribute, so `:global()` (scoped by .hero-cta) is needed to style them.
-.hero-cta :global(.btn) {
-  font-size: 15px;
-  font-weight: 600;
-  padding: 11px 20px;
-  border-radius: 10px;
-  border: 1px solid var(--border);
-  cursor: pointer;
-}
-
-.hero-cta :global(.btn:hover) {
-  text-decoration: none;
-}
-
-.hero-cta :global(.btn-primary) {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #0b0d11;
-}
-
-.hero-cta :global(.btn-primary:hover) {
-  filter: brightness(1.07);
-}
-
-.hero-cta :global(.btn-ghost) {
-  background: var(--surface);
-  color: var(--fg);
-}
-
-.hero-cta :global(.btn-ghost:hover) {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
 .threads {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 16px;
   margin-top: 56px;
-}
-
-.thread-card {
-  padding: 20px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--bg-soft);
-}
-
-.thread-card h3 {
-  margin: 0 0 6px;
-  font-size: 16px;
-}
-
-.thread-card p {
-  margin: 0;
-  font-size: 14.5px;
 }
 
 @media (max-width: 720px) {
