@@ -119,8 +119,12 @@ const ui: NavSection = {
   label: 'UI',
   icon: '📦',
   basePath: '/ui',
-  home: '/ui/button',
+  home: '/ui/theming',
   groups: [
+    {
+      label: 'Overview',
+      items: [{ label: 'Styling & theming', path: '/ui/theming' }],
+    },
     {
       label: 'Foundational',
       items: [
