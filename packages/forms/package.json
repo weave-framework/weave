@@ -1,6 +1,6 @@
 {
   "name": "@weave-framework/forms",
-  "version": "0.2.60",
+  "version": "0.2.61",
   "description": "Weave forms — signal-native field/form state + validation over bind:value. Zero third-party deps.",
   "type": "module",
   "sideEffects": false,

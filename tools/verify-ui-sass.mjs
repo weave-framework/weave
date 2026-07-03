@@ -562,6 +562,15 @@ try {
 }
 check('example.scss compiles (theme + all-styles + scoped override)', exampleOk);
 
+/* ── reduced-motion: all-styles() emits a prefers-reduced-motion guard scoped to weave-* ── */
+check('all-styles emits a prefers-reduced-motion guard', /@media\s*\(prefers-reduced-motion:\s*reduce\)/.test(cssStyles));
+check('reduced-motion scopes to weave- classes only', /\[class\^=["']?weave-["']?\]/.test(cssStyles));
+check('reduced-motion collapses animation duration', /animation-duration:\s*0\.001ms\s*!important/.test(cssStyles));
+check('reduced-motion collapses transition duration', /transition-duration:\s*0\.001ms\s*!important/.test(cssStyles));
+check('reduced-motion caps animation iterations', /animation-iteration-count:\s*1\s*!important/.test(cssStyles));
+const cssRM = compile(`@use '@weave-framework/ui' as weave;\n@include weave.reduced-motion();`);
+check('reduced-motion() is includable standalone', /@media\s*\(prefers-reduced-motion:\s*reduce\)/.test(cssRM));
+
 console.log(`\n${'-'.repeat(40)}`);
 console.log(`ui-sass  pass ${pass}  fail ${fail}`);
 process.exit(fail > 0 ? 1 : 0);

@@ -9,6 +9,18 @@
 > releases here. Publishing itself is a separate, explicit step (the `/publish` skill /
 > `pnpm publish:packages`) — pushing code does **not** publish to npm.
 
+## 0.2.61 — 2026-07-03
+
+**U6 a11y audit — cross-cutting pass (reduced motion + RTL, `@weave-framework/ui`).** Completes the U6 accessibility
+audit. **Reduced motion:** a new `reduced-motion()` mixin (included automatically by `all-styles()`) emits one
+`@media (prefers-reduced-motion: reduce)` block, scoped to `weave-*` classes, that collapses every transition and
+animation the library owns — including the previously-unguarded infinite Progress-Bar and Progress-Spinner loops — to
+an instant duration, while keeping animation end-states intact. It never touches the consumer's own markup, and is
+exposed standalone for per-component compiles. **RTL:** the cheap, direction-safe spacing swaps are now logical
+(`margin-inline-*` on Chips/Paginator/Snackbar/Stepper); the deeper RTL work (bidi-aware keyboard arrows, fill/sticky
+positioning) is a scoped follow-on. With this, all 37 styled components have been audited across roles/states,
+keyboard, focus, reduced-motion, and RTL, with every fix pinned by a test.
+
 ## 0.2.60 — 2026-07-03
 
 **U6 a11y audit — Batch D (power-user, `@weave-framework/ui`).** Audited Menubar, Popover-edit, and the Table

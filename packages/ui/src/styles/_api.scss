@@ -315,6 +315,30 @@ $_builtins: (
   @include overrides('popover-edit', $map);
 }
 
+// Honour `prefers-reduced-motion: reduce` for the library's OWN elements. Scoped to
+// `weave-*` classes so it never touches the consumer's markup. Neutralises transitions AND
+// animations (including the infinite progress-bar / spinner loops) by collapsing their
+// duration — using a tiny non-zero duration + a single iteration keeps `animation-fill-mode`
+// end-states intact (safer than `animation: none`, which can strand a reveal at its start).
+// `all-styles()` includes this automatically; include it yourself if you compile per-component.
+@mixin reduced-motion() {
+  @media (prefers-reduced-motion: reduce) {
+    [class^='weave-'],
+    [class*=' weave-'] {
+      &,
+      &::before,
+      &::after {
+        animation-duration: 0.001ms !important;
+        animation-delay: 0ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+        transition-delay: 0ms !important;
+        scroll-behavior: auto !important;
+      }
+    }
+  }
+}
+
 // Emit the structural CSS (class rules) for every built-in component.
 // Prefer per-component includes to keep CSS small; all-styles() is the convenience.
 @mixin all-styles() {
@@ -356,4 +380,5 @@ $_builtins: (
   @include timepicker.styles();
   @include menubar.styles();
   @include popover-edit.styles();
+  @include reduced-motion();
 }

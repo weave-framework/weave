@@ -37,7 +37,7 @@
   }
 
   .weave-paginator__range {
-    margin-left: var(--weave-paginator-section-gap);
+    margin-inline-start: var(--weave-paginator-section-gap);
     color: var(--weave-paginator-range);
     font-size: var(--weave-paginator-range-size);
     font-variant-numeric: tabular-nums;
@@ -50,7 +50,7 @@
     display: inline-flex;
     align-items: center;
     gap: var(--weave-paginator-jump-gap);
-    margin-left: var(--weave-paginator-section-gap);
+    margin-inline-start: var(--weave-paginator-section-gap);
     color: var(--weave-paginator-range);
     font-size: var(--weave-paginator-range-size);
   }
@@ -67,7 +67,7 @@
   // Optional page-size picker — the control IS the Select component; this just spaces +
   // widths the composed <Select>.
   .weave-paginator__size {
-    margin-left: var(--weave-paginator-section-gap);
+    margin-inline-start: var(--weave-paginator-section-gap);
     width: var(--weave-paginator-size-width);
   }
 

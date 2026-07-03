@@ -96,7 +96,7 @@
   }
 
   .weave-stepper__optional {
-    margin-left: var(--weave-stepper-optional-gap);
+    margin-inline-start: var(--weave-stepper-optional-gap);
     color: var(--weave-stepper-optional);
     font-size: var(--weave-stepper-optional-size);
   }
