@@ -90,15 +90,34 @@ For the `icon` variant, project an icon and always give it a `label` — that be
 ## Events
 
 `<Button>` forwards native button events straight through — `on:click` is the one you'll reach for most. You write
-it on the component and it lands on the underlying `<button>` with no plumbing. An `on:X` handler is **always a
-function you return from `setup`** — like the `inc` from [Basic usage](#basic-usage):
+it on the component and it lands on the underlying `<button>` with no plumbing. Here's a complete, runnable example —
+a delete button that asks first (click it twice):
 
-```html
-<Button on:click={{ inc }}>Clicked {{ count() }} times</Button>
-```
+:::demo button-confirm
 
-Any other native button event works the same way — `on:focus`, `on:blur`, `on:pointerdown`, … each one calls the
-function you bind to it.
+:::tabs
+~~~html title="app.html"
+<Button variant={{ 'outline' }} on:click={{ remove }}>{{ label() }}</Button>
+~~~
+~~~ts title="app.ts"
+import { signal } from '@weave-framework/runtime';
+import Button from '@weave-framework/ui/button';
+
+export function setup() {
+  const armed = signal(false);
+  const remove = () => {
+    if (!armed()) return armed.set(true); // first click: arm
+    // second click: actually delete…
+    armed.set(false);
+  };
+  const label = () => (armed() ? 'Click again to confirm' : 'Delete');
+  return { armed, remove, label };
+}
+~~~
+:::
+
+An `on:X` handler is **always a function you return from `setup`** (`remove` here). Any other native button event
+works the same way — `on:focus`, `on:blur`, `on:pointerdown`, … each one calls the function you bind to it.
 
 ## Content
 

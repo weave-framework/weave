@@ -3,6 +3,7 @@ import CounterDemo from '../demos/counter-demo';
 import ButtonEvents from '../demos/ui/button-events';
 import ButtonVariants from '../demos/ui/button-variants';
 import ButtonDisabled from '../demos/ui/button-disabled';
+import ButtonConfirm from '../demos/ui/button-confirm';
 
 /**
  * Live-demo registry: maps a `:::demo <key>` directive to a real Weave component.
@@ -17,4 +18,5 @@ export const demos: Record<string, Component> = {
   'button-events': ButtonEvents,
   'button-variants': ButtonVariants,
   'button-disabled': ButtonDisabled,
+  'button-confirm': ButtonConfirm,
 };
