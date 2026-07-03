@@ -6,7 +6,7 @@
   --callout-color: var(--accent);
   display: flex;
   gap: 11px;
-  align-items: flex-start;
+  align-items: center;
   margin: 18px 0;
   padding: 12px 14px;
   border-radius: 10px;
@@ -27,7 +27,6 @@
 // colour, richer than the tint; `--callout-color` is inherited from `.callout`.
 .callout :global(.weave-icon) {
   flex: none;
-  margin-top: 1px;
   color: var(--callout-color);
 }
 
