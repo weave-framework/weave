@@ -59,7 +59,7 @@ export interface SidenavProps {
 
 export const template: string =
   '<div class={{ rootClass() }} ref={{ root }} on:keydown={{ onKeydown }}>' +
-  '<aside class="weave-sidenav__drawer" ref={{ drawer }}><slot name="drawer"></slot></aside>' +
+  '<aside class="weave-sidenav__drawer" ref={{ drawer }} aria-modal={{ drawerModal() }}><slot name="drawer"></slot></aside>' +
   '<div class="weave-sidenav__backdrop" aria-hidden="true" on:click={{ onBackdropClick }}></div>' +
   '<div class="weave-sidenav__content"><slot></slot></div>' +
   '</div>';
@@ -68,6 +68,7 @@ export interface SidenavContext {
   root: Signal<HTMLElement | null>;
   drawer: Signal<HTMLElement | null>;
   rootClass: () => string;
+  drawerModal: () => 'true' | undefined;
   onKeydown: (event: KeyboardEvent) => void;
   onBackdropClick: () => void;
 }
@@ -155,6 +156,8 @@ export function setup(props: SidenavProps): SidenavContext {
       if (props.class) parts.push(props.class);
       return parts.join(' ');
     },
+    // Declare modality to AT while the over-mode drawer is open (it already traps focus + Esc-closes).
+    drawerModal: (): 'true' | undefined => (effectiveMode() === 'over' && opened() ? 'true' : undefined),
     onKeydown,
     onBackdropClick,
   };

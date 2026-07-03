@@ -64,6 +64,21 @@ const matchRe = (s: string, re: RegExp, msg?: string): void => assert.ok(re.test
 const JUN15: Date = A.create(2026, 5, 15);
 
 /* ── field ── */
+test('datepicker: aria-controls on the field points at the open calendar panel (clears on close)', async () => {
+  const m: Mounted = await mount({ control: dateField(JUN15), locale: 'en-US' });
+  const f: HTMLElement = field(m);
+  assert.equal(f.getAttribute('aria-controls'), null, 'no aria-controls while closed');
+  f.click();
+  await tick();
+  const controls: string | null = f.getAttribute('aria-controls');
+  assert.ok(controls, 'aria-controls set when open');
+  assert.equal(panel()?.id, controls, 'points at the calendar panel id');
+  f.click();
+  await tick();
+  assert.equal(f.getAttribute('aria-controls'), null, 'aria-controls cleared on close');
+  m.dispose();
+});
+
 test('datepicker: renders a combobox field; the value formats via the adapter', async () => {
   const m: Mounted = await mount({ control: dateField(JUN15), locale: 'en-US' });
   const f: HTMLElement = field(m);

@@ -67,6 +67,19 @@ test('timepicker: placeholder shows when empty', async () => {
   m.dispose();
 });
 
+test('timepicker: spinbutton columns expose aria-valuemin/max (APG)', async () => {
+  const m: Mounted = await mount({ control: timeField(T0930), locale: 'en-US' }); // 12h
+  field(m).click();
+  await tick();
+  const [hour, minute] = cols();
+  assert.equal(hour.getAttribute('role'), 'spinbutton');
+  assert.equal(hour.getAttribute('aria-valuemin'), '1', '12h hour min = 1');
+  assert.equal(hour.getAttribute('aria-valuemax'), '12', '12h hour max = 12');
+  assert.equal(minute.getAttribute('aria-valuemin'), '0', 'minute min = 0');
+  assert.equal(minute.getAttribute('aria-valuemax'), '59', 'minute max = 59');
+  m.dispose();
+});
+
 /* ── panel open ── */
 test('timepicker: clicking opens hour:minute spinner columns + AM/PM (12h)', async () => {
   const m: Mounted = await mount({ control: timeField(T0930), locale: 'en-US' });

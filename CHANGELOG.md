@@ -9,6 +9,17 @@
 > releases here. Publishing itself is a separate, explicit step (the `/publish` skill /
 > `pnpm publish:packages`) — pushing code does **not** publish to npm.
 
+## 0.2.59 — 2026-07-03
+
+**U6 a11y audit — Batch C (complex/data, `@weave-framework/ui`).** Audited the 10 complex components (Tabs, Sidenav,
+Expansion, Stepper, Slider, Paginator, Table, Tree, Datepicker, Timepicker). Three genuine ARIA fixes, each pinned by
+a failing-first test: **`<Datepicker>`** now exposes `aria-controls` from its combobox trigger to the calendar panel
+(set on open, cleared on close), matching Select/Autocomplete; **`<Timepicker>`** spinbutton columns now carry the
+APG-required `aria-valuemin`/`aria-valuemax` (hour 0–23 or 1–12 by 12/24h, minute 0–59); **`<Sidenav>`** declares
+`aria-modal="true"` on the over-mode drawer while open (it already trapped focus and closed on Esc). Everything else
+audited conformant on roles/states, keyboard, and focus; reduced-motion and RTL findings are batched into the
+upcoming centralized cross-cutting pass. No behaviour change beyond the added ARIA.
+
 ## 0.2.58 — 2026-07-03
 
 **U6 a11y audit — Batch B (overlay, `@weave-framework/ui`).** Audited the 8 overlay components (Tooltip, Menu,

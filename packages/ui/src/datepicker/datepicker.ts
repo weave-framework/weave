@@ -70,12 +70,13 @@ export interface DatepickerProps {
 export const template: string =
   '<div class={{ rootClass() }} ref={{ root }}>' +
   '<div class="weave-datepicker__field" ref={{ trigger }} role={{ fieldRole() }} tabindex={{ tabindex() }}' +
-  ' aria-haspopup={{ fieldHaspopup() }} aria-expanded={{ fieldExpanded() }} aria-label={{ fieldLabel() }}' +
+  ' aria-haspopup={{ fieldHaspopup() }} aria-expanded={{ fieldExpanded() }} aria-controls={{ fieldControls() }}' +
+  ' aria-label={{ fieldLabel() }}' +
   ' aria-required={{ ariaRequired() }} aria-disabled={{ ariaDisabled() }} on:click={{ onFieldClick }}' +
   ' on:keydown={{ onTriggerKeydown }}>' +
   '@if (editable()) {' +
   '<input class="weave-datepicker__input" ref={{ input }} type="text" role="combobox" aria-haspopup="dialog"' +
-  '  aria-expanded={{ inputExpanded() }} aria-label={{ label() }} placeholder={{ placeholder() }} .disabled={{ isDisabled() }}' +
+  '  aria-expanded={{ inputExpanded() }} aria-controls={{ inputControls() }} aria-label={{ label() }} placeholder={{ placeholder() }} .disabled={{ isDisabled() }}' +
   '  on:keydown={{ onInputKeydown }} on:blur={{ onInputBlur }} on:click={{ onInputClick }} />' +
   '}' +
   '@if (!editable()) {<span class={{ valueClass() }}>{{ displayText() }}</span>}' +
@@ -99,7 +100,9 @@ export interface DatepickerContext {
   fieldRole: () => string | undefined;
   fieldHaspopup: () => string | undefined;
   fieldExpanded: () => 'true' | 'false' | undefined;
+  fieldControls: () => string | undefined;
   inputExpanded: () => 'true' | 'false';
+  inputControls: () => string | undefined;
   fieldLabel: () => string | undefined;
   tabindex: () => number;
   isDisabled: () => boolean;
@@ -122,6 +125,7 @@ let _seq: number = 0;
 
 export function setup(props: DatepickerProps): DatepickerContext {
   const id: number = ++_seq;
+  const panelId: string = `weave-datepicker-${id}-panel`;
   const root: Signal<HTMLElement | null> = signal<HTMLElement | null>(null);
   const trigger: Signal<HTMLElement | null> = signal<HTMLElement | null>(null);
   const input: Signal<HTMLInputElement | null> = signal<HTMLInputElement | null>(null);
@@ -163,7 +167,7 @@ export function setup(props: DatepickerProps): DatepickerContext {
     box.setAttribute('role', 'dialog');
     box.setAttribute('aria-modal', 'false');
     box.setAttribute('aria-label', 'Choose date');
-    box.id = `weave-datepicker-${id}-panel`;
+    box.id = panelId;
 
     const header: HTMLElement = document.createElement('div');
     header.className = 'weave-datepicker__nav';
@@ -492,7 +496,10 @@ export function setup(props: DatepickerProps): DatepickerContext {
     fieldRole: (): string | undefined => (editable() ? undefined : 'combobox'),
     fieldHaspopup: (): string | undefined => (editable() ? undefined : 'dialog'),
     fieldExpanded: (): 'true' | 'false' | undefined => (editable() ? undefined : open() ? 'true' : 'false'),
+    // aria-controls points at the calendar panel only while it is open + in the DOM (APG combobox).
+    fieldControls: (): string | undefined => (!editable() && open() ? panelId : undefined),
     inputExpanded: (): 'true' | 'false' => (open() ? 'true' : 'false'),
+    inputControls: (): string | undefined => (editable() && open() ? panelId : undefined),
     fieldLabel: (): string | undefined => (editable() ? undefined : props.label),
     tabindex: (): number => (editable() || isDisabled() ? -1 : 0),
     isDisabled,

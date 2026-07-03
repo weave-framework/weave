@@ -197,6 +197,14 @@ export function setup(props: TimepickerProps): TimepickerContext {
     col.setAttribute('role', 'spinbutton');
     col.tabIndex = 0;
     col.setAttribute('aria-label', kind === 'hour' ? 'Hour' : 'Minute');
+    // APG spinbutton requires the value bounds. Hour range depends on 12/24h; minute is 0–59.
+    if (kind === 'hour') {
+      col.setAttribute('aria-valuemin', use24 ? '0' : '1');
+      col.setAttribute('aria-valuemax', use24 ? '23' : '12');
+    } else {
+      col.setAttribute('aria-valuemin', '0');
+      col.setAttribute('aria-valuemax', '59');
+    }
     const up: HTMLButtonElement = spinButton('▲', `Increment ${kind}`, inc);
     const value: HTMLElement = document.createElement('span');
     value.className = 'weave-timepicker__col-value';

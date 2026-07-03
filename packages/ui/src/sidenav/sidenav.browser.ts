@@ -7,7 +7,7 @@ import { setup, template, type SidenavProps, type SidenavContext, type SidenavAp
 const rt: typeof dom & { signal: typeof signal; effect: typeof effect } = { ...dom, signal, effect };
 const tick = (): Promise<void> => new Promise<void>((r) => queueMicrotask(r));
 
-const SCOPE: string[] = ['root', 'drawer', 'rootClass', 'onKeydown', 'onBackdropClick'];
+const SCOPE: string[] = ['root', 'drawer', 'rootClass', 'drawerModal', 'onKeydown', 'onBackdropClick'];
 
 type RenderFn = (ctx: SidenavContext, slots: Record<string, () => Node>) => HTMLElement;
 type MakeRender = (ctx: SidenavContext, rt: unknown, c: unknown) => RenderFn;
@@ -63,6 +63,18 @@ test('sidenav renders drawer / content / backdrop and projects both slots', () =
   assert.equal(m.drawer.textContent, 'NAV');
   assert.equal(m.content.textContent, 'PAGE');
   m.dispose();
+});
+
+test('sidenav: over-mode open drawer declares aria-modal; side / closed do not', () => {
+  const over: Mounted = mount({ mode: 'over', defaultOpened: true });
+  assert.equal(over.drawer.getAttribute('aria-modal'), 'true', 'over + opened is modal');
+  over.dispose();
+  const side: Mounted = mount({ mode: 'side', defaultOpened: true });
+  assert.equal(side.drawer.getAttribute('aria-modal'), null, 'side mode is not modal');
+  side.dispose();
+  const closed: Mounted = mount({ mode: 'over', defaultOpened: false });
+  assert.equal(closed.drawer.getAttribute('aria-modal'), null, 'over + closed is not modal');
+  closed.dispose();
 });
 
 /* ── mode + open modifier classes ── */
