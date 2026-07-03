@@ -9,6 +9,17 @@
 > releases here. Publishing itself is a separate, explicit step (the `/publish` skill /
 > `pnpm publish:packages`) — pushing code does **not** publish to npm.
 
+## 0.2.58 — 2026-07-03
+
+**U6 a11y audit — Batch B (overlay, `@weave-framework/ui`).** Audited the 8 overlay components (Tooltip, Menu,
+Context-Menu, Dialog, Bottom-Sheet, Snackbar, Select, Autocomplete). The focus machinery is sound — modal focus-trap
+activates after attach and restores focus on close; non-modal surfaces don't steal focus. One genuine fix:
+**`<Autocomplete>`** used to set `aria-controls` once and leave it pointing at its (detached) listbox after close;
+it now sets `aria-controls` on open and removes it on close, matching `<Select>` (pinned by a failing-first test).
+Reduced-motion and one RTL (Snackbar `start/end` positioning) finding are batched into the upcoming centralized
+cross-cutting pass; modal background `inert`/`aria-hidden` is logged as a scoped follow-on (the components are
+already `aria-modal`-conformant). No other behaviour change.
+
 ## 0.2.57 — 2026-07-03
 
 **U6 a11y audit — Batch A (foundational, `@weave-framework/ui`).** Audited the 17 foundational components (Button,

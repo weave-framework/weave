@@ -113,6 +113,18 @@ test('autocomplete: typing filters static options (case-insensitive, by label)',
   dispose();
 });
 
+test('autocomplete: aria-controls tracks the open listbox and clears on close', () => {
+  const { input, dispose } = mount({ options: FRUITS });
+  assert.equal(input.getAttribute('aria-controls'), null, 'no aria-controls while closed');
+  typeInto(input, 'ap'); // open
+  const controls: string | null = input.getAttribute('aria-controls');
+  assert.ok(controls, 'aria-controls set when open');
+  assert.equal(panel()?.id, controls, 'aria-controls points at the listbox id');
+  key(input, 'Escape'); // close
+  assert.equal(input.getAttribute('aria-controls'), null, 'aria-controls removed on close (listbox detached)');
+  dispose();
+});
+
 test('autocomplete: an option description (via accessor) renders as subtext', () => {
   const { input, dispose } = mount({ options: FRUITS, optionDescription: (f) => f.kind });
   typeInto(input, 'a');

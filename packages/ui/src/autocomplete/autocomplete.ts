@@ -179,7 +179,6 @@ export function setup<T = { value: string; label: string }>(props: AutocompleteP
     listbox.className = 'weave-autocomplete__panel';
     listbox.setAttribute('role', 'listbox');
     listbox.id = `weave-autocomplete-${id}-list`;
-    el.setAttribute('aria-controls', listbox.id);
     overlay = createOverlay({
       positionStrategy: connectedPosition(el, { positions: buildPositions(props.position, 'bottom-start'), offset: 4 }),
     });
@@ -190,6 +189,7 @@ export function setup<T = { value: string; label: string }>(props: AutocompleteP
     ensurePanel();
     overlay!.attach(listbox as HTMLElement);
     input()?.setAttribute('aria-expanded', 'true');
+    input()?.setAttribute('aria-controls', (listbox as HTMLElement).id); // APG: only while the popup is in the DOM
     open.set(true);
     renderResults();
   }
@@ -199,6 +199,7 @@ export function setup<T = { value: string; label: string }>(props: AutocompleteP
     overlay?.detach();
     input()?.setAttribute('aria-expanded', 'false');
     input()?.removeAttribute('aria-activedescendant');
+    input()?.removeAttribute('aria-controls'); // the listbox element is detached while closed
     open.set(false);
   }
 
