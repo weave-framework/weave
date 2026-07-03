@@ -61,7 +61,7 @@ export function setup(): ShellSetup {
     if (section) navigate(section.home);
   };
 
-  const theme = signal<'dark' | 'light'>('dark');
+  const theme = signal<'dark' | 'light'>('light');
   const toggleTheme = (): void => {
     theme.set((t) => (t === 'dark' ? 'light' : 'dark'));
     document.documentElement.dataset.theme = theme();

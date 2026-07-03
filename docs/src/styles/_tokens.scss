@@ -1,41 +1,7 @@
 /* Design tokens as CSS custom properties, so a single [data-theme] attribute on
-   <html> flips the whole site between dark (default) and light. */
+   <html> flips the whole site between light (default) and dark. */
 
 :root,
-[data-theme='dark'] {
-  color-scheme: dark;
-
-  --bg: #0f1115;
-  --bg-soft: #14171d;
-  --surface: #181c23;
-  --code-bg: #0c0e12;
-
-  --fg: #e7ebf0;
-  --fg-soft: #c2c9d2;
-  --muted: #8b94a3;
-
-  --border: #272d38;
-  --accent: #1e8cd2; /* logo blue */
-  --green: #69be46; /* logo green */
-  --orange: #f59b2d; /* logo orange */
-  --red: #d2051e; /* logo red */
-
-  --mono: ui-monospace, "SF Mono", "JetBrains Mono", "Fira Code", Menlo, Consolas, monospace;
-  --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-
-  /* Syntax-highlight token colors (dark). */
-  --tok-comment: #6b7686;
-  --tok-string: #9ccf6a;
-  --tok-keyword: #c792ea;
-  --tok-number: #f5a96a;
-  --tok-func: #5cb6f0;
-  --tok-property: #7fd4c1;
-  --tok-tag: #f07a82;
-  --tok-attr: #f5b86a;
-  --tok-interp: #5cb6f0;
-  --tok-punct: #8b94a3;
-}
-
 [data-theme='light'] {
   color-scheme: light;
 
@@ -49,7 +15,14 @@
   --muted: #687180;
 
   --border: #e2e6ec;
-  --accent: #1373b0;
+  --accent: #1373b0; /* logo blue (light) */
+
+  /* Theme-independent brand + fonts — declared on :root so they apply in both themes. */
+  --green: #69be46; /* logo green */
+  --orange: #f59b2d; /* logo orange */
+  --red: #d2051e; /* logo red */
+  --mono: ui-monospace, "SF Mono", "JetBrains Mono", "Fira Code", Menlo, Consolas, monospace;
+  --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 
   /* Syntax-highlight token colors (light). */
   --tok-comment: #8a93a0;
@@ -62,4 +35,32 @@
   --tok-attr: #b5651d;
   --tok-interp: #1373b0;
   --tok-punct: #687180;
+}
+
+[data-theme='dark'] {
+  color-scheme: dark;
+
+  --bg: #0f1115;
+  --bg-soft: #14171d;
+  --surface: #181c23;
+  --code-bg: #0c0e12;
+
+  --fg: #e7ebf0;
+  --fg-soft: #c2c9d2;
+  --muted: #8b94a3;
+
+  --border: #272d38;
+  --accent: #1e8cd2; /* logo blue (dark) */
+
+  /* Syntax-highlight token colors (dark). */
+  --tok-comment: #6b7686;
+  --tok-string: #9ccf6a;
+  --tok-keyword: #c792ea;
+  --tok-number: #f5a96a;
+  --tok-func: #5cb6f0;
+  --tok-property: #7fd4c1;
+  --tok-tag: #f07a82;
+  --tok-attr: #f5b86a;
+  --tok-interp: #5cb6f0;
+  --tok-punct: #8b94a3;
 }
