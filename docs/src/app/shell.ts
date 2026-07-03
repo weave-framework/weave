@@ -1,5 +1,6 @@
-import { signal } from '@weave-framework/runtime';
+import { signal, effect } from '@weave-framework/runtime';
 import { RouterView, Link, navigate, currentPath, type Router } from '@weave-framework/router';
+import { scrollToHash } from '../lib/util/scroll';
 import Toolbar from '@weave-framework/ui/toolbar';
 import Button from '@weave-framework/ui/button';
 import Badge from '@weave-framework/ui/badge';
@@ -106,6 +107,24 @@ export function setup(): ShellSetup {
     navApi = api;
   };
   const toggleNav = (): void => navApi?.toggle();
+
+  // Route-change scroll: the content scrolls inside the Sidenav pane (not the window), so a
+  // new page would otherwise stay wherever the previous one was scrolled. On a path change,
+  // smooth-scroll to the URL's anchor if it has one, else ease the new page up to the top.
+  effect(() => {
+    currentPath(); // track route changes
+    const hash: string = location.hash;
+    const pane: HTMLElement | null = document.querySelector('.weave-sidenav__content');
+    // Kick the smooth scroll SYNCHRONOUSLY here — this effect runs before RouterView swaps the
+    // routed content, so the pane is still at the previous offset and the browser animates it
+    // to the top (the animation carries on through the content swap). An anchored URL waits a
+    // frame for the new page to render, then eases to the anchor.
+    if (!hash) {
+      pane?.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    requestAnimationFrame(() => scrollToHash(hash));
+  });
 
   return {
     router,
