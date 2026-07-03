@@ -162,9 +162,11 @@ const ui: NavSection = {
     {
       label: 'Feedback & overlays',
       items: [
+        { label: 'Dialog', path: '/ui/dialog' },
+        { label: 'Snackbar', path: '/ui/snackbar' },
+        { label: 'Tooltip', path: '/ui/tooltip' },
         { label: 'Progress Bar', path: '/ui/progress-bar' },
         { label: 'Progress Spinner', path: '/ui/progress-spinner' },
-        { label: 'Tooltip', path: '/ui/tooltip' },
       ],
     },
   ],

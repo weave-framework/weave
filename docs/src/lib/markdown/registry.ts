@@ -32,6 +32,8 @@ import TimepickerBasic from '../demos/ui/timepicker-basic';
 import ProgressBarDemo from '../demos/ui/progress-bar-demo';
 import ProgressSpinnerDemo from '../demos/ui/progress-spinner-demo';
 import TooltipDemo from '../demos/ui/tooltip-demo';
+import DialogDemo from '../demos/ui/dialog-demo';
+import SnackbarDemo from '../demos/ui/snackbar-demo';
 import AutocompleteBasic from '../demos/ui/autocomplete-basic';
 
 /**
@@ -77,4 +79,6 @@ export const demos: Record<string, Component> = {
   'progress-bar-demo': ProgressBarDemo,
   'progress-spinner-demo': ProgressSpinnerDemo,
   'tooltip-demo': TooltipDemo,
+  'dialog-demo': DialogDemo,
+  'snackbar-demo': SnackbarDemo,
 };
