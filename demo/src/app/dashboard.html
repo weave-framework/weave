@@ -7,30 +7,43 @@
 
     <nav class="nav">
       @for (item of nav; track item.label) {
-        <a class={{ item.active ? 'nav__item nav__item--active' : 'nav__item' }} href="#">
+        <button
+          type="button"
+          class={{ item.label === activeNav() ? 'nav__item nav__item--active' : 'nav__item' }}
+          on:click={{ () => selectNav(item.label) }}
+        >
           <Icon name={{ item.icon }} />
           <span>{{ item.label }}</span>
-        </a>
+        </button>
       }
     </nav>
 
     <div class="sidebar__foot">
       <span class="sidebar__dot"></span>
-      Built with Weave — same components, a different skin.
+      Built with Weave — same components, a different skin. Try the swatches ↗
     </div>
   </aside>
 
   <div class="main">
     <header class="topbar">
       <div>
-        <h1 class="topbar__title">Overview</h1>
-        <p class="topbar__sub">Real-time — every value below is a live signal</p>
+        <h1 class="topbar__title">{{ activeNav() }}</h1>
+        <p class="topbar__sub">{{ navSub() }}</p>
       </div>
       <div class="topbar__right">
-        <span class="live"><span class="live__dot"></span>Live</span>
-        <span class="latency">
-          <Icon name={{ 'clock' }} /> {{ latency() }} ms
-        </span>
+        <div class="accent-switch" role="group" aria-label="Accent colour">
+          @for (a of accents; track a.key) {
+            <button
+              type="button"
+              class={{ a.key === accent() ? 'swatch swatch--on' : 'swatch' }}
+              style={{ 'background:' + a.color }}
+              aria-label={{ a.key }}
+              on:click={{ () => setAccent(a.key) }}
+            ></button>
+          }
+        </div>
+        <SlideToggle checked={{ live() }} onChange={{ setLive }} label={{ 'Live feed' }} />
+        <span class="latency"><Icon name={{ 'clock' }} /> {{ latency() }} ms</span>
       </div>
     </header>
 
@@ -88,7 +101,11 @@
       <Card class="panel panel--feed">
         <div class="panel__head">
           <h2 class="panel__title">Activity</h2>
-          <span class="live"><span class="live__dot"></span></span>
+          @if (live()) {
+            <span class="live"><span class="live__dot"></span>Live</span>
+          } @else {
+            <span class="live live--paused">Paused</span>
+          }
         </div>
         <ul class="feed">
           @for (e of events(); track e.id) {
@@ -102,14 +119,29 @@
       </Card>
     </section>
 
+    <Card class="panel">
+      <div class="panel__head">
+        <h2 class="panel__title">System status</h2>
+        <Badge variant={{ 'tag' }}>3 regions</Badge>
+      </div>
+      <Expansion panels={{ statusPanels }} value={{ openPanels() }} onChange={{ setOpenPanels }} />
+    </Card>
+
     <Card class="panel panel--table">
       <div class="panel__head">
         <h2 class="panel__title">Recent transactions</h2>
-        <Badge variant={{ 'tag' }}>live</Badge>
+        <div class="panel__tools">
+          <Select
+            options={{ filterOpts }}
+            value={{ filter() }}
+            onChange={{ setFilter }}
+            label={{ 'Filter' }}
+          />
+        </div>
       </div>
       <Table
         columns={{ columns }}
-        dataSource={{ txns }}
+        dataSource={{ visibleTxns }}
         trackBy={{ trackTxn }}
         ariaLabel={{ 'Recent transactions' }}
       />

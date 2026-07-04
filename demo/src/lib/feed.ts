@@ -25,6 +25,7 @@ export interface FeedEvent {
 }
 
 export interface Feed {
+  live: Signal<boolean>;
   now: Signal<number>;
   revenue: Signal<number>;
   users: Signal<number>;
@@ -65,6 +66,7 @@ function money(n: number): string {
 
 /** Build a feed with a seeded, plausible starting state, ready to `start()`. */
 export function createFeed(): Feed {
+  const live = signal(true);
   const now = signal(0);
   const revenue = signal(284_120);
   const users = signal(3_418);
@@ -103,6 +105,7 @@ export function createFeed(): Feed {
   }
 
   function tick(): void {
+    if (!live()) return; // paused — freeze the whole feed
     const t = now() + 1;
     now.set(t);
 
@@ -145,6 +148,7 @@ export function createFeed(): Feed {
   }
 
   return {
+    live,
     now,
     revenue,
     users,
