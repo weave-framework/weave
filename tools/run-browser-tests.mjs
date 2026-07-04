@@ -23,9 +23,13 @@ function findTests(dir) {
   return out;
 }
 
-const files = findTests(join(root, 'packages')).sort();
+// Optional substring filters from argv — `node tools/run-browser-tests.mjs forms devtools`
+// runs only test files whose path contains one of the given substrings. No args = all.
+const filters = process.argv.slice(2).filter((a) => !a.startsWith('-'));
+let files = findTests(join(root, 'packages')).sort();
+if (filters.length) files = files.filter((f) => filters.some((s) => f.includes(s)));
 if (files.length === 0) {
-  console.error('No *.browser.ts test files found.');
+  console.error(filters.length ? `No *.browser.ts test files match: ${filters.join(', ')}` : 'No *.browser.ts test files found.');
   process.exit(1);
 }
 
