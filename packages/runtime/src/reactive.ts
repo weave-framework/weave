@@ -12,6 +12,8 @@
  * and memos stay cached until a true dependency changes.
  */
 
+import { registerDevNode, isDevtoolsEnabled } from './devtools.js';
+
 const CLEAN: 0 = 0;
 const CHECK: 1 = 1;
 const DIRTY: 2 = 2;
@@ -169,8 +171,8 @@ export interface Signal<T> {
 /** A cached derived value. Read-only. */
 export type Computed<T> = () => T;
 
-/** Create a reactive value. */
-export function signal<T>(initial: T, opts: { equals?: (a: T, b: T) => boolean } = {}): Signal<T> {
+/** Create a reactive value. Pass `name` to surface it in devtools ({@link inspect}). */
+export function signal<T>(initial: T, opts: { equals?: (a: T, b: T) => boolean; name?: string } = {}): Signal<T> {
   const node: Source & { value: T; equals: (a: T, b: T) => boolean } = {
     value: initial,
     observers: new Set(),
@@ -180,6 +182,9 @@ export function signal<T>(initial: T, opts: { equals?: (a: T, b: T) => boolean }
     track(node);
     return node.value;
   }) as Signal<T>;
+  if (isDevtoolsEnabled() && opts.name) {
+    currentOwner?._disposers.push(registerDevNode('signal', opts.name, () => node.value));
+  }
   read.set = (next) => {
     const value: T = typeof next === 'function' ? (next as (prev: T) => T)(node.value) : next;
     if (node.equals(node.value, value)) return node.value;
@@ -197,7 +202,7 @@ export function signal<T>(initial: T, opts: { equals?: (a: T, b: T) => boolean }
  * A cached derived value. Recomputes lazily, only when a dependency changed.
  * No manual memoization (useMemo / useCallback) is ever needed.
  */
-export function computed<T>(fn: () => T, opts: { equals?: (a: T, b: T) => boolean } = {}): Computed<T> {
+export function computed<T>(fn: () => T, opts: { equals?: (a: T, b: T) => boolean; name?: string } = {}): Computed<T> {
   const c: Computation = {
     fn: fn as () => unknown,
     sources: new Set(),
@@ -221,6 +226,14 @@ export function computed<T>(fn: () => T, opts: { equals?: (a: T, b: T) => boolea
       c.state = DIRTY;
     });
   }
+  if (isDevtoolsEnabled() && opts.name) {
+    owner?._disposers.push(
+      registerDevNode('computed', opts.name, () => {
+        updateIfNecessary(c);
+        return c.value;
+      })
+    );
+  }
   return () => {
     updateIfNecessary(c);
     track(c);
@@ -233,7 +246,7 @@ export function computed<T>(fn: () => T, opts: { equals?: (a: T, b: T) => boolea
  * Dependencies are tracked automatically — there is no dependency array, ever.
  * Return a cleanup function from `fn`, or call `onCleanup`, to tear down.
  */
-export function effect(fn: () => void | (() => void)): () => void {
+export function effect(fn: () => void | (() => void), opts: { name?: string } = {}): () => void {
   const c: Computation = {
     fn: () => {
       const ret: void | (() => void) = fn();
@@ -258,6 +271,9 @@ export function effect(fn: () => void | (() => void)): () => void {
   };
   // Register with the active ownership scope so a block tears this effect down on unmount.
   if (currentOwner) currentOwner._disposers.push(stop);
+  if (isDevtoolsEnabled() && opts.name) {
+    currentOwner?._disposers.push(registerDevNode('effect', opts.name));
+  }
   return stop;
 }
 
