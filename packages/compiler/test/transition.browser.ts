@@ -108,6 +108,46 @@ test('out: leave animation runs when a @for is emptied to zero', async () => {
   assert.equal(el.querySelectorAll('li:not(.none)').length, 0, 'rows removed after the animation finishes');
 });
 
+/* ──────────── lifecycle callbacks (C1) ──────────── */
+
+test('codegen routes on:<phase> to transitionEvent, not a DOM listener', () => {
+  const { code } = compileTemplate(`<div in:fade on:enterend={{ done }}>x</div>`, { mode: 'module', scope: ['fade', 'done'] });
+  assert.ok(code.includes('transitionEvent('), code);
+  assert.ok(code.includes('"enterend"'), code);
+  assert.ok(!code.includes('listen('), 'a lifecycle phase must not become an addEventListener');
+});
+
+test('on:enterstart / on:enterend fire around the intro', async () => {
+  const seen: string[] = [];
+  const el: HTMLElement = render(
+    `<div in:run on:enterstart={{ () => seen.push('start') }} on:enterend={{ () => seen.push('end') }}>hi</div>`,
+    { run: tFade, seen },
+    ['run', 'seen']
+  ) as HTMLElement;
+  host().appendChild(el);
+  await tick(); // onMount → intro begins
+  assert.deepEqual(seen, ['start'], 'enterstart fired as the intro begins');
+  await wait(60);
+  assert.deepEqual(seen, ['start', 'end'], 'enterend fired when the intro finishes');
+});
+
+test('on:leavestart / on:leaveend fire around the outro, before removal', async () => {
+  const show: Signal<boolean> = signal(true);
+  const seen: string[] = [];
+  const el: Element = render(
+    `<div>@if (show()) { <p out:run on:leavestart={{ () => seen.push('start') }} on:leaveend={{ () => seen.push('end') }}>bye</p> }</div>`,
+    { show, run: tFade, seen },
+    ['show', 'run', 'seen']
+  );
+  host().appendChild(el);
+  show.set(false); // @if clears → outro begins
+  assert.deepEqual(seen, ['start'], 'leavestart fired when the outro begins');
+  assert.ok(el.querySelector('p'), 'still present during the outro');
+  await wait(80);
+  assert.deepEqual(seen, ['start', 'end'], 'leaveend fired when the outro finishes');
+  assert.equal(el.querySelector('p'), null, 'removed only after leaveend');
+});
+
 test('no outro registered (in: only) removes immediately', async () => {
   const show: Signal<boolean> = signal(true);
   const el: Element = render(`<div>@if (show()) { <p in:run>hi</p> }</div>`, { show, run: tFade }, ['show', 'run']);

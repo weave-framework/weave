@@ -126,6 +126,9 @@ const SVG_TAGS: Set<string> = new Set<string>([
   'animate', 'animateMotion', 'animateTransform', 'mpath', 'set',
 ]);
 
+/** `on:<phase>` names that are transition lifecycle hooks, not DOM events. */
+const TRANSITION_PHASES: Set<string> = new Set<string>(['enterstart', 'enterend', 'leavestart', 'leaveend']);
+
 /**
  * PascalCase child-component tag → kebab-case module basename (`SlideToggle` → `slide-toggle`).
  * Used by the loader to resolve a `<Foo>` tag to its sibling component module by convention.
@@ -373,6 +376,12 @@ function compileFragment(
         break;
       }
       case 'event': {
+        // The four transition lifecycle moments are not DOM events — route them to the
+        // element's transition instead of addEventListener.
+        if (TRANSITION_PHASES.has(attr.name)) {
+          sink.push(`${gen.H('transitionEvent')}(${n}, ${q(attr.name)}, ${rewrite(attr.expr, sc).code});`);
+          break;
+        }
         const handler: string = wrapHandler(attr, sc);
         const opts: string = eventOpts(attr.modifiers);
         sink.push(`${gen.H('listen')}(${n}, ${q(attr.name)}, ${handler}${opts ? `, ${opts}` : ''});`);

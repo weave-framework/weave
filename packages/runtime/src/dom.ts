@@ -209,9 +209,29 @@ export interface TransitionConfig {
 /** A transition: given the node + params, returns how to animate it. */
 export type TransitionFn<P = void> = (node: Element, params: P) => TransitionConfig;
 
+/** The four transition lifecycle moments a consumer can hook with `on:<phase>`. */
+export type TransitionPhase = 'enterstart' | 'enterend' | 'leavestart' | 'leaveend';
+
 interface Outroable extends ChildNode {
   /** Registered by an `out:`/`transition:` directive; played before removal. */
   __wOut?: () => Promise<void>;
+  /** Registered by `on:<phase>` — lifecycle callbacks fired around the animation. */
+  __wLifecycle?: Partial<Record<TransitionPhase, () => void>>;
+}
+
+/**
+ * `on:enterstart / enterend / leavestart / leaveend` — register a lifecycle callback for
+ * the element's transition. Enter phases fire around the intro (mount) animation, leave
+ * phases around the outro (removal) animation; `*start` fires as the animation begins,
+ * `*end` when it finishes (or immediately, if the element has no transition of that mode).
+ */
+export function transitionEvent(el: Element, phase: TransitionPhase, handler: () => void): void {
+  const n: Outroable = el as unknown as Outroable;
+  (n.__wLifecycle ??= {})[phase] = handler;
+}
+
+function fireLifecycle(node: HTMLElement, phase: TransitionPhase): void {
+  (node as unknown as Outroable).__wLifecycle?.[phase]?.();
 }
 
 /** Drive one transition with rAF; resolves when it finishes. */
@@ -224,8 +244,13 @@ function playTransition(node: HTMLElement, config: TransitionConfig, intro: bool
     if (css) node.style.cssText = orig + ';' + css(t, 1 - t);
     if (tick) tick(t, 1 - t);
   };
+  fireLifecycle(node, intro ? 'enterstart' : 'leavestart');
   apply(0); // set the start frame now (intro: hidden) — runs in a microtask, before paint
   return new Promise<void>((resolve) => {
+    const done = (): void => {
+      fireLifecycle(node, intro ? 'enterend' : 'leaveend');
+      resolve();
+    };
     const startAt: number = performance.now() + delay;
     const step = (now: number): void => {
       if (now < startAt) return void requestAnimationFrame(step);
@@ -233,7 +258,7 @@ function playTransition(node: HTMLElement, config: TransitionConfig, intro: bool
       apply(p);
       if (p < 1) return void requestAnimationFrame(step);
       if (intro) node.style.cssText = orig; // entered — drop the inline overrides
-      resolve();
+      done();
     };
     requestAnimationFrame(step);
   });
