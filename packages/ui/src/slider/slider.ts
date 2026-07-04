@@ -18,6 +18,7 @@
  */
 
 import { signal, type Signal } from '@weave-framework/runtime';
+import { activeDirection } from '../cdk/index.js';
 
 /** The subset of a `@weave-framework/forms` `Field<number>` a control binds to. */
 export interface SliderControl {
@@ -179,14 +180,20 @@ export function setup(props: SliderProps): SliderContext {
     const s: number = step() > 0 ? step() : 1;
     const big: number = Math.max(s, (max() - min()) / 10);
     let next: number = value();
+    // Up/Down are unambiguous; only the horizontal arrows flip under RTL.
+    const horizStep: number = activeDirection() === 'rtl' ? -s : s;
     switch (event.key) {
-      case 'ArrowRight':
       case 'ArrowUp':
         next += s;
         break;
-      case 'ArrowLeft':
       case 'ArrowDown':
         next -= s;
+        break;
+      case 'ArrowRight':
+        next += horizStep;
+        break;
+      case 'ArrowLeft':
+        next -= horizStep;
         break;
       case 'PageUp':
         next += big;

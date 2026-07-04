@@ -17,7 +17,7 @@
  *   <Datepicker control={{ form.controls.dob }} max={{ adapter.today() }} />
  */
 import { signal, effect, onDispose, type Signal } from '@weave-framework/runtime';
-import { createOverlay, connectedPosition, createDateAdapter, type OverlayRef, type DateAdapter } from '../cdk/index.js';
+import { createOverlay, connectedPosition, createDateAdapter, activeDirection, type OverlayRef, type DateAdapter } from '../cdk/index.js';
 import { buildPositions, type MenuPosition } from '../shared/positions.js';
 
 /** The subset of a forms `Field<Date>` a Datepicker binds to. */
@@ -316,8 +316,10 @@ export function setup(props: DatepickerProps): DatepickerContext {
       return;
     }
     let handled: boolean = true;
-    if (key === 'ArrowLeft') moveFocus(adapter.addDays(focusedDate, -1));
-    else if (key === 'ArrowRight') moveFocus(adapter.addDays(focusedDate, 1));
+    // In RTL the grid runs right-to-left, so ArrowLeft moves to the next day, ArrowRight to the previous.
+    const dayStep: number = activeDirection() === 'rtl' ? -1 : 1;
+    if (key === 'ArrowLeft') moveFocus(adapter.addDays(focusedDate, -dayStep));
+    else if (key === 'ArrowRight') moveFocus(adapter.addDays(focusedDate, dayStep));
     else if (key === 'ArrowUp') moveFocus(adapter.addDays(focusedDate, -7));
     else if (key === 'ArrowDown') moveFocus(adapter.addDays(focusedDate, 7));
     else if (key === 'Home') moveFocus(startOfWeek(focusedDate));

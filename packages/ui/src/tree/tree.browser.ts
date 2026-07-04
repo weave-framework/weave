@@ -3,6 +3,7 @@ import { signal, effect, createOwner, runInOwner, disposeOwner, type Owner } fro
 import * as dom from '@weave-framework/runtime/dom';
 import { compileTemplate, inferCtxNames, parseTemplate } from '@weave-framework/compiler';
 import { setup, template, type TreeProps, type TreeContext } from '@weave-framework/ui/tree';
+import { setDirection } from '@weave-framework/ui/cdk';
 
 const rt: typeof dom & { signal: typeof signal; effect: typeof effect } = { ...dom, signal, effect };
 const tick = (): Promise<void> => new Promise<void>((r) => queueMicrotask(r));
@@ -218,6 +219,24 @@ test('tree: ArrowLeft collapses an expanded folder, then moves to the parent', a
   press(m, 'ArrowLeft'); // expanded folder → collapse
   assert.equal(byName(m, 'src').getAttribute('aria-expanded'), 'false');
   m.dispose();
+});
+
+test('tree: RTL flips expand/collapse — ArrowLeft expands + steps in, ArrowRight collapses + steps out', async () => {
+  setDirection('rtl');
+  try {
+    const m: Mounted<FileNode> = await mount<FileNode>({ ...NESTED });
+    press(m, 'ArrowLeft'); // active defaults to src → expand (into-key is ArrowLeft in RTL)
+    assert.equal(byName(m, 'src').getAttribute('aria-expanded'), 'true', 'ArrowLeft expands in RTL');
+    press(m, 'ArrowLeft'); // already expanded → step into first child
+    assert.equal(document.activeElement, byName(m, 'index.ts'), 'ArrowLeft steps into the child');
+    press(m, 'ArrowRight'); // child → move to parent (out-key is ArrowRight in RTL)
+    assert.equal(document.activeElement, byName(m, 'src'), 'ArrowRight moves up to the parent');
+    press(m, 'ArrowRight'); // expanded folder → collapse
+    assert.equal(byName(m, 'src').getAttribute('aria-expanded'), 'false', 'ArrowRight collapses in RTL');
+    m.dispose();
+  } finally {
+    setDirection('ltr');
+  }
 });
 
 test('tree: Up/Down rove focus; a single tab stop (roving tabindex)', async () => {

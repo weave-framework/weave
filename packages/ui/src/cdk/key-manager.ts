@@ -7,6 +7,7 @@
  */
 
 import { signal, type Signal } from '@weave-framework/runtime';
+import { activeDirection } from './bidi.js';
 
 export type Orientation = 'vertical' | 'horizontal' | 'both';
 
@@ -25,6 +26,13 @@ export interface ListKeyManagerOptions<T> {
   getLabel?: (item: T) => string;
   /** ms of inactivity before the typeahead buffer resets. Default 500. */
   typeaheadDebounce?: number;
+  /**
+   * For `horizontal`/`both` orientation, whether ArrowLeft/ArrowRight are flipped so
+   * ArrowLeft advances (RTL). Defaults to reading the active CDK direction
+   * ({@link activeDirection}), so a global `<html dir="rtl">` just works; pass a getter
+   * to override (e.g. a subtree that provides its own direction).
+   */
+  rtl?: () => boolean;
 }
 
 export interface ListKeyManager<T> {
@@ -50,6 +58,7 @@ export function listKeyManager<T>(items: () => T[], options: ListKeyManagerOptio
   const isDisabled: (item: T) => boolean = options.isDisabled ?? (() => false);
   const getLabel: (item: T) => string = options.getLabel ?? ((i) => String(i));
   const debounce: number = options.typeaheadDebounce ?? 500;
+  const isRtl: () => boolean = options.rtl ?? (() => activeDirection() === 'rtl');
 
   const _index: Signal<number> = signal<number>(-1);
   let buffer: string = '';
@@ -120,12 +129,16 @@ export function listKeyManager<T>(items: () => T[], options: ListKeyManagerOptio
     const key: string = event.key;
     const vertical: boolean = orientation === 'vertical' || orientation === 'both';
     const horizontal: boolean = orientation === 'horizontal' || orientation === 'both';
+    // In RTL, horizontal nav flips: ArrowLeft advances, ArrowRight goes back.
+    const rtl: boolean = horizontal && isRtl();
+    const fwdKey: string = rtl ? 'ArrowLeft' : 'ArrowRight';
+    const backKey: string = rtl ? 'ArrowRight' : 'ArrowLeft';
 
-    if ((vertical && key === 'ArrowDown') || (horizontal && key === 'ArrowRight')) {
+    if ((vertical && key === 'ArrowDown') || (horizontal && key === fwdKey)) {
       commit(seek(_index(), 1));
       return true;
     }
-    if ((vertical && key === 'ArrowUp') || (horizontal && key === 'ArrowLeft')) {
+    if ((vertical && key === 'ArrowUp') || (horizontal && key === backKey)) {
       commit(seek(_index(), -1));
       return true;
     }

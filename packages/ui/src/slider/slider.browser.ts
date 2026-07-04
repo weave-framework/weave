@@ -11,6 +11,7 @@ import {
 import * as dom from '@weave-framework/runtime/dom';
 import { compileTemplate } from '@weave-framework/compiler';
 import { setup, template, type SliderProps, type SliderContext, type SliderControl } from '@weave-framework/ui/slider';
+import { setDirection } from '@weave-framework/ui/cdk';
 
 const rt: typeof dom & { signal: typeof signal; effect: typeof effect } = { ...dom, signal, effect };
 
@@ -85,6 +86,23 @@ test('Arrow keys step, Home/End jump, values clamp to the range', () => {
   assert.equal(el.getAttribute('aria-valuenow'), '100');
   assert.ok(seen.includes(51) && seen.includes(0) && seen.includes(100));
   dispose();
+});
+
+test('RTL flips the horizontal arrows — ArrowRight decreases, ArrowLeft increases', () => {
+  setDirection('rtl');
+  try {
+    const { el, dispose } = mount({ defaultValue: 50, step: 1 });
+    key(el, 'ArrowRight');
+    assert.equal(el.getAttribute('aria-valuenow'), '49', 'ArrowRight decreases in RTL');
+    key(el, 'ArrowLeft');
+    key(el, 'ArrowLeft');
+    assert.equal(el.getAttribute('aria-valuenow'), '51', 'ArrowLeft increases in RTL');
+    key(el, 'ArrowUp');
+    assert.equal(el.getAttribute('aria-valuenow'), '52', 'ArrowUp still increases (vertical unaffected)');
+    dispose();
+  } finally {
+    setDirection('ltr');
+  }
 });
 
 test('PageUp/PageDown move by the larger page step', () => {

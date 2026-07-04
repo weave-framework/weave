@@ -2,7 +2,7 @@ import { test, assert } from '../../../../tools/harness.js';
 import { signal, effect, createOwner, runInOwner, disposeOwner, type Signal, type Owner } from '@weave-framework/runtime';
 import * as dom from '@weave-framework/runtime/dom';
 import { compileTemplate, inferCtxNames, parseTemplate } from '@weave-framework/compiler';
-import { createDateAdapter, type DateAdapter } from '@weave-framework/ui/cdk';
+import { createDateAdapter, setDirection, type DateAdapter } from '@weave-framework/ui/cdk';
 import { setup, template, type DatepickerProps, type DatepickerContext, type DatepickerControl } from '@weave-framework/ui/datepicker';
 
 const rt: typeof dom & { signal: typeof signal; effect: typeof effect } = { ...dom, signal, effect };
@@ -158,6 +158,21 @@ test('datepicker: arrow keys move day focus; Enter selects', async () => {
   gridKey('Enter');
   assert.ok(A.isSameDay(ctl.value() as Date, A.create(2026, 5, 23)), 'selected Jun 23 via keyboard');
   m.dispose();
+});
+
+test('datepicker: RTL flips day arrows — ArrowLeft = next day, ArrowRight = previous', async () => {
+  setDirection('rtl');
+  try {
+    const ctl: DatepickerControl = dateField(JUN15);
+    const m: Mounted = await mount({ control: ctl, locale: 'en-US' });
+    field(m).click();
+    gridKey('ArrowLeft'); // RTL: next day → Jun 16
+    gridKey('Enter');
+    assert.ok(A.isSameDay(ctl.value() as Date, A.create(2026, 5, 16)), 'ArrowLeft moved forward to Jun 16 in RTL');
+    m.dispose();
+  } finally {
+    setDirection('ltr');
+  }
 });
 
 test('datepicker: PageDown moves a month; Shift+PageDown moves a year', async () => {

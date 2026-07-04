@@ -2,7 +2,7 @@ import { test, assert } from '../../../../tools/harness.js';
 import { signal, effect, createOwner, runInOwner, disposeOwner, type Signal, type Owner } from '@weave-framework/runtime';
 import * as dom from '@weave-framework/runtime/dom';
 import { compileTemplate, inferCtxNames, parseTemplate } from '@weave-framework/compiler';
-import { ArrayDataSource } from '@weave-framework/ui/cdk';
+import { ArrayDataSource, setDirection } from '@weave-framework/ui/cdk';
 import { toComponent } from '../internal/compose.js';
 import * as CheckboxMod from '@weave-framework/ui/checkbox';
 import { setup, template, type TableProps, type TableContext, type SortState, type TableColumn } from '@weave-framework/ui/table';
@@ -276,6 +276,22 @@ test('table: the resize grip exposes aria-valuenow (width) + aria-valuemin (APG 
   grip(m, 'name').dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowRight' }));
   assert.equal(grip(m, 'name').getAttribute('aria-valuenow'), '216', 'valuenow tracks the resize');
   m.dispose();
+});
+
+test('table: RTL flips resize arrows — ArrowRight narrows, ArrowLeft widens (grip on the left edge)', async () => {
+  setDirection('rtl');
+  try {
+    const cols: TableColumn<Row>[] = [{ key: 'name', header: 'Name', width: 200, resizable: true }];
+    const m: Mounted = await mount({ columns: cols, dataSource: ROWS });
+    grip(m, 'name').dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowRight' }));
+    assert.equal(grip(m, 'name').getAttribute('aria-valuenow'), '184', 'ArrowRight narrows in RTL (-16)');
+    grip(m, 'name').dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowLeft' }));
+    grip(m, 'name').dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowLeft' }));
+    assert.equal(grip(m, 'name').getAttribute('aria-valuenow'), '216', 'ArrowLeft widens in RTL (+16)');
+    m.dispose();
+  } finally {
+    setDirection('ltr');
+  }
 });
 
 test('table: keyboard Arrow resizes the column + emits onColumnResize', async () => {

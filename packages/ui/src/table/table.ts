@@ -19,7 +19,7 @@
  *   <Table columns={{ cols }} dataSource={{ rows }} selectable expandable />
  */
 import { signal, onMount, type Signal, type Computed } from '@weave-framework/runtime';
-import { selectionModel, isDataSource, draggable, type SelectionModel, type DataSource } from '../cdk/index.js';
+import { selectionModel, isDataSource, draggable, activeDirection, type SelectionModel, type DataSource } from '../cdk/index.js';
 
 export type SortDirection = 'asc' | 'desc';
 
@@ -311,11 +311,13 @@ export function setup<T = Record<string, unknown>>(props: TableProps<T>): TableC
     const col: TableColumn<T> | undefined = resizeCol(key);
     if (!col) return;
     const cur: number = effWidth(col) ?? DEFAULT_STICKY_W;
+    // In RTL the grip sits on the left edge, so ArrowRight narrows and ArrowLeft widens.
+    const grow: number = activeDirection() === 'rtl' ? -RESIZE_STEP : RESIZE_STEP;
     if (event.key === 'ArrowLeft') {
-      setWidth(col, cur - RESIZE_STEP);
+      setWidth(col, cur - grow);
       event.preventDefault();
     } else if (event.key === 'ArrowRight') {
-      setWidth(col, cur + RESIZE_STEP);
+      setWidth(col, cur + grow);
       event.preventDefault();
     }
   };

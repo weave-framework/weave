@@ -1,6 +1,6 @@
 import { test, assert } from '../../../../tools/harness.js';
 import { effect } from '@weave-framework/runtime';
-import { listKeyManager, type Orientation, type ListKeyManager, type ListKeyManagerOptions } from '@weave-framework/ui/cdk';
+import { listKeyManager, setDirection, type Orientation, type ListKeyManager, type ListKeyManagerOptions } from '@weave-framework/ui/cdk';
 
 interface Item {
   label: string;
@@ -67,6 +67,32 @@ test('key-manager: horizontal orientation uses Left/Right, ignores Up/Down', () 
   assert.equal(m.onKeydown(key('ArrowDown')), false, 'vertical keys ignored');
   assert.equal(m.onKeydown(key('ArrowRight')), true);
   assert.equal(m.activeIndex(), 0);
+});
+
+test('key-manager: RTL flips horizontal arrows — ArrowLeft advances, ArrowRight goes back', () => {
+  const m: ListKeyManager<Item> = km(list(['a', 'b', 'c']), {
+    orientation: 'horizontal' as Orientation,
+    rtl: () => true,
+  });
+  assert.equal(m.onKeydown(key('ArrowLeft')), true, 'ArrowLeft handled in RTL');
+  assert.equal(m.activeItem()!.label, 'a', 'ArrowLeft advances from -1 → first');
+  m.onKeydown(key('ArrowLeft'));
+  assert.equal(m.activeItem()!.label, 'b', 'ArrowLeft keeps advancing');
+  m.onKeydown(key('ArrowRight'));
+  assert.equal(m.activeItem()!.label, 'a', 'ArrowRight goes back in RTL');
+});
+
+test('key-manager: default rtl reads the global CDK direction (setDirection)', () => {
+  setDirection('rtl');
+  try {
+    const m: ListKeyManager<Item> = km(list(['a', 'b']), { orientation: 'horizontal' as Orientation });
+    assert.equal(m.onKeydown(key('ArrowLeft')), true, 'ArrowLeft advances under global rtl');
+    assert.equal(m.activeItem()!.label, 'a');
+    assert.equal(m.onKeydown(key('ArrowRight')), true);
+    assert.equal(m.activeIndex(), 0, 'ArrowRight goes back (stays at first, no wrap)');
+  } finally {
+    setDirection('ltr'); // don't leak direction into other tests
+  }
 });
 
 test('key-manager: typeahead jumps to a match and a repeated letter cycles', () => {

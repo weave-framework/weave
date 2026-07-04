@@ -20,7 +20,7 @@
  *   <Tree nodes={{ roots }} selectable defaultExpanded={{ [roots[0]] }} />
  */
 import { signal, onMount, type Signal } from '@weave-framework/runtime';
-import { selectionModel, listKeyManager, dropList, type SelectionModel, type ListKeyManager, type DropEvent } from '../cdk/index.js';
+import { selectionModel, listKeyManager, dropList, activeDirection, type SelectionModel, type ListKeyManager, type DropEvent } from '../cdk/index.js';
 
 /** A node's rendered content: a factory over the node + its 1-based level. */
 export type TreeNodeContent<N> = (node: N, level: number) => Node | string;
@@ -299,7 +299,11 @@ export function setup<N = unknown>(props: TreeProps<N>): TreeContext<N> {
     const i: number = manager.activeIndex();
     const n: FlatNode<N> | undefined = vis[i];
 
-    if (event.key === 'ArrowRight') {
+    // In RTL the horizontal arrows flip: ArrowLeft expands / steps in, ArrowRight collapses / steps out.
+    const rtl: boolean = activeDirection() === 'rtl';
+    const intoKey: string = rtl ? 'ArrowLeft' : 'ArrowRight';
+    const outKey: string = rtl ? 'ArrowRight' : 'ArrowLeft';
+    if (event.key === intoKey) {
       if (n?.expandable && !isExpandedNode(n.node)) {
         expand(n);
         event.preventDefault();
@@ -312,7 +316,7 @@ export function setup<N = unknown>(props: TreeProps<N>): TreeContext<N> {
       }
       return;
     }
-    if (event.key === 'ArrowLeft') {
+    if (event.key === outKey) {
       if (n?.expandable && isExpandedNode(n.node)) {
         collapse(n);
         event.preventDefault();
