@@ -3,6 +3,7 @@ import {
   signal,
   computed,
   enableDevtools,
+  clearTrace,
   createOwner,
   runInOwner,
   disposeOwner,
@@ -14,6 +15,8 @@ import {
 
 const panelEl = (): HTMLElement | null => document.querySelector('[data-weave-devtools]');
 const listText = (): string => document.querySelector('[data-weave-devtools-list]')?.textContent ?? '';
+const clickTab = (v: string): void =>
+  (document.querySelector(`[data-weave-devtools-tab="${v}"]`) as HTMLButtonElement).click();
 
 test('mountDevtoolsPanel lists nodes, updates live on value + registry change, disposes', () => {
   enableDevtools(true);
@@ -73,6 +76,41 @@ test('mountDevtoolsPanel filter narrows the list by name', () => {
   input.dispatchEvent(new Event('input'));
   assert.ok(listText().includes('alpha-node'), 'matching node stays');
   assert.ok(!listText().includes('beta-node'), 'non-matching node is filtered out');
+  dispose();
+  disposeOwner(owner);
+  enableDevtools(false);
+});
+
+test('mountDevtoolsPanel Trace tab logs propagation events live', () => {
+  enableDevtools(true);
+  clearTrace();
+  const owner: Owner = createOwner();
+  let s: Signal<number> | null = null;
+  runInOwner(owner, () => {
+    s = signal(1, { name: 'pt-src' });
+    const d: Computed<number> = computed(() => s!() * 2, { name: 'pt-dbl' });
+    d();
+  });
+  const dispose: () => void = mountDevtoolsPanel();
+  clickTab('trace');
+  assert.ok(!listText().includes('pt-src → pt-dbl'), 'no event before the change');
+  s!.set(5); // synchronous → panel re-renders
+  assert.ok(listText().includes('pt-src → pt-dbl'), 'the trigger edge is logged in the Trace view');
+  dispose();
+  disposeOwner(owner);
+  enableDevtools(false);
+});
+
+test('mountDevtoolsPanel Tree tab nests nodes under their component scope', () => {
+  enableDevtools(true);
+  const owner: Owner = createOwner();
+  runInOwner(owner, () => {
+    signal(0, { name: 'ptree-node' });
+  });
+  const dispose: () => void = mountDevtoolsPanel();
+  clickTab('tree');
+  assert.ok(listText().includes('·scope') || listText().includes('▾'), 'a scope header renders');
+  assert.ok(listText().includes('ptree-node'), 'the node appears under a scope');
   dispose();
   disposeOwner(owner);
   enableDevtools(false);
