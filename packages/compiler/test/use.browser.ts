@@ -99,6 +99,32 @@ test('reactive arg via getter — action wraps the read in an effect', async () 
   assert.deepEqual(seen, ['hi', 'bye'], 'effect disposed with the element — no further runs');
 });
 
+test('reactive use: — an { update, destroy } action re-runs update on arg change, destroys on unmount', async () => {
+  const size: Signal<number> = signal(1);
+  const seen: number[] = [];
+  let destroyed: number = 0;
+  const track = (_el: Element, initial: number): dom.ActionResult<number> => {
+    seen.push(initial);
+    return {
+      update: (n: number): number => seen.push(n),
+      destroy: (): void => {
+        destroyed++;
+      },
+    };
+  };
+  const { dispose } = mount('<div use:track={{size()}}></div>', { track, size }, ['track', 'size']);
+  await tick();
+  assert.deepEqual(seen, [1], 'action ran once with the initial arg');
+  size.set(2);
+  assert.deepEqual(seen, [1, 2], 'update re-ran with the new arg');
+  size.set(3);
+  assert.deepEqual(seen, [1, 2, 3], 'update re-ran again');
+  dispose();
+  assert.equal(destroyed, 1, 'destroy fired on unmount');
+  size.set(4);
+  assert.deepEqual(seen, [1, 2, 3], 'no update after dispose');
+});
+
 test('a returned cleanup runs on unmount', async () => {
   let cleaned: number = 0;
   const listen = () => () => {

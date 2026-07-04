@@ -193,15 +193,44 @@ export function setRef(target: Signal<Element | null> | ((el: Element) => void),
  * tied to the element's region). All fire when the region unmounts. For reactivity
  * over `arg`, pass a getter (`use:tip={() => x()}`) and read it inside an `effect`.
  */
-export type Action<A = void> = (el: Element, arg: A) => void | (() => void);
+/** A `use:` action's optional return: a teardown fn, or a Svelte-style `{ update, destroy }` handle. */
+export interface ActionResult<A = void> {
+  /** Called with the new argument whenever the (reactive) `use:action={arg}` argument changes. */
+  update?: (arg: A) => void;
+  /** Called when the element is removed (owner disposal). */
+  destroy?: () => void;
+}
+
+/** A `use:` action: runs on mount, may return a teardown fn or an `{ update, destroy }` handle. */
+export type Action<A = void> = (el: Element, arg: A) => void | (() => void) | ActionResult<A>;
 
 /**
- * Wire a `use:` action onto an element. Deferred to `onMount` timing so the
- * element is live in the document (focus / measure / 3rd-party init work), and
- * skipped entirely if the region is disposed before the microtask fires.
+ * Wire a `use:` action onto an element. Deferred to `onMount` timing so the element is live
+ * (focus / measure / 3rd-party init), and skipped if the region is disposed before the
+ * microtask fires. The argument is passed as a getter, so a **reactive** action returns
+ * `{ update, destroy }`: `update(arg)` re-runs when `use:action={arg}` changes, `destroy()`
+ * on removal. A plain action may still just return a teardown fn (now wired to disposal).
  */
-export function applyAction<A = void>(el: Element, action: Action<A>, arg?: A): void {
-  onMount(() => action(el, arg as A));
+export function applyAction<A = void>(el: Element, action: Action<A>, argFn?: () => A): void {
+  onMount(() => {
+    const result: void | (() => void) | ActionResult<A> = action(el, argFn ? argFn() : (undefined as A));
+    if (typeof result === 'function') {
+      onDispose(result);
+    } else if (result && typeof result === 'object') {
+      if (result.update && argFn) {
+        let first: boolean = true;
+        effect(() => {
+          const arg: A = argFn(); // track the reactive argument
+          if (first) {
+            first = false;
+            return; // the initial arg was already applied by the action() call above
+          }
+          result.update!(arg);
+        });
+      }
+      if (result.destroy) onDispose(result.destroy);
+    }
+  });
 }
 
 /* ──────────────────────────── transitions ──────────────────────────── */

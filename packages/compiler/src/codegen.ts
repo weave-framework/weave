@@ -394,13 +394,13 @@ function compileFragment(
         sink.push(`${gen.H('setRef')}(${rewrite(attr.expr, sc).code}, ${n});`);
         break;
       case 'use': {
-        // `use:action={arg}` → applyAction(el, action, arg). The action is the
-        // `name` identifier (rewritten against ctx); the arg is evaluated eagerly
-        // (a snapshot — pass a getter `={() => sig()}` for reactivity).
+        // `use:action={arg}` → applyAction(el, action, () => arg). The action is the `name`
+        // identifier (rewritten against ctx); the arg is passed as a getter, so a reactive
+        // action's `update(arg)` re-runs when it changes (see applyAction / ActionResult).
         const action: string = rewrite(attr.name, sc).code;
         sink.push(
           attr.expr !== undefined
-            ? `${gen.H('applyAction')}(${n}, ${action}, ${rewrite(attr.expr, sc).code});`
+            ? `${gen.H('applyAction')}(${n}, ${action}, () => ${rewrite(attr.expr, sc).code});`
             : `${gen.H('applyAction')}(${n}, ${action});`
         );
         break;
