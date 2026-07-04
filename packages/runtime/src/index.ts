@@ -36,11 +36,14 @@ export {
   traceFor,
   clearTrace,
   setTraceLimit,
+  inspectTree,
   type DevKind,
   type DevNode,
   type DevSnapshot,
   type DevEdge,
   type DevTrigger,
+  type DevOwner,
+  type DevOwnerNode,
 } from './devtools.js';
 
 export { mountDevtoolsPanel, type DevtoolsPanelOptions } from './devtools-panel.js';

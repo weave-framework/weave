@@ -13,12 +13,25 @@
 
 export type DevKind = 'signal' | 'computed' | 'effect';
 
+/**
+ * The minimal shape of an ownership scope that devtools needs to build the tree — a
+ * structural view of the runtime's `Owner` (no import, so devtools stays free of the
+ * reactive core that imports it). `_parent` is the ambient scope at creation; `name` is
+ * set by `mountComponent` (a component scope names itself after the component).
+ */
+export interface DevOwner {
+  _parent: DevOwner | null;
+  name?: string;
+}
+
 /** One registered reactive node. `read` yields its current value (absent for effects). */
 export interface DevNode {
   id: number;
   name: string;
   kind: DevKind;
   read?: () => unknown;
+  /** The ownership scope this node was created in (for the component/owner tree). */
+  owner?: DevOwner | null;
 }
 
 /** A snapshot row from {@link inspect}. */
@@ -74,11 +87,12 @@ export function registerDevNode(
   kind: DevKind,
   name: string | undefined,
   read?: () => unknown,
-  node?: object
+  node?: object,
+  owner?: DevOwner | null
 ): () => void {
   if (!enabled || !name) return noop;
   const id: number = nextId++;
-  registry.set(id, { id, name, kind, read });
+  registry.set(id, { id, name, kind, read, owner });
   if (node) {
     internalNodes.set(id, node);
     nodeToId.set(node, id);
@@ -212,4 +226,69 @@ export function inspectGraph(): { nodes: DevSnapshot[]; edges: DevEdge[] } {
     }
   }
   return { nodes: inspect(), edges };
+}
+
+/* ─────────────────────────────── owner tree ─────────────────────────────── */
+
+/** A scope in the component/owner tree: its directly-owned nodes + child scopes. */
+export interface DevOwnerNode {
+  /** Synthetic id for this scope (stable within one {@link inspectTree} call). */
+  id: number;
+  /** The scope name — set for component scopes by `mountComponent`; undefined otherwise. */
+  name?: string;
+  /** The registered reactive nodes created directly in this scope. */
+  nodes: DevSnapshot[];
+  /** Nested child scopes. */
+  children: DevOwnerNode[];
+}
+
+/**
+ * The component/owner tree: registered nodes nested under the scope hierarchy they were
+ * created in (the shape developers think in), rather than the flat {@link inspect} list.
+ * Scopes with no name are anonymous control-flow/render scopes; component scopes carry the
+ * component name. Nodes created outside any scope collect under a leading `(unowned)` root.
+ */
+export function inspectTree(): DevOwnerNode[] {
+  const snapById: Map<number, DevSnapshot> = new Map<number, DevSnapshot>();
+  for (const s of inspect()) snapById.set(s.id, s);
+
+  const owners: Map<DevOwner, DevSnapshot[]> = new Map<DevOwner, DevSnapshot[]>();
+  const unowned: DevSnapshot[] = [];
+  for (const node of registry.values()) {
+    const snap: DevSnapshot | undefined = snapById.get(node.id);
+    if (!snap) continue;
+    const o: DevOwner | null | undefined = node.owner;
+    if (!o) {
+      unowned.push(snap);
+      continue;
+    }
+    if (!owners.has(o)) owners.set(o, []);
+    owners.get(o)!.push(snap);
+  }
+  // Pull in each owner's ancestor chain so the tree stays connected even through
+  // intermediate scopes that own no registered node of their own.
+  for (const o of [...owners.keys()]) {
+    let p: DevOwner | null = o._parent;
+    while (p) {
+      if (!owners.has(p)) owners.set(p, []);
+      p = p._parent;
+    }
+  }
+
+  const idMap: Map<DevOwner, number> = new Map<DevOwner, number>();
+  let oid: number = 1;
+  for (const o of owners.keys()) idMap.set(o, oid++);
+
+  const build = (o: DevOwner): DevOwnerNode => ({
+    id: idMap.get(o)!,
+    name: o.name,
+    nodes: owners.get(o) ?? [],
+    children: [...owners.keys()].filter((c) => c._parent === o).map(build),
+  });
+
+  const roots: DevOwnerNode[] = [...owners.keys()]
+    .filter((o) => !o._parent || !owners.has(o._parent))
+    .map(build);
+  if (unowned.length) roots.unshift({ id: 0, nodes: unowned, children: [] });
+  return roots;
 }

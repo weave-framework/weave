@@ -1106,6 +1106,8 @@ export function mountComponent(
   props?: Record<string, unknown>
 ): () => void {
   const owner: Owner = createOwner(null);
+  // Name the scope after the component so devtools' inspectTree() shows a component tree.
+  owner.name = (component as { displayName?: string }).displayName || component.name || 'Component';
   const node: Node = runInOwner(owner, () => component(props, {}));
   const unmount: () => void = mount(node, container);
   return () => {
