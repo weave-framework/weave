@@ -171,7 +171,47 @@ export const tooltip: Action<string> = (el, text) => {
 ~~~
 :::
 
-Three tear-down options, all fired when the region unmounts: return a cleanup function, call `onDispose` inside the action, or create an `effect` (its disposal is tied to the element's region). For an argument that should *react*, pass a getter (`use:tip={{ () => label() }}`) and read it inside an `effect` in the action — the `arg` itself is passed once.
+Three tear-down options, all fired when the region unmounts: return a cleanup function, call `onDispose` inside the action, or create an `effect` (its disposal is tied to the element's region).
+
+**Reactive actions.** For an argument that should *react*, return an `{ update, destroy }` handle (the Svelte-style contract) — `update(arg)` runs whenever `use:action={{ arg }}` changes, `destroy()` on removal:
+
+~~~ts
+export const tooltip: Action<string> = (el, text) => {
+  const tip = makeTip(el, text);
+  return {
+    update: (next) => tip.setText(next),   // re-runs when the arg changes
+    destroy: () => tip.destroy(),
+  };
+};
+~~~
+
+(The older pattern — pass a getter `use:tip={{ () => label() }}` and read it inside an `effect` — still works too.)
+
+## Styling one property: `style:`
+
+`style:prop={{ expr }}` sets a single inline style property reactively. It shines for **CSS custom properties**, letting a signal drive a design token that your CSS then consumes:
+
+~~~html
+<div style:--accent={{ theme() }} style:opacity={{ faded() ? 0.5 : 1 }}>…</div>
+~~~
+
+A `null`/`undefined`/`false` value removes the property. Use it over a full `style={{ … }}` string when only one or two properties are dynamic.
+
+## Dynamic & kept-alive components
+
+`<Dynamic is={{ comp }}>` renders a component chosen at runtime, swapping reactively when `is` changes; other props and slots are forwarded. `<KeepAlive is={{ comp }}>` is the same, but **caches** the instance (DOM *and* live state) when you swap away and restores it on return — ideal for tabs or wizard steps whose state must survive being hidden.
+
+~~~html
+<Dynamic is={{ tab() === 'a' ? PanelA : PanelB }} />
+
+<KeepAlive is={{ step() }} />   <!-- each step keeps its scroll / input across switches -->
+~~~
+
+`<Teleport to="…">` (an alias of `<Portal>`) renders its slot into a different DOM location — modals, tooltips, toasts that must escape an `overflow`/`z-index` ancestor — while staying in the logical tree (owner, context, and disposal behave as if it lived in place):
+
+~~~html
+<Teleport to="body"><div class="modal">…</div></Teleport>
+~~~
 
 ## Transitions: `transition:` / `in:` / `out:`
 

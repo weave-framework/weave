@@ -217,6 +217,20 @@ Two pieces do the work, both reusing the same virtual-module machinery as `weave
 - **`@weave-framework/language-server`** — a Volar LSP server (TypeScript + CSS services) used by both editors. It reports template diagnostics on the `.html` side.
 - **`@weave-framework/typescript-plugin`** — a tsserver plugin that takes over component `.ts` files (and `.weave` SFCs) so imports used only in templates aren't marked unused, and a parent's import of a child resolves the child's typed props.
 
+## DevTools: inspecting the reactive graph
+
+Weave ships a zero-dependency, in-app DevTools panel for looking at your live reactive graph — every **named** `signal`/`computed`/`effect`, its current value, and which sources trigger it. It's off unless you turn it on, so production pays nothing.
+
+~~~ts
+import { enableDevtools, mountDevtoolsPanel, signal } from '@weave-framework/runtime';
+
+enableDevtools();                          // BEFORE creating signals (unnamed nodes never register)
+const count = signal(0, { name: 'count' }); // name a node to surface it
+mountDevtoolsPanel();                       // floating overlay; returns a disposer
+~~~
+
+The panel updates live with no polling (it reads the graph inside an effect), filters by name, and shows each node's dependencies (`← count`) so you can see *who triggers whom*. For programmatic access, `inspect()` returns a snapshot of all named nodes and `inspectGraph()` returns nodes **plus edges**. Gate the calls behind a dev flag (e.g. `import.meta.env.DEV`) so nothing ships to production.
+
 :::callout info "What you just learned"
 One `weave` CLI does it all — once `@weave-framework/cli` is a dev dependency you run it as `weave <cmd>` (via `npm run`/`npx`). The four commands are `dev` (watch + live-reload), `build` (static `dist/`), `check` (template + child-prop type-checking), and `routes` (file-based route gen). The big idea: a `weave.config.ts` switches `dev`/`build` into the full config-driven pipeline, while no config drops you into a bare legacy flag-driven one — and `dev` behaves quite differently between them (in-memory server vs esbuild's serve, port from config vs `--port`). Flags like `--config`, `--out`, `--serve`, `--port`, `--no-minify`, and `--eager` each belong to a specific command and pipeline. `styleLang` really compiles `css`/`scss`/`sass` differently, and editor support is a shared Volar server behind a VS Code extension and a WebStorm/LSP4IJ plugin.
 :::

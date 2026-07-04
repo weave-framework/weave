@@ -23,6 +23,7 @@ To render HTML rather than text, use the `.innerHTML` property binding below —
 | `name={{ expr }}` | Reactive attribute. Removed when the value is `null`/`false`; set to `""` when `true`; otherwise stringified. |
 | `.prop={{ expr }}` | Set a DOM **property** (e.g. `.value`, `.checked`, `.innerHTML`), not an attribute. Reactive. |
 | `class:name={{ expr }}` | Toggle a single class by truthiness of the expression. |
+| `style:prop={{ expr }}` | Set one inline style property reactively. `style:--accent={{ hex }}` sets a **CSS custom property** (bind a design token to a signal); a `null`/`false` value removes it. |
 | `show={{ expr }}` | Toggle visibility via `display` (the element stays in the DOM, unlike `@if`). Restores the element's own inline `display` when shown. |
 | `on:event={{ handler }}` | Attach an event listener. The handler is read once (handlers are never reactive). |
 | `on:event\|mod={{ handler }}` | Event with modifiers (chain with `\|`). See the modifier table below. |
@@ -30,7 +31,7 @@ To render HTML rather than text, use the `.innerHTML` property binding below —
 | `bind:checked={{ signal }}` | Two-way bind a checkbox as a boolean. |
 | `bind:group={{ signal }}` | Two-way bind a radio group or value-checkbox; the signal holds the **selected value**. |
 | `ref={{ target }}` | Store the element reference into a signal or callback after insertion. Alias: `bind:this`. |
-| `use:action={{ arg }}` | Run a `use:` action `(el, arg) => cleanup?` after the element is inserted (at mount timing). |
+| `use:action={{ arg }}` | Run a `use:` action after insertion. Returns nothing, a teardown fn, or a reactive `{ update, destroy }` — `update(arg)` re-runs when the argument changes, `destroy()` on removal. |
 | `transition:fn={{ params }}` | Play an enter **and** leave animation. |
 | `in:fn={{ params }}` | Enter animation only. |
 | `out:fn={{ params }}` | Leave animation only (the element's removal waits for it). |
