@@ -20,6 +20,10 @@ Weave has a few hard, non-negotiable principles. A change that breaks one won't 
 - **A fix isn't done until a test fails without it.** Add a test that reproduces the bug
   (or covers the feature) and would fail on `main` — then make it pass.
 
+These are Gate 1: a change that breaks one is declined regardless of how popular it is. For
+the full picture of how a proposal becomes part of Weave, see [GOVERNANCE.md](GOVERNANCE.md);
+for how changes are versioned, see [VERSIONING.md](VERSIONING.md).
+
 ## Getting started
 
 Prerequisites: **Node 22+** and **pnpm 11+**.
@@ -65,11 +69,14 @@ git commit -s -m "fix: ..."
 
 This adds a `Signed-off-by: Your Name <you@example.com>` line to the commit message.
 
-## Reporting bugs & requesting features
+## Reporting bugs & proposing changes
 
-Open an issue using the templates. For a bug, include a minimal reproduction, what you
-expected, and what happened. For a feature, describe the use case first — the "why"
-matters more than the "how".
+- **Bugs** → open a [GitHub Issue](https://github.com/weave-framework/weave/issues) with a
+  minimal reproduction, what you expected, and what happened.
+- **Ideas & feature requests** → start a [GitHub Discussion](https://github.com/weave-framework/weave/discussions),
+  not an issue. Describe the use case first — the "why" matters more than the "how".
+- **Substantial changes** then go through an [RFC](rfcs/) — see the
+  [RFC process](rfcs/README.md) and [GOVERNANCE.md](GOVERNANCE.md).
 
 ## License
 
