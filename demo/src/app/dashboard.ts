@@ -6,6 +6,10 @@ import Icon from '@weave-framework/ui/icon';
 import SlideToggle from '@weave-framework/ui/slide-toggle';
 import Select from '@weave-framework/ui/select';
 import Expansion from '@weave-framework/ui/expansion';
+import Input from '@weave-framework/ui/input';
+import Checkbox from '@weave-framework/ui/checkbox';
+import ButtonToggle from '@weave-framework/ui/button-toggle';
+import Button from '@weave-framework/ui/button';
 import { openDialog } from '@weave-framework/ui/dialog';
 import { snackbar } from '@weave-framework/ui/snackbar';
 import { createFeed, type Txn, type TxnStatus, type FeedEvent } from '../lib/feed';
@@ -18,6 +22,10 @@ void Icon;
 void SlideToggle;
 void Select;
 void Expansion;
+void Input;
+void Checkbox;
+void ButtonToggle;
+void Button;
 
 const money = (n: number): string => `$${Math.round(n).toLocaleString('en-US')}`;
 const moneyCompact = (n: number): string =>
@@ -59,6 +67,17 @@ const FILTER_OPTS = [
   { value: 'settled', label: 'Settled' },
   { value: 'pending', label: 'Pending' },
   { value: 'failed', label: 'Failed' },
+];
+
+const REGION_OPTS = [
+  { value: 'eu', label: 'EU-West (Amsterdam)' },
+  { value: 'us', label: 'US-East (Virginia)' },
+  { value: 'ap', label: 'AP-South (Mumbai)' },
+];
+
+const DENSITY_OPTS = [
+  { value: 'comfortable', label: 'Comfortable' },
+  { value: 'compact', label: 'Compact' },
 ];
 
 const STATUS_PANELS = [
@@ -154,11 +173,22 @@ interface Setup {
   activeNav: () => string;
   openPanels: () => string[];
   navSub: () => string;
+  regionOpts: typeof REGION_OPTS;
+  densityOpts: typeof DENSITY_OPTS;
+  workspace: () => string;
+  region: () => string;
+  emailAlerts: () => boolean;
+  density: () => string;
   setLive: (v: boolean) => void;
   setFilter: (v: unknown) => void;
   setAccent: (key: string) => void;
   selectNav: (label: string) => void;
   setOpenPanels: (v: string[]) => void;
+  setWorkspace: (v: string) => void;
+  setRegion: (v: unknown) => void;
+  setEmailAlerts: (v: boolean) => void;
+  setDensity: (v: unknown) => void;
+  saveSettings: () => void;
   money: (n: number) => string;
   moneyCompact: (n: number) => string;
   num: (n: number) => string;
@@ -174,6 +204,12 @@ export function setup(): Setup {
   const accent = signal<string>('violet');
   const activeNav = signal<string>('Overview');
   const openPanels = signal<string[]>(['eu']);
+
+  // Settings-view form state.
+  const workspace = signal<string>('Acme Payments');
+  const region = signal<string>('eu');
+  const emailAlerts = signal<boolean>(true);
+  const density = signal<string>('comfortable');
 
   const bars = computed(() => buildBars(feed.series()));
   const visibleTxns = computed<Txn[]>(() =>
@@ -219,11 +255,23 @@ export function setup(): Setup {
     activeNav,
     openPanels,
     navSub: () => NAV_SUB[activeNav()] ?? '',
+    regionOpts: REGION_OPTS,
+    densityOpts: DENSITY_OPTS,
+    workspace,
+    region,
+    emailAlerts,
+    density,
     setLive: (v) => feed.live.set(v),
     setFilter: (v) => filter.set(v as string),
     setAccent,
     selectNav: (label) => activeNav.set(label),
     setOpenPanels: (v) => openPanels.set(v),
+    setWorkspace: (v) => workspace.set(v),
+    setRegion: (v) => region.set(v as string),
+    setEmailAlerts: (v) => emailAlerts.set(v),
+    setDensity: (v) => density.set(v as string),
+    saveSettings: () =>
+      snackbar(`Settings saved for “${workspace()}”`, { action: 'Dismiss', duration: 3000 }),
     money,
     moneyCompact,
     num,

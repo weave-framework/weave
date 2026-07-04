@@ -170,6 +170,35 @@
 .live--paused {
   color: var(--app-warn);
 }
+
+/* Customers view: feed spans wider than the chart */
+.panels {
+  &:has(.panel--wide) {
+    grid-template-columns: 1.4fr 1fr;
+  }
+}
+
+/* Settings view — a real form */
+.settings {
+  max-width: 640px;
+}
+.settings__grid {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  max-width: 420px;
+}
+.settings__toggles {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-top: 4px;
+}
+.settings__actions {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--app-line);
+}
 .latency {
   display: inline-flex;
   align-items: center;

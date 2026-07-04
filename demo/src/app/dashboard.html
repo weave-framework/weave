@@ -47,49 +47,155 @@
       </div>
     </header>
 
-    <section class="kpis">
-      <Card class="kpi">
-        <span class="kpi__label">Revenue today</span>
-        <span class="kpi__value">{{ moneyCompact(revenue()) }}</span>
-        @if (revenueDelta() >= 0) {
-          <span class="kpi__delta kpi__delta--up"><Icon name={{ 'arrow-up' }} />+{{ money(revenueDelta()) }}/s</span>
-        } @else {
-          <span class="kpi__delta kpi__delta--down"><Icon name={{ 'arrow-down' }} />−{{ money(-revenueDelta()) }}/s</span>
-        }
-      </Card>
+    @if (activeNav() !== 'Settings') {
+      <section class="kpis">
+        <Card class="kpi">
+          <span class="kpi__label">Revenue today</span>
+          <span class="kpi__value">{{ moneyCompact(revenue()) }}</span>
+          @if (revenueDelta() >= 0) {
+            <span class="kpi__delta kpi__delta--up"><Icon name={{ 'arrow-up' }} />+{{ money(revenueDelta()) }}/s</span>
+          } @else {
+            <span class="kpi__delta kpi__delta--down"><Icon name={{ 'arrow-down' }} />−{{ money(-revenueDelta()) }}/s</span>
+          }
+        </Card>
+        <Card class="kpi">
+          <span class="kpi__label">Active users</span>
+          <span class="kpi__value">{{ num(users()) }}</span>
+          @if (usersDelta() >= 0) {
+            <span class="kpi__delta kpi__delta--up"><Icon name={{ 'arrow-up' }} />+{{ num(usersDelta()) }}</span>
+          } @else {
+            <span class="kpi__delta kpi__delta--down"><Icon name={{ 'arrow-down' }} />−{{ num(-usersDelta()) }}</span>
+          }
+        </Card>
+        <Card class="kpi">
+          <span class="kpi__label">Orders</span>
+          <span class="kpi__value">{{ num(orders()) }}</span>
+          <span class="kpi__delta kpi__delta--muted">cumulative</span>
+        </Card>
+        <Card class="kpi">
+          <span class="kpi__label">p95 latency</span>
+          <span class="kpi__value">{{ latency() }}<small> ms</small></span>
+          @if (latency() < 90) {
+            <span class="kpi__delta kpi__delta--up">healthy</span>
+          } @else {
+            <span class="kpi__delta kpi__delta--down">elevated</span>
+          }
+        </Card>
+      </section>
+    }
 
-      <Card class="kpi">
-        <span class="kpi__label">Active users</span>
-        <span class="kpi__value">{{ num(users()) }}</span>
-        @if (usersDelta() >= 0) {
-          <span class="kpi__delta kpi__delta--up"><Icon name={{ 'arrow-up' }} />+{{ num(usersDelta()) }}</span>
-        } @else {
-          <span class="kpi__delta kpi__delta--down"><Icon name={{ 'arrow-down' }} />−{{ num(-usersDelta()) }}</span>
-        }
-      </Card>
+    @if (activeNav() === 'Overview') {
+      <section class="panels">
+        <Card class="panel panel--chart">
+          <div class="panel__head">
+            <h2 class="panel__title">Throughput</h2>
+            <Badge variant={{ 'tag' }}>req/s</Badge>
+          </div>
+          <div class="chart">
+            @for (b of bars(); track b.i) {
+              <span class="bar" style={{ 'height:' + b.h + '%' }}></span>
+            }
+          </div>
+        </Card>
+        <Card class="panel panel--feed">
+          <div class="panel__head">
+            <h2 class="panel__title">Activity</h2>
+            @if (live()) {
+              <span class="live"><span class="live__dot"></span>Live</span>
+            } @else {
+              <span class="live live--paused">Paused</span>
+            }
+          </div>
+          <ul class="feed">
+            @for (e of events(); track e.id) {
+              <li class={{ 'feed__row feed__row--' + e.kind }}>
+                <span class="feed__icon"><Icon name={{ eventIcon(e.kind) }} /></span>
+                <span class="feed__text">{{ e.text }}</span>
+                <span class="feed__ago">{{ rel(now() - e.createdAt) }}</span>
+              </li>
+            }
+          </ul>
+        </Card>
+      </section>
 
-      <Card class="kpi">
-        <span class="kpi__label">Orders</span>
-        <span class="kpi__value">{{ num(orders()) }}</span>
-        <span class="kpi__delta kpi__delta--muted">cumulative</span>
-      </Card>
-
-      <Card class="kpi">
-        <span class="kpi__label">p95 latency</span>
-        <span class="kpi__value">{{ latency() }}<small> ms</small></span>
-        @if (latency() < 90) {
-          <span class="kpi__delta kpi__delta--up">healthy</span>
-        } @else {
-          <span class="kpi__delta kpi__delta--down">elevated</span>
-        }
-      </Card>
-    </section>
-
-    <section class="panels">
-      <Card class="panel panel--chart">
+      <Card class="panel">
         <div class="panel__head">
-          <h2 class="panel__title">Throughput</h2>
-          <Badge variant={{ 'tag' }}>req/s</Badge>
+          <h2 class="panel__title">System status</h2>
+          <Badge variant={{ 'tag' }}>3 regions</Badge>
+        </div>
+        <Expansion panels={{ statusPanels }} value={{ openPanels() }} onChange={{ setOpenPanels }} />
+      </Card>
+
+      <Card class="panel panel--table">
+        <div class="panel__head">
+          <h2 class="panel__title">Recent transactions</h2>
+          <div class="panel__tools">
+            <Select options={{ filterOpts }} value={{ filter() }} onChange={{ setFilter }} label={{ 'Filter' }} />
+          </div>
+        </div>
+        <Table columns={{ columns }} dataSource={{ visibleTxns }} trackBy={{ trackTxn }} ariaLabel={{ 'Recent transactions' }} />
+      </Card>
+    }
+
+    @if (activeNav() === 'Payments') {
+      <Card class="panel panel--table">
+        <div class="panel__head">
+          <h2 class="panel__title">All transactions</h2>
+          <div class="panel__tools">
+            <Select options={{ filterOpts }} value={{ filter() }} onChange={{ setFilter }} label={{ 'Filter' }} />
+          </div>
+        </div>
+        <Table columns={{ columns }} dataSource={{ visibleTxns }} trackBy={{ trackTxn }} ariaLabel={{ 'All transactions' }} />
+      </Card>
+    }
+
+    @if (activeNav() === 'Customers') {
+      <section class="panels">
+        <Card class="panel panel--feed panel--wide">
+          <div class="panel__head">
+            <h2 class="panel__title">Customer activity</h2>
+            @if (live()) {
+              <span class="live"><span class="live__dot"></span>Live</span>
+            } @else {
+              <span class="live live--paused">Paused</span>
+            }
+          </div>
+          <ul class="feed">
+            @for (e of events(); track e.id) {
+              <li class={{ 'feed__row feed__row--' + e.kind }}>
+                <span class="feed__icon"><Icon name={{ eventIcon(e.kind) }} /></span>
+                <span class="feed__text">{{ e.text }}</span>
+                <span class="feed__ago">{{ rel(now() - e.createdAt) }}</span>
+              </li>
+            }
+          </ul>
+        </Card>
+        <Card class="panel">
+          <div class="panel__head">
+            <h2 class="panel__title">Sign-up rate</h2>
+            <Badge variant={{ 'tag' }}>/min</Badge>
+          </div>
+          <div class="chart">
+            @for (b of bars(); track b.i) {
+              <span class="bar" style={{ 'height:' + b.h + '%' }}></span>
+            }
+          </div>
+        </Card>
+      </section>
+    }
+
+    @if (activeNav() === 'Alerts') {
+      <Card class="panel">
+        <div class="panel__head">
+          <h2 class="panel__title">Region health</h2>
+          <Badge variant={{ 'tag' }}>3 regions</Badge>
+        </div>
+        <Expansion panels={{ statusPanels }} value={{ openPanels() }} onChange={{ setOpenPanels }} />
+      </Card>
+      <Card class="panel">
+        <div class="panel__head">
+          <h2 class="panel__title">Latency (p95)</h2>
+          <Badge variant={{ 'tag' }}>ms</Badge>
         </div>
         <div class="chart">
           @for (b of bars(); track b.i) {
@@ -97,54 +203,26 @@
           }
         </div>
       </Card>
+    }
 
-      <Card class="panel panel--feed">
+    @if (activeNav() === 'Settings') {
+      <Card class="panel settings">
         <div class="panel__head">
-          <h2 class="panel__title">Activity</h2>
-          @if (live()) {
-            <span class="live"><span class="live__dot"></span>Live</span>
-          } @else {
-            <span class="live live--paused">Paused</span>
-          }
+          <h2 class="panel__title">Workspace settings</h2>
         </div>
-        <ul class="feed">
-          @for (e of events(); track e.id) {
-            <li class={{ 'feed__row feed__row--' + e.kind }}>
-              <span class="feed__icon"><Icon name={{ eventIcon(e.kind) }} /></span>
-              <span class="feed__text">{{ e.text }}</span>
-              <span class="feed__ago">{{ rel(now() - e.createdAt) }}</span>
-            </li>
-          }
-        </ul>
+        <div class="settings__grid">
+          <Input value={{ workspace() }} onInput={{ setWorkspace }} label={{ 'Workspace name' }} />
+          <Select options={{ regionOpts }} value={{ region() }} onChange={{ setRegion }} label={{ 'Default region' }} />
+          <ButtonToggle options={{ densityOpts }} value={{ density() }} onChange={{ setDensity }} label={{ 'Table density' }} />
+          <div class="settings__toggles">
+            <SlideToggle checked={{ live() }} onChange={{ setLive }} label={{ 'Live updates' }} />
+            <Checkbox checked={{ emailAlerts() }} onChange={{ setEmailAlerts }} label={{ 'Email me on alerts' }} />
+          </div>
+        </div>
+        <div class="settings__actions">
+          <Button on:click={{ saveSettings }}>Save changes</Button>
+        </div>
       </Card>
-    </section>
-
-    <Card class="panel">
-      <div class="panel__head">
-        <h2 class="panel__title">System status</h2>
-        <Badge variant={{ 'tag' }}>3 regions</Badge>
-      </div>
-      <Expansion panels={{ statusPanels }} value={{ openPanels() }} onChange={{ setOpenPanels }} />
-    </Card>
-
-    <Card class="panel panel--table">
-      <div class="panel__head">
-        <h2 class="panel__title">Recent transactions</h2>
-        <div class="panel__tools">
-          <Select
-            options={{ filterOpts }}
-            value={{ filter() }}
-            onChange={{ setFilter }}
-            label={{ 'Filter' }}
-          />
-        </div>
-      </div>
-      <Table
-        columns={{ columns }}
-        dataSource={{ visibleTxns }}
-        trackBy={{ trackTxn }}
-        ariaLabel={{ 'Recent transactions' }}
-      />
-    </Card>
+    }
   </div>
 </div>
