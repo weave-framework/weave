@@ -65,6 +65,18 @@ test('Portal targets a CSS selector and an Element', () => {
   t2.remove();
 });
 
+test('Teleport is an alias of Portal — renders the slot into the target', () => {
+  assert.is(dom.Teleport, dom.Portal, 'same implementation');
+  const t: HTMLElement = target('tp-target');
+  const o: Owner = createOwner();
+  runInOwner(o, () =>
+    dom.Teleport({ to: '#tp-target' }, { default: () => { const d: HTMLSpanElement = document.createElement('span'); d.id = 'tp-in'; return d; } })
+  );
+  assert.equal(document.getElementById('tp-in')!.parentElement, t, 'Teleport honored the target');
+  disposeOwner(o);
+  t.remove();
+});
+
 test('a missing selector falls back to document.body', () => {
   const owner: Owner = createOwner();
   runInOwner(owner, () =>

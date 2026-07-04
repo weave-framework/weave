@@ -1309,6 +1309,13 @@ export const Portal: Component = (props = {}, slots = {}) => {
   return placeholder;
 };
 
+/**
+ * `<Teleport>` — the familiar name (Vue) for {@link Portal}. Identical behaviour: render the
+ * default slot into a different DOM location (`to` selector/element) while staying in the
+ * logical component tree. Provided as an alias so either name works; there is one implementation.
+ */
+export const Teleport: Component = Portal;
+
 /* ──────────────────────────── mount ──────────────────────────── */
 
 /**
