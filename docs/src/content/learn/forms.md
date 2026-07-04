@@ -16,8 +16,15 @@ Here's the shared shape every control gives you:
 | `valid()` | reactive | `true` when this control **and every descendant** is valid |
 | `validating()` | reactive | `true` while an async check is in flight here or in any descendant |
 | `touched()` | reactive | `true` once this control (or any descendant) has been touched |
+| `dirty()` | reactive | `true` once this control (or any descendant) has **changed from its initial value** |
 | `reset()` | method | Restore initial value(s) and clear touched/errors |
 | `touchAll()` | method | Mark this control **and every descendant** touched — e.g. on a failed submit, to reveal all errors |
+
+`touched` and `dirty` answer different questions: **`touched`** is about *interaction* (the field was blurred), **`dirty`** is about *value change*. `pristine` is simply `!dirty()`. Both are derived and cascade up a group/array, and `reset()` clears them. Use `dirty()` for "unsaved changes" guards or to enable a Save button only when something actually changed:
+
+~~~ts
+const changed = form.dirty();     // true if any field differs from its initial value
+~~~
 
 Two of those are worth calling out now because the brief leans on them later:
 

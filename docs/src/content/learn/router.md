@@ -87,6 +87,55 @@ Two distinctions worth pinning down:
 - **`path: ''` is the index child** — it matches when the parent's path is fully consumed. This is *not* the same as `path: '*'`, the catch-all fallback for unmatched paths.
 - **There is no `meta`, `lazy`, or `name` field.** A component *can* be a `lazy()`-wrapped component (that's how code-splitting works), but `lazy` is not a route key — you wrap the component, you don't set a flag.
 
+## Typed routes with `route()`
+
+Plain-object routes work, but their `params` are an untyped `Record<string, string>`. The `route(path, config)` builder captures the path *literal* so `guard` and `loader` get **params inferred from the path** — `route('/user/:id', …)` gives `params.id: string`, with autocomplete and a compile error on a typo:
+
+~~~ts
+import { route } from '@weave-framework/router';
+
+const routes = [
+  route('/user/:id', {
+    component: User,
+    guard: (ctx) => (ctx.params.id ? true : '/'),   // ctx.params.id is typed
+  }),
+  { path: '*', component: NotFound },               // plain objects still work alongside
+];
+~~~
+
+`route()` returns a plain `Route`, so it drops straight into the same `createRouter([...])` array and nests via `children`. Use it where you want typed params; keep plain objects where you don't.
+
+## Route loaders
+
+A route may declare a `loader` — data fetched when the route renders, exposed to the component (and its descendants) via `useLoaderData()`. The result is an **`@await`-compatible** `{ data, loading, error }`, so it drives `@await` directly. The loader re-runs when this route's params/query change (the previous run is aborted via `ctx.signal`):
+
+~~~ts
+route('/user/:id', {
+  component: User,
+  loader: ({ params, signal }) => fetch(`/api/users/${params.id}`, { signal }).then((r) => r.json()),
+});
+~~~
+
+~~~html title="user.html"
+@await (user()) {
+  <p>Loading…</p>
+} @then (u) {
+  <h1>{{ u.name }}</h1>
+} @catch (e) {
+  <p>Failed: {{ e.message }}</p>
+}
+~~~
+
+~~~ts title="user.ts"
+import { useLoaderData } from '@weave-framework/router';
+export function setup() {
+  const user = useLoaderData<{ name: string }>();  // { data, loading, error }
+  return { user };
+}
+~~~
+
+> SSR note: loaders are the seam a future server render awaits and serializes into the page (see [RFC 0001](https://github.com/weave-framework/weave/blob/main/rfcs/0001-ssr-hydration.md)). Today they run on the client.
+
 ## Placing views: RouterView
 
 `<RouterView>` renders whatever route matches at its depth. Put one at the top, handing it the router:
@@ -217,13 +266,24 @@ Both are reactive reads — call them inside an effect/computed and they re-run 
 | `matched(depth = 0)` | `Match \| null` | The match at `depth` in the resolved chain (`0` = top component), or `null` |
 | `chain()` | `Match[]` | The full resolved chain, layout → … → leaf |
 | `params(depth?)` | `Record<string,string>` | Accumulated params at `depth`; **default is the leaf** (i.e. all params) |
+| `path()` | `string` | This router's current pathname (reactive) |
 | `query()` | `Record<string,string>` | The current query params (same as `currentQuery()`) |
+| `navigate(to)` | `void` | Navigate this router (pushes history) |
+| `back()` | `void` | Go back one history entry |
 | `redirectTo()` | `string \| null` | The canonical pathname the URL should sync to after a guard/redirect, or `null` |
 | `preload(to)` | `void` | Non-reactively resolve `to` and warm every lazy chunk in its chain |
 
 A `Match` is `{ view: Component; params: Record<string,string> }`.
 
-`createRouter`'s only option is `{ basename }` — equivalent to calling `setBasename` (see [Hosting under a sub-path](#hosting-under-a-sub-path)).
+A router **owns its own signals** (path / query / navigation) — so multiple routers, isolated tests, and a future per-request SSR render each get their own URL. The module-level `navigate()` / `currentPath()` / `currentQuery()` are sugar that delegate to the active router; inside a routed component, `useRouter()` is the canonical way to reach it:
+
+~~~ts
+import { useRouter } from '@weave-framework/router';
+const r = useRouter();          // injected from the enclosing <RouterView>
+r.navigate('/dashboard');
+~~~
+
+`createRouter`'s options are `{ basename?, viewTransitions? }` — `basename` is equivalent to `setBasename` (see [Hosting under a sub-path](#hosting-under-a-sub-path)); `viewTransitions` is covered under [Animating route changes](#animating-route-changes).
 
 :::callout info "Redirect-loop protection"
 Resolution follows redirect and guard-redirect hops, but caps the chase at **16 hops**. If a redirect loop never settles, resolution gives up and yields an **empty chain** — a deliberate failure outcome (nothing renders) rather than an infinite spin. Design your redirects so they converge well under 16 hops.
@@ -324,6 +384,16 @@ Pass a transition to the top `<RouterView>` to animate swaps. The entering view 
 ~~~
 
 `transition`/`transitionParams` are honoured on the **top outlet only** — nested outlets don't run their own transition. Author a page-root `out:` if you also want a leave animation.
+
+### Native View Transitions
+
+For a browser-native cross-fade of the whole page, opt in with `viewTransitions: true`. On navigation the router wraps the DOM swap in `document.startViewTransition()`; because Weave's updates are synchronous, the outlet swaps *inside* the transition callback and the browser animates between the before/after snapshots:
+
+~~~ts
+const router = createRouter(routes, { viewTransitions: true });
+~~~
+
+It's a progressive enhancement: browsers without the API fall back to a plain swap, and any `transition` prop on `<RouterView>` still plays. Style the animation with the standard `::view-transition-*` pseudo-elements in your CSS.
 
 ## Code-splitting a route
 
