@@ -1,6 +1,6 @@
 {
   "name": "@weave-framework/data",
-  "version": "0.2.111",
+  "version": "0.2.112",
   "description": "Weave data — signal-native async resources + a tiny fetch client. Zero third-party deps.",
   "type": "module",
   "sideEffects": false,

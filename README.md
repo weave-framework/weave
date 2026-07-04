@@ -70,6 +70,16 @@ Weave is *small, fast, signal‑native, and low‑ceremony* — and built to hol
 
 We won't oversell the young parts: SSR/hydration and devtools are on the roadmap, and the ecosystem is still growing. But the foundation is real and tested today — and it's aimed squarely at the work real applications demand.
 
+## 💜 Support Weave
+
+Weave is free and MIT‑licensed, built and maintained in the open. If it saves your team time — or you just want to see it thrive — you can sponsor its development:
+
+### → **[Become a sponsor](https://github.com/sponsors/aidasjosas)**
+
+Every tier is recognition‑based — your name or logo on the docs and in this README — and it keeps Weave independent, maintained, and moving. Thank you for helping the threads stay tight. 🧵
+
+---
+
 ## License
 
 [MIT](LICENSE) — woven with care. 🧵
