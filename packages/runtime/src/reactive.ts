@@ -12,7 +12,7 @@
  * and memos stay cached until a true dependency changes.
  */
 
-import { registerDevNode, isDevtoolsEnabled } from './devtools.js';
+import { registerDevNode, isDevtoolsEnabled, recordTrigger } from './devtools.js';
 
 const CLEAN: 0 = 0;
 const CHECK: 1 = 1;
@@ -106,7 +106,12 @@ function run(c: Computation): void {
     if (c.isMemo) {
       if (!c.equals(c.value, result)) {
         c.value = result;
-        for (const o of c.observers) o.state = DIRTY;
+        const devOn: boolean = isDevtoolsEnabled();
+        for (const o of c.observers) {
+          o.state = DIRTY;
+          // Trigger-trace: this memo's new value dirties its observers (the B→C link in A→B→C).
+          if (devOn) recordTrigger(c, o);
+        }
       }
     }
   } catch (e) {
@@ -192,6 +197,8 @@ export function signal<T>(initial: T, opts: { equals?: (a: T, b: T) => boolean; 
     const value: T = typeof next === 'function' ? (next as (prev: T) => T)(node.value) : next;
     if (node.equals(node.value, value)) return node.value;
     node.value = value;
+    // Devtools trigger-trace: this write dirties each direct observer (guarded — zero-cost when off).
+    if (isDevtoolsEnabled()) for (const o of node.observers) recordTrigger(node, o);
     notify(node.observers);
     flush();
     return value;

@@ -32,10 +32,15 @@ export {
   inspectGraph,
   devNodeCount,
   onDevtoolsChange,
+  inspectTrace,
+  traceFor,
+  clearTrace,
+  setTraceLimit,
   type DevKind,
   type DevNode,
   type DevSnapshot,
   type DevEdge,
+  type DevTrigger,
 } from './devtools.js';
 
 export { mountDevtoolsPanel, type DevtoolsPanelOptions } from './devtools-panel.js';

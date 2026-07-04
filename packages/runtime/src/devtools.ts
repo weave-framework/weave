@@ -130,6 +130,70 @@ export interface DevEdge {
   to: number;
 }
 
+/* ─────────────────────────────── trigger trace ─────────────────────────────── */
+
+/**
+ * One recorded propagation event: a value change in `from` marked `to` dirty. This is
+ * the *temporal* view — "what just fired and what it caused" — as opposed to the static
+ * {@link inspectGraph} edges ("what depends on what"). `seq` is a monotonic counter (no
+ * `Date.now()` in the core, so replay/tests stay deterministic).
+ */
+export interface DevTrigger {
+  from: number;
+  to: number;
+  fromName: string;
+  toName: string;
+  seq: number;
+}
+
+let traceSeq: number = 0;
+let traceCap: number = 500;
+const traceBuf: DevTrigger[] = [];
+
+/** Set the trigger-trace ring-buffer size (drop-oldest past the cap). Default 500. */
+export function setTraceLimit(n: number): void {
+  traceCap = Math.max(1, Math.floor(n));
+  while (traceBuf.length > traceCap) traceBuf.shift();
+}
+
+/**
+ * Core hook: record that a value change in `fromNode` dirtied `toNode`. A no-op unless
+ * devtools are on AND both ends are registered named nodes — so an unnamed graph, or a
+ * production build, records nothing. Called from the reactive propagation path.
+ */
+export function recordTrigger(fromNode: object, toNode: object): void {
+  if (!enabled) return;
+  const from: number | undefined = nodeToId.get(fromNode);
+  if (from === undefined) return;
+  const to: number | undefined = nodeToId.get(toNode);
+  if (to === undefined) return;
+  traceBuf.push({
+    from,
+    to,
+    fromName: registry.get(from)?.name ?? '?',
+    toName: registry.get(to)?.name ?? '?',
+    seq: ++traceSeq,
+  });
+  if (traceBuf.length > traceCap) traceBuf.shift();
+}
+
+/** Recent trigger events, newest first (all up to the cap, or the last `limit`). */
+export function inspectTrace(limit?: number): DevTrigger[] {
+  const rev: DevTrigger[] = [...traceBuf].reverse();
+  return limit != null ? rev.slice(0, limit) : rev;
+}
+
+/** Trigger events touching a node (as source or target), newest first — the panel's per-node slice. */
+export function traceFor(id: number, limit?: number): DevTrigger[] {
+  const hits: DevTrigger[] = traceBuf.filter((t) => t.from === id || t.to === id).reverse();
+  return limit != null ? hits.slice(0, limit) : hits;
+}
+
+/** Clear the trigger-trace ring-buffer. */
+export function clearTrace(): void {
+  traceBuf.length = 0;
+}
+
 /**
  * The live reactive graph: every registered node plus the edges between them. An edge is
  * derived from a computation's internal `sources` — for each registered computed/effect,
