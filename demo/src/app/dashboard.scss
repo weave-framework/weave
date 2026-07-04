@@ -1,0 +1,357 @@
+// Layout + custom chrome for Weave Analytics. Colours all come from the theme tokens
+// (set in styles/main.scss), so this whole product re-skins with one token map.
+
+.shell {
+  display: grid;
+  grid-template-columns: 248px 1fr;
+  min-height: 100vh;
+}
+
+/* ---- Sidebar ------------------------------------------------------------- */
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding: 22px 16px;
+  background: color-mix(in oklab, var(--app-surface) 60%, var(--app-bg));
+  border-right: 1px solid var(--app-line);
+  position: sticky;
+  top: 0;
+  height: 100vh;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 8px;
+}
+.brand__mark {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, var(--app-accent), #b06cff 60%, #ff7ac6);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 6px 16px var(--app-accent-soft);
+}
+.brand__name {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--app-sub);
+}
+.brand__name b {
+  color: var(--app-ink);
+  font-weight: 800;
+}
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.nav__item {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 9px 12px;
+  border-radius: 10px;
+  color: var(--app-sub);
+  text-decoration: none;
+  font-size: 0.9rem;
+  font-weight: 500;
+  border: 1px solid transparent;
+  transition: background 0.15s, color 0.15s;
+}
+.nav__item:hover {
+  color: var(--app-ink);
+  background: color-mix(in oklab, var(--app-ink) 6%, transparent);
+}
+.nav__item--active {
+  color: var(--app-ink);
+  background: var(--app-accent-soft);
+  border-color: color-mix(in oklab, var(--app-accent) 40%, transparent);
+}
+.nav__item--active :global(.weave-icon),
+.nav__item--active svg {
+  color: var(--app-accent);
+}
+
+.sidebar__foot {
+  margin-top: auto;
+  display: flex;
+  gap: 8px;
+  font-size: 0.72rem;
+  line-height: 1.5;
+  color: var(--app-sub);
+  padding: 0 8px;
+}
+.sidebar__dot {
+  flex: none;
+  margin-top: 5px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--app-ok);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--app-ok) 22%, transparent);
+}
+
+/* ---- Main --------------------------------------------------------------- */
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 24px 30px 40px;
+  min-width: 0;
+}
+
+.topbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+.topbar__title {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+.topbar__sub {
+  margin: 3px 0 0;
+  color: var(--app-sub);
+  font-size: 0.85rem;
+}
+.topbar__right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.latency {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.85rem;
+  color: var(--app-sub);
+}
+
+.live {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--app-ok);
+}
+.live__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--app-ok);
+  animation: pulse 1.6s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--app-ok) 55%, transparent);
+  }
+  60% {
+    box-shadow: 0 0 0 6px transparent;
+  }
+}
+
+/* ---- KPI cards ---------------------------------------------------------- */
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+}
+.kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.kpi__label {
+  font-size: 0.78rem;
+  color: var(--app-sub);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.kpi__value {
+  font-size: 1.7rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.kpi__value small {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--app-sub);
+}
+.kpi__delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.kpi__delta--up {
+  color: var(--app-ok);
+}
+.kpi__delta--down {
+  color: var(--app-bad);
+}
+.kpi__delta--muted {
+  color: var(--app-sub);
+  font-weight: 500;
+}
+
+/* ---- Panels ------------------------------------------------------------- */
+.panels {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 14px;
+}
+.panel__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+.panel__title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+/* Chart — a live bar sparkline (plain HTML; heights are the only thing that ticks) */
+.chart {
+  height: 190px;
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+}
+.bar {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 2px;
+  border-radius: 3px 3px 0 0;
+  background: linear-gradient(
+    to top,
+    color-mix(in oklab, var(--app-accent) 55%, transparent),
+    var(--app-accent)
+  );
+  transition: height 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.bar:last-child {
+  background: linear-gradient(to top, color-mix(in oklab, #ff7ac6 55%, transparent), #ff7ac6);
+}
+
+/* Activity feed */
+.feed {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.feed__row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 6px;
+  border-radius: 8px;
+  font-size: 0.86rem;
+  animation: rowIn 0.35s ease;
+}
+.feed__row + .feed__row {
+  border-top: 1px solid color-mix(in oklab, var(--app-line) 60%, transparent);
+}
+.feed__icon {
+  display: inline-flex;
+  width: 26px;
+  height: 26px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  background: color-mix(in oklab, var(--app-ink) 6%, transparent);
+  color: var(--app-sub);
+}
+.feed__row--alert .feed__icon {
+  background: color-mix(in oklab, var(--app-bad) 18%, transparent);
+  color: var(--app-bad);
+}
+.feed__row--upgrade .feed__icon,
+.feed__row--payout .feed__icon {
+  background: var(--app-accent-soft);
+  color: var(--app-accent);
+}
+.feed__row--signup .feed__icon {
+  background: color-mix(in oklab, var(--app-ok) 16%, transparent);
+  color: var(--app-ok);
+}
+.feed__text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.feed__ago {
+  color: var(--app-sub);
+  font-size: 0.76rem;
+  font-variant-numeric: tabular-nums;
+}
+@keyframes rowIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ---- Status pills (rendered by the table's Status cell) ----------------- */
+.pill {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  border: 1px solid;
+}
+.pill--settled {
+  color: var(--app-ok);
+  border-color: color-mix(in oklab, var(--app-ok) 45%, transparent);
+  background: color-mix(in oklab, var(--app-ok) 12%, transparent);
+}
+.pill--pending {
+  color: var(--app-warn);
+  border-color: color-mix(in oklab, var(--app-warn) 45%, transparent);
+  background: color-mix(in oklab, var(--app-warn) 12%, transparent);
+}
+.pill--failed {
+  color: var(--app-bad);
+  border-color: color-mix(in oklab, var(--app-bad) 45%, transparent);
+  background: color-mix(in oklab, var(--app-bad) 12%, transparent);
+}
+
+/* ---- Responsive --------------------------------------------------------- */
+@media (max-width: 980px) {
+  .shell {
+    grid-template-columns: 1fr;
+  }
+  .sidebar {
+    display: none;
+  }
+  .panels {
+    grid-template-columns: 1fr;
+  }
+  .kpis {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

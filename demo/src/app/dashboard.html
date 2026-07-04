@@ -1,0 +1,118 @@
+<div class="shell">
+  <aside class="sidebar">
+    <div class="brand">
+      <span class="brand__mark"></span>
+      <span class="brand__name">Weave<b>Analytics</b></span>
+    </div>
+
+    <nav class="nav">
+      @for (item of nav; track item.label) {
+        <a class={{ item.active ? 'nav__item nav__item--active' : 'nav__item' }} href="#">
+          <Icon name={{ item.icon }} />
+          <span>{{ item.label }}</span>
+        </a>
+      }
+    </nav>
+
+    <div class="sidebar__foot">
+      <span class="sidebar__dot"></span>
+      Built with Weave — same components, a different skin.
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <div>
+        <h1 class="topbar__title">Overview</h1>
+        <p class="topbar__sub">Real-time — every value below is a live signal</p>
+      </div>
+      <div class="topbar__right">
+        <span class="live"><span class="live__dot"></span>Live</span>
+        <span class="latency">
+          <Icon name={{ 'clock' }} /> {{ latency() }} ms
+        </span>
+      </div>
+    </header>
+
+    <section class="kpis">
+      <Card class="kpi">
+        <span class="kpi__label">Revenue today</span>
+        <span class="kpi__value">{{ moneyCompact(revenue()) }}</span>
+        @if (revenueDelta() >= 0) {
+          <span class="kpi__delta kpi__delta--up"><Icon name={{ 'arrow-up' }} />+{{ money(revenueDelta()) }}/s</span>
+        } @else {
+          <span class="kpi__delta kpi__delta--down"><Icon name={{ 'arrow-down' }} />−{{ money(-revenueDelta()) }}/s</span>
+        }
+      </Card>
+
+      <Card class="kpi">
+        <span class="kpi__label">Active users</span>
+        <span class="kpi__value">{{ num(users()) }}</span>
+        @if (usersDelta() >= 0) {
+          <span class="kpi__delta kpi__delta--up"><Icon name={{ 'arrow-up' }} />+{{ num(usersDelta()) }}</span>
+        } @else {
+          <span class="kpi__delta kpi__delta--down"><Icon name={{ 'arrow-down' }} />−{{ num(-usersDelta()) }}</span>
+        }
+      </Card>
+
+      <Card class="kpi">
+        <span class="kpi__label">Orders</span>
+        <span class="kpi__value">{{ num(orders()) }}</span>
+        <span class="kpi__delta kpi__delta--muted">cumulative</span>
+      </Card>
+
+      <Card class="kpi">
+        <span class="kpi__label">p95 latency</span>
+        <span class="kpi__value">{{ latency() }}<small> ms</small></span>
+        @if (latency() < 90) {
+          <span class="kpi__delta kpi__delta--up">healthy</span>
+        } @else {
+          <span class="kpi__delta kpi__delta--down">elevated</span>
+        }
+      </Card>
+    </section>
+
+    <section class="panels">
+      <Card class="panel panel--chart">
+        <div class="panel__head">
+          <h2 class="panel__title">Throughput</h2>
+          <Badge variant={{ 'tag' }}>req/s</Badge>
+        </div>
+        <div class="chart">
+          @for (b of bars(); track b.i) {
+            <span class="bar" style={{ 'height:' + b.h + '%' }}></span>
+          }
+        </div>
+      </Card>
+
+      <Card class="panel panel--feed">
+        <div class="panel__head">
+          <h2 class="panel__title">Activity</h2>
+          <span class="live"><span class="live__dot"></span></span>
+        </div>
+        <ul class="feed">
+          @for (e of events(); track e.id) {
+            <li class={{ 'feed__row feed__row--' + e.kind }}>
+              <span class="feed__icon"><Icon name={{ eventIcon(e.kind) }} /></span>
+              <span class="feed__text">{{ e.text }}</span>
+              <span class="feed__ago">{{ rel(now() - e.createdAt) }}</span>
+            </li>
+          }
+        </ul>
+      </Card>
+    </section>
+
+    <Card class="panel panel--table">
+      <div class="panel__head">
+        <h2 class="panel__title">Recent transactions</h2>
+        <Badge variant={{ 'tag' }}>live</Badge>
+      </div>
+      <Table
+        columns={{ columns }}
+        dataSource={{ txns }}
+        trackBy={{ trackTxn }}
+        ariaLabel={{ 'Recent transactions' }}
+      />
+    </Card>
+  </div>
+</div>

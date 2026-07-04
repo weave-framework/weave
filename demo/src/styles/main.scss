@@ -1,0 +1,77 @@
+// ---------------------------------------------------------------------------
+// Weave Analytics — theme
+//
+// The whole point of this file: the SAME @weave-framework/ui components you see in
+// the docs are re-skinned into a completely different product here, purely by handing
+// `theme()` a different token map. No component selectors are overridden — just tokens.
+// ---------------------------------------------------------------------------
+@use 'pkg:@weave-framework/ui' as weave;
+
+// Structural component CSS (theme-agnostic).
+@include weave.all-styles();
+
+// A bold, dark, violet product palette — nothing like the docs' light/blue look.
+@include weave.theme(
+  (
+    color: (
+      canvas: #0a0c12,
+      surface: #141926,
+      ink: #eef1f8,
+      sub: #8790a8,
+      line: #232b3f,
+      field: #0f1420,
+      accent: #7c6cff,
+      paid: #34d8a4,
+      error: #ff5c72,
+      neutral: #8790a8,
+    ),
+    shape: (
+      radius: 12px,
+    ),
+    text: (
+      font: '"Inter", system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+    ),
+  )
+);
+
+// App-level conveniences that ride the same tokens, so the custom chrome (sidebar,
+// charts, feed) stays in lockstep with the theme.
+:root {
+  --app-bg: var(--weave-color-canvas);
+  --app-surface: var(--weave-color-surface);
+  --app-ink: var(--weave-color-ink);
+  --app-sub: var(--weave-color-sub);
+  --app-line: var(--weave-color-line);
+  --app-accent: var(--weave-color-accent);
+  --app-accent-soft: color-mix(in oklab, var(--weave-color-accent) 16%, transparent);
+  --app-ok: var(--weave-color-paid);
+  --app-bad: var(--weave-color-error);
+  --app-warn: #ffb648;
+  --app-radius: 12px;
+  --app-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 8px 24px rgba(0, 0, 0, 0.35);
+  --app-mono: "SF Mono", "JetBrains Mono", "Fira Code", ui-monospace, Menlo, Consolas, monospace;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--app-bg);
+  color: var(--app-ink);
+  font-family: var(--weave-text-font);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+#app {
+  min-height: 100%;
+}
