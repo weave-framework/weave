@@ -14,10 +14,6 @@ this list is a live intention, not a historical note.
 
 ## Planned — UI library
 
-- **Full RTL / bidirectional support.** Complete mirrored behavior under `dir="rtl"`: directional keyboard
-  (ArrowLeft/Right swap in horizontal widgets — Tabs, Stepper, Slider, Menubar), mirrored overlay positioning,
-  and sticky-offset/fill direction. The structural a11y pass already swapped the cheap physical→logical CSS
-  sites; this is the remaining behavioral (JS) half.
 - **Permanent live component gallery.** A hosted, always-current gallery of every component and its variants.
 - **UI testing harnesses** (`@weave-framework/ui/testing`). Ready-made utilities for consumers to drive and
   assert Weave components in their own tests (open an overlay, exercise the keyboard map, check focus return).
@@ -31,6 +27,9 @@ this list is a live intention, not a historical note.
 - **Forms v2.** Async validators with promise-settled `pending()`, `dirty()`, `fieldArray()`, and
   schema-driven / nested forms.
 - **Router v2.** Typed route params inferred from the path, route-level data loaders, and View Transitions.
+- **Server-side rendering — SSG first.** Accepted as a future track ([RFC 0001](rfcs/0001-ssr-hydration.md)):
+  build-time prerendering + client hydration for SEO and first paint, before request-time SSR / streaming. Scheduled
+  after the client-first roadmap matures, so it never comes at the cost of the core.
 
 ---
 
@@ -38,6 +37,7 @@ this list is a live intention, not a historical note.
 
 Not planned — these are conscious design choices, not omissions:
 
-- **SSR / hydration / streaming / RSC** — a separate future track, built only on real demand.
+- **Streaming SSR / RSC** — later phases of the SSR track above, only on real demand (the first cut is static
+  prerendering + hydration).
 - **A full animation system** beyond the transition callbacks above — CSS covers the rest.
 - **RxJS interop** — the reactive model is signal-native by design.
