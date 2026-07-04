@@ -897,12 +897,15 @@ function isResource(x: unknown): x is ResourceLike {
 
 /**
  * `@await` — render by the settle state of the `source`, which may be a
- * `@weave-framework/data` **resource** (driven reactively off its `loading`/`error`/`data`
- * signals — a refetch shows `pending` again) or a bare **Promise** (or plain
- * value; wired once via `then`/`catch`). The three branch fns are optional;
- * `then`/`catch` receive the resolved value / error. Built on {@link ifBlock}, so
- * each branch renders in its own owner scope (disposed on swap/unmount). The
- * `source` is read **once, untracked** (a new Promise each render is not a dep).
+ * `@weave-framework/data` **resource** (driven off its `loading`/`error`/`data` signals — a
+ * refetch shows `pending` again) or a bare **Promise** (or plain value). The three branch
+ * fns are optional; `then`/`catch` receive the resolved value / error. Built on
+ * {@link ifBlock}, so each branch renders in its own owner scope (disposed on swap/unmount).
+ *
+ * The `source` is read **reactively**: `source()` is tracked, so when its dependencies change
+ * (e.g. `@await fetchUser(id())` as `id` changes) the block re-enters `pending` and settles
+ * the new Promise. A stale Promise resolving after the source moved on is ignored (token
+ * guard). A stable source with no dependencies simply reads once, as before.
  */
 export function awaitBlock(
   anchor: Comment,
@@ -911,30 +914,38 @@ export function awaitBlock(
   then?: (value: unknown) => Node,
   onCatch?: (err: unknown) => Node
 ): void {
-  const src: unknown = untrack(source);
   const pendingThunk: (() => Node) | null = pending ? () => pending() : null;
-
-  if (isResource(src)) {
-    const thenThunk: (() => Node) | null = then ? () => then(src.data()) : null;
-    const catchThunk: (() => Node) | null = onCatch ? () => onCatch(src.error()) : null;
-    ifBlock(anchor, () => {
-      if (src.loading()) return pendingThunk;
-      if (src.error() != null) return catchThunk;
-      return thenThunk;
-    });
-    return;
-  }
-
-  // a Promise (or plain value): settle once into a small state machine
   const state: Signal<'pending' | 'then' | 'catch'> = signal<'pending' | 'then' | 'catch'>('pending');
   const value: Signal<unknown> = signal<unknown>(undefined);
   const failure: Signal<unknown> = signal<unknown>(undefined);
-  Promise.resolve(src).then(
-    (v) => batch(() => { value.set(v); state.set('then'); }),
-    (e) => batch(() => { failure.set(e); state.set('catch'); })
-  );
   const thenThunk: (() => Node) | null = then ? () => then(value()) : null;
   const catchThunk: (() => Node) | null = onCatch ? () => onCatch(failure()) : null;
+
+  let token: number = 0; // bumped each time the source changes; guards stale settles
+  effect(() => {
+    const src: unknown = source(); // TRACKED — re-runs when the source's deps change
+    const my: number = ++token;
+
+    if (isResource(src)) {
+      // Subscribe to the resource's own signals (loading is always read → always a dep).
+      if (src.loading()) return void state.set('pending');
+      const err: unknown = src.error();
+      if (err != null) {
+        batch(() => { failure.set(err); state.set('catch'); });
+        return;
+      }
+      batch(() => { value.set(src.data()); state.set('then'); });
+      return;
+    }
+
+    // A Promise (or plain value): re-enter pending, settle once, ignore if superseded.
+    state.set('pending');
+    Promise.resolve(src).then(
+      (v) => { if (my === token) batch(() => { value.set(v); state.set('then'); }); },
+      (e) => { if (my === token) batch(() => { failure.set(e); state.set('catch'); }); }
+    );
+  });
+
   ifBlock(anchor, () => {
     const s: 'pending' | 'then' | 'catch' = state();
     return s === 'pending' ? pendingThunk : s === 'catch' ? catchThunk : thenThunk;

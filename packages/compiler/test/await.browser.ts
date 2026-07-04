@@ -100,6 +100,59 @@ test('Promise: a plain (non-thenable) value resolves into @then', async () => {
   h.remove();
 });
 
+test('Promise: a reactive source re-awaits when its dependency changes', async () => {
+  const id: Signal<number> = signal(1);
+  const store: Record<number, { promise: Promise<string>; resolve: (v: string) => void; reject: (e: unknown) => void }> = {
+    1: deferred<string>(),
+    2: deferred<string>(),
+  };
+  const fetchUser = (uid: number): Promise<string> => store[uid].promise;
+  const h: HTMLElement = host(
+    render(
+      '<div>@await (fetchUser(id())) { <span class="l">loading</span> } @then (u) { <b class="d">{{ u }}</b> } @catch (e) { <i class="e">{{ e }}</i> }</div>',
+      { fetchUser, id },
+      ['fetchUser', 'id']
+    )
+  );
+  assert.ok(h.querySelector('.l'), 'pending for user 1');
+  store[1].resolve('Alice');
+  await flush();
+  assert.equal(h.querySelector('.d')?.textContent, 'Alice', 'then renders user 1');
+
+  // change the dependency → the block must re-enter pending and await the NEW promise
+  id.set(2);
+  assert.ok(h.querySelector('.l'), 'reactive source re-entered pending for user 2');
+  assert.equal(h.querySelector('.d'), null, 'stale value cleared');
+  store[2].resolve('Bob');
+  await flush();
+  assert.equal(h.querySelector('.d')?.textContent, 'Bob', 'then re-renders with the new value');
+  h.remove();
+});
+
+test('Promise: a stale resolution after the source changed is ignored', async () => {
+  const id: Signal<number> = signal(1);
+  const store: Record<number, { promise: Promise<string>; resolve: (v: string) => void; reject: (e: unknown) => void }> = {
+    1: deferred<string>(),
+    2: deferred<string>(),
+  };
+  const fetchUser = (uid: number): Promise<string> => store[uid].promise;
+  const h: HTMLElement = host(
+    render(
+      '<div>@await (fetchUser(id())) @then (u) { <b class="d">{{ u }}</b> }</div>',
+      { fetchUser, id },
+      ['fetchUser', 'id']
+    )
+  );
+  id.set(2); // switch before the first ever resolves
+  store[2].resolve('current');
+  await flush();
+  assert.equal(h.querySelector('.d')?.textContent, 'current');
+  store[1].resolve('stale'); // the superseded promise resolves late
+  await flush();
+  assert.equal(h.querySelector('.d')?.textContent, 'current', 'stale resolution did not clobber');
+  h.remove();
+});
+
 /* ──────────────────────────── resource ──────────────────────────── */
 
 test('resource: loading → then, driven off its signals', async () => {
