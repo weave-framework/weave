@@ -141,13 +141,27 @@ function openTxnDialog(t: Txn): void {
 
 interface Bar {
   i: number;
+  /** bar height, 8–100, in the chart's 0–100 viewBox units */
   h: number;
+  /** left edge in viewBox units (geometry precomputed so the template stays plain) */
+  x: number;
+  /** top edge (100 − h) */
+  y: number;
+  /** bar width in viewBox units */
+  w: number;
+  /** the trailing bar gets the highlight gradient */
+  last: boolean;
 }
 function buildBars(xs: number[]): Bar[] {
   const min = Math.min(...xs);
   const max = Math.max(...xs);
   const range = max - min || 1;
-  return xs.map((v, i) => ({ i, h: Math.round((8 + ((v - min) / range) * 92) * 10) / 10 }));
+  const n = xs.length;
+  const slot = 100 / n;
+  return xs.map((v, i) => {
+    const h = Math.round((8 + ((v - min) / range) * 92) * 10) / 10;
+    return { i, h, x: i * slot + slot * 0.12, y: 100 - h, w: slot * 0.76, last: i === n - 1 };
+  });
 }
 
 interface Setup {

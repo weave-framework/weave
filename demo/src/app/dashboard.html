@@ -91,11 +91,28 @@
             <h2 class="panel__title">Throughput</h2>
             <Badge variant={{ 'tag' }}>req/s</Badge>
           </div>
-          <div class="chart">
+          <svg class="chart" viewBox="0 0 100 100" preserveAspectRatio="none" role="img" aria-label={{ 'Bar chart sparkline' }}>
+            <defs>
+              <linearGradient id="chartBar" x1="0" y1="1" x2="0" y2="0">
+                <stop class="chart__from" offset="0"></stop>
+                <stop class="chart__to" offset="1"></stop>
+              </linearGradient>
+              <linearGradient id="chartBarLast" x1="0" y1="1" x2="0" y2="0">
+                <stop class="chart__from chart__from--last" offset="0"></stop>
+                <stop class="chart__to chart__to--last" offset="1"></stop>
+              </linearGradient>
+            </defs>
             @for (b of bars(); track b.i) {
-              <span class="bar" style={{ 'height:' + b.h + '%' }}></span>
+              <rect
+                class="chart__bar"
+                x={{ b.x }}
+                y={{ b.y }}
+                width={{ b.w }}
+                height={{ b.h }}
+                fill={{ b.last ? 'url(#chartBarLast)' : 'url(#chartBar)' }}
+              ></rect>
             }
-          </div>
+          </svg>
         </Card>
         <Card class="panel panel--feed">
           <div class="panel__head">
@@ -175,11 +192,28 @@
             <h2 class="panel__title">Sign-up rate</h2>
             <Badge variant={{ 'tag' }}>/min</Badge>
           </div>
-          <div class="chart">
+          <svg class="chart" viewBox="0 0 100 100" preserveAspectRatio="none" role="img" aria-label={{ 'Bar chart sparkline' }}>
+            <defs>
+              <linearGradient id="chartBar" x1="0" y1="1" x2="0" y2="0">
+                <stop class="chart__from" offset="0"></stop>
+                <stop class="chart__to" offset="1"></stop>
+              </linearGradient>
+              <linearGradient id="chartBarLast" x1="0" y1="1" x2="0" y2="0">
+                <stop class="chart__from chart__from--last" offset="0"></stop>
+                <stop class="chart__to chart__to--last" offset="1"></stop>
+              </linearGradient>
+            </defs>
             @for (b of bars(); track b.i) {
-              <span class="bar" style={{ 'height:' + b.h + '%' }}></span>
+              <rect
+                class="chart__bar"
+                x={{ b.x }}
+                y={{ b.y }}
+                width={{ b.w }}
+                height={{ b.h }}
+                fill={{ b.last ? 'url(#chartBarLast)' : 'url(#chartBar)' }}
+              ></rect>
             }
-          </div>
+          </svg>
         </Card>
       </section>
     }
@@ -197,11 +231,28 @@
           <h2 class="panel__title">Latency (p95)</h2>
           <Badge variant={{ 'tag' }}>ms</Badge>
         </div>
-        <div class="chart">
+        <svg class="chart" viewBox="0 0 100 100" preserveAspectRatio="none" role="img" aria-label={{ 'Bar chart sparkline' }}>
+          <defs>
+            <linearGradient id="chartBar" x1="0" y1="1" x2="0" y2="0">
+              <stop class="chart__from" offset="0"></stop>
+              <stop class="chart__to" offset="1"></stop>
+            </linearGradient>
+            <linearGradient id="chartBarLast" x1="0" y1="1" x2="0" y2="0">
+              <stop class="chart__from chart__from--last" offset="0"></stop>
+              <stop class="chart__to chart__to--last" offset="1"></stop>
+            </linearGradient>
+          </defs>
           @for (b of bars(); track b.i) {
-            <span class="bar" style={{ 'height:' + b.h + '%' }}></span>
+            <rect
+              class="chart__bar"
+              x={{ b.x }}
+              y={{ b.y }}
+              width={{ b.w }}
+              height={{ b.h }}
+              fill={{ b.last ? 'url(#chartBarLast)' : 'url(#chartBar)' }}
+            ></rect>
           }
-        </div>
+        </svg>
       </Card>
     }
 
