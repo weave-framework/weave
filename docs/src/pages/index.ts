@@ -9,6 +9,8 @@ void Card;
 interface HomeSetup {
   /** Navigate to the Learn intro (primary CTA). */
   goStarted: () => void;
+  /** Open the live flagship demo in a new tab. */
+  openDemo: () => void;
   /** Navigate to the API reference (secondary CTA). */
   goReference: () => void;
   /** Open the repository in a new tab. */
@@ -16,11 +18,13 @@ interface HomeSetup {
 }
 
 const repoUrl = 'https://github.com/weave-framework/weave';
+const demoUrl = 'https://demo.weaveframework.dev';
 
 /** The docs landing page (route `/`). */
 export function setup(): HomeSetup {
   return {
     goStarted: () => navigate('/learn/introduction'),
+    openDemo: () => window.open(demoUrl, '_blank', 'noopener,noreferrer'),
     goReference: () => navigate('/reference/runtime'),
     openRepo: () => window.open(repoUrl, '_blank', 'noopener,noreferrer'),
   };

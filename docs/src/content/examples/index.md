@@ -14,6 +14,14 @@ This very site is a Weave app, and so is every example on it. The live app you i
 block *is* that source, compiled and mounted — what you read is what runs.
 :::
 
+## See the flagship demo
+
+Want a full, standalone app rather than a page-sized example? **[Weave Analytics](https://demo.weaveframework.dev)**
+is a live dashboard deployed on its own — KPIs, a chart, a filterable data table, an activity feed, and five
+distinct sidebar views including a real settings form — around a dozen `@weave-framework/ui` components wired
+together. Its entire dark-violet look comes from **one `weave.theme((…))` call**, so it doubles as a demonstration
+of token re-skinning. **[Open the live demo ↗](https://demo.weaveframework.dev)**
+
 ## The apps
 
 Each one is chosen to exercise a different cluster of the framework, so together they cover essentially every
