@@ -71,9 +71,9 @@ class Gen {
     this.usedComponents.add(name); // the composed child tags, independent of resolution mode
     return this.mode === 'function' ? `_c.${name}` : name;
   }
-  tpl(html: string): string {
+  tpl(html: string, svg: boolean = false): string {
     const v: string = `_t${this.tplN++}`;
-    this.templates.push(`const ${v} = ${this.H('template')}(${JSON.stringify(html)});`);
+    this.templates.push(`const ${v} = ${this.H(svg ? 'templateSvg' : 'template')}(${JSON.stringify(html)});`);
     return v;
   }
   fn(prefix: string = '_b'): string {
@@ -103,6 +103,28 @@ export function compileTemplate(input: string, options: CompileOptions = {}): Co
   const code: string = [domImport + '\n' + coreImport, ...gen.templates, `export default ${render}`].join('\n');
   return { code, components };
 }
+
+/**
+ * SVG-only element tags — those that MUST be created in the SVG namespace and, unlike
+ * `<svg>` itself, are not recognised by the HTML parser at the top level of a plain
+ * `<template>` (they would become `HTMLUnknownElement`s). A fragment rooted at one of
+ * these is parsed via the runtime's `templateSvg` (see codegen `tpl(html, svg)`).
+ * `<svg>` is deliberately excluded — the HTML parser handles it correctly on its own,
+ * and it can legitimately be the root of a normal (HTML-context) template.
+ * Ambiguous tags shared with HTML (`a`, `title`, `style`, `script`) are excluded too.
+ */
+const SVG_TAGS: Set<string> = new Set<string>([
+  'path', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon',
+  'g', 'defs', 'use', 'symbol', 'marker', 'mask', 'pattern', 'clipPath',
+  'linearGradient', 'radialGradient', 'stop', 'image', 'foreignObject',
+  'text', 'tspan', 'textPath', 'desc', 'view',
+  'filter', 'feBlend', 'feColorMatrix', 'feComponentTransfer', 'feComposite',
+  'feConvolveMatrix', 'feDiffuseLighting', 'feDisplacementMap', 'feDropShadow',
+  'feFlood', 'feFuncA', 'feFuncB', 'feFuncG', 'feFuncR', 'feGaussianBlur',
+  'feImage', 'feMerge', 'feMergeNode', 'feMorphology', 'feOffset',
+  'feSpecularLighting', 'feTile', 'feTurbulence',
+  'animate', 'animateMotion', 'animateTransform', 'mpath', 'set',
+]);
 
 /**
  * PascalCase child-component tag → kebab-case module basename (`SlideToggle` → `slide-toggle`).
@@ -589,8 +611,15 @@ function compileFragment(
   if (singleRoot) emitElement(sole!, [], scope, isHost);
   else emitChildren(top, [], scope, isHost);
 
+  // A fragment whose top-level element(s) are SVG-only tags (a `@for` row / `@if`
+  // branch / component root of `<path>`, `<g>`, …) must be parsed in the SVG
+  // namespace, else the HTML parser makes an inert `HTMLUnknownElement`. `<svg>` at
+  // the top parses correctly on its own, so it isn't in SVG_TAGS → no wrapping.
+  const topEls: ElementNode[] = top.filter((n): n is ElementNode => n.type === 'element');
+  const svgRoot: boolean = topEls.length > 0 && SVG_TAGS.has(topEls[0].tag);
+
   const ctor: string = singleRoot ? gen.H('clone') : gen.H('cloneFragment');
-  const tplVar: string = gen.tpl(html);
+  const tplVar: string = gen.tpl(html, svgRoot);
   const body: string[] = [
     `const _r = ${ctor}(${tplVar});`,
     ...nodeDecls,

@@ -9,6 +9,19 @@
 > releases here. Publishing itself is a separate, explicit step (the `/publish` skill /
 > `pnpm publish:packages`) — pushing code does **not** publish to npm.
 
+## 0.2.120 — 2026-07-04
+
+**Fix (compiler + runtime) — SVG child elements in a nested fragment now get the SVG namespace.** An SVG-only
+element (`<path>`, `<g>`, `<circle>`, `<rect>`, …) that is the root of a *separately-compiled* fragment — an
+`@if` / `@for` / `@key` body, or a component/slot root — was parsed at the top level of a plain `<template>`, where
+the HTML parser (having no `<svg>` ancestor to enter foreign content) created an inert `HTMLUnknownElement` in the
+XHTML namespace: it appeared in the DOM but the browser never painted it. This is why a `@for`-driven SVG chart
+(e.g. bars/paths bound to data) silently failed and had to be worked around with `<div>`s. The compiler now detects
+a fragment rooted at an SVG-only tag and emits a namespace-aware `templateSvg()` runtime helper (parses inside a
+throw-away `<svg>` wrapper, then lifts the children out) so those nodes are real SVG elements. `<svg>` itself is
+unaffected (the HTML parser handles it correctly), and an SVG child in the *same* template already worked. Pinned by
+five browser tests (`packages/compiler/test/svg.browser.ts`), three of which fail on revert.
+
 ## 0.2.108 — 2026-07-04
 
 **Docs — new Examples section (six complete, runnable apps built with nothing but Weave).** A new top-level

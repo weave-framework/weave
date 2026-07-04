@@ -24,6 +24,25 @@ export function template(html: string): HTMLTemplateElement {
   return tpl;
 }
 
+/**
+ * Parse an SVG fragment with the correct namespace. An SVG child element
+ * (`<path>`, `<g>`, `<circle>`, …) parsed at the top level of a plain `<template>`
+ * lands in the HTML namespace (an `HTMLUnknownElement` the browser never paints),
+ * because there is no `<svg>` ancestor to switch the parser into foreign content.
+ * The compiler emits this variant for any fragment rooted at an SVG element — an
+ * `@if`/`@for`/`@key` body, a component/slot root — so those nodes are real SVG
+ * elements. We parse inside a throw-away `<svg>` wrapper, then lift the children
+ * into a fresh template (they keep their SVG namespace once created).
+ */
+export function templateSvg(html: string): HTMLTemplateElement {
+  const wrap: HTMLTemplateElement = document.createElement('template');
+  wrap.innerHTML = '<svg>' + html + '</svg>';
+  const svg: Element = wrap.content.firstElementChild as Element;
+  const tpl: HTMLTemplateElement = document.createElement('template');
+  while (svg.firstChild) tpl.content.appendChild(svg.firstChild);
+  return tpl;
+}
+
 /** Clone a template's single root node (the common single-root component case). */
 export function clone(tpl: HTMLTemplateElement): Element {
   const root: Element | ChildNode | null = tpl.content.firstElementChild ?? tpl.content.firstChild;
