@@ -48,6 +48,12 @@ export interface Control<T> {
   validating: () => boolean;
   /** Whether this control (or any descendant) has been touched. Reactive. */
   touched: () => boolean;
+  /**
+   * Whether this control (or any descendant) has changed from its initial value — the
+   * Weave analog of Angular's `dirty`. `touched` is about *interaction* (blurred), `dirty`
+   * is about *value change*. `pristine` is simply `!dirty()`. Cleared by {@link reset}.
+   */
+  dirty: () => boolean;
   /** Restore initial value(s) and clear touched/errors. */
   reset: () => void;
   /** Mark this control (and every descendant) touched — e.g. on a failed submit. */
@@ -142,6 +148,7 @@ export function field<T>(
     error,
     valid: computed(() => error() === null),
     touched,
+    dirty: computed(() => !Object.is(value(), initial)),
     validating: () => validating(),
     reset: () => {
       value.set(initial);
@@ -296,6 +303,7 @@ export function group<C extends Controls>(controls: C, opts: GroupOptions<C> = {
     touched: () => list.some((c) => c.touched()),
     reset: () => list.forEach((c) => c.reset()),
     touchAll,
+    dirty: () => list.some((c) => c.dirty()),
     submitting: () => submitting(),
     submitError: () => submitError(),
     validateAsync,
@@ -348,6 +356,8 @@ export function fieldArray<T>(factory: (seed?: T) => Control<T>, seeds: T[] = []
     valid: () => items().every((c) => c.valid()),
     validating: () => items().some((c) => c.validating()),
     touched: () => items().some((c) => c.touched()),
+    // Dirty if the item set changed (push/removeAt) or any current item is dirty.
+    dirty: () => items().length !== seeds.length || items().some((c) => c.dirty()),
     reset: () => items.set(seeds.map((s) => factory(s))),
     touchAll: () => items().forEach((c) => c.touchAll()),
     push: (seed?: T) => items.set((xs) => [...xs, factory(seed)]),

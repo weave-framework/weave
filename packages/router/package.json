@@ -1,6 +1,6 @@
 {
   "name": "@weave-framework/router",
-  "version": "0.2.137",
+  "version": "0.2.138",
   "description": "Weave official client router — signal-driven, history-based, with RouterView + Link. Zero third-party deps.",
   "type": "module",
   "sideEffects": [

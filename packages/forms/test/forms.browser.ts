@@ -1,5 +1,37 @@
 import { test, assert } from '../../../tools/harness.js';
-import { field, form, validators, type Field, type Group } from '@weave-framework/forms';
+import { field, form, fieldArray, validators, type Field, type Group, type FieldArray } from '@weave-framework/forms';
+
+test('field.dirty() tracks change from initial, cleared by reset / restoring the value', () => {
+  const f: Field<string> = field('init');
+  assert.equal(f.dirty(), false, 'pristine at start');
+  f.value.set('changed');
+  assert.equal(f.dirty(), true, 'dirty after an edit');
+  f.value.set('init');
+  assert.equal(f.dirty(), false, 'restoring the initial value → pristine again');
+  f.value.set('x');
+  f.reset();
+  assert.equal(f.dirty(), false, 'reset clears dirty');
+});
+
+test('group.dirty() aggregates: true if any child changed', () => {
+  const g: Group<{ a: Field<string>; b: Field<number> }> = form({ a: field('a'), b: field(0) });
+  assert.equal(g.dirty(), false, 'pristine group');
+  g.controls.b.value.set(5);
+  assert.equal(g.dirty(), true, 'dirty once a child changes');
+  g.reset();
+  assert.equal(g.dirty(), false, 'reset cascades → pristine');
+});
+
+test('fieldArray.dirty(): item-set change (push/removeAt) or a dirty item; reset restores', () => {
+  const arr: FieldArray<string> = fieldArray<string>((s) => field(s ?? ''), ['one', 'two']);
+  assert.equal(arr.dirty(), false, 'pristine at seeds');
+  arr.push('three');
+  assert.equal(arr.dirty(), true, 'push makes it dirty');
+  arr.reset();
+  assert.equal(arr.dirty(), false, 'reset restores the seed set');
+  (arr.controls()[0] as Field<string>).value.set('edited');
+  assert.equal(arr.dirty(), true, 'a dirty item makes the array dirty');
+});
 
 test('field validates reactively (first failure wins)', () => {
   const email: Field<string> = field('', [validators.required(), validators.email()]);
