@@ -222,5 +222,23 @@ const examples: NavSection = {
   ],
 };
 
+/** Enterprise — the trust story: why Weave is safe to adopt, plus commercial support. */
+const enterprise: NavSection = {
+  id: 'enterprise',
+  label: 'Enterprise',
+  icon: 'lock',
+  basePath: '/enterprise',
+  home: '/enterprise/safe-to-bet-on',
+  groups: [
+    {
+      label: 'Adopting Weave',
+      items: [
+        { label: 'Is it safe to bet on?', path: '/enterprise/safe-to-bet-on' },
+        { label: 'Support', path: '/enterprise/support' },
+      ],
+    },
+  ],
+};
+
 /** The whole site's navigation. Add a section here to add a top-level area. */
-export const sections: NavSection[] = [learn, reference, ui, examples];
+export const sections: NavSection[] = [learn, reference, ui, examples, enterprise];
