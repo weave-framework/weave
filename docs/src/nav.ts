@@ -234,6 +234,7 @@ const enterprise: NavSection = {
       label: 'Adopting Weave',
       items: [
         { label: 'Is it safe to bet on?', path: '/enterprise/safe-to-bet-on' },
+        { label: 'Incremental adoption', path: '/enterprise/incremental-adoption' },
         { label: 'Support', path: '/enterprise/support' },
       ],
     },
