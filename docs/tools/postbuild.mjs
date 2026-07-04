@@ -33,11 +33,4 @@ if (useBase) {
 await copyFile(join(dist, 'index.html'), join(dist, '404.html'));
 await writeFile(join(dist, '.nojekyll'), '');
 
-// Custom domain: emit a CNAME so GitHub Pages serves the site at that apex host.
-const cname = (process.env.DOCS_CNAME || '').trim();
-if (cname) await writeFile(join(dist, 'CNAME'), `${cname}\n`, 'utf8');
-
-console.log(
-  `postbuild → 404.html + .nojekyll` +
-    `${useBase ? ` + <base href="${base}">` : ''}${cname ? ` + CNAME ${cname}` : ''}`,
-);
+console.log(`postbuild → 404.html + .nojekyll${useBase ? ` + <base href="${base}">` : ''}`);

@@ -50,10 +50,10 @@ jobs:
         env:
           # Served at the ROOT of the custom domain (weaveframework.dev), so no
           # sub-path <base href> — keep absolute asset paths. (Was "/weave/" for the
-          # user.github.io/weave/ project page.)
+          # user.github.io/weave/ project page.) The custom domain is configured in
+          # the repo's Pages settings (authoritative for workflow builds); no CNAME
+          # file is emitted into the artifact, to avoid a deploy-time domain conflict.
           DOCS_BASE: /
-          # Emit a CNAME so Pages serves at the custom apex domain.
-          DOCS_CNAME: weaveframework.dev
 
       - uses: actions/configure-pages@v5
 
