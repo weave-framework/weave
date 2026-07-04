@@ -88,11 +88,36 @@ function withBase(p: string): string {
  */
 export function setBasename(base: string): void {
   basename = normalizeBase(base);
-  if (typeof location !== 'undefined') path.set(stripBase(location.pathname));
+  if (typeof location !== 'undefined') activeState.path.set(stripBase(location.pathname));
 }
 
-const path: Signal<string> = signal(typeof location !== 'undefined' ? stripBase(location.pathname) : '/');
-const search: Signal<string> = signal(typeof location !== 'undefined' ? location.search : '');
+/**
+ * Per-router reactive state. v2 (C5): a router **owns its signals** (path / search /
+ * query) instead of the module holding one global set — so multiple routers, isolated
+ * tests, and (later) a per-request SSR render each get their own URL. `activeState` is
+ * the browser-active router's state that the module-level sugar (`navigate` /
+ * `currentPath` / …) and the `popstate` listener read + write; it's the most-recently
+ * created router, or `defaultState` before any `createRouter`.
+ */
+interface RouterState {
+  path: Signal<string>;
+  search: Signal<string>;
+  query: Computed<RouteParams>;
+}
+function createState(): RouterState {
+  const path: Signal<string> = signal(typeof location !== 'undefined' ? stripBase(location.pathname) : '/');
+  const search: Signal<string> = signal(typeof location !== 'undefined' ? location.search : '');
+  // Parsed query string as a reactive `{ key: value }` map (last value wins on repeats).
+  const query: Computed<RouteParams> = computed<RouteParams>(() => {
+    const out: RouteParams = {};
+    const s: string = search();
+    if (s) new URLSearchParams(s).forEach((v, k) => (out[k] = v));
+    return out;
+  });
+  return { path, search, query };
+}
+const defaultState: RouterState = createState();
+let activeState: RouterState = defaultState;
 
 /* ──────────── navigation hooks + scroll ──────────── */
 
@@ -169,36 +194,28 @@ if (typeof window !== 'undefined') {
     curPos = st && typeof st.__wpos === 'number' ? st.__wpos : 0;
     const internal: string = stripBase(location.pathname);
     batch(() => {
-      path.set(internal);
-      search.set(location.search);
+      activeState.path.set(internal);
+      activeState.search.set(location.search);
     });
     runAfter({ path: internal, search: location.search, hash: location.hash, type: 'pop' });
   });
 }
 
-/** The reactive current pathname (read-only). */
-export const currentPath = (): string => path();
+/** The reactive current pathname of the active router (read-only). */
+export const currentPath = (): string => activeState.path();
 
-/** Parsed query string as a reactive `{ key: value }` map (last value wins on repeats). */
-const queryMap: Computed<RouteParams> = computed<RouteParams>(() => {
-  const out: RouteParams = {};
-  const s: string = search();
-  if (s) new URLSearchParams(s).forEach((v, k) => (out[k] = v));
-  return out;
-});
+/** The reactive current query params of the active router (read-only). */
+export const currentQuery = (): RouteParams => activeState.query();
 
-/** The reactive current query params (read-only). */
-export const currentQuery = (): RouteParams => queryMap();
-
-/** Programmatic navigation (pushes history). Resilient if the env blocks pushState. */
-export function navigate(to: string): void {
+/** Programmatic navigation against a specific router state (pushes history). */
+function navigateState(state: RouterState, to: string): void {
   const hash: string = to.includes('#') ? to.slice(to.indexOf('#')) : '';
   const noHash: string = to.split('#')[0];
   const qI: number = noHash.indexOf('?');
   const nextPath: string = qI === -1 ? noHash : noHash.slice(0, qI);
   const nextSearch: string = qI === -1 ? '' : noHash.slice(qI);
   // A bare same-URL navigation is a no-op — unless there's a `#fragment` to scroll to.
-  if (nextPath === path.peek() && nextSearch === search.peek() && !hash) return;
+  if (nextPath === state.path.peek() && nextSearch === state.search.peek() && !hash) return;
   // Remember where we are before leaving, so back/forward can restore it.
   if (typeof window !== 'undefined') scrollPositions.set(curPos, window.scrollY);
   const nextPos: number = ++posSeq;
@@ -210,10 +227,15 @@ export function navigate(to: string): void {
     /* non-navigable environment (tests, sandboxes) — the signals stay authoritative */
   }
   batch(() => {
-    path.set(nextPath);
-    search.set(nextSearch);
+    state.path.set(nextPath);
+    state.search.set(nextSearch);
   });
   runAfter({ path: nextPath, search: nextSearch, hash, type: 'push' });
+}
+
+/** Programmatic navigation on the active router (pushes history). Resilient if the env blocks pushState. */
+export function navigate(to: string): void {
+  navigateState(activeState, to);
 }
 
 /** Go back one history entry (the `popstate` listener syncs the path). */
@@ -316,8 +338,14 @@ export interface Router {
   chain: () => Match[];
   /** Accumulated path params at `depth` (default: the leaf — i.e. all params). */
   params: (depth?: number) => RouteParams;
+  /** This router's reactive current pathname (read-only). */
+  path: () => string;
   /** The current query params (reactive). */
   query: () => RouteParams;
+  /** Navigate this router (pushes history). */
+  navigate: (to: string) => void;
+  /** Go back one history entry. */
+  back: () => void;
   /** Canonical pathname the URL should sync to after a guard/redirect, or null. */
   redirectTo: () => string | null;
   /** Warm a path's lazy route chunk(s) ahead of navigation (Link prefetch). */
@@ -334,6 +362,11 @@ let activeRouter: Router | null = null;
  * a top `<RouterView router={r}/>` and a nested `<RouterView/>` inside each layout.
  */
 export function createRouter(routes: Route[], options?: { basename?: string }): Router {
+  // This router owns its reactive state and becomes the browser-active one (the target
+  // of the module-level sugar + the popstate listener). Set active BEFORE applying the
+  // basename so `setBasename` corrects THIS router's path.
+  const state: RouterState = createState();
+  activeState = state;
   if (options?.basename !== undefined) setBasename(options.basename);
   const compiled: Compiled[] = compileRoutes(routes);
   const fallback: Route | undefined = routes.find((r) => r.path === '*');
@@ -344,8 +377,8 @@ export function createRouter(routes: Route[], options?: { basename?: string }): 
     chain: Match[];
     redirectTo: string | null;
   }>(() => {
-    const q: RouteParams = queryMap();
-    const start: string = path();
+    const q: RouteParams = state.query();
+    const start: string = state.path();
     let p: string = start;
     for (let hops: number = 0; hops < 16; hops++) {
       const res: LevelResult = resolveLevel(compiled, splitSegs(p), q, p, {});
@@ -385,7 +418,10 @@ export function createRouter(routes: Route[], options?: { basename?: string }): 
       const i: number = depth ?? ch.length - 1;
       return ch[i]?.params ?? {};
     },
-    query: () => queryMap(),
+    path: () => state.path(),
+    query: () => state.query(),
+    navigate: (to: string) => navigateState(state, to),
+    back: () => back(),
     redirectTo: () => resolution().redirectTo,
     preload,
   };
@@ -407,6 +443,20 @@ interface OutletCtx {
 
 /** Carries the router + the next outlet's depth down the tree (set by each RouterView). */
 const OutletContext: Context<OutletCtx | null> = createContext<OutletCtx | null>(null);
+
+/**
+ * Inject the router from context — the canonical way a routed component reaches its
+ * router (`const r = useRouter(); r.navigate('/x'); r.params()`). Must be called within
+ * a `<RouterView>` subtree; the module-level `navigate()`/`currentPath()` sugar covers
+ * code outside the routed tree.
+ */
+export function useRouter(): Router {
+  const ctx: OutletCtx | null = inject(OutletContext);
+  if (!ctx?.router) {
+    throw new Error('useRouter() must be called within a <RouterView> subtree');
+  }
+  return ctx.router;
+}
 
 /**
  * Router outlet: renders the matched component at its depth in the chain. The top
@@ -445,7 +495,7 @@ export const RouterView: Component = (props = {}) => {
   if (router && depth === 0) {
     effect(() => {
       const to: string | null = router.redirectTo();
-      if (to !== null && to !== path.peek()) navigate(to);
+      if (to !== null && to !== router.path()) router.navigate(to);
     });
   }
 

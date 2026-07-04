@@ -11,6 +11,7 @@ import {
   RouterView,
   Link,
   prefetch,
+  useRouter,
 } from '@weave-framework/router';
 import type { Router, Match } from '@weave-framework/router';
 
@@ -125,6 +126,38 @@ test('a guard re-resolves when the auth signal it reads changes', () => {
   assert.is(r.matched()?.view, Login, 'unauthed → redirected to login');
   authed.set(true);
   assert.is(r.matched()?.view, Home, 'authed → route re-resolves to the real component');
+});
+
+test('useRouter() injects the router in a routed component; r.navigate/path/query work', () => {
+  let seen: Router | null = null;
+  const Probe: Component = () => {
+    seen = useRouter();
+    return span('probe');
+  };
+  const r: Router = createRouter([
+    { path: '/', component: Probe },
+    { path: '/about', component: About },
+    { path: '*', component: NotFound },
+  ]);
+  navigate('/');
+  const el: HTMLElement = host();
+  mountComponent(RouterView, el, { router: r });
+  assert.is(seen, r, 'useRouter() returns the router from context');
+  // The instance methods drive THIS router's own signals (no module singleton).
+  seen!.navigate('/about?tab=x');
+  assert.equal(seen!.path(), '/about', 'r.path() reflects r.navigate()');
+  assert.equal(seen!.query().tab, 'x', 'r.query() parses the query');
+  assert.ok(el.textContent?.includes('about'), 'the outlet swapped via r.navigate()');
+});
+
+test('useRouter() throws outside a <RouterView> subtree', () => {
+  let threw: boolean = false;
+  try {
+    useRouter();
+  } catch {
+    threw = true;
+  }
+  assert.ok(threw, 'throws when no router is in context');
 });
 
 test('RouterView swaps components on navigation', () => {
