@@ -196,5 +196,31 @@ const ui: NavSection = {
   ],
 };
 
+/** Examples — complete, runnable mini-apps, each built with nothing but Weave.
+ *  Every page is a real app you can read end to end and lift into your project. */
+const examples: NavSection = {
+  id: 'examples',
+  label: 'Examples',
+  icon: 'star',
+  basePath: '/examples',
+  home: '/examples',
+  groups: [
+    {
+      label: 'Overview',
+      items: [{ label: 'Overview', path: '/examples' }],
+    },
+    {
+      label: 'Applications',
+      items: [
+        { label: 'Todo list', path: '/examples/todo' },
+        { label: 'Data dashboard', path: '/examples/dashboard' },
+        { label: 'Settings panel', path: '/examples/settings' },
+        { label: 'Sign-up wizard', path: '/examples/signup' },
+        { label: 'Kanban board', path: '/examples/kanban' },
+      ],
+    },
+  ],
+};
+
 /** The whole site's navigation. Add a section here to add a top-level area. */
-export const sections: NavSection[] = [learn, reference, ui];
+export const sections: NavSection[] = [learn, reference, ui, examples];

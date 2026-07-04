@@ -1,0 +1,100 @@
+<div class="kanban">
+  <section class="kanban__col">
+    <header class="kanban__col-head">
+      <span class="kanban__col-title">To do</span>
+      <Badge variant={{ 'tag' }}>{{ todo().length }}</Badge>
+    </header>
+    <div class="kanban__body" ref={{ todoBody }}>
+      @for (c of todo(); track c.id) {
+        <div class="kanban__card-wrap">
+          <Card class="kanban__card">
+            <div class="kanban__card-top">
+              <span class="kanban__grip" aria-hidden="true">⠿</span>
+              <span class={{ prioClass(c) }}>{{ prioLabel(c) }}</span>
+            </div>
+            <p class="kanban__card-title">{{ c.title }}</p>
+            <div class="kanban__tags">
+              @for (tag of c.tags; track tag) {
+                <Badge variant={{ 'tag' }}>{{ tag }}</Badge>
+              }
+            </div>
+            <div class="kanban__card-actions">
+              <Button variant={{ 'icon' }} label={{ 'Move to previous lane' }} disabled={{ !canLeft('todo') }} on:click={{ () => moveLane(c, 'todo', -1) }}>
+                <Icon name={{ 'chevron-left' }} />
+              </Button>
+              <Button variant={{ 'icon' }} label={{ 'Move to next lane' }} disabled={{ !canRight('todo') }} on:click={{ () => moveLane(c, 'todo', 1) }}>
+                <Icon name={{ 'chevron-right' }} />
+              </Button>
+            </div>
+          </Card>
+        </div>
+      }
+    </div>
+  </section>
+
+  <section class="kanban__col">
+    <header class="kanban__col-head">
+      <span class="kanban__col-title">In progress</span>
+      <Badge variant={{ 'tag' }}>{{ doing().length }}</Badge>
+    </header>
+    <div class="kanban__body" ref={{ doingBody }}>
+      @for (c of doing(); track c.id) {
+        <div class="kanban__card-wrap">
+          <Card class="kanban__card">
+            <div class="kanban__card-top">
+              <span class="kanban__grip" aria-hidden="true">⠿</span>
+              <span class={{ prioClass(c) }}>{{ prioLabel(c) }}</span>
+            </div>
+            <p class="kanban__card-title">{{ c.title }}</p>
+            <div class="kanban__tags">
+              @for (tag of c.tags; track tag) {
+                <Badge variant={{ 'tag' }}>{{ tag }}</Badge>
+              }
+            </div>
+            <div class="kanban__card-actions">
+              <Button variant={{ 'icon' }} label={{ 'Move to previous lane' }} disabled={{ !canLeft('doing') }} on:click={{ () => moveLane(c, 'doing', -1) }}>
+                <Icon name={{ 'chevron-left' }} />
+              </Button>
+              <Button variant={{ 'icon' }} label={{ 'Move to next lane' }} disabled={{ !canRight('doing') }} on:click={{ () => moveLane(c, 'doing', 1) }}>
+                <Icon name={{ 'chevron-right' }} />
+              </Button>
+            </div>
+          </Card>
+        </div>
+      }
+    </div>
+  </section>
+
+  <section class="kanban__col">
+    <header class="kanban__col-head">
+      <span class="kanban__col-title">Done</span>
+      <Badge variant={{ 'tag' }}>{{ done().length }}</Badge>
+    </header>
+    <div class="kanban__body" ref={{ doneBody }}>
+      @for (c of done(); track c.id) {
+        <div class="kanban__card-wrap">
+          <Card class="kanban__card">
+            <div class="kanban__card-top">
+              <span class="kanban__grip" aria-hidden="true">⠿</span>
+              <span class={{ prioClass(c) }}>{{ prioLabel(c) }}</span>
+            </div>
+            <p class="kanban__card-title">{{ c.title }}</p>
+            <div class="kanban__tags">
+              @for (tag of c.tags; track tag) {
+                <Badge variant={{ 'tag' }}>{{ tag }}</Badge>
+              }
+            </div>
+            <div class="kanban__card-actions">
+              <Button variant={{ 'icon' }} label={{ 'Move to previous lane' }} disabled={{ !canLeft('done') }} on:click={{ () => moveLane(c, 'done', -1) }}>
+                <Icon name={{ 'chevron-left' }} />
+              </Button>
+              <Button variant={{ 'icon' }} label={{ 'Move to next lane' }} disabled={{ !canRight('done') }} on:click={{ () => moveLane(c, 'done', 1) }}>
+                <Icon name={{ 'chevron-right' }} />
+              </Button>
+            </div>
+          </Card>
+        </div>
+      }
+    </div>
+  </section>
+</div>

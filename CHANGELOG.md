@@ -9,6 +9,19 @@
 > releases here. Publishing itself is a separate, explicit step (the `/publish` skill /
 > `pnpm publish:packages`) — pushing code does **not** publish to npm.
 
+## 0.2.108 — 2026-07-04
+
+**Docs — new Examples section (six complete, runnable apps built with nothing but Weave).** A new top-level
+`Examples` area (`/examples`) sits alongside Learn / Reference / UI, each page an end-to-end mini-app with the live
+demo running on the page and its full `app.html` / `app.ts` / `app.scss` source beneath it. **Todo list** (signals,
+`computed`, `store`, `localStorage` via an `effect`, keyed `@for`), **Data dashboard** (a `filtered → sorted →
+paginated` pipeline owning the `Table` with `clientSort` off, custom `cell` renderers, live KPI `Card`s),
+**Settings panel** (every form control bound one way, a live `Tabs` preview via factory content + `effect`,
+`snackbar()`), **Sign-up wizard** (`@weave-framework/forms` `field`/`validators` wired to a linear `Stepper`'s
+per-step `completed`, the idiomatic `control` binding on Input/Select/Checkbox, a Finish guard), and **Kanban board**
+(the CDK `dropList` + `moveItemInArray` for drag-to-reorder, arrow buttons for lane moves). Each demo dogfoods the
+real `@weave-framework/ui` components and was live-verified. No framework code changed.
+
 ## 0.2.87 — 2026-07-03
 
 **Fix — composed child components resolve when nested inside `@if`/`@for` and documented as an import example

@@ -1,0 +1,40 @@
+.wizard {
+  max-width: 520px;
+}
+
+.wizard__fields {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.wizard__review {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.wizard__summary {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 16px;
+  margin: 0;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.wizard__summary dt {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.wizard__summary dd {
+  margin: 0;
+  font-weight: 600;
+  text-align: right;
+}
+
+.wizard__error {
+  margin: 0;
+  color: var(--red);
+  font-size: 0.85rem;
+}

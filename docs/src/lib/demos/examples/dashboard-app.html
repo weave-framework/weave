@@ -1,0 +1,44 @@
+<div class="dash">
+  <div class="dash__kpis">
+    <Card class="dash__kpi">
+      <span class="dash__kpi-label">Projects</span>
+      <span class="dash__kpi-value">{{ kpi().count }}</span>
+    </Card>
+    <Card class="dash__kpi">
+      <span class="dash__kpi-label">Active</span>
+      <span class="dash__kpi-value">{{ kpi().active }} <Badge variant={{ 'tag' }}>live</Badge></span>
+    </Card>
+    <Card class="dash__kpi">
+      <span class="dash__kpi-label">Avg. progress</span>
+      <span class="dash__kpi-value">{{ kpi().avg }}%</span>
+      <ProgressBar value={{ kpi().avg }} label={{ 'Average completion' }} />
+    </Card>
+    <Card class="dash__kpi">
+      <span class="dash__kpi-label">Budget</span>
+      <span class="dash__kpi-value">{{ kpi().budget }}</span>
+    </Card>
+  </div>
+
+  <div class="dash__controls">
+    <Select options={{ statusOpts }} value={{ status() }} onChange={{ setStatus }} label={{ 'Filter by status' }} />
+    <span class="dash__result-count">{{ total() }} projects</span>
+  </div>
+
+  <Table
+    columns={{ columns }}
+    dataSource={{ pageRows }}
+    sort={{ sort() }}
+    onSort={{ onSort }}
+    clientSort={{ false }}
+    trackBy={{ trackBy }}
+    ariaLabel={{ 'Projects' }}
+  />
+
+  <Paginator
+    length={{ total() }}
+    pageSize={{ size() }}
+    pageIndex={{ page() }}
+    onPage={{ onPage }}
+    pageSizeOptions={{ [6, 12, 18] }}
+  />
+</div>

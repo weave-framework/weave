@@ -49,6 +49,11 @@ import TreeDemo from '../demos/ui/tree-demo';
 import BottomSheetDemo from '../demos/ui/bottom-sheet-demo';
 import PopoverEditDemo from '../demos/ui/popover-edit-demo';
 import AutocompleteBasic from '../demos/ui/autocomplete-basic';
+import TodoApp from '../demos/examples/todo-app';
+import DashboardApp from '../demos/examples/dashboard-app';
+import SettingsApp from '../demos/examples/settings-app';
+import WizardApp from '../demos/examples/wizard-app';
+import KanbanApp from '../demos/examples/kanban-app';
 
 /**
  * Live-demo registry: maps a `:::demo <key>` directive to a real Weave component.
@@ -109,4 +114,9 @@ export const demos: Record<string, Component> = {
   'tree-demo': TreeDemo,
   'bottom-sheet-demo': BottomSheetDemo,
   'popover-edit-demo': PopoverEditDemo,
+  'examples-todo': TodoApp,
+  'examples-dashboard': DashboardApp,
+  'examples-settings': SettingsApp,
+  'examples-signup': WizardApp,
+  'examples-kanban': KanbanApp,
 };

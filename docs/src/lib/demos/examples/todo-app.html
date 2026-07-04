@@ -1,0 +1,38 @@
+<div class="todo">
+  <form class="todo__add" on:submit={{ submit }}>
+    <Input
+      value={{ draft() }}
+      onInput={{ setDraft }}
+      label={{ 'New task' }}
+      placeholder={{ 'What needs doing?' }}
+      class="todo__input"
+    />
+    <Button type={{ 'submit' }}>Add</Button>
+  </form>
+
+  <div class="todo__bar">
+    <ButtonToggle options={{ filterOpts }} value={{ filter() }} onChange={{ setFilter }} label={{ 'Filter tasks' }} />
+    <Badge variant={{ 'tag' }}>{{ todos.remaining() }} left</Badge>
+  </div>
+
+  @if (visible().length) {
+    <ul class="todo__list">
+      @for (t of visible(); track t.id) {
+        <li class={{ rowClass(t) }}>
+          <Checkbox checked={{ t.done }} onChange={{ (d) => todos.toggle(t.id, d) }} label={{ t.text }} />
+          <Button variant={{ 'icon' }} label={{ 'Delete task' }} on:click={{ () => todos.remove(t.id) }}>
+            <Icon name={{ 'trash-2' }} />
+          </Button>
+        </li>
+      }
+    </ul>
+  } @else {
+    <p class="todo__empty">Nothing here — add a task above.</p>
+  }
+
+  @if (hasDone()) {
+    <div class="todo__footer">
+      <Button variant={{ 'ghost' }} on:click={{ todos.clearDone }}>Clear completed</Button>
+    </div>
+  }
+</div>

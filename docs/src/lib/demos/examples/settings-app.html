@@ -1,0 +1,36 @@
+<div class="settings">
+  <form class="settings__form" on:submit={{ save }}>
+    <section class="settings__group">
+      <h4 class="settings__h">Account</h4>
+      <Input value={{ name() }} onInput={{ setName }} label={{ 'Display name' }} />
+      <Input type={{ 'email' }} value={{ email() }} onInput={{ setEmail }} label={{ 'Email' }} />
+      <Select options={{ languageOpts }} value={{ language() }} onChange={{ setLanguage }} label={{ 'Language' }} />
+    </section>
+
+    <section class="settings__group">
+      <h4 class="settings__h">Appearance</h4>
+      <RadioGroup options={{ themeOpts }} value={{ theme() }} onChange={{ setTheme }} label={{ 'Theme' }} />
+      <Slider min={{ 0 }} max={{ 2 }} step={{ 1 }} value={{ density() }} onChange={{ setDensity }}
+              format={{ densityFmt }} label={{ 'Density' }} />
+      <SlideToggle checked={{ reduceMotion() }} onChange={{ setReduceMotion }} label={{ 'Reduce motion' }} />
+    </section>
+
+    <section class="settings__group">
+      <h4 class="settings__h">Notifications</h4>
+      <SlideToggle checked={{ emailNotif() }} onChange={{ setEmailNotif }} label={{ 'Email notifications' }} />
+      <SlideToggle checked={{ pushNotif() }} onChange={{ setPushNotif }} label={{ 'Push notifications' }} />
+    </section>
+
+    <div class="settings__actions">
+      <Button type={{ 'submit' }}>Save changes</Button>
+      <Button type={{ 'button' }} variant={{ 'ghost' }} on:click={{ reset }}>Reset</Button>
+    </div>
+  </form>
+
+  <aside class="settings__preview">
+    <Card>
+      <h4 class="settings__h">Live preview</h4>
+      <Tabs tabs={{ previewTabs }} value={{ tab() }} onChange={{ setTab }} label={{ 'Preview format' }} />
+    </Card>
+  </aside>
+</div>
