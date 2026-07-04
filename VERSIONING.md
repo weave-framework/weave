@@ -44,6 +44,10 @@ When it does, it won't blindside you:
   warnings pointing to the replacement, before anything is removed.
 - **With a path forward** — clear migration notes, and a codemod wherever one is feasible.
 
+A deprecated API keeps working until at least the next major release, and is only then
+removed — so deprecations don't pile up forever, and nothing disappears without that
+window to migrate.
+
 ## Before 1.0
 
 Weave is pre-1.0 today. By the letter of SemVer that means the API is still stabilizing
