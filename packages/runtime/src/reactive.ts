@@ -183,7 +183,10 @@ export function signal<T>(initial: T, opts: { equals?: (a: T, b: T) => boolean; 
     return node.value;
   }) as Signal<T>;
   if (isDevtoolsEnabled() && opts.name) {
-    currentOwner?._disposers.push(registerDevNode('signal', opts.name, () => node.value));
+    // Register the TRACKED getter (`read`), not the raw value — so a devtools consumer that
+    // reads `inspect()` inside an effect (the panel) subscribes and re-renders on change.
+    // Outside a reactive context `track()` no-ops, so a plain `inspect()` snapshot is unchanged.
+    currentOwner?._disposers.push(registerDevNode('signal', opts.name, read));
   }
   read.set = (next) => {
     const value: T = typeof next === 'function' ? (next as (prev: T) => T)(node.value) : next;
@@ -226,19 +229,17 @@ export function computed<T>(fn: () => T, opts: { equals?: (a: T, b: T) => boolea
       c.state = DIRTY;
     });
   }
-  if (isDevtoolsEnabled() && opts.name) {
-    owner?._disposers.push(
-      registerDevNode('computed', opts.name, () => {
-        updateIfNecessary(c);
-        return c.value;
-      })
-    );
-  }
-  return () => {
+  // The tracked getter — reused as the devtools read, so `inspect()` inside an effect (the
+  // panel) subscribes to this memo and re-renders when it changes.
+  const get = (): T => {
     updateIfNecessary(c);
     track(c);
     return c.value as T;
   };
+  if (isDevtoolsEnabled() && opts.name) {
+    owner?._disposers.push(registerDevNode('computed', opts.name, get));
+  }
+  return get;
 }
 
 /**
