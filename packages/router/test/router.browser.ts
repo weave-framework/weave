@@ -210,6 +210,52 @@ test('useLoaderData() throws when the route has no loader', () => {
   assert.ok(threw, 'throws without a loader in context');
 });
 
+test('viewTransitions:true wraps the swap in document.startViewTransition when supported', () => {
+  const d: Document & { startViewTransition?: (cb: () => void) => unknown } = document;
+  const orig: ((cb: () => void) => unknown) | undefined = d.startViewTransition;
+  let called: number = 0;
+  d.startViewTransition = (cb: () => void): unknown => {
+    called++;
+    cb();
+    return { finished: Promise.resolve(), ready: Promise.resolve(), updateCallbackDone: Promise.resolve() };
+  };
+  try {
+    const r: Router = createRouter(
+      [{ path: '/', component: Home }, { path: '/about', component: About }, { path: '*', component: NotFound }],
+      { viewTransitions: true }
+    );
+    navigate('/');
+    const el: HTMLElement = host();
+    mountComponent(RouterView, el, { router: r });
+    called = 0;
+    navigate('/about');
+    assert.ok(called >= 1, 'startViewTransition was called on navigation');
+    assert.ok(el.textContent?.includes('about'), 'the swap still applied inside the VT callback');
+  } finally {
+    delete d.startViewTransition; // restore the native prototype method (we shadowed it)
+    void orig;
+  }
+});
+
+test('viewTransitions falls back to a direct swap when the API is unavailable', () => {
+  const d: Document & { startViewTransition?: (cb: () => void) => unknown } = document;
+  // Shadow the native prototype method with an own `undefined` so feature-detect sees it absent.
+  d.startViewTransition = undefined;
+  try {
+    const r: Router = createRouter(
+      [{ path: '/', component: Home }, { path: '/about', component: About }, { path: '*', component: NotFound }],
+      { viewTransitions: true }
+    );
+    navigate('/');
+    const el: HTMLElement = host();
+    mountComponent(RouterView, el, { router: r });
+    navigate('/about');
+    assert.ok(el.textContent?.includes('about'), 'still swaps without the VT API');
+  } finally {
+    delete d.startViewTransition; // drop our shadow → the native method is visible again
+  }
+});
+
 test('useRouter() injects the router in a routed component; r.navigate/path/query work', () => {
   let seen: Router | null = null;
   const Probe: Component = () => {

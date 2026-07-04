@@ -153,6 +153,8 @@ interface RouterState {
   path: Signal<string>;
   search: Signal<string>;
   query: Computed<RouteParams>;
+  /** Wrap this router's navigations in `document.startViewTransition` when supported. */
+  vt: boolean;
 }
 function createState(): RouterState {
   const path: Signal<string> = signal(typeof location !== 'undefined' ? stripBase(location.pathname) : '/');
@@ -164,7 +166,26 @@ function createState(): RouterState {
     if (s) new URLSearchParams(s).forEach((v, k) => (out[k] = v));
     return out;
   });
-  return { path, search, query };
+  return { path, search, query, vt: false };
+}
+
+/** Document with the View Transitions API (typed narrowly so we can feature-detect zero-dep). */
+type VTDocument = Document & { startViewTransition?: (cb: () => void | Promise<void>) => unknown };
+
+/**
+ * Apply a state mutation, wrapped in a native View Transition when this router opted in
+ * (`viewTransitions: true`) and the browser supports it. Weave's updates are synchronous,
+ * so the outlet's swap happens *inside* the callback — the browser snapshots before/after
+ * and cross-fades. Unsupported browsers (or `vt: false`) just apply directly — a graceful
+ * fallback, and any Weave `transition` prop on `<RouterView>` still plays as before.
+ */
+function applyWithViewTransition(state: RouterState, apply: () => void): void {
+  const doc: VTDocument | undefined = typeof document !== 'undefined' ? (document as VTDocument) : undefined;
+  if (state.vt && doc && typeof doc.startViewTransition === 'function') {
+    doc.startViewTransition(apply);
+  } else {
+    apply();
+  }
 }
 const defaultState: RouterState = createState();
 let activeState: RouterState = defaultState;
@@ -243,9 +264,11 @@ if (typeof window !== 'undefined') {
     const st: { __wpos?: number } | null = e.state as { __wpos?: number } | null;
     curPos = st && typeof st.__wpos === 'number' ? st.__wpos : 0;
     const internal: string = stripBase(location.pathname);
-    batch(() => {
-      activeState.path.set(internal);
-      activeState.search.set(location.search);
+    applyWithViewTransition(activeState, () => {
+      batch(() => {
+        activeState.path.set(internal);
+        activeState.search.set(location.search);
+      });
     });
     runAfter({ path: internal, search: location.search, hash: location.hash, type: 'pop' });
   });
@@ -276,9 +299,11 @@ function navigateState(state: RouterState, to: string): void {
   } catch {
     /* non-navigable environment (tests, sandboxes) — the signals stay authoritative */
   }
-  batch(() => {
-    state.path.set(nextPath);
-    state.search.set(nextSearch);
+  applyWithViewTransition(state, () => {
+    batch(() => {
+      state.path.set(nextPath);
+      state.search.set(nextSearch);
+    });
   });
   runAfter({ path: nextPath, search: nextSearch, hash, type: 'push' });
 }
@@ -413,11 +438,12 @@ let activeRouter: Router | null = null;
  * guard-redirect hops are followed (capped at 16 to break loops). Place the output with
  * a top `<RouterView router={r}/>` and a nested `<RouterView/>` inside each layout.
  */
-export function createRouter(routes: Route[], options?: { basename?: string }): Router {
+export function createRouter(routes: Route[], options?: { basename?: string; viewTransitions?: boolean }): Router {
   // This router owns its reactive state and becomes the browser-active one (the target
   // of the module-level sugar + the popstate listener). Set active BEFORE applying the
   // basename so `setBasename` corrects THIS router's path.
   const state: RouterState = createState();
+  state.vt = !!options?.viewTransitions;
   activeState = state;
   if (options?.basename !== undefined) setBasename(options.basename);
   const compiled: Compiled[] = compileRoutes(routes);
