@@ -49,7 +49,7 @@ Weave's core is solid — signal-native, covered by a broad browser test suite, 
 
 - **Documentation site** — the home this README keeps pointing you toward: live today, and filling in component by component.
 - **Server‑side rendering & hydration** — added when there's a real need, with a clean boundary rather than magic strings.
-- **Devtools** — a way to watch the fabric update live.
+- **DevTools** — an in‑app panel to watch the fabric update live: named signals/computeds/effects, their values, and who triggers whom. **Shipped** — `mountDevtoolsPanel()`.
 - **More of everything** — the long tail of polish that turns a framework into a daily driver.
 
 Ideas and contributions are welcome — the roadmap is a direction, not a fence.
