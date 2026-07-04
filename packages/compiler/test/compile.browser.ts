@@ -109,6 +109,22 @@ test('class: binding toggles', () => {
   assert.equal(el.className, 'done');
 });
 
+test('style: binding sets a standard property and a --custom property reactively', () => {
+  const color: Signal<string> = signal('red');
+  const accent: Signal<string> = signal('#0a0');
+  const el: HTMLElement = render(
+    '<div style:color={{color()}} style:--accent={{accent()}}>x</div>',
+    { color, accent },
+    ['color', 'accent']
+  ) as HTMLElement;
+  assert.equal(el.style.color, 'red', 'standard property set');
+  assert.equal(el.style.getPropertyValue('--accent'), '#0a0', 'custom property set');
+  color.set('blue');
+  accent.set('#00f');
+  assert.equal(el.style.color, 'blue', 'standard property updates reactively');
+  assert.equal(el.style.getPropertyValue('--accent'), '#00f', 'custom property updates reactively');
+});
+
 test('event modifier preventDefault wraps the handler', () => {
   let ran: boolean = false;
   const onSubmit = (): boolean => (ran = true);

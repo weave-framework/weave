@@ -557,6 +557,9 @@ class Parser {
     if (rawName.startsWith('class:')) {
       return { type: 'class', name: rawName.slice(6), expr: exprOf(), offset };
     }
+    if (rawName.startsWith('style:')) {
+      return { type: 'style', name: rawName.slice(6), expr: exprOf(), offset };
+    }
     if (rawName.startsWith('bind:')) {
       return { type: 'bind', name: rawName.slice(5), expr: exprOf(), offset };
     }

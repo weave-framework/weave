@@ -138,6 +138,20 @@ export function bindClass(el: Element, name: string, fn: () => unknown): void {
 }
 
 /**
+ * Set one inline style property reactively (`style:color={c}`, `style:--accent={hex}`). A
+ * `--custom` name sets a CSS custom property (great for theming — bind a token to a signal);
+ * any other name sets a standard property. A `null`/`undefined`/`false` value removes it.
+ */
+export function bindStyleProp(el: Element, name: string, fn: () => unknown): void {
+  const style: CSSStyleDeclaration = (el as HTMLElement).style;
+  effect(() => {
+    const v: unknown = fn();
+    if (v == null || v === false) style.removeProperty(name);
+    else style.setProperty(name, String(v));
+  });
+}
+
+/**
  * `show={expr}` — toggle visibility via `display` (the element stays in the DOM,
  * unlike `@if` which removes it). Preserves the element's own inline `display`
  * when shown; sets `display: none` when hidden.

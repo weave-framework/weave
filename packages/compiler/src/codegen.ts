@@ -364,6 +364,9 @@ function compileFragment(
       case 'class':
         sink.push(`${gen.H('bindClass')}(${n}, ${q(attr.name)}, () => ${rewrite(attr.expr, sc).code});`);
         break;
+      case 'style':
+        sink.push(`${gen.H('bindStyleProp')}(${n}, ${q(attr.name)}, () => ${rewrite(attr.expr, sc).code});`);
+        break;
       case 'show':
         sink.push(`${gen.H('bindShow')}(${n}, () => ${rewrite(attr.expr, sc).code});`);
         break;

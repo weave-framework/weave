@@ -175,6 +175,7 @@ export type Attr =
   | PropAttr
   | EventAttr
   | ClassAttr
+  | StyleAttr
   | BindAttr
   | RefAttr
   | UseAttr
@@ -212,6 +213,13 @@ export interface EventAttr {
 /** class:name={expr} */
 export interface ClassAttr {
   type: 'class';
+  name: string;
+  expr: string;
+  offset?: Offset;
+}
+/** style:prop={expr} — one inline style property (`style:color`, `style:--accent`). */
+export interface StyleAttr {
+  type: 'style';
   name: string;
   expr: string;
   offset?: Offset;
