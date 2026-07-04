@@ -33,6 +33,24 @@ let enabled: boolean = false;
 let nextId: number = 1;
 const registry: Map<number, DevNode> = new Map<number, DevNode>();
 
+// Registry-membership change listeners — a panel bridges these to a signal so it
+// re-reads when nodes appear/disappear. Value changes are tracked separately (an effect
+// that calls inspect() reads each node's getter, so it re-runs on any value change).
+const changeListeners: Set<() => void> = new Set<() => void>();
+function emitChange(): void {
+  for (const cb of changeListeners) cb();
+}
+
+/**
+ * Subscribe to registry-membership changes (a named node registered or unregistered).
+ * Returns an unsubscribe fn. Zero-dep by design — devtools stays free of the reactive
+ * core (which imports it); tooling turns this into reactivity on its own side.
+ */
+export function onDevtoolsChange(cb: () => void): () => void {
+  changeListeners.add(cb);
+  return () => void changeListeners.delete(cb);
+}
+
 /** Turn introspection on (or off). Off by default — production pays nothing. */
 export function enableDevtools(on: boolean = true): void {
   enabled = on;
@@ -52,7 +70,11 @@ export function registerDevNode(kind: DevKind, name: string | undefined, read?: 
   if (!enabled || !name) return noop;
   const id: number = nextId++;
   registry.set(id, { id, name, kind, read });
-  return () => void registry.delete(id);
+  emitChange();
+  return () => {
+    registry.delete(id);
+    emitChange();
+  };
 }
 
 function noop(): void {

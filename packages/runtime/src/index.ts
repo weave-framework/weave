@@ -30,6 +30,7 @@ export {
   isDevtoolsEnabled,
   inspect,
   devNodeCount,
+  onDevtoolsChange,
   type DevKind,
   type DevNode,
   type DevSnapshot,

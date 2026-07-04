@@ -6,6 +6,7 @@ import {
   enableDevtools,
   inspect,
   devNodeCount,
+  onDevtoolsChange,
   createOwner,
   runInOwner,
   disposeOwner,
@@ -46,6 +47,27 @@ test('devtools: enabled — signal/computed/effect surface with kind + live valu
   assert.equal(byName('dt-count'), undefined, 'unregistered when the owner disposes (no leak)');
   assert.equal(byName('dt-double'), undefined);
   assert.equal(byName('dt-log'), undefined);
+  enableDevtools(false);
+});
+
+test('devtools: onDevtoolsChange fires on register + unregister; unsubscribe stops it', () => {
+  enableDevtools(true);
+  let changes: number = 0;
+  const off: () => void = onDevtoolsChange(() => changes++);
+  const owner: Owner = createOwner();
+  runInOwner(owner, () => {
+    signal(1, { name: 'dt-chg' });
+  });
+  assert.ok(changes >= 1, 'fired when a named node registered');
+  const afterRegister: number = changes;
+  disposeOwner(owner);
+  assert.ok(changes > afterRegister, 'fired again when the node unregistered');
+  const afterDispose: number = changes;
+  off();
+  const owner2: Owner = createOwner();
+  runInOwner(owner2, () => void signal(2, { name: 'dt-chg2' }));
+  assert.equal(changes, afterDispose, 'no more fires after unsubscribe');
+  disposeOwner(owner2);
   enableDevtools(false);
 });
 
