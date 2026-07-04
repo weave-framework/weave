@@ -1316,6 +1316,108 @@ export const Portal: Component = (props = {}, slots = {}) => {
  */
 export const Teleport: Component = Portal;
 
+/**
+ * `<Dynamic is={{ comp }}>` — render a component chosen at runtime, swapping reactively when
+ * `is` changes. `is` is the component **value**; because a bound `is={{ current() }}` compiles
+ * to a reactive getter, reading it here tracks the source, so the swap is automatic. Every
+ * other prop and all slots are forwarded to the rendered component (getters preserved, so
+ * forwarded props stay reactive). A non-function `is` renders nothing.
+ *
+ * Usage: `<Dynamic is={{ tab() === 'a' ? PanelA : PanelB }} title={{ t }}>…</Dynamic>`.
+ */
+export const Dynamic: Component = (props = {}, slots = {}) => {
+  const host: HTMLElement = document.createElement('div');
+  host.style.display = 'contents';
+  const anchor: Comment = document.createComment('dynamic');
+  host.appendChild(anchor);
+
+  // Forward every prop except `is`, preserving property descriptors so getters stay reactive.
+  const childProps: Record<string, unknown> = {};
+  for (const key in props) {
+    if (key === 'is') continue;
+    const desc: PropertyDescriptor | undefined = Object.getOwnPropertyDescriptor(props, key);
+    if (desc) Object.defineProperty(childProps, key, desc);
+  }
+
+  const thunks: Map<Component, () => Node> = new Map<Component, () => Node>();
+  ifBlock(anchor, () => {
+    const comp: unknown = (props as { is?: unknown }).is; // reading the getter tracks `is`
+    if (typeof comp !== 'function') return null;
+    const view: Component = comp as Component;
+    let thunk: (() => Node) | undefined = thunks.get(view);
+    if (!thunk) {
+      thunk = () => view(childProps, slots);
+      thunks.set(view, thunk);
+    }
+    return thunk;
+  });
+  return host;
+};
+
+/**
+ * `<KeepAlive is={{ comp }}>` — like {@link Dynamic}, but instead of destroying a component
+ * when you swap away, it **detaches and caches** the instance (its DOM *and* live state), then
+ * re-attaches the SAME instance when you swap back. The canonical use is tabs/wizard steps
+ * whose scroll position, form input, or in-flight state should survive being hidden.
+ *
+ * Unlike Dynamic (which disposes the outgoing branch), a cached instance stays live while
+ * detached — its effects keep running — so its state is exactly preserved. All cached
+ * instances are disposed together when the `<KeepAlive>` itself unmounts. Extra props/slots
+ * are forwarded (and read once per instance, at first creation).
+ */
+export const KeepAlive: Component = (props = {}, slots = {}) => {
+  const host: HTMLElement = document.createElement('div');
+  host.style.display = 'contents';
+  const anchor: Comment = document.createComment('keep-alive');
+  host.appendChild(anchor);
+
+  const childProps: Record<string, unknown> = {};
+  for (const key in props) {
+    if (key === 'is') continue;
+    const desc: PropertyDescriptor | undefined = Object.getOwnPropertyDescriptor(props, key);
+    if (desc) Object.defineProperty(childProps, key, desc);
+  }
+
+  // Each seen component keeps its own persistent owner + captured nodes, cached across swaps.
+  const cache: Map<Component, { nodes: ChildNode[]; owner: Owner }> = new Map<
+    Component,
+    { nodes: ChildNode[]; owner: Owner }
+  >();
+  let active: ChildNode[] = [];
+  const lexical: Owner | null = getOwner();
+
+  effect(() => {
+    const comp: unknown = (props as { is?: unknown }).is; // reading the getter tracks `is`
+    // Detach the current instance WITHOUT disposing it — its state is kept in the cache.
+    for (const n of active) n.remove();
+    active = [];
+    if (typeof comp !== 'function') return;
+    const view: Component = comp as Component;
+
+    let entry: { nodes: ChildNode[]; owner: Owner } | undefined = cache.get(view);
+    if (!entry) {
+      // Build in a persistent owner parented to the lexical scope (so it survives swaps but is
+      // still torn down when KeepAlive unmounts). Untrack construction — only `is` is our dep.
+      const owner: Owner = runInOwner(lexical, () => createOwner(null));
+      let node: Node = anchor;
+      runInOwner(owner, () => untrack(() => { node = view(childProps, slots); }));
+      const nodes: ChildNode[] =
+        node instanceof DocumentFragment ? ([...node.childNodes] as ChildNode[]) : [node as ChildNode];
+      entry = { nodes, owner };
+      cache.set(view, entry);
+    }
+    const parent: Node = anchor.parentNode!;
+    for (const n of entry.nodes) parent.insertBefore(n, anchor);
+    active = entry.nodes;
+  });
+
+  onDispose(() => {
+    for (const e of cache.values()) disposeOwner(e.owner);
+    cache.clear();
+  });
+  return host;
+};
+
 /* ──────────────────────────── mount ──────────────────────────── */
 
 /**
