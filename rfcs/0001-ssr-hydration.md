@@ -1,14 +1,38 @@
-# RFC: Server-side rendering & hydration
+# RFC 0001: Server-side rendering & hydration
 
-- **Status:** Draft
+- **Status:** Accepted (scoped) — 2026-07-04
 - **Author(s):** Aidas Josas (@aidasjosas)
-- **Discussion:** <open a GitHub Discussion before review>
+- **Discussion:** decided directly by the maintainer (no community to gauge yet); this RFC is
+  the decision record.
 
-> **Note on scope.** `ROADMAP.md` currently lists SSR / hydration / streaming / RSC under
-> **“Out of scope (confirmed)”** as a *separate future track*. This RFC is the deliberate
-> vehicle for reconsidering that line — not a decision to build. Accepting it means
-> committing to the design direction below; declining it keeps SSR out of scope with the
-> reasoning recorded here.
+## Decision (2026-07-04)
+
+**Accepted, with a deliberately narrow scope and schedule.** SSR is a real competitive gap
+(every meta-framework — Next/Nuxt/SvelteKit/SolidStart/Angular Universal — has it), and it is
+the single most-cited blocker for content-first / SEO-sensitive adopters. We commit to closing
+that gap. But it is also the largest permanent cost Weave can take on — a *second render path,
+maintained forever* — and a half-built SSR would damage trust more than its absence. So:
+
+1. **Phase 1 = SSG only** (build-time prerender + client hydration). It closes the most
+   valuable slice (SEO + first paint for static/content pages), needs the same hydrate
+   investment as full SSR, and would **dogfood on the Weave docs site itself**. Request-time
+   SSR, streaming, islands, and RSC are explicitly **later phases**, not the first cut.
+2. **Sequenced after Phase C** brings the client-first framework to a 1.0-worthy state. SSR is
+   a parallel *future* track with its own milestones; it must not freeze or slow the
+   client-first roadmap. **Not started now.**
+3. The open design questions below (server strategy, data serialization, mismatch policy) are
+   resolved when Phase 1 work actually begins — this decision fixes the *direction and scope*,
+   not the final API.
+
+One line: **yes we close the gap, starting with the smallest viable slice (SSG), after the
+client story is polished** — not dropping everything for the full streaming beast now, nor
+pretending the gap doesn't exist.
+
+## Scope note
+
+`ROADMAP.md` previously listed SSR / hydration / streaming / RSC under *“Out of scope
+(confirmed)”*. This RFC supersedes that line: SSR is now an **accepted future track, scoped to
+SSG-first and scheduled post-Phase-C**. The sections below are the design of record.
 
 ## Summary
 
