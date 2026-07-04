@@ -18,7 +18,7 @@
  * Async data loading belongs in the component via `@weave-framework/data`.
  */
 
-import { signal, computed, effect, batch, getOwner, createContext, provide, inject } from '@weave-framework/runtime';
+import { signal, computed, effect, batch, onCleanup, getOwner, createContext, provide, inject } from '@weave-framework/runtime';
 import type { Signal, Computed, Context } from '@weave-framework/runtime';
 import { ifBlock, transition, type Component, type TransitionFn } from '@weave-framework/runtime/dom';
 
@@ -47,8 +47,23 @@ export interface Route {
   guard?: Guard;
   /** Static redirect target (pathname). When matched, resolve to this path instead. */
   redirect?: string;
+  /**
+   * Route-level data loader. Runs when the route is rendered; its result is exposed to
+   * the component (and descendants) via {@link useLoaderData}, which returns an
+   * `@await`-compatible `{ data, loading, error }` — so `@await (useLoaderData())` just
+   * works. Re-runs when this route's params/query change; the previous run is aborted.
+   */
+  loader?: (ctx: LoaderContext) => unknown;
   /** Nested routes, matched against the path remainder under this route. */
   children?: Route[];
+}
+
+/** Context handed to a route {@link Route.loader}: the (typed, via `route()`) params, query, and an abort signal. */
+export interface LoaderContext<P = RouteParams> {
+  params: P;
+  query: RouteParams;
+  /** Aborted when the loader re-runs (param/query change) or the route unmounts. */
+  signal: AbortSignal;
 }
 
 /**
@@ -69,6 +84,8 @@ export interface RouteConfig<Path extends string = string> {
   component?: Component;
   /** Sync guard with params typed from the path literal. */
   guard?: (ctx: { path: string; params: RouteParamsOf<Path>; query: RouteParams }) => boolean | string;
+  /** Data loader with params typed from the path literal (`route('/user/:id', …)` → `params.id`). */
+  loader?: (ctx: LoaderContext<RouteParamsOf<Path>>) => unknown;
   redirect?: string;
   children?: Route[];
 }
@@ -323,6 +340,8 @@ function matchPrefix(
 export interface Match {
   view: Component;
   params: RouteParams;
+  /** This route's data loader, if any (run by the outlet; read via {@link useLoaderData}). */
+  loader?: (ctx: LoaderContext) => unknown;
 }
 
 type LevelResult = { chain: Match[] } | { redirect: string } | null;
@@ -343,7 +362,7 @@ function resolveLevel(
     const verdict: boolean | string = c.route.guard ? c.route.guard({ path: fullPath, params, query }) : true;
     if (verdict === false) return null; // blocked → caller falls back
     if (typeof verdict === 'string') return { redirect: verdict };
-    const here: Match = { view: c.route.component!, params };
+    const here: Match = { view: c.route.component!, params, loader: c.route.loader };
     if (m.rest.length === 0) {
       // Path fully consumed: include an index child (`path: ''`) if one matches.
       if (c.children.length) {
@@ -492,6 +511,84 @@ export function useRouter(): Router {
 }
 
 /**
+ * Reactive view of a route loader's result — the same `{ data, loading, error }` shape a
+ * `@weave-framework/data` resource exposes, so it drives `@await` directly.
+ */
+export interface LoaderData<T = unknown> {
+  /** Latest resolved value, or `undefined` while pending. Reactive. */
+  data: () => T | undefined;
+  /** True while the loader is in flight (initial run + each re-run). Reactive. */
+  loading: () => boolean;
+  /** The last rejection, or `undefined`. Cleared at the start of each run. Reactive. */
+  error: () => unknown;
+}
+
+/** Carries the current route's loader result down to the component + descendants. */
+const LoaderDataContext: Context<LoaderData | null> = createContext<LoaderData | null>(null);
+
+/**
+ * Read the current route's {@link Route.loader} result inside a routed component. Returns
+ * an `@await`-compatible `{ data, loading, error }`, so `@await (useLoaderData())` renders
+ * pending / value / error branches. Throws if the route has no loader.
+ */
+export function useLoaderData<T = unknown>(): LoaderData<T> {
+  const data: LoaderData | null = inject(LoaderDataContext);
+  if (!data) {
+    throw new Error('useLoaderData() requires the current route to define a loader');
+  }
+  return data as LoaderData<T>;
+}
+
+/**
+ * Run a match's loader as a reactive resource: (re)runs whenever this depth's params or
+ * query change (keyed, so unrelated navigations don't refetch), aborting the previous run
+ * and ignoring its late settle. Runtime-only (no `@weave-framework/data` dependency) —
+ * loaders need just load/value/error + abort, which the `@await` contract is built on.
+ *
+ * SSR seam (Phase D, RFC 0001 §4): a future `renderToString` will `await` these before
+ * serializing and seed the resolved value into the page so the client hydrates without a
+ * re-fetch — this resource is the single place that wiring will hook in.
+ */
+function createLoaderResource(match: Match, router: Router, depth: number): LoaderData {
+  const dataSig: Signal<unknown> = signal<unknown>(undefined);
+  const loadingSig: Signal<boolean> = signal<boolean>(true);
+  const errorSig: Signal<unknown> = signal<unknown>(undefined);
+  let token: number = 0;
+  let lastKey: string | null = null;
+  let ac: AbortController | null = null;
+
+  effect(() => {
+    const params: RouteParams = router.params(depth);
+    const query: RouteParams = router.query();
+    const key: string = JSON.stringify(params) + ' ' + JSON.stringify(query);
+    if (key === lastKey) return; // same inputs → don't re-run on an unrelated navigation
+    lastKey = key;
+
+    const my: number = ++token;
+    ac?.abort();
+    ac = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const signal: AbortSignal = ac ? ac.signal : ({ aborted: false } as AbortSignal);
+    batch(() => {
+      loadingSig.set(true);
+      errorSig.set(undefined);
+    });
+    Promise.resolve()
+      .then(() => match.loader!({ params, query, signal }))
+      .then(
+        (value: unknown) => {
+          if (my === token) batch(() => { dataSig.set(value); loadingSig.set(false); });
+        },
+        (err: unknown) => {
+          if (my === token) batch(() => { errorSig.set(err); loadingSig.set(false); });
+        }
+      );
+  });
+  onCleanup(() => ac?.abort());
+
+  return { data: () => dataSig(), loading: () => loadingSig(), error: () => errorSig() };
+}
+
+/**
  * Router outlet: renders the matched component at its depth in the chain. The top
  * outlet takes `router` as a prop and renders depth 0; a nested `<RouterView/>` written
  * inside a layout discovers the router + its depth via context. A `display:contents`
@@ -539,7 +636,14 @@ export const RouterView: Component = (props = {}) => {
     let thunk: (() => Node) | undefined = thunks.get(m.view);
     if (!thunk) {
       const view: Component = m.view;
+      const loaderMatch: Match = m; // loader fn is stable per route; params are read live
       thunk = () => {
+        // Run this route's loader (if any) and expose it via context so a descendant's
+        // useLoaderData() resolves it. Provided in the branch's own owner scope, so it
+        // disposes with the view on swap/unmount.
+        if (loaderMatch.loader && getOwner()) {
+          provide(LoaderDataContext, createLoaderResource(loaderMatch, router!, depth));
+        }
         const node: Node = view({
           get params() {
             return router!.params(depth);

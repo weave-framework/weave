@@ -13,8 +13,15 @@ import {
   prefetch,
   useRouter,
   route,
+  useLoaderData,
 } from '@weave-framework/router';
-import type { Router, Match } from '@weave-framework/router';
+import type { Router, Match, LoaderData } from '@weave-framework/router';
+
+/** Flush a macrotask + pending effects so an async loader settles. */
+const flush = async (): Promise<void> => {
+  await new Promise((r) => setTimeout(r, 0));
+  await tick();
+};
 
 // Route "components" are plain Component functions returning a <span> (so they
 // are distinguishable from RouterView's own display:contents <div> host).
@@ -160,6 +167,47 @@ test('route() guard receives the path params (typed at compile time, correct at 
   navigate('/user/9');
   assert.is(r.matched()?.view, User);
   assert.equal(seenId, '9', 'guard saw the param value');
+});
+
+test('a route loader is exposed via useLoaderData(): loading → data, re-runs on param change', async () => {
+  let ld: LoaderData<string> | null = null;
+  const UserL: Component = () => {
+    ld = useLoaderData<string>();
+    const el: HTMLSpanElement = document.createElement('span');
+    effect(() => {
+      el.textContent = ld!.loading() ? 'pending' : String(ld!.data());
+    });
+    return el;
+  };
+  const r: Router = createRouter([
+    route('/u/:id', { component: UserL, loader: ({ params }) => Promise.resolve('LOADED:' + params.id) }),
+    { path: '*', component: NotFound },
+  ]);
+  navigate('/u/1');
+  const el: HTMLElement = host();
+  mountComponent(RouterView, el, { router: r });
+  assert.equal(el.textContent, 'pending', 'loading before the loader settles');
+  await flush();
+  assert.equal(el.textContent, 'LOADED:1', 'loader value rendered after settle');
+  navigate('/u/2');
+  await flush();
+  assert.equal(el.textContent, 'LOADED:2', 'loader re-ran on a param change');
+});
+
+test('useLoaderData() throws when the route has no loader', () => {
+  let threw: boolean = false;
+  const NoLoader: Component = () => {
+    try {
+      useLoaderData();
+    } catch {
+      threw = true;
+    }
+    return span('x');
+  };
+  const r: Router = createRouter([{ path: '/', component: NoLoader }, { path: '*', component: NotFound }]);
+  navigate('/');
+  mountComponent(RouterView, host(), { router: r });
+  assert.ok(threw, 'throws without a loader in context');
 });
 
 test('useRouter() injects the router in a routed component; r.navigate/path/query work', () => {
