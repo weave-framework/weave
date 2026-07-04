@@ -51,6 +51,39 @@ export interface Route {
   children?: Route[];
 }
 
+/**
+ * Type-level path-param inference: turns a path literal into the params object its
+ * matches carry. `'/user/:id'` → `{ id: string }`, `'/user/:id/post/:pid'` →
+ * `{ id: string; pid: string }`, a param-less path → `{}`. Used by {@link route} so
+ * `guard`/`loader` see typed `params`.
+ */
+export type RouteParamsOf<Path extends string> =
+  Path extends `${string}:${infer Param}/${infer Rest}`
+    ? { [K in Param | keyof RouteParamsOf<`/${Rest}`>]: string }
+    : Path extends `${string}:${infer Param}`
+      ? { [K in Param]: string }
+      : Record<never, string>;
+
+/** Config for {@link route} — like {@link Route} minus `path`, with a typed `guard`. */
+export interface RouteConfig<Path extends string = string> {
+  component?: Component;
+  /** Sync guard with params typed from the path literal. */
+  guard?: (ctx: { path: string; params: RouteParamsOf<Path>; query: RouteParams }) => boolean | string;
+  redirect?: string;
+  children?: Route[];
+}
+
+/**
+ * Typed route builder. Captures the path *literal* in a generic so `guard` (and, in v2,
+ * `loader`) receive `params` inferred from the path — `route('/user/:id', …)` gives
+ * `params.id: string`. Returns a plain {@link Route}, so it drops into the same
+ * `createRouter([...])` array and nests via `children`. Plain-object routes still work
+ * (with untyped `params`); `route()` is the opt-in for inference.
+ */
+export function route<Path extends string>(path: Path, config: RouteConfig<Path> = {}): Route {
+  return { path, ...config } as unknown as Route;
+}
+
 /* ──────────── base path (for hosting under a sub-path, e.g. GitHub Pages) ──────────── */
 
 // All public paths (route patterns, navigate(), Link `to`, currentPath()) are

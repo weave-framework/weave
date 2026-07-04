@@ -12,6 +12,7 @@ import {
   Link,
   prefetch,
   useRouter,
+  route,
 } from '@weave-framework/router';
 import type { Router, Match } from '@weave-framework/router';
 
@@ -126,6 +127,39 @@ test('a guard re-resolves when the auth signal it reads changes', () => {
   assert.is(r.matched()?.view, Login, 'unauthed → redirected to login');
   authed.set(true);
   assert.is(r.matched()?.view, Home, 'authed → route re-resolves to the real component');
+});
+
+test('route() builds routes that match like the object form (incl. params)', () => {
+  const r: Router = createRouter([
+    route('/user/:id', { component: User }),
+    route('/about', { component: About }),
+    { path: '*', component: NotFound },
+  ]);
+  navigate('/user/7');
+  assert.is(r.matched()?.view, User, 'route() component matched');
+  assert.equal(r.matched()?.params.id, '7', 'param captured via route() builder');
+  navigate('/about');
+  assert.is(r.matched()?.view, About);
+  navigate('/nope');
+  assert.is(r.matched()?.view, NotFound, 'plain-object fallback still works alongside route()');
+});
+
+test('route() guard receives the path params (typed at compile time, correct at runtime)', () => {
+  let seenId: string | null = null;
+  const r: Router = createRouter([
+    route('/user/:id', {
+      component: User,
+      // `ctx.params.id` is typed `string` (inferred from '/user/:id') — see the tsc check.
+      guard: (ctx) => {
+        seenId = ctx.params.id;
+        return true;
+      },
+    }),
+    { path: '*', component: NotFound },
+  ]);
+  navigate('/user/9');
+  assert.is(r.matched()?.view, User);
+  assert.equal(seenId, '9', 'guard saw the param value');
 });
 
 test('useRouter() injects the router in a routed component; r.navigate/path/query work', () => {
