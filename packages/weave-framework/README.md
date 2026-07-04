@@ -8,7 +8,7 @@
 
 *No Virtual DOM. No dependency arrays. No ceremony. Just the threads you need, woven tight.*
 
-[📚 **Documentation**](https://weave-framework.github.io/weave/) · [🚀 Get started](https://weave-framework.github.io/weave/)
+[📚 **Documentation**](https://weaveframework.dev/) · [🚀 Get started](https://weaveframework.dev/)
 
 </div>
 
@@ -64,7 +64,7 @@ None of this makes the others "wrong." It's a different set of trade‑offs — 
 
 Installation, your first component, guides, and the complete API reference all live in the documentation:
 
-### → **[Read the documentation](https://weave-framework.github.io/weave/)**
+### → **[Read the documentation](https://weaveframework.dev/)**
 
 ---
 

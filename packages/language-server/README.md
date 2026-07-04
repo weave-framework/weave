@@ -2,7 +2,7 @@
 
 Weave language server — Volar-based IDE support (`.weave` files + template type-checking) for VS Code and WebStorm.
 
-Part of **[Weave](https://weave-framework.github.io/weave/)** — a fine-grained reactive, signal-native UI framework: no Virtual DOM, zero third-party runtime dependencies.
+Part of **[Weave](https://weaveframework.dev/)** — a fine-grained reactive, signal-native UI framework: no Virtual DOM, zero third-party runtime dependencies.
 
 You normally don't install this by hand — it ships inside the **Weave editor extensions** (VS Code / WebStorm). Install it directly only when integrating a custom editor:
 
@@ -10,7 +10,7 @@ You normally don't install this by hand — it ships inside the **Weave editor e
 npm install -D @weave-framework/language-server
 ```
 
-📚 **Editor setup + docs:** [weave-framework.github.io/weave](https://weave-framework.github.io/weave/)
+📚 **Editor setup + docs:** [weaveframework.dev](https://weaveframework.dev/)
 
 ## License
 

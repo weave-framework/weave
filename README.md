@@ -8,7 +8,7 @@
 
 *No Virtual DOM. No dependency arrays. No ceremony. Just the threads you need, woven tight.*
 
-[📚 **Documentation**](https://weave-framework.github.io/weave/) · [🚀 Get started](https://weave-framework.github.io/weave/) · [🗺️ Roadmap](#-where-its-headed)
+[📚 **Documentation**](https://weaveframework.dev/) · [🚀 Get started](https://weaveframework.dev/) · [🗺️ Roadmap](#-where-its-headed)
 
 </div>
 
@@ -60,7 +60,7 @@ Ideas and contributions are welcome — the roadmap is a direction, not a fence.
 
 Installation, your first component, guides, and the complete API reference all live in the documentation:
 
-### → **[Read the documentation](https://weave-framework.github.io/weave/)**
+### → **[Read the documentation](https://weaveframework.dev/)**
 
 ---
 
