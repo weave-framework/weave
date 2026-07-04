@@ -12,7 +12,7 @@
 
   .weave-progress-bar__fill {
     position: relative;
-    left: 0;
+    inset-inline-start: 0;
     width: 0;
     height: 100%;
     background: var(--weave-progress-bar-fill);
@@ -30,10 +30,10 @@
 
   @keyframes weave-progress-bar-indet {
     0% {
-      left: calc(-1 * var(--weave-progress-bar-segment));
+      inset-inline-start: calc(-1 * var(--weave-progress-bar-segment));
     }
     100% {
-      left: 100%;
+      inset-inline-start: 100%;
     }
   }
 }

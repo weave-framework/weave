@@ -38,7 +38,7 @@
     content: '';
     position: absolute;
     top: var(--weave-slide-toggle-knob-inset);
-    left: var(--weave-slide-toggle-knob-inset);
+    inset-inline-start: var(--weave-slide-toggle-knob-inset);
     width: var(--weave-slide-toggle-knob-size);
     height: var(--weave-slide-toggle-knob-size);
     border-radius: var(--weave-slide-toggle-knob-radius);
@@ -59,6 +59,8 @@
   }
 
   .weave-slide-toggle__input:checked + .weave-slide-toggle__track::after {
+    // knob rests at inline-start; on = slide toward inline-end (transforms aren't
+    // direction-aware, so RTL flips the sign — see the [dir='rtl'] override below).
     transform: translateX(
       calc(
         var(--weave-slide-toggle-track-width) - var(--weave-slide-toggle-knob-size) - 2 *
@@ -66,6 +68,17 @@
       )
     );
     background: var(--weave-slide-toggle-knob-on);
+  }
+
+  [dir='rtl'] .weave-slide-toggle__input:checked + .weave-slide-toggle__track::after {
+    transform: translateX(
+      calc(
+        -1 * (
+            var(--weave-slide-toggle-track-width) - var(--weave-slide-toggle-knob-size) - 2 *
+              var(--weave-slide-toggle-knob-inset)
+          )
+      )
+    );
   }
 
   .weave-slide-toggle__input:focus-visible + .weave-slide-toggle__track {

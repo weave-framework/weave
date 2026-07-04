@@ -233,7 +233,8 @@ export function setup(props: SliderProps): SliderContext {
     disabledAttr: (): string | undefined => (disabled() ? 'true' : undefined),
     invalidAttr: (): string | undefined => (invalid() ? 'true' : undefined),
     fillStyle: (): string => `width: ${percent()}%`,
-    thumbStyle: (): string => `left: ${percent()}%`,
+    // logical inline-start so the thumb sits from the correct edge under RTL
+    thumbStyle: (): string => `inset-inline-start: ${percent()}%`,
     onPointerdown,
     onPointermove,
     onPointerup,

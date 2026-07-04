@@ -15,9 +15,9 @@
     gap: var(--weave-list-padding-x);
     min-height: var(--weave-list-row-height);
     padding: var(--weave-list-padding-y) var(--weave-list-padding-x);
-    // A 2px accent left border appears only when selected; reserve the space now so
+    // A 2px accent inline-start border appears only when selected; reserve the space now so
     // selection doesn't shift the row content (transparent placeholder border).
-    border-left: var(--weave-list-marker-width) solid transparent;
+    border-inline-start: var(--weave-list-marker-width) solid transparent;
     color: var(--weave-list-text);
     font-size: var(--weave-list-font-size);
     font-weight: var(--weave-list-weight);
@@ -77,7 +77,7 @@
   /* Selected — accentSoft tint + 2px accent left border (state via native ARIA attr). */
   .weave-list__row[aria-selected='true'] {
     background: var(--weave-list-selected-background);
-    border-left-color: var(--weave-list-selected-marker);
+    border-inline-start-color: var(--weave-list-selected-marker);
   }
 
   .weave-list__row[aria-disabled='true'] {

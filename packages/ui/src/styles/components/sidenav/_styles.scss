@@ -14,7 +14,7 @@
     box-sizing: border-box;
     width: var(--weave-sidenav-width);
     background: var(--weave-sidenav-drawer-background);
-    border-right: 1px solid var(--weave-sidenav-drawer-line);
+    border-inline-end: 1px solid var(--weave-sidenav-drawer-line);
     overflow: auto;
     transition:
       transform var(--weave-sidenav-duration) ease,
@@ -77,8 +77,8 @@
   /* ── end position: drawer docks to the inline-end edge ── */
   .weave-sidenav--end .weave-sidenav__drawer {
     order: 2;
-    border-right: 0;
-    border-left: 1px solid var(--weave-sidenav-drawer-line);
+    border-inline-end: 0;
+    border-inline-start: 1px solid var(--weave-sidenav-drawer-line);
   }
 
   .weave-sidenav--end.weave-sidenav--side:not(.weave-sidenav--opened) .weave-sidenav__drawer {

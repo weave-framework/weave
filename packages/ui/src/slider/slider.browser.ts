@@ -64,7 +64,10 @@ test('renders role=slider with the value ARIA + a focusable tab stop', () => {
 test('fill width + thumb position reflect the value percent', () => {
   const { el, dispose } = mount({ value: 25 });
   assert.equal(el.querySelector<HTMLElement>('.weave-slider__fill')?.style.width, '25%');
-  assert.equal(el.querySelector<HTMLElement>('.weave-slider__thumb')?.style.left, '25%');
+  assert.equal(
+    el.querySelector<HTMLElement>('.weave-slider__thumb')?.style.getPropertyValue('inset-inline-start'),
+    '25%'
+  );
   dispose();
 });
 

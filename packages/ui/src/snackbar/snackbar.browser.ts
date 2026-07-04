@@ -1,5 +1,5 @@
 import { test, assert } from '../../../../tools/harness.js';
-import { overlayContainer } from '@weave-framework/ui/cdk';
+import { overlayContainer, setDirection } from '@weave-framework/ui/cdk';
 import { snackbar, type SnackbarRef } from '@weave-framework/ui/snackbar';
 
 const bars = (): HTMLElement[] =>
@@ -94,6 +94,19 @@ test('snackbar: position start anchors to the bottom-left (not centered)', () =>
   assert.equal(wrapper.style.bottom, '0px');
   assert.equal(wrapper.style.left, '0px', 'anchored left');
   ref.dismiss();
+});
+
+test('snackbar: RTL maps position start to the bottom-right edge', () => {
+  setDirection('rtl');
+  try {
+    const ref: SnackbarRef = snackbar('Start', { duration: 0, position: 'start' });
+    const wrapper: HTMLElement = bar()?.parentElement as HTMLElement;
+    assert.equal(wrapper.style.right, '0px', 'start anchors to the right edge in RTL');
+    assert.equal(wrapper.style.left, '', 'not anchored left in RTL');
+    ref.dismiss();
+  } finally {
+    setDirection('ltr');
+  }
 });
 
 test('snackbar: afterDismissed resolves when dismissed', async () => {

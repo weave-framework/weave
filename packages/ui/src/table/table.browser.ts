@@ -221,7 +221,11 @@ test('table: a sticky column gets the sticky class + an inline offset', async ()
   const m: Mounted = await mount({ columns: cols, dataSource: ROWS });
   const firstHead: HTMLElement = m.host.querySelector('thead th') as HTMLElement;
   assert.ok(firstHead.classList.contains('weave-table__cell--sticky-start'));
-  assert.equal(firstHead.style.left, '0px', 'first sticky column pinned at 0');
+  assert.equal(
+    firstHead.style.getPropertyValue('inset-inline-start'),
+    '0px',
+    'first sticky column pinned at the inline-start edge (logical, RTL-safe)'
+  );
   const firstCell: HTMLElement = bodyRows(m)[0].querySelector('.weave-table__cell') as HTMLElement;
   assert.ok(firstCell.classList.contains('weave-table__cell--sticky-start'));
   m.dispose();

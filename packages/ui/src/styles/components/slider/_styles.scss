@@ -26,7 +26,8 @@
   // Accent fill to the value (width set inline).
   .weave-slider__fill {
     position: absolute;
-    inset: 0 auto 0 0;
+    inset-block: 0;
+    inset-inline-start: 0;
     height: 100%;
     background: var(--weave-slider-fill);
     border-radius: inherit;

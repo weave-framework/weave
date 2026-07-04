@@ -12,7 +12,7 @@
   .weave-badge__mark {
     position: absolute;
     top: 0;
-    right: 0;
+    inset-inline-end: 0;
     transform: translate(50%, -50%);
     box-sizing: border-box;
     display: inline-flex;
@@ -48,13 +48,31 @@
   }
 
   .weave-badge--start .weave-badge__mark {
-    right: auto;
-    left: 0;
+    inset-inline-end: auto;
+    inset-inline-start: 0;
     transform: translate(-50%, -50%);
   }
 
   .weave-badge--bottom.weave-badge--start .weave-badge__mark {
     transform: translate(-50%, 50%);
+  }
+
+  /* Transforms aren't direction-aware — flip the horizontal push under RTL so the
+     mark still sits just outside the correct (logical) corner. */
+  [dir='rtl'] .weave-badge__mark {
+    transform: translate(-50%, -50%);
+  }
+
+  [dir='rtl'] .weave-badge--bottom .weave-badge__mark {
+    transform: translate(-50%, 50%);
+  }
+
+  [dir='rtl'] .weave-badge--start .weave-badge__mark {
+    transform: translate(50%, -50%);
+  }
+
+  [dir='rtl'] .weave-badge--bottom.weave-badge--start .weave-badge__mark {
+    transform: translate(50%, 50%);
   }
 
   /* Tag — a standalone outline label; the container IS the visible mark. */

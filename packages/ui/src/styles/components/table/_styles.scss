@@ -38,7 +38,7 @@
     color: var(--weave-table-header-text);
     font-size: var(--weave-table-header-size);
     font-weight: var(--weave-table-header-weight);
-    text-align: left;
+    text-align: start;
     white-space: nowrap;
     box-shadow: 0 1px 0 var(--weave-table-line); // hairline under the header
   }
@@ -74,7 +74,7 @@
   .weave-table__resize-grip {
     position: absolute;
     top: 0;
-    right: 0;
+    inset-inline-end: 0;
     height: 100%;
     width: var(--weave-table-resize-grip-width);
     cursor: col-resize;
@@ -88,7 +88,7 @@
     content: '';
     position: absolute;
     top: 20%;
-    right: calc((var(--weave-table-resize-grip-width) - var(--weave-table-resize-grip-line)) / 2);
+    inset-inline-end: calc((var(--weave-table-resize-grip-width) - var(--weave-table-resize-grip-line)) / 2);
     width: var(--weave-table-resize-grip-line);
     height: 60%;
     background: var(--weave-table-resize-grip);
@@ -113,13 +113,13 @@
   }
 
   .weave-table__cell--numeric {
-    text-align: right;
+    text-align: end;
     font-variant-numeric: tabular-nums;
   }
 
   // Reserve the selected-row marker space on the first cell so selecting never shifts content.
   .weave-table__row > .weave-table__cell:first-child {
-    border-left: var(--weave-table-marker-width) solid transparent;
+    border-inline-start: var(--weave-table-marker-width) solid transparent;
   }
 
   .weave-table__row:hover > .weave-table__cell {
@@ -132,7 +132,7 @@
   }
 
   .weave-table__row[aria-selected='true'] > .weave-table__cell:first-child {
-    border-left-color: var(--weave-table-selected-marker);
+    border-inline-start-color: var(--weave-table-selected-marker);
   }
 
   /* ── sticky columns (offsets set inline by JS) ── */

@@ -286,14 +286,15 @@ export function setup<T = Record<string, unknown>>(props: TableProps<T>): TableC
     const s: Slot[] = slots();
     const idx: number = s.findIndex((x) => x.id === id);
     if (idx < 0 || !s[idx].sticky) return '';
+    // Logical insets so sticky columns dock to the correct edge under RTL.
     if (s[idx].sticky === 'start') {
       let px: number = 0;
       for (let i: number = 0; i < idx; i++) if (s[i].sticky === 'start') px += s[i].width;
-      return `left:${px}px`;
+      return `inset-inline-start:${px}px`;
     }
     let px: number = 0;
     for (let i: number = s.length - 1; i > idx; i--) if (s[i].sticky === 'end') px += s[i].width;
-    return `right:${px}px`;
+    return `inset-inline-end:${px}px`;
   };
 
   const alignOf = (c: TableColumn<T>): string => c.align ?? (c.numeric ? 'end' : 'start');

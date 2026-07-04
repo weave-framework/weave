@@ -16,6 +16,7 @@ import {
   globalPosition,
   noopScroll,
   announce,
+  activeDirection,
   type OverlayRef,
   type GlobalPositionConfig,
 } from '../cdk/index.js';
@@ -67,8 +68,19 @@ let _current: Active | null = null;
 const _queue: Entry[] = [];
 
 function positionConfig(position: 'center' | 'start' | 'end' = 'center'): GlobalPositionConfig {
-  if (position === 'start') return { centerHorizontally: false, centerVertically: false, bottom: '0', left: '0' };
-  if (position === 'end') return { centerHorizontally: false, centerVertically: false, bottom: '0', right: '0' };
+  // `start`/`end` are logical: in RTL, start is the right edge and end is the left.
+  const cfg: GlobalPositionConfig = { centerHorizontally: false, centerVertically: false, bottom: '0' };
+  const rtl: boolean = activeDirection() === 'rtl';
+  if (position === 'start') {
+    if (rtl) cfg.right = '0';
+    else cfg.left = '0';
+    return cfg;
+  }
+  if (position === 'end') {
+    if (rtl) cfg.left = '0';
+    else cfg.right = '0';
+    return cfg;
+  }
   return { centerHorizontally: true, centerVertically: false, bottom: '0' };
 }
 
