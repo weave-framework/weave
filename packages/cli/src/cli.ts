@@ -107,8 +107,23 @@ export async function main(argv: string[]): Promise<void> {
     return;
   }
 
+  if (cmd === 'mcp') {
+    // Launch the Weave MCP server over stdio (an AI-editor integration). Imported lazily so
+    // the CLI doesn't bundle it; `weave-mcp` is the equivalent standalone bin.
+    try {
+      const mcp: { runStdioServer: (o?: object) => Promise<void> } = await import('@weave-framework/mcp');
+      await mcp.runStdioServer();
+    } catch (e) {
+      console.error(
+        `weave mcp: could not start the MCP server — is @weave-framework/mcp installed?\n${(e as Error)?.message ?? String(e)}`
+      );
+      process.exit(1);
+    }
+    return;
+  }
+
   console.error(
-    'usage: weave <build|dev|check|routes> [entry|paths…] [--config file] [--out dir] [--serve dir] [--port n] [--no-minify] [--eager]'
+    'usage: weave <build|dev|check|routes|mcp> [entry|paths…] [--config file] [--out dir] [--serve dir] [--port n] [--no-minify] [--eager]'
   );
   process.exit(1);
 }

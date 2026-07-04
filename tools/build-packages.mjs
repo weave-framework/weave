@@ -19,7 +19,7 @@ import { fileURLToPath } from 'node:url';
 const repo = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 /** tsc-emit library packages, in dependency order. */
-const LIB_ORDER = ['runtime', 'compiler', 'store', 'i18n', 'data', 'forms', 'router', 'ui', 'check'];
+const LIB_ORDER = ['runtime', 'compiler', 'store', 'i18n', 'data', 'forms', 'router', 'ui', 'check', 'mcp'];
 
 function run(cmd, args, label) {
   process.stdout.write(`\n▶ ${label}\n`);

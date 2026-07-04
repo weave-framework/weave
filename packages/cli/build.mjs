@@ -18,7 +18,7 @@ await build({
   format: 'esm',
   platform: 'node',
   target: 'node18',
-  external: ['esbuild', 'typescript', 'sass'],
+  external: ['esbuild', 'typescript', 'sass', '@weave-framework/mcp'],
 });
 
 console.log('cli build → packages/cli/dist/cli.js');

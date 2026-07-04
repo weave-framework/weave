@@ -1,6 +1,6 @@
 {
   "name": "@weave-framework/cli",
-  "version": "0.2.154",
+  "version": "0.2.155",
   "description": "Weave CLI — `weave build`, `weave dev` (watch + live-reload), `weave check`, `weave routes`.",
   "type": "module",
   "bin": {
@@ -39,6 +39,7 @@
     }
   },
   "dependencies": {
+    "@weave-framework/mcp": "workspace:*",
     "esbuild": "^0.25.0",
     "typescript": "^5.7.0"
   },

@@ -25,7 +25,7 @@ const dryRun = process.argv.includes('--dry-run');
 
 // Dependency order — a package's @weave deps must be on the registry first.
 // `weave-framework` is a deps-only meta-package (installs the core) — publish it LAST, after its deps exist.
-const ORDER = ['runtime', 'compiler', 'store', 'i18n', 'data', 'forms', 'router', 'ui', 'check', 'cli', 'create-weave', 'weave-framework'];
+const ORDER = ['runtime', 'compiler', 'store', 'i18n', 'data', 'forms', 'router', 'ui', 'check', 'mcp', 'cli', 'create-weave', 'weave-framework'];
 
 // Always build fresh dist/ before publishing the library + CLI packages.
 {

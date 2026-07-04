@@ -23,6 +23,9 @@ await esbuild({
   bundle: true,
   format: 'esm',
   platform: 'node',
+  // NB: @weave-framework/mcp stays INLINED in the dev bin (unlike the prod build, which
+  // externalizes it) — the dev bundle runs from node_modules/.weave/, whose module
+  // resolution can't reach the workspace-linked package, so we bundle it in.
   external: ['esbuild', 'typescript', 'sass'],
   outfile: out,
 });

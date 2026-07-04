@@ -1,6 +1,6 @@
 {
   "name": "weave-monorepo",
-  "version": "0.2.154",
+  "version": "0.2.155",
   "description": "Weave — fine-grained reactive, signal-native UI framework. Compiled, TypeScript-first, no Virtual DOM.",
   "type": "module",
   "private": true,
@@ -17,9 +17,10 @@
     "docs:serve": "node docs/tools/serve-dist.mjs",
     "verify:ui-sass": "node tools/verify-ui-sass.mjs",
     "verify:ui-compose": "node tools/verify-ui-compose.mjs",
+    "verify:mcp": "node packages/mcp/test/stdio.smoke.mjs",
     "build:ls": "node packages/language-server/build.mjs",
     "verify:ls": "node packages/language-server/build.mjs && node tools/verify-language-server.mjs && node tools/verify-ls-push-diagnostics.mjs",
-    "typecheck": "tsc --noEmit -p packages/runtime/tsconfig.json && tsc --noEmit -p packages/compiler/tsconfig.json && tsc --noEmit -p packages/check/tsconfig.json && tsc --noEmit -p packages/store/tsconfig.json && tsc --noEmit -p packages/router/tsconfig.json && tsc --noEmit -p packages/forms/tsconfig.json && tsc --noEmit -p packages/i18n/tsconfig.json && tsc --noEmit -p packages/data/tsconfig.json && tsc --noEmit -p packages/cli/tsconfig.json && tsc --noEmit -p packages/language-server/tsconfig.json && tsc --noEmit -p packages/typescript-plugin/tsconfig.json && tsc --noEmit -p packages/ui/tsconfig.json"
+    "typecheck": "tsc --noEmit -p packages/runtime/tsconfig.json && tsc --noEmit -p packages/compiler/tsconfig.json && tsc --noEmit -p packages/check/tsconfig.json && tsc --noEmit -p packages/store/tsconfig.json && tsc --noEmit -p packages/router/tsconfig.json && tsc --noEmit -p packages/forms/tsconfig.json && tsc --noEmit -p packages/i18n/tsconfig.json && tsc --noEmit -p packages/data/tsconfig.json && tsc --noEmit -p packages/cli/tsconfig.json && tsc --noEmit -p packages/language-server/tsconfig.json && tsc --noEmit -p packages/typescript-plugin/tsconfig.json && tsc --noEmit -p packages/ui/tsconfig.json && tsc --noEmit -p packages/mcp/tsconfig.json"
   },
   "keywords": [
     "reactive",
