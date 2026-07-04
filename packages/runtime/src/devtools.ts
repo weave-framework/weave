@@ -32,6 +32,10 @@ export interface DevSnapshot {
 let enabled: boolean = false;
 let nextId: number = 1;
 const registry: Map<number, DevNode> = new Map<number, DevNode>();
+// The internal reactive node behind each id, and its reverse map — used by
+// {@link inspectGraph} to turn a computation's `sources` into edges between registered ids.
+const internalNodes: Map<number, object> = new Map<number, object>();
+const nodeToId: Map<object, number> = new Map<object, number>();
 
 // Registry-membership change listeners — a panel bridges these to a signal so it
 // re-reads when nodes appear/disappear. Value changes are tracked separately (an effect
@@ -66,13 +70,27 @@ export function isDevtoolsEnabled(): boolean {
  * disposer) when devtools are off or the node is unnamed. Returns an unregister fn the
  * primitive ties to its owner's disposal so the graph doesn't leak.
  */
-export function registerDevNode(kind: DevKind, name: string | undefined, read?: () => unknown): () => void {
+export function registerDevNode(
+  kind: DevKind,
+  name: string | undefined,
+  read?: () => unknown,
+  node?: object
+): () => void {
   if (!enabled || !name) return noop;
   const id: number = nextId++;
   registry.set(id, { id, name, kind, read });
+  if (node) {
+    internalNodes.set(id, node);
+    nodeToId.set(node, id);
+  }
   emitChange();
   return () => {
     registry.delete(id);
+    const n: object | undefined = internalNodes.get(id);
+    if (n) {
+      nodeToId.delete(n);
+      internalNodes.delete(id);
+    }
     emitChange();
   };
 }
@@ -104,4 +122,30 @@ export function inspect(): DevSnapshot[] {
 /** Number of registered nodes (mostly for tests / a panel header). */
 export function devNodeCount(): number {
   return registry.size;
+}
+
+/** A directed edge `from → to`: reading `from` triggers a recompute of `to` (a computed/effect). */
+export interface DevEdge {
+  from: number;
+  to: number;
+}
+
+/**
+ * The live reactive graph: every registered node plus the edges between them. An edge is
+ * derived from a computation's internal `sources` — for each registered computed/effect,
+ * every source that is ALSO a registered node yields `source → thisNode` ("source triggers
+ * this"). Signals are leaves (no sources). This is the data behind the panel's "who triggers
+ * whom" view.
+ */
+export function inspectGraph(): { nodes: DevSnapshot[]; edges: DevEdge[] } {
+  const edges: DevEdge[] = [];
+  for (const [id, node] of internalNodes) {
+    const sources: Set<unknown> | undefined = (node as { sources?: Set<unknown> }).sources;
+    if (!sources) continue; // signals have no `sources` — they're graph leaves
+    for (const src of sources) {
+      const from: number | undefined = nodeToId.get(src as object);
+      if (from !== undefined) edges.push({ from, to: id });
+    }
+  }
+  return { nodes: inspect(), edges };
 }

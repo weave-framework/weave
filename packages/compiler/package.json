@@ -1,6 +1,6 @@
 {
   "name": "@weave-framework/compiler",
-  "version": "0.2.140",
+  "version": "0.2.141",
   "description": "Weave template compiler — parses .weave/.html templates to fine-grained DOM code.",
   "type": "module",
   "sideEffects": false,

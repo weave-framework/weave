@@ -186,7 +186,7 @@ export function signal<T>(initial: T, opts: { equals?: (a: T, b: T) => boolean; 
     // Register the TRACKED getter (`read`), not the raw value — so a devtools consumer that
     // reads `inspect()` inside an effect (the panel) subscribes and re-renders on change.
     // Outside a reactive context `track()` no-ops, so a plain `inspect()` snapshot is unchanged.
-    currentOwner?._disposers.push(registerDevNode('signal', opts.name, read));
+    currentOwner?._disposers.push(registerDevNode('signal', opts.name, read, node));
   }
   read.set = (next) => {
     const value: T = typeof next === 'function' ? (next as (prev: T) => T)(node.value) : next;
@@ -237,7 +237,7 @@ export function computed<T>(fn: () => T, opts: { equals?: (a: T, b: T) => boolea
     return c.value as T;
   };
   if (isDevtoolsEnabled() && opts.name) {
-    owner?._disposers.push(registerDevNode('computed', opts.name, get));
+    owner?._disposers.push(registerDevNode('computed', opts.name, get, c));
   }
   return get;
 }
@@ -273,7 +273,7 @@ export function effect(fn: () => void | (() => void), opts: { name?: string } = 
   // Register with the active ownership scope so a block tears this effect down on unmount.
   if (currentOwner) currentOwner._disposers.push(stop);
   if (isDevtoolsEnabled() && opts.name) {
-    currentOwner?._disposers.push(registerDevNode('effect', opts.name));
+    currentOwner?._disposers.push(registerDevNode('effect', opts.name, undefined, c));
   }
   return stop;
 }

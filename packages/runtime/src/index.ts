@@ -29,11 +29,13 @@ export {
   enableDevtools,
   isDevtoolsEnabled,
   inspect,
+  inspectGraph,
   devNodeCount,
   onDevtoolsChange,
   type DevKind,
   type DevNode,
   type DevSnapshot,
+  type DevEdge,
 } from './devtools.js';
 
 export { mountDevtoolsPanel, type DevtoolsPanelOptions } from './devtools-panel.js';

@@ -14,7 +14,7 @@
  */
 import { signal, effect } from './reactive.js';
 import type { Signal } from './reactive.js';
-import { inspect, onDevtoolsChange, isDevtoolsEnabled, type DevSnapshot, type DevKind } from './devtools.js';
+import { inspectGraph, onDevtoolsChange, isDevtoolsEnabled, type DevSnapshot, type DevKind } from './devtools.js';
 
 export interface DevtoolsPanelOptions {
   /** Where to dock the panel. Default `'bottom-right'`. */
@@ -101,8 +101,20 @@ export function mountDevtoolsPanel(options: DevtoolsPanelOptions = {}): () => vo
   const stop: () => void = effect(() => {
     version();
     const q: string = filter().toLowerCase();
-    const rows: DevSnapshot[] = inspect().filter((n) => !q || n.name.toLowerCase().includes(q));
-    const total: number = isDevtoolsEnabled() ? inspect().length : 0;
+    // The whole graph: nodes (with live values, tracked) + edges (who triggers whom).
+    const graph: { nodes: DevSnapshot[]; edges: { from: number; to: number }[] } = inspectGraph();
+    const nameById: Map<number, string> = new Map<number, string>(graph.nodes.map((n) => [n.id, n.name]));
+    // Per node, the names of the registered sources it reads ("← deps").
+    const depsById: Map<number, string[]> = new Map<number, string[]>();
+    for (const e of graph.edges) {
+      const name: string | undefined = nameById.get(e.from);
+      if (!name) continue;
+      const arr: string[] = depsById.get(e.to) ?? [];
+      arr.push(name);
+      depsById.set(e.to, arr);
+    }
+    const rows: DevSnapshot[] = graph.nodes.filter((n) => !q || n.name.toLowerCase().includes(q));
+    const total: number = isDevtoolsEnabled() ? graph.nodes.length : 0;
     title.textContent = `Weave DevTools · ${rows.length}/${total}`;
 
     list.textContent = '';
@@ -129,6 +141,14 @@ export function mountDevtoolsPanel(options: DevtoolsPanelOptions = {}): () => vo
         val.textContent = '= ' + formatValue(n.value);
       }
       row.append(kind, name, val);
+      const deps: string[] | undefined = depsById.get(n.id);
+      if (deps && deps.length > 0) {
+        const dep: HTMLSpanElement = document.createElement('span');
+        dep.textContent = '← ' + deps.join(', ');
+        dep.title = 'reads (triggered by)';
+        dep.style.cssText = 'flex:none;color:#6e7681;font-style:italic';
+        row.appendChild(dep);
+      }
       list.appendChild(row);
     }
   });

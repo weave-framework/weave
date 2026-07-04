@@ -5,6 +5,7 @@ import {
   effect,
   enableDevtools,
   inspect,
+  inspectGraph,
   devNodeCount,
   onDevtoolsChange,
   createOwner,
@@ -68,6 +69,25 @@ test('devtools: onDevtoolsChange fires on register + unregister; unsubscribe sto
   runInOwner(owner2, () => void signal(2, { name: 'dt-chg2' }));
   assert.equal(changes, afterDispose, 'no more fires after unsubscribe');
   disposeOwner(owner2);
+  enableDevtools(false);
+});
+
+test('inspectGraph: an edge connects a source to the computed that reads it', () => {
+  enableDevtools(true);
+  const owner: Owner = createOwner();
+  runInOwner(owner, () => {
+    const s: Signal<number> = signal(2, { name: 'g-src' });
+    const d: Computed<number> = computed(() => s() * 2, { name: 'g-double' });
+    d(); // realize the memo so it links to its source
+    const graph: { nodes: DevSnapshot[]; edges: { from: number; to: number }[] } = inspectGraph();
+    const srcId: number = graph.nodes.find((n) => n.name === 'g-src')!.id;
+    const dblId: number = graph.nodes.find((n) => n.name === 'g-double')!.id;
+    assert.ok(
+      graph.edges.some((e) => e.from === srcId && e.to === dblId),
+      'edge g-src → g-double (source triggers the computed)'
+    );
+  });
+  disposeOwner(owner);
   enableDevtools(false);
 });
 

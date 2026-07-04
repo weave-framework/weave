@@ -1,6 +1,7 @@
 import { test, assert } from '../../../tools/harness.js';
 import {
   signal,
+  computed,
   enableDevtools,
   createOwner,
   runInOwner,
@@ -8,6 +9,7 @@ import {
   mountDevtoolsPanel,
   type Owner,
   type Signal,
+  type Computed,
 } from '@weave-framework/runtime';
 
 const panelEl = (): HTMLElement | null => document.querySelector('[data-weave-devtools]');
@@ -39,6 +41,22 @@ test('mountDevtoolsPanel lists nodes, updates live on value + registry change, d
   assert.equal(panelEl(), null, 'dispose removes the panel from the DOM');
   disposeOwner(owner);
   disposeOwner(owner2);
+  enableDevtools(false);
+});
+
+test('mountDevtoolsPanel shows dependency edges (← source) for a computed', () => {
+  enableDevtools(true);
+  const owner: Owner = createOwner();
+  runInOwner(owner, () => {
+    const s: Signal<number> = signal(3, { name: 'dep-src' });
+    const d: Computed<number> = computed(() => s() * 2, { name: 'dep-double' });
+    d(); // realize so the edge links
+  });
+  const dispose: () => void = mountDevtoolsPanel();
+  assert.ok(listText().includes('dep-double'), 'computed is listed');
+  assert.ok(listText().includes('← dep-src'), 'shows its dependency (who triggers it)');
+  dispose();
+  disposeOwner(owner);
   enableDevtools(false);
 });
 
