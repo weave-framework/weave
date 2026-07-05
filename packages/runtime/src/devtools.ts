@@ -11,6 +11,7 @@
  * A visual panel (component tree · live values · "who triggers whom" graph) builds on top.
  */
 
+/** The kind of a registered devtools node — a `signal`, a `computed`, or an `effect`. */
 export type DevKind = 'signal' | 'computed' | 'effect';
 
 /**

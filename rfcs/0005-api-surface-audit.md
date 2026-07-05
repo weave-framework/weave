@@ -60,8 +60,8 @@ public contract to stabilise.
   `runtime/dom` surface dropped **51 → 21** (public: `mount`/`mountComponent`/`defineComponent`/`lazy`/`Portal`/
   `Teleport`/`Dynamic`/`KeepAlive`/`transition`/`ErrorBoundary`/`defineCustomElement` + types). Emitted code still
   imports the helpers (they stay exported); typecheck + 1062 tests + docs build green.
-- [ ] Skim the other 7 entries for any accidental export (none found in this pass, but confirm on the final diff).
-- [ ] Confirm every *public* export has a doc comment (api-gen already surfaces them; fill gaps).
+- [x] Skim the other 7 entries for any accidental export — confirmed: after the `runtime/dom` split the documented surface is **151 exports** (runtime 51 · runtime-dom 21 · router 30 · forms 17 · data 17 · i18n 13 · forms-dom 1 · store 1); all intentional public API, no strays.
+- [x] Confirm every *public* export has a doc comment — filled the last **13 gaps** (Router/RouteParams, Field/GroupOptions, I18n/I18nConfig, resource + Client/ClientOptions/RequestOptions/ResourceOptions, DevKind/DevtoolsPanelOptions). api-gen now reports **0** undocumented public exports.
 - [x] Finalise `VERSIONING.md`: the stability promise applies to the audited public surface; breaking = deprecate-first, major-only. (Covers documented exports + props + template syntax + UI token/ARIA contract; now cross-links this audit and states `@internal` helpers carry no promise.)
 - [x] Deprecation policy in place (how a symbol is marked deprecated and for how long) — deprecate-first, warnings to the replacement, kept until at least the next major (`VERSIONING.md` → "When a breaking change is genuinely needed").
 - [ ] Bump to **1.0.0** + CHANGELOG / RELEASE-NOTES entry; then launch ([[weave-launch-sequencing]]).

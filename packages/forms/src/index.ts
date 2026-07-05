@@ -60,6 +60,7 @@ export interface Control<T> {
   touchAll: () => void;
 }
 
+/** A single reactive form control — a `value` signal plus validity / touched / dirty state. Created by {@link field}. */
 export interface Field<T> extends Control<T> {
   /** The editable value — bind it with `bind:value={field.value}`. (A `Signal`, so also callable.) */
   value: Signal<T>;
@@ -175,6 +176,7 @@ export type FormValidator<C extends Controls> = (values: ValuesOf<C>) => Record<
 /** Reserved key in a {@link FormValidator} result for a group-level (not field-bound) error. */
 export const FORM_ERROR_KEY: '_form' = '_form';
 
+/** Options for {@link group} — currently a group-level cross-field `validate` over the group's own values. */
 export interface GroupOptions<C extends Controls> {
   /** Cross-field validation over this group's own values snapshot (e.g. password confirm). */
   validate?: FormValidator<C>;

@@ -22,6 +22,7 @@ import { signal, computed, effect, batch, onCleanup, getOwner, createContext, pr
 import type { Signal, Computed, Context } from '@weave-framework/runtime';
 import { ifBlock, transition, type Component, type TransitionFn } from '@weave-framework/runtime/dom';
 
+/** Path parameters matched from the URL, as a string map (`/users/:id` → `{ id: '42' }`). */
 export type RouteParams = Record<string, string>;
 
 /** Context handed to a guard: the resolved path, accumulated path params, and query. */
@@ -408,6 +409,7 @@ function resolveLevel(
   return null;
 }
 
+/** A router instance — owns its reactive URL state and resolves the matched route chain. Created by {@link createRouter}; reach the ambient one with {@link useRouter}. */
 export interface Router {
   /** The match at `depth` in the resolved chain (default 0 — the top component), or null. */
   matched: (depth?: number) => Match | null;

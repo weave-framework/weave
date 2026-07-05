@@ -28,6 +28,7 @@ export interface FetchInfo {
 /** Produces the data for a resource. Gets the (non-null) source value + abort info. */
 export type Fetcher<S, T> = (value: S, info: FetchInfo) => Promise<T> | T;
 
+/** Options for {@link resource} — currently an `initialValue` seed returned until the first fetch resolves. */
 export interface ResourceOptions<T> {
   /** Seed value before the first fetch resolves (data() returns this meanwhile). */
   initialValue?: T;
@@ -50,6 +51,11 @@ export interface Resource<T> {
 /** A source value of `undefined | null | false` means "not ready" — the fetcher is skipped. */
 type SourceValue<S> = S | undefined | null | false;
 
+/**
+ * Create a reactive {@link Resource} from an async `fetcher`, optionally driven by a reactive `source`:
+ * `resource(fetcher, opts?)` or `resource(source, fetcher, opts?)`. The fetcher re-runs whenever the
+ * source changes; a `source` of `undefined` / `null` / `false` means "not ready" and skips the fetch.
+ */
 export function resource<T>(fetcher: Fetcher<true, T>, options?: ResourceOptions<T>): Resource<T>;
 export function resource<S, T>(
   source: () => SourceValue<S>,
@@ -281,6 +287,7 @@ export type RequestHandler = (req: WeaveRequest) => Promise<Response>;
  */
 export type Interceptor = (req: WeaveRequest, next: RequestHandler) => Promise<Response>;
 
+/** Options for {@link createClient} — base URL, default headers, an error hook, an interceptor chain, and a `fetch` override. */
 export interface ClientOptions {
   /** Prepended to every request path. */
   baseUrl?: string;
@@ -294,6 +301,7 @@ export interface ClientOptions {
   fetch?: typeof fetch;
 }
 
+/** Per-request options — a `json` body shortcut, raw `body`, query `params`, plus the standard `RequestInit` fields. */
 export interface RequestOptions extends Omit<RequestInit, 'body' | 'method'> {
   /** Body shortcut: JSON-stringified, with `Content-Type: application/json` set. */
   json?: unknown;
@@ -303,6 +311,7 @@ export interface RequestOptions extends Omit<RequestInit, 'body' | 'method'> {
   params?: Record<string, string | number | boolean>;
 }
 
+/** An HTTP client — `get` / `post` / `put` / `patch` / `delete` (and a generic `request`) over a shared config. Created by {@link createClient}. */
 export interface Client {
   request<T = unknown>(method: string, path: string, opts?: RequestOptions): Promise<T>;
   get<T = unknown>(path: string, opts?: RequestOptions): Promise<T>;

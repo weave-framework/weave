@@ -30,6 +30,7 @@ import {
 /** Which view the panel shows. */
 type PanelView = 'nodes' | 'trace' | 'tree';
 
+/** Options for {@link mountDevtoolsPanel} — where to dock the floating panel and which container to mount it into. */
 export interface DevtoolsPanelOptions {
   /** Where to dock the panel. Default `'bottom-right'`. */
   position?: 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';

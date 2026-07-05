@@ -30,6 +30,7 @@ export interface Messages {
 /** Loads the messages for a language — and optionally a lazy *scope* within it. */
 export type Loader = (lang: string, scope?: string) => Messages | Promise<Messages>;
 
+/** Configuration for {@link createI18n} — initial / fallback language, eager messages, a lazy `loader`, and the missing-key handler. */
 export interface I18nConfig {
   /** Initial active language. */
   lang: string;
@@ -50,6 +51,7 @@ export interface I18nConfig {
 /** A translate function bound to a (root or scoped) message namespace. */
 export type TranslateFn = (key: string, params?: FormatParams) => string;
 
+/** An i18n instance — the reactive `locale()`, the known languages, and `t()` translate functions. Created by {@link createI18n}. */
 export interface I18n {
   /** Active language. Reactive — read it to subscribe. */
   locale(): string;
