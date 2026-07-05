@@ -118,6 +118,10 @@ function extract(pkg) {
     }
     const decl = real.declarations?.[0];
     if (!decl) continue;
+    // Skip `@internal` exports (RFC 0005): the compiler-emitted `runtime/dom` helpers stay
+    // exported (generated code imports them by name) but are not part of the documented,
+    // semver-frozen public API — so they must not appear in the API reference.
+    if (real.getJsDocTags(checker).some((t) => t.name === 'internal')) continue;
     const kind = kindOf(decl);
     const doc = ts.displayPartsToString(real.getDocumentationComment(checker)).trim();
 

@@ -17,7 +17,7 @@ import type { Signal, Owner } from './reactive.js';
 
 /* ──────────────────────────── structure ──────────────────────────── */
 
-/** Parse an HTML string into a reusable, cached `<template>`. Parsed once. */
+/** Parse an HTML string into a reusable, cached `<template>`. Parsed once. @internal */
 export function template(html: string): HTMLTemplateElement {
   const tpl: HTMLTemplateElement = document.createElement('template');
   tpl.innerHTML = html;
@@ -33,6 +33,7 @@ export function template(html: string): HTMLTemplateElement {
  * `@if`/`@for`/`@key` body, a component/slot root — so those nodes are real SVG
  * elements. We parse inside a throw-away `<svg>` wrapper, then lift the children
  * into a fresh template (they keep their SVG namespace once created).
+ * @internal
  */
 export function templateSvg(html: string): HTMLTemplateElement {
   const wrap: HTMLTemplateElement = document.createElement('template');
@@ -43,13 +44,13 @@ export function templateSvg(html: string): HTMLTemplateElement {
   return tpl;
 }
 
-/** Clone a template's single root node (the common single-root component case). */
+/** Clone a template's single root node (the common single-root component case). @internal */
 export function clone(tpl: HTMLTemplateElement): Element {
   const root: Element | ChildNode | null = tpl.content.firstElementChild ?? tpl.content.firstChild;
   return root!.cloneNode(true) as Element;
 }
 
-/** Clone a template's whole content as a fragment (multi-root components). */
+/** Clone a template's whole content as a fragment (multi-root components). @internal */
 export function cloneFragment(tpl: HTMLTemplateElement): DocumentFragment {
   return tpl.content.cloneNode(true) as DocumentFragment;
 }
@@ -57,6 +58,7 @@ export function cloneFragment(tpl: HTMLTemplateElement): DocumentFragment {
 /**
  * Walk to a descendant by child-index path, resolved at compile time.
  * `child(root, 1)` → root.childNodes[1]; `child(root, 1, 0)` → root.childNodes[1].childNodes[0].
+ * @internal
  */
 export function child(node: Node, ...path: number[]): Node {
   let n: Node = node;
@@ -64,14 +66,14 @@ export function child(node: Node, ...path: number[]): Node {
   return n;
 }
 
-/** Insert a comment placeholder, the stable anchor a dynamic region renders before. */
+/** Insert a comment placeholder, the stable anchor a dynamic region renders before. @internal */
 export function anchor(parent: Node, before: Node | null = null): Comment {
   const c: Comment = document.createComment('');
   parent.insertBefore(c, before);
   return c;
 }
 
-/** Insert `node` into `parent` before `before` (or append). */
+/** Insert `node` into `parent` before `before` (or append). @internal */
 export function insert(parent: Node, node: Node, before: Node | null = null): void {
   parent.insertBefore(node, before);
 }
@@ -88,12 +90,12 @@ function stringify(v: unknown): string {
   return v == null || v === false ? '' : String(v);
 }
 
-/** Static text at an anchor (compiler-classified non-reactive expression). */
+/** Static text at an anchor (compiler-classified non-reactive expression). @internal */
 export function setText(anchorNode: Comment, value: unknown): void {
   textBefore(anchorNode).data = stringify(value);
 }
 
-/** Reactive text: one effect, one text node, updated in place. */
+/** Reactive text: one effect, one text node, updated in place. @internal */
 export function bindText(anchorNode: Comment, fn: () => unknown): void {
   const t: Text = textBefore(anchorNode);
   effect(() => {
@@ -113,24 +115,24 @@ function applyAttr(el: Element, name: string, value: unknown): void {
   }
 }
 
-/** Static attribute (boolean/null aware). */
+/** Static attribute (boolean/null aware). @internal */
 export function setAttr(el: Element, name: string, value: unknown): void {
   applyAttr(el, name, value);
 }
 
-/** Reactive attribute. */
+/** Reactive attribute. @internal */
 export function bindAttr(el: Element, name: string, fn: () => unknown): void {
   effect(() => applyAttr(el, name, fn()));
 }
 
-/** Reactive DOM property (e.g. `.value`, `.checked`). */
+/** Reactive DOM property (e.g. `.value`, `.checked`). @internal */
 export function bindProp(el: Element, name: string, fn: () => unknown): void {
   effect(() => {
     (el as unknown as Record<string, unknown>)[name] = fn();
   });
 }
 
-/** Toggle a single class reactively (`class:done={cond}`). */
+/** Toggle a single class reactively (`class:done={cond}`). @internal */
 export function bindClass(el: Element, name: string, fn: () => unknown): void {
   effect(() => {
     el.classList.toggle(name, !!fn());
@@ -141,6 +143,7 @@ export function bindClass(el: Element, name: string, fn: () => unknown): void {
  * Set one inline style property reactively (`style:color={c}`, `style:--accent={hex}`). A
  * `--custom` name sets a CSS custom property (great for theming — bind a token to a signal);
  * any other name sets a standard property. A `null`/`undefined`/`false` value removes it.
+ * @internal
  */
 export function bindStyleProp(el: Element, name: string, fn: () => unknown): void {
   const style: CSSStyleDeclaration = (el as HTMLElement).style;
@@ -155,6 +158,7 @@ export function bindStyleProp(el: Element, name: string, fn: () => unknown): voi
  * `show={expr}` — toggle visibility via `display` (the element stays in the DOM,
  * unlike `@if` which removes it). Preserves the element's own inline `display`
  * when shown; sets `display: none` when hidden.
+ * @internal
  */
 export function bindShow(el: HTMLElement, fn: () => unknown): void {
   const original: string = el.style.display === 'none' ? '' : el.style.display;
@@ -165,7 +169,7 @@ export function bindShow(el: HTMLElement, fn: () => unknown): void {
 
 /* ──────────────────────────── events / refs ──────────────────────────── */
 
-/** Attach an event listener. Static — handlers are never reactive. */
+/** Attach an event listener. Static — handlers are never reactive. @internal */
 export function listen(
   el: Element,
   type: string,
@@ -175,7 +179,7 @@ export function listen(
   el.addEventListener(type, handler, opts);
 }
 
-/** Assign an element reference to a signal or a callback (`ref={el}` / `bind:this`). */
+/** Assign an element reference to a signal or a callback (`ref={el}` / `bind:this`). @internal */
 export function setRef(target: Signal<Element | null> | ((el: Element) => void), el: Element): void {
   if (typeof target === 'function' && 'set' in target) {
     (target as Signal<Element | null>).set(el);
@@ -210,6 +214,7 @@ export type Action<A = void> = (el: Element, arg: A) => void | (() => void) | Ac
  * microtask fires. The argument is passed as a getter, so a **reactive** action returns
  * `{ update, destroy }`: `update(arg)` re-runs when `use:action={arg}` changes, `destroy()`
  * on removal. A plain action may still just return a teardown fn (now wired to disposal).
+ * @internal
  */
 export function applyAction<A = void>(el: Element, action: Action<A>, argFn?: () => A): void {
   onMount(() => {
@@ -267,6 +272,7 @@ interface Outroable extends ChildNode {
  * the element's transition. Enter phases fire around the intro (mount) animation, leave
  * phases around the outro (removal) animation; `*start` fires as the animation begins,
  * `*end` when it finishes (or immediately, if the element has no transition of that mode).
+ * @internal
  */
 export function transitionEvent(el: Element, phase: TransitionPhase, handler: () => void): void {
   const n: Outroable = el as unknown as Outroable;
@@ -323,7 +329,7 @@ export function transition(
   if (mode !== 'in') (node as Outroable).__wOut = () => playTransition(node, fn(node, params), false);
 }
 
-/** Remove a node, first playing (and awaiting) its registered outro if it has one. */
+/** Remove a node, first playing (and awaiting) its registered outro if it has one. @internal */
 export function removeWithOutro(node: ChildNode): void {
   const out: (() => Promise<void>) | undefined = (node as Outroable).__wOut;
   if (out) out().then(() => node.remove());
@@ -345,6 +351,7 @@ export function removeWithOutro(node: ChildNode): void {
  * Text inputs are IME-safe: the DOM is not overwritten mid-composition, and the
  * signal is written once composition ends. The signal is the source of truth, so
  * we only assign back to the DOM when the value actually differs (no caret jump).
+ * @internal
  */
 export function bindValue(el: Element, sig: Signal<unknown>, kind: 'value' | 'checked' | 'group'): void {
   if (kind === 'checked') {
@@ -429,6 +436,7 @@ export function bindValue(el: Element, sig: Signal<unknown>, kind: 'value' | 'ch
  * (a component / fragment / text body) is the live span from `node` to `end` inclusive,
  * bracketed by marker comments so the reconciler can move or remove it as one unit
  * even as its inner node count changes.
+ * @internal
  */
 export interface Row {
   key: unknown;
@@ -510,6 +518,7 @@ function getSequence(arr: number[]): number[] {
  *
  * Rows are single-root (the common `@for` over `<li>`/component case).
  * `end` is a stable anchor (comment) marking the end of the list region.
+ * @internal
  */
 export function reconcileKeyed<T>(
   parent: Node,
@@ -582,6 +591,7 @@ function placeBefore(parent: Node, node: Node, anchorNode: Node): ChildNode[] {
  * `@if` / `@else` / `@switch`. `selector` returns the chosen branch's render
  * function (a stable reference — same branch ⇒ no remount), or null. The branch
  * runs in its own ownership scope so its effects are disposed when it unmounts.
+ * @internal
  */
 export function ifBlock(anchor: Comment, selector: () => (() => Node | null) | null): void {
   // Capture the *construction-time* (lexical) owner. Branch owners parent to it so
@@ -624,6 +634,7 @@ export function ifBlock(anchor: Comment, selector: () => (() => Node | null) | n
  * the current `tag`, wiring its attributes/children via `build`, and **re-creates**
  * it (disposing the old one's effects) whenever `tag` changes. Built on `ifBlock`,
  * deduping by tag string so an unrelated re-render doesn't needlessly rebuild.
+ * @internal
  */
 export function dynElement(
   anchor: Comment,
@@ -657,6 +668,7 @@ export function dynElement(
  * `@key (expr) { … }` — tear down and re-create `content` whenever `key` changes
  * (fresh DOM + effects; replays mount-time work). Built on `ifBlock`: a new thunk
  * per distinct key forces a swap, while an unchanged key leaves the DOM untouched.
+ * @internal
  */
 export function keyBlock(anchor: Comment, key: () => unknown, content: () => Node | null): void {
   const NONE: symbol = Symbol();
@@ -695,6 +707,7 @@ interface EachRow<T> extends Row {
  * variables that update across reorders. Each row owns its effects (disposed on
  * removal). Uses {@link reconcileKeyed} for minimal DOM moves. Rows are
  * single-root (a `@for` body wraps one element). `emptyRender` is the `@empty`.
+ * @internal
  */
 export function eachBlock<T>(
   anchor: Comment,
@@ -833,6 +846,7 @@ function firstElement(nodes: ChildNode[]): Element | null {
  * construction-time owner, like {@link ifBlock}), so effects dispose on unmount/swap and
  * context still resolves. `viewport`/`interaction`/`hover` observe the placeholder's root
  * element; with no placeholder they fire immediately (nothing to observe).
+ * @internal
  */
 export function deferBlock(
   anchor: Comment,
@@ -974,6 +988,7 @@ function isResource(x: unknown): x is ResourceLike {
  * (e.g. `@await fetchUser(id())` as `id` changes) the block re-enters `pending` and settles
  * the new Promise. A stale Promise resolving after the source moved on is ignored (token
  * guard). A stable source with no dependencies simply reads once, as before.
+ * @internal
  */
 export function awaitBlock(
   anchor: Comment,
@@ -1027,6 +1042,7 @@ export function awaitBlock(
  * single node, a fragment (its children are inserted), or null (no-op). The
  * child instantiates within the current ownership scope, so its effects are
  * disposed when the surrounding region unmounts.
+ * @internal
  */
 export function mountChild(anchorNode: Comment, node: Node | null): void {
   if (node) anchorNode.parentNode!.insertBefore(node, anchorNode);

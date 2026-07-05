@@ -1,6 +1,6 @@
 # RFC 0005: Public API surface audit (freeze prep)
 
-- **Status:** Draft — 2026-07-05
+- **Status:** In progress — 2026-07-05 (the `runtime/dom` split is **done** via option 1; `VERSIONING.md` + 1.0 bump remain)
 - **Author(s):** Aidas Josas (@aidasjosas) — audit produced by the maintainer's agent as the
   pre-1.0 **API-freeze** groundwork ([[weave-launch-sequencing]]).
 - **Discussion:** a findings + checklist doc. The public/internal *decisions* are the
@@ -55,7 +55,11 @@ public contract to stabilise.
 
 ## Freeze checklist (the actual 1.0 gate)
 
-- [ ] **Resolve the `runtime/dom` split** (option 1 or 2 above) so the public surface is only the intended user API.
+- [x] **Resolve the `runtime/dom` split** — done via **option 1**: the 29 compiler-emitted helpers + the internal
+  `Row` type are `@internal`-tagged in `dom.ts`, and `docs/tools/gen-api.mjs` skips `@internal` exports. The documented
+  `runtime/dom` surface dropped **51 → 21** (public: `mount`/`mountComponent`/`defineComponent`/`lazy`/`Portal`/
+  `Teleport`/`Dynamic`/`KeepAlive`/`transition`/`ErrorBoundary`/`defineCustomElement` + types). Emitted code still
+  imports the helpers (they stay exported); typecheck + 1062 tests + docs build green.
 - [ ] Skim the other 7 entries for any accidental export (none found in this pass, but confirm on the final diff).
 - [ ] Confirm every *public* export has a doc comment (api-gen already surfaces them; fill gaps).
 - [ ] Finalise `VERSIONING.md`: the stability promise applies to the audited public surface; breaking = deprecate-first, major-only.
