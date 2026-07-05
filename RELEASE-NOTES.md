@@ -3,6 +3,23 @@
 Human-readable highlights, one section per release — everything notable that landed since
 the previous one. For the granular, per-version log see [CHANGELOG.md](CHANGELOG.md).
 
+## 1.0.12 — 2026-07-05
+
+### ✨ Feature — `weave dev` proxy (`dev.proxy`)
+- **`weave dev` can now proxy API calls to your backend, so they stay same-origin** (no CORS,
+  and `HttpOnly` cookie auth just works). Config it like Vite/Angular/Next:
+  ```ts
+  dev: { proxy: { '/api': 'http://localhost:5201' } }                     // shorthand
+  dev: { proxy: { '/api': { target: '…', changeOrigin: true, rewrite: { '^/api': '' } } } }
+  ```
+  A request is proxied when its path equals a key or starts with `key + '/'` (so `/api` matches
+  `/api` and `/api/x`, but not `/apiary`); the first match wins and runs before Weave's own dev
+  routes. The request (method/headers/body/query) is streamed to the backend and the response
+  piped back unchanged, so `Cookie` and `Set-Cookie` pass through both ways; `changeOrigin`
+  (default `true`) sets the forwarded `Host`, and `rewrite` rewrites the path only (the query is
+  preserved). An unreachable backend returns `502` without crashing the dev server. Dev-only —
+  production builds are already same-origin. Built on Node's `http`/`https`, no new dependencies.
+
 ## 1.0.10 — 2026-07-05
 
 ### 🐛 Fix — `@weave-framework/ui` is now consumable from a real app

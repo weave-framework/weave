@@ -10,6 +10,18 @@
 > `pnpm publish:packages`) — pushing code does **not** publish to npm. (The scheme started at
 > `0.2.0`; the line crossed `1.0.0` on 2026-07-05 when the public API was frozen.)
 
+## 1.0.12 — 2026-07-05
+
+**Feature (cli) — `weave dev` proxy (`dev.proxy`).** A Vite/Angular/Next-style dev proxy so an app's API calls stay
+same-origin in dev (no CORS; `HttpOnly` cookie auth works): `dev: { proxy: { '/api': 'http://localhost:5201' } }`
+(shorthand) or the full `{ target, changeOrigin, rewrite }` form. A request is proxied when its path equals a key or
+starts with `key + '/'` (`/api` matches `/api`/`/api/x`, not `/apiary`; first key wins), checked before the dev
+server's own routes. Method/headers/body/query stream to the backend and the response pipes back unchanged, so
+`Cookie`/`Set-Cookie` pass both ways; `changeOrigin` (default `true`) sets the forwarded `Host`; `rewrite` rewrites
+the path only (query preserved); an unreachable backend → `502`, no crash. Dev-only, zero new deps (Node
+`http`/`https`). Pinned by a new `verify:dev-proxy` gate (boots the real dev server + a throwaway backend; 5 checks
+fail without the proxy).
+
 ## 1.0.10 — 2026-07-05
 
 **Fix (ui) — `@weave-framework/ui` dist now ships a real `export default`, so components are consumable in a real
