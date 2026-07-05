@@ -64,13 +64,16 @@ export function setup(): ShellSetup {
 
   // Build a group's links as a Node for an Expansion body — composing the REAL router <Link>
   // (a callable component returning an <a> with navigation + active state), not a re-created link.
+  // `exact`: every sidebar item is a distinct leaf page, so match the path exactly. Without it,
+  // Link's default prefix-by-segment matching keeps a section-root item (e.g. Examples "Overview"
+  // at `/examples`) highlighted on every child route (`/examples/dashboard`, …) — two active items.
   const buildGroupLinks = (items: NavItem[]): Node => {
     const box: HTMLElement = document.createElement('div');
     box.className = 'nav-group-links';
     for (const it of items) {
       box.appendChild(
         Link(
-          { to: it.path, class: 'nav-link', activeClass: 'active' },
+          { to: it.path, class: 'nav-link', activeClass: 'active', exact: true },
           { default: () => document.createTextNode(it.label) },
         ) as Node,
       );
