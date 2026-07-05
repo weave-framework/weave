@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/schema",
+  "executors": {
+    "build": {
+      "implementation": "./dist/executors/build/executor.js",
+      "schema": "./dist/executors/build/schema.json",
+      "description": "Run `weave build` for a Weave project."
+    },
+    "serve": {
+      "implementation": "./dist/executors/serve/executor.js",
+      "schema": "./dist/executors/serve/schema.json",
+      "description": "Run `weave dev` (watch + live-reload) for a Weave project."
+    },
+    "check": {
+      "implementation": "./dist/executors/check/executor.js",
+      "schema": "./dist/executors/check/schema.json",
+      "description": "Run `weave check` — type-check a Weave project."
+    }
+  }
+}

@@ -1,18 +1,21 @@
 {
-  "name": "@weave-framework/check",
+  "name": "@weave-framework/nx",
   "version": "0.2.156",
-  "description": "Weave template type-checking — virtual .ts generation + tsc, mapped back to source.",
+  "description": "Nx plugin for Weave — inferred build/serve/check targets (crystal createNodesV2), executors, and generators, so a Weave app is a first-class project in an Nx monorepo.",
   "type": "module",
-  "sideEffects": false,
   "main": "./src/index.ts",
-  "module": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
-    "./emit": "./src/emit.ts"
+    "./plugin": "./src/plugin.ts"
   },
+  "executors": "./executors.json",
+  "generators": "./generators.json",
   "files": [
-    "dist"
+    "dist",
+    "executors.json",
+    "generators.json",
+    "README.md"
   ],
   "engines": {
     "node": ">=18"
@@ -20,29 +23,28 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/weave-framework/weave.git",
-    "directory": "packages/check"
+    "directory": "packages/nx"
   },
   "publishConfig": {
     "access": "public",
     "main": "./dist/index.js",
-    "module": "./dist/index.js",
     "types": "./dist/index.d.ts",
     "exports": {
       ".": {
         "types": "./dist/index.d.ts",
         "import": "./dist/index.js"
       },
-      "./emit": {
-        "types": "./dist/emit.d.ts",
-        "import": "./dist/emit.js"
+      "./plugin": {
+        "types": "./dist/plugin.d.ts",
+        "import": "./dist/plugin.js"
       }
     }
   },
   "dependencies": {
-    "@weave-framework/compiler": "workspace:*"
+    "@nx/devkit": "^23.0.1"
   },
   "peerDependencies": {
-    "typescript": "^5.7.0"
+    "nx": ">=21.0.0"
   },
   "license": "MIT"
 }

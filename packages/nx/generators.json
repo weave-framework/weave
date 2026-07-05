@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/schema",
+  "generators": {
+    "application": {
+      "factory": "./dist/generators/application/generator.js",
+      "schema": "./dist/generators/application/schema.json",
+      "description": "Create a Weave application project.",
+      "aliases": ["app"]
+    },
+    "library": {
+      "factory": "./dist/generators/library/generator.js",
+      "schema": "./dist/generators/library/schema.json",
+      "description": "Create a Weave library project.",
+      "aliases": ["lib"]
+    },
+    "component": {
+      "factory": "./dist/generators/component/generator.js",
+      "schema": "./dist/generators/component/schema.json",
+      "description": "Create a Weave component in a project.",
+      "aliases": ["c"]
+    }
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/schema",
+  "$id": "WeaveApplication",
+  "title": "Create a Weave application",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Application name.",
+      "$default": { "$source": "argv", "index": 0 },
+      "x-prompt": "What name would you like to use for the application?"
+    },
+    "directory": {
+      "type": "string",
+      "description": "Parent directory for the app (default 'apps')."
+    },
+    "style": {
+      "type": "string",
+      "enum": ["css", "scss"],
+      "description": "Stylesheet language.",
+      "default": "css"
+    }
+  },
+  "required": ["name"]
+}

@@ -12,3 +12,6 @@ allowBuilds:
   '@vscode/vsce-sign': false
   esbuild: true
   keytar: false
+  # nx ships a postinstall that sets up its native runner — needed to build/test the
+  # @weave-framework/nx plugin against a real Nx devkit in this workspace.
+  nx: true

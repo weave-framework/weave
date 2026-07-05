@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/schema",
+  "$id": "WeaveLibrary",
+  "title": "Create a Weave library",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Library name.",
+      "$default": { "$source": "argv", "index": 0 },
+      "x-prompt": "What name would you like to use for the library?"
+    },
+    "directory": {
+      "type": "string",
+      "description": "Parent directory for the library (default 'libs')."
+    },
+    "style": {
+      "type": "string",
+      "enum": ["css", "scss", "none"],
+      "description": "Stylesheet language (or none).",
+      "default": "css"
+    }
+  },
+  "required": ["name"]
+}

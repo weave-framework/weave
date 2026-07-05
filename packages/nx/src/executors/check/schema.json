@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json-schema.org/schema",
+  "version": 2,
+  "title": "Weave check executor",
+  "description": "Run `weave check` — type-check a Weave project's templates and components.",
+  "type": "object",
+  "properties": {},
+  "additionalProperties": false
+}

@@ -12,14 +12,33 @@
  * same order so pnpm's workspace:* → version rewrite resolves on the registry).
  */
 import { spawnSync } from 'node:child_process';
-import { rmSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { cpSync, mkdirSync, readdirSync, rmSync, statSync } from 'node:fs';
+import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 /** tsc-emit library packages, in dependency order. */
-const LIB_ORDER = ['runtime', 'compiler', 'store', 'i18n', 'data', 'forms', 'router', 'ui', 'check', 'mcp'];
+const LIB_ORDER = ['runtime', 'compiler', 'store', 'i18n', 'data', 'forms', 'router', 'ui', 'check', 'mcp', 'nx'];
+
+/** Copy every non-.ts asset under a package's src/ into its dist/ (e.g. Nx executor/generator
+ *  schema.json files, which tsc does not emit but the Nx manifests reference at dist paths). */
+function copyNonTsAssets(pkg) {
+  const srcDir = join(repo, 'packages', pkg, 'src');
+  const distDir = join(repo, 'packages', pkg, 'dist');
+  const walk = (dir) => {
+    for (const entry of readdirSync(dir)) {
+      const full = join(dir, entry);
+      if (statSync(full).isDirectory()) walk(full);
+      else if (!entry.endsWith('.ts')) {
+        const dest = join(distDir, relative(srcDir, full));
+        mkdirSync(dirname(dest), { recursive: true });
+        cpSync(full, dest);
+      }
+    }
+  };
+  walk(srcDir);
+}
 
 function run(cmd, args, label) {
   process.stdout.write(`\n▶ ${label}\n`);
@@ -38,6 +57,10 @@ for (const p of [...LIB_ORDER, 'cli']) {
 for (const p of LIB_ORDER) {
   run('npx', ['tsc', '-p', `packages/${p}/tsconfig.build.json`], `tsc build @weave-framework/${p}`);
 }
+
+// Nx plugin: copy the executor/generator schema.json assets tsc doesn't emit (the Nx
+// manifests reference them at dist/**/schema.json).
+copyNonTsAssets('nx');
 
 // CLI: declarations via tsc, runnable bundle via esbuild.
 run('npx', ['tsc', '-p', 'packages/cli/tsconfig.build.json'], 'tsc d.ts @weave-framework/cli');

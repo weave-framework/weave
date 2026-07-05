@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/schema",
+  "$id": "WeaveComponent",
+  "title": "Create a Weave component",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Component name (PascalCase or kebab-case).",
+      "$default": { "$source": "argv", "index": 0 },
+      "x-prompt": "What name would you like to use for the component?"
+    },
+    "project": {
+      "type": "string",
+      "description": "The project to add the component to.",
+      "$default": { "$source": "projectName" }
+    },
+    "directory": {
+      "type": "string",
+      "description": "Subdirectory under the project source root."
+    },
+    "style": {
+      "type": "string",
+      "enum": ["css", "scss", "none"],
+      "description": "Stylesheet language (or none).",
+      "default": "css"
+    }
+  },
+  "required": ["name", "project"]
+}
