@@ -16,11 +16,20 @@
  */
 
 import { context, type BuildContext, type Plugin, type PluginBuild, type BuildResult } from 'esbuild';
-import { createServer, type Server, type IncomingMessage, type ServerResponse } from 'node:http';
+import {
+  createServer,
+  request as httpRequest,
+  type Server,
+  type IncomingMessage,
+  type ServerResponse,
+  type ClientRequest,
+} from 'node:http';
+import { request as httpsRequest } from 'node:https';
 import type { AddressInfo } from 'node:net';
 import { mkdir, writeFile, readFile } from 'node:fs/promises';
 import { join, extname, relative, sep, isAbsolute } from 'node:path';
 import { weave, type WeaveState } from './plugin.js';
+import type { ProxyTable, ProxyRule } from './config.js';
 import { entryPlugin, VIRTUAL_ENTRY } from './entry.js';
 import { compileStyleFile, type StyleLang } from './styles.js';
 import { injectHtml } from './html.js';
@@ -40,6 +49,8 @@ export interface DevConfig {
   index?: string;
   /** In-memory mode: write nothing to disk, run Weave's own dev server. Default false (legacy). */
   inMemory?: boolean;
+  /** Dev proxy: forward matching request paths to a backend so API calls stay same-origin. */
+  proxy?: ProxyTable;
 }
 
 export interface DevServer {
@@ -65,6 +76,78 @@ const MIME: Record<string, string> = {
 
 function mime(path: string): string {
   return MIME[extname(path).toLowerCase()] ?? 'application/octet-stream';
+}
+
+/* ──────────────────────────── dev proxy ──────────────────────────── */
+
+/** A proxy rule with defaults resolved (shorthand expanded, `changeOrigin` filled in). */
+interface NormalizedRule {
+  target: string;
+  changeOrigin: boolean;
+  rewrite?: Record<string, string>;
+}
+
+/** Normalize a proxy table entry (string shorthand → full rule) with defaults filled in. */
+function normalizeRule(entry: string | ProxyRule): NormalizedRule {
+  const rule: ProxyRule = typeof entry === 'string' ? { target: entry } : entry;
+  return { target: rule.target, changeOrigin: rule.changeOrigin ?? true, rewrite: rule.rewrite };
+}
+
+/**
+ * First rule whose key matches `path` (query already stripped), or null. A key matches when
+ * `path` equals it or starts with `key + '/'` — so `/api` matches `/api` and `/api/x` (and
+ * `/api?q=1`, since `path` is query-stripped) but NOT `/apiary`. Insertion order wins.
+ */
+function matchProxy(path: string, table: ProxyTable): string | ProxyRule | null {
+  for (const key of Object.keys(table)) {
+    if (path === key || path.startsWith(key + '/')) return table[key];
+  }
+  return null;
+}
+
+/**
+ * Forward one request to a backend and pipe the response back unchanged. Streams the body
+ * (so POST payloads and cookies pass through both ways); a `rewrite` is applied to the PATH
+ * only (the query is preserved). An unreachable backend → 502, never a dev-server crash.
+ */
+function proxyRequest(req: IncomingMessage, res: ServerResponse, entry: string | ProxyRule): void {
+  const rule: NormalizedRule = normalizeRule(entry);
+  const target: URL = new URL(rule.target);
+
+  // Split the full URL into path + query; rewrite the path, keep the query verbatim.
+  const raw: string = req.url ?? '/';
+  const q: number = raw.indexOf('?');
+  let path: string = q === -1 ? raw : raw.slice(0, q);
+  const query: string = q === -1 ? '' : raw.slice(q);
+  if (rule.rewrite) {
+    for (const [source, replacement] of Object.entries(rule.rewrite)) {
+      path = path.replace(new RegExp(source), replacement);
+    }
+  }
+
+  const headers: IncomingMessage['headers'] = { ...req.headers };
+  if (rule.changeOrigin) headers.host = target.host;
+
+  const send: typeof httpRequest = target.protocol === 'https:' ? httpsRequest : httpRequest;
+  const proxied: ClientRequest = send(
+    {
+      protocol: target.protocol,
+      hostname: target.hostname,
+      port: target.port,
+      method: req.method,
+      path: path + query,
+      headers,
+    },
+    (backendRes: IncomingMessage): void => {
+      res.writeHead(backendRes.statusCode ?? 502, backendRes.headers);
+      backendRes.pipe(res);
+    }
+  );
+  proxied.on('error', (err: Error): void => {
+    res.writeHead(502, { 'content-type': 'text/plain; charset=utf-8' });
+    res.end(`weave dev proxy: could not reach ${rule.target} — ${err.message}`);
+  });
+  req.pipe(proxied);
 }
 
 export async function dev(config: DevConfig): Promise<DevServer> {
@@ -142,6 +225,18 @@ async function handleRequest(
   clients: Set<ServerResponse>
 ): Promise<void> {
   const url: string = (req.url ?? '/').split('?')[0];
+
+  // Dev proxy: forward matching paths to a backend so the app's API calls stay same-origin
+  // (no CORS, cookie auth just works). Runs FIRST — before SSE, build outputs, static, and
+  // the SPA shell — so a configured prefix (e.g. `/api`) always wins. App prefixes don't
+  // collide with `/__weave_reload` or `/main.js`.
+  if (config.proxy) {
+    const rule: string | ProxyRule | null = matchProxy(url, config.proxy);
+    if (rule) {
+      proxyRequest(req, res, rule);
+      return;
+    }
+  }
 
   // Live-reload SSE: hold the connection open; `capture` pushes 'reload' on rebuild.
   if (url === RELOAD_PATH) {

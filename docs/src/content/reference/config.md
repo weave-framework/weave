@@ -59,9 +59,38 @@ All relative paths in the config are resolved against the **directory containing
 | `routesDir` | `string` | — (off) | File-based routing directory. When set, `weave build`/`dev` regenerate `routes.gen.ts` from it before bundling. |
 | `styles` | `string[]` | `[]` | Global entry stylesheets, compiled and concatenated in order (first = base) **before** component CSS. |
 | `dev.port` | `number` | — (auto) | Dev-server listen port. When unset, the dev server picks a port. |
+| `dev.proxy` | `Record<string, string \| ProxyRule>` | — (off) | Dev-server proxy table — forward matching request paths to a backend so API calls stay same-origin. See below. |
 | `build.minify` | `boolean` | `true` | Minify the production JS/CSS bundle. |
 
 There is no separate "enable routing" flag: routing is on exactly when `routesDir` is set. Likewise there is no "disable minify" flag beyond setting `build.minify: false`.
+
+## `dev.proxy` — forward API calls to your backend (dev only)
+
+In dev the app is served from `http://localhost:<port>`, but your backend API usually runs on another origin. Calling it directly is cross-origin — CORS preflights, and friction for cookie auth. `dev.proxy` forwards matching request paths to the backend so calls stay **same-origin** (no CORS, `HttpOnly` cookies just work). It applies to the dev server only; a production build is already same-origin.
+
+```ts
+// shorthand — forward everything under /api to the backend
+dev: { port: 5300, proxy: { '/api': 'http://localhost:5201' } }
+
+// full form — strip the /api prefix before forwarding
+dev: {
+  proxy: {
+    '/api': { target: 'http://localhost:5201', changeOrigin: true, rewrite: { '^/api': '' } },
+  },
+}
+```
+
+A request is proxied when its path **equals** a key or starts with `key + '/'` — so `/api` matches `/api` and `/api/x` (and `/api?q=1`), but **not** `/apiary`. The first matching key wins, and the check runs before Weave's own routes (the live-reload endpoint, `/main.js`, static assets, the SPA shell), so a prefix like `/api` always takes precedence.
+
+Each value is either a `target` origin (shorthand) or a rule:
+
+| Field | Type | Default | Purpose |
+|-------|------|---------|---------|
+| `target` | `string` | — | Backend origin, e.g. `'http://localhost:5201'`. |
+| `changeOrigin` | `boolean` | `true` | Send the target's host in the forwarded `Host` header. |
+| `rewrite` | `Record<string, string>` | — | Path rewrites applied in order — `new RegExp(source)` → replacement. Rewrites the path only; the query string is preserved. |
+
+The request (method, headers, body, query) is streamed to the backend and the response piped back unchanged, so `Cookie` (up) and `Set-Cookie` (down) pass through both ways. If the backend can't be reached the dev server replies `502` and stays up.
 
 ## You must declare `root` or `entry` (fail-loud)
 

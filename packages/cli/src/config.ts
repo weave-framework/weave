@@ -16,6 +16,27 @@ import { readFile } from 'node:fs/promises';
 import { resolve, dirname, join, isAbsolute } from 'node:path';
 import type { StyleLang } from './styles.js';
 
+/**
+ * A single `weave dev` proxy rule — forward matching request paths to a backend origin
+ * so the app's API calls stay same-origin (no CORS, cookie auth just works).
+ */
+export interface ProxyRule {
+  /** Backend origin, e.g. `'http://localhost:5201'`. */
+  target: string;
+  /** Send the target's host in the forwarded `Host` header (default `true`). */
+  changeOrigin?: boolean;
+  /** Path rewrites applied in insertion order: `new RegExp(source)` → replacement (path only; the query is preserved). */
+  rewrite?: Record<string, string>;
+}
+
+/**
+ * Dev-proxy table: a request-path prefix → its backend. The value is either a `target`
+ * origin (shorthand) or a full {@link ProxyRule}. A request is proxied when its path
+ * equals a key or starts with `key + '/'` (so `/api` matches `/api` and `/api/x`, but not
+ * `/apiary`); the first matching key wins. Dev-server only — production builds are same-origin.
+ */
+export type ProxyTable = Record<string, string | ProxyRule>;
+
 export interface WeaveConfig {
   /**
    * Root component module (relative to the config file). When set, the framework
@@ -44,7 +65,7 @@ export interface WeaveConfig {
   routesDir?: string;
   /** Global entry stylesheets, compiled + concatenated in order (first = base). */
   styles?: string[];
-  dev?: { port?: number };
+  dev?: { port?: number; proxy?: ProxyTable };
   build?: { minify?: boolean };
 }
 
@@ -72,6 +93,8 @@ export interface ResolvedConfig {
   routesDir?: string;
   styles: string[];
   port?: number;
+  /** Dev-server proxy table (see {@link ProxyTable}), or undefined. */
+  proxy?: ProxyTable;
   minify: boolean;
 }
 
@@ -146,6 +169,7 @@ function resolveConfig(raw: WeaveConfig, root: string): ResolvedConfig {
     routesDir: raw.routesDir ? abs(raw.routesDir) : undefined,
     styles: (raw.styles ?? []).map(abs),
     port: raw.dev?.port,
+    proxy: raw.dev?.proxy,
     minify: raw.build?.minify ?? true,
   };
 }

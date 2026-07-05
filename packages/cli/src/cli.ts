@@ -76,6 +76,7 @@ export async function main(argv: string[]): Promise<void> {
         styles: config.styles,
         index: config.index,
         inMemory: true,
+        proxy: config.proxy,
       });
       console.log(`weave dev → ${url}`);
       return;
