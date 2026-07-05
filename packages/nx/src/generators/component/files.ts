@@ -14,7 +14,7 @@ export function componentFiles(dir: string, fileName: string, style: 'css' | 'sc
       `import { signal, type Signal } from '@weave-framework/runtime';\n\n` +
       `export function setup(): { count: Signal<number>; inc: () => void } {\n` +
       `  const count: Signal<number> = signal(0);\n` +
-      `  const inc = (): void => count.set((n) => n + 1);\n` +
+      `  const inc = (): void => { count.set((n) => n + 1); };\n` +
       `  return { count, inc };\n` +
       `}\n`,
   });

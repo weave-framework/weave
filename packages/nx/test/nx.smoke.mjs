@@ -103,6 +103,13 @@ try {
   const appHtml = tree.read('apps/shop/src/app/app.html', 'utf-8');
   ok(appHtml.includes('on:click={{ inc }}'), 'app.html keeps the canonical on:click={{ inc }} binding');
   ok(!appHtml.includes('on:click="{{'), 'app.html is not Prettier-mangled');
+  // bug4: `count.set(...)` returns the value, so an expression-body `(): void =>` arrow trips
+  // TS2322 (number not assignable to void). The starter must use a block body.
+  const appTs = tree.read('apps/shop/src/app/app.ts', 'utf-8');
+  ok(
+    appTs.includes('(): void => {') && !appTs.includes('(): void => count.set'),
+    'app.ts uses a block-body void arrow (expression body would return number → TS2322)'
+  );
 
   await plugin.componentGenerator(tree, { name: 'UserCard', project: 'shop', style: 'css' });
   ok(tree.exists('apps/shop/src/user-card/user-card.ts'), 'component generator wrote kebab .ts');
@@ -112,6 +119,11 @@ try {
   ok(
     compHtml.includes('on:click={{ inc }}') && !compHtml.includes('on:click="{{'),
     'component .html keeps the canonical binding'
+  );
+  const compTs = tree.read('apps/shop/src/user-card/user-card.ts', 'utf-8');
+  ok(
+    compTs.includes('(): void => {') && !compTs.includes('(): void => count.set'),
+    'component .ts uses a block-body void arrow (avoids the TS2322 void-return trap)'
   );
 
   const libTask = await plugin.libraryGenerator(tree, { name: 'ui-kit', style: 'none' });

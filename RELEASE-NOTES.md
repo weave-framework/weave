@@ -3,6 +3,17 @@
 Human-readable highlights, one section per release — everything notable that landed since
 the previous one. For the granular, per-version log see [CHANGELOG.md](CHANGELOG.md).
 
+## 1.0.5 — 2026-07-05
+
+### 🐛 Fixes — scaffolded starter type error
+- **The generated starter now type-checks.** Every scaffolder (`create-weave`, the `@weave-framework/nx`
+  application/component generators, and the `@weave-framework/mcp` scaffold tool) emitted
+  `const inc = (): void => count.set((n) => n + 1);` — but `count.set(...)` returns the new value, so an
+  expression-body arrow annotated `(): void` fails with *`TS2322: Type 'number' is not assignable to type 'void'`*.
+  Changed to a block body: `const inc = (): void => { count.set((n) => n + 1); };`.
+- **New gate:** the `create-weave` starter template is now type-checked in CI (`typecheck` runs its `tsconfig`), so
+  a scaffolded app that doesn't compile can no longer ship.
+
 ## 1.0.4 — 2026-07-05
 
 ### 🐛 Fixes — `@weave-framework/nx` generators
