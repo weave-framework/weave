@@ -1,6 +1,6 @@
 # RFC 0007: DevTools deep — trigger-trace & component tree
 
-- **Status:** Draft (build spec) — 2026-07-05
+- **Status:** ✅ Implemented — 2026-07-05 (`0.2.152→0.2.154`: trigger-trace `inspectTrace`/`traceFor` + component/owner tree `inspectTree` + panel Trace/Tree tabs)
 - **Author(s):** Aidas Josas (@aidasjosas) — prep for a dedicated session; the depth follow-on to
   the shipped DevTools (introspection `0.2.131`, reactive panel + dep-graph this session).
 - **Discussion:** design direction + first steps.

@@ -1,6 +1,6 @@
 # RFC 0006: Weave MCP server (`@weave-framework/mcp`)
 
-- **Status:** Draft (build spec) — 2026-07-05
+- **Status:** ✅ Implemented — 2026-07-05 (`0.2.155`, `@weave-framework/mcp`: in-house JSON-RPC/stdio; tools compile_template/check/routes/scaffold_component; `weave mcp` + `weave-mcp` bin). docs_search deferred (docs index is app-local, not a package dep).
 - **Author(s):** Aidas Josas (@aidasjosas) — prep for a dedicated session (Tier-2 item).
 - **Discussion:** design direction + first steps so a fresh session can build it without re-deriving.
 

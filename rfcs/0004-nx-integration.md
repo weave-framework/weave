@@ -1,6 +1,6 @@
 # RFC 0004: Nx integration (`@weave-framework/nx`)
 
-- **Status:** Accepted (build spec) — 2026-07-04
+- **Status:** ✅ Implemented — 2026-07-05 (`0.2.156`, `@weave-framework/nx`: createNodesV2 inference + build/serve/check executors + application/library/component generators)
 - **Author(s):** Aidas Josas (@aidasjosas) — designed this session by the maintainer's agent,
   scoped as a **pre-launch enterprise-adoption** deliverable.
 - **Discussion:** decision record + full execution checklist for the "make Weave easy to

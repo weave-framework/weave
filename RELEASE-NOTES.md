@@ -3,6 +3,39 @@
 Human-readable highlights, one section per release — everything notable that landed since
 the previous one. For the granular, per-version log see [CHANGELOG.md](CHANGELOG.md).
 
+## Unreleased (`0.2.108`–`0.2.156`)
+
+The largest batch since the last npm release — Phase C, all Tier-2 template features, and four
+new dedicated capabilities. Two brand-new packages: **`@weave-framework/mcp`** and **`@weave-framework/nx`**.
+
+### ✨ Features
+- **Router v2** (RFC 0003) — the router owns its signals + `useRouter()`; a typed `route()` builder with
+  `RouteParamsOf<Path>` param inference; route-level `loader` + `useLoaderData()` (reuses `@await` v2); native
+  **View Transitions**.
+- **DevTools** — a live in-app panel (`mountDevtoolsPanel()`): named signals/computeds/effects with values, a
+  dependency graph (who triggers whom), a temporal **trigger-trace** (`inspectTrace`/`traceFor`), and a
+  **component/owner tree** (`inspectTree`) — Nodes / Trace / Tree tabs. Zero-cost when off.
+- **Tier-2 template features** — `<Teleport>` (alias of `<Portal>`), `<Dynamic is>`, state-preserving
+  `<KeepAlive>`, reactive `style:prop` / `style:--custom`, and reactive `use:` actions (`ActionResult { update, destroy }`).
+- **Forms v2** — `dirty()` / pristine across field/group/fieldArray, plus **schema-driven forms**
+  (`@weave-framework/forms/schema`): a `fieldType()` registry + `schemaForm()` builder over the existing
+  primitives, with 8 built-in field types and a render model.
+- **`@weave-framework/mcp`** — a Model Context Protocol server exposing the toolchain to AI editors as tools
+  (`weave_compile_template`, `weave_check`, `weave_routes`, `weave_scaffold_component`). In-house JSON-RPC over
+  stdio, zero third-party deps. Launch with `weave mcp` or the `weave-mcp` bin.
+- **`@weave-framework/nx`** — an Nx plugin: inferred (crystal `createNodesV2`) `build`/`serve`/`check` targets with
+  correct cache inputs/outputs, matching executors, and `application` / `library` / `component` generators.
+- **`@await` v2** — reactive source (re-enters pending + awaits a new Promise on a dependency change); **transition
+  lifecycle callbacks** `on:enterstart/enterend/leavestart/leaveend`.
+- **Benchmarks** — a vanilla-baselined harness + a `/learn/performance` methodology page (~1.4× vanilla geomean).
+
+### ♿ Accessibility / i18n
+- **Full RTL** — bidi keyboard (key-manager `rtl` option + per-component swaps) and logical-CSS / positioning
+  across the component library.
+
+### 🐛 Fixes
+- SVG `<path d={{ }}>` and other SVG-only fragment roots now compile and paint (namespace-aware `templateSvg()`).
+
 ## 0.2.107 — 2026-07-04
 
 The first npm release since `0.2.53` — it bundles the full accessibility audit, new icon

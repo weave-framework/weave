@@ -1,6 +1,8 @@
 # RFC 0002: Component extension points (plugins)
 
-- **Status:** Draft — 2026-07-04
+- **Status:** ◐ Partially implemented — 2026-07-05. The **schema-driven forms / field-type registry** slice shipped
+  (`0.2.151`, `@weave-framework/forms/schema`: `fieldType()` registry + `schemaForm()` builder). The broader
+  component extension points (Table `columnTypes`, feature-pipeline plugins) remain design-of-record.
 - **Author(s):** Aidas Josas (@aidasjosas)
 - **Discussion:** captured from a design session; not yet gauged. This RFC records the
   *direction and open questions*, not a final API.
