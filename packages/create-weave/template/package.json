@@ -8,15 +8,15 @@
     "check": "weave check"
   },
   "dependencies": {
-    "@weave-framework/runtime": "^0.2.0",
-    "@weave-framework/router": "^0.2.0",
-    "@weave-framework/store": "^0.2.0",
-    "@weave-framework/forms": "^0.2.0",
-    "@weave-framework/i18n": "^0.2.0",
-    "@weave-framework/data": "^0.2.0"
+    "@weave-framework/runtime": "^1.0.0",
+    "@weave-framework/router": "^1.0.0",
+    "@weave-framework/store": "^1.0.0",
+    "@weave-framework/forms": "^1.0.0",
+    "@weave-framework/i18n": "^1.0.0",
+    "@weave-framework/data": "^1.0.0"
   },
   "devDependencies": {
-    "@weave-framework/cli": "^0.2.0",
+    "@weave-framework/cli": "^1.0.0",
     "typescript": "^5.7.0"
   }
 }

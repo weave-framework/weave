@@ -3,6 +3,13 @@
 Human-readable highlights, one section per release — everything notable that landed since
 the previous one. For the granular, per-version log see [CHANGELOG.md](CHANGELOG.md).
 
+## 1.0.2 — 2026-07-05
+
+### 🐛 Fixes
+- **`npm create weave@latest` now scaffolds a 1.0 app.** The starter template pinned `@weave-framework/*` at
+  `^0.2.0`, so a fresh project resolved to the old `0.2.x` line instead of 1.0. Bumped the template ranges to
+  `^1.0.0`.
+
 ## 1.0.0 — 2026-07-05 🎉
 
 **Weave is 1.0.** The public API is now **stable and frozen** — from here, breaking changes only ever
