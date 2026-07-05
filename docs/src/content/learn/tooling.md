@@ -229,7 +229,27 @@ const count = signal(0, { name: 'count' }); // name a node to surface it
 mountDevtoolsPanel();                       // floating overlay; returns a disposer
 ~~~
 
-The panel updates live with no polling (it reads the graph inside an effect), filters by name, and shows each node's dependencies (`← count`) so you can see *who triggers whom*. For programmatic access, `inspect()` returns a snapshot of all named nodes and `inspectGraph()` returns nodes **plus edges**. Gate the calls behind a dev flag (e.g. `import.meta.env.DEV`) so nothing ships to production.
+The panel updates live with no polling (it reads the graph inside an effect), filters by name, and has three tabs:
+
+- **Nodes** — the flat list: every named node with its live value and its dependencies (`← count`), so you can see *who triggers whom*.
+- **Trace** — a temporal log of what just fired: each `from → to` propagation event as a value change dirties an observer, newest first. This answers "why did *that* recompute?" that a static graph can't.
+- **Tree** — the reactive graph mapped back onto the **component/owner scopes** you think in, rather than a flat list. A component scope (mounted via `mountComponent`) is named after the component.
+
+For programmatic access: `inspect()` snapshots all named nodes, `inspectGraph()` returns nodes **plus edges**, `inspectTrace(limit?)` / `traceFor(id)` read the trigger-trace ring-buffer (bounded via `setTraceLimit`; `clearTrace()` empties it), and `inspectTree()` returns the owner hierarchy. Gate the calls behind a dev flag (e.g. `import.meta.env.DEV`) so nothing ships to production.
+
+## AI editor integration (MCP)
+
+`@weave-framework/mcp` is a **Model Context Protocol** server that exposes the Weave toolchain to MCP-capable AI editors as structured tools — so your assistant can compile-check a template, type-check the project, resolve routes, or scaffold a component instead of guessing. It's a small in-house JSON-RPC-over-stdio server (zero third-party deps); the tools thin-wrap the existing compiler/check/router.
+
+~~~jsonc title="MCP client config"
+{
+  "mcpServers": {
+    "weave": { "command": "weave-mcp", "cwd": "/path/to/your/project" }
+  }
+}
+~~~
+
+Equivalently, `weave mcp` starts the same server. The tools are `weave_compile_template` (validate markup → real compiler errors), `weave_check` (project diagnostics), `weave_routes` (file-based route tree), and `weave_scaffold_component` (generate a component's files — returned, never written without you).
 
 :::callout info "What you just learned"
 One `weave` CLI does it all — once `@weave-framework/cli` is a dev dependency you run it as `weave <cmd>` (via `npm run`/`npx`). The four commands are `dev` (watch + live-reload), `build` (static `dist/`), `check` (template + child-prop type-checking), and `routes` (file-based route gen). The big idea: a `weave.config.ts` switches `dev`/`build` into the full config-driven pipeline, while no config drops you into a bare legacy flag-driven one — and `dev` behaves quite differently between them (in-memory server vs esbuild's serve, port from config vs `--port`). Flags like `--config`, `--out`, `--serve`, `--port`, `--no-minify`, and `--eager` each belong to a specific command and pipeline. `styleLang` really compiles `css`/`scss`/`sass` differently, and editor support is a shared Volar server behind a VS Code extension and a WebStorm/LSP4IJ plugin.

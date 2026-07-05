@@ -61,3 +61,25 @@ No surprises — here are the edges:
 4. Like it? Grow from the edges inward, at your own pace.
 
 That's incremental adoption — no big bang, no rewrite, no leap of faith. Just one element at a time.
+
+## Drop into an existing Nx monorepo
+
+Already on [Nx](https://nx.dev)? `@weave-framework/nx` makes a Weave app a first-class project — no target boilerplate.
+
+~~~bash
+nx add @weave-framework/nx
+~~~
+
+Register the inference plugin in `nx.json` and every project with a `weave.config.{ts,js,json}` gets `build` / `serve` / `check` targets inferred automatically, with correct cache inputs and outputs:
+
+~~~jsonc title="nx.json"
+{ "plugins": ["@weave-framework/nx/plugin"] }
+~~~
+
+~~~bash
+nx build my-weave-app     # cached; output = the config's outDir
+nx serve my-weave-app     # weave dev (watch + live-reload)
+nx check my-weave-app     # cached type-check
+~~~
+
+Under the hood each target runs the existing `weave` CLI with `cwd` set to the project root, so the Weave build itself needs no Nx-specific changes — you get Nx caching, `nx affected`, and the project graph over your Weave apps for free. Generators scaffold projects and components: `nx g @weave-framework/nx:application`, `:library`, `:component`. The plugin depends on `@nx/devkit` (dev-time, correct for an Nx plugin); the Weave runtime stays zero-dependency.

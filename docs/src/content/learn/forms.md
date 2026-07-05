@@ -364,6 +364,29 @@ Step by step, on submit it:
 
 If your handler throws or rejects, the thrown value is stored in `submitError()` (typed `unknown` — it's whatever you threw) and `submitting()` flips back to `false`. The button re-enables either way. So throw from the handler to record a failure and let the UI react.
 
+## Schema-driven forms
+
+When you'd rather **describe** a form than hand-wire every `field(...)`, reach for `@weave-framework/forms/schema`. A **field-type registry** maps a declarative field's `type` to its default value, the validators its constraints translate to, and a UI render hint; `schemaForm()` walks the schema and composes the exact same `field`/`group` primitives — so validity, values, `touched`, `dirty`, cross-field `validate`, and `submit` all work identically.
+
+~~~ts
+import { schemaForm, fieldType } from '@weave-framework/forms/schema';
+
+const f = schemaForm({
+  fields: [
+    { name: 'email', type: 'email', required: true, label: 'Email' },
+    { name: 'age',   type: 'number', min: 18 },
+    { name: 'plan',  type: 'select', options: [{ value: 'free', label: 'Free' }] },
+    { name: 'tos',   type: 'checkbox', required: true },
+  ],
+});
+
+f.valid();      // aggregate validity, reactive
+f.value();      // { email, age, plan, tos }
+f.render();     // [{ name, field, control:'input', props:{type:'email'}, label }, …] → drive the UI
+~~~
+
+Built-in types: `text`, `textarea`, `email`, `password`, `number`, `checkbox`, `select`, `radio`, `date`. Register your own with `fieldType({ name, defaultValue, validators, control, props })` (globally, or per-form via `schemaForm(schema, { types: [...] })` — which wins without mutating the global registry). An unknown `type` fails loud. Iterate `render()` to build the UI: each entry carries the live `field` plus a `control` component key and merged `props`.
+
 :::callout info "What you just learned"
 Everything is a `Control` (value/valid/validating/touched/reset/touchAll), so `field`, `group`/`form`, and `fieldArray` nest to any depth. A `field` is a writable signal plus derived `error`/`valid`/`touched`; `error()` resolves sync ?? cross-field ?? async. Sync validators run on every change but errors only *show* once `touched`; `asyncValidate` is debounced (`debounceMs`), abortable, runs only after sync passes — and silently *passes* on a thrown rejection (catch it yourself). Built-in `validators` cover required (also "must-check"/"must-pick"), min/max (strict), minLength/maxLength (string, null-tolerant), pattern, and a loose email. `use:control` binds value/touched/aria-invalid and adapts to text/number/checkbox/radio/multi-select. `group`/`form` run cross-field rules (field keys only; `_form`/`FORM_ERROR_KEY` for group-level), `fieldArray` does dynamic lists (`controls()`, `reset()` rebuilds from seeds), and `form.submit(handler)` owns touch-all → `validateAsync` → focus-first-error → `submitting`/`submitError`.
 :::
