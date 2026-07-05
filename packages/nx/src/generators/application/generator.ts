@@ -5,8 +5,10 @@
  */
 
 import {
+  addDependenciesToPackageJson,
   addProjectConfiguration,
   formatFiles,
+  type GeneratorCallback,
   joinPathFragments,
   names,
   type ProjectConfiguration,
@@ -19,13 +21,19 @@ export interface ApplicationGeneratorSchema {
   style?: 'css' | 'scss';
 }
 
+/** Version range for the generated app's `@weave-framework/*` deps — mirrors the create-weave template. */
+const WEAVE_DEP_RANGE = '^1.0.0';
+
 /** Compute the workspace-relative project root for an app (default under `apps/`). */
 export function appRoot(name: string, directory?: string): string {
   const fileName: string = names(name).fileName;
   return directory ? joinPathFragments(directory, fileName) : joinPathFragments('apps', fileName);
 }
 
-export async function applicationGenerator(tree: Tree, schema: ApplicationGeneratorSchema): Promise<string> {
+export async function applicationGenerator(
+  tree: Tree,
+  schema: ApplicationGeneratorSchema
+): Promise<GeneratorCallback> {
   const style: 'css' | 'scss' = schema.style ?? 'css';
   const root: string = appRoot(schema.name, schema.directory);
 
@@ -55,11 +63,6 @@ export async function applicationGenerator(tree: Tree, schema: ApplicationGenera
       `}\n`
   );
   tree.write(
-    joinPathFragments(root, 'src/app/app.html'),
-    `<main class="app">\n  <h1>Hello, Weave</h1>\n` +
-      `  <button on:click={{ inc }}>clicked {{ count() }} times</button>\n</main>\n`
-  );
-  tree.write(
     joinPathFragments(root, `src/app/app.${style}`),
     `.app {\n  font-family: system-ui, sans-serif;\n  text-align: center;\n  padding: 2rem;\n}\n`
   );
@@ -80,8 +83,36 @@ export async function applicationGenerator(tree: Tree, schema: ApplicationGenera
     },
   };
   addProjectConfiguration(tree, schema.name, project);
+
+  // Add the runtime deps the scaffold imports (mirrors create-weave) + the CLI dev dep.
+  // The returned task installs them — and, crucially, is a *function*, which is the shape
+  // Nx expects a generator to return (returning a non-function broke `nx g` with
+  // "task is not a function").
+  const installTask: GeneratorCallback = addDependenciesToPackageJson(
+    tree,
+    {
+      '@weave-framework/runtime': WEAVE_DEP_RANGE,
+      '@weave-framework/router': WEAVE_DEP_RANGE,
+      '@weave-framework/store': WEAVE_DEP_RANGE,
+      '@weave-framework/forms': WEAVE_DEP_RANGE,
+      '@weave-framework/i18n': WEAVE_DEP_RANGE,
+      '@weave-framework/data': WEAVE_DEP_RANGE,
+    },
+    { '@weave-framework/cli': WEAVE_DEP_RANGE }
+  );
+
   await formatFiles(tree);
-  return root;
+
+  // Weave `.html` templates use `{{ }}` bindings that Prettier (run by formatFiles) mangles
+  // — e.g. `on:click={{ inc }}` becomes `on:click="{{" inc }}`. Write the template AFTER
+  // formatting so the canonical binding survives untouched.
+  tree.write(
+    joinPathFragments(root, 'src/app/app.html'),
+    `<main class="app">\n  <h1>Hello, Weave</h1>\n` +
+      `  <button on:click={{ inc }}>clicked {{ count() }} times</button>\n</main>\n`
+  );
+
+  return installTask;
 }
 
 export default applicationGenerator;

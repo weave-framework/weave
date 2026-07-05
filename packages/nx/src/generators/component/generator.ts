@@ -27,10 +27,16 @@ export async function componentGenerator(tree: Tree, schema: ComponentGeneratorS
   const dir: string = joinPathFragments(sourceRoot, schema.directory ?? '', fileName);
   const style: 'css' | 'scss' | 'none' = schema.style ?? 'css';
 
-  for (const file of componentFiles(dir, fileName, style)) {
+  const files = componentFiles(dir, fileName, style);
+  // Write the Weave `.html` template after formatFiles so Prettier can't mangle its
+  // `{{ }}` bindings (e.g. `on:click={{ inc }}` → `on:click="{{" inc }}`).
+  const htmlFiles = files.filter((f) => f.path.endsWith('.html'));
+  for (const file of files) {
+    if (file.path.endsWith('.html')) continue;
     tree.write(file.path, file.content);
   }
   await formatFiles(tree);
+  for (const file of htmlFiles) tree.write(file.path, file.content);
 }
 
 export default componentGenerator;

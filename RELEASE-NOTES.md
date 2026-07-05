@@ -3,6 +3,19 @@
 Human-readable highlights, one section per release — everything notable that landed since
 the previous one. For the granular, per-version log see [CHANGELOG.md](CHANGELOG.md).
 
+## 1.0.4 — 2026-07-05
+
+### 🐛 Fixes — `@weave-framework/nx` generators
+- **`nx g @weave-framework/nx:application` (and `:library`) no longer crash at the end with *"task is not a
+  function"*.** The generators returned the project-root string; Nx calls a generator's return value as a task
+  callback, so a non-function threw. They now return the install task (a callback).
+- **Generated projects get their `@weave-framework/*` dependencies.** The scaffold imports `runtime` (and, for
+  apps, the full `router`/`store`/`forms`/`i18n`/`data` set) plus the `cli` dev dependency — the generators now add
+  them to `package.json` (mirroring `create-weave`) and install them.
+- **The scaffolded `.html` templates keep their Weave `{{ }}` bindings.** `formatFiles` (Prettier) was mangling
+  `on:click={{ inc }}` into `on:click="{{" inc }}`; templates are now written *after* formatting so they survive
+  verbatim.
+
 ## 1.0.3 — 2026-07-05
 
 ### 🐛 Fixes
