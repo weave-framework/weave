@@ -161,6 +161,15 @@ importers:
         specifier: workspace:*
         version: link:../router
 
+  packages/nx:
+    dependencies:
+      '@nx/devkit':
+        specifier: ^23.0.1
+        version: 23.0.1(nx@23.0.1)
+      nx:
+        specifier: '>=21.0.0'
+        version: 23.0.1
+
   packages/router:
     dependencies:
       '@weave-framework/runtime':
