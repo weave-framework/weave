@@ -8,7 +8,15 @@
 
 *No Virtual DOM. No dependency arrays. No ceremony. Just the threads you need, woven tight.*
 
-[📚 **Documentation**](https://weaveframework.dev/) · [🚀 Get started](https://weaveframework.dev/) · [🗺️ Roadmap](#-where-its-headed)
+[![npm](https://img.shields.io/npm/v/@weave-framework/runtime?label=npm&color=8b5cf6)](https://www.npmjs.com/package/@weave-framework/runtime) [![license: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE) [![zero dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)](#-built-to-be-trusted)
+
+[📚 **Documentation**](https://weaveframework.dev/) · [🚀 Get started](https://weaveframework.dev/) · [🎡 Live demo](https://demo.weaveframework.dev) · [🗺️ Roadmap](#-where-its-headed)
+
+**Weave is 1.0 — the public API is stable and frozen.** Breaking changes only ever land in a major version, deprecated‑first. [Read the 1.0 notes →](https://github.com/weave-framework/weave/releases/tag/v1.0.0)
+
+```bash
+npm create weave@latest my-app
+```
 
 </div>
 
@@ -45,7 +53,7 @@ None of this makes the others "wrong." It's a different set of trade‑offs — 
 
 ## 🗺️ Where it's headed
 
-Weave's core is solid — signal-native, covered by a broad browser test suite, and dogfooded end to end by a complete demo app. It evolves deliberately, and one rule sits above the rest: *don't break your app.* Stability isn't a milestone we're waiting on — it's the priority today. On the near horizon:
+Weave's core is solid — signal-native, covered by a broad browser test suite, and dogfooded end to end by a complete demo app. It evolves deliberately, and one rule sits above the rest: *don't break your app.* As of **1.0**, that's a formal promise: the public API is frozen and versioned under [semver](VERSIONING.md) — breaking changes only ever land in a major, deprecated‑first. On the horizon:
 
 - **Documentation site** — the home this README keeps pointing you toward: live today, and filling in component by component.
 - **Server‑side rendering & hydration** — added when there's a real need, with a clean boundary rather than magic strings.
@@ -59,7 +67,14 @@ Ideas and contributions are welcome — the roadmap is a direction, not a fence.
 
 ## 📚 Get started
 
-Installation, your first component, guides, and the complete API reference all live in the documentation:
+Scaffold a new app in one command — pick npm, pnpm, or yarn:
+
+```bash
+npm create weave@latest my-app
+cd my-app && npm install && npm run dev
+```
+
+Your first component, guides, and the complete API reference all live in the documentation:
 
 ### → **[Read the documentation](https://weaveframework.dev/)**
 
