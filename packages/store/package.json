@@ -1,6 +1,6 @@
 {
   "name": "@weave-framework/store",
-  "version": "0.2.161",
+  "version": "0.2.162",
   "description": "Weave built-in state management — lazy singleton stores over signals. Zero dependencies.",
   "type": "module",
   "sideEffects": false,

@@ -3,7 +3,7 @@
 Human-readable highlights, one section per release — everything notable that landed since
 the previous one. For the granular, per-version log see [CHANGELOG.md](CHANGELOG.md).
 
-## Unreleased (`0.2.108`–`0.2.156`)
+## 0.2.162 — 2026-07-05 (`0.2.108`–`0.2.162`)
 
 The largest batch since the last npm release — Phase C, all Tier-2 template features, and four
 new dedicated capabilities. Two brand-new packages: **`@weave-framework/mcp`** and **`@weave-framework/nx`**.
@@ -35,6 +35,13 @@ new dedicated capabilities. Two brand-new packages: **`@weave-framework/mcp`** a
 
 ### 🐛 Fixes
 - SVG `<path d={{ }}>` and other SVG-only fragment roots now compile and paint (namespace-aware `templateSvg()`).
+- Docs sidebar highlights exactly one item — a section-root link (e.g. Examples "Overview") no longer stays
+  active on its child routes (`Link` now supports `exact`).
+
+### 🔧 Internal / CI
+- The docs site (`weaveframework.dev`) now deploys only on a `[publish]`-marked release, in lockstep with npm — so
+  the documentation never gets ahead of the packages you can install. Ordinary pushes still validate the build.
+- `pnpm-lock.yaml` synced with the new `@weave-framework/nx` dependencies (fixes `--frozen-lockfile` CI failures).
 
 ## 0.2.107 — 2026-07-04
 

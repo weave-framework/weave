@@ -20,16 +20,11 @@ this list is a live intention, not a historical note.
 
 ## Planned — framework
 
-- **Transition lifecycle callbacks.** `on:enterstart / enterend / leavestart / leaveend` — surface the four
-  transition moments the runtime already owns.
-- **DevTools.** An in-app inspector: component tree, live signal values, and a "who triggers whom" reactivity
-  graph.
-- **Forms v2.** Async validators with promise-settled `pending()`, `dirty()`, `fieldArray()`, and
-  schema-driven / nested forms.
-- **Router v2.** Typed route params inferred from the path, route-level data loaders, and View Transitions.
 - **Server-side rendering — SSG first.** Accepted as a future track ([RFC 0001](rfcs/0001-ssr-hydration.md)):
   build-time prerendering + client hydration for SEO and first paint, before request-time SSR / streaming. Scheduled
   after the client-first roadmap matures, so it never comes at the cost of the core.
+- **1.0 — API freeze.** Tag the internal-only `runtime/dom` compiler helpers `@internal`, publish a `VERSIONING.md`
+  stability promise, and cut **1.0.0**. The public surface stops moving under you.
 
 ---
 
