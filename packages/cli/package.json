@@ -1,6 +1,6 @@
 {
   "name": "@weave-framework/cli",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "description": "Weave CLI — `weave build`, `weave dev` (watch + live-reload), `weave check`, `weave routes`.",
   "type": "module",
   "bin": {

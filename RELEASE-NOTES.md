@@ -3,6 +3,26 @@
 Human-readable highlights, one section per release — everything notable that landed since
 the previous one. For the granular, per-version log see [CHANGELOG.md](CHANGELOG.md).
 
+## 1.0.10 — 2026-07-05
+
+### 🐛 Fix — `@weave-framework/ui` is now consumable from a real app
+- **The documented `import Button from '@weave-framework/ui/button'` now works for real npm consumers.** The ui
+  library was built with plain `tsc`, so every component shipped UNCOMPILED — `export const template` /
+  `export function setup`, no `render`, and no **default export**. A real consumer's `weave build` failed with
+  *"No matching export for default"* and `weave check` with *TS1192*. (The monorepo masked it: dev exports resolve
+  to `src` and the loader compiles on the fly.) The ui build now compiles each component at build time through the
+  same `compileComponent` the loader uses, so dist ships `export default defineComponent(render, setup)` plus a
+  props-typed default in its `.d.ts` — `Parameters<typeof Button>[0]` is the component's props. `weave check` also
+  gained `esModuleInterop` + `resolveJsonModule`. A new `verify:ui-consume` gate proves consumption against the
+  built dist for all 29 components (and fails on the old plain-tsc output).
+
+### 🔧 Infrastructure — docs deploy moved to Cloudflare
+- **The documentation site (weaveframework.dev) now deploys to Cloudflare Workers** instead of GitHub Pages, whose
+  backend had begun intermittently rejecting deployments with a terminal *"Deployment failed, try again later."*
+  (the build always passed; only the Pages deploy step flaked). It now uses the same reliable static-assets path
+  as the flagship demo, still gated on a `[publish]` commit so the docs stay in lockstep with npm. No user-facing
+  change to the framework.
+
 ## 1.0.5 — 2026-07-05
 
 ### 🐛 Fixes — scaffolded starter type error

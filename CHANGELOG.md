@@ -7,7 +7,37 @@
 > VS Code extension (`editor/vscode`) is versioned independently. **This version is exactly
 > what is published to npm** — bump it in the same commit as the change, and record notable
 > releases here. Publishing itself is a separate, explicit step (the `/publish` skill /
-> `pnpm publish:packages`) — pushing code does **not** publish to npm.
+> `pnpm publish:packages`) — pushing code does **not** publish to npm. (The scheme started at
+> `0.2.0`; the line crossed `1.0.0` on 2026-07-05 when the public API was frozen.)
+
+## 1.0.10 — 2026-07-05
+
+**Fix (ui) — `@weave-framework/ui` dist now ships a real `export default`, so components are consumable in a real
+app.** The ui build was plain `tsc`, which shipped components UNCOMPILED (`export const template` /
+`export function setup`, no `render`, no default export), so the documented
+`import Button from '@weave-framework/ui/button'` failed a real consumer's `weave build` (*"No matching export for
+default"*) and `weave check` (*TS1192*) — masked in the monorepo, where dev exports resolve to `src` and the loader
+compiles on the fly. The ui build now compiles each component at build time through the loader's own
+`compileComponent` (`tools/build-ui-components.mjs` → staged tree → `tsconfig.compiled.json`), emitting
+`export default defineComponent(render, setup)` + a props-typed `.d.ts` default; `weave check` gained
+`esModuleInterop` + `resolveJsonModule`. New gate `verify:ui-consume` proves consumption against the built dist for
+all 29 components (fails on the old output — DoD-proven).
+
+**Infrastructure — docs deploy moved from GitHub Pages to Cloudflare Workers** (`docs/wrangler.toml` +
+`.github/workflows/docs.yml`). The Pages `deploy` step had begun intermittently returning a terminal *"Deployment
+failed, try again later."* (build always passed); the docs now deploy to the same reliable Cloudflare static-assets
+path as the flagship demo, still `[publish]`-gated. No framework change.
+
+## 1.0.0 — 2026-07-05
+
+**🏆 1.0 — the public API is frozen and stable.** The `0.2.108→1.0.0` arc (see `RELEASE-NOTES.md` for the
+highlights) shipped Phase C (transition callbacks, reactive `@await`, DevTools panel + trigger-trace + component
+tree, Forms v2 `dirty()`, Router v2), all Tier-2 template features (`<Teleport>`/`<Dynamic>`/`<KeepAlive>`,
+reactive `style:`/`use:`), schema-driven forms, and two new packages — `@weave-framework/mcp` (MCP server) and
+`@weave-framework/nx` (Nx plugin). The freeze (RFC 0005) `@internal`-tagged the compiler-emitted `runtime/dom`
+helpers and made `VERSIONING.md`'s stability promise binding. All 14 packages went live on npm at `1.0.0`;
+`1.0.1→1.0.5` followed with the README 1.0 hero, the `create-weave` template version pin, and three scaffolder
+hotfixes (nx exports / nx generators / scaffolded-starter type error).
 
 ## 0.2.120 — 2026-07-04
 
