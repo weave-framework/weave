@@ -2,6 +2,13 @@ name: Deploy docs
 
 # Builds the documentation site (docs/) with Weave and publishes it to GitHub Pages.
 #
+# DEPLOY CADENCE: the `build` job runs on every push (CI validation — a broken docs build
+# shows up red immediately, but nothing public changes). The `deploy` job is GATED on the
+# SAME condition as the npm publish workflow — a [publish]-marked commit (or a manual
+# workflow_dispatch). So weaveframework.dev only moves when the packages actually ship to
+# npm, and the docs never document features that aren't installable yet. Ordinary commits
+# bump the version and validate the build, but the live site stays put until you [publish].
+#
 # NOTE on hosting: the @weave-framework/router resolves routes from location.pathname with no
 # base path, so the site must be served at the ORIGIN ROOT — a user/org page
 # (username.github.io) or a custom domain. A project page at /<repo>/ would need
@@ -63,6 +70,12 @@ jobs:
 
   deploy:
     needs: build
+    # Gate: publish the site to weaveframework.dev only on a [publish]-marked commit (in
+    # lockstep with the npm release), or a manual dispatch. Ordinary pushes still run `build`
+    # above as a CI check, but do NOT touch the live site — so docs never get ahead of npm.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      contains(github.event.head_commit.message, '[publish]')
     runs-on: ubuntu-latest
     environment:
       name: github-pages
