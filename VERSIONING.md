@@ -15,7 +15,11 @@ API** — the surface you're safe to build on — is:
   ARIA/DOM structure you're expected to style and target
 
 Anything **not** on that list — internal helpers, undocumented behavior, private fields,
-implementation detail — is not part of the contract and may change at any time.
+implementation detail — is not part of the contract and may change at any time. This boundary
+is deliberate and enforced: the public surface was audited before 1.0 ([RFC 0005](rfcs/0005-api-surface-audit.md)),
+and the compiler-emitted runtime helpers your build imports (e.g. from `@weave-framework/runtime/dom`) are
+tagged `@internal` and excluded from the API reference — they stay exported for generated code, but their
+signatures are free to change and carry no stability promise.
 
 ## How a version is decided
 

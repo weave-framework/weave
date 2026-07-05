@@ -62,8 +62,8 @@ public contract to stabilise.
   imports the helpers (they stay exported); typecheck + 1062 tests + docs build green.
 - [ ] Skim the other 7 entries for any accidental export (none found in this pass, but confirm on the final diff).
 - [ ] Confirm every *public* export has a doc comment (api-gen already surfaces them; fill gaps).
-- [ ] Finalise `VERSIONING.md`: the stability promise applies to the audited public surface; breaking = deprecate-first, major-only.
-- [ ] Deprecation policy in place (how a symbol is marked deprecated and for how long).
+- [x] Finalise `VERSIONING.md`: the stability promise applies to the audited public surface; breaking = deprecate-first, major-only. (Covers documented exports + props + template syntax + UI token/ARIA contract; now cross-links this audit and states `@internal` helpers carry no promise.)
+- [x] Deprecation policy in place (how a symbol is marked deprecated and for how long) — deprecate-first, warnings to the replacement, kept until at least the next major (`VERSIONING.md` → "When a breaking change is genuinely needed").
 - [ ] Bump to **1.0.0** + CHANGELOG / RELEASE-NOTES entry; then launch ([[weave-launch-sequencing]]).
 
 ## Alternatives considered
