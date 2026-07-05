@@ -79,7 +79,21 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.deploy1.outputs.page_url || steps.deploy2.outputs.page_url }}
     steps:
-      - id: deployment
+      # GitHub Pages' backend intermittently rejects a brand-new deployment with a terminal
+      # "Deployment failed, try again later." (not a timeout — deploy-pages' built-in
+      # error_count retry only covers status-POLLING errors, so it gives up immediately).
+      # It's a GitHub-side transient: most [publish] deploys succeed, the odd one fails and
+      # used to need a manual `gh run rerun`, surfacing a red run + a failure email each time.
+      # So retry once IN-RUN: attempt 1 is allowed to fail, we wait for the backend to settle,
+      # then attempt 2. Only if BOTH fail does the job go red (a real, persistent problem).
+      - id: deploy1
+        uses: actions/deploy-pages@v4
+        continue-on-error: true
+      - name: Wait before retrying the Pages deployment
+        if: steps.deploy1.outcome == 'failure'
+        run: sleep 30
+      - id: deploy2
+        if: steps.deploy1.outcome == 'failure'
         uses: actions/deploy-pages@v4
