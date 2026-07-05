@@ -1,19 +1,25 @@
 name: Deploy docs
 
-# Builds the documentation site (docs/) with Weave and publishes it to GitHub Pages.
+# Builds the documentation site (docs/) with Weave and deploys it to Cloudflare Workers
+# static-assets (weaveframework.dev) — the same reliable path that serves the flagship demo
+# (demo.weaveframework.dev). This replaced GitHub Pages, whose backend intermittently
+# rejected deployments with a terminal "Deployment failed, try again later." (build always
+# passed; only the Pages deploy step flaked), forcing manual reruns + failure emails.
 #
 # DEPLOY CADENCE: the `build` job runs on every push (CI validation — a broken docs build
 # shows up red immediately, but nothing public changes). The `deploy` job is GATED on the
 # SAME condition as the npm publish workflow — a [publish]-marked commit (or a manual
 # workflow_dispatch). So weaveframework.dev only moves when the packages actually ship to
-# npm, and the docs never document features that aren't installable yet. Ordinary commits
-# bump the version and validate the build, but the live site stays put until you [publish].
+# npm, and the docs never document features that aren't installable yet.
 #
 # NOTE on hosting: the @weave-framework/router resolves routes from location.pathname with no
-# base path, so the site must be served at the ORIGIN ROOT — a user/org page
-# (username.github.io) or a custom domain. A project page at /<repo>/ would need
-# basename support in the router (not yet implemented). The SPA fallback (404.html)
-# is produced by docs/tools/postbuild.mjs.
+# base path, so the site is served at the ORIGIN ROOT of the custom domain (weaveframework.dev)
+# with `not_found_handling = "single-page-application"` (docs/wrangler.toml) as the SPA
+# fallback. DOCS_BASE stays "/" (absolute asset paths).
+#
+# SECRETS (repo → Settings → Secrets → Actions): CLOUDFLARE_API_TOKEN (a token with the
+# "Workers Scripts: Edit" permission) and CLOUDFLARE_ACCOUNT_ID. The weaveframework.dev
+# custom domain is attached to the `weave-docs` Worker in the Cloudflare dashboard.
 
 on:
   push:
@@ -26,12 +32,10 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
-# Allow one concurrent deployment; let an in-progress run finish.
+# One docs deploy at a time; let an in-progress run finish.
 concurrency:
-  group: pages
+  group: docs-deploy
   cancel-in-progress: false
 
 jobs:
@@ -39,34 +43,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: pnpm/action-setup@v4
         with:
           version: 11
-
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: pnpm
-
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-
       - name: Build docs
         run: pnpm docs:build
         env:
-          # Served at the ROOT of the custom domain (weaveframework.dev), so no
-          # sub-path <base href> — keep absolute asset paths. (Was "/weave/" for the
-          # user.github.io/weave/ project page.) The custom domain is configured in
-          # the repo's Pages settings (authoritative for workflow builds); no CNAME
-          # file is emitted into the artifact, to avoid a deploy-time domain conflict.
           DOCS_BASE: /
-
-      - uses: actions/configure-pages@v5
-
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: docs/dist
 
   deploy:
     needs: build
@@ -78,22 +67,27 @@ jobs:
       contains(github.event.head_commit.message, '[publish]')
     runs-on: ubuntu-latest
     environment:
-      name: github-pages
-      url: ${{ steps.deploy1.outputs.page_url || steps.deploy2.outputs.page_url }}
+      name: cloudflare-docs
+      url: https://weaveframework.dev/
     steps:
-      # GitHub Pages' backend intermittently rejects a brand-new deployment with a terminal
-      # "Deployment failed, try again later." (not a timeout — deploy-pages' built-in
-      # error_count retry only covers status-POLLING errors, so it gives up immediately).
-      # It's a GitHub-side transient: most [publish] deploys succeed, the odd one fails and
-      # used to need a manual `gh run rerun`, surfacing a red run + a failure email each time.
-      # So retry once IN-RUN: attempt 1 is allowed to fail, we wait for the backend to settle,
-      # then attempt 2. Only if BOTH fail does the job go red (a real, persistent problem).
-      - id: deploy1
-        uses: actions/deploy-pages@v4
-        continue-on-error: true
-      - name: Wait before retrying the Pages deployment
-        if: steps.deploy1.outcome == 'failure'
-        run: sleep 30
-      - id: deploy2
-        if: steps.deploy1.outcome == 'failure'
-        uses: actions/deploy-pages@v4
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build docs
+        run: pnpm docs:build
+        env:
+          DOCS_BASE: /
+      - name: Deploy to Cloudflare Workers (weave-docs)
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: docs
+          command: deploy

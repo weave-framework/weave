@@ -1,0 +1,16 @@
+# Cloudflare deploy config for the Weave documentation site (docs/).
+# `pnpm docs:build` writes the static SPA to docs/dist; this serves it as static assets
+# with single-page-app fallback (a deep link like /learn/signals boots index.html and the
+# @weave-framework/router takes over). Served at the root of weaveframework.dev.
+#
+# This replaced GitHub Pages, whose backend intermittently rejected deployments with a
+# terminal "Deployment failed, try again later." The same Cloudflare Workers static-assets
+# path already runs the flagship demo (demo.weaveframework.dev) with no such flakiness.
+# Deploy is driven by .github/workflows/docs.yml (gated on a [publish]-marked commit, so
+# the live docs stay in lockstep with the npm release — never ahead of it).
+name = "weave-docs"
+compatibility_date = "2026-07-05"
+
+[assets]
+directory = "./dist"
+not_found_handling = "single-page-application"
