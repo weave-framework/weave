@@ -1,6 +1,6 @@
 {
   "name": "@weave-framework/runtime",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Weave reactive core + DOM runtime. Zero dependencies.",
   "type": "module",
   "sideEffects": false,
@@ -9,7 +9,8 @@
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
-    "./dom": "./src/dom.ts"
+    "./dom": "./src/dom.ts",
+    "./package.json": "./package.json"
   },
   "files": [
     "dist"
@@ -35,7 +36,8 @@
       "./dom": {
         "types": "./dist/dom.d.ts",
         "import": "./dist/dom.js"
-      }
+      },
+      "./package.json": "./package.json"
     }
   },
   "license": "MIT"

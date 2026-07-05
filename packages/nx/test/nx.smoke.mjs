@@ -6,7 +6,7 @@
  * Run: `node packages/nx/test/nx.smoke.mjs` (wired as `pnpm verify:nx`).
  */
 import { build as esbuild } from 'esbuild';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createTreeWithEmptyWorkspace } from '@nx/devkit/testing';
@@ -101,6 +101,14 @@ try {
   ok(tree.exists('libs/ui-kit/src/index.ts'), 'library generator wrote a barrel index');
   ok(!tree.exists('libs/ui-kit/src/lib/ui-kit/ui-kit.css'), 'style "none" omitted the stylesheet');
   ok(readProjectConfiguration(tree, 'ui-kit').projectType === 'library', 'registered as a library');
+
+  /* ---- packaging: exports must expose ./package.json (Nx reads it to find generators) ---- */
+  const nxPkg = JSON.parse(readFileSync(join(here, '..', 'package.json'), 'utf-8'));
+  ok(!!nxPkg.exports?.['./package.json'], 'dev exports exposes ./package.json (Nx needs it)');
+  ok(
+    !!nxPkg.publishConfig?.exports?.['./package.json'],
+    'publishConfig.exports exposes ./package.json (the PUBLISHED map — its absence broke @weave-framework/nx@1.0.2)'
+  );
 } catch (e) {
   ok(false, `threw: ${e.stack ?? e.message}`);
 }

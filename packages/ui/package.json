@@ -1,6 +1,6 @@
 {
   "name": "@weave-framework/ui",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Weave UI — signal-native component library (Material+CDK equivalent) with the Weave design system. Ships SCSS; zero third-party runtime deps.",
   "type": "module",
   "sideEffects": false,
@@ -206,7 +206,8 @@
     "./cdk": {
       "types": "./src/cdk/index.ts",
       "import": "./src/cdk/index.ts"
-    }
+    },
+    "./package.json": "./package.json"
   },
   "files": [
     "dist",
@@ -424,7 +425,8 @@
       "./cdk": {
         "types": "./dist/cdk/index.d.ts",
         "import": "./dist/cdk/index.js"
-      }
+      },
+      "./package.json": "./package.json"
     }
   },
   "dependencies": {

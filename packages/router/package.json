@@ -1,6 +1,6 @@
 {
   "name": "@weave-framework/router",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Weave official client router — signal-driven, history-based, with RouterView + Link. Zero third-party deps.",
   "type": "module",
   "sideEffects": [
@@ -12,7 +12,8 @@
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
-    "./files": "./src/files.ts"
+    "./files": "./src/files.ts",
+    "./package.json": "./package.json"
   },
   "files": [
     "dist"
@@ -38,7 +39,8 @@
       "./files": {
         "types": "./dist/files.d.ts",
         "import": "./dist/files.js"
-      }
+      },
+      "./package.json": "./package.json"
     }
   },
   "dependencies": {

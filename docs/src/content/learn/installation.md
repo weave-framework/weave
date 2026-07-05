@@ -2,8 +2,8 @@
 
 This page takes you from an **empty computer** to a running Weave app. No prior framework experience needed — we'll name every step.
 
-:::callout info "Pre-1.0"
-Weave is pre-1.0. The packages are published on npm under the **`@weave-framework/*`** scope (`@weave-framework/runtime`, `@weave-framework/cli`, …). APIs may still shift between minor versions; pin a version if you need stability.
+:::callout info "Weave is 1.0 — stable API"
+Weave is 1.0 — the public API is stable and frozen. The packages are published on npm under the **`@weave-framework/*`** scope (`@weave-framework/runtime`, `@weave-framework/cli`, …). Breaking changes only ever land in a major version, deprecated-first.
 :::
 
 :::callout tip "Can't find it via npm search?"

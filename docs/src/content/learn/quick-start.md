@@ -3,7 +3,7 @@
 Let's get something on screen. By the end of this page you'll have a running app, a component you wrote, and a feel for the loop: edit a file, see it live.
 
 :::callout info "First, get Weave running"
-This page assumes you've already got a project. If not, the quickest start is `npm create weave@latest my-app` (or pnpm/yarn) — see [Installation](/learn/installation), which also covers adding Weave to an existing project. Weave is **pre-1.0** (published on npm under the `@weave-framework/*` scope), but the shapes on this page are stable.
+This page assumes you've already got a project. If not, the quickest start is `npm create weave@latest my-app` (or pnpm/yarn) — see [Installation](/learn/installation), which also covers adding Weave to an existing project. Weave is **1.0** (published on npm under the `@weave-framework/*` scope), so the shapes on this page are stable.
 :::
 
 ## The shape of a project

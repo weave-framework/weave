@@ -1,6 +1,6 @@
 {
   "name": "@weave-framework/cli",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Weave CLI — `weave build`, `weave dev` (watch + live-reload), `weave check`, `weave routes`.",
   "type": "module",
   "bin": {
@@ -9,7 +9,8 @@
   "main": "./src/cli.ts",
   "types": "./src/cli.ts",
   "exports": {
-    ".": "./src/cli.ts"
+    ".": "./src/cli.ts",
+    "./package.json": "./package.json"
   },
   "files": [
     "dist",
@@ -35,7 +36,8 @@
       ".": {
         "types": "./dist/cli.d.ts",
         "import": "./dist/cli.js"
-      }
+      },
+      "./package.json": "./package.json"
     }
   },
   "dependencies": {

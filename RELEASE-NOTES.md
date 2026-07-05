@@ -3,6 +3,16 @@
 Human-readable highlights, one section per release — everything notable that landed since
 the previous one. For the granular, per-version log see [CHANGELOG.md](CHANGELOG.md).
 
+## 1.0.3 — 2026-07-05
+
+### 🐛 Fixes
+- **`@weave-framework/nx` works with `nx g` / target inference again.** The plugin's `exports` map didn't expose
+  `./package.json`, so Nx — which resolves `@weave-framework/nx/package.json` to discover its generators — failed
+  with *"Package subpath './package.json' is not defined by exports"*. Added `"./package.json"` to the exports map
+  (and, defensively, to every `@weave-framework/*` package) so the manifest is always resolvable. A regression test
+  now pins it.
+- Fixed stale **"pre-1.0"** copy in the Installation and Quick start docs — Weave is 1.0.
+
 ## 1.0.2 — 2026-07-05
 
 ### 🐛 Fixes

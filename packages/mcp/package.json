@@ -1,6 +1,6 @@
 {
   "name": "@weave-framework/mcp",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Weave MCP server — exposes the Weave toolchain (compile/check/routes/scaffold) to AI agents & editors as Model Context Protocol tools. In-house JSON-RPC over stdio, zero third-party deps.",
   "type": "module",
   "sideEffects": false,
@@ -11,7 +11,8 @@
     "weave-mcp": "./bin/weave-mcp.mjs"
   },
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
   },
   "files": [
     "dist",
@@ -37,7 +38,8 @@
       ".": {
         "types": "./dist/index.d.ts",
         "import": "./dist/index.js"
-      }
+      },
+      "./package.json": "./package.json"
     }
   },
   "dependencies": {

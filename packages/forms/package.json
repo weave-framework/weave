@@ -1,6 +1,6 @@
 {
   "name": "@weave-framework/forms",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Weave forms — signal-native field/form state + validation over bind:value. Zero third-party deps.",
   "type": "module",
   "sideEffects": false,
@@ -10,7 +10,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./dom": "./src/dom.ts",
-    "./schema": "./src/schema.ts"
+    "./schema": "./src/schema.ts",
+    "./package.json": "./package.json"
   },
   "files": [
     "dist"
@@ -40,7 +41,8 @@
       "./schema": {
         "types": "./dist/schema.d.ts",
         "import": "./dist/schema.js"
-      }
+      },
+      "./package.json": "./package.json"
     }
   },
   "dependencies": {
