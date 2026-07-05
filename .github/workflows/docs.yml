@@ -84,10 +84,14 @@ jobs:
         run: pnpm docs:build
         env:
           DOCS_BASE: /
+      # Deploy via `pnpm dlx`, NOT cloudflare/wrangler-action: that action runs
+      # `npm i wrangler`, which walks up to the repo-root package.json (a pnpm workspace
+      # with `workspace:*` deps npm can't parse) → EUNSUPPORTEDPROTOCOL. `pnpm dlx` fetches
+      # wrangler into an isolated store and never reads the workspace manifest. wrangler
+      # authenticates from the CLOUDFLARE_* env vars and reads docs/wrangler.toml (cwd).
       - name: Deploy to Cloudflare Workers (weave-docs)
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: docs
-          command: deploy
+        run: pnpm dlx wrangler@4 deploy
+        working-directory: docs
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
