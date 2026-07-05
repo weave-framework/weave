@@ -32,6 +32,11 @@ const OPTIONS: ts.CompilerOptions = {
   noEmit: true,
   skipLibCheck: true,
   allowJs: false,
+  // Match how a real app's tsconfig resolves deps: default-import interop (so
+  // `import Button from '@weave-framework/ui/button'` is well-typed) and JSON imports
+  // (i18n message bundles are `.json`).
+  esModuleInterop: true,
+  resolveJsonModule: true,
 };
 
 const norm = (p: string): string => p.replace(/\\/g, '/').toLowerCase();

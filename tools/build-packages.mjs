@@ -55,6 +55,14 @@ for (const p of [...LIB_ORDER, 'cli']) {
 }
 
 for (const p of LIB_ORDER) {
+  if (p === 'ui') {
+    // ui components must be COMPILED (loader-style) before tsc, so dist ships a real
+    // `export default defineComponent(render, setup)`. Stage src/ → .compiled/ with each
+    // component pre-compiled, then tsc that staged tree. See tools/build-ui-components.mjs.
+    run('node', ['tools/build-ui-components.mjs'], 'compile @weave-framework/ui components → .compiled');
+    run('npx', ['tsc', '-p', 'packages/ui/tsconfig.compiled.json'], 'tsc build @weave-framework/ui');
+    continue;
+  }
   run('npx', ['tsc', '-p', `packages/${p}/tsconfig.build.json`], `tsc build @weave-framework/${p}`);
 }
 

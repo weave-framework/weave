@@ -1,0 +1,12 @@
+{
+  "//": "Publish build for @weave-framework/ui. Compiles the STAGED tree (.compiled/, produced by tools/build-ui-components.mjs) rather than src/, so each component's dist ships a real `export default defineComponent(render, setup)` + a typed default in its .d.ts. See build-ui-components.mjs for why.",
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": ".compiled",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": []
+  },
+  "include": [".compiled/**/*.ts"],
+  "exclude": [".compiled/**/*.browser.ts", ".compiled/**/*.test.ts", ".compiled/**/*.spec.ts"]
+}
