@@ -3,6 +3,31 @@
 Human-readable highlights, one section per release — everything notable that landed since
 the previous one. For the granular, per-version log see [CHANGELOG.md](CHANGELOG.md).
 
+## 1.0.0 — 2026-07-05 🎉
+
+**Weave is 1.0.** The public API is now **stable and frozen** — from here, breaking changes only ever
+land in a major version, deprecated-first, per [VERSIONING.md](VERSIONING.md). Everything you build on the
+documented surface won't change out from under you.
+
+This release is the freeze itself; the features it stabilises shipped across the `0.2.x` line (see `0.2.162`
+below and [CHANGELOG.md](CHANGELOG.md) for the full history): the signal-native runtime with no Virtual DOM,
+the compiler + template syntax, Router v2, Forms v2 (incl. schema-driven forms), i18n, the data layer,
+DevTools, the full `@weave-framework/ui` component library, and the `mcp` + `nx` toolchain packages.
+
+### 🔒 API freeze (what changed for 1.0)
+- **Deliberate public surface** ([RFC 0005](rfcs/0005-api-surface-audit.md)) — audited to **151 documented
+  exports**. The ~29 compiler-emitted `runtime/dom` helpers (`bindText`, `ifBlock`, `mountChild`, …) are now
+  `@internal`: still exported for generated code, but excluded from the reference and carrying **no** stability
+  promise. Their signatures stay free to change; your code never imports them directly.
+- **Every public export is documented** — the API reference reports zero undocumented public exports.
+- **`VERSIONING.md`** states the promise: it covers documented exports, component props, the template syntax,
+  and the UI token / ARIA contract; breaking changes are major-only, deprecated first, kept until at least the
+  next major.
+
+### 🔧 Internal / CI
+- The docs site deploys only on a `[publish]` release, in lockstep with npm — the documentation never runs
+  ahead of the installable packages.
+
 ## 0.2.162 — 2026-07-05 (`0.2.108`–`0.2.162`)
 
 The largest batch since the last npm release — Phase C, all Tier-2 template features, and four

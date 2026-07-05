@@ -1,6 +1,6 @@
 # RFC 0005: Public API surface audit (freeze prep)
 
-- **Status:** In progress — 2026-07-05 (the `runtime/dom` split is **done** via option 1; `VERSIONING.md` + 1.0 bump remain)
+- **Status:** Implemented — 2026-07-05 (runtime/dom split done via option 1; surface audited to 151 documented exports, 0 undocumented; `VERSIONING.md` finalised; **shipped in 1.0.0**)
 - **Author(s):** Aidas Josas (@aidasjosas) — audit produced by the maintainer's agent as the
   pre-1.0 **API-freeze** groundwork ([[weave-launch-sequencing]]).
 - **Discussion:** a findings + checklist doc. The public/internal *decisions* are the
@@ -64,7 +64,7 @@ public contract to stabilise.
 - [x] Confirm every *public* export has a doc comment — filled the last **13 gaps** (Router/RouteParams, Field/GroupOptions, I18n/I18nConfig, resource + Client/ClientOptions/RequestOptions/ResourceOptions, DevKind/DevtoolsPanelOptions). api-gen now reports **0** undocumented public exports.
 - [x] Finalise `VERSIONING.md`: the stability promise applies to the audited public surface; breaking = deprecate-first, major-only. (Covers documented exports + props + template syntax + UI token/ARIA contract; now cross-links this audit and states `@internal` helpers carry no promise.)
 - [x] Deprecation policy in place (how a symbol is marked deprecated and for how long) — deprecate-first, warnings to the replacement, kept until at least the next major (`VERSIONING.md` → "When a breaking change is genuinely needed").
-- [ ] Bump to **1.0.0** + CHANGELOG / RELEASE-NOTES entry; then launch ([[weave-launch-sequencing]]).
+- [x] Bump to **1.0.0** + CHANGELOG / RELEASE-NOTES entry; then launch ([[weave-launch-sequencing]]).
 
 ## Alternatives considered
 

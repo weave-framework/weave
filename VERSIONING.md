@@ -52,12 +52,12 @@ A deprecated API keeps working until at least the next major release, and is onl
 removed — so deprecations don't pile up forever, and nothing disappears without that
 window to migrate.
 
-## Before 1.0
+## 1.0 and onward
 
-Weave is pre-1.0 today. By the letter of SemVer that means the API is still stabilizing
-and anything may change — but in practice we hold ourselves to the policy above, and have
-shipped over a hundred releases with no breaking change to the code you write.
+**Weave is 1.0.** The public API surface above was audited and settled ([RFC 0005](rfcs/0005-api-surface-audit.md)),
+and the promise is now in full force: **breaking changes land only in a major version, deprecated first.** The
+`0.2.x` line got there the honest way — over a hundred releases with no breaking change to the code you write —
+so 1.0 is a formalisation of what already held, not a reset.
 
-**1.0 is the point at which "breaking changes only in a major version" becomes a firm
-guarantee.** We'll cut it once the public API surface above is settled enough to stand
-behind that promise without reservation.
+Pre-1.0 history is preserved in [CHANGELOG.md](CHANGELOG.md); from 1.0 on, the version number carries the
+guarantee.

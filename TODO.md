@@ -23,8 +23,6 @@ this list is a live intention, not a historical note.
 - **Server-side rendering — SSG first.** Accepted as a future track ([RFC 0001](rfcs/0001-ssr-hydration.md)):
   build-time prerendering + client hydration for SEO and first paint, before request-time SSR / streaming. Scheduled
   after the client-first roadmap matures, so it never comes at the cost of the core.
-- **1.0 — API freeze.** Tag the internal-only `runtime/dom` compiler helpers `@internal`, publish a `VERSIONING.md`
-  stability promise, and cut **1.0.0**. The public surface stops moving under you.
 
 ---
 
