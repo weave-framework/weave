@@ -74,6 +74,12 @@ export interface InputProps {
    * overlay-based Tooltip — Input stays CDK-free.
    */
   revealTooltip?: boolean;
+  /**
+   * Called every time the password reveal toggle flips, with the new state (`true` = value
+   * now visible as plaintext, `false` = hidden). Lets the app react to the change — e.g.
+   * drive its own tooltip — without reaching into Input's internal button.
+   */
+  onRevealToggle?: (revealed: boolean) => void;
   /** Called on mount with the native field — lets a composer (e.g. Autocomplete) add
    *  combobox ARIA / manage `aria-activedescendant` without re-creating the field. */
   onInputRef?: (el: HTMLInputElement | HTMLTextAreaElement) => void;
@@ -244,7 +250,9 @@ export function setup(props: InputProps): InputContext {
     revealTitle: (): string | undefined => (props.revealTooltip === false ? undefined : revealText()),
     revealPressed: (): string => (revealed() ? 'true' : 'false'),
     toggleReveal: (): void => {
-      revealed.set(!revealed());
+      const next: boolean = !revealed();
+      revealed.set(next);
+      props.onRevealToggle?.(next);
     },
     onNativeInput,
     onBlur,

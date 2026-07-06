@@ -1,6 +1,6 @@
 {
   "name": "@weave-framework/i18n",
-  "version": "1.4.4",
+  "version": "1.4.5",
   "description": "Weave i18n — optional, signal-native translations with ICU plural/select. Zero third-party deps.",
   "type": "module",
   "sideEffects": false,

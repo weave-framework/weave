@@ -255,6 +255,18 @@ test('revealable: a native title tooltip is on by default and follows the state 
   dispose();
 });
 
+test('revealable: onRevealToggle fires with the new state on each toggle', () => {
+  const states: boolean[] = [];
+  const { root, dispose } = mount({ type: 'password', revealable: true, onRevealToggle: (r) => states.push(r) });
+  const btn: HTMLButtonElement = root.querySelector<HTMLButtonElement>('.weave-input__reveal')!;
+  assert.deepEqual(states, [], 'not called before any interaction');
+  btn.click();
+  assert.deepEqual(states, [true], 'fires true when the value becomes visible');
+  btn.click();
+  assert.deepEqual(states, [true, false], 'fires false when hidden again');
+  dispose();
+});
+
 test('revealable: revealTooltip={{false}} suppresses the title but keeps aria-label', () => {
   const { root, dispose } = mount({ type: 'password', revealable: true, revealTooltip: false });
   const btn: HTMLButtonElement = root.querySelector<HTMLButtonElement>('.weave-input__reveal')!;
