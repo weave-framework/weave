@@ -3,6 +3,32 @@
 Human-readable highlights, one section per release — everything notable that landed since
 the previous one. For the granular, per-version log see [CHANGELOG.md](CHANGELOG.md).
 
+## 1.1.0 — 2026-07-06
+
+**Weave's first minor since 1.0** — new, backward-compatible surface (per [VERSIONING.md](VERSIONING.md)):
+nothing you already wrote changes.
+
+### ✨ Feature — extend a component without forking it
+- **A component can now `extend` another** — it reuses the base's entire `setup` context and behaviour, then
+  overrides or adds on top, with its own template as a full override. Authored as an ordinary component file:
+  ```ts
+  // my-list.ts
+  import List from '@weave-framework/ui/list';
+  import { computed } from '@weave-framework/runtime';
+
+  export const extend = List;                          // this component extends <List>
+  export function setup(props, base) {                 // base = List's setup context
+    return { ...base, totalCount: computed(() => base.items().length) }; // reuse + add / override
+  }
+  ```
+  The extension's template reads base-provided names (`listClass`, `items`, …) **and** the ones it adds, all
+  from one merged context. Extensions **compose** — an already-extended component can be extended again. To
+  reshape data the base's *internals* read (not just what the template sees), an optional `extendProps(props)`
+  runs **before** the base setup. See [Extending a component](https://weaveframework.dev/learn/components).
+- This is [RFC 0008](rfcs/0008-component-extension.md) **mode #1** (full template override). Declarative
+  *patches* against the base template — add just an attribute or a node without rewriting the whole template —
+  are a planned follow-up.
+
 ## 1.0.15 — 2026-07-06
 
 ### ✨ Feature — `use:` actions on component tags

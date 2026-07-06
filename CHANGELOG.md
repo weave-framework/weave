@@ -10,6 +10,19 @@
 > `pnpm publish:packages`) — pushing code does **not** publish to npm. (The scheme started at
 > `0.2.0`; the line crossed `1.0.0` on 2026-07-05 when the public API was frozen.)
 
+## 1.1.0 — 2026-07-06
+
+**Feature (compiler, runtime) — component extension (`extend`), RFC 0008 mode #1.** A component whose script
+exports `const extend = Base` compiles to `defineComponent(render, extendSetup(extend, setup?, extendProps?))`:
+it reuses the base component's whole setup context and its own `setup(props, base)` overrides/adds on top, with
+its own template as the full override. `extendProps(props)` reshapes props BEFORE the base setup (the deep seam
+past closure privacy — a returned-key override only changes what the template sees, not what the base's internal
+closures read). `defineComponent` now attaches the raw setup as `__wSetup` so `extendSetup` can compose it;
+chaining works by construction (an extended component's `__wSetup` is the composed function). The runtime helper
+is `@internal` (api-gen skips it — `runtime/dom` stays 21 documented exports); no loader change. Declarative
+template *patches* (`#3`) remain a planned follow-up. First **minor** since 1.0 — additive, nothing existing
+changes. Docs: learn/components "Extending a component".
+
 ## 1.0.15 — 2026-07-06
 
 **Feature (compiler, check) — `use:` actions on component tags.** `use:action={{ arg }}` on a `<Component>` now
