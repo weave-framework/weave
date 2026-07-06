@@ -82,11 +82,20 @@ class Gen {
 }
 
 export function compileTemplate(input: string, options: CompileOptions = {}): CompileResult {
+  return compileTemplateAst(parseTemplate(input), options);
+}
+
+/**
+ * Like {@link compileTemplate} but from an already-parsed AST — used when the AST is
+ * transformed before codegen (e.g. RFC 0008 `#3` component-extension template patches
+ * splice/patch the base template's AST, then compile the result without a round-trip through
+ * template text).
+ */
+export function compileTemplateAst(ast: TemplateNode[], options: CompileOptions = {}): CompileResult {
   const mode: 'module' | 'function' = options.mode ?? 'module';
   const runtimeImport: string = options.runtimeImport ?? '@weave-framework/runtime/dom';
   const gen: Gen = new Gen(mode, options.scopeAttr, options.hostAttr);
 
-  const ast: TemplateNode[] = parseTemplate(input);
   // isHost: the render fragment's top-level elements are the component's roots → `:host`.
   const render: string = compileFragment(gen, ast, ctxScope(options.scope ?? []), 'render', 'ctx, slots', true);
   const components: string[] = [...gen.usedComponents];

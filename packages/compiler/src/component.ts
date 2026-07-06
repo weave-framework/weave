@@ -13,16 +13,23 @@
  * passes directly.
  */
 
-import { compileTemplate, type CompileResult } from './codegen.js';
+import { compileTemplate, compileTemplateAst, type CompileResult } from './codegen.js';
 import { parseTemplate } from './parser.js';
+import type { TemplateNode } from './ast.js';
+import { applyPatches, type PatchOp } from './patch.js';
 import { inferCtxNames } from './infer.js';
 import { scopeCss, scopeAttr, hostAttr, hashCss } from './css.js';
 
 export interface ComponentSource {
   /** Setup module — user imports + `export function setup(props) { … return bindings }`. */
   script?: string;
-  /** Template markup. */
+  /** Template markup. For a `#3` component-extension, this is the BASE template `patches` apply to. */
   template: string;
+  /**
+   * RFC 0008 `#3` — declarative patch ops applied to `template` (the base template) before codegen.
+   * Present only for a component-file extension that patches its base rather than overriding it (#1).
+   */
+  patches?: PatchOp[];
   /** Component CSS (scoped to this component). */
   styles?: string;
 }
@@ -60,10 +67,13 @@ export function compileComponent(src: ComponentSource, opts: ComponentOptions = 
   const hash: string = opts.hash ?? hashCss(opts.filename ?? src.template);
   const attr: string = scopeAttr(hash);
 
-  const scope: string[] = inferCtxNames(parseTemplate(src.template));
+  // Parse once; a `#3` extension patches the base template's AST before scope-inference + codegen.
+  let ast: TemplateNode[] = parseTemplate(src.template);
+  if (src.patches?.length) ast = applyPatches(ast, src.patches);
+  const scope: string[] = inferCtxNames(ast);
   // Stamp the `:host` root marker only when the styles actually use `:host` (else zero cost).
   const host: string | undefined = src.styles && /:host\b/.test(src.styles) ? hostAttr(hash) : undefined;
-  const compiled: CompileResult = compileTemplate(src.template, { mode: 'module', scope, scopeAttr: attr, hostAttr: host });
+  const compiled: CompileResult = compileTemplateAst(ast, { mode: 'module', scope, scopeAttr: attr, hostAttr: host });
   // Demote the template module's default export to a local `render` we can wire up.
   const renderBody: string = compiled.code.replace('export default function render', 'function render');
 
