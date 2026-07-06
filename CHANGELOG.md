@@ -10,6 +10,22 @@
 > `pnpm publish:packages`) — pushing code does **not** publish to npm. (The scheme started at
 > `0.2.0`; the line crossed `1.0.0` on 2026-07-05 when the public API was frozen.)
 
+## 1.4.0 — 2026-07-06
+
+**Feature (`@weave-framework/router`) — async before-leave / canDeactivate guards (`beforeEach`).**
+Adds `beforeEach(fn: LeaveGuard): () => void`: a guard run before every navigation commits
+(push / replace / pop) that may return `boolean | Promise<boolean>` — a `false` cancels and the
+current path + address bar stay put. All guards must allow to proceed; the first `false`
+short-circuits; the returned function unregisters. Push/replace are gated in `navigateState`
+(with a synchronous fast path when no guard is registered, so existing behavior/timing is
+unchanged); `popstate` awaits the guards and, on a veto, rolls history back via `history.go` so
+the URL matches staying put (no half-state). `afterEach` fires only on a committed navigation.
+Also adds `navigate(to, { replace: true })` + the `NavigateOptions` type (via `history.replaceState`),
+making the previously internal `'replace'` `NavType` a public API. New types exported: `LeaveGuard`,
+`LeaveInfo`, `NavigateOptions`. Tests: `packages/router/test/router.browser.ts` (cancel navigate,
+multi-guard short-circuit, `<Link>` click, replace gating + afterEach-only-on-commit, pop gate) —
+DoD-proven (all go red when the gate is neutered).
+
 ## 1.3.2 — 2026-07-06
 
 **Fix (`@weave-framework/check`, `@weave-framework/cli`, `@weave-framework/compiler`) — a template

@@ -3,6 +3,29 @@
 Human-readable highlights, one section per release — everything notable that landed since
 the previous one. For the granular, per-version log see [CHANGELOG.md](CHANGELOG.md).
 
+## 1.4.0 — 2026-07-06
+
+### ✨ Feature — `@weave-framework/router`: async before-leave guards (unsaved-changes prompts)
+- **New `beforeEach(fn)` — an async, cancellable guard that runs before every navigation commits**
+  (push, replace, *and* browser back/forward). Route `guard`s are synchronous by design (great for
+  auth), so there was no point at which navigation could pause to **await a user decision** — which is
+  exactly what an *"you have unsaved changes, really leave?"* prompt on a routed page needs. `beforeEach`
+  fills that gap:
+  - The guard receives `LeaveInfo { to, from, type }` and returns `boolean | Promise<boolean>` — return
+    `false` (or `Promise<false>`) to cancel; the current path and the address bar stay put.
+  - **All registered guards must allow** for a navigation to proceed; the first `false` short-circuits.
+    `beforeEach(fn)` returns an unregister function — call it in the page's cleanup so the guard only
+    lives while that page is mounted.
+  - **Browser back/forward is handled too:** on a cancelled `pop` the router rolls history back
+    (`history.go`) so the URL matches staying put — no "content old, address new" half-state.
+  - `afterEach` fires only on a **committed** navigation (never on a cancelled one); the synchronous
+    route guards and matching are unchanged and run only after before-leave allows.
+- **New `navigate(to, { replace: true })`** (and the `NavigateOptions` type) — swap the current history
+  entry instead of pushing, via `history.replaceState`. This promotes the previously internal-only
+  `'replace'` `NavType` to real public API.
+- When **no** `beforeEach` guard is registered, navigation stays fully synchronous — existing behavior
+  and timing are unchanged.
+
 ## 1.3.2 — 2026-07-06
 
 ### 🐞 Fix — a template parse error points at the file, not a stack trace
