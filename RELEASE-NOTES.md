@@ -3,6 +3,34 @@
 Human-readable highlights, one section per release — everything notable that landed since
 the previous one. For the granular, per-version log see [CHANGELOG.md](CHANGELOG.md).
 
+## 1.0.15 — 2026-07-06
+
+### ✨ Feature — `use:` actions on component tags
+- **A `use:` action now works on a component tag, not just a DOM element** — Weave forwards it to
+  the component's single **root element**, with the identical lifecycle it has on an element (runs
+  at mount, supports a returned cleanup or `{ update, destroy }`, and re-runs `update` when the
+  argument changes; multiple `use:` on one component all run, in order):
+  ```html
+  <Button use:menu={{ accountMenu }}>Account ▾</Button>   <!-- action attaches to the root <button> -->
+  <a use:menu={{ accountMenu }}>Account (footer)</a>       <!-- same menu, native trigger -->
+  ```
+  This lets a `@weave-framework/ui` `<Button>` (or any single-root component) be a menu/tooltip
+  trigger, and preserves the "define once, trigger from many places" pattern across a mix of
+  components and native elements. The action's `aria-*` and listeners land on the component's root
+  element (e.g. `aria-haspopup`/`aria-expanded` on the `<button>` inside `<Button>`). `weave check`
+  type-checks the action as `(Element, arg)` on components too.
+- **Single-root constraint, fail-loud.** A component that renders a fragment (multiple top-level
+  nodes), a text/comment root, or nothing is a clear error — *"use: on `<Account>`: actions attach
+  to a single root element, but `<Account>` renders 3 nodes."* — never a silent mis-attach.
+- Component **props**, `on:` events, and element-level `use:` are unchanged — no behaviour change
+  for existing code. (`transition:`/`in:`/`out:` and `ref`/`bind:this` on components are not yet
+  supported — a natural follow-up on the same forwarding mechanism.)
+
+### 📋 Docs
+- Accepted **RFC 0008 — component extension (`extendComponent`)**: a future primitive to subclass
+  any component (reuse its `setup` + template, override/add on both) without forking. Design record
+  only — not implemented yet.
+
 ## 1.0.12 — 2026-07-05
 
 ### ✨ Feature — `weave dev` proxy (`dev.proxy`)

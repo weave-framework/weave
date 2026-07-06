@@ -10,6 +10,20 @@
 > `pnpm publish:packages`) — pushing code does **not** publish to npm. (The scheme started at
 > `0.2.0`; the line crossed `1.0.0` on 2026-07-05 when the public API was frozen.)
 
+## 1.0.15 — 2026-07-06
+
+**Feature (compiler, check) — `use:` actions on component tags.** `use:action={{ arg }}` on a `<Component>` now
+forwards to the component's single **root DOM element** through the same `applyAction` path elements use — identical
+lifecycle (mount timing, returned cleanup or `{ update, destroy }`, `update(arg)` on change, multiple in order). The
+compiler no longer rejects `use:` on a component tag; the mounted node is resolved to its root via a new `@internal`
+`componentRoot(node, tag)` guard that throws a clear single-root error for a fragment/text/empty root ("use: on
+`<Tag>`: actions attach to a single root element, but `<Tag>` renders N nodes.") — never a silent mis-attach.
+`@weave-framework/check` already type-checked component directives as `(Element, arg)`; a parity test pins it. Props,
+`on:` events, and element `use:` are unchanged. Docs updated (learn/templates + components, reference/template-syntax).
+
+**Docs (rfc) — RFC 0008 accepted.** `extendComponent` — a future primitive to subclass any component (reuse its
+`setup` + template, override/add on both sides) without forking. Design record only; not implemented.
+
 ## 1.0.12 — 2026-07-05
 
 **Feature (cli) — `weave dev` proxy (`dev.proxy`).** A Vite/Angular/Next-style dev proxy so an app's API calls stay

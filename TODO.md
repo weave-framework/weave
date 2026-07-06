@@ -20,6 +20,10 @@ this list is a live intention, not a historical note.
 
 ## Planned — framework
 
+- **Component extension — `extendComponent`.** Accepted as a future primitive
+  ([RFC 0008](rfcs/0008-component-extension.md)): take any component, reuse all of its functionality, and
+  override/add on both the `setup` (TypeScript) and the template (HTML) without forking it — the loader composes
+  the extended template against the base. Design accepted; not yet built.
 - **Server-side rendering — SSG first.** Accepted as a future track ([RFC 0001](rfcs/0001-ssr-hydration.md)):
   build-time prerendering + client hydration for SEO and first paint, before request-time SSR / streaming. Scheduled
   after the client-first roadmap matures, so it never comes at the cost of the core.
