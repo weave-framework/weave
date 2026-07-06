@@ -48,7 +48,8 @@ export {
 
 export { mountDevtoolsPanel, type DevtoolsPanelOptions } from './devtools-panel.js';
 
-export { linkedSignal, debounced, watch } from './extras.js';
+export { linkedSignal, debounced, watch, fromObservable, toObservable } from './extras.js';
+export type { InteropObserver, Unsubscribable, Subscribable } from './extras.js';
 
 export { fade, fly, slide, scale } from './transitions.js';
 export type { TransitionFn, TransitionConfig } from './dom.js';

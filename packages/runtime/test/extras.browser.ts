@@ -7,8 +7,10 @@ import {
   linkedSignal,
   debounced,
   watch,
+  fromObservable,
+  toObservable,
 } from '@weave-framework/runtime';
-import type { Signal, Computed, Owner } from '@weave-framework/runtime';
+import type { Signal, Computed, Owner, InteropObserver, Unsubscribable, Subscribable } from '@weave-framework/runtime';
 
 const wait = (ms: number): Promise<void> => new Promise<void>((r) => setTimeout(r, ms));
 
@@ -153,4 +155,125 @@ test('watch callback cleanup runs before the next call and on stop', () => {
   assert.deepEqual(cleaned, [1], 'previous cleanup ran before the next call');
   disposeOwner(owner);
   assert.deepEqual(cleaned, [1, 2], 'final cleanup ran on stop');
+});
+
+/* ─────────────────── Observable interop (Angular / RxJS bridge) ─────────────────── */
+
+/** A minimal RxJS/Angular-style Subject for tests (no rxjs dependency). */
+interface TestSubject<T> {
+  subscribe(o: InteropObserver<T>): Unsubscribable;
+  next(v: T): void;
+  error(e: unknown): void;
+  count(): number;
+}
+function makeSubject<T>(): TestSubject<T> {
+  const observers: Set<InteropObserver<T>> = new Set<InteropObserver<T>>();
+  return {
+    subscribe: (o: InteropObserver<T>): Unsubscribable => {
+      observers.add(o);
+      return { unsubscribe: (): void => void observers.delete(o) };
+    },
+    next: (v: T): void => { for (const o of observers) o.next?.(v); },
+    error: (e: unknown): void => { for (const o of observers) o.error?.(e); },
+    count: (): number => observers.size,
+  };
+}
+
+test('fromObservable seeds the initial value and tracks emissions', () => {
+  const subj: TestSubject<number> = makeSubject<number>();
+  const owner: Owner = createOwner();
+  const v: () => number | undefined = runInOwner(owner, () => fromObservable(subj, -1));
+  assert.equal(v(), -1, 'initial value before any emission');
+  subj.next(1);
+  assert.equal(v(), 1);
+  subj.next(2);
+  assert.equal(v(), 2, 'tracks the latest emission');
+  disposeOwner(owner);
+});
+
+test('fromObservable auto-unsubscribes when its owner disposes', () => {
+  const subj: TestSubject<number> = makeSubject<number>();
+  const owner: Owner = createOwner();
+  const v: () => number | undefined = runInOwner(owner, () => fromObservable(subj, 0));
+  assert.equal(subj.count(), 1, 'subscribed on creation');
+  subj.next(5);
+  assert.equal(v(), 5);
+  disposeOwner(owner);
+  assert.equal(subj.count(), 0, 'unsubscribed on owner dispose');
+  subj.next(9);
+  assert.equal(v(), 5, 'no updates after unsubscribe');
+});
+
+test('fromObservable re-throws a stream error on the next read', () => {
+  const subj: TestSubject<number> = makeSubject<number>();
+  const owner: Owner = createOwner();
+  const v: () => number | undefined = runInOwner(owner, () => fromObservable(subj, 0));
+  subj.error(new Error('boom'));
+  let threw: boolean = false;
+  try {
+    v();
+  } catch (e) {
+    threw = true;
+    assert.equal((e as Error).message, 'boom');
+  }
+  assert.ok(threw, 'reading after an error re-throws it');
+  disposeOwner(owner);
+});
+
+test('fromObservable stores a function-valued emission verbatim (not as an updater)', () => {
+  const fn = (): number => 42;
+  const subj: TestSubject<() => number> = makeSubject<() => number>();
+  const owner: Owner = createOwner();
+  const v: () => (() => number) | undefined = runInOwner(owner, () => fromObservable<() => number>(subj));
+  subj.next(fn);
+  assert.is(v(), fn, 'the emitted function is the stored value, not an updater');
+  assert.equal(v()!(), 42);
+  disposeOwner(owner);
+});
+
+test('toObservable emits the current value on subscribe, then on each change', () => {
+  const n: Signal<number> = signal(1);
+  const seen: number[] = [];
+  const sub: Unsubscribable = toObservable(() => n()).subscribe({ next: (v) => seen.push(v) }) as Unsubscribable;
+  assert.deepEqual(seen, [1], 'current value emitted synchronously on subscribe');
+  n.set(2);
+  n.set(3);
+  assert.deepEqual(seen, [1, 2, 3], 'emits on each change');
+  sub.unsubscribe();
+});
+
+test('toObservable unsubscribe stops emissions', () => {
+  const n: Signal<number> = signal(0);
+  const seen: number[] = [];
+  const sub: Unsubscribable = toObservable(() => n()).subscribe({ next: (v) => seen.push(v) }) as Unsubscribable;
+  n.set(1);
+  sub.unsubscribe();
+  n.set(2);
+  assert.deepEqual(seen, [0, 1], 'no emissions after unsubscribe');
+});
+
+test('toObservable supports independent subscribers', () => {
+  const n: Signal<number> = signal(0);
+  const a: number[] = [];
+  const b: number[] = [];
+  const obs: Subscribable<number> = toObservable(() => n());
+  const subA: Unsubscribable = obs.subscribe({ next: (v) => a.push(v) }) as Unsubscribable;
+  n.set(1);
+  const subB: Unsubscribable = obs.subscribe({ next: (v) => b.push(v) }) as Unsubscribable; // B seeds at current (1)
+  n.set(2);
+  subA.unsubscribe();
+  n.set(3); // only B still listening
+  assert.deepEqual(a, [0, 1, 2], 'A stopped after unsubscribe');
+  assert.deepEqual(b, [1, 2, 3], 'B seeded at the current value and continued');
+  subB.unsubscribe();
+});
+
+test('round-trip: fromObservable(toObservable(sig)) mirrors the signal', () => {
+  const n: Signal<number> = signal(10);
+  const owner: Owner = createOwner();
+  const mirror: () => number | undefined = runInOwner(owner, () => fromObservable(toObservable(() => n()), -1));
+  assert.equal(mirror(), 10, 'seeded with the current value on subscribe');
+  n.set(20);
+  assert.equal(mirror(), 20, 'tracks through the round-trip');
+  disposeOwner(owner);
 });

@@ -438,8 +438,31 @@ How it differs from a bare `effect`, and the one footgun about `prev`:
 | Previous value | not available | passed as second arg (`undefined` on first call) |
 | Runs on creation | always | only with `immediate: true` |
 
+### fromObservable / toObservable — the RxJS / Angular bridge
+
+Two thin adapters that bridge between a Weave reactive value and an **RxJS/Angular-style Observable** — the migration seam for code that speaks Observables (Angular's `HttpClient`, `async` pipe, `Subject` state). **Zero dependency:** the bridge only duck-types the Observable contract (`{ subscribe(observer) }`), so it needs no `rxjs` import.
+
+~~~ts title="fromObservable(observable, initial?) — Observable → signal"
+import { fromObservable } from '@weave-framework/runtime';
+
+// http.get(...) returns an Observable — read it as a reactive value:
+const user = fromObservable(http.get<User>('/me'));
+// template: @if (user()) { {{ user()!.name }} }
+~~~
+
+~~~ts title="toObservable(source) — signal → Observable"
+import { signal, toObservable } from '@weave-framework/runtime';
+
+const count = signal(0);
+const count$ = toObservable(() => count()); // hand to an async pipe / rxjs.from()
+~~~
+
+- **`fromObservable`** subscribes and pushes each emission into a read-only accessor; it **auto-unsubscribes when the surrounding owner disposes** (call it inside a component/`setup`). The accessor returns `initial` (or `undefined`) until the first emission. If the stream **errors**, the error is re-thrown on the next read — mirroring Angular's `toSignal`, so it lands in a `catchError` boundary or a local try/catch.
+- **`toObservable`** returns a minimal Observable: each `subscribe(observer)` emits the **current** value immediately, then on every change, and returns an `unsubscribe`. It carries the `Symbol.observable` interop hook, so Angular's `async` pipe and `rxjs.from(...)` accept it directly.
+- Full RxJS *operator* interop stays out of scope by design — but source↔signal bridging covers the bulk of an Angular migration (the `async` pipe, `valueChanges`/`statusChanges`, Observable-returning services).
+
 :::callout info "What you just learned"
-`signal` is the source (with an `equals` option); `computed` is a cached, **lazy** derivation (also with `equals`) — its body may never run if nobody reads it, and a throw inside it surfaces at the reader. `effect` runs **immediately**, returns a `stop()` handle, supports cleanups (before each re-run and on disposal), and a throw inside it goes **up the owner chain** to an error boundary. `batch` groups effect flushes (reads still see writes immediately; nested batches flush at the outermost end), `untrack` and `peek` read without subscribing (`untrack` even un-subscribes computed reads), and `tick` flushes then awaits a microtask. `catchError(handler, fn)` is the programmatic error boundary. Ownership — `root`, `getOwner`, `createOwner`, `runInOwner`, `disposeOwner` — disposes your effects for you, and is the fix for leaking nested effects. The extras — `linkedSignal`, `debounced`, `watch` — are thin, optional conveniences over those primitives.
+`signal` is the source (with an `equals` option); `computed` is a cached, **lazy** derivation (also with `equals`) — its body may never run if nobody reads it, and a throw inside it surfaces at the reader. `effect` runs **immediately**, returns a `stop()` handle, supports cleanups (before each re-run and on disposal), and a throw inside it goes **up the owner chain** to an error boundary. `batch` groups effect flushes (reads still see writes immediately; nested batches flush at the outermost end), `untrack` and `peek` read without subscribing (`untrack` even un-subscribes computed reads), and `tick` flushes then awaits a microtask. `catchError(handler, fn)` is the programmatic error boundary. Ownership — `root`, `getOwner`, `createOwner`, `runInOwner`, `disposeOwner` — disposes your effects for you, and is the fix for leaking nested effects. The extras — `linkedSignal`, `debounced`, `watch`, and the `fromObservable`/`toObservable` RxJS/Angular bridge — are thin, optional conveniences over those primitives.
 :::
 
 [Next: Components →](/learn/components) · [Full reactive API in the Reference →](/reference/runtime)
