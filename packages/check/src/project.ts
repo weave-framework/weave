@@ -8,34 +8,60 @@
 
 import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
-import { extractSources, classifyTemplate, faithfulTemplate, type ExtractedSources } from '@weave-framework/compiler';
+import { extractSources, classifyTemplate, faithfulTemplate, ParseError, type ExtractedSources } from '@weave-framework/compiler';
 import { buildVirtualSfc, buildVirtualSeparate, type Virtual } from './emit.js';
-import { runCheck, type Diagnostic } from './check.js';
+import { runCheck, offsetToLineCol, type Diagnostic } from './check.js';
 
 const SKIP: Set<string> = new Set(['node_modules', 'dist', '.git', '.weave']);
 
-/** Build virtuals for every component found under `roots`, then check them together. */
+/** Build virtuals for every component found under `roots`, then check them together. A template
+ *  that fails to PARSE (e.g. a malformed attribute) becomes a normal `file:line:col` diagnostic
+ *  rather than a thrown stack trace, so one bad template no longer aborts the whole check. */
 export function checkProject(roots: string[]): Diagnostic[] {
   const virtuals: Virtual[] = [];
-  for (const root of roots) collect(root, virtuals);
-  return virtuals.length ? runCheck(virtuals) : [];
+  const parseDiags: Diagnostic[] = [];
+  for (const root of roots) collect(root, virtuals, parseDiags);
+  return [...parseDiags, ...(virtuals.length ? runCheck(virtuals) : [])];
 }
 
-function collect(path: string, out: Virtual[]): void {
+/** Turn a compiler {@link ParseError} into a source-located diagnostic. `source` is the exact text
+ *  the parser saw, whose offsets map 1:1 to `file` (the sibling `.html`, or the offset-faithful
+ *  `.weave`/inline-template region). */
+function parseDiagnostic(file: string, source: string, e: ParseError): Diagnostic {
+  const { line, col }: { line: number; col: number } = offsetToLineCol(source, e.offset ?? 0);
+  return { file, line, col, code: 0, message: e.message, category: 'error' };
+}
+
+/** Run a virtual builder; a `ParseError` becomes a diagnostic (any other error still throws). */
+function tryBuild(build: () => Virtual, file: string, source: string, out: Virtual[], diags: Diagnostic[]): void {
+  try {
+    out.push(absolutize(build()));
+  } catch (e) {
+    if (e instanceof ParseError) {
+      diags.push(parseDiagnostic(file, source, e));
+      return;
+    }
+    throw e;
+  }
+}
+
+function collect(path: string, out: Virtual[], diags: Diagnostic[]): void {
   if (!existsSync(path)) return;
   const st: ReturnType<typeof statSync> = statSync(path);
   if (st.isDirectory()) {
     for (const entry of readdirSync(path)) {
       if (SKIP.has(entry)) continue;
-      collect(join(path, entry), out);
+      collect(join(path, entry), out, diags);
     }
     return;
   }
   if (path.endsWith('.weave')) {
-    out.push(absolutize(buildVirtualSfc(path, readFileSync(path, 'utf8'))));
+    // A `.weave` template parses `parseSfcLoc(source).template`, which blanks the script/style
+    // regions in place — so offsets map 1:1 back to the raw `.weave` source.
+    const source: string = readFileSync(path, 'utf8');
+    tryBuild(() => buildVirtualSfc(path, source), path, source, out, diags);
   } else if (path.endsWith('.ts') && !path.endsWith('.d.ts')) {
-    const v: Virtual | null = collectTs(path);
-    if (v) out.push(absolutize(v));
+    collectTs(path, out, diags);
   }
 }
 
@@ -52,8 +78,9 @@ function absolutize(v: Virtual): Virtual {
   return v;
 }
 
-/** Resolve a `.ts` component's template into a virtual (or null if it is not a component). */
-function collectTs(tsPath: string): Virtual | null {
+/** Resolve a `.ts` component's template into a virtual (or nothing if it is not a component); a
+ *  parse failure is recorded as a diagnostic against the offending template file. */
+function collectTs(tsPath: string, out: Virtual[], diags: Diagnostic[]): void {
   const source: string = readFileSync(tsPath, 'utf8');
   const decl: ExtractedSources = extractSources(source);
   const siblingHtml: string = tsPath.replace(/\.ts$/, '.html');
@@ -65,15 +92,20 @@ function collectTs(tsPath: string): Virtual | null {
       const faithful: string = decl.templateRange
         ? faithfulTemplate(source, decl.templateRange)
         : decl.template;
-      return buildVirtualSeparate(tsPath, decl.script, tsPath, faithful);
+      tryBuild(() => buildVirtualSeparate(tsPath, decl.script, tsPath, faithful), tsPath, faithful, out, diags);
+      return;
     }
     const file: string = resolve(dirname(tsPath), decl.template);
-    if (!existsSync(file)) return null; // build reports the missing file; check just skips
-    return buildVirtualSeparate(tsPath, decl.script, file, readFileSync(file, 'utf8'));
+    if (!existsSync(file)) return; // build reports the missing file; check just skips
+    const html: string = readFileSync(file, 'utf8');
+    tryBuild(() => buildVirtualSeparate(tsPath, decl.script, file, html), file, html, out, diags);
+    return;
   }
 
   if (existsSync(siblingHtml)) {
-    return buildVirtualSeparate(tsPath, decl.script, siblingHtml, readFileSync(siblingHtml, 'utf8'));
+    const html: string = readFileSync(siblingHtml, 'utf8');
+    tryBuild(() => buildVirtualSeparate(tsPath, decl.script, siblingHtml, html), siblingHtml, html, out, diags);
+    return;
   }
-  return null; // ordinary module
+  // ordinary module → not a component
 }

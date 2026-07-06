@@ -26,7 +26,7 @@ import type { OnLoadArgs, OnLoadResult, Plugin, PluginBuild } from 'esbuild';
 import { readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import { compileComponent, parseSfc, extractSources, classifyTemplate, classifyStyle, childImportCandidates, hashCss } from '@weave-framework/compiler';
+import { compileComponent, parseSfc, extractSources, classifyTemplate, classifyStyle, childImportCandidates, hashCss, ParseError } from '@weave-framework/compiler';
 import type { ComponentSource, ExtractedSources, PatchOp, CompiledComponent } from '@weave-framework/compiler';
 import { compileStyleFileTracked, compileStyleSource, type StyleLang } from './styles.js';
 
@@ -64,6 +64,32 @@ function cssInjector(css: string): string {
   )};if(document.getElementById(id))return;const s=document.createElement("style");s.id=id;s.textContent=${JSON.stringify(
     css
   )};document.head.appendChild(s);})();\n`;
+}
+
+/**
+ * Turn a compiler {@link ParseError} into an esbuild error framed at the offending template's
+ * `file:line:col` (with the source line), instead of letting it bubble up as a raw JS stack trace
+ * pointing at esbuild internals. `source` is the exact text the parser saw; its offsets map to
+ * `file`. For a `.weave` SFC the template is the block body, so the reported line is relative to
+ * that block — good enough to jump to the bad markup.
+ */
+function parseErrorResult(e: ParseError, file: string, source: string): OnLoadResult {
+  const offset: number = Math.min(e.offset ?? 0, source.length);
+  let line: number = 1;
+  let column: number = 0;
+  let lineStart: number = 0;
+  for (let i: number = 0; i < offset; i++) {
+    if (source[i] === '\n') {
+      line++;
+      column = 0;
+      lineStart = i + 1;
+    } else {
+      column++;
+    }
+  }
+  const nl: number = source.indexOf('\n', lineStart);
+  const lineText: string = source.slice(lineStart, nl === -1 ? source.length : nl);
+  return { errors: [{ text: e.message, location: { file, line, column, length: 1, lineText } }] };
 }
 
 /**
@@ -354,9 +380,14 @@ export function weave(state: WeaveState, options: WeaveOptions = {}): Plugin {
         const styles: string | undefined = src.styles
           ? await compileStyleSource(src.styles, styleLang, dirname(args.path))
           : undefined;
-        const { code, css, components } = compileComponent({ ...src, styles }, { filename: args.path });
-        const wired: string = injectChildImports(code, components, dirname(args.path), src.script, args.path);
-        return emit(wired, css, dirname(args.path));
+        try {
+          const { code, css, components } = compileComponent({ ...src, styles }, { filename: args.path });
+          const wired: string = injectChildImports(code, components, dirname(args.path), src.script, args.path);
+          return emit(wired, css, dirname(args.path));
+        } catch (e) {
+          if (e instanceof ParseError) return parseErrorResult(e, args.path, src.template);
+          throw e;
+        }
       });
 
       build.onLoad({ filter: /\.ts$/ }, async (args: OnLoadArgs) => {
@@ -392,14 +423,19 @@ export function weave(state: WeaveState, options: WeaveOptions = {}): Plugin {
             );
           }
           const patches: PatchOp[] = readPatchOps(decl.script ?? source, args.path);
-          const compiled: CompiledComponent = compileComponent(
-            { script: decl.script, template: base.template, patches },
-            { filename: args.path, hash: hashCss(base.filename) }
-          );
-          // Base-template child tags resolve relative to the BASE dir; inserted tags the extension
-          // itself imports are skipped by injectChildImports (explicit import wins).
-          const wired: string = injectChildImports(compiled.code, compiled.components, base.dir, decl.script, args.path);
-          return { ...emit(wired, compiled.css, dir), watchFiles: [base.file] };
+          try {
+            const compiled: CompiledComponent = compileComponent(
+              { script: decl.script, template: base.template, patches },
+              { filename: args.path, hash: hashCss(base.filename) }
+            );
+            // Base-template child tags resolve relative to the BASE dir; inserted tags the extension
+            // itself imports are skipped by injectChildImports (explicit import wins).
+            const wired: string = injectChildImports(compiled.code, compiled.components, base.dir, decl.script, args.path);
+            return { ...emit(wired, compiled.css, dir), watchFiles: [base.file] };
+          } catch (e) {
+            if (e instanceof ParseError) return { ...parseErrorResult(e, base.file, base.template), watchFiles: [base.file] };
+            throw e;
+          }
         }
 
         // A `.ts` is a component iff it declares a template OR has a sibling `.html`.
@@ -418,15 +454,24 @@ export function weave(state: WeaveState, options: WeaveOptions = {}): Plugin {
           styleLang
         );
 
-        const { code, css, components } = compileComponent(
-          { script: decl.script, template: template.text, styles: styles.css },
-          { filename: args.path }
-        );
-        const wired: string = injectChildImports(code, components, dir, decl.script, args.path);
-        // Tell esbuild this module also depends on its template + style files, so a
-        // template-only or style-only edit (which leaves the .ts untouched) still
-        // triggers a watch-mode rebuild + live-reload.
-        return { ...emit(wired, css, dir), watchFiles: [...template.files, ...styles.files] };
+        try {
+          const { code, css, components } = compileComponent(
+            { script: decl.script, template: template.text, styles: styles.css },
+            { filename: args.path }
+          );
+          const wired: string = injectChildImports(code, components, dir, decl.script, args.path);
+          // Tell esbuild this module also depends on its template + style files, so a
+          // template-only or style-only edit (which leaves the .ts untouched) still
+          // triggers a watch-mode rebuild + live-reload.
+          return { ...emit(wired, css, dir), watchFiles: [...template.files, ...styles.files] };
+        } catch (e) {
+          // A malformed template → a framed `file:line:col` esbuild error at the .html/template,
+          // not a raw parser stack trace. Point at the template file (sibling/declared), else the .ts.
+          if (e instanceof ParseError) {
+            return { ...parseErrorResult(e, template.files[0] ?? args.path, template.text), watchFiles: template.files };
+          }
+          throw e;
+        }
       });
     },
   };

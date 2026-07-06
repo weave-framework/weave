@@ -3,6 +3,20 @@
 Human-readable highlights, one section per release — everything notable that landed since
 the previous one. For the granular, per-version log see [CHANGELOG.md](CHANGELOG.md).
 
+## 1.3.2 — 2026-07-06
+
+### 🐞 Fix — a template parse error points at the file, not a stack trace
+- **`weave check` and `weave build` now surface a malformed template as a clean `file:line:col`
+  diagnostic.** 1.3.1 stopped the infinite-loop / OOM on a bad attribute (e.g. `<div }>` or a
+  leftover Angular-style `(click)` / `[prop]`), but still dumped a raw parser stack trace with no
+  filename. Now:
+  - `weave check` prints `path/app.html:2:8 - error: Unexpected character "}" in attributes of <div>`,
+    and one bad template no longer aborts the whole check — it becomes an ordinary diagnostic.
+  - `weave build` frames the error at the template with the offending source line + caret and fails
+    with a concise `weave build failed — N errors.` instead of esbuild's internal stack.
+  `ParseError` now carries a structured source offset, so the tools that know the filename can map it
+  precisely.
+
 ## 1.3.1 — 2026-07-06
 
 ### 🐞 Fixes — Nx integration & the template parser

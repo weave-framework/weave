@@ -10,6 +10,19 @@
 > `pnpm publish:packages`) — pushing code does **not** publish to npm. (The scheme started at
 > `0.2.0`; the line crossed `1.0.0` on 2026-07-05 when the public API was frozen.)
 
+## 1.3.2 — 2026-07-06
+
+**Fix (`@weave-framework/check`, `@weave-framework/cli`, `@weave-framework/compiler`) — a template
+parse error is now a located diagnostic, not a stack trace.** 1.3.1's `parseAttrs` advance-guard
+stopped the hang/OOM but the `ParseError` still bubbled up as a raw parser stack with no filename. Now
+`ParseError` carries a structured `offset`; `weave check` catches it in `checkProject` and reports
+`file:line:col - error: <message>` (so one malformed template no longer aborts the whole check), and
+the build loader (`packages/cli/src/plugin.ts`) returns an esbuild error framed at the template's
+`file:line:col` (source line + caret). `weave build` summarizes a build failure as `weave build failed
+— N errors.` instead of dumping esbuild's internal stack; non-esbuild failures still show their message.
+New `verify:check` smoke asserts `checkProject` returns a precise diagnostic (not a throw) for a
+malformed attribute; `braces.browser.ts` asserts the `ParseError` carries `.offset`. Patch release.
+
 ## 1.3.1 — 2026-07-06
 
 **Fix (`@weave-framework/nx`) — build output follows the Nx convention.** The `build` executor now

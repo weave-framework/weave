@@ -50,14 +50,18 @@ test('parseAttrs fails loud on a stray non-advancing char (no infinite loop / OO
   ];
   for (const c of cases) {
     let msg: string = '';
+    let offset: unknown = undefined;
     try {
       parseTemplate(c.src);
     } catch (e) {
       msg = (e as Error).message;
+      offset = (e as { offset?: number }).offset;
     }
     assert.ok(msg.includes('Unexpected character'), `${c.src} → should throw a ParseError, got: ${msg || '(no throw)'}`);
     assert.ok(msg.includes(JSON.stringify(c.ch)), `${c.src} → error names the character ${c.ch}: ${msg}`);
     assert.ok(msg.includes(`<${c.tag}>`), `${c.src} → error names the tag <${c.tag}>: ${msg}`);
+    // The error carries a structured source offset so `weave check`/`build` can map it to file:line:col.
+    assert.equal(typeof offset, 'number', `${c.src} → ParseError carries a numeric .offset (got ${String(offset)})`);
   }
 });
 

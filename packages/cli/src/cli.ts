@@ -40,30 +40,43 @@ export async function main(argv: string[]): Promise<void> {
   const config: ResolvedConfig | null = await loadConfig(process.cwd(), flag(rest, '--config'));
 
   if (cmd === 'build') {
-    if (config) {
-      syncRoutes(config); // file-based routing: regenerate routes.gen.ts before bundling
-      // An explicit `--out` overrides the config's `outDir` (used by `@weave-framework/nx`, which
-      // passes the workspace-root `dist/<project>` path); with no flag the config value stands, so
-      // a standalone `weave build` is unchanged.
-      const outDir: string = flag(rest, '--out') ?? config.outDir;
-      await build({
-        entry: config.entry,
-        virtualEntry: virtualEntryFor(config),
-        outDir,
-        minify: config.minify,
-        styleLang: config.styleLang,
-        styles: config.styles,
-        publicDir: config.publicDir,
-        index: config.index,
-        clean: true, // a fresh, self-contained artifact each prod build
-      });
-      console.log(`weave build → ${outDir}/`);
+    try {
+      if (config) {
+        syncRoutes(config); // file-based routing: regenerate routes.gen.ts before bundling
+        // An explicit `--out` overrides the config's `outDir` (used by `@weave-framework/nx`, which
+        // passes the workspace-root `dist/<project>` path); with no flag the config value stands, so
+        // a standalone `weave build` is unchanged.
+        const outDir: string = flag(rest, '--out') ?? config.outDir;
+        await build({
+          entry: config.entry,
+          virtualEntry: virtualEntryFor(config),
+          outDir,
+          minify: config.minify,
+          styleLang: config.styleLang,
+          styles: config.styles,
+          publicDir: config.publicDir,
+          index: config.index,
+          clean: true, // a fresh, self-contained artifact each prod build
+        });
+        console.log(`weave build → ${outDir}/`);
+        return;
+      }
+      // `weave build` is the production bundle → minify by default; `--no-minify` opts out.
+      await build({ entry, outDir: outdir, minify: !rest.includes('--no-minify') });
+      console.log(`weave build → ${outdir}/`);
       return;
+    } catch (e) {
+      // esbuild already prints each error framed at `file:line:col` (including template parse errors
+      // surfaced by the loader) — so just summarize + fail, rather than re-dumping esbuild's internal
+      // stack. Non-esbuild failures (a bad config, a missing file) still show their message.
+      const errs: unknown = (e as { errors?: unknown[] }).errors;
+      if (Array.isArray(errs)) {
+        console.error(`\nweave build failed — ${errs.length} error${errs.length === 1 ? '' : 's'}.`);
+      } else {
+        console.error(`\nweave build failed: ${(e as Error)?.message ?? String(e)}`);
+      }
+      process.exit(1);
     }
-    // `weave build` is the production bundle → minify by default; `--no-minify` opts out.
-    await build({ entry, outDir: outdir, minify: !rest.includes('--no-minify') });
-    console.log(`weave build → ${outdir}/`);
-    return;
   }
   if (cmd === 'dev') {
     if (config) {
@@ -134,5 +147,7 @@ export async function main(argv: string[]): Promise<void> {
 }
 
 function formatDiagnostic(d: Diagnostic): string {
-  return `${d.file}:${d.line}:${d.col} - ${d.category} TS${d.code}: ${d.message}`;
+  // TS diagnostics carry a `TS<code>`; a template parse error (code 0) has none.
+  const code: string = d.code ? ` TS${d.code}` : '';
+  return `${d.file}:${d.line}:${d.col} - ${d.category}${code}: ${d.message}`;
 }

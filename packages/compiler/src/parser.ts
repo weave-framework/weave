@@ -23,7 +23,19 @@ const VOID: Set<string> = new Set([
   'link', 'meta', 'param', 'source', 'track', 'wbr',
 ]);
 
-export class ParseError extends Error {}
+export class ParseError extends Error {
+  /**
+   * Source offset of the error within the parsed template, when known. Lets callers that hold the
+   * source + filename (`weave check`, the build loader) map it to a `file:line:col` diagnostic
+   * instead of surfacing a raw stack trace.
+   */
+  offset?: number;
+  constructor(message: string, offset?: number) {
+    super(message);
+    this.name = 'ParseError';
+    this.offset = offset;
+  }
+}
 
 /** A parsed attribute value: a static string, a `{expr}` (with its source offset), or none. */
 type AttrValue =
@@ -447,22 +459,6 @@ class Parser {
     return this.src[this.pos];
   }
 
-  /** 1-based line/column of a source offset — for human-readable parse-error locations. */
-  lineCol(pos: number): { line: number; col: number } {
-    let line: number = 1;
-    let col: number = 1;
-    const end: number = Math.min(pos, this.src.length);
-    for (let i: number = 0; i < end; i++) {
-      if (this.src[i] === '\n') {
-        line++;
-        col = 1;
-      } else {
-        col++;
-      }
-    }
-    return { line, col };
-  }
-
   readInterp(): { expr: string; offset: number } {
     // Text interpolation uses the same brace-balanced, string-aware scan as attribute `{{ }}`, so a
     // literal `}}` inside a string (`{{ fn("}}") }}`) or an inner object literal doesn't cut it short
@@ -551,10 +547,7 @@ class Parser {
       // WITHOUT moving the cursor — the loop would then spin forever, growing `attrs` until the
       // process OOMs. Fail loud with the exact character + location instead.
       if (this.pos === before) {
-        const { line, col }: { line: number; col: number } = this.lineCol(before);
-        throw new ParseError(
-          `Unexpected character ${JSON.stringify(c)} in attributes of <${tag}> (line ${line}, col ${col})`
-        );
+        throw new ParseError(`Unexpected character ${JSON.stringify(c)} in attributes of <${tag}>`, before);
       }
     }
     return attrs;
