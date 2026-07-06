@@ -217,6 +217,50 @@ export function afterEach(fn: AfterHook): () => void {
   return () => void afterHooks.delete(fn);
 }
 
+/* ──────────── before-leave guards (async, cancellable) ──────────── */
+
+/** Where a pending navigation is going, and how it was triggered — handed to every {@link LeaveGuard}. */
+export interface LeaveInfo {
+  /** The target pathname (query/hash excluded). */
+  to: string;
+  /** The current pathname being left. */
+  from: string;
+  /** How the navigation was triggered — same set as {@link NavType}. */
+  type: NavType;
+}
+
+/**
+ * A before-leave guard. Runs BEFORE a navigation commits and may be async: return
+ * `true` (or `Promise<true>`) to allow, `false` (or `Promise<false>`) to cancel and
+ * stay put. Unlike a route {@link Guard} it can await a user decision (e.g. an
+ * "unsaved changes" dialog) before the navigation happens.
+ */
+export type LeaveGuard = (nav: LeaveInfo) => boolean | Promise<boolean>;
+
+const beforeHooks: Set<LeaveGuard> = new Set<LeaveGuard>();
+
+/**
+ * Register a guard run BEFORE every navigation (push / replace / pop). If any guard
+ * resolves `false`, the navigation is cancelled: the current path is kept, the address
+ * bar stays put, and a back/forward is rolled back so URL and history stay in sync.
+ * ALL guards must allow for the navigation to proceed; the first `false` short-circuits
+ * (later guards don't run). Returns an unregister function — call it in the component's
+ * cleanup so the guard lives only while the page is mounted.
+ */
+export function beforeEach(fn: LeaveGuard): () => void {
+  beforeHooks.add(fn);
+  return () => void beforeHooks.delete(fn);
+}
+
+/** Run the before-leave guards in registration order; resolves `false` on the first veto. */
+async function canLeave(info: LeaveInfo): Promise<boolean> {
+  for (const fn of beforeHooks) {
+    // `await` transparently handles both a plain boolean and a Promise<boolean>.
+    if ((await fn(info)) === false) return false;
+  }
+  return true;
+}
+
 // Built-in scroll handling (on by default in the browser): scroll to top on a new
 // navigation, to a `#fragment` element if the URL has one, and restore the saved
 // position on back/forward. Apps that manage scroll themselves opt out.
@@ -261,17 +305,49 @@ function runAfter(nav: NavInfo): void {
 }
 
 if (typeof window !== 'undefined') {
+  // True while we roll back a guard-cancelled pop — the resulting popstate is ours, not the user's.
+  let reverting: boolean = false;
   window.addEventListener('popstate', (e: PopStateEvent) => {
+    if (reverting) {
+      reverting = false; // swallow the reversal's own popstate; state is already consistent
+      return;
+    }
     const st: { __wpos?: number } | null = e.state as { __wpos?: number } | null;
-    curPos = st && typeof st.__wpos === 'number' ? st.__wpos : 0;
-    const internal: string = stripBase(location.pathname);
-    applyWithViewTransition(activeState, () => {
-      batch(() => {
-        activeState.path.set(internal);
-        activeState.search.set(location.search);
+    const targetPos: number = st && typeof st.__wpos === 'number' ? st.__wpos : 0;
+    const to: string = stripBase(location.pathname);
+    const from: string = activeState.path.peek();
+
+    const commit = (): void => {
+      curPos = targetPos;
+      applyWithViewTransition(activeState, () => {
+        batch(() => {
+          activeState.path.set(to);
+          activeState.search.set(location.search);
+        });
       });
+      runAfter({ path: to, search: location.search, hash: location.hash, type: 'pop' });
+    };
+
+    // No before-leave guards, or not actually changing page → commit immediately (unchanged behavior).
+    if (beforeHooks.size === 0 || to === from) {
+      commit();
+      return;
+    }
+    // The browser has already moved the URL; remember the direction so a veto can undo it.
+    const wentBack: boolean = targetPos <= curPos;
+    void canLeave({ to, from, type: 'pop' }).then((ok) => {
+      if (ok) {
+        commit();
+        return;
+      }
+      // Cancelled: roll history the opposite way so the URL + entry match staying put.
+      reverting = true;
+      try {
+        history.go(wentBack ? 1 : -1);
+      } catch {
+        reverting = false;
+      }
     });
-    runAfter({ path: internal, search: location.search, hash: location.hash, type: 'pop' });
   });
 }
 
@@ -281,22 +357,31 @@ export const currentPath = (): string => activeState.path();
 /** The reactive current query params of the active router (read-only). */
 export const currentQuery = (): RouteParams => activeState.query();
 
-/** Programmatic navigation against a specific router state (pushes history). */
-function navigateState(state: RouterState, to: string): void {
-  const hash: string = to.includes('#') ? to.slice(to.indexOf('#')) : '';
-  const noHash: string = to.split('#')[0];
-  const qI: number = noHash.indexOf('?');
-  const nextPath: string = qI === -1 ? noHash : noHash.slice(0, qI);
-  const nextSearch: string = qI === -1 ? '' : noHash.slice(qI);
-  // A bare same-URL navigation is a no-op — unless there's a `#fragment` to scroll to.
-  if (nextPath === state.path.peek() && nextSearch === state.search.peek() && !hash) return;
-  // Remember where we are before leaving, so back/forward can restore it.
-  if (typeof window !== 'undefined') scrollPositions.set(curPos, window.scrollY);
-  const nextPos: number = ++posSeq;
+/**
+ * Commit a push/replace navigation on `state`: write history, update the signals (inside a
+ * View Transition when enabled), and fire the after-hooks. Split out of {@link navigateState}
+ * so an async before-leave guard can gate it.
+ */
+function commitNavigate(
+  state: RouterState,
+  nextPath: string,
+  nextSearch: string,
+  hash: string,
+  replace: boolean
+): void {
+  // Write the externally-visible URL (basename-prefixed); signals stay internal.
+  const url: string = withBase(nextPath) + nextSearch + hash;
   try {
-    // Write the externally-visible URL (basename-prefixed); signals stay internal.
-    history.pushState({ __wpos: nextPos }, '', withBase(nextPath) + nextSearch + hash);
-    curPos = nextPos;
+    if (replace) {
+      // Replace swaps the current entry (and keeps its history position + saved scroll).
+      history.replaceState({ __wpos: curPos }, '', url);
+    } else {
+      // Remember where we are before leaving, so back/forward can restore the scroll.
+      if (typeof window !== 'undefined') scrollPositions.set(curPos, window.scrollY);
+      const nextPos: number = ++posSeq;
+      history.pushState({ __wpos: nextPos }, '', url);
+      curPos = nextPos;
+    }
   } catch {
     /* non-navigable environment (tests, sandboxes) — the signals stay authoritative */
   }
@@ -306,12 +391,39 @@ function navigateState(state: RouterState, to: string): void {
       state.search.set(nextSearch);
     });
   });
-  runAfter({ path: nextPath, search: nextSearch, hash, type: 'push' });
+  runAfter({ path: nextPath, search: nextSearch, hash, type: replace ? 'replace' : 'push' });
 }
 
-/** Programmatic navigation on the active router (pushes history). Resilient if the env blocks pushState. */
-export function navigate(to: string): void {
-  navigateState(activeState, to);
+/** Options for {@link navigate}: `replace` swaps the current history entry instead of pushing a new one. */
+export interface NavigateOptions {
+  replace?: boolean;
+}
+
+/** Programmatic navigation against a specific router state (push, or replace). Gated by before-leave guards. */
+function navigateState(state: RouterState, to: string, opts?: NavigateOptions): void {
+  const replace: boolean = opts?.replace === true;
+  const hash: string = to.includes('#') ? to.slice(to.indexOf('#')) : '';
+  const noHash: string = to.split('#')[0];
+  const qI: number = noHash.indexOf('?');
+  const nextPath: string = qI === -1 ? noHash : noHash.slice(0, qI);
+  const nextSearch: string = qI === -1 ? '' : noHash.slice(qI);
+  // A bare same-URL navigation is a no-op — unless there's a `#fragment` to scroll to.
+  if (nextPath === state.path.peek() && nextSearch === state.search.peek() && !hash) return;
+  // Fast path: no before-leave guards → commit synchronously (unchanged behavior + timing).
+  if (beforeHooks.size === 0) {
+    commitNavigate(state, nextPath, nextSearch, hash, replace);
+    return;
+  }
+  // Guards present → await their verdict before committing; any `false` cancels (stay put).
+  const info: LeaveInfo = { to: nextPath, from: state.path.peek(), type: replace ? 'replace' : 'push' };
+  void canLeave(info).then((ok) => {
+    if (ok) commitNavigate(state, nextPath, nextSearch, hash, replace);
+  });
+}
+
+/** Programmatic navigation on the active router (push, or `{ replace: true }`). Resilient if the env blocks history. */
+export function navigate(to: string, opts?: NavigateOptions): void {
+  navigateState(activeState, to, opts);
 }
 
 /** Go back one history entry (the `popstate` listener syncs the path). */
@@ -421,8 +533,8 @@ export interface Router {
   path: () => string;
   /** The current query params (reactive). */
   query: () => RouteParams;
-  /** Navigate this router (pushes history). */
-  navigate: (to: string) => void;
+  /** Navigate this router (push, or `{ replace: true }`). Gated by before-leave guards. */
+  navigate: (to: string, opts?: NavigateOptions) => void;
   /** Go back one history entry. */
   back: () => void;
   /** Canonical pathname the URL should sync to after a guard/redirect, or null. */
@@ -500,7 +612,7 @@ export function createRouter(routes: Route[], options?: { basename?: string; vie
     },
     path: () => state.path(),
     query: () => state.query(),
-    navigate: (to: string) => navigateState(state, to),
+    navigate: (to: string, opts?: NavigateOptions) => navigateState(state, to, opts),
     back: () => back(),
     redirectTo: () => resolution().redirectTo,
     preload,

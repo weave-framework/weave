@@ -218,13 +218,14 @@ const save = async () => { await store.create(input); navigate('/'); };
 const cancel = () => back();  // go back one history entry
 ~~~
 
-**`navigate(to)`** pushes a new history entry. It is the only public way to change the route programmatically — there is **no `replace()` function** and no `<Link replace>` prop. (`'replace'` exists only as a `NavType` value used internally for popstate-style transitions, not as a public API.) What `navigate` does, in order:
+**`navigate(to)`** pushes a new history entry. Pass **`navigate(to, { replace: true })`** to swap the current entry instead of pushing a new one (no `<Link replace>` prop yet — call `navigate` from a click handler). What `navigate` does, in order:
 
 1. Splits a trailing `#hash` and a `?query` out of `to`.
 2. **No-op guard:** if the resulting path and search equal the current ones *and* there's no `#fragment`, it returns without touching history.
-3. Saves the current scroll position so back/forward can restore it.
-4. Writes the externally-visible URL via `history.pushState` (basename-prefixed). If `pushState` throws (tests, sandboxes, non-navigable environments), it's swallowed — the path/search signals stay authoritative.
-5. Updates the `path` and `search` signals in one batch, then fires the `afterEach` hooks.
+3. **Before-leave guards:** if any [`beforeEach`](#before-leaving-async-guards) guard is registered, it awaits their verdict — a `false` cancels here and nothing below runs. With no guards registered it stays fully synchronous.
+4. Saves the current scroll position so back/forward can restore it (push only).
+5. Writes the externally-visible URL via `history.pushState` / `history.replaceState` (basename-prefixed). If it throws (tests, sandboxes, non-navigable environments), it's swallowed — the path/search signals stay authoritative.
+6. Updates the `path` and `search` signals in one batch, then fires the `afterEach` hooks.
 
 **`back()`** simply calls `history.back()`; the `popstate` listener then syncs the signals (a `'pop'` navigation).
 
@@ -268,7 +269,7 @@ Both are reactive reads — call them inside an effect/computed and they re-run 
 | `params(depth?)` | `Record<string,string>` | Accumulated params at `depth`; **default is the leaf** (i.e. all params) |
 | `path()` | `string` | This router's current pathname (reactive) |
 | `query()` | `Record<string,string>` | The current query params (same as `currentQuery()`) |
-| `navigate(to)` | `void` | Navigate this router (pushes history) |
+| `navigate(to, opts?)` | `void` | Navigate this router (pushes history; `{ replace: true }` swaps the current entry). Gated by `beforeEach` guards |
 | `back()` | `void` | Go back one history entry |
 | `redirectTo()` | `string \| null` | The canonical pathname the URL should sync to after a guard/redirect, or `null` |
 | `preload(to)` | `void` | Non-reactively resolve `to` and warm every lazy chunk in its chain |
@@ -345,6 +346,45 @@ The payload is the full `NavInfo`:
 | `type` | `NavType` | `'push'` (a `navigate()`), `'pop'` (back/forward), or `'replace'` |
 
 The `type` field lets a single hook distinguish a programmatic push from a browser back/forward — useful for analytics or focus management that should behave differently on `pop`.
+
+## Before leaving (async guards)
+
+Route `guard`s are synchronous — great for auth, useless for *"you have unsaved changes, really leave?"*, which has to **await a user decision**. That's what **`beforeEach`** is for: a guard that runs **before every navigation commits** (push, replace, *and* browser back/forward) and can be async. Return `true` to allow, `false` to cancel and stay put.
+
+~~~ts title="user-settings.ts"
+import { beforeEach } from '@weave-framework/router';
+import { onMount } from '@weave-framework/runtime';
+
+export function setup() {
+  // Register while this page is mounted; unregister on cleanup so the guard
+  // only fires for *this* page. beforeEach() returns its own unregister fn.
+  onMount(() =>
+    beforeEach(async () => {
+      if (!isDirty()) return true;               // clean → allow
+      const choice = await confirmUnsaved();     // await a dialog
+      if (choice === 'cancel') return false;     // stay put
+      if (choice === 'save') return await save(); // save, then leave if it succeeded
+      return true;                               // discard → leave
+    }),
+  );
+  // ...
+}
+~~~
+
+The guard receives a `LeaveInfo` — `{ to, from, type }` (target pathname, current pathname, and the `NavType`) — so it can key off *where* you're going. Semantics:
+
+| Aspect | Behavior |
+|--------|----------|
+| **Async** | Return a `Promise<boolean>`; the router awaits it before committing. Nothing navigates while it's pending. |
+| **Cancel** | `false` (or `Promise<false>`) → the navigation does not happen; `currentPath()` and the address bar stay on the old path. |
+| **Back/forward** | On a cancelled `pop` the router rolls history back (`history.go`) so the URL matches staying put — no "content old, address new" half-state. |
+| **Multiple guards** | All registered guards must return `true`; the **first `false` short-circuits** (later guards don't run). |
+| **Unregister** | `beforeEach(fn)` returns an unregister function — call it in cleanup (e.g. `onMount`'s return) so the guard lives only while the page is mounted. |
+| **Ordering** | Before-leave runs **earlier** than the target route's matching/`guard`. If it cancels, matching never runs and `afterEach` does not fire. |
+
+:::callout info "beforeEach vs guard"
+`guard` answers *"can I enter this route?"* synchronously from signals. `beforeEach` answers *"may I leave the current page?"* and can await. They're complementary — a page can have both. `beforeEach` covers **in-app** navigation only; for browser reload / tab-close use a `beforeunload` listener (a different layer the browser owns).
+:::
 
 ## Scroll handling
 
@@ -459,11 +499,14 @@ All exported from `@weave-framework/router`:
 | `Router` | the instance (see [The Router instance](#the-router-instance)) |
 | `NavType` | `'push' \| 'pop' \| 'replace'` |
 | `NavInfo` | `{ path; search; hash; type }` |
+| `NavigateOptions` | `{ replace?: boolean }` |
+| `LeaveGuard` | `(nav: LeaveInfo) => boolean \| Promise<boolean>` |
+| `LeaveInfo` | `{ to: string; from: string; type: NavType }` |
 | `FileRoute` | `{ path: string; file?: string; children? }` |
 | `EmitRoutesOptions` | `{ lazy?; runtimeImport?; importPrefix? }` |
 
 :::callout info "What you just learned"
-Routes are an ordered tree of `{ path, component?, guard?, redirect?, children? }`, or come from the filesystem (page files are `.weave`/`.ts`/`.tsx`/`.js`/`.jsx`; `_layout` nests a folder, no-layout flattens it; routes sort by per-segment specificity). Place views with `<RouterView>` (top outlet drives URL-sync and transitions; nested outlets inject the router). Navigate with `<Link>` (active class, arbitrary prop pass-through, modifier-click bailout, basename-prefixed `href`) or `navigate()`/`back()` — there is **no** `replace()`. Guards are sync, receive a `RouteContext`, and return `true`/`false`/a path; a static `redirect` short-circuits before the guard; redirects are capped at 16 hops (an empty chain on a loop). The `Router` instance exposes `matched`/`chain`/`params`/`query`/`redirectTo`/`preload`; hook `afterEach` for the full `NavInfo`; prefetch via `<Link>`, `prefetch()`, or `router.preload()`; control scroll with `setScrollHandling`; serve under a sub-path with `basename`/`setBasename`.
+Routes are an ordered tree of `{ path, component?, guard?, redirect?, children? }`, or come from the filesystem (page files are `.weave`/`.ts`/`.tsx`/`.js`/`.jsx`; `_layout` nests a folder, no-layout flattens it; routes sort by per-segment specificity). Place views with `<RouterView>` (top outlet drives URL-sync and transitions; nested outlets inject the router). Navigate with `<Link>` (active class, arbitrary prop pass-through, modifier-click bailout, basename-prefixed `href`) or `navigate()`/`navigate(to, { replace: true })`/`back()`. Guards are sync, receive a `RouteContext`, and return `true`/`false`/a path; a static `redirect` short-circuits before the guard; redirects are capped at 16 hops (an empty chain on a loop). Await a leave decision (unsaved-changes prompts) with `beforeEach` — async, cancellable, covers push/replace/back. The `Router` instance exposes `matched`/`chain`/`params`/`query`/`redirectTo`/`preload`; hook `afterEach` for the full `NavInfo`; prefetch via `<Link>`, `prefetch()`, or `router.preload()`; control scroll with `setScrollHandling`; serve under a sub-path with `basename`/`setBasename`.
 :::
 
 [Next: Store →](/learn/store) · [Reference: @weave-framework/router →](/reference/router)

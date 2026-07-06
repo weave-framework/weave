@@ -8,6 +8,7 @@ import {
   currentPath,
   currentQuery,
   afterEach,
+  beforeEach,
   RouterView,
   Link,
   prefetch,
@@ -619,4 +620,155 @@ test('Link prefetch={{false}} does not warm on hover', () => {
   host().appendChild(link);
   link.dispatchEvent(new Event('pointerenter'));
   assert.equal(loads, 0, 'prefetch disabled — no load on hover');
+});
+
+/* ──────────── FW-4: async before-leave / canDeactivate guards ──────────── */
+
+/** Flush microtasks + a macrotask so a registered async before-leave guard fully settles. */
+const settle = async (): Promise<void> => {
+  await tick();
+  await new Promise((r) => setTimeout(r, 0));
+  await tick();
+};
+
+test('beforeEach: a Promise<false> guard cancels navigate() and stays put; unregister restores it', async () => {
+  createRouter([
+    { path: '/a', component: Home },
+    { path: '/b', component: About },
+    { path: '*', component: NotFound },
+  ]);
+  navigate('/a');
+  assert.equal(currentPath(), '/a');
+  let called: number = 0;
+  const off: () => void = beforeEach(async () => { called++; return false; });
+  try {
+    navigate('/b');
+    await settle();
+    assert.equal(currentPath(), '/a', 'navigation cancelled — path unchanged');
+    assert.equal(called, 1, 'the guard was consulted');
+  } finally {
+    off();
+  }
+  // After unregister the guard is no longer called and navigation proceeds normally.
+  navigate('/b');
+  assert.equal(currentPath(), '/b', 'unregister restored normal (synchronous) navigation');
+  assert.equal(called, 1, 'guard not called after unregister');
+});
+
+test('beforeEach: allowed only if ALL guards return true; first false short-circuits', async () => {
+  createRouter([
+    { path: '/x', component: Home },
+    { path: '/y', component: About },
+  ]);
+  navigate('/x');
+  const calls: string[] = [];
+  const off1: () => void = beforeEach(async () => { calls.push('g1'); return true; });
+  const off2: () => void = beforeEach(async () => { calls.push('g2'); return false; });
+  const off3: () => void = beforeEach(async () => { calls.push('g3'); return true; });
+  try {
+    navigate('/y');
+    await settle();
+    assert.equal(currentPath(), '/x', 'one false → cancelled');
+    assert.deepEqual(calls, ['g1', 'g2'], 'short-circuits at the first false (g3 not consulted)');
+  } finally {
+    off1(); off2(); off3();
+  }
+  const offAll: () => void = beforeEach(async () => true);
+  try {
+    navigate('/y');
+    await settle();
+    assert.equal(currentPath(), '/y', 'all guards true → allowed');
+  } finally {
+    offAll();
+  }
+});
+
+test('beforeEach: a Promise<false> guard cancels a <Link> click', async () => {
+  createRouter([
+    { path: '/lp', component: Home },
+    { path: '/lq', component: About },
+  ]);
+  navigate('/lp');
+  const link: HTMLAnchorElement = Link({ to: '/lq' }, {}) as HTMLAnchorElement;
+  host().appendChild(link);
+  const off: () => void = beforeEach(async () => false);
+  try {
+    link.dispatchEvent(new MouseEvent('click', { button: 0, bubbles: true, cancelable: true }));
+    await settle();
+    assert.equal(currentPath(), '/lp', 'Link navigation cancelled by the guard');
+  } finally {
+    off();
+  }
+});
+
+test('beforeEach: gates navigate(to,{replace}); afterEach fires only on a committed nav', async () => {
+  createRouter([
+    { path: '/r1', component: Home },
+    { path: '/r2', component: About },
+  ]);
+  navigate('/r1');
+  const seen: string[] = [];
+  const offAfter: () => void = afterEach((n) => seen.push(`${n.type}:${n.path}`));
+  try {
+    const offBefore: () => void = beforeEach(async () => false);
+    try {
+      navigate('/r2', { replace: true });
+      await settle();
+      assert.equal(currentPath(), '/r1', 'replace cancelled — stays');
+      assert.deepEqual(seen, [], 'afterEach did not fire for a cancelled navigation');
+    } finally {
+      offBefore();
+    }
+    // No guards now → replace commits synchronously and reports type 'replace'.
+    seen.length = 0;
+    navigate('/r2', { replace: true });
+    assert.equal(currentPath(), '/r2', 'replace committed once allowed');
+    assert.deepEqual(seen, ['replace:/r2'], 'afterEach reports a replace navigation');
+  } finally {
+    offAfter();
+  }
+});
+
+// The Playwright harness serves a non-navigable page (`page.setContent`), so real
+// `history.pushState`/`back()` are inert and `location` is frozen — the router runs off
+// its signals here (the same reason the scroll test above drives pops via a synthetic
+// PopStateEvent). We therefore exercise the pop-guard path with synthetic popstate events,
+// and anchor "allow" against the path a guard-free pop lands on (the location-derived path).
+test('beforeEach: a pop (browser back) is gated — a false guard stays put, a true guard commits', async () => {
+  createRouter([{ path: '*', component: NotFound }]); // catch-all so any location-derived path matches
+  const pop = (): void =>
+    window.dispatchEvent(new PopStateEvent('popstate', { state: { __wpos: 0 } }));
+
+  // Baseline: a guard-free pop commits to whatever path the location resolves to.
+  navigate('/pop-base');
+  pop();
+  await settle();
+  const popTarget: string = currentPath();
+  assert.notEqual(popTarget, '/pop-base', 'a guard-free pop moved off the pushed path (baseline)');
+
+  // Cancel: a Promise<false> guard must NOT move us off the current page.
+  navigate('/pop-stay');
+  assert.equal(currentPath(), '/pop-stay');
+  const offNo: () => void = beforeEach(async () => false);
+  try {
+    pop();
+    await settle();
+    assert.equal(currentPath(), '/pop-stay', 'cancelled pop — path unchanged (stayed put)');
+  } finally {
+    offNo();
+  }
+  // Drain any pending rollback bookkeeping with one guard-free pop before the allow case.
+  pop();
+  await settle();
+
+  // Allow: a passing guard lets the pop commit to the same place a guard-free pop would.
+  navigate('/pop-go');
+  const offYes: () => void = beforeEach(async () => true);
+  try {
+    pop();
+    await settle();
+    assert.equal(currentPath(), popTarget, 'allowed pop committed to the location-derived path');
+  } finally {
+    offYes();
+  }
 });
