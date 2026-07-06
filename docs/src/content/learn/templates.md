@@ -456,4 +456,6 @@ This renders `<h1>`…`<h6>` depending on `level()`. The same tag value across r
 Every dynamic value uses `{{ }}` (and a literal `@` is escaped as `@@`). Bind attributes/properties/classes/visibility, wire `on:` events with all six modifiers (`preventDefault`, `stopPropagation`, `self`, `once`, `capture`, `passive`), go two-way with `bind:` (string / number / boolean / value / string-array depending on the control), and reach the DOM with `ref` (signal or callback) and `use:`. Structure with `@if` (incl. `; as`), `@for` (track, `@empty`, positional `$`-locals), `@switch`, `@let`, and `@key`; go async with `@defer` (seven triggers) and `@await`/`@then`/`@catch`; reuse with `@snippet`/`@render`; compose with components (capitalized tags — static/dynamic props, `on:` events, and `use:` actions forwarded to the root) and slots; and go dynamic with `<w:element>`.
 :::
 
+Keep your templates consistently formatted with the [Prettier plugin](/learn/tooling#formatting-templates-prettier) — it understands `{{ }}`, the `@`-blocks, and every binding kind, so you can stop `.prettierignore`-ing them.
+
 [Next: Reactivity in depth →](/learn/reactivity) · [Reference: template syntax →](/reference/template-syntax)

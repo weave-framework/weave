@@ -19,7 +19,7 @@ import { fileURLToPath } from 'node:url';
 const repo = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 /** tsc-emit library packages, in dependency order. */
-const LIB_ORDER = ['runtime', 'compiler', 'store', 'i18n', 'data', 'forms', 'router', 'ui', 'check', 'mcp', 'nx'];
+const LIB_ORDER = ['runtime', 'compiler', 'prettier-plugin', 'store', 'i18n', 'data', 'forms', 'router', 'ui', 'check', 'mcp', 'nx'];
 
 /** Copy every non-.ts asset under a package's src/ into its dist/ (e.g. Nx executor/generator
  *  schema.json files, which tsc does not emit but the Nx manifests reference at dist paths). */

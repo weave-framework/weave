@@ -10,6 +10,24 @@
 > `pnpm publish:packages`) — pushing code does **not** publish to npm. (The scheme started at
 > `0.2.0`; the line crossed `1.0.0` on 2026-07-05 when the public API was frozen.)
 
+## 1.3.0 — 2026-07-06
+
+**New package — `@weave-framework/prettier-plugin`.** A Prettier plugin that formats Weave templates
+(`.weave` SFCs + Weave-template `.html`). It reuses `@weave-framework/compiler`'s parser (no separate
+grammar, so it can't drift from what compiles): elements/attributes lay out by width, bindings are
+preserved by kind (`on:`/`bind:`/`use:`/`class:`/`style:`/`ref`/`.prop`), control-flow `@`-blocks
+reindent with `@@` kept escaped, `{{ }}` expressions format via Prettier's `typescript` printer, and SFC
+`<script>`/`<style>` via `typescript`/`css`/`scss`. `.weave` is picked up automatically; Weave `.html`
+opts in via a Prettier `overrides` glob (`parser: "weave"`) so plain HTML is untouched. Output is
+idempotent; whitespace handling is conservative (block-level reindent only, no inline reflow, `<pre>`
+verbatim) in this first release. Smoke-tested via `verify:prettier` — no `SyntaxError`, idempotency, and
+a normalized-AST round-trip proving attribute kinds, comments, and `@@` escaping are preserved.
+
+**Compiler — opt-in comment preservation.** `parseTemplate(src, { comments: true })` emits `CommentNode`s
+instead of discarding `<!-- … -->`; **off by default**, so the compile path (codegen, `weave check`) is
+unchanged — proven by the existing compiler+check browser suite (214 tests) staying green. The Prettier
+plugin is the only consumer. First **minor** bump for the new package.
+
 ## 1.2.0 — 2026-07-06
 
 **Feature (compiler, cli) — component-extension template patches (`#3`), RFC 0008.** An extension file that

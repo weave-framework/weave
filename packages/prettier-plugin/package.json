@@ -1,22 +1,19 @@
 {
-  "name": "@weave-framework/router",
+  "name": "@weave-framework/prettier-plugin",
   "version": "1.3.0",
-  "description": "Weave official client router — signal-driven, history-based, with RouterView + Link. Zero third-party deps.",
+  "description": "Prettier plugin for Weave templates — formats .weave SFCs and Weave-template .html files ({{ }}, @if/@for/@switch, on:/bind:/use: bindings) by reusing the Weave compiler's parser.",
   "type": "module",
-  "sideEffects": [
-    "./src/index.ts",
-    "./dist/index.js"
-  ],
   "main": "./src/index.ts",
   "module": "./src/index.ts",
   "types": "./src/index.ts",
+  "sideEffects": false,
   "exports": {
     ".": "./src/index.ts",
-    "./files": "./src/files.ts",
     "./package.json": "./package.json"
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md"
   ],
   "engines": {
     "node": ">=18"
@@ -24,8 +21,15 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/weave-framework/weave.git",
-    "directory": "packages/router"
+    "directory": "packages/prettier-plugin"
   },
+  "keywords": [
+    "prettier",
+    "prettier-plugin",
+    "weave",
+    "formatter",
+    "template"
+  ],
   "publishConfig": {
     "access": "public",
     "main": "./dist/index.js",
@@ -36,15 +40,14 @@
         "types": "./dist/index.d.ts",
         "import": "./dist/index.js"
       },
-      "./files": {
-        "types": "./dist/files.d.ts",
-        "import": "./dist/files.js"
-      },
       "./package.json": "./package.json"
     }
   },
   "dependencies": {
-    "@weave-framework/runtime": "workspace:*"
+    "@weave-framework/compiler": "workspace:*"
+  },
+  "peerDependencies": {
+    "prettier": ">=3.0.0"
   },
   "license": "MIT"
 }

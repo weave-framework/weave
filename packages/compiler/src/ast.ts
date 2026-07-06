@@ -4,6 +4,7 @@ export type TemplateNode =
   | ElementNode
   | TextNode
   | InterpNode
+  | CommentNode
   | IfNode
   | ForNode
   | SwitchNode
@@ -167,6 +168,18 @@ export interface InterpNode {
   type: 'interp';
   expr: string;
   offset?: Offset;
+}
+
+/**
+ * `<!-- … -->` — an HTML comment. The compiler DROPS comments (they never reach the DOM), so
+ * a `CommentNode` is only produced when {@link parseTemplate} is called with `{ comments: true }`
+ * (opt-in, off by default). Codegen/check/infer never enable it, so their output is unaffected;
+ * the sole consumer is `@weave-framework/prettier-plugin`, which must round-trip comments losslessly.
+ */
+export interface CommentNode {
+  type: 'comment';
+  /** the raw inner text between `<!--` and `-->` (verbatim, not trimmed) */
+  value: string;
 }
 
 export type Attr =

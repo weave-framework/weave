@@ -217,6 +217,37 @@ Two pieces do the work, both reusing the same virtual-module machinery as `weave
 - **`@weave-framework/language-server`** — a Volar LSP server (TypeScript + CSS services) used by both editors. It reports template diagnostics on the `.html` side.
 - **`@weave-framework/typescript-plugin`** — a tsserver plugin that takes over component `.ts` files (and `.weave` SFCs) so imports used only in templates aren't marked unused, and a parent's import of a child resolves the child's typed props.
 
+## Formatting templates: Prettier
+
+Weave templates use a dialect Prettier's stock HTML parser can't read — `{{ }}` interpolation, `@if`/`@for`/`@switch` control flow, and `on:`/`bind:`/`use:` bindings all make it throw (`SyntaxError: Opening tag "Button" not terminated`). The usual escape hatch is to `.prettierignore` your templates — which means the files you edit most never get formatted. `@weave-framework/prettier-plugin` fixes that: it formats `.weave` SFCs and Weave-template `.html` files as first-class Prettier citizens, so you can drop them from `.prettierignore` and get format-on-save, `prettier --check` in CI, and pre-commit hooks back.
+
+It doesn't ship its own grammar — it **reuses the Weave compiler's parser**, so the formatter can never drift from what actually compiles. Embedded `{{ }}` expressions are formatted by delegating to Prettier's own `typescript` printer, and a `.weave` SFC's `<script>`/`<style>` blocks go through the `typescript`/`css`/`scss` printers.
+
+Install it as a dev dependency and add it to your `plugins`:
+
+~~~bash
+npm install -D @weave-framework/prettier-plugin
+~~~
+
+`.weave` files are picked up automatically (the extension is unambiguous). Weave-template `.html` files need an explicit opt-in, because `.html` is also plain HTML — the plugin deliberately does **not** hijack every `.html` in your project. Route your Weave templates to the `weave` parser with a Prettier `overrides` entry:
+
+~~~jsonc title=".prettierrc"
+{
+  "plugins": ["@weave-framework/prettier-plugin"],
+  "overrides": [
+    { "files": "src/**/*.html", "options": { "parser": "weave" } }
+  ]
+}
+~~~
+
+Point the `files` glob at wherever your Weave `.html` templates live (e.g. `src/**/*.html`). Any `.html` **not** matched is left to Prettier's normal HTML formatter, untouched.
+
+What it does: elements and components lay their attributes on one line when they fit, else one per line; the binding kinds (`on:`, `bind:`, `use:`, `class:`, `style:`, `ref`, `.prop`) are preserved exactly; control-flow blocks reindent while keeping their `@`-syntax intact (`@@` stays escaped); `{{ }}` expressions get formatted; and HTML comments are preserved. Formatting is idempotent — running it twice produces no further changes.
+
+:::callout info "Whitespace: conservative by design"
+The current release reindents block structure and formats expressions, but does **not** aggressively reflow inline text runs — so nothing that could change rendering (significant whitespace between inline elements, `<pre>` content) is touched. Prettier-grade inline whitespace reflow is a planned follow-up.
+:::
+
 ## DevTools: inspecting the reactive graph
 
 Weave ships a zero-dependency, in-app DevTools panel for looking at your live reactive graph — every **named** `signal`/`computed`/`effect`, its current value, and which sources trigger it. It's off unless you turn it on, so production pays nothing.

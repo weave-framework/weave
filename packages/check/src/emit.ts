@@ -287,6 +287,8 @@ function emit(nodes: TemplateNode[], ctx: Set<string>): Line[] {
           break;
         case 'text':
           break;
+        case 'comment':
+          break; // dropped at compile time; only the formatter opts into comment nodes
         case 'interp':
           mk().lit('  void (').expr(node.offset, node.expr, scope).lit(');').push(node.offset);
           break;

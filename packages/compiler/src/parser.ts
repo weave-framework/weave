@@ -31,8 +31,17 @@ type AttrValue =
   | { kind: 'expr'; expr: string; offset: number }
   | null;
 
-export function parseTemplate(input: string): TemplateNode[] {
-  const p: Parser = new Parser(input);
+/** Options for {@link parseTemplate}. */
+export interface ParseOptions {
+  /**
+   * Preserve `<!-- … -->` as {@link CommentNode}s instead of dropping them. Off by default so the
+   * compile path (codegen/check) is byte-for-byte unchanged; only the formatter opts in.
+   */
+  comments?: boolean;
+}
+
+export function parseTemplate(input: string, opts: ParseOptions = {}): TemplateNode[] {
+  const p: Parser = new Parser(input, opts);
   const nodes: TemplateNode[] = p.parseChildren(null);
   return nodes;
 }
@@ -41,7 +50,7 @@ class Parser {
   pos: number = 0;
   /** Inner start offset of the most recent {@link readParen} — for block-head expr offsets. */
   parenStart: number = 0;
-  constructor(public src: string) {}
+  constructor(public src: string, public opts: ParseOptions = {}) {}
 
   /** Offset of `sub`'s first non-whitespace char within `parent` (which starts at `parentStart`). */
   exprOffset(parentStart: number, parent: string, sub: string): number {
@@ -71,7 +80,8 @@ class Parser {
         continue;
       }
       if (this.src.startsWith('<!--', this.pos)) {
-        this.skipComment();
+        const value: string = this.readComment();
+        if (this.opts.comments) out.push({ type: 'comment', value });
         continue;
       }
       if (this.peek() === '@' && BLOCK_KW.test(this.src.slice(this.pos))) {
@@ -444,9 +454,13 @@ class Parser {
     return this.readDoubleBracedExpr();
   }
 
-  skipComment(): void {
-    const end: number = this.src.indexOf('-->', this.pos);
+  /** Consume `<!-- … -->` and return the raw inner text (verbatim). Unterminated ⇒ to EOF. */
+  readComment(): string {
+    const inner: number = this.pos + 4; // past `<!--`
+    const end: number = this.src.indexOf('-->', inner);
+    const value: string = this.src.slice(inner, end === -1 ? this.src.length : end);
     this.pos = end === -1 ? this.src.length : end + 3;
+    return value;
   }
 
   readText(stopAtBrace: boolean): string {

@@ -1,6 +1,6 @@
 {
   "name": "weave-monorepo",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Weave — fine-grained reactive, signal-native UI framework. Compiled, TypeScript-first, no Virtual DOM.",
   "type": "module",
   "private": true,
@@ -21,10 +21,11 @@
     "verify:dev-proxy": "node tools/verify-dev-proxy.mjs",
     "verify:extend": "node tools/verify-extend.mjs",
     "verify:mcp": "node packages/mcp/test/stdio.smoke.mjs",
+    "verify:prettier": "node packages/prettier-plugin/test/format.smoke.mjs",
     "verify:nx": "node packages/nx/test/nx.smoke.mjs",
     "build:ls": "node packages/language-server/build.mjs",
     "verify:ls": "node packages/language-server/build.mjs && node tools/verify-language-server.mjs && node tools/verify-ls-push-diagnostics.mjs",
-    "typecheck": "tsc --noEmit -p packages/runtime/tsconfig.json && tsc --noEmit -p packages/compiler/tsconfig.json && tsc --noEmit -p packages/check/tsconfig.json && tsc --noEmit -p packages/store/tsconfig.json && tsc --noEmit -p packages/router/tsconfig.json && tsc --noEmit -p packages/forms/tsconfig.json && tsc --noEmit -p packages/i18n/tsconfig.json && tsc --noEmit -p packages/data/tsconfig.json && tsc --noEmit -p packages/cli/tsconfig.json && tsc --noEmit -p packages/language-server/tsconfig.json && tsc --noEmit -p packages/typescript-plugin/tsconfig.json && tsc --noEmit -p packages/ui/tsconfig.json && tsc --noEmit -p packages/mcp/tsconfig.json && tsc --noEmit -p packages/nx/tsconfig.json && tsc --noEmit -p packages/create-weave/template/tsconfig.json"
+    "typecheck": "tsc --noEmit -p packages/runtime/tsconfig.json && tsc --noEmit -p packages/compiler/tsconfig.json && tsc --noEmit -p packages/prettier-plugin/tsconfig.json && tsc --noEmit -p packages/check/tsconfig.json && tsc --noEmit -p packages/store/tsconfig.json && tsc --noEmit -p packages/router/tsconfig.json && tsc --noEmit -p packages/forms/tsconfig.json && tsc --noEmit -p packages/i18n/tsconfig.json && tsc --noEmit -p packages/data/tsconfig.json && tsc --noEmit -p packages/cli/tsconfig.json && tsc --noEmit -p packages/language-server/tsconfig.json && tsc --noEmit -p packages/typescript-plugin/tsconfig.json && tsc --noEmit -p packages/ui/tsconfig.json && tsc --noEmit -p packages/mcp/tsconfig.json && tsc --noEmit -p packages/nx/tsconfig.json && tsc --noEmit -p packages/create-weave/template/tsconfig.json"
   },
   "keywords": [
     "reactive",
@@ -55,6 +56,7 @@
     "eslint": "^10.6.0",
     "nx": "^23.0.1",
     "playwright": "^1.49.0",
+    "prettier": "^3.4.0",
     "sass": "^1.101.0",
     "typescript": "^5.7.0",
     "typescript-eslint": "^8.62.0"

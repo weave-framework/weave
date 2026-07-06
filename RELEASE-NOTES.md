@@ -3,6 +3,38 @@
 Human-readable highlights, one section per release — everything notable that landed since
 the previous one. For the granular, per-version log see [CHANGELOG.md](CHANGELOG.md).
 
+## 1.3.0 — 2026-07-06
+
+### ✨ New package — `@weave-framework/prettier-plugin`
+- **A Prettier plugin for Weave templates.** Prettier's stock HTML parser throws on the first Weave
+  token (`SyntaxError: Opening tag "Button" not terminated`), so until now the only workaround was to
+  `.prettierignore` your templates — meaning the files you edit most never got formatted. This plugin
+  makes `.weave` SFCs and Weave-template `.html` files first-class Prettier citizens: `{{ }}`
+  interpolation, `@if`/`@for`/`@switch`/`@defer`/`@await` control flow, and every binding kind
+  (`on:`/`bind:`/`use:`/`class:`/`style:`/`ref`/`.prop`). Format-on-save, `prettier --check` in CI,
+  and pre-commit hooks all work on templates again.
+- **It reuses the compiler's own parser** rather than shipping a separate grammar, so the formatter can
+  never drift from what actually compiles. Embedded `{{ }}` expressions are formatted by delegating to
+  Prettier's `typescript` printer; a `.weave` SFC's `<script>`/`<style>` blocks go through the
+  `typescript`/`css`/`scss` printers. Output is idempotent, and `@@` escaping / comments / binding
+  kinds are preserved.
+- **`.weave` files are picked up automatically.** Route Weave `.html` templates to the `weave` parser
+  with a Prettier `overrides` entry so plain HTML elsewhere is untouched:
+  ```jsonc
+  { "plugins": ["@weave-framework/prettier-plugin"],
+    "overrides": [{ "files": "src/**/*.html", "options": { "parser": "weave" } }] }
+  ```
+  See [Tooling → Formatting templates](https://weaveframework.dev/learn/tooling#formatting-templates-prettier).
+- **Whitespace is conservative by design** in this first release: block structure is reindented and
+  expressions are formatted, but inline text runs are not aggressively reflowed (and `<pre>`/`<textarea>`
+  are left verbatim), so nothing that could change rendering is touched. Prettier-grade inline
+  whitespace reflow is a planned follow-up.
+
+### 🧩 Compiler — opt-in comment preservation
+- `parseTemplate(src, { comments: true })` now preserves `<!-- … -->` as `CommentNode`s instead of
+  dropping them. It's **off by default**, so codegen and `weave check` are byte-for-byte unchanged; the
+  Prettier plugin is the sole consumer, and it's what lets the formatter round-trip comments losslessly.
+
 ## 1.2.0 — 2026-07-06
 
 ### ✨ Feature — extend a component by *patching* its template

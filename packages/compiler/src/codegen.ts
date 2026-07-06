@@ -254,6 +254,10 @@ function compileFragment(
       case 'text':
         html += escapeText(node.value);
         return;
+      case 'comment':
+        // Comments are dropped at compile time (parseTemplate never emits them here — only the
+        // formatter opts in). This no-op keeps the switch total if that ever changes.
+        return;
       case 'interp': {
         html += '<!---->';
         const { code, reactive } = rewrite(node.expr, sc);
