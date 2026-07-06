@@ -61,6 +61,12 @@ export interface InputProps {
   clearable?: boolean;
   /** Accessible name for the clear button. Default 'Clear'. */
   clearLabel?: string;
+  /** For a `type="password"` field, show a reveal (eye) toggle that switches the value between hidden and visible. */
+  revealable?: boolean;
+  /** Accessible name for the reveal toggle in its hidden (will-show) state. Default 'Show password'. */
+  revealLabel?: string;
+  /** Accessible name for the reveal toggle in its revealed (will-hide) state. Default 'Hide password'. */
+  hideLabel?: string;
   /** Called on mount with the native field — lets a composer (e.g. Autocomplete) add
    *  combobox ARIA / manage `aria-activedescendant` without re-creating the field. */
   onInputRef?: (el: HTMLInputElement | HTMLTextAreaElement) => void;
@@ -84,6 +90,12 @@ export const template: string =
   '@if (showClear()) {' +
   '<button type="button" class="weave-input__clear" aria-label={{ clearLabel() }} on:click={{ clear }}>×</button>' +
   '}' +
+  '@if (showReveal()) {' +
+  '<button type="button" class="weave-input__reveal" aria-label={{ revealAriaLabel() }}' +
+  ' aria-pressed={{ revealPressed() }} disabled={{ isDisabled() }} on:click={{ toggleReveal }}>' +
+  '<Icon name={{ revealIcon() }} />' +
+  '</button>' +
+  '}' +
   '<span class="weave-input__suffix"><slot name="suffix"></slot></span>' +
   '</div>';
 
@@ -104,6 +116,11 @@ export interface InputContext {
   label: () => string | undefined;
   showClear: () => boolean;
   clearLabel: () => string;
+  showReveal: () => boolean;
+  revealIcon: () => string;
+  revealAriaLabel: () => string;
+  revealPressed: () => string;
+  toggleReveal: () => void;
   onNativeInput: (event: Event) => void;
   onBlur: () => void;
   clear: () => void;
@@ -114,6 +131,10 @@ export function setup(props: InputProps): InputContext {
   const input: Signal<HTMLInputElement | HTMLTextAreaElement | null> = signal<
     HTMLInputElement | HTMLTextAreaElement | null
   >(null);
+
+  // Password reveal (eye) toggle — only meaningful on a single-line `type="password"` field.
+  const revealed: Signal<boolean> = signal<boolean>(false);
+  const canReveal = (): boolean => !!props.revealable && (props.type ?? 'text') === 'password' && !props.multiline;
 
   const currentValue = (): string => (props.control ? props.control.value() : props.value ?? '');
   const isDisabled = (): boolean => !!props.disabled;
@@ -189,7 +210,8 @@ export function setup(props: InputProps): InputContext {
     },
     multiline: (): boolean => !!props.multiline,
     singleline: (): boolean => !props.multiline,
-    type: (): string => props.type ?? 'text',
+    // While revealed, the native type becomes 'text' so the value shows as plaintext.
+    type: (): string => (canReveal() && revealed() ? 'text' : props.type ?? 'text'),
     rows: (): number => props.rows ?? 3,
     placeholder: (): string | undefined => props.placeholder,
     currentValue,
@@ -200,6 +222,14 @@ export function setup(props: InputProps): InputContext {
     label: (): string | undefined => props.label,
     showClear: (): boolean => !!props.clearable && !isDisabled() && !isReadonly() && currentValue().length > 0,
     clearLabel: (): string => props.clearLabel ?? 'Clear',
+    showReveal: (): boolean => canReveal(),
+    revealIcon: (): string => (revealed() ? 'eye-off' : 'eye'),
+    revealAriaLabel: (): string =>
+      revealed() ? props.hideLabel ?? 'Hide password' : props.revealLabel ?? 'Show password',
+    revealPressed: (): string => (revealed() ? 'true' : 'false'),
+    toggleReveal: (): void => {
+      revealed.set(!revealed());
+    },
     onNativeInput,
     onBlur,
     clear,

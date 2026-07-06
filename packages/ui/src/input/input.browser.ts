@@ -10,6 +10,8 @@ import {
 } from '@weave-framework/runtime';
 import * as dom from '@weave-framework/runtime/dom';
 import { compileTemplate } from '@weave-framework/compiler';
+import * as IconMod from '@weave-framework/ui/icon';
+import { toComponent } from '../internal/compose.js';
 import { setup, template, type InputProps, type InputContext, type InputControl } from '@weave-framework/ui/input';
 
 const rt: typeof dom & { signal: typeof signal; effect: typeof effect } = { ...dom, signal, effect };
@@ -19,7 +21,8 @@ const tick = (): Promise<void> => new Promise<void>((r) => queueMicrotask(r));
 
 const SCOPE: string[] = [
   'root', 'input', 'rootClass', 'multiline', 'singleline', 'type', 'rows', 'placeholder', 'currentValue',
-  'isDisabled', 'isReadonly', 'isRequired', 'name', 'label', 'showClear', 'clearLabel', 'onNativeInput', 'onBlur', 'clear',
+  'isDisabled', 'isReadonly', 'isRequired', 'name', 'label', 'showClear', 'clearLabel',
+  'showReveal', 'revealIcon', 'revealAriaLabel', 'revealPressed', 'toggleReveal', 'onNativeInput', 'onBlur', 'clear',
 ];
 
 type Slots = { prefix?: () => Node; suffix?: () => Node };
@@ -43,7 +46,7 @@ function mount(props: InputProps, slots: Slots = {}): Mounted {
       '_c',
       code.replace('return render(ctx, {});', 'return render;')
     ) as MakeRender;
-    const render: RenderFn = make(ctx, rt, {});
+    const render: RenderFn = make(ctx, rt, { Icon: toComponent(IconMod as never) });
     return render(ctx, slots as Record<string, () => Node>);
   });
   document.body.appendChild(root);
@@ -187,6 +190,57 @@ test('clicking clear empties the value (and the button disappears)', () => {
   clear!.click();
   assert.equal(value(), '', 'value cleared');
   assert.equal(root.querySelector('.weave-input__clear'), null, 'the × is gone once empty');
+  dispose();
+});
+
+/* ─────────────────────────── password reveal ─────────────────────────── */
+
+test('revealable: the eye toggle renders only for a password field with revealable', () => {
+  const plain: Mounted = mount({ type: 'password' });
+  assert.equal(plain.root.querySelector('.weave-input__reveal'), null, 'no toggle without revealable');
+  plain.dispose();
+
+  const text: Mounted = mount({ type: 'text', revealable: true });
+  assert.equal(text.root.querySelector('.weave-input__reveal'), null, 'no toggle on a non-password field');
+  text.dispose();
+
+  const pw: Mounted = mount({ type: 'password', revealable: true });
+  assert.ok(pw.root.querySelector('.weave-input__reveal'), 'password + revealable renders the toggle');
+  assert.ok(pw.root.querySelector('.weave-icon'), 'the composed <Icon> rendered inside it');
+  pw.dispose();
+});
+
+test('revealable: clicking the eye flips type password↔text with aria-pressed + label', () => {
+  const { root, field, dispose } = mount({ type: 'password', revealable: true });
+  const btn: HTMLButtonElement = root.querySelector<HTMLButtonElement>('.weave-input__reveal')!;
+  assert.equal(field.type, 'password', 'starts hidden');
+  assert.equal(btn.getAttribute('aria-pressed'), 'false');
+  assert.equal(btn.getAttribute('aria-label'), 'Show password');
+
+  btn.click();
+  assert.equal(field.type, 'text', 'revealed → plaintext');
+  assert.equal(btn.getAttribute('aria-pressed'), 'true');
+  assert.equal(btn.getAttribute('aria-label'), 'Hide password');
+
+  btn.click();
+  assert.equal(field.type, 'password', 'toggles back to hidden');
+  assert.equal(btn.getAttribute('aria-pressed'), 'false');
+  dispose();
+});
+
+test('revealable: the toggle is type=button (never submits its form)', () => {
+  const { root, dispose } = mount({ type: 'password', revealable: true });
+  const btn: HTMLButtonElement = root.querySelector<HTMLButtonElement>('.weave-input__reveal')!;
+  assert.equal(btn.getAttribute('type'), 'button', 'a reveal click must not submit the surrounding form');
+  dispose();
+});
+
+test('revealable: reveal/hide labels are overridable (i18n)', () => {
+  const { root, dispose } = mount({ type: 'password', revealable: true, revealLabel: 'Rodyti', hideLabel: 'Slėpti' });
+  const btn: HTMLButtonElement = root.querySelector<HTMLButtonElement>('.weave-input__reveal')!;
+  assert.equal(btn.getAttribute('aria-label'), 'Rodyti', 'custom show label');
+  btn.click();
+  assert.equal(btn.getAttribute('aria-label'), 'Slėpti', 'custom hide label after reveal');
   dispose();
 });
 

@@ -108,4 +108,28 @@
     font-size: var(--weave-input-clear-size);
     line-height: 1;
   }
+
+  /* Password reveal (eye) toggle — a plain icon button sharing the adornment tint. */
+  .weave-input__reveal {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--weave-input-adornment);
+    font-size: var(--weave-input-reveal-size);
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  .weave-input__reveal:hover:not(:disabled) {
+    color: var(--weave-input-text);
+  }
+
+  .weave-input__reveal:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
 }
