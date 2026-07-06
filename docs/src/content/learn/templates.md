@@ -415,9 +415,30 @@ On a component tag, only three kinds of attribute are allowed:
 </Card>
 ~~~
 
-:::callout info "Other bindings on a component are compile errors"
-`bind:`, `ref`/`bind:this`, `use:`, `class:`, `.prop`, `show`, and `transition:`/`in:`/`out:` are **not** allowed on a component tag — the compiler rejects them. Those directives target a real DOM element, and a component is an abstraction over (potentially many) elements. Put the directive on a plain element *inside* the component, or expose a prop. Project markup into the component through named or default `slot="…"`.
+:::callout info "`use:` works on a component; other DOM directives don't (yet)"
+`use:` **is** allowed on a component tag — the action is forwarded to the component's single root DOM element (see [`use:` on components](#use-on-components) below). `bind:`, `ref`/`bind:this`, `class:`, `.prop`, `show`, and `transition:`/`in:`/`out:` are **not** allowed on a component tag — the compiler rejects them (they target a real DOM element, and a component is an abstraction over potentially many elements). Put those on a plain element *inside* the component, or expose a prop. Project markup into the component through named or default `slot="…"`.
 :::
+
+### `use:` on components
+
+A `use:` action attaches to a single-root component the same way it does to an element — Weave forwards it to that component's **root DOM element**, with the identical lifecycle (runs at mount, supports a returned cleanup or `{ update, destroy }`, and re-runs `update` when the argument changes). This means a menu/tooltip trigger can be a real component, not just a native tag, and the "define once, trigger from many places" pattern keeps working across a mix of components and elements:
+
+~~~html title="One menu, many triggers"
+<script>
+  import Button from '@weave-framework/ui/button';
+  export function setup() {
+    const accountMenu = { items: [{ value: 'profile', label: 'Profile' }, { value: 'signout', label: 'Sign out' }], onSelect: (v) => {/* … */} };
+    return { Button, accountMenu, menu };
+  }
+</script>
+
+<Button use:menu={{ accountMenu }}>Account ▾</Button>   <!-- component trigger -->
+<a use:menu={{ accountMenu }}>Account (footer)</a>       <!-- same menu, native trigger -->
+~~~
+
+The action's `aria-*` and listeners land on the component's root element — e.g. `aria-haspopup`/`aria-expanded` end up on the `<button>` inside `<Button>`, exactly where they belong. Multiple `use:` on one component all run, in order.
+
+**Single-root constraint.** The component must render exactly one root element. A component that renders a fragment (multiple top-level nodes), a text/comment root, or nothing is a clear error — e.g. `use:menu on <Account>: actions attach to a single root element, but <Account> renders 3 nodes.` — never a silent mis-attach. (`transition:`/`in:`/`out:` and `ref`/`bind:this` on components are **not yet** supported — put them on an element inside for now.)
 
 The full story — props as reactive getters, callbacks up, named/fallback slots — is in [Components](/learn/components).
 
@@ -432,7 +453,7 @@ When the *tag itself* is dynamic, use `<w:element this={{ tag }}>`. It rebuilds 
 This renders `<h1>`…`<h6>` depending on `level()`. The same tag value across re-renders is deduped, so an unrelated re-render won't needlessly rebuild it.
 
 :::callout info "What you just learned"
-Every dynamic value uses `{{ }}` (and a literal `@` is escaped as `@@`). Bind attributes/properties/classes/visibility, wire `on:` events with all six modifiers (`preventDefault`, `stopPropagation`, `self`, `once`, `capture`, `passive`), go two-way with `bind:` (string / number / boolean / value / string-array depending on the control), and reach the DOM with `ref` (signal or callback) and `use:`. Structure with `@if` (incl. `; as`), `@for` (track, `@empty`, positional `$`-locals), `@switch`, `@let`, and `@key`; go async with `@defer` (seven triggers) and `@await`/`@then`/`@catch`; reuse with `@snippet`/`@render`; compose with components (capitalized tags — only static/dynamic props and `on:` events) and slots; and go dynamic with `<w:element>`.
+Every dynamic value uses `{{ }}` (and a literal `@` is escaped as `@@`). Bind attributes/properties/classes/visibility, wire `on:` events with all six modifiers (`preventDefault`, `stopPropagation`, `self`, `once`, `capture`, `passive`), go two-way with `bind:` (string / number / boolean / value / string-array depending on the control), and reach the DOM with `ref` (signal or callback) and `use:`. Structure with `@if` (incl. `; as`), `@for` (track, `@empty`, positional `$`-locals), `@switch`, `@let`, and `@key`; go async with `@defer` (seven triggers) and `@await`/`@then`/`@catch`; reuse with `@snippet`/`@render`; compose with components (capitalized tags — static/dynamic props, `on:` events, and `use:` actions forwarded to the root) and slots; and go dynamic with `<w:element>`.
 :::
 
 [Next: Reactivity in depth →](/learn/reactivity) · [Reference: template syntax →](/reference/template-syntax)

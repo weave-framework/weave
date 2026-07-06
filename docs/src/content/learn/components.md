@@ -190,7 +190,7 @@ Use whichever reads better. The point is the same as everywhere else in UI: data
 :::callout info "What counts as a child component"
 A tag is a **child component** when its name starts with an **uppercase letter** (`<TaskCard>`, `<Badge>`). A lowercase tag (`<div>`, `<my-widget>`) is a plain DOM element. That single rule is how the compiler decides whether to mount a component or emit an element — there is no registration step.
 
-And because component tags compile to a function call with a props object, **only static, dynamic (`{{ }}`), and `on:` attributes are allowed on a `<Component>`**. The DOM-level directives — `class:`, `bind:`, `use:`, `transition:`, `ref`, `show`, `.prop` — are compile errors on a component tag (they only mean something on a real element). Pass data as props instead.
+And because component tags compile to a function call with a props object, **static, dynamic (`{{ }}`), and `on:` attributes are the props/events surface of a `<Component>`**. One DOM directive is also allowed: **`use:` forwards its action to the component's single root element** (same lifecycle as on an element — see [`use:` on components](/learn/templates#use-on-components)). The other DOM-level directives — `class:`, `bind:`, `transition:`, `ref`, `show`, `.prop` — are compile errors on a component tag (they only mean something on a real element). Pass data as props instead.
 :::
 
 ## Two-way: pass the signal itself

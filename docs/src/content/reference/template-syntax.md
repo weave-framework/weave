@@ -157,6 +157,14 @@ Each parameter must be a plain identifier (`param`, `other`, `$x`, `_y`). Defaul
 
 In the child: `<slot />` is the default slot, `<slot name="header" />` a named one, and content between the tags (`<slot>fallback</slot>`) is the fallback shown when nothing is provided for that slot.
 
+A component tag takes static/dynamic props and `on:` events — plus **`use:` actions**, which forward to the component's single **root element** with the same lifecycle as on an element:
+
+~~~html
+<Button use:menu={{ accountMenu }}>Account ▾</Button>   <!-- action attaches to the root <button> -->
+~~~
+
+The component must render exactly one root element (a fragment / text / empty root is a clear error). Other DOM directives (`bind:`, `ref`, `class:`, `.prop`, `show`, `transition:`/`in:`/`out:`) are **not** allowed on a component tag.
+
 ## Dynamic elements
 
 ~~~html

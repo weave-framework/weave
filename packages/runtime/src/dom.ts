@@ -238,6 +238,22 @@ export function applyAction<A = void>(el: Element, action: Action<A>, argFn?: ()
   });
 }
 
+/**
+ * Resolve the single root Element of a component's rendered output — the attach point for a
+ * `use:` action forwarded onto a `<Component>` tag. Actions attach to exactly one Element; a
+ * component that renders a fragment (multiple top-level nodes), a text/comment root, or nothing
+ * is a loud error, never a silent mis-attach. Checked synchronously, the instant the component's
+ * node is produced (before insertion), so the failure points at the offending render.
+ * @internal
+ */
+export function componentRoot(node: Node | null, tag: string): Element {
+  if (node instanceof Element) return node;
+  const count: number = node instanceof DocumentFragment ? node.childNodes.length : node ? 1 : 0;
+  throw new Error(
+    `weave: use: on <${tag}>: actions attach to a single root element, but <${tag}> renders ${count} nodes.`
+  );
+}
+
 /* ──────────────────────────── transitions ──────────────────────────── */
 
 /** What a transition function returns — the Svelte-style transition contract. */

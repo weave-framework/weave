@@ -11,7 +11,7 @@
 
 import { parseTemplate } from './parser.js';
 import type {
-  TemplateNode, ElementNode, Attr, StaticAttr, EventAttr, IfNode, IfBranch, ForNode, SwitchNode,
+  TemplateNode, ElementNode, Attr, StaticAttr, EventAttr, UseAttr, IfNode, IfBranch, ForNode, SwitchNode,
   DeferNode, DeferTrigger, AwaitNode, SnippetNode, RenderNode, KeyNode,
 } from './ast.js';
 import { rewrite, ctxScope, childScope, type Scope, type Binding } from './scope.js';
@@ -426,6 +426,7 @@ function compileFragment(
     // an `attr`, consumed inside the child) must not be auto-forwarded (double-invoked) too.
     const props: string[] = [];
     const eventKeys: string[] = [];
+    const uses: UseAttr[] = []; // `use:` actions forwarded to the mounted component's root element
     for (const attr of node.attrs) {
       switch (attr.type) {
         case 'static':
@@ -441,8 +442,12 @@ function compileFragment(
           eventKeys.push(k);
           break;
         }
+        case 'use':
+          // `use:action` on a component forwards to its single root DOM element (below).
+          uses.push(attr);
+          break;
         default:
-          throw new Error(`'${attr.type}' binding on <${node.tag}> is not supported yet (M5: props + on:event only)`);
+          throw new Error(`'${attr.type}' binding on <${node.tag}> is not supported yet (props, on:event, use: only)`);
       }
     }
     if (eventKeys.length) props.push(`'$events': [${eventKeys.map((k) => JSON.stringify(k)).join(', ')}]`);
@@ -474,7 +479,29 @@ function compileFragment(
 
     const propsObj: string = props.length ? `{ ${props.join(', ')} }` : '{}';
     const slotsObj: string = slots.length ? `{ ${slots.join(', ')} }` : '{}';
-    stmts.push(`${gen.H('mountChild')}(${anchorVar}, ${gen.Comp(node.tag)}(${propsObj}, ${slotsObj}));`);
+    const mountExpr: string = `${gen.Comp(node.tag)}(${propsObj}, ${slotsObj})`;
+
+    if (uses.length === 0) {
+      stmts.push(`${gen.H('mountChild')}(${anchorVar}, ${mountExpr});`);
+      return;
+    }
+
+    // `use:` on a component: capture the mounted node, resolve its single root Element
+    // (loud error if it renders a fragment/text/nothing), forward each action onto that
+    // root through the SAME `applyAction` path elements use, then mount. Order preserved.
+    const nodeVar: string = gen.fn('_cn');
+    const rootVar: string = gen.fn('_cr');
+    stmts.push(`const ${nodeVar} = ${mountExpr};`);
+    stmts.push(`const ${rootVar} = ${gen.H('componentRoot')}(${nodeVar}, ${q(node.tag)});`);
+    for (const u of uses) {
+      const action: string = rewrite(u.name, sc).code;
+      stmts.push(
+        u.expr !== undefined
+          ? `${gen.H('applyAction')}(${rootVar}, ${action}, () => ${rewrite(u.expr, sc).code});`
+          : `${gen.H('applyAction')}(${rootVar}, ${action});`
+      );
+    }
+    stmts.push(`${gen.H('mountChild')}(${anchorVar}, ${nodeVar});`);
   }
 
   function emitSlot(node: ElementNode, path: number[], sc: Scope): void {
