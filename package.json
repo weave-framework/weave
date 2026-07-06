@@ -1,6 +1,6 @@
 {
   "name": "weave-monorepo",
-  "version": "1.4.2",
+  "version": "1.4.3",
   "description": "Weave — fine-grained reactive, signal-native UI framework. Compiled, TypeScript-first, no Virtual DOM.",
   "type": "module",
   "private": true,

@@ -22,7 +22,7 @@ const tick = (): Promise<void> => new Promise<void>((r) => queueMicrotask(r));
 const SCOPE: string[] = [
   'root', 'input', 'rootClass', 'multiline', 'singleline', 'type', 'rows', 'placeholder', 'currentValue',
   'isDisabled', 'isReadonly', 'isRequired', 'name', 'label', 'showClear', 'clearLabel',
-  'showReveal', 'revealIcon', 'revealAriaLabel', 'revealPressed', 'toggleReveal', 'onNativeInput', 'onBlur', 'clear',
+  'showReveal', 'revealIcon', 'revealAriaLabel', 'revealTitle', 'revealPressed', 'toggleReveal', 'onNativeInput', 'onBlur', 'clear',
 ];
 
 type Slots = { prefix?: () => Node; suffix?: () => Node };
@@ -241,6 +241,25 @@ test('revealable: reveal/hide labels are overridable (i18n)', () => {
   assert.equal(btn.getAttribute('aria-label'), 'Rodyti', 'custom show label');
   btn.click();
   assert.equal(btn.getAttribute('aria-label'), 'Slėpti', 'custom hide label after reveal');
+  dispose();
+});
+
+test('revealable: a native title tooltip is on by default and follows the state (FW-5)', () => {
+  const { root, dispose } = mount({ type: 'password', revealable: true, revealLabel: 'Rodyti', hideLabel: 'Slėpti' });
+  const btn: HTMLButtonElement = root.querySelector<HTMLButtonElement>('.weave-input__reveal')!;
+  assert.equal(btn.getAttribute('title'), 'Rodyti', 'title shows the localized show-label by default');
+  assert.equal(btn.getAttribute('aria-label'), 'Rodyti', 'aria-label (accessible name) unchanged');
+  btn.click();
+  assert.equal(btn.getAttribute('title'), 'Slėpti', 'title follows the revealed state');
+  assert.equal(btn.getAttribute('aria-label'), 'Slėpti', 'aria-label still present alongside title');
+  dispose();
+});
+
+test('revealable: revealTooltip={{false}} suppresses the title but keeps aria-label', () => {
+  const { root, dispose } = mount({ type: 'password', revealable: true, revealTooltip: false });
+  const btn: HTMLButtonElement = root.querySelector<HTMLButtonElement>('.weave-input__reveal')!;
+  assert.ok(!btn.hasAttribute('title'), 'no native title when the app opts out');
+  assert.equal(btn.getAttribute('aria-label'), 'Show password', 'aria-label (accessible name) stays');
   dispose();
 });
 

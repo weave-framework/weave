@@ -67,6 +67,13 @@ export interface InputProps {
   revealLabel?: string;
   /** Accessible name for the reveal toggle in its revealed (will-hide) state. Default 'Hide password'. */
   hideLabel?: string;
+  /**
+   * Show a native `title` tooltip on the reveal toggle (the visible hover hint, text = the
+   * current reveal/hide label). Default `true`; set `false` to suppress it. The `aria-label`
+   * (accessible name) is unaffected either way. Native `title` avoids coupling Input to the
+   * overlay-based Tooltip — Input stays CDK-free.
+   */
+  revealTooltip?: boolean;
   /** Called on mount with the native field — lets a composer (e.g. Autocomplete) add
    *  combobox ARIA / manage `aria-activedescendant` without re-creating the field. */
   onInputRef?: (el: HTMLInputElement | HTMLTextAreaElement) => void;
@@ -92,7 +99,7 @@ export const template: string =
   '}' +
   '@if (showReveal()) {' +
   '<button type="button" class="weave-input__reveal" aria-label={{ revealAriaLabel() }}' +
-  ' aria-pressed={{ revealPressed() }} disabled={{ isDisabled() }} on:click={{ toggleReveal }}>' +
+  ' title={{ revealTitle() }} aria-pressed={{ revealPressed() }} disabled={{ isDisabled() }} on:click={{ toggleReveal }}>' +
   '<Icon name={{ revealIcon() }} />' +
   '</button>' +
   '}' +
@@ -119,6 +126,7 @@ export interface InputContext {
   showReveal: () => boolean;
   revealIcon: () => string;
   revealAriaLabel: () => string;
+  revealTitle: () => string | undefined;
   revealPressed: () => string;
   toggleReveal: () => void;
   onNativeInput: (event: Event) => void;
@@ -135,6 +143,10 @@ export function setup(props: InputProps): InputContext {
   // Password reveal (eye) toggle — only meaningful on a single-line `type="password"` field.
   const revealed: Signal<boolean> = signal<boolean>(false);
   const canReveal = (): boolean => !!props.revealable && (props.type ?? 'text') === 'password' && !props.multiline;
+  // The label shown for the reveal toggle in the current state — the source for BOTH the
+  // aria-label (accessible name) and the optional native `title` tooltip.
+  const revealText = (): string =>
+    revealed() ? props.hideLabel ?? 'Hide password' : props.revealLabel ?? 'Show password';
 
   const currentValue = (): string => (props.control ? props.control.value() : props.value ?? '');
   const isDisabled = (): boolean => !!props.disabled;
@@ -224,8 +236,12 @@ export function setup(props: InputProps): InputContext {
     clearLabel: (): string => props.clearLabel ?? 'Clear',
     showReveal: (): boolean => canReveal(),
     revealIcon: (): string => (revealed() ? 'eye-off' : 'eye'),
-    revealAriaLabel: (): string =>
-      revealed() ? props.hideLabel ?? 'Hide password' : props.revealLabel ?? 'Show password',
+    revealAriaLabel: (): string => revealText(),
+    // Native `title` tooltip: on by default, omitted (undefined → no attribute) when
+    // `revealTooltip={false}`. Same text as the aria-label, following the toggle state.
+    // Native `title` tooltip: on by default, omitted (undefined → no attribute) when
+    // `revealTooltip={false}`. Same text as the aria-label, following the toggle state.
+    revealTitle: (): string | undefined => (props.revealTooltip === false ? undefined : revealText()),
     revealPressed: (): string => (revealed() ? 'true' : 'false'),
     toggleReveal: (): void => {
       revealed.set(!revealed());
