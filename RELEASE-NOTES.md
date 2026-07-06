@@ -3,6 +3,31 @@
 Human-readable highlights, one section per release — everything notable that landed since
 the previous one. For the granular, per-version log see [CHANGELOG.md](CHANGELOG.md).
 
+## 1.3.1 — 2026-07-06
+
+### 🐞 Fixes — Nx integration & the template parser
+- **`@weave-framework/nx`: builds now land at the Nx-conventional `dist/<project>`.** The `build`
+  executor defaults its output to `<workspaceRoot>/dist/<projectRoot>` (matching every other Nx
+  plugin) instead of the app-local `dist/`, and the app generator scaffolds
+  `"outputs": ["{workspaceRoot}/dist/{projectRoot}"]` so Nx caching restores files to the right
+  place. A project can still override via `outputPath` in `project.json`. Standalone (non-Nx)
+  `weave build` is unchanged — internally an explicit `--out` now overrides the config's `outDir`,
+  which is the seam the executor uses.
+- **`@weave-framework/nx`: the `build` executor is now actually published.** A `.gitignore` `build/`
+  rule (meant for build output) silently swallowed `packages/nx/src/executors/build/`, so the
+  executor's source was never committed and `nx build` failed with *"Unable to resolve
+  @weave-framework/nx:build."* The source is un-ignored and shipped, and a smoke test now asserts
+  every executor declared in `executors.json` has a non-ignored source and resolves on disk.
+- **The template parser no longer hangs / OOMs on a malformed attribute.** A stray character the
+  attribute scanner can't consume (e.g. `}` from a Prettier-mangled `router="{{" router }}`) used to
+  spin the parse loop forever until Node ran out of memory (~5 GB). It now fails fast with a clear
+  `Unexpected character '}' in attributes of <RouterView> (line N, col M)`.
+
+### ✨ Scaffolded apps format their Weave templates
+- **`nx g @weave-framework/nx:application` wires up `@weave-framework/prettier-plugin`** — the new
+  app gets it as a devDependency plus a `.prettierrc` routing `.html` to the `weave` parser, so
+  `{{ }}` bindings format correctly instead of being mangled by a Weave-unaware Prettier.
+
 ## 1.3.0 — 2026-07-06
 
 ### ✨ New package — `@weave-framework/prettier-plugin`

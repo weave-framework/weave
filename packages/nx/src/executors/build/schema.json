@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/schema",
+  "version": 2,
+  "title": "Weave build executor",
+  "description": "Run `weave build` for a Weave project.",
+  "type": "object",
+  "properties": {
+    "config": {
+      "type": "string",
+      "description": "Path to the weave.config file (relative to the project root)."
+    },
+    "outputPath": {
+      "type": "string",
+      "description": "Output directory (Nx convention: dist/<projectRoot> under the workspace root). Defaults to <workspaceRoot>/dist/<projectRoot> when unset."
+    },
+    "outDir": {
+      "type": "string",
+      "description": "Override the output directory (alias of outputPath; outputPath wins if both are set)."
+    },
+    "noMinify": {
+      "type": "boolean",
+      "description": "Skip minification.",
+      "default": false
+    }
+  },
+  "additionalProperties": false
+}

@@ -70,7 +70,7 @@ Produces a static bundle you can deploy. Both pipelines minify by default and co
 |------|----------|---------|--------|
 | `--config <path>` | both | auto-discover | Point at an explicit config file; forces config mode. |
 | `[entry]` (positional) | legacy | `src/main.ts` | The hand-written entry module. Ignored in config mode. |
-| `--out <dir>` | legacy | `dist` | Output directory. **In config mode this flag is ignored** — set `outDir` in the config instead. |
+| `--out <dir>` | both | `dist` (legacy) / config `outDir` | Output directory. In config mode an explicit `--out` **overrides** the config's `outDir` (this is how `@weave-framework/nx` redirects the build to the workspace-root `dist/<project>`); with no flag the config's `outDir` stands. |
 | `--no-minify` | legacy | minified | Skip minification (handy for inspecting output). In config mode, control this with `build.minify` in the config. |
 
 ### weave check

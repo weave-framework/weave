@@ -75,7 +75,9 @@ export async function applicationGenerator(
       build: {
         executor: '@weave-framework/nx:build',
         options: { config: 'weave.config.ts' },
-        outputs: ['{projectRoot}/dist'],
+        // The executor writes to `<workspaceRoot>/dist/<projectRoot>` (Nx convention, matching every
+        // other plugin), so caching must point there — not the app-local `{projectRoot}/dist`.
+        outputs: ['{workspaceRoot}/dist/{projectRoot}'],
         cache: true,
       },
       serve: { executor: '@weave-framework/nx:serve', options: { config: 'weave.config.ts' } },
@@ -98,18 +100,36 @@ export async function applicationGenerator(
       '@weave-framework/i18n': WEAVE_DEP_RANGE,
       '@weave-framework/data': WEAVE_DEP_RANGE,
     },
-    { '@weave-framework/cli': WEAVE_DEP_RANGE }
+    { '@weave-framework/cli': WEAVE_DEP_RANGE, '@weave-framework/prettier-plugin': WEAVE_DEP_RANGE }
   );
 
   await formatFiles(tree);
 
-  // Weave `.html` templates use `{{ }}` bindings that Prettier (run by formatFiles) mangles
-  // — e.g. `on:click={{ inc }}` becomes `on:click="{{" inc }}`. Write the template AFTER
-  // formatting so the canonical binding survives untouched.
+  // Everything below is written AFTER `formatFiles` on purpose. `formatFiles` runs Prettier with
+  // the workspace's *currently installed* plugins — and `@weave-framework/prettier-plugin` is only
+  // installed by `installTask` afterwards. So during generation Prettier is still Weave-unaware and
+  // would mangle `{{ }}` bindings (`on:click={{ inc }}` → `on:click="{{" inc }}`); writing the
+  // template + the Prettier config here keeps them pristine. Once installed, the developer's own
+  // Prettier picks up the config below and formats Weave templates correctly.
   tree.write(
     joinPathFragments(root, 'src/app/app.html'),
     `<main class="app">\n  <h1>Hello, Weave</h1>\n` +
       `  <button on:click={{ inc }}>clicked {{ count() }} times</button>\n</main>\n`
+  );
+
+  // Wire up the Weave Prettier plugin for this app: `.weave` files are picked up automatically;
+  // route the app's Weave `.html` templates to the `weave` parser so plain HTML elsewhere is
+  // untouched. This is what makes format-on-save / `prettier --check` work on templates.
+  tree.write(
+    joinPathFragments(root, '.prettierrc'),
+    JSON.stringify(
+      {
+        plugins: ['@weave-framework/prettier-plugin'],
+        overrides: [{ files: '*.html', options: { parser: 'weave' } }],
+      },
+      null,
+      2
+    ) + '\n'
   );
 
   return installTask;

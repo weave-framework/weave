@@ -37,6 +37,49 @@ test('single-brace attribute binding is rejected (one syntax — M10 step 5)', (
   assert.ok(threw, 'a single-brace attribute binding should be a parse error');
 });
 
+test('parseAttrs fails loud on a stray non-advancing char (no infinite loop / OOM) — FW-2', () => {
+  // Without the advance-guard, a stray char that `readAttrName` can't consume (and that isn't a
+  // terminator) leaves the cursor stuck, so the attr loop spins forever and OOMs. Each of these
+  // must instead throw a clear one-line ParseError naming the character AND the tag. (If the guard
+  // is removed, this test HANGS instead of failing — that hang is the regression it guards against.)
+  const cases: Array<{ src: string; ch: string; tag: string }> = [
+    { src: '<X }>', ch: '}', tag: 'X' },
+    { src: '<X (foo)>', ch: '(', tag: 'X' },
+    { src: '<X [bar]>', ch: '[', tag: 'X' },
+    { src: '<RouterView router="{{" router }} />', ch: '}', tag: 'RouterView' }, // the real repro
+  ];
+  for (const c of cases) {
+    let msg: string = '';
+    try {
+      parseTemplate(c.src);
+    } catch (e) {
+      msg = (e as Error).message;
+    }
+    assert.ok(msg.includes('Unexpected character'), `${c.src} → should throw a ParseError, got: ${msg || '(no throw)'}`);
+    assert.ok(msg.includes(JSON.stringify(c.ch)), `${c.src} → error names the character ${c.ch}: ${msg}`);
+    assert.ok(msg.includes(`<${c.tag}>`), `${c.src} → error names the tag <${c.tag}>: ${msg}`);
+  }
+});
+
+test('parseAttrs advance-guard does not fire on valid templates — FW-2', () => {
+  // The guard must be inert whenever the cursor genuinely advances.
+  const ok: string[] = [
+    '<div id="x" class="y"></div>',
+    '<Comp .value={{ text() }} on:click={{ save }} use:tip />',
+    '<input bind:value={{ name }} />',
+    '<br/>',
+  ];
+  for (const src of ok) {
+    let threw: string = '';
+    try {
+      parseTemplate(src);
+    } catch (e) {
+      threw = (e as Error).message;
+    }
+    assert.equal(threw, '', `valid template should parse: ${src} (threw: ${threw})`);
+  }
+});
+
 test('{{ }} balances inner braces: arrow with an object argument', () => {
   // the closing }} must not be confused by the inner object literal's braces
   assert.equal(

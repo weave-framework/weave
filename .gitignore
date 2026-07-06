@@ -4,6 +4,11 @@ node_modules/
 # Build output
 dist/
 build/
+# …but NOT the Nx plugin's `build` EXECUTOR source — the unanchored `build/` above would swallow
+# `packages/nx/src/executors/build/`, so it was never committed and the published package shipped
+# without its `build` executor (`nx build` → "Unable to resolve @weave-framework/nx:build").
+!packages/nx/src/executors/build/
+!packages/nx/src/executors/build/**
 # Staged, pre-compiled @weave-framework/ui tree (tools/build-ui-components.mjs)
 packages/ui/.compiled/
 # Transient bundle emitted by tools/verify-dev-proxy.mjs (cleaned on exit)

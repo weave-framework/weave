@@ -10,6 +10,37 @@
 > `pnpm publish:packages`) — pushing code does **not** publish to npm. (The scheme started at
 > `0.2.0`; the line crossed `1.0.0` on 2026-07-05 when the public API was frozen.)
 
+## 1.3.1 — 2026-07-06
+
+**Fix (`@weave-framework/nx`) — build output follows the Nx convention.** The `build` executor now
+defaults `outputPath` to `<workspaceRoot>/dist/<projectRoot>` (forwarded to the CLI as `--out`, via a
+pure `withBuildDefaults` helper) and the application generator scaffolds
+`outputs: ["{workspaceRoot}/dist/{projectRoot}"]`, so a Weave app's artifact lands where every other
+Nx plugin puts it and cache restore targets the same place. Projects may override with `outputPath` in
+`project.json`. To enable this, `weave build` in config mode now honors an explicit `--out` as an
+override of the config's `outDir`; standalone builds with no `--out` are unchanged.
+
+**Fix (`@weave-framework/nx`) — the `build` executor is now actually published.** The repo's
+`.gitignore` had an unanchored `build/` rule that swallowed `packages/nx/src/executors/build/`, so the
+source was never committed and `@weave-framework/nx` shipped without its `build` executor
+(`nx build` → "Unable to resolve @weave-framework/nx:build"). Un-ignored via a negation + committed;
+`verify:nx` now asserts every executor in `executors.json` has a non-ignored source and (when built)
+resolves in `dist/`.
+
+**Fix (`@weave-framework/compiler`) — parser fails loud instead of hanging on a bad attribute.**
+`parseAttrs` gained an advance-guard: if `readAttrName` can't consume the current character and it
+isn't a terminator (e.g. `}`, `(`, `[`, `*`, `#`), the parser throws
+`Unexpected character '<c>' in attributes of <tag> (line N, col M)` instead of looping forever until
+Node OOMs (~5 GB / `RangeError: Invalid array length`). Regression-tested with the real repro
+`<RouterView router="{{" router }} />` (a Prettier-mangled binding — also fixed at the source by
+`@weave-framework/prettier-plugin`).
+
+**Scaffold — Weave Prettier plugin wired in.** The Nx application generator now adds
+`@weave-framework/prettier-plugin` as a devDependency and writes a project `.prettierrc`
+(`plugins: ["@weave-framework/prettier-plugin"]` + an `.html` → `weave` parser override), written
+after `formatFiles` (the plugin isn't installed at generation time), so a generated app formats its
+templates instead of mangling `{{ }}` bindings. Patch release.
+
 ## 1.3.0 — 2026-07-06
 
 **New package — `@weave-framework/prettier-plugin`.** A Prettier plugin that formats Weave templates

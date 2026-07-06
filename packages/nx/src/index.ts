@@ -16,7 +16,7 @@ export {
   type WeaveNxPluginOptions,
 } from './plugin.js';
 
-export { buildArgs, runWeave, projectRootOf, runForProject } from './executors/run-weave.js';
+export { buildArgs, runWeave, projectRootOf, runForProject, withBuildDefaults } from './executors/run-weave.js';
 export type { BuildOptions, ServeOptions, CheckOptions } from './executors/run-weave.js';
 
 export { applicationGenerator, appRoot, type ApplicationGeneratorSchema } from './generators/application/generator.js';

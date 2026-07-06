@@ -42,10 +42,14 @@ export async function main(argv: string[]): Promise<void> {
   if (cmd === 'build') {
     if (config) {
       syncRoutes(config); // file-based routing: regenerate routes.gen.ts before bundling
+      // An explicit `--out` overrides the config's `outDir` (used by `@weave-framework/nx`, which
+      // passes the workspace-root `dist/<project>` path); with no flag the config value stands, so
+      // a standalone `weave build` is unchanged.
+      const outDir: string = flag(rest, '--out') ?? config.outDir;
       await build({
         entry: config.entry,
         virtualEntry: virtualEntryFor(config),
-        outDir: config.outDir,
+        outDir,
         minify: config.minify,
         styleLang: config.styleLang,
         styles: config.styles,
@@ -53,7 +57,7 @@ export async function main(argv: string[]): Promise<void> {
         index: config.index,
         clean: true, // a fresh, self-contained artifact each prod build
       });
-      console.log(`weave build → ${config.outDir}/`);
+      console.log(`weave build → ${outDir}/`);
       return;
     }
     // `weave build` is the production bundle → minify by default; `--no-minify` opts out.
