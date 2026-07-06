@@ -1,11 +1,22 @@
 # RFC 0008: Component extension (`extendComponent`)
 
-- **Status:** ✅ Accepted — 2026-07-06. Decided directly (maintainer, per GOVERNANCE — no
-  community to gauge yet; the RFC is the decision record). Resolved: **Variant A** (loader
-  follows the base import); **one template mode per extension — `#1` full override *xor* `#3`
-  patches, never mixed** (mixing is unmanageable and ambiguous); **override + add are always
-  available together** within the chosen mode; **chained extension allowed** (test-pinned);
-  **name = `extendComponent`**. Remaining unresolved questions are refinements, not blockers.
+- **Status:** ◐ Partially implemented — 2026-07-06. **Mode #1 (full template override) shipped**
+  via the **component-file authoring form** (below). `#3` declarative patches remain parked.
+  Accepted 2026-07-06 (maintainer, per GOVERNANCE — the RFC is the decision record). Resolved:
+  **authoring form A = a component FILE that declares `export const extend = Base`** (NOT an inline
+  `extendComponent(...)` call — the loader only build-processes component files, and mode #1's
+  template composition must be build-time; see *Authoring form*); **one template mode per extension
+  — `#1` full override *xor* `#3` patches, never mixed**; **override + add always available
+  together** within the chosen mode; **chained extension allowed** (test-pinned).
+
+- **Implemented (mode #1, form A):** a component whose script exports `const extend = Base`
+  compiles to `defineComponent(render, extendSetup(extend, setup?, extendProps?))`. `extendSetup`
+  (runtime, `@weave-framework/runtime/dom`) composes the base setup context (retrieved from the
+  `__wSetup` that `defineComponent` now attaches to every component) with the extension's own —
+  `extendProps` reshapes props BEFORE the base setup (the deep seam), `setup(props, base)` overrides
+  and adds on top of the base context, and the extension's own template is the full override.
+  Compiler change is in `compileComponent`; **no loader change needed**. `#3` patches (which DO need
+  the loader to read the base template) are the parked follow-on.
 - **Author(s):** Aidas Josas (@aidasjosas)
 - **Discussion:** captured from a design session; decided directly. Records the direction; the
   built API may refine details (maintainer owns the final shape).
@@ -60,7 +71,54 @@ small, typed, testable unit — and never forks the base.
 
 ## Design
 
-### The signature
+### Authoring form — a component FILE (form A, shipped for mode #1)
+
+An extension is authored as an ordinary Weave **component file** (`.weave`, or a `.ts` + sibling
+`.html`) that declares the base it extends. This is the form the loader can build-process (an
+inline `extendComponent(...)` call in a plain `.ts` is not build-processed, so its template can't
+be composed at build time — see *Alternatives*):
+
+```ts
+// my-list.ts — extends the <List> component
+import List from '@weave-framework/ui/list';
+import { computed } from '@weave-framework/runtime';
+
+export const extend = List;                       // ← marks this an extension of List
+
+// optional — reshape props BEFORE the base setup reads them (the deep seam; see "closure privacy")
+export function extendProps(props) {
+  return { ...props, items: props.items.map(normalize) };
+}
+
+// base = List's setup context; override existing keys / add new ones
+export function setup(props, base) {
+  return {
+    ...base,
+    totalCount: computed(() => base.items().length),
+    onRowDblClick: (item) => props.onOpen?.(item.value),
+  };
+}
+```
+```html
+<!-- my-list.html — the FULL override template (mode #1); reads base keys + the added ones -->
+<div class={{ listClass() }} role={{ listRole() }} aria-label={{ label() }} on:keydown={{ onKeydown }}>
+  <div class="my-list__count">{{ totalCount() }} total</div>
+  @for (item of items(); track item.value) {
+    <div class="weave-list__row" ... on:dblclick={{ () => onRowDblClick(item) }}>{{ item.title }}</div>
+  }
+</div>
+```
+
+It compiles to `defineComponent(render, extendSetup(extend, setup, extendProps))`. `extendSetup`
+runs `extendProps` → base setup (via the base component's attached `__wSetup`) → `setup(props,
+base)`, then merges (`{ ...baseCtx, ...ownCtx }`). Chaining works because an extended component's
+own `__wSetup` *is* this composed function. **No loader change** — `compileComponent` handles it.
+
+### The original inline sketch (superseded for mode #1)
+
+The signature below was the initial exploration. It is superseded by the component-file form above
+for what shipped; it remains the reference for the option-shape (props/setup/template) and for the
+`#3` patch design.
 
 ```ts
 extendComponent(Base, {

@@ -283,6 +283,51 @@ export function setup(props: { task: Task }) {
 }
 ~~~
 
+## Extending a component
+
+Sometimes a component does *almost* what you need — you want to keep all of its behaviour but reshape the data it renders, add an event, or drop in a piece of markup. Instead of forking it, **extend** it: a component file declares `export const extend = Base`, and it reuses the base's whole `setup` context while overriding or adding on top.
+
+:::tabs
+~~~ts title="my-list.ts"
+import List from '@weave-framework/ui/list';
+import { computed } from '@weave-framework/runtime';
+
+export const extend = List;                    // this component extends <List>
+
+// base = List's setup context. Reuse it, override keys, add new ones.
+export function setup(props, base) {
+  return {
+    ...base,
+    totalCount: computed(() => base.items().length),   // add
+    onRowDblClick: (item) => props.onOpen?.(item.value), // add
+  };
+}
+~~~
+~~~html title="my-list.html"
+<div class={{ listClass() }} role={{ listRole() }} on:keydown={{ onKeydown }}>
+  <div class="count">{{ totalCount() }} total</div>
+  @for (item of items(); track item.value) {
+    <div class="weave-list__row" tabindex={{ tabindexFor(item) }}
+         on:click={{ () => activate(item) }} on:dblclick={{ () => onRowDblClick(item) }}>
+      {{ item.title }}
+    </div>
+  }
+</div>
+~~~
+:::
+
+The template is a **full override** — it reads base-provided names (`listClass`, `items`, `activate`, …) *and* the names you added (`totalCount`, `onRowDblClick`) from the one merged context. Extension composes: `MyList`'s own `setup` runs on top of `List`'s, and an already-extended component can be extended again.
+
+**Reshaping data the base reads.** Overriding a returned key changes what the *template* sees, but the base's internal logic closes over its own `props` — it won't see an override. To change data the base's internals depend on, use the optional `extendProps`, which reshapes props **before** the base setup runs:
+
+~~~ts
+export function extendProps(props) {
+  return { ...props, items: props.items.map(normalize) }; // the base setup reads these
+}
+~~~
+
+Today extension is **full-template override** (you write the whole template, reusing the merged context). Declarative *patches* against the base template — add just an attribute or a node without copying — are a planned follow-up ([RFC 0008](https://github.com/weave-framework/weave/blob/main/rfcs/0008-component-extension.md)).
+
 ## A note on privacy
 
 Only what `setup` returns is visible to the template, and only props + `on:` events cross the boundary into a child. A component's internal signals and helpers stay private by construction — there's no `@ViewChild` reaching into a child's guts. When a deeply nested component needs shared state, lift it: a signal passed down, a [context](/learn/lifecycle-context-di) provided to a subtree, or a [store](/learn/store) shared app-wide.

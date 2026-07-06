@@ -1084,7 +1084,7 @@ export function defineComponent(
   render: (ctx: Record<string, unknown>, slots: Record<string, () => Node>) => Node,
   setup?: (props: Record<string, unknown>) => Record<string, unknown> | void
 ): Component {
-  return (props = {}, slots = {}) => {
+  const component: ComponentWithSetup = (props = {}, slots = {}) => {
     const owner: Owner = createOwner(); // _parent = surrounding owner (context chain)
     onDispose(() => disposeOwner(owner)); // surrounding scope disposes this instance
     // Untrack the whole instance construction: a component's reactivity comes from its own internal
@@ -1124,6 +1124,44 @@ export function defineComponent(
         return node;
       }),
     );
+  };
+  // Expose the raw setup so a component-file extension (`export const extend = Base`) can
+  // compose the base's setup context — see `extendSetup`. Zero cost for non-extended use.
+  component.__wSetup = setup;
+  return component;
+}
+
+/** A component with its raw setup attached, so `extendSetup` can compose it. @internal */
+interface ComponentWithSetup extends Component {
+  __wSetup?: (props: Record<string, unknown>) => Record<string, unknown> | void;
+}
+
+/**
+ * The runtime half of a **component-file extension** (`export const extend = Base`): compose
+ * a base component's setup with the extension's own. The compiler emits
+ * `defineComponent(render, extendSetup(extend, setup, extendProps))` for a component whose
+ * script exports `extend`. On each instantiation this:
+ *   1. runs the optional `propsFn` FIRST — it reshapes the props the BASE setup reads, the
+ *      documented seam for changing data the base's internals depend on (its private closures
+ *      can't be reached by overriding a returned key — see RFC 0008);
+ *   2. runs the base setup (from the base component's attached `__wSetup`) with those props;
+ *   3. runs the extension's `own(props, base)` with the base context in hand;
+ *   4. merges — the extension's returned keys override/extend the base context.
+ * A base that is not a Weave component (no `__wSetup`) contributes an empty context. Chaining
+ * works by construction: an extended component's own `__wSetup` is this composed function.
+ * @internal
+ */
+export function extendSetup(
+  base: Component,
+  own?: (props: Record<string, unknown>, base: Record<string, unknown>) => Record<string, unknown> | void,
+  propsFn?: (props: Record<string, unknown>) => Record<string, unknown>
+): (props: Record<string, unknown>) => Record<string, unknown> {
+  return (props: Record<string, unknown>): Record<string, unknown> => {
+    const p: Record<string, unknown> = propsFn ? propsFn(props) : props;
+    const baseSetup: ComponentWithSetup['__wSetup'] = (base as ComponentWithSetup).__wSetup;
+    const baseCtx: Record<string, unknown> = (baseSetup ? baseSetup(p) : undefined) || {};
+    const ownCtx: Record<string, unknown> = (own ? own(p, baseCtx) : undefined) || {};
+    return { ...baseCtx, ...ownCtx };
   };
 }
 

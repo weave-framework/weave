@@ -314,3 +314,46 @@ test('compileComponent without setup emits defineComponent(render)', () => {
   assert.ok(code.includes('export default defineComponent(render)'), code);
   assert.equal(css, '', 'no styles → empty css');
 });
+
+/* ──────────── RFC 0008 — component-file extension (`export const extend`) ──────────── */
+
+test('compileComponent: `export const extend` wraps setup with extendSetup(extend, setup)', () => {
+  const { code } = compileComponent({
+    script:
+      'import List from "./list";\n' +
+      'export const extend = List;\n' +
+      'export function setup(props, base) { return { ...base, extra: () => 1 }; }',
+    template: '<div>{{ extra() }}</div>',
+  });
+  assert.ok(
+    code.includes('export default defineComponent(render, extendSetup(extend, setup));'),
+    `expected extendSetup(extend, setup); got:\n${code}`
+  );
+  assert.ok(code.includes('extendSetup') && /import \{ defineComponent, extendSetup \}/.test(code), 'extendSetup is imported');
+});
+
+test('compileComponent: an extension with extendProps threads the props seam', () => {
+  const { code } = compileComponent({
+    script:
+      'import List from "./list";\n' +
+      'export const extend = List;\n' +
+      'export function extendProps(props) { return props; }\n' +
+      'export function setup(props, base) { return base; }',
+    template: '<div>{{ items() }}</div>',
+  });
+  assert.ok(
+    code.includes('extendSetup(extend, setup, extendProps)'),
+    `expected extendSetup(extend, setup, extendProps); got:\n${code}`
+  );
+});
+
+test('compileComponent: an extension with no own setup passes undefined for it', () => {
+  const { code } = compileComponent({
+    script: 'import List from "./list";\nexport const extend = List;',
+    template: '<div>{{ items() }}</div>',
+  });
+  assert.ok(
+    code.includes('extendSetup(extend, undefined)'),
+    `expected extendSetup(extend, undefined); got:\n${code}`
+  );
+});

@@ -50,6 +50,10 @@ export interface CompiledComponent {
 }
 
 const HAS_SETUP: RegExp = /export\s+(?:async\s+)?function\s+setup\b|export\s+(?:const|let|var)\s+setup\b/;
+/** A component-file EXTENSION declares `export const extend = Base` (RFC 0008, form A / mode #1). */
+const HAS_EXTEND: RegExp = /export\s+(?:const|let|var)\s+extend\b/;
+/** Optional `export function extendProps(props)` — the pre-base props seam (RFC 0008). */
+const HAS_EXTEND_PROPS: RegExp = /export\s+(?:async\s+)?function\s+extendProps\b|export\s+(?:const|let|var)\s+extendProps\b/;
 
 /** Compile a `{ script, template, styles }` triple into a component module + scoped CSS. */
 export function compileComponent(src: ComponentSource, opts: ComponentOptions = {}): CompiledComponent {
@@ -65,13 +69,29 @@ export function compileComponent(src: ComponentSource, opts: ComponentOptions = 
 
   const css: string = src.styles ? scopeCss(src.styles, hash) : '';
   const script: string = src.script ?? '';
-  const setupArg: string = HAS_SETUP.test(script) ? 'render, setup' : 'render';
+  const hasSetup: boolean = HAS_SETUP.test(script);
+
+  // A component-file EXTENSION (`export const extend = Base`, RFC 0008): the default export wraps
+  // its own setup with the base's via `extendSetup(extend, setup?, extendProps?)`, so an instance
+  // reuses the base's setup context and this component's `setup(props, base)` overrides/adds on top.
+  // Its own template is the full override (mode #1). A non-extension component is unchanged.
+  const isExtension: boolean = HAS_EXTEND.test(script);
+  let defaultExport: string;
+  let extendImport: string = '';
+  if (isExtension) {
+    const args: string[] = ['extend', hasSetup ? 'setup' : 'undefined'];
+    if (HAS_EXTEND_PROPS.test(script)) args.push('extendProps');
+    defaultExport = `export default defineComponent(render, extendSetup(${args.join(', ')}));`;
+    extendImport = ', extendSetup';
+  } else {
+    defaultExport = `export default defineComponent(${hasSetup ? 'render, setup' : 'render'});`;
+  }
 
   const code: string = [
     script.trim(),
-    'import { defineComponent } from "@weave-framework/runtime/dom";',
+    `import { defineComponent${extendImport} } from "@weave-framework/runtime/dom";`,
     renderBody,
-    `export default defineComponent(${setupArg});`,
+    defaultExport,
   ]
     .filter(Boolean)
     .join('\n\n');
