@@ -276,19 +276,30 @@ is a deliberate boundary, not a bug: it keeps a base component's internals encap
 - **Type flow.** Carrying the base context type into `setup(props, base)` for full autocomplete on
   `base.*`, and merging the added keys into the component's props/exports, is non-trivial TS work.
 
-## Unresolved questions
+## Follow-ups (planned refinements — not blocking; both modes ship without them)
 
-1. **Patch selector power.** Just tag/class/role, or also attribute selectors / nth-of-type /
-   descendant combinators? Start minimal (tag/class/role) and grow on demand?
-2. **Multiple template modes together.** May an extension use `#1` *and* `#3`? (Leaning: no —
-   a full override replaces the base, so patches are meaningless against it; pick one.)
-3. **Chained extension.** Can you `extendComponent(MyList, …)` (extend an already-extended
-   component)? Should work by construction (it's just another component with a resolvable
-   template + setup) — but needs a test to pin it.
-4. **Type surface.** How far to push `base`-context typing and added-key inference before it's not
-   worth the complexity — full inference vs a typed-but-open first cut.
-5. **Slots / snippets.** How do `#3` patches interact with a base that renders `slots` /
-   `@snippet`? Can a patch target inside a slot region?
-6. **DevTools.** Should `inspectTree()` show an extended component as "MyList (extends List)" so
-   the relationship is visible when debugging?
-7. **Naming.** `extendComponent` vs `extend` vs `derive` — pick before freeze.
+1. **Patch-markup type-checking (the notable gap).** `weave check` type-checks a normal template — and
+   a `#1` full-override extension's template — against `setup`, but it does **not** yet look inside the
+   strings in `patch` ops, so a typo in a `#3` patched expression (`{{ totalCont() }}`) surfaces at
+   build/runtime, not in the editor. A sound implementation is essentially the full one: `check` must
+   resolve the LOCAL base, apply the patches, MERGE the base + extension setup contexts, AND carry the
+   base template's own scopes (a patch referencing a base `@for` var like `item` must not be a false
+   "unknown name") — i.e. replicate the loader's build-time resolve/merge inside check, with char-precise
+   offset mapping back into the `.ts` patch strings. A partial "check against the extension's own keys
+   only" is REJECTED: it false-positives on legitimate base-scope names. Deferred until `#3` sees real
+   use; documented as a known limitation in learn/components. (Note: `#1` is fully checked — prefer it
+   when you want the additions type-checked.)
+2. **Patch selector power.** Shipped: tag / `.class` / `[attr]` / `[attr=value]`. Could grow (nth-of-type,
+   descendant combinators) on demand.
+3. **Type surface for `setup(props, base)`.** Full `base`-context typing + added-key inference vs the
+   current typed-but-open cut.
+4. **Slots / snippets.** How `#3` patches interact with a base that renders `slots` / `@snippet` — can a
+   patch target inside a slot region?
+5. **DevTools.** Should `inspectTree()` show an extended component as "MyList (extends List)"?
+
+### Resolved
+
+- **Authoring form** — a component FILE (`export const extend = Base`), not an inline call (loader only
+  build-processes component files). **Template modes never mix** — `#1` full override *xor* `#3` patches.
+  **Chained extension** works (test-pinned). **`#3` is local-base only** (published packages ship no raw
+  template) and **build-time** (a patch on a `@for` row applies to dynamically-added rows too).

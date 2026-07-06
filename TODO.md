@@ -20,11 +20,12 @@ this list is a live intention, not a historical note.
 
 ## Planned — framework
 
-- **Component extension — declarative template patches.** ([RFC 0008](rfcs/0008-component-extension.md), the `#3`
-  follow-on.) A component can already **`extend`** another — reuse its whole `setup` context and behaviour,
-  override/add on top, with a full-template override (shipped in 1.1.0; see
-  [Extending a component](https://weaveframework.dev/learn/components)). Still planned: *declarative patches* against
-  the base template (add just an attribute or a node without rewriting the whole template).
+- **Component extension — `weave check` for patch markup.** ([RFC 0008](rfcs/0008-component-extension.md) —
+  the last follow-on.) A component can **`extend`** another — reuse its whole `setup` context and behaviour,
+  then either a full-template override (`#1`, 1.1.0) or *declarative patches* against the base template
+  (`#3`, 1.2.0). Both shipped; see [Extending a component](https://weaveframework.dev/learn/components). Still
+  planned: `weave check` type-checking of the markup inside `#3` `patch` ops (today a typo in a patched
+  expression surfaces at build/runtime, not in the editor; `#1` extensions are already fully checked).
 - **Server-side rendering — SSG first.** Accepted as a future track ([RFC 0001](rfcs/0001-ssr-hydration.md)):
   build-time prerendering + client hydration for SEO and first paint, before request-time SSR / streaming. Scheduled
   after the client-first roadmap matures, so it never comes at the cost of the core.

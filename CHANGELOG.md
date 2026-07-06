@@ -10,6 +10,25 @@
 > `pnpm publish:packages`) — pushing code does **not** publish to npm. (The scheme started at
 > `0.2.0`; the line crossed `1.0.0` on 2026-07-05 when the public API was frozen.)
 
+## 1.2.0 — 2026-07-06
+
+**Feature (compiler, cli) — component-extension template patches (`#3`), RFC 0008.** An extension file that
+exports `const extend = Base` + a STATIC `const patch = [ … ]` (and no own template) patches the base
+template instead of overriding it. The loader (`packages/cli/src/plugin.ts`) resolves the LOCAL base's raw
+template, reads the ops statically (isolated `new Function` eval — no module evaluation), and
+`compileComponent` applies them via `packages/compiler/src/patch.ts` `applyPatches` on the base AST (new
+`compileTemplateAst` compiles from the transformed AST, no text round-trip). Ops:
+`attr`/`removeAttr`/`prepend`/`append`/`before`/`after`/`replace`/`remove`/`wrap`; selectors by
+tag/`.class`/`[attr]`/`[attr=value]`; inserted markup + added attributes are parsed by the same Weave parser;
+a zero-match selector is a loud build error. **Build-time** (a patch on a `@for` row applies to
+dynamically-added rows — runtime DOM patching would not); compiles with the **base's style hash** so the
+base's scoped CSS still matches; base child tags resolve relative to the base dir. **LOCAL base only**
+(published packages ship no raw template) and one template mode per extension (`#1` xor `#3`). New gate
+`verify:extend` (end-to-end through the real loader, DoD revert-proven) + `patch.browser.ts` (10 tests).
+Completes RFC 0008 (both modes). **Known limitation:** `weave check` doesn't type-check patch markup yet
+(a deferred follow-up; `#1` full-override extensions are fully checked). First **minor** bump for this
+additive surface.
+
 ## 1.1.0 — 2026-07-06
 
 **Feature (compiler, runtime) — component extension (`extend`), RFC 0008 mode #1.** A component whose script

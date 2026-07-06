@@ -347,6 +347,10 @@ Ops: `attr` / `removeAttr`, `prepend` / `append` (children), `before` / `after` 
 
 Two constraints: the base must be a **local** component (a published package ships no raw template — patch a local base, or use full override), and a patch extension uses **either** patches **or** a full-override template, never both.
 
+:::callout info "Patch markup isn't type-checked yet"
+`weave check` type-checks a normal template (and a full-override extension's template) against `setup`, but it does **not yet** look inside the strings in `patch` ops. A typo in a patched expression (`{{ totalCont() }}`) surfaces at build/runtime, not in your editor. Full-override (`#1`) extensions are fully type-checked — reach for those when you want the check to cover your additions. Patch-markup type-checking is a planned follow-up ([RFC 0008](https://github.com/weave-framework/weave/blob/main/rfcs/0008-component-extension.md)).
+:::
+
 Full override (write your own `template`) vs patch (`export const patch`) — pick whichever is less work for the change. See [RFC 0008](https://github.com/weave-framework/weave/blob/main/rfcs/0008-component-extension.md).
 
 ## A note on privacy

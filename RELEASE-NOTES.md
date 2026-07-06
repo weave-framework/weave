@@ -3,6 +3,40 @@
 Human-readable highlights, one section per release — everything notable that landed since
 the previous one. For the granular, per-version log see [CHANGELOG.md](CHANGELOG.md).
 
+## 1.2.0 — 2026-07-06
+
+### ✨ Feature — extend a component by *patching* its template
+- **A component extension can now patch its base's template instead of overriding it.** Declare
+  `export const patch` — a static array of ops — and skip writing your own template; the loader
+  resolves the (local) base template, applies the ops, and compiles the result:
+  ```ts
+  // my-list.ts
+  import List from './list';
+  export const extend = List;
+  export const patch = [
+    { op: 'attr',    sel: '.weave-list__row', attr: 'on:dblclick={{ () => onRowDblClick(item) }}' },
+    { op: 'prepend', sel: '[role]',           html: '<div class="count">{{ totalCount() }} total</div>' },
+  ];
+  export function setup(props, base) {
+    return { ...base, totalCount: () => base.items().length, onRowDblClick: (i) => props.onOpen?.(i.value) };
+  }
+  ```
+  Ops: `attr` / `removeAttr`, `prepend` / `append`, `before` / `after`, `replace`, `remove`, `wrap`.
+  Selectors match by tag, `.class`, `[attr]`, or `[attr=value]`; a selector that matches nothing is a
+  **loud build error**. Inserted markup and added attributes are ordinary Weave template text (`{{ }}`,
+  `on:`, `use:`, `@if`/`@for`, nested components all work).
+- **It's build-time, so it's correct for reactive content** — a patch on a `@for` row applies to every
+  row, including ones added later (a runtime DOM patch would miss them). The extension compiles with the
+  **base's style hash**, so the base's **scoped CSS still applies**.
+- **Two constraints:** the base must be a **local** component (a published package ships no raw template
+  — patch a local base, or use full override), and an extension uses **either** patches **or** a
+  full-override template, never both.
+- **Known limitation:** patch markup isn't type-checked by `weave check` yet (a typo in a patched
+  expression surfaces at build/runtime, not in the editor). Full-override (`#1`) extensions are fully
+  checked. See [Extending a component](https://weaveframework.dev/learn/components).
+- This completes [RFC 0008](rfcs/0008-component-extension.md) (both modes: `#1` full override from 1.1.0,
+  `#3` patches here).
+
 ## 1.1.0 — 2026-07-06
 
 **Weave's first minor since 1.0** — new, backward-compatible surface (per [VERSIONING.md](VERSIONING.md)):
