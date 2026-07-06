@@ -26,8 +26,8 @@ import type { OnLoadArgs, OnLoadResult, Plugin, PluginBuild } from 'esbuild';
 import { readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import { compileComponent, parseSfc, extractSources, classifyTemplate, classifyStyle, childImportCandidates } from '@weave-framework/compiler';
-import type { ComponentSource, ExtractedSources } from '@weave-framework/compiler';
+import { compileComponent, parseSfc, extractSources, classifyTemplate, classifyStyle, childImportCandidates, hashCss } from '@weave-framework/compiler';
+import type { ComponentSource, ExtractedSources, PatchOp, CompiledComponent } from '@weave-framework/compiler';
 import { compileStyleFileTracked, compileStyleSource, type StyleLang } from './styles.js';
 
 export interface WeaveState {
@@ -241,6 +241,95 @@ function injectChildImports(
   return imports.length ? imports.join('\n') + '\n' + code : code;
 }
 
+/* ───────────────── RFC 0008 `#3` — component-file extension via base-template patches ───────────────── */
+
+/** The base identifier of a `#3` extension: `export const extend = List` → `"List"` (else null). */
+function extensionBase(script: string): string | null {
+  const m: RegExpMatchArray | null = stripComments(script).match(/export\s+const\s+extend\s*=\s*([A-Za-z_$][\w$]*)/);
+  return m ? m[1] : null;
+}
+
+/** The module specifier a default import binds `name` to: `import List from './list'` → `"./list"`. */
+function defaultImportSpec(script: string, name: string): string | null {
+  const code: string = stripComments(script);
+  const re: RegExp = new RegExp(`import\\s+${name}\\b[^;]*?\\bfrom\\s+['"]([^'"]+)['"]`);
+  const m: RegExpMatchArray | null = code.match(re);
+  return m ? m[1] : null;
+}
+
+/** Extract the balanced `[ … ]` after `export const patch =`, respecting string literals. */
+function patchArrayExpr(script: string): string | null {
+  const code: string = stripComments(script);
+  const decl: RegExpMatchArray | null = code.match(/export\s+const\s+patch\s*=/);
+  if (!decl || decl.index === undefined) return null;
+  const start: number = code.indexOf('[', decl.index);
+  if (start === -1) return null;
+  let depth: number = 0;
+  let quote: string = '';
+  for (let i: number = start; i < code.length; i++) {
+    const c: string = code[i];
+    if (quote) {
+      if (c === '\\') { i++; continue; }
+      if (c === quote) quote = '';
+      continue;
+    }
+    if (c === '"' || c === "'" || c === '`') { quote = c; continue; }
+    if (c === '[') depth++;
+    else if (c === ']' && --depth === 0) return code.slice(start, i + 1);
+  }
+  return null;
+}
+
+/** Evaluate the (static, literal) patch array in isolation — it references no imports. */
+function readPatchOps(script: string, filename: string): PatchOp[] {
+  const expr: string | null = patchArrayExpr(script);
+  if (!expr) throw new Error(`weave: ${filename} — could not read \`export const patch = [ … ]\` (must be a static array literal).`);
+  try {
+    const ops: unknown = new Function(`return (${expr});`)();
+    if (!Array.isArray(ops)) throw new Error('not an array');
+    return ops as PatchOp[];
+  } catch (e) {
+    throw new Error(
+      `weave: ${filename} — \`export const patch\` must be a STATIC array literal (plain objects/strings, no identifiers or imports): ${(e as Error).message}`
+    );
+  }
+}
+
+/** A resolved base component's template + where it lives (for hash + child-import resolution). */
+interface BaseTemplate {
+  template: string;
+  dir: string;
+  filename: string;
+  file: string;
+}
+
+/** Read a LOCAL base component's raw template (for a `#3` patch to apply to). Null if not resolvable. */
+async function readBaseTemplate(spec: string, fromDir: string): Promise<BaseTemplate | null> {
+  if (!spec.startsWith('.')) return null; // published packages ship no raw template — local only
+  const base: string = resolve(fromDir, spec);
+  const weavePath: string = base + '.weave';
+  if (existsSync(weavePath)) {
+    const src: ComponentSource = parseSfc(await readFile(weavePath, 'utf8'));
+    return { template: src.template, dir: dirname(weavePath), filename: weavePath, file: weavePath };
+  }
+  const tsPath: string = base + '.ts';
+  if (existsSync(tsPath)) {
+    const decl: ExtractedSources = extractSources(await readFile(tsPath, 'utf8'));
+    if (decl.template !== undefined && classifyTemplate(decl.template) === 'inline') {
+      return { template: decl.template, dir: dirname(tsPath), filename: tsPath, file: tsPath };
+    }
+    const htmlPath: string = base + '.html';
+    if (existsSync(htmlPath)) {
+      return { template: await readFile(htmlPath, 'utf8'), dir: dirname(tsPath), filename: tsPath, file: htmlPath };
+    }
+    if (decl.template !== undefined) {
+      const tf: string = resolve(dirname(tsPath), decl.template);
+      if (existsSync(tf)) return { template: await readFile(tf, 'utf8'), dir: dirname(tsPath), filename: tsPath, file: tf };
+    }
+  }
+  return null;
+}
+
 export function weave(state: WeaveState, options: WeaveOptions = {}): Plugin {
   const styleLang: StyleLang = options.styleLang ?? 'css';
   const dev: boolean = options.dev ?? false;
@@ -282,10 +371,40 @@ export function weave(state: WeaveState, options: WeaveOptions = {}): Plugin {
 
         const siblingHtml: string = args.path.replace(/\.ts$/, '.html');
         const hasSiblingHtml: boolean = existsSync(siblingHtml);
+        const dir: string = dirname(args.path);
+
+        // RFC 0008 `#3` — a component-file extension that PATCHES its base's template rather than
+        // writing its own (`export const extend = Base` + `export const patch = [ … ]`, no own
+        // template/sibling .html). Resolve the base's raw template (local only), apply the patch ops,
+        // and compile — reusing the BASE's hash so the base's scoped CSS still matches, and resolving
+        // the base template's child tags relative to the BASE dir.
+        const baseIdent: string | null = decl.template === undefined && !hasSiblingHtml ? extensionBase(decl.script ?? source) : null;
+        if (baseIdent && /export\s+const\s+patch\s*=/.test(stripComments(decl.script ?? source))) {
+          const spec: string | null = defaultImportSpec(decl.script ?? source, baseIdent);
+          if (!spec) {
+            throw new Error(`weave: ${args.path} — extends '${baseIdent}' but no matching \`import ${baseIdent} from '…'\` was found.`);
+          }
+          const base: BaseTemplate | null = await readBaseTemplate(spec, dir);
+          if (!base) {
+            throw new Error(
+              `weave: ${args.path} — a \`#3\` (patch) extension needs a LOCAL base with a readable template; '${spec}' did not resolve. ` +
+                `Published packages ship no raw template — use a local base, or \`#1\` (write your own \`template\`).`
+            );
+          }
+          const patches: PatchOp[] = readPatchOps(decl.script ?? source, args.path);
+          const compiled: CompiledComponent = compileComponent(
+            { script: decl.script, template: base.template, patches },
+            { filename: args.path, hash: hashCss(base.filename) }
+          );
+          // Base-template child tags resolve relative to the BASE dir; inserted tags the extension
+          // itself imports are skipped by injectChildImports (explicit import wins).
+          const wired: string = injectChildImports(compiled.code, compiled.components, base.dir, decl.script, args.path);
+          return { ...emit(wired, compiled.css, dir), watchFiles: [base.file] };
+        }
+
         // A `.ts` is a component iff it declares a template OR has a sibling `.html`.
         if (decl.template === undefined && !hasSiblingHtml) return undefined; // ordinary module
 
-        const dir: string = dirname(args.path);
         const template: { text: string; files: string[] } = await resolveTemplate(
           decl,
           args.path,

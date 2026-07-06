@@ -326,7 +326,28 @@ export function extendProps(props) {
 }
 ~~~
 
-Today extension is **full-template override** (you write the whole template, reusing the merged context). Declarative *patches* against the base template — add just an attribute or a node without copying — are a planned follow-up ([RFC 0008](https://github.com/weave-framework/weave/blob/main/rfcs/0008-component-extension.md)).
+### Patching the base template instead of overriding it
+
+Writing a full template just to add one attribute or node is a lot of copying. Instead, an extension can **patch** the base's template: declare `export const patch` — an array of ops — and *don't* write your own template. The loader reads the base's template, applies the ops, and compiles the result, so the patch lands in the compiled output (it applies to every `@for` row, even dynamically-added ones — not just what's on screen at mount):
+
+~~~ts title="my-list.ts (patch form)"
+import List from './list';                 // a LOCAL base component
+
+export const extend = List;
+export const patch = [
+  { op: 'attr',    sel: '.weave-list__row', attr: 'on:dblclick={{ () => onRowDblClick(item) }}' },
+  { op: 'prepend', sel: '[role]',           html: '<div class="count">{{ totalCount() }} total</div>' },
+];
+export function setup(props, base) {
+  return { ...base, totalCount: () => base.items().length, onRowDblClick: (i) => props.onOpen?.(i.value) };
+}
+~~~
+
+Ops: `attr` / `removeAttr`, `prepend` / `append` (children), `before` / `after` (siblings), `replace`, `remove`, `wrap`. Selectors match by tag, `.class`, `[attr]`, or `[attr=value]`; a selector that matches nothing is a **loud build error**. The markup an op inserts and the attribute it adds are ordinary Weave template text — `{{ }}`, `on:`, `use:`, `@if`/`@for`, and nested components all work. The extension compiles with the base's style hash, so the **base's scoped CSS still applies**.
+
+Two constraints: the base must be a **local** component (a published package ships no raw template — patch a local base, or use full override), and a patch extension uses **either** patches **or** a full-override template, never both.
+
+Full override (write your own `template`) vs patch (`export const patch`) — pick whichever is less work for the change. See [RFC 0008](https://github.com/weave-framework/weave/blob/main/rfcs/0008-component-extension.md).
 
 ## A note on privacy
 

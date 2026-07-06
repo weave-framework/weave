@@ -1,22 +1,31 @@
 # RFC 0008: Component extension (`extendComponent`)
 
-- **Status:** ◐ Partially implemented — 2026-07-06. **Mode #1 (full template override) shipped**
-  via the **component-file authoring form** (below). `#3` declarative patches remain parked.
-  Accepted 2026-07-06 (maintainer, per GOVERNANCE — the RFC is the decision record). Resolved:
-  **authoring form A = a component FILE that declares `export const extend = Base`** (NOT an inline
-  `extendComponent(...)` call — the loader only build-processes component files, and mode #1's
-  template composition must be build-time; see *Authoring form*); **one template mode per extension
-  — `#1` full override *xor* `#3` patches, never mixed**; **override + add always available
-  together** within the chosen mode; **chained extension allowed** (test-pinned).
+- **Status:** ✅ Implemented — 2026-07-06. **Both modes shipped** via the **component-file authoring
+  form** (below): `#1` full template override AND `#3` declarative patches. Accepted 2026-07-06
+  (maintainer, per GOVERNANCE — the RFC is the decision record). Resolved: **authoring form A = a
+  component FILE that declares `export const extend = Base`** (NOT an inline `extendComponent(...)`
+  call — the loader only build-processes component files, and template composition must be
+  build-time); **one template mode per extension — `#1` full override *xor* `#3` patches, never
+  mixed**; **override + add always available together**; **chained extension allowed** (test-pinned);
+  **`#3` is local-base only** (a published package ships no raw template) and **build-time** (so a
+  patch on a `@for` row applies to dynamically-added rows too — runtime DOM patching would not).
 
-- **Implemented (mode #1, form A):** a component whose script exports `const extend = Base`
-  compiles to `defineComponent(render, extendSetup(extend, setup?, extendProps?))`. `extendSetup`
-  (runtime, `@weave-framework/runtime/dom`) composes the base setup context (retrieved from the
-  `__wSetup` that `defineComponent` now attaches to every component) with the extension's own —
-  `extendProps` reshapes props BEFORE the base setup (the deep seam), `setup(props, base)` overrides
-  and adds on top of the base context, and the extension's own template is the full override.
-  Compiler change is in `compileComponent`; **no loader change needed**. `#3` patches (which DO need
-  the loader to read the base template) are the parked follow-on.
+- **Implemented — mode #1 (form A):** a component whose script exports `const extend = Base` compiles
+  to `defineComponent(render, extendSetup(extend, setup?, extendProps?))`. `extendSetup` (runtime,
+  `@weave-framework/runtime/dom`, `@internal`) composes the base setup context (from the `__wSetup`
+  that `defineComponent` now attaches to every component) with the extension's own — `extendProps`
+  reshapes props BEFORE the base setup (the deep seam), `setup(props, base)` overrides/adds, and the
+  extension's own template is the full override. Compiler-only (`compileComponent`).
+
+- **Implemented — mode #3 (form A):** a component that exports `const extend = Base` + a static
+  `const patch = [ … ]` (and NO own template) patches the base template. The loader
+  (`packages/cli/src/plugin.ts`) resolves the LOCAL base's raw template, reads the ops statically,
+  and `compileComponent` applies them to the base AST (`packages/compiler/src/patch.ts`
+  `applyPatches`, via `compileTemplateAst`) before codegen — reusing the **base's style hash** so the
+  base's scoped CSS still matches, and resolving base-template child tags relative to the **base dir**.
+  Ops: `attr`/`removeAttr`/`prepend`/`append`/`before`/`after`/`replace`/`remove`/`wrap`; selectors by
+  tag/`.class`/`[attr]`/`[attr=value]`; a zero-match selector is a loud build error. Proven end-to-end
+  by `tools/verify-extend.mjs` (patch on every dynamic row + base setup reuse + base scoped CSS).
 - **Author(s):** Aidas Josas (@aidasjosas)
 - **Discussion:** captured from a design session; decided directly. Records the direction; the
   built API may refine details (maintainer owns the final shape).
