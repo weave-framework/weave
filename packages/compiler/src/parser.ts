@@ -18,7 +18,10 @@ import type {
 const BLOCK_KW: RegExp =
   /^@(if|else|for|empty|switch|case|default|let|defer|placeholder|await|then|catch|snippet|render|key)\b/;
 
-const VOID: Set<string> = new Set([
+/** HTML void elements — self-close with no close tag. Any OTHER self-closing element (e.g. an
+ *  SVG `<path/>` in foreign content) must be serialized with an explicit close tag, or the HTML
+ *  parser leaves it open and nests the following siblings inside it. */
+export const VOID: Set<string> = new Set([
   'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input',
   'link', 'meta', 'param', 'source', 'track', 'wbr',
 ]);

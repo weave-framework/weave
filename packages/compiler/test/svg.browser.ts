@@ -86,6 +86,46 @@ test('a fragment rooted at an SVG element (<g>) is in the SVG namespace', () => 
   assert.equal((el.querySelector('circle') as Element).namespaceURI, SVG_NS);
 });
 
+// FW-8: self-closing SVG child tags (<circle/>, <rect/>, <path/>, …) must parse as COMPLETE
+// elements. codegen serializes a self-closing non-void element with an explicit close tag; without
+// it the HTML parser leaves each <path> open in foreign content and nests every following sibling
+// inside it (a flat list of shapes becomes a deep tree — only the first renders right).
+test('self-closing SVG children stay siblings, not nested (FW-8)', () => {
+  const el: Element = render(
+    '<svg viewBox="0 0 100 100"><circle cx="30" cy="30" r="20" fill="#16347b" /><rect x="50" y="50" width="40" height="40" fill="#b62724" /></svg>',
+    {},
+    []
+  );
+  host().appendChild(el);
+  const circle: Element = el.querySelector('circle') as Element;
+  const rect: Element = el.querySelector('rect') as Element;
+  assert.ok(circle && rect, 'both shapes exist');
+  assert.equal(el.children.length, 2, '<svg> has two sibling children');
+  assert.equal(rect.parentElement, el, 'the rect is a direct child of <svg>, NOT nested in the circle');
+  assert.equal(circle.querySelector('rect'), null, 'the rect is not buried inside the circle');
+  assert.equal(circle.namespaceURI, SVG_NS);
+  assert.equal(rect.namespaceURI, SVG_NS);
+});
+
+test('many self-closing shapes in a <g> stay flat siblings (FW-8)', () => {
+  const el: Element = render(
+    '<svg viewBox="0 0 501 500"><g id="logo">' +
+      '<circle cx="228" cy="250" r="191" fill="#fff" />' +
+      '<path id="sky" fill="#16347b" d="M1 1" />' +
+      '<path id="banner" fill="#f5d317" d="M2 2" />' +
+      '<path id="dancer" fill="#b62724" d="M3 3" />' +
+      '</g></svg>',
+    {},
+    []
+  );
+  host().appendChild(el);
+  const g: Element = el.querySelector('#logo') as Element;
+  assert.equal(g.children.length, 4, 'the <g> has four flat sibling shapes');
+  assert.equal((el.querySelector('#sky') as Element).parentElement, g, '#sky is a direct child of <g>');
+  assert.equal((el.querySelector('#dancer') as Element).parentElement, g, '#dancer is a sibling, not nested');
+  assert.equal(el.querySelectorAll('path').length, 3, 'all three paths present as siblings');
+});
+
 // `<svg>` itself must NOT be wrapped — it parses correctly and is a valid HTML-context
 // root; double-wrapping would nest it wrongly.
 test('an <svg> root still parses correctly (not double-wrapped)', () => {

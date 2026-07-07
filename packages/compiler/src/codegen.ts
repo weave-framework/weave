@@ -9,7 +9,7 @@
  * and any template locals), keeping every block's effects in its own scope.
  */
 
-import { parseTemplate } from './parser.js';
+import { parseTemplate, VOID } from './parser.js';
 import type {
   TemplateNode, ElementNode, Attr, StaticAttr, EventAttr, UseAttr, IfNode, IfBranch, ForNode, SwitchNode,
   DeferNode, DeferTrigger, AwaitNode, SnippetNode, RenderNode, KeyNode,
@@ -316,6 +316,11 @@ function compileFragment(
     html += '>';
     if (!node.selfClosing) {
       emitChildren(node.children, path, sc);
+      html += `</${node.tag}>`;
+    } else if (!VOID.has(node.tag)) {
+      // A self-closing element that ISN'T an HTML void element — e.g. an SVG `<path/>` /
+      // `<circle/>` in foreign content — needs an explicit close tag. Without one the HTML
+      // parser leaves it open and nests every following sibling inside it (FW-8).
       html += `</${node.tag}>`;
     }
   }
