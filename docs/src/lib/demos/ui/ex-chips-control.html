@@ -1,0 +1,4 @@
+<div style="display:flex; flex-direction:column; gap:10px;">
+  <Chips control={{ tags }} label={{ 'Tags' }} />
+  <span style="color:var(--fg-muted)">touched: {{ touched() ? 'yes' : 'no' }} — value: [{{ tags.value().join(', ') }}]</span>
+</div>

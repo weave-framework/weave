@@ -1,0 +1,8 @@
+<style>
+  .spinner-accent { --weave-progress-spinner-indicator: #16a34a; }
+  .spinner-danger { --weave-progress-spinner-indicator: #dc2626; }
+</style>
+<div style="display:flex; gap:28px; align-items:center;">
+  <ProgressSpinner label={{ 'Loading' }} class={{ 'spinner-accent' }} />
+  <ProgressSpinner small={{ true }} label={{ 'Deleting' }} class={{ 'spinner-danger' }} />
+</div>

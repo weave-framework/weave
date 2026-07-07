@@ -1,0 +1,172 @@
+# Tabs — examples
+
+Every feature of `<Tabs>`, each as a live, self-contained example you can read and lift straight into
+your project. The prose lives on the [Tabs reference page](/ui/tabs); this page is just the examples,
+covering the full component surface.
+
+```ts
+import Tabs from '@weave-framework/ui/tabs';
+```
+```scss
+@use '@weave-framework/ui/tabs';
+```
+
+## Basic — value + onChange
+
+Describe the tabs as data — each `{ label, content }` — and bind the active **index** two-way with
+`value` + `onChange`.
+
+:::demo ex-tabs-basic
+
+:::tabs
+~~~html title="app.html"
+<Tabs tabs={{ tabs }} value={{ idx() }} onChange={{ setIdx }} />
+~~~
+~~~ts title="app.ts"
+import { signal } from '@weave-framework/runtime';
+import Tabs from '@weave-framework/ui/tabs';
+
+export function setup() {
+  const idx = signal(0);
+  const tabs = [
+    { label: 'Overview', content: 'A summary of everything.' },
+    { label: 'Activity', content: 'Recent activity shows here.' },
+    { label: 'Settings', content: 'Tweak your preferences.' },
+  ];
+  return { tabs, idx, setIdx: (i) => idx.set(i) };
+}
+~~~
+:::
+
+## Uncontrolled — defaultIndex
+
+Leave `value` off and Tabs owns its own selection; `defaultIndex` seeds the initial tab.
+
+:::demo ex-tabs-uncontrolled
+
+:::tabs
+~~~html title="app.html"
+<Tabs tabs={{ tabs }} defaultIndex={{ 1 }} />
+~~~
+~~~ts title="app.ts"
+import Tabs from '@weave-framework/ui/tabs';
+
+export function setup() {
+  const tabs = [
+    { label: 'Overview', content: 'A summary of everything.' },
+    { label: 'Activity', content: 'Recent activity shows here.' },
+    { label: 'Settings', content: 'Tweak your preferences.' },
+  ];
+  return { tabs };
+}
+~~~
+:::
+
+## Panel content — string, node, factory
+
+Each tab's `content` is arbitrary: a plain string, a live DOM `Node`, or a factory `() => Node` built
+fresh when the panel mounts.
+
+:::demo ex-tabs-content
+
+:::tabs
+~~~html title="app.html"
+<Tabs tabs={{ tabs }} />
+~~~
+~~~ts title="app.ts"
+import Tabs, { type TabItem } from '@weave-framework/ui/tabs';
+
+export function setup() {
+  const node = document.createElement('em');
+  node.textContent = 'A pre-built DOM node.';
+
+  const tabs: TabItem[] = [
+    { label: 'String', content: 'Plain text content.' },
+    { label: 'Node', content: node },
+    {
+      label: 'Factory',
+      content: () => {
+        const el = document.createElement('button');
+        el.type = 'button';
+        el.textContent = 'Built by a factory';
+        return el;
+      },
+    },
+  ];
+  return { tabs };
+}
+~~~
+:::
+
+## Disabled tab
+
+`disabled` on a single item makes that tab unselectable and skips it in keyboard nav.
+
+:::demo ex-tabs-disabled
+
+:::tabs
+~~~html title="app.html"
+<Tabs tabs={{ tabs }} />
+~~~
+~~~ts title="app.ts"
+import Tabs, { type TabItem } from '@weave-framework/ui/tabs';
+
+export function setup() {
+  const tabs: TabItem[] = [
+    { label: 'Overview', content: 'A summary of everything.' },
+    { label: 'Billing', content: 'Not available on your plan.', disabled: true },
+    { label: 'Settings', content: 'Tweak your preferences.' },
+  ];
+  return { tabs };
+}
+~~~
+:::
+
+## Disabled group
+
+`disabled` on the group turns off every tab at once.
+
+:::demo ex-tabs-disabled-all
+
+:::tabs
+~~~html title="app.html"
+<Tabs tabs={{ tabs }} disabled={{ true }} />
+~~~
+:::
+
+## Activation follows focus
+
+By default activation is **manual** — Arrow keys move focus, Enter / Space / click selects. Set
+`activateOnFocus` to make selection follow focus, so arrowing switches panels immediately.
+
+:::demo ex-tabs-activate-on-focus
+
+:::tabs
+~~~html title="app.html"
+<Tabs tabs={{ tabs }} activateOnFocus={{ true }} />
+~~~
+:::
+
+## Accessible label
+
+`label` gives the tablist an accessible name (`aria-label` on the `role="tablist"`).
+
+:::demo ex-tabs-label
+
+:::tabs
+~~~html title="app.html"
+<Tabs tabs={{ tabs }} label={{ 'Account sections' }} />
+~~~
+:::
+
+## Custom class
+
+`class` forwards extra classes onto the container for scoped styling.
+
+:::demo ex-tabs-class
+
+:::tabs
+~~~html title="app.html"
+<Tabs tabs={{ tabs }} class={{ 'dense' }} />
+~~~
+:::

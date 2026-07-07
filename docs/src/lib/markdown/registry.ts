@@ -62,6 +62,16 @@ import DashboardApp from '../demos/examples/dashboard-app';
 import SettingsApp from '../demos/examples/settings-app';
 import WizardApp from '../demos/examples/wizard-app';
 import KanbanApp from '../demos/examples/kanban-app';
+import ExAutocompleteAsync from '../demos/ui/ex-autocomplete-async';
+import ExAutocompleteBasic from '../demos/ui/ex-autocomplete-basic';
+import ExAutocompleteClearable from '../demos/ui/ex-autocomplete-clearable';
+import ExAutocompleteControl from '../demos/ui/ex-autocomplete-control';
+import ExAutocompleteDisabled from '../demos/ui/ex-autocomplete-disabled';
+import ExAutocompleteFilter from '../demos/ui/ex-autocomplete-filter';
+import ExAutocompleteMinChars from '../demos/ui/ex-autocomplete-min-chars';
+import ExAutocompleteOptionShape from '../demos/ui/ex-autocomplete-option-shape';
+import ExAutocompletePosition from '../demos/ui/ex-autocomplete-position';
+import ExAutocompleteValueOninput from '../demos/ui/ex-autocomplete-value-oninput';
 import ExBadgeClass from '../demos/ui/ex-badge-class';
 import ExBadgeCount from '../demos/ui/ex-badge-count';
 import ExBadgeLabel from '../demos/ui/ex-badge-label';
@@ -91,10 +101,44 @@ import ExCheckboxForms from '../demos/ui/ex-checkbox-forms';
 import ExCheckboxName from '../demos/ui/ex-checkbox-name';
 import ExCheckboxStates from '../demos/ui/ex-checkbox-states';
 import ExCheckboxTristate from '../demos/ui/ex-checkbox-tristate';
+import ExChipsAdd from '../demos/ui/ex-chips-add';
+import ExChipsBasic from '../demos/ui/ex-chips-basic';
+import ExChipsControl from '../demos/ui/ex-chips-control';
+import ExChipsDisabled from '../demos/ui/ex-chips-disabled';
+import ExChipsReadonly from '../demos/ui/ex-chips-readonly';
+import ExChipsRemoveLabel from '../demos/ui/ex-chips-remove-label';
 import ExDividerCustom from '../demos/ui/ex-divider-custom';
 import ExDividerHorizontal from '../demos/ui/ex-divider-horizontal';
 import ExDividerSemantic from '../demos/ui/ex-divider-semantic';
 import ExDividerVertical from '../demos/ui/ex-divider-vertical';
+import ExExpansionBasic from '../demos/ui/ex-expansion-basic';
+import ExExpansionCustomClass from '../demos/ui/ex-expansion-custom-class';
+import ExExpansionDefaultOpen from '../demos/ui/ex-expansion-default-open';
+import ExExpansionDisabledAll from '../demos/ui/ex-expansion-disabled-all';
+import ExExpansionDisabledPanel from '../demos/ui/ex-expansion-disabled-panel';
+import ExExpansionHeadingLevel from '../demos/ui/ex-expansion-heading-level';
+import ExExpansionRichBody from '../demos/ui/ex-expansion-rich-body';
+import ExExpansionSingle from '../demos/ui/ex-expansion-single';
+import ExFormFieldClass from '../demos/ui/ex-form-field-class';
+import ExFormFieldControl from '../demos/ui/ex-form-field-control';
+import ExFormFieldLabelHint from '../demos/ui/ex-form-field-label-hint';
+import ExFormFieldManualError from '../demos/ui/ex-form-field-manual-error';
+import ExFormFieldUnlabelled from '../demos/ui/ex-form-field-unlabelled';
+import ExFormFieldWrapCheckbox from '../demos/ui/ex-form-field-wrap-checkbox';
+import ExFormFieldWrapSelect from '../demos/ui/ex-form-field-wrap-select';
+import ExIconColor from '../demos/ui/ex-icon-color';
+import ExIconLabel from '../demos/ui/ex-icon-label';
+import ExIconName from '../demos/ui/ex-icon-name';
+import ExIconSrc from '../demos/ui/ex-icon-src';
+import ExIconSvg from '../demos/ui/ex-icon-svg';
+import ExProgressBarClass from '../demos/ui/ex-progress-bar-class';
+import ExProgressBarDeterminate from '../demos/ui/ex-progress-bar-determinate';
+import ExProgressBarIndeterminate from '../demos/ui/ex-progress-bar-indeterminate';
+import ExProgressBarValues from '../demos/ui/ex-progress-bar-values';
+import ExProgressSpinnerBasic from '../demos/ui/ex-progress-spinner-basic';
+import ExProgressSpinnerClass from '../demos/ui/ex-progress-spinner-class';
+import ExProgressSpinnerInButton from '../demos/ui/ex-progress-spinner-in-button';
+import ExProgressSpinnerSizes from '../demos/ui/ex-progress-spinner-sizes';
 import ExRadioBasic from '../demos/ui/ex-radio-basic';
 import ExRadioDisabled from '../demos/ui/ex-radio-disabled';
 import ExRadioForms from '../demos/ui/ex-radio-forms';
@@ -124,6 +168,14 @@ import ExSliderFormat from '../demos/ui/ex-slider-format';
 import ExSliderRange from '../demos/ui/ex-slider-range';
 import ExSliderStep from '../demos/ui/ex-slider-step';
 import ExSliderUncontrolled from '../demos/ui/ex-slider-uncontrolled';
+import ExTabsActivateOnFocus from '../demos/ui/ex-tabs-activate-on-focus';
+import ExTabsBasic from '../demos/ui/ex-tabs-basic';
+import ExTabsClass from '../demos/ui/ex-tabs-class';
+import ExTabsContent from '../demos/ui/ex-tabs-content';
+import ExTabsDisabled from '../demos/ui/ex-tabs-disabled';
+import ExTabsDisabledAll from '../demos/ui/ex-tabs-disabled-all';
+import ExTabsLabel from '../demos/ui/ex-tabs-label';
+import ExTabsUncontrolled from '../demos/ui/ex-tabs-uncontrolled';
 import ExToolbarClass from '../demos/ui/ex-toolbar-class';
 import ExToolbarInk from '../demos/ui/ex-toolbar-ink';
 import ExToolbarParts from '../demos/ui/ex-toolbar-parts';
@@ -140,6 +192,16 @@ import ExToolbarSticky from '../demos/ui/ex-toolbar-sticky';
  */
 export const demos: Record<string, Component> = {
   counter: CounterDemo,
+  'ex-autocomplete-async': ExAutocompleteAsync,
+  'ex-autocomplete-basic': ExAutocompleteBasic,
+  'ex-autocomplete-clearable': ExAutocompleteClearable,
+  'ex-autocomplete-control': ExAutocompleteControl,
+  'ex-autocomplete-disabled': ExAutocompleteDisabled,
+  'ex-autocomplete-filter': ExAutocompleteFilter,
+  'ex-autocomplete-min-chars': ExAutocompleteMinChars,
+  'ex-autocomplete-option-shape': ExAutocompleteOptionShape,
+  'ex-autocomplete-position': ExAutocompletePosition,
+  'ex-autocomplete-value-oninput': ExAutocompleteValueOninput,
   'ex-badge-class': ExBadgeClass,
   'ex-badge-count': ExBadgeCount,
   'ex-badge-label': ExBadgeLabel,
@@ -169,10 +231,44 @@ export const demos: Record<string, Component> = {
   'ex-checkbox-name': ExCheckboxName,
   'ex-checkbox-states': ExCheckboxStates,
   'ex-checkbox-tristate': ExCheckboxTristate,
+  'ex-chips-add': ExChipsAdd,
+  'ex-chips-basic': ExChipsBasic,
+  'ex-chips-control': ExChipsControl,
+  'ex-chips-disabled': ExChipsDisabled,
+  'ex-chips-readonly': ExChipsReadonly,
+  'ex-chips-remove-label': ExChipsRemoveLabel,
   'ex-divider-custom': ExDividerCustom,
   'ex-divider-horizontal': ExDividerHorizontal,
   'ex-divider-semantic': ExDividerSemantic,
   'ex-divider-vertical': ExDividerVertical,
+  'ex-expansion-basic': ExExpansionBasic,
+  'ex-expansion-custom-class': ExExpansionCustomClass,
+  'ex-expansion-default-open': ExExpansionDefaultOpen,
+  'ex-expansion-disabled-all': ExExpansionDisabledAll,
+  'ex-expansion-disabled-panel': ExExpansionDisabledPanel,
+  'ex-expansion-heading-level': ExExpansionHeadingLevel,
+  'ex-expansion-rich-body': ExExpansionRichBody,
+  'ex-expansion-single': ExExpansionSingle,
+  'ex-form-field-class': ExFormFieldClass,
+  'ex-form-field-control': ExFormFieldControl,
+  'ex-form-field-label-hint': ExFormFieldLabelHint,
+  'ex-form-field-manual-error': ExFormFieldManualError,
+  'ex-form-field-unlabelled': ExFormFieldUnlabelled,
+  'ex-form-field-wrap-checkbox': ExFormFieldWrapCheckbox,
+  'ex-form-field-wrap-select': ExFormFieldWrapSelect,
+  'ex-icon-color': ExIconColor,
+  'ex-icon-label': ExIconLabel,
+  'ex-icon-name': ExIconName,
+  'ex-icon-src': ExIconSrc,
+  'ex-icon-svg': ExIconSvg,
+  'ex-progress-bar-class': ExProgressBarClass,
+  'ex-progress-bar-determinate': ExProgressBarDeterminate,
+  'ex-progress-bar-indeterminate': ExProgressBarIndeterminate,
+  'ex-progress-bar-values': ExProgressBarValues,
+  'ex-progress-spinner-basic': ExProgressSpinnerBasic,
+  'ex-progress-spinner-class': ExProgressSpinnerClass,
+  'ex-progress-spinner-in-button': ExProgressSpinnerInButton,
+  'ex-progress-spinner-sizes': ExProgressSpinnerSizes,
   'ex-radio-basic': ExRadioBasic,
   'ex-radio-disabled': ExRadioDisabled,
   'ex-radio-forms': ExRadioForms,
@@ -202,6 +298,14 @@ export const demos: Record<string, Component> = {
   'ex-slider-range': ExSliderRange,
   'ex-slider-step': ExSliderStep,
   'ex-slider-uncontrolled': ExSliderUncontrolled,
+  'ex-tabs-activate-on-focus': ExTabsActivateOnFocus,
+  'ex-tabs-basic': ExTabsBasic,
+  'ex-tabs-class': ExTabsClass,
+  'ex-tabs-content': ExTabsContent,
+  'ex-tabs-disabled': ExTabsDisabled,
+  'ex-tabs-disabled-all': ExTabsDisabledAll,
+  'ex-tabs-label': ExTabsLabel,
+  'ex-tabs-uncontrolled': ExTabsUncontrolled,
   'ex-toolbar-class': ExToolbarClass,
   'ex-toolbar-ink': ExToolbarInk,
   'ex-toolbar-parts': ExToolbarParts,

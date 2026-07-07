@@ -1,0 +1,10 @@
+<div style="max-width:320px; display:flex; flex-direction:column; gap:10px;">
+  <Autocomplete options={{ users }}
+                optionValue={{ optionValue }}
+                optionLabel={{ optionLabel }}
+                optionDescription={{ optionDescription }}
+                onSelect={{ onSelect }}
+                label={{ 'User' }}
+                placeholder={{ 'Search people…' }} />
+  <span style="color:var(--fg-muted)">Chosen: {{ chosen() || '—' }}</span>
+</div>

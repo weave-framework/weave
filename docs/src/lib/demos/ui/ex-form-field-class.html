@@ -1,0 +1,8 @@
+<style>
+  .field-block { display: block; width: 100%; }
+</style>
+<div style="max-width:420px;">
+  <FormField label={{ 'Handle' }} hint={{ 'This class stretches the field full-width.' }} class={{ 'field-block' }}>
+    <Input value={{ handle() }} onInput={{ setHandle }} placeholder={{ '@you' }} />
+  </FormField>
+</div>
