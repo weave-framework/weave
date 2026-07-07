@@ -64,6 +64,32 @@ test('use:action={{arg}} passes the argument through', async () => {
   dispose();
 });
 
+test('use:action with an INLINE multi-property object literal reaches the action (not a block)', async () => {
+  let seen: unknown = undefined;
+  const grab = (_el: Element, arg: unknown): void => {
+    seen = arg;
+  };
+  // The reported bug: an inline object literal must compile to `() => ({…})`, not `() => {…}`
+  // (a JS block). Two properties → the comma makes the block form a hard syntax error.
+  const { dispose } = mount("<div use:grab={{ { color: 'red', size: 3 } }}></div>", { grab }, ['grab']);
+  await tick();
+  assert.deepEqual(seen, { color: 'red', size: 3 }, 'inline object-literal arg reaches the action');
+  dispose();
+});
+
+test('use:action with a single-property inline object literal — the silent-loss case', async () => {
+  let seen: unknown = 'sentinel';
+  const grab = (_el: Element, arg: unknown): void => {
+    seen = arg;
+  };
+  // One property compiled fine as `() => { centered: true }` but returned undefined (a labeled
+  // block, not an object) — the option was silently lost. The paren wrap fixes it.
+  const { dispose } = mount('<div use:grab={{ { centered: true } }}></div>', { grab }, ['grab']);
+  await tick();
+  assert.deepEqual(seen, { centered: true }, 'single-property object is an object, not an undefined block');
+  dispose();
+});
+
 test('use:action with no arg calls action(el, undefined)', async () => {
   let arg: unknown = 'sentinel';
   let gotEl: Element | null = null;

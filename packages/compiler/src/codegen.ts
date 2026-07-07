@@ -215,7 +215,7 @@ function compileFragment(
     for (const node of children) {
       if (node.type === 'let') {
         html += '<!---->'; // placeholder slot keeps child indices stable
-        stmts.push(`const ${node.name} = ${gen.Hc('computed')}(() => ${rewrite(node.expr, cur).code});`);
+        stmts.push(`const ${node.name} = ${gen.Hc('computed')}(() => (${rewrite(node.expr, cur).code}));`);
         cur = childScope(cur, { [node.name]: node.name });
         dom++;
         continue;
@@ -263,7 +263,7 @@ function compileFragment(
         const { code, reactive } = rewrite(node.expr, sc);
         stmts.push(
           reactive
-            ? `${gen.H('bindText')}(${nodeExpr(path)}, () => ${code});`
+            ? `${gen.H('bindText')}(${nodeExpr(path)}, () => (${code}));`
             : `${gen.H('setText')}(${nodeExpr(path)}, ${code});`
         );
         return;
@@ -366,22 +366,22 @@ function compileFragment(
         const { code, reactive } = rewrite(attr.expr, sc);
         sink.push(
           reactive
-            ? `${gen.H('bindAttr')}(${n}, ${q(attr.name)}, () => ${code});`
+            ? `${gen.H('bindAttr')}(${n}, ${q(attr.name)}, () => (${code}));`
             : `${gen.H('setAttr')}(${n}, ${q(attr.name)}, ${code});`
         );
         break;
       }
       case 'prop':
-        sink.push(`${gen.H('bindProp')}(${n}, ${q(attr.name)}, () => ${rewrite(attr.expr, sc).code});`);
+        sink.push(`${gen.H('bindProp')}(${n}, ${q(attr.name)}, () => (${rewrite(attr.expr, sc).code}));`);
         break;
       case 'class':
-        sink.push(`${gen.H('bindClass')}(${n}, ${q(attr.name)}, () => ${rewrite(attr.expr, sc).code});`);
+        sink.push(`${gen.H('bindClass')}(${n}, ${q(attr.name)}, () => (${rewrite(attr.expr, sc).code}));`);
         break;
       case 'style':
-        sink.push(`${gen.H('bindStyleProp')}(${n}, ${q(attr.name)}, () => ${rewrite(attr.expr, sc).code});`);
+        sink.push(`${gen.H('bindStyleProp')}(${n}, ${q(attr.name)}, () => (${rewrite(attr.expr, sc).code}));`);
         break;
       case 'show':
-        sink.push(`${gen.H('bindShow')}(${n}, () => ${rewrite(attr.expr, sc).code});`);
+        sink.push(`${gen.H('bindShow')}(${n}, () => (${rewrite(attr.expr, sc).code}));`);
         break;
       case 'transition': {
         // transition:fn / in:fn / out:fn → transition(el, fn, params, mode). The
@@ -407,13 +407,15 @@ function compileFragment(
         sink.push(`${gen.H('setRef')}(${rewrite(attr.expr, sc).code}, ${n});`);
         break;
       case 'use': {
-        // `use:action={arg}` → applyAction(el, action, () => arg). The action is the `name`
+        // `use:action={arg}` → applyAction(el, action, () => (arg)). The action is the `name`
         // identifier (rewritten against ctx); the arg is passed as a getter, so a reactive
         // action's `update(arg)` re-runs when it changes (see applyAction / ActionResult).
+        // The arg is parenthesized so an object-literal arg (`use:tip={{ {a:1} }}`) is an
+        // expression, not a `() => { … }` block.
         const action: string = rewrite(attr.name, sc).code;
         sink.push(
           attr.expr !== undefined
-            ? `${gen.H('applyAction')}(${n}, ${action}, () => ${rewrite(attr.expr, sc).code});`
+            ? `${gen.H('applyAction')}(${n}, ${action}, () => (${rewrite(attr.expr, sc).code}));`
             : `${gen.H('applyAction')}(${n}, ${action});`
         );
         break;
@@ -510,7 +512,7 @@ function compileFragment(
       const action: string = rewrite(u.name, sc).code;
       stmts.push(
         u.expr !== undefined
-          ? `${gen.H('applyAction')}(${rootVar}, ${action}, () => ${rewrite(u.expr, sc).code});`
+          ? `${gen.H('applyAction')}(${rootVar}, ${action}, () => (${rewrite(u.expr, sc).code}));`
           : `${gen.H('applyAction')}(${rootVar}, ${action});`
       );
     }
