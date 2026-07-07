@@ -1,0 +1,9 @@
+<div style="max-width:320px; display:flex; flex-direction:column; gap:14px;">
+  <Input value={{ amount() }} onInput={{ setAmount }} type={{ 'number' }} label={{ 'Price' }} placeholder={{ '0.00' }}>
+    <span slot="prefix" style="color:var(--fg-muted)">€</span>
+    <span slot="suffix" style="color:var(--fg-muted)">/mo</span>
+  </Input>
+  <Input value={{ q() }} onInput={{ setQ }} label={{ 'Search' }} placeholder={{ 'Search…' }}>
+    <Icon slot="prefix" name={{ 'search' }} />
+  </Input>
+</div>

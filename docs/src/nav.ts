@@ -211,6 +211,10 @@ const examples: NavSection = {
       items: [{ label: 'Overview', path: '/examples' }],
     },
     {
+      label: 'Components',
+      items: [{ label: 'Input', path: '/examples/components/input' }],
+    },
+    {
       label: 'Applications',
       items: [
         { label: 'Todo list', path: '/examples/todo' },

@@ -17,6 +17,14 @@ import RippleBasic from '../demos/ui/ripple-basic';
 import DividerBasic from '../demos/ui/divider-basic';
 import InputBasic from '../demos/ui/input-basic';
 import InputFeatures from '../demos/ui/input-features';
+import InputAdornments from '../demos/ui/input-adornments';
+import InputClearable from '../demos/ui/input-clearable';
+import InputTypes from '../demos/ui/input-types';
+import InputMultiline from '../demos/ui/input-multiline';
+import InputPassword from '../demos/ui/input-password';
+import InputPasswordTooltip from '../demos/ui/input-password-tooltip';
+import InputStates from '../demos/ui/input-states';
+import InputValidation from '../demos/ui/input-validation';
 import CheckboxBasic from '../demos/ui/checkbox-basic';
 import CheckboxTristate from '../demos/ui/checkbox-tristate';
 import RadioBasic from '../demos/ui/radio-basic';
@@ -82,6 +90,14 @@ export const demos: Record<string, Component> = {
   'divider-basic': DividerBasic,
   'input-basic': InputBasic,
   'input-features': InputFeatures,
+  'input-adornments': InputAdornments,
+  'input-clearable': InputClearable,
+  'input-types': InputTypes,
+  'input-multiline': InputMultiline,
+  'input-password': InputPassword,
+  'input-password-tooltip': InputPasswordTooltip,
+  'input-states': InputStates,
+  'input-validation': InputValidation,
   'checkbox-basic': CheckboxBasic,
   'checkbox-tristate': CheckboxTristate,
   'radio-basic': RadioBasic,
