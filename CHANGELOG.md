@@ -12,8 +12,9 @@
 
 ## Unreleased
 
-Committed locally as `1.4.1`→`1.4.21` (batched; npm still `1.4.0`). Ships as `1.5.0` (minor) at publish.
+Committed locally as `1.4.1`→`1.4.22` (batched; npm still `1.4.0`). Ships as `1.5.0` (minor) at publish.
 
+- **1.4.22 — docs(site):** context-menu example galleries for `selected`, `optionContent`, `itemTemplate` (3 demos) — parity with the menu galleries.
 - **1.4.21 — docs(site):** menu example galleries for `selected`, `optionContent`, `itemTemplate` (3 demos + reference prose); RELEASE-NOTES/CHANGELOG batch ledger opened.
 - **1.4.20 — fix(compiler):** object spread/rest (`{ ...opts }`) in a template expression is now scope-rewritten (the `...` was mistaken for a member `.`), so `use:menu={{ { ...opts, itemTemplate: row } }}` resolves `opts`. Fixed in both `rewrite` and `inferCtxNames`.
 - **1.4.19 — feat(ui):** menu/contextMenu `itemTemplate` (FW-10) — authored `@snippet` renders the whole row from the full row context (`item` + `checked`/`active()`/`index`/`disabled`).

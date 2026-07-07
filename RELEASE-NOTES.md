@@ -61,7 +61,7 @@ still `1.4.0`). New public API ⇒ this ships as a **minor** (`1.5.0`) at publis
 
 - **Per-component example galleries** for all 38 `@weave-framework/ui` components under
   Examples → Components (each a live, full-option-surface page).
-- **Menu galleries** for `selected`, `optionContent` and `itemTemplate`.
+- **Menu and Context Menu galleries** for `selected`, `optionContent` and `itemTemplate`.
 
 ## 1.4.0 — 2026-07-06
 

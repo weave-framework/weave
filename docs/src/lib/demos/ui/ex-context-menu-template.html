@@ -1,0 +1,15 @@
+<div style="display:flex; flex-direction:column; gap:10px;">
+  <div use:contextMenu={{ { ...ctxOpts, itemTemplate: langRow } }} style="padding:28px; border:1px dashed var(--border); border-radius:6px; text-align:center; user-select:none;">Right-click to pick a language · {{ locale() }}</div>
+
+  @snippet langRow(row) {
+    <span
+      style="display:flex; align-items:center; gap:10px; padding:8px 12px; width:100%;"
+      style:background={{ row.checked ? 'var(--surface-active, rgba(99,102,241,.12))' : 'transparent' }}
+      style:font-weight={{ row.checked ? '600' : '400' }}
+    >
+      <span style="font-size:18px; line-height:1;">{{ row.item.flag }}</span>
+      <span style="flex:1;">{{ row.item.label }}</span>
+      @if (row.checked) { <Icon name={{ 'check' }} /> }
+    </span>
+  }
+</div>

@@ -169,3 +169,108 @@ export function setup() {
 }
 ~~~
 :::
+
+## Value picker — `selected`
+
+`selected` turns it into a **value picker**: the row whose value equals it is marked with a check
+(`role=menuitemradio` + `aria-checked`). Pass a getter so the mark tracks the value — it's re-read on
+every right-click.
+
+:::demo ex-context-menu-selected
+
+:::tabs
+~~~html title="app.html"
+<div use:contextMenu={{ ctxOpts }}>Right-click here</div>
+~~~
+~~~ts title="app.ts"
+export function setup() {
+  const sort = signal('name');
+  const ctxOpts = {
+    items: [
+      { value: 'name', label: 'Sort by name' },
+      { value: 'date', label: 'Sort by date' },
+      { value: 'size', label: 'Sort by size' },
+    ],
+    selected: () => sort(),            // ✓ marks the active row; re-read on every open
+    onSelect: (v) => sort.set(v),
+  };
+  return { contextMenu, ctxOpts, sort };
+}
+~~~
+:::
+
+## Custom row content — `optionContent`
+
+`optionContent` returns a DOM node used as the row body in place of the default label — a flag, an
+icon, a swatch. `optionLabel` still drives the accessible name and typeahead. For a row whose design
+depends on its state (checked / active), use `itemTemplate` below.
+
+:::demo ex-context-menu-content
+
+:::tabs
+~~~html title="app.html"
+<div use:contextMenu={{ ctxOpts }}>Right-click here</div>
+~~~
+~~~ts title="app.ts"
+export function setup() {
+  const flagRow = (l) => {
+    const row = document.createElement('span');
+    row.style.cssText = 'display:inline-flex; gap:8px; align-items:center;';
+    const flag = document.createElement('span'); flag.textContent = l.flag;
+    const name = document.createElement('span'); name.textContent = l.label;
+    row.append(flag, name);
+    return row;
+  };
+  const ctxOpts = {
+    items: langs,                      // { value, label, flag }
+    optionValue: (l) => l.value,
+    optionLabel: (l) => l.label,       // still the accessible name + typeahead
+    optionContent: flagRow,
+    onSelect: (v) => locale.set(v),
+  };
+  return { contextMenu, ctxOpts, locale };
+}
+~~~
+:::
+
+## Authored row template — `itemTemplate`
+
+For a row whose design depends on its state, hand the menu an authored `@snippet` via `itemTemplate`.
+It renders the **whole** row from the full row context — `row.item` plus `row.checked`, reactive
+`row.active()`, `row.index`, `row.disabled` — owning the layout, the marker (here a **trailing** `<Icon>`
+on the checked row) and the selected styling. `optionLabel` still drives the accessible name + typeahead;
+`selected` still sets the ARIA. Add the snippet inline (`{ ...ctxOpts, itemTemplate: langRow }`) because a
+`@snippet` is a template-local value.
+
+:::demo ex-context-menu-template
+
+:::tabs
+~~~html title="app.html"
+<div use:contextMenu={{ { ...ctxOpts, itemTemplate: langRow } }}>Right-click here</div>
+
+@snippet langRow(row) {
+  <span
+    style="display:flex; align-items:center; gap:10px; padding:8px 12px; width:100%;"
+    style:background={{ row.checked ? 'var(--surface-active)' : 'transparent' }}
+    style:font-weight={{ row.checked ? '600' : '400' }}
+  >
+    <span>{{ row.item.flag }}</span>
+    <span style="flex:1;">{{ row.item.label }}</span>
+    @if (row.checked) { <Icon name={{ 'check' }} /> }
+  </span>
+}
+~~~
+~~~ts title="app.ts"
+export function setup() {
+  const locale = signal('nl');
+  const ctxOpts = {
+    items: langs,                      // { value, label, flag }
+    optionValue: (l) => l.value,
+    optionLabel: (l) => l.label,
+    selected: () => locale(),          // drives row.checked + the ARIA
+    onSelect: (v) => locale.set(v),
+  };
+  return { contextMenu, ctxOpts, locale };
+}
+~~~
+:::

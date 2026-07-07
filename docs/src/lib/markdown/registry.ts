@@ -117,8 +117,11 @@ import ExChipsDisabled from '../demos/ui/ex-chips-disabled';
 import ExChipsReadonly from '../demos/ui/ex-chips-readonly';
 import ExChipsRemoveLabel from '../demos/ui/ex-chips-remove-label';
 import ExContextMenuBasic from '../demos/ui/ex-context-menu-basic';
+import ExContextMenuContent from '../demos/ui/ex-context-menu-content';
 import ExContextMenuCustom from '../demos/ui/ex-context-menu-custom';
 import ExContextMenuItems from '../demos/ui/ex-context-menu-items';
+import ExContextMenuSelected from '../demos/ui/ex-context-menu-selected';
+import ExContextMenuTemplate from '../demos/ui/ex-context-menu-template';
 import ExContextMenuPosition from '../demos/ui/ex-context-menu-position';
 import ExContextMenuStrings from '../demos/ui/ex-context-menu-strings';
 import ExDatepickerBasic from '../demos/ui/ex-datepicker-basic';
@@ -376,8 +379,11 @@ export const demos: Record<string, Component> = {
   'ex-chips-readonly': ExChipsReadonly,
   'ex-chips-remove-label': ExChipsRemoveLabel,
   'ex-context-menu-basic': ExContextMenuBasic,
+  'ex-context-menu-content': ExContextMenuContent,
   'ex-context-menu-custom': ExContextMenuCustom,
   'ex-context-menu-items': ExContextMenuItems,
+  'ex-context-menu-selected': ExContextMenuSelected,
+  'ex-context-menu-template': ExContextMenuTemplate,
   'ex-context-menu-position': ExContextMenuPosition,
   'ex-context-menu-strings': ExContextMenuStrings,
   'ex-datepicker-basic': ExDatepickerBasic,
