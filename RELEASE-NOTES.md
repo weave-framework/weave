@@ -3,10 +3,10 @@
 Human-readable highlights, one section per release — everything notable that landed since
 the previous one. For the granular, per-version log see [CHANGELOG.md](CHANGELOG.md).
 
-## Unreleased
+## 1.5.0 — 2026-07-07
 
-Highlights accumulated since **1.4.0** (committed locally as `1.4.1`→`1.4.21`, batched — npm is
-still `1.4.0`). New public API ⇒ this ships as a **minor** (`1.5.0`) at publish.
+Everything since **1.4.0** (developed locally as `1.4.1`→`1.4.22` in batch mode, released here as a
+single **minor** — new public API across `ui`, `runtime` and `i18n`).
 
 ### ✨ Features — `@weave-framework/ui`
 

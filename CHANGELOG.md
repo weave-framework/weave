@@ -10,9 +10,9 @@
 > `pnpm publish:packages`) — pushing code does **not** publish to npm. (The scheme started at
 > `0.2.0`; the line crossed `1.0.0` on 2026-07-05 when the public API was frozen.)
 
-## Unreleased
+## 1.5.0 — 2026-07-07
 
-Committed locally as `1.4.1`→`1.4.22` (batched; npm still `1.4.0`). Ships as `1.5.0` (minor) at publish.
+Released from the local batch `1.4.1`→`1.4.22` (npm went `1.4.0` → `1.5.0` directly). Per-step log:
 
 - **1.4.22 — docs(site):** context-menu example galleries for `selected`, `optionContent`, `itemTemplate` (3 demos) — parity with the menu galleries.
 - **1.4.21 — docs(site):** menu example galleries for `selected`, `optionContent`, `itemTemplate` (3 demos + reference prose); RELEASE-NOTES/CHANGELOG batch ledger opened.
