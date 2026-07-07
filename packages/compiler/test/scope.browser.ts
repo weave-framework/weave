@@ -57,6 +57,40 @@ test('rewrite: property names after a ctx member are not rewritten but stay mapp
   assertFullSourceCoverage(expr, r.segments);
 });
 
+test('rewrite: a spread of a ctx binding is scope-rewritten, not mistaken for a member', () => {
+  // The `...` ends in `.`, but the spread argument is a REFERENCE — it must get `__ctx.`
+  // (regression: `use:menu={{ { ...opts, itemTemplate: row } }}` compiled to a bare `...opts`).
+  // The FW-10 shape: `opts` is a ctx binding (spread), `snip` is a template-local snippet (bare).
+  const expr: string = '{ ...opts, itemTemplate: snip }';
+  const scope: Scope = new Map([
+    ['opts', { kind: 'ctx' }],
+    ['snip', { kind: 'local' }],
+  ]) as Scope;
+  const r: ReturnType<typeof rewrite> = rewrite(expr, scope, '__ctx');
+  assert.equal(r.code, '{ ...__ctx.opts, itemTemplate: snip }');
+  assert.equal(r.reactive, true);
+  assertVerbatim(expr, r.code, r.segments);
+  assertFullSourceCoverage(expr, r.segments);
+});
+
+test('rewrite: a spread of a lexical local stays a bare spread', () => {
+  const expr: string = '{ ...base, n: 1 }';
+  const scope: Scope = new Map([['base', { kind: 'local' }]]) as Scope;
+  const r: ReturnType<typeof rewrite> = rewrite(expr, scope, '__ctx');
+  assert.equal(r.code, '{ ...base, n: 1 }');
+  assertVerbatim(expr, r.code, r.segments);
+  assertFullSourceCoverage(expr, r.segments);
+});
+
+test('rewrite: a spread whose argument is a member access rewrites only the head', () => {
+  // `...cfg.opts` — `cfg` is the reference (gets `__ctx.`), `opts` is a real property (verbatim).
+  const expr: string = '{ ...cfg.opts }';
+  const r: ReturnType<typeof rewrite> = rewrite(expr, ctxScope(['cfg', 'opts']), '__ctx');
+  assert.equal(r.code, '{ ...__ctx.cfg.opts }');
+  assertVerbatim(expr, r.code, r.segments);
+  assertFullSourceCoverage(expr, r.segments);
+});
+
 test('rewrite: local bindings emit the bare name, fully mapped', () => {
   const scope: Scope = new Map([['todo', { kind: 'local' }]]);
   const expr: string = 'todo.title';

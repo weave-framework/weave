@@ -166,7 +166,10 @@ export function rewrite(expr: string, scope: Scope, ctxRef: string = 'ctx'): Rew
       let j: number = i + 1;
       while (j < n && ID_CHAR.test(expr[j])) j++;
       const name: string = expr.slice(i, j);
-      const isProperty: boolean = lastNonSpace(out) === '.';
+      // A member access (`obj.name`) leaves `name` verbatim — but a spread/rest `...name` also
+      // ends in `.`, and there `name` IS a reference that must be scope-rewritten. Distinguish
+      // the two: only a lone `.` is a property accessor; `...` is a spread.
+      const isProperty: boolean = lastNonSpace(out) === '.' && !endsWithSpread(out);
       const binding: Binding | undefined = scope.get(name);
 
       // An explicit object-literal key (`{ key: … }` / `, key: …`) is a property name, not a
@@ -227,6 +230,13 @@ function lastNonSpace(s: string): string {
     if (!/\s/.test(s[i])) return s[i];
   }
   return '';
+}
+
+/** Does `s` end (ignoring trailing whitespace) with a `...` spread/rest, not a member `.`? */
+function endsWithSpread(s: string): boolean {
+  let i: number = s.length - 1;
+  while (i >= 0 && /\s/.test(s[i])) i--;
+  return i >= 2 && s[i] === '.' && s[i - 1] === '.' && s[i - 2] === '.';
 }
 
 /** First non-whitespace character in `s` at or after `from` (''  if none). */
@@ -351,9 +361,13 @@ export function freeIdentifiers(expr: string): string[] {
       let j: number = i + 1;
       while (j < n && ID_CHAR.test(expr[j])) j++;
       const name: string = expr.slice(i, j);
-      const prev: string = lastNonSpace(expr.slice(0, i));
+      const before: string = expr.slice(0, i);
+      const prev: string = lastNonSpace(before);
       const next: string = firstNonSpaceFrom(expr, j);
-      const isProperty: boolean = prev === '.';
+      // A member access (`obj.name`) is a property; a spread/rest (`...name`) also ends in `.` but
+      // there `name` is a data reference that must be inferred as ctx (regression: a `use:` config
+      // `{ ...opts, … }` failed to pull `opts` into scope, so it stayed a bare global).
+      const isProperty: boolean = prev === '.' && !endsWithSpread(before);
       // An explicit object-literal key (`{ key: … }` / `, key: …`) is a property name, not component
       // data — don't infer it as ctx. Shorthand `{ key }` (next is `,`/`}`) IS a value ref → kept.
       const isObjectKey: boolean = (prev === '{' || prev === ',') && next === ':';
