@@ -20,7 +20,7 @@ const rt: typeof dom & { signal: typeof signal; effect: typeof effect } = { ...d
 const tick = (): Promise<void> => new Promise<void>((r) => queueMicrotask(r));
 
 const SCOPE: string[] = [
-  'root', 'input', 'rootClass', 'multiline', 'singleline', 'type', 'rows', 'placeholder', 'currentValue',
+  'root', 'input', 'revealBtn', 'rootClass', 'multiline', 'singleline', 'type', 'rows', 'placeholder', 'currentValue',
   'isDisabled', 'isReadonly', 'isRequired', 'name', 'label', 'showClear', 'clearLabel',
   'showReveal', 'revealIcon', 'revealAriaLabel', 'revealTitle', 'revealPressed', 'toggleReveal', 'onNativeInput', 'onBlur', 'clear',
 ];
@@ -273,6 +273,85 @@ test('revealable: revealTooltip={{false}} suppresses the title but keeps aria-la
   assert.ok(!btn.hasAttribute('title'), 'no native title when the app opts out');
   assert.equal(btn.getAttribute('aria-label'), 'Show password', 'aria-label (accessible name) stays');
   dispose();
+});
+
+/* ─────────────────────────── FW-6: selectable tooltip type ─────────────────────────── */
+
+/** Flush the onMount microtask + the lazy `import()` of the weave Tooltip. */
+const settle = (): Promise<void> => new Promise<void>((r) => setTimeout(r, 0));
+
+test('revealTooltip normalises: true/"native"/omitted → native title, false/"none" → nothing (FW-6)', () => {
+  const cases: Array<[InputProps['revealTooltip'], boolean]> = [
+    [undefined, true], [true, true], ['native', true],
+    [false, false], ['none', false],
+  ];
+  for (const [mode, hasTitle] of cases) {
+    const { root, dispose } = mount({ type: 'password', revealable: true, revealTooltip: mode });
+    const btn: HTMLButtonElement = root.querySelector<HTMLButtonElement>('.weave-input__reveal')!;
+    assert.equal(btn.hasAttribute('title'), hasTitle, `title presence for revealTooltip=${String(mode)}`);
+    assert.equal(btn.getAttribute('aria-label'), 'Show password', `aria-label present for revealTooltip=${String(mode)}`);
+    dispose();
+  }
+});
+
+test('revealTooltip="native": title follows the hidden↔revealed state (FW-6)', () => {
+  const { root, dispose } = mount({ type: 'password', revealable: true, revealTooltip: 'native', revealLabel: 'Rodyti', hideLabel: 'Slėpti' });
+  const btn: HTMLButtonElement = root.querySelector<HTMLButtonElement>('.weave-input__reveal')!;
+  assert.equal(btn.getAttribute('title'), 'Rodyti');
+  btn.click();
+  assert.equal(btn.getAttribute('title'), 'Slėpti', 'native title tracks state');
+  dispose();
+});
+
+test('revealTooltip="none": neither native title nor a weave bubble (FW-6)', async () => {
+  const { root, dispose } = mount({ type: 'password', revealable: true, revealTooltip: 'none' });
+  const btn: HTMLButtonElement = root.querySelector<HTMLButtonElement>('.weave-input__reveal')!;
+  assert.ok(!btn.hasAttribute('title'), 'no native title');
+  await settle();
+  btn.dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
+  assert.equal(document.querySelector('.weave-tooltip'), null, 'no weave bubble in none mode');
+  assert.equal(btn.getAttribute('aria-label'), 'Show password', 'aria-label still present');
+  dispose();
+});
+
+test('revealTooltip="weave": renders the weave Tooltip (no title), text follows state (FW-6)', async () => {
+  const { root, dispose } = mount({
+    type: 'password', revealable: true, revealTooltip: 'weave', revealLabel: 'Rodyti', hideLabel: 'Slėpti',
+  });
+  const btn: HTMLButtonElement = root.querySelector<HTMLButtonElement>('.weave-input__reveal')!;
+  assert.ok(!btn.hasAttribute('title'), 'no native title in weave mode (its own bubble instead)');
+  assert.equal(btn.getAttribute('aria-label'), 'Rodyti', 'aria-label (accessible name) present');
+
+  await settle(); // onMount + lazy import() of the Tooltip action resolve
+  btn.dispatchEvent(new FocusEvent('focusin', { bubbles: true })); // focus shows immediately (no hover delay)
+  const tip: Element | null = document.querySelector('.weave-tooltip');
+  assert.ok(tip, 'weave bubble shown on keyboard focus');
+  assert.equal(tip!.getAttribute('role'), 'tooltip', 'the bubble is role=tooltip');
+  assert.equal(tip!.textContent, 'Rodyti', 'bubble text = current (show) label');
+
+  btn.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
+  btn.click(); // revealed → the label flips to hide; the tooltip re-applies with the new text
+  await settle();
+  btn.dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
+  const tip2: Element | null = document.querySelector('.weave-tooltip');
+  assert.ok(tip2, 'bubble shows again after toggle');
+  assert.equal(tip2!.textContent, 'Slėpti', 'bubble text follows the revealed state');
+  dispose();
+});
+
+test('revealTooltip="weave": onRevealToggle still fires, and disposing removes the bubble (FW-6)', async () => {
+  const states: boolean[] = [];
+  const { root, dispose } = mount({
+    type: 'password', revealable: true, revealTooltip: 'weave', onRevealToggle: (r) => states.push(r),
+  });
+  const btn: HTMLButtonElement = root.querySelector<HTMLButtonElement>('.weave-input__reveal')!;
+  await settle();
+  btn.click();
+  assert.deepEqual(states, [true], 'onRevealToggle unaffected by weave mode');
+  btn.dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
+  assert.ok(document.querySelector('.weave-tooltip'), 'bubble present while mounted');
+  dispose();
+  assert.equal(document.querySelector('.weave-tooltip'), null, 'bubble torn down on dispose');
 });
 
 /* ─────────────────────────── prefix / suffix ─────────────────────────── */

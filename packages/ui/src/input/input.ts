@@ -23,7 +23,7 @@
  *   </Input>
  */
 
-import { signal, effect, onMount, type Signal } from '@weave-framework/runtime';
+import { signal, effect, onMount, onDispose, type Signal } from '@weave-framework/runtime';
 
 /** The subset of a `@weave-framework/forms` `Field<string>` an input binds to. */
 export interface InputControl {
@@ -68,12 +68,20 @@ export interface InputProps {
   /** Accessible name for the reveal toggle in its revealed (will-hide) state. Default 'Hide password'. */
   hideLabel?: string;
   /**
-   * Show a native `title` tooltip on the reveal toggle (the visible hover hint, text = the
-   * current reveal/hide label). Default `true`; set `false` to suppress it. The `aria-label`
-   * (accessible name) is unaffected either way. Native `title` avoids coupling Input to the
-   * overlay-based Tooltip — Input stays CDK-free.
+   * Which tooltip renders on the reveal toggle (the visible hover/focus hint, text = the
+   * current reveal/hide label, following the hidden↔revealed state):
+   *
+   *  - `'native'` (or `true`, or omitted) — the native browser `title`. Zero extra cost;
+   *    Input stays CDK-free.
+   *  - `'weave'` — the weave-ui `Tooltip` (styled bubble, hover + keyboard focus). The
+   *    overlay/CDK code is **lazily imported** only when this mode is used, so `'native'`
+   *    and `'none'` consumers never statically depend on it.
+   *  - `'none'` (or `false`) — no tooltip at all.
+   *
+   * The `aria-label` (accessible name) on the toggle is present in every mode — a tooltip
+   * is a description, not the accessible name.
    */
-  revealTooltip?: boolean;
+  revealTooltip?: boolean | 'none' | 'native' | 'weave';
   /**
    * Called every time the password reveal toggle flips, with the new state (`true` = value
    * now visible as plaintext, `false` = hidden). Lets the app react to the change — e.g.
@@ -104,7 +112,7 @@ export const template: string =
   '<button type="button" class="weave-input__clear" aria-label={{ clearLabel() }} on:click={{ clear }}>×</button>' +
   '}' +
   '@if (showReveal()) {' +
-  '<button type="button" class="weave-input__reveal" aria-label={{ revealAriaLabel() }}' +
+  '<button type="button" class="weave-input__reveal" ref={{ revealBtn }} aria-label={{ revealAriaLabel() }}' +
   ' title={{ revealTitle() }} aria-pressed={{ revealPressed() }} disabled={{ isDisabled() }} on:click={{ toggleReveal }}>' +
   '<Icon name={{ revealIcon() }} />' +
   '</button>' +
@@ -115,6 +123,7 @@ export const template: string =
 export interface InputContext {
   root: Signal<HTMLElement | null>;
   input: Signal<HTMLInputElement | HTMLTextAreaElement | null>;
+  revealBtn: Signal<HTMLButtonElement | null>;
   rootClass: () => string;
   multiline: () => boolean;
   singleline: () => boolean;
@@ -148,11 +157,51 @@ export function setup(props: InputProps): InputContext {
 
   // Password reveal (eye) toggle — only meaningful on a single-line `type="password"` field.
   const revealed: Signal<boolean> = signal<boolean>(false);
+  const revealBtn: Signal<HTMLButtonElement | null> = signal<HTMLButtonElement | null>(null);
   const canReveal = (): boolean => !!props.revealable && (props.type ?? 'text') === 'password' && !props.multiline;
   // The label shown for the reveal toggle in the current state — the source for BOTH the
-  // aria-label (accessible name) and the optional native `title` tooltip.
+  // aria-label (accessible name) and the tooltip (native or weave).
   const revealText = (): string =>
     revealed() ? props.hideLabel ?? 'Hide password' : props.revealLabel ?? 'Show password';
+
+  // Which tooltip renders on the reveal eye. Back-compat: `true`/omitted → native,
+  // `false` → none; the three string modes pass through.
+  const revealTooltipMode = (): 'none' | 'native' | 'weave' => {
+    const t: boolean | 'none' | 'native' | 'weave' | undefined = props.revealTooltip;
+    if (t === undefined || t === true) return 'native';
+    if (t === false) return 'none';
+    return t;
+  };
+
+  // FW-6 'weave' mode: attach the weave-ui Tooltip to the reveal eye. The Tooltip pulls the
+  // overlay/CDK code, which native/none consumers must NOT pay for — so it is **lazily
+  // imported** here, only when this field asks for it. `tooltip()` fixes its text at creation
+  // (no reactive-update handle), so we re-apply it whenever the label flips (see toggleReveal).
+  let tooltipDetach: (() => void) | null = null;
+  let tooltipApply: ((el: HTMLButtonElement, text: string) => void) | null = null;
+  const syncRevealTooltip = (): void => {
+    if (!tooltipApply) return;
+    const el: HTMLButtonElement | null = revealBtn();
+    if (el) tooltipApply(el, revealText());
+  };
+  onMount((): void => {
+    if (revealTooltipMode() !== 'weave') return;
+    let disposed: boolean = false;
+    void import('../tooltip/tooltip.js').then(({ tooltip }): void => {
+      if (disposed) return;
+      tooltipApply = (el: HTMLButtonElement, text: string): void => {
+        tooltipDetach?.();
+        tooltipDetach = tooltip(el, text);
+      };
+      syncRevealTooltip(); // initial attach with the current label
+    });
+    onDispose((): void => {
+      disposed = true;
+      tooltipDetach?.();
+      tooltipDetach = null;
+      tooltipApply = null;
+    });
+  });
 
   const currentValue = (): string => (props.control ? props.control.value() : props.value ?? '');
   const isDisabled = (): boolean => !!props.disabled;
@@ -219,6 +268,7 @@ export function setup(props: InputProps): InputContext {
   return {
     root,
     input,
+    revealBtn,
     rootClass: (): string => {
       const parts: string[] = ['weave-input'];
       if (props.multiline) parts.push('weave-input--multiline');
@@ -243,16 +293,15 @@ export function setup(props: InputProps): InputContext {
     showReveal: (): boolean => canReveal(),
     revealIcon: (): string => (revealed() ? 'eye-off' : 'eye'),
     revealAriaLabel: (): string => revealText(),
-    // Native `title` tooltip: on by default, omitted (undefined → no attribute) when
-    // `revealTooltip={false}`. Same text as the aria-label, following the toggle state.
-    // Native `title` tooltip: on by default, omitted (undefined → no attribute) when
-    // `revealTooltip={false}`. Same text as the aria-label, following the toggle state.
-    revealTitle: (): string | undefined => (props.revealTooltip === false ? undefined : revealText()),
+    // Native `title` tooltip — only in 'native' mode (the default). 'none'/'weave' → no
+    // title attribute ('weave' renders its own bubble). Text follows the toggle state.
+    revealTitle: (): string | undefined => (revealTooltipMode() === 'native' ? revealText() : undefined),
     revealPressed: (): string => (revealed() ? 'true' : 'false'),
     toggleReveal: (): void => {
       const next: boolean = !revealed();
       revealed.set(next);
       props.onRevealToggle?.(next);
+      syncRevealTooltip(); // 'weave' mode: refresh the bubble text to match the new state
     },
     onNativeInput,
     onBlur,
