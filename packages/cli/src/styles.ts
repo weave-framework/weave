@@ -9,9 +9,59 @@
  */
 
 import { readFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { dirname, basename, resolve } from 'node:path';
+import { createHash } from 'node:crypto';
 
 export type StyleLang = 'css' | 'scss' | 'sass';
+
+/** An asset a stylesheet references via `url(...)` — copied to the output / served in dev. */
+export interface StyleAsset {
+  /** Absolute path to the source file on disk. */
+  absPath: string;
+  /** Output-relative path it is emitted/served at (no leading slash), e.g. `assets/ab12cd34-font.woff2`. */
+  servedPath: string;
+}
+
+// A `url(...)` reference: optional quote, then the ref (up to the closing quote/paren).
+const URL_RE = /url\(\s*(['"]?)([^'")]+)\1\s*\)/g;
+
+/** A url() ref the pipeline must leave alone — absolute, protocol, data:, or a bare fragment. */
+function isExternalRef(ref: string): boolean {
+  return (
+    /^(https?:)?\/\//.test(ref) || ref.startsWith('data:') || ref.startsWith('/') || ref.startsWith('#')
+  );
+}
+
+/**
+ * Rewrite a compiled stylesheet's **relative** `url(...)` references (fonts, images) to a
+ * stable `/assets/<hash>-<name>` path and report each asset to copy/serve. Refs are resolved
+ * against `baseDir` (the stylesheet's own directory); external/absolute/data: refs and refs
+ * whose target doesn't exist on disk are left untouched. Same source file → same served path
+ * (deduped by absolute path), so repeated refs share one emitted asset.
+ */
+export function rewriteStyleAssets(css: string, baseDir: string): { css: string; assets: StyleAsset[] } {
+  const byAbs = new Map<string, string>(); // absPath → servedPath (dedupe)
+  const assets: StyleAsset[] = [];
+  const out: string = css.replace(URL_RE, (whole: string, _q: string, ref: string): string => {
+    const raw: string = ref.trim();
+    if (isExternalRef(raw)) return whole;
+    const suffix: string = raw.match(/[?#].*$/)?.[0] ?? ''; // preserve ?query / #fragment
+    const filePart: string = suffix ? raw.slice(0, -suffix.length) : raw;
+    const absPath: string = resolve(baseDir, filePart);
+    if (!existsSync(absPath)) return whole; // unknown target — don't break it
+    let servedPath: string | undefined = byAbs.get(absPath);
+    if (!servedPath) {
+      const hash: string = createHash('sha1').update(absPath).digest('hex').slice(0, 8);
+      servedPath = `assets/${hash}-${basename(absPath)}`;
+      byAbs.set(absPath, servedPath);
+      assets.push({ absPath, servedPath });
+    }
+    return `url(/${servedPath}${suffix})`;
+  });
+  return { css: out, assets };
+}
 
 /** The style language implied by a file extension (defaults to plain CSS). */
 export function langFromExt(file: string): StyleLang {
@@ -34,6 +84,20 @@ export async function compileStyleFile(path: string): Promise<string> {
   if (langFromExt(path) === 'css') return readFile(path, 'utf8');
   const sass: typeof import('sass') = await import('sass'); // lazy — only when scss/sass is in play
   return sass.compile(path, { importers: pkgImporters(sass) }).css; // sass infers scss vs indented from the extension
+}
+
+/**
+ * Compile a style FILE and process its `url(...)` asset references: relative refs are rewritten
+ * to `/assets/<hash>-<name>` and returned as {@link StyleAsset}s for the caller to copy (build)
+ * or serve (dev). `url()`s are resolved against the stylesheet's own directory — exact for a
+ * plain `.css` (e.g. an `@fontsource` sheet); for `.scss`, refs authored in `@use`/`@import`
+ * partials resolve against the ENTRY's dir, so keep asset `url()`s in the entry or use absolute.
+ */
+export async function compileStyleFileWithAssets(
+  path: string
+): Promise<{ css: string; assets: StyleAsset[] }> {
+  const compiled: string = await compileStyleFile(path);
+  return rewriteStyleAssets(compiled, dirname(path));
 }
 
 /**

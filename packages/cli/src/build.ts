@@ -6,7 +6,7 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { weave, type WeaveState } from './plugin.js';
 import { entryPlugin, VIRTUAL_ENTRY } from './entry.js';
-import { compileStyleFile, type StyleLang } from './styles.js';
+import { compileStyleFileWithAssets, type StyleAsset, type StyleLang } from './styles.js';
 import { injectHtml } from './html.js';
 
 export interface BuildConfig {
@@ -55,12 +55,24 @@ export async function build(config: BuildConfig): Promise<void> {
     await cp(config.publicDir, outDir, { recursive: true });
   }
 
-  // Global entry styles (in declared order) first, then component scoped CSS.
-  const globalCss: string = (await Promise.all((config.styles ?? []).map(compileStyleFile))).join(
-    '\n'
+  // Global entry styles (in declared order) first, then component scoped CSS. Each stylesheet's
+  // url() assets (fonts, images) are rewritten to /assets/… and copied into the output.
+  const compiledStyles: Array<{ css: string; assets: StyleAsset[] }> = await Promise.all(
+    (config.styles ?? []).map(compileStyleFileWithAssets)
   );
+  const globalCss: string = compiledStyles.map((s) => s.css).join('\n');
   await mkdir(outDir, { recursive: true });
   await writeFile(join(outDir, 'app.css'), [globalCss, ...state.css].filter(Boolean).join('\n'));
+
+  // Emit each referenced url() asset (deduped by served path) next to app.css.
+  const seen: Set<string> = new Set();
+  for (const asset of compiledStyles.flatMap((s) => s.assets)) {
+    if (seen.has(asset.servedPath)) continue;
+    seen.add(asset.servedPath);
+    const dest: string = join(outDir, asset.servedPath);
+    await mkdir(join(dest, '..'), { recursive: true });
+    await cp(asset.absPath, dest);
+  }
 
   // Copy the HTML shell into the output, injecting the entry script + stylesheet link
   // (and stripping any dev live-reload) so dist/ is self-contained + deployable.

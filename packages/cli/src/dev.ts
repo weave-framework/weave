@@ -31,7 +31,7 @@ import { join, extname, relative, sep, isAbsolute } from 'node:path';
 import { weave, type WeaveState } from './plugin.js';
 import type { ProxyTable, ProxyRule } from './config.js';
 import { entryPlugin, VIRTUAL_ENTRY } from './entry.js';
-import { compileStyleFile, type StyleLang } from './styles.js';
+import { compileStyleFileWithAssets, type StyleAsset, type StyleLang } from './styles.js';
 import { injectHtml } from './html.js';
 
 export interface DevConfig {
@@ -70,8 +70,17 @@ const MIME: Record<string, string> = {
   '.webmanifest': 'application/manifest+json; charset=utf-8',
   '.svg': 'image/svg+xml',
   '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.webp': 'image/webp',
+  '.avif': 'image/avif',
   '.ico': 'image/x-icon',
   '.woff2': 'font/woff2',
+  '.woff': 'font/woff',
+  '.ttf': 'font/ttf',
+  '.otf': 'font/otf',
+  '.eot': 'application/vnd.ms-fontobject',
 };
 
 function mime(path: string): string {
@@ -160,9 +169,15 @@ async function devInMemory(config: DevConfig): Promise<DevServer> {
   const state: WeaveState = { css: [] };
 
   // Global entry styles → a JS banner that injects them as one <style> (compiled once).
+  // Their url() assets (fonts, images) are rewritten to /assets/… and served from `assetMap`.
+  const assetMap: Map<string, string> = new Map(); // '/assets/…' → absolute source path
   let banner: { js: string } | undefined;
   if (config.styles?.length) {
-    const css: string = (await Promise.all(config.styles.map(compileStyleFile))).join('\n');
+    const compiled: Array<{ css: string; assets: StyleAsset[] }> = await Promise.all(
+      config.styles.map(compileStyleFileWithAssets)
+    );
+    const css: string = compiled.map((s) => s.css).join('\n');
+    for (const asset of compiled.flatMap((s) => s.assets)) assetMap.set('/' + asset.servedPath, asset.absPath);
     if (css)
       // Guard by a fixed id: if this banner is evaluated more than once (e.g. bundled into
       // a lazily-loaded route chunk on SPA navigation), it would otherwise append a duplicate
@@ -211,7 +226,7 @@ async function devInMemory(config: DevConfig): Promise<DevServer> {
   await ctx.watch();
 
   const server: Server = createServer((req: IncomingMessage, res: ServerResponse): void => {
-    void handleRequest(req, res, config, outputs, clients);
+    void handleRequest(req, res, config, outputs, clients, assetMap);
   });
   const port: number = await listen(server, config.port);
   return { ctx, url: `http://127.0.0.1:${port}` };
@@ -222,7 +237,8 @@ async function handleRequest(
   res: ServerResponse,
   config: DevConfig,
   outputs: Map<string, Uint8Array>,
-  clients: Set<ServerResponse>
+  clients: Set<ServerResponse>,
+  assetMap: Map<string, string> = new Map()
 ): Promise<void> {
   const url: string = (req.url ?? '/').split('?')[0];
 
@@ -258,6 +274,21 @@ async function handleRequest(
   if (built) {
     res.writeHead(200, { 'content-type': mime(url) });
     res.end(Buffer.from(built));
+    return;
+  }
+
+  // A url() asset from a global stylesheet (font/image) — rewritten to /assets/… and served
+  // from its original on-disk location, so self-hosted webfonts load (no 404, no fallback).
+  const assetSrc: string | undefined = assetMap.get(url);
+  if (assetSrc) {
+    try {
+      const buf: Buffer = await readFile(assetSrc);
+      res.writeHead(200, { 'content-type': mime(url) });
+      res.end(buf);
+    } catch {
+      res.writeHead(404);
+      res.end('Not found');
+    }
     return;
   }
 

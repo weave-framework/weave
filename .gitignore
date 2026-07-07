@@ -39,3 +39,6 @@ npm-debug.log*
 Thumbs.db
 .idea/
 *.swp
+
+# transient esbuild bundle from the cli styles-assets smoke
+packages/cli/test/.smoke-*/
