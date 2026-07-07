@@ -1,0 +1,7 @@
+<div style="display:flex; flex-direction:column; gap:12px;">
+  <Checkbox checked={{ allOn() }} indeterminate={{ indeterminate() }} onChange={{ toggleAll }} label={{ 'All notifications' }} />
+  <div style="padding-left:28px; display:flex; flex-direction:column; gap:12px;">
+    <Checkbox checked={{ email() }} onChange={{ setEmail }} label={{ 'Email' }} />
+    <Checkbox checked={{ sms() }} onChange={{ setSms }} label={{ 'SMS' }} />
+  </div>
+</div>

@@ -1,0 +1,5 @@
+<div style="display:flex; flex-direction:column; gap:12px;">
+  <Checkbox checked={{ offOn() }} disabled={{ true }} label={{ 'Disabled (off)' }} />
+  <Checkbox checked={{ onOn() }} disabled={{ true }} label={{ 'Disabled (on)' }} />
+  <Checkbox checked={{ req() }} onChange={{ setReq }} required={{ true }} label={{ 'Required' }} />
+</div>

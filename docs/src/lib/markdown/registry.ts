@@ -62,6 +62,35 @@ import DashboardApp from '../demos/examples/dashboard-app';
 import SettingsApp from '../demos/examples/settings-app';
 import WizardApp from '../demos/examples/wizard-app';
 import KanbanApp from '../demos/examples/kanban-app';
+import ExButtonAriaCurrent from '../demos/ui/ex-button-aria-current';
+import ExButtonClass from '../demos/ui/ex-button-class';
+import ExButtonContent from '../demos/ui/ex-button-content';
+import ExButtonDisabled from '../demos/ui/ex-button-disabled';
+import ExButtonEvents from '../demos/ui/ex-button-events';
+import ExButtonType from '../demos/ui/ex-button-type';
+import ExButtonVariants from '../demos/ui/ex-button-variants';
+import ExCheckboxBasic from '../demos/ui/ex-checkbox-basic';
+import ExCheckboxForms from '../demos/ui/ex-checkbox-forms';
+import ExCheckboxName from '../demos/ui/ex-checkbox-name';
+import ExCheckboxStates from '../demos/ui/ex-checkbox-states';
+import ExCheckboxTristate from '../demos/ui/ex-checkbox-tristate';
+import ExSelectAdornments from '../demos/ui/ex-select-adornments';
+import ExSelectBasic from '../demos/ui/ex-select-basic';
+import ExSelectClearable from '../demos/ui/ex-select-clearable';
+import ExSelectCustom from '../demos/ui/ex-select-custom';
+import ExSelectMultiple from '../demos/ui/ex-select-multiple';
+import ExSelectOptions from '../demos/ui/ex-select-options';
+import ExSelectPosition from '../demos/ui/ex-select-position';
+import ExSelectStates from '../demos/ui/ex-select-states';
+import ExSelectValidation from '../demos/ui/ex-select-validation';
+import ExSliderBasic from '../demos/ui/ex-slider-basic';
+import ExSliderClass from '../demos/ui/ex-slider-class';
+import ExSliderControl from '../demos/ui/ex-slider-control';
+import ExSliderDisabled from '../demos/ui/ex-slider-disabled';
+import ExSliderFormat from '../demos/ui/ex-slider-format';
+import ExSliderRange from '../demos/ui/ex-slider-range';
+import ExSliderStep from '../demos/ui/ex-slider-step';
+import ExSliderUncontrolled from '../demos/ui/ex-slider-uncontrolled';
 
 /**
  * Live-demo registry: maps a `:::demo <key>` directive to a real Weave component.
@@ -73,6 +102,35 @@ import KanbanApp from '../demos/examples/kanban-app';
  */
 export const demos: Record<string, Component> = {
   counter: CounterDemo,
+  'ex-button-aria-current': ExButtonAriaCurrent,
+  'ex-button-class': ExButtonClass,
+  'ex-button-content': ExButtonContent,
+  'ex-button-disabled': ExButtonDisabled,
+  'ex-button-events': ExButtonEvents,
+  'ex-button-type': ExButtonType,
+  'ex-button-variants': ExButtonVariants,
+  'ex-checkbox-basic': ExCheckboxBasic,
+  'ex-checkbox-forms': ExCheckboxForms,
+  'ex-checkbox-name': ExCheckboxName,
+  'ex-checkbox-states': ExCheckboxStates,
+  'ex-checkbox-tristate': ExCheckboxTristate,
+  'ex-select-adornments': ExSelectAdornments,
+  'ex-select-basic': ExSelectBasic,
+  'ex-select-clearable': ExSelectClearable,
+  'ex-select-custom': ExSelectCustom,
+  'ex-select-multiple': ExSelectMultiple,
+  'ex-select-options': ExSelectOptions,
+  'ex-select-position': ExSelectPosition,
+  'ex-select-states': ExSelectStates,
+  'ex-select-validation': ExSelectValidation,
+  'ex-slider-basic': ExSliderBasic,
+  'ex-slider-class': ExSliderClass,
+  'ex-slider-control': ExSliderControl,
+  'ex-slider-disabled': ExSliderDisabled,
+  'ex-slider-format': ExSliderFormat,
+  'ex-slider-range': ExSliderRange,
+  'ex-slider-step': ExSliderStep,
+  'ex-slider-uncontrolled': ExSliderUncontrolled,
   'button-events': ButtonEvents,
   'button-variants': ButtonVariants,
   'button-disabled': ButtonDisabled,

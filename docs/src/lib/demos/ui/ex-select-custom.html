@@ -1,0 +1,14 @@
+<div style="max-width:320px; display:flex; flex-direction:column; gap:14px;">
+  <Select
+    options={{ countries }}
+    optionValue={{ optCode }}
+    optionLabel={{ optName }}
+    optionDescription={{ optRegion }}
+    emit={{ 'object' }}
+    value={{ picked() }}
+    onChange={{ setPicked }}
+    label={{ 'Country' }}
+    placeholder={{ 'Pick a country' }}
+  />
+  <span style="color:var(--fg-muted)">Object: {{ picked() ? picked().name + ' (' + picked().region + ')' : 'none' }}</span>
+</div>

@@ -1,0 +1,9 @@
+<div style="display:flex; flex-direction:column; gap:12px;">
+  <Checkbox
+    checked={{ subscribe() }}
+    onChange={{ setSubscribe }}
+    name={{ 'newsletter' }}
+    class={{ 'my-checkbox' }}
+    label={{ 'Subscribe to the newsletter' }} />
+  <span style="color:var(--fg-muted)">Submits as <code>newsletter={{ subscribe() ? 'on' : '' }}</code></span>
+</div>

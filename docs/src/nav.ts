@@ -212,7 +212,13 @@ const examples: NavSection = {
     },
     {
       label: 'Components',
-      items: [{ label: 'Input', path: '/examples/components/input' }],
+      items: [
+        { label: 'Button', path: '/examples/components/button' },
+        { label: 'Checkbox', path: '/examples/components/checkbox' },
+        { label: 'Input', path: '/examples/components/input' },
+        { label: 'Select', path: '/examples/components/select' },
+        { label: 'Slider', path: '/examples/components/slider' },
+      ],
     },
     {
       label: 'Applications',

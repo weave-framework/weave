@@ -1,0 +1,6 @@
+<div style="max-width:320px; display:flex; flex-direction:column; gap:14px;">
+  <FormField label={{ 'Level' }} error={{ levelError() }}>
+    <Slider control={{ level }} min={{ 0 }} max={{ 100 }} step={{ 5 }} />
+  </FormField>
+  <span style="color:var(--fg-muted)">Value: {{ level.value() }}</span>
+</div>

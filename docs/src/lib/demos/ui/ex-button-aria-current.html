@@ -1,0 +1,23 @@
+<div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
+  <Button
+    variant={{ page() === 1 ? 'primary' : 'ghost' }}
+    ariaCurrent={{ currentOf(1) }}
+    on:click={{ () => select(1) }}
+  >1</Button>
+  <Button
+    variant={{ page() === 2 ? 'primary' : 'ghost' }}
+    ariaCurrent={{ currentOf(2) }}
+    on:click={{ () => select(2) }}
+  >2</Button>
+  <Button
+    variant={{ page() === 3 ? 'primary' : 'ghost' }}
+    ariaCurrent={{ currentOf(3) }}
+    on:click={{ () => select(3) }}
+  >3</Button>
+  <Button
+    variant={{ page() === 4 ? 'primary' : 'ghost' }}
+    ariaCurrent={{ currentOf(4) }}
+    on:click={{ () => select(4) }}
+  >4</Button>
+  <span style="color:var(--fg-muted)">Page {{ page() }}</span>
+</div>

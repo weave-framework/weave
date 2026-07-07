@@ -1,0 +1,6 @@
+<div style="display:flex; flex-wrap:wrap; gap:12px; align-items:center;">
+  <Button on:click={{ inc }} on:focus={{ onFocus }} on:blur={{ onBlur }}>
+    Clicked {{ count() }} times
+  </Button>
+  <span style="color:var(--fg-muted)">Focus state: {{ status() }}</span>
+</div>

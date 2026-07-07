@@ -1,0 +1,8 @@
+<form on:submit={{ onSubmit }} style="display:flex; flex-wrap:wrap; gap:12px; align-items:center;">
+  <input value={{ name() }} on:input={{ onName }} required placeholder="Your name"
+    style="padding:6px 10px; border:1px solid var(--border); border-radius:6px;" />
+  <Button type={{ 'submit' }}>Create account</Button>
+  <Button type={{ 'reset' }} variant={{ 'outline' }}>Reset</Button>
+  <Button type={{ 'button' }} variant={{ 'ghost' }}>Does nothing</Button>
+  <span style="color:var(--fg-muted)">Submitted: {{ submitted() || '(none)' }}</span>
+</form>
