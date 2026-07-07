@@ -10,6 +10,26 @@
 > `pnpm publish:packages`) — pushing code does **not** publish to npm. (The scheme started at
 > `0.2.0`; the line crossed `1.0.0` on 2026-07-05 when the public API was frozen.)
 
+## Unreleased
+
+Committed locally as `1.4.1`→`1.4.21` (batched; npm still `1.4.0`). Ships as `1.5.0` (minor) at publish.
+
+- **1.4.21 — docs(site):** menu example galleries for `selected`, `optionContent`, `itemTemplate` (3 demos + reference prose); RELEASE-NOTES/CHANGELOG batch ledger opened.
+- **1.4.20 — fix(compiler):** object spread/rest (`{ ...opts }`) in a template expression is now scope-rewritten (the `...` was mistaken for a member `.`), so `use:menu={{ { ...opts, itemTemplate: row } }}` resolves `opts`. Fixed in both `rewrite` and `inferCtxNames`.
+- **1.4.19 — feat(ui):** menu/contextMenu `itemTemplate` (FW-10) — authored `@snippet` renders the whole row from the full row context (`item` + `checked`/`active()`/`index`/`disabled`).
+- **1.4.18 — feat(ui):** menu/contextMenu `optionContent` (FW-9) — custom row body `Node`; `optionLabel` still drives the accessible name + typeahead.
+- **1.4.17 — fix(compiler):** self-closing SVG/foreign tags (FW-8) serialize with a close tag → siblings, not nested.
+- **1.4.16 — fix(cli):** `styles` url() assets (FW-7) hashed, emitted into the build + served in dev (no more font 404s).
+- **1.4.15 — fix(compiler):** parenthesize reactive binding expressions so object literals in `use:` compile.
+- **1.4.14 — feat(ui):** menu/contextMenu `selected` — value-picker rows (`role=menuitemradio` + `aria-checked` + check).
+- **1.4.7–1.4.13 — docs(site):** per-component example galleries for all 38 `@weave-framework/ui` components.
+- **1.4.6 — feat(ui):** Input `revealTooltip` selector (FW-6) — `'none' | 'native' | 'weave'`.
+- **1.4.5 — feat(ui):** Input `onRevealToggle(shown)` callback.
+- **1.4.4 — feat(i18n):** standalone Intl formatters (`formatNumber`/`formatCurrency`/`formatPercent`/`formatDate`/`formatRelativeTime`/`formatList`).
+- **1.4.3 — feat(ui):** Input reveal toggle native `title` tooltip (FW-5).
+- **1.4.2 — feat(runtime):** Observable↔signal bridge (`fromObservable` / `toObservable`).
+- **1.4.1 — feat(ui):** Input password/secret reveal (`revealable`) — eye toggle.
+
 ## 1.4.0 — 2026-07-06
 
 **Feature (`@weave-framework/router`) — async before-leave / canDeactivate guards (`beforeEach`).**

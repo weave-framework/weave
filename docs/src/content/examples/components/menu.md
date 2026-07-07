@@ -169,3 +169,106 @@ const assignMenu: MenuOptions<User> = {
 };
 ~~~
 :::
+
+## Value picker — `selected`
+
+`selected` turns the menu into a **value picker**: the row whose value equals it is marked with a
+check (`role=menuitemradio` + `aria-checked`) — the current density, view, language, sort order, and
+the like. Pass a **getter** (`selected: () => density()`) so the mark tracks the value; it's re-read on
+every open, so re-opening always shows the current choice ticked.
+
+:::demo ex-menu-selected
+
+:::tabs
+~~~html title="app.html"
+<Button variant={{ 'ghost' }} use:menu={{ viewMenu }}>Density: {{ density() }} ▾</Button>
+~~~
+~~~ts title="app.ts"
+const density = signal('comfortable');
+const viewMenu: MenuOptions = {
+  items: [
+    { value: 'comfortable', label: 'Comfortable' },
+    { value: 'cozy', label: 'Cozy' },
+    { value: 'compact', label: 'Compact' },
+  ],
+  selected: () => density(),           // ✓ marks the active row; re-read on every open
+  onSelect: (v) => density.set(String(v)),
+};
+~~~
+:::
+
+## Custom row content — `optionContent`
+
+`optionContent` returns a DOM node used as the row body in place of the default label span — a flag,
+an icon, a colour swatch, an avatar. `optionLabel` still drives the accessible name **and** typeahead,
+so typing "ne" still jumps to Nederlands even though the row shows a flag. Reach for this for a simple
+content swap; when the row's design depends on its state (checked / active), use `itemTemplate` below.
+
+:::demo ex-menu-custom
+
+:::tabs
+~~~html title="app.html"
+<Button use:menu={{ langMenu }}>Language ▾</Button>
+~~~
+~~~ts title="app.ts"
+interface Lang { value: string; label: string; flag: string; }
+
+// optionContent builds the row body — a flag + the native name.
+const flagRow = (l: Lang): Node => {
+  const row = document.createElement('span');
+  row.style.cssText = 'display:inline-flex; gap:8px; align-items:center;';
+  const flag = document.createElement('span'); flag.textContent = l.flag;
+  const name = document.createElement('span'); name.textContent = l.label;
+  row.append(flag, name);
+  return row;
+};
+
+const langMenu: MenuOptions<Lang> = {
+  items: langs,
+  optionValue: (l) => l.value,
+  optionLabel: (l) => l.label,      // still the accessible name + typeahead text
+  optionContent: flagRow,
+  onSelect: (v) => locale.set(String(v)),
+};
+~~~
+:::
+
+## Authored row template — `itemTemplate`
+
+For a row whose **design depends on its state**, hand the menu an authored `@snippet` via
+`itemTemplate`. It renders the **whole** row (weave stamps no default label/check) and receives the full
+row context: `row.item` (the JSON), plus `row.checked` (matches `selected`), `row.active()` (a reactive
+keyboard-highlight getter), `row.index` and `row.disabled`. The template owns the layout, the marker
+(here a **trailing** `<Icon>` shown only on the checked row) and the selected background. `optionLabel`
+still drives the accessible name + typeahead; `selected` still sets the ARIA. Because a `@snippet` is a
+template-local value, add it inline — `{ ...langMenu, itemTemplate: langRow }`.
+
+:::demo ex-menu-template
+
+:::tabs
+~~~html title="app.html"
+<Button use:menu={{ { ...langMenu, itemTemplate: langRow } }}>Language ▾</Button>
+
+@snippet langRow(row) {
+  <span
+    style="display:flex; align-items:center; gap:10px; padding:8px 12px; width:100%;"
+    style:background={{ row.checked ? 'var(--surface-active)' : 'transparent' }}
+    style:font-weight={{ row.checked ? '600' : '400' }}
+  >
+    <span>{{ row.item.flag }}</span>
+    <span style="flex:1;">{{ row.item.label }}</span>
+    @if (row.checked) { <Icon name={{ 'check' }} /> }
+  </span>
+}
+~~~
+~~~ts title="app.ts"
+const locale = signal('nl');
+const langMenu: MenuOptions<Lang> = {
+  items: langs,                        // { value, label, flag }
+  optionValue: (l) => l.value,
+  optionLabel: (l) => l.label,         // accessible name + typeahead
+  selected: () => locale(),            // drives row.checked + the ARIA
+  onSelect: (v) => locale.set(String(v)),
+};
+~~~
+:::

@@ -178,6 +178,9 @@ import ExListPlain from '../demos/ui/ex-list-plain';
 import ExListReorderable from '../demos/ui/ex-list-reorderable';
 import ExMenuAccessors from '../demos/ui/ex-menu-accessors';
 import ExMenuBasic from '../demos/ui/ex-menu-basic';
+import ExMenuCustom from '../demos/ui/ex-menu-custom';
+import ExMenuSelected from '../demos/ui/ex-menu-selected';
+import ExMenuTemplate from '../demos/ui/ex-menu-template';
 import ExMenuDescriptions from '../demos/ui/ex-menu-descriptions';
 import ExMenuDividersDisabled from '../demos/ui/ex-menu-dividers-disabled';
 import ExMenuPosition from '../demos/ui/ex-menu-position';
@@ -434,6 +437,9 @@ export const demos: Record<string, Component> = {
   'ex-list-reorderable': ExListReorderable,
   'ex-menu-accessors': ExMenuAccessors,
   'ex-menu-basic': ExMenuBasic,
+  'ex-menu-custom': ExMenuCustom,
+  'ex-menu-selected': ExMenuSelected,
+  'ex-menu-template': ExMenuTemplate,
   'ex-menu-descriptions': ExMenuDescriptions,
   'ex-menu-dividers-disabled': ExMenuDividersDisabled,
   'ex-menu-position': ExMenuPosition,

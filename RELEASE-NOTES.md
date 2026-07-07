@@ -3,6 +3,66 @@
 Human-readable highlights, one section per release — everything notable that landed since
 the previous one. For the granular, per-version log see [CHANGELOG.md](CHANGELOG.md).
 
+## Unreleased
+
+Highlights accumulated since **1.4.0** (committed locally as `1.4.1`→`1.4.21`, batched — npm is
+still `1.4.0`). New public API ⇒ this ships as a **minor** (`1.5.0`) at publish.
+
+### ✨ Features — `@weave-framework/ui`
+
+- **Input — password/secret reveal (`revealable`).** An opt-in eye toggle that flips an
+  `<input type="password">` to text and back; composes `<Icon>` (eye / eye-off), is a real
+  `type="button"` with `aria-pressed`, and is i18n-labelled (`revealLabel` / `hideLabel`).
+  Companion props: **`onRevealToggle(shown)`** (notified on each toggle) and
+  **`revealTooltip`** (`'none' | 'native' | 'weave'`) choosing the toggle's tooltip — `'native'`
+  is a plain `title`, `'weave'` lazily mounts the CDK tooltip. Opt-in: nothing renders without
+  `revealable`.
+- **Menu / Context Menu — richer rows.** Three additive options, all preserving keyboard nav,
+  typeahead (`optionLabel`), ARIA, `disabled`, `divider` and positioning:
+  - **`selected`** — a value picker: the row equal to it is marked `role=menuitemradio` +
+    `aria-checked` with a leading check. Pass a getter so the mark tracks the value (re-read on
+    every open).
+  - **`optionContent(item) => Node`** (FW-9) — custom row body (a flag, icon, swatch, avatar)
+    in place of the default label; `optionLabel` still drives the accessible name + typeahead.
+  - **`itemTemplate(row) => Node`** (FW-10) — an authored `@snippet` that renders the **whole**
+    row from the full row context (`item`, `checked`, reactive `active()`, `index`, `disabled`),
+    owning the layout, marker (position + icon) and selected/active styling. `selected` still
+    sets the ARIA; the visible marker becomes the template's job.
+
+### ✨ Features — runtime & i18n
+
+- **`@weave-framework/runtime` — Observable↔signal bridge.** `fromObservable(obs, initial)` and
+  `toObservable(signal)` interop with any `Symbol.observable` / `.subscribe` source (RxJS, etc.)
+  with no dependency added.
+- **`@weave-framework/i18n` — standalone Intl formatters.** `formatNumber` / `formatCurrency` /
+  `formatPercent` / `formatDate` / `formatRelativeTime` / `formatList` — the zero-dep replacement
+  for Angular pipes, usable in `.ts` and templates, honouring the active locale.
+
+### 🐞 Fixes — `@weave-framework/compiler`
+
+- **`use:` config object literals now compile.** A reactive binding expression that is an object
+  literal (`use:tip={{ { placement: 'top' } }}`) was read as a statement block; expressions are
+  now parenthesized at every binding site.
+- **Object spread/rest is scope-rewritten.** `{ ...opts, … }` inside a template expression left
+  `opts` as a bare global (the `...` was mistaken for a member `.`), so
+  `use:menu={{ { ...menuOpts, itemTemplate: row } }}` silently lost its options. Both the rewriter
+  and auto-scope inference now recognise a spread argument as a data reference.
+- **Self-closing SVG tags stay siblings (FW-8).** A self-closing foreign-content element
+  (`<path/>`, `<circle/>`) is serialized with an explicit close tag, so following siblings no
+  longer nest inside it.
+
+### 🐞 Fixes — `@weave-framework/cli`
+
+- **`styles` url() assets are emitted + served (FW-7).** Relative `url(...)` references in compiled
+  CSS (fonts, images) are hashed, copied into the build, and served in dev — previously they
+  404'd because only the CSS text was bundled.
+
+### 📚 Docs
+
+- **Per-component example galleries** for all 38 `@weave-framework/ui` components under
+  Examples → Components (each a live, full-option-surface page).
+- **Menu galleries** for `selected`, `optionContent` and `itemTemplate`.
+
 ## 1.4.0 — 2026-07-06
 
 ### ✨ Feature — `@weave-framework/router`: async before-leave guards (unsaved-changes prompts)
