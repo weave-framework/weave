@@ -1,0 +1,4 @@
+<div style="max-width:420px; display:flex; flex-direction:column; gap:10px;">
+  <Table columns={{ columns }} dataSource={{ rows }} trackBy={{ trackBy }} resizableColumns={{ true }} columnWidths={{ widths() }} onColumnResize={{ onResize }} ariaLabel={{ 'Resizable' }} />
+  <span style="color:var(--fg-muted)">name: {{ widths().name }}px · role: {{ widths().role }}px</span>
+</div>

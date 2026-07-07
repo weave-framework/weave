@@ -1,0 +1,4 @@
+<div style="display:flex; gap:10px; align-items:center;">
+  <span use:popoverEdit={{ cfg }} tabindex="0" style="padding:5px 10px; border-radius:4px; cursor:text; border:1px dashed var(--border); opacity:{{ locked() ? 0.5 : 1 }};">{{ amount() }}</span>
+  <button type="button" on:click={{ toggle }}>{{ locked() ? 'Unlock editing' : 'Lock editing' }}</button>
+</div>

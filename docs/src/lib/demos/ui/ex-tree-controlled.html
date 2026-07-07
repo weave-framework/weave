@@ -1,0 +1,8 @@
+<div style="max-width:320px; display:flex; flex-direction:column; gap:10px;">
+  <div style="display:flex; gap:8px;">
+    <button type="button" on:click={{ expandAll }}>Expand all</button>
+    <button type="button" on:click={{ collapseAll }}>Collapse all</button>
+  </div>
+  <Tree nodes={{ nodes }} expanded={{ expanded() }} onExpandedChange={{ onExpandedChange }} />
+  <span style="color:var(--fg-muted)">{{ count() }} branch(es) open</span>
+</div>

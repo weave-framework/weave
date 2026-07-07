@@ -78,6 +78,15 @@ import ExBadgeLabel from '../demos/ui/ex-badge-label';
 import ExBadgeMax from '../demos/ui/ex-badge-max';
 import ExBadgePosition from '../demos/ui/ex-badge-position';
 import ExBadgeVariants from '../demos/ui/ex-badge-variants';
+import ExBottomSheetActions from '../demos/ui/ex-bottom-sheet-actions';
+import ExBottomSheetAfterClosed from '../demos/ui/ex-bottom-sheet-after-closed';
+import ExBottomSheetBasic from '../demos/ui/ex-bottom-sheet-basic';
+import ExBottomSheetContentFactory from '../demos/ui/ex-bottom-sheet-content-factory';
+import ExBottomSheetHeader from '../demos/ui/ex-bottom-sheet-header';
+import ExBottomSheetNoDrag from '../demos/ui/ex-bottom-sheet-no-drag';
+import ExBottomSheetNonDismissable from '../demos/ui/ex-bottom-sheet-non-dismissable';
+import ExBottomSheetOnClose from '../demos/ui/ex-bottom-sheet-on-close';
+import ExBottomSheetScrolling from '../demos/ui/ex-bottom-sheet-scrolling';
 import ExButtonAriaCurrent from '../demos/ui/ex-button-aria-current';
 import ExButtonClass from '../demos/ui/ex-button-class';
 import ExButtonContent from '../demos/ui/ex-button-content';
@@ -107,6 +116,11 @@ import ExChipsControl from '../demos/ui/ex-chips-control';
 import ExChipsDisabled from '../demos/ui/ex-chips-disabled';
 import ExChipsReadonly from '../demos/ui/ex-chips-readonly';
 import ExChipsRemoveLabel from '../demos/ui/ex-chips-remove-label';
+import ExContextMenuBasic from '../demos/ui/ex-context-menu-basic';
+import ExContextMenuCustom from '../demos/ui/ex-context-menu-custom';
+import ExContextMenuItems from '../demos/ui/ex-context-menu-items';
+import ExContextMenuPosition from '../demos/ui/ex-context-menu-position';
+import ExContextMenuStrings from '../demos/ui/ex-context-menu-strings';
 import ExDatepickerBasic from '../demos/ui/ex-datepicker-basic';
 import ExDatepickerBounds from '../demos/ui/ex-datepicker-bounds';
 import ExDatepickerClearable from '../demos/ui/ex-datepicker-clearable';
@@ -116,6 +130,15 @@ import ExDatepickerFilter from '../demos/ui/ex-datepicker-filter';
 import ExDatepickerFormat from '../demos/ui/ex-datepicker-format';
 import ExDatepickerPosition from '../demos/ui/ex-datepicker-position';
 import ExDatepickerStates from '../demos/ui/ex-datepicker-states';
+import ExDialogActions from '../demos/ui/ex-dialog-actions';
+import ExDialogAlert from '../demos/ui/ex-dialog-alert';
+import ExDialogBasic from '../demos/ui/ex-dialog-basic';
+import ExDialogHeader from '../demos/ui/ex-dialog-header';
+import ExDialogNodeContent from '../demos/ui/ex-dialog-node-content';
+import ExDialogNondismissable from '../demos/ui/ex-dialog-nondismissable';
+import ExDialogOnclose from '../demos/ui/ex-dialog-onclose';
+import ExDialogResult from '../demos/ui/ex-dialog-result';
+import ExDialogSize from '../demos/ui/ex-dialog-size';
 import ExDividerCustom from '../demos/ui/ex-divider-custom';
 import ExDividerHorizontal from '../demos/ui/ex-divider-horizontal';
 import ExDividerSemantic from '../demos/ui/ex-divider-semantic';
@@ -153,12 +176,31 @@ import ExListDisabledRow from '../demos/ui/ex-list-disabled-row';
 import ExListMeta from '../demos/ui/ex-list-meta';
 import ExListPlain from '../demos/ui/ex-list-plain';
 import ExListReorderable from '../demos/ui/ex-list-reorderable';
+import ExMenuAccessors from '../demos/ui/ex-menu-accessors';
+import ExMenuBasic from '../demos/ui/ex-menu-basic';
+import ExMenuDescriptions from '../demos/ui/ex-menu-descriptions';
+import ExMenuDividersDisabled from '../demos/ui/ex-menu-dividers-disabled';
+import ExMenuPosition from '../demos/ui/ex-menu-position';
+import ExMenuStrings from '../demos/ui/ex-menu-strings';
+import ExMenubarBasic from '../demos/ui/ex-menubar-basic';
+import ExMenubarClass from '../demos/ui/ex-menubar-class';
+import ExMenubarDescriptions from '../demos/ui/ex-menubar-descriptions';
+import ExMenubarDisabledItems from '../demos/ui/ex-menubar-disabled-items';
+import ExMenubarDisabledMenu from '../demos/ui/ex-menubar-disabled-menu';
+import ExMenubarDividers from '../demos/ui/ex-menubar-dividers';
+import ExMenubarSelectObject from '../demos/ui/ex-menubar-select-object';
 import ExPaginatorBasic from '../demos/ui/ex-paginator-basic';
 import ExPaginatorDisabled from '../demos/ui/ex-paginator-disabled';
 import ExPaginatorJump from '../demos/ui/ex-paginator-jump';
 import ExPaginatorLabelClass from '../demos/ui/ex-paginator-label-class';
 import ExPaginatorPageSize from '../demos/ui/ex-paginator-page-size';
 import ExPaginatorWindow from '../demos/ui/ex-paginator-window';
+import ExPopoverEditBasic from '../demos/ui/ex-popover-edit-basic';
+import ExPopoverEditCustomEditor from '../demos/ui/ex-popover-edit-custom-editor';
+import ExPopoverEditDisabled from '../demos/ui/ex-popover-edit-disabled';
+import ExPopoverEditPlaceholder from '../demos/ui/ex-popover-edit-placeholder';
+import ExPopoverEditPosition from '../demos/ui/ex-popover-edit-position';
+import ExPopoverEditTable from '../demos/ui/ex-popover-edit-table';
 import ExProgressBarClass from '../demos/ui/ex-progress-bar-class';
 import ExProgressBarDeterminate from '../demos/ui/ex-progress-bar-determinate';
 import ExProgressBarIndeterminate from '../demos/ui/ex-progress-bar-indeterminate';
@@ -204,12 +246,29 @@ import ExSliderFormat from '../demos/ui/ex-slider-format';
 import ExSliderRange from '../demos/ui/ex-slider-range';
 import ExSliderStep from '../demos/ui/ex-slider-step';
 import ExSliderUncontrolled from '../demos/ui/ex-slider-uncontrolled';
+import ExSnackbarAction from '../demos/ui/ex-snackbar-action';
+import ExSnackbarBasic from '../demos/ui/ex-snackbar-basic';
+import ExSnackbarDuration from '../demos/ui/ex-snackbar-duration';
+import ExSnackbarPoliteness from '../demos/ui/ex-snackbar-politeness';
+import ExSnackbarPositions from '../demos/ui/ex-snackbar-positions';
+import ExSnackbarQueue from '../demos/ui/ex-snackbar-queue';
+import ExSnackbarRef from '../demos/ui/ex-snackbar-ref';
 import ExStepperBasic from '../demos/ui/ex-stepper-basic';
 import ExStepperDisabled from '../demos/ui/ex-stepper-disabled';
 import ExStepperExternalNav from '../demos/ui/ex-stepper-external-nav';
 import ExStepperLabels from '../demos/ui/ex-stepper-labels';
 import ExStepperLinear from '../demos/ui/ex-stepper-linear';
 import ExStepperOptional from '../demos/ui/ex-stepper-optional';
+import ExTableBasic from '../demos/ui/ex-table-basic';
+import ExTableCustomCells from '../demos/ui/ex-table-custom-cells';
+import ExTableEmpty from '../demos/ui/ex-table-empty';
+import ExTableExpandable from '../demos/ui/ex-table-expandable';
+import ExTableHidden from '../demos/ui/ex-table-hidden';
+import ExTableResizable from '../demos/ui/ex-table-resizable';
+import ExTableSelection from '../demos/ui/ex-table-selection';
+import ExTableSingleSelect from '../demos/ui/ex-table-single-select';
+import ExTableSorting from '../demos/ui/ex-table-sorting';
+import ExTableSticky from '../demos/ui/ex-table-sticky';
 import ExTabsActivateOnFocus from '../demos/ui/ex-tabs-activate-on-focus';
 import ExTabsBasic from '../demos/ui/ex-tabs-basic';
 import ExTabsClass from '../demos/ui/ex-tabs-class';
@@ -238,6 +297,16 @@ import ExTooltipDelay from '../demos/ui/ex-tooltip-delay';
 import ExTooltipDisabled from '../demos/ui/ex-tooltip-disabled';
 import ExTooltipOnButton from '../demos/ui/ex-tooltip-on-button';
 import ExTooltipPositions from '../demos/ui/ex-tooltip-positions';
+import ExTreeAccessors from '../demos/ui/ex-tree-accessors';
+import ExTreeControlled from '../demos/ui/ex-tree-controlled';
+import ExTreeExpandable from '../demos/ui/ex-tree-expandable';
+import ExTreeFlat from '../demos/ui/ex-tree-flat';
+import ExTreeLabelled from '../demos/ui/ex-tree-labelled';
+import ExTreeNested from '../demos/ui/ex-tree-nested';
+import ExTreeNodeContent from '../demos/ui/ex-tree-node-content';
+import ExTreeReorderable from '../demos/ui/ex-tree-reorderable';
+import ExTreeSelectionMultiple from '../demos/ui/ex-tree-selection-multiple';
+import ExTreeSelectionSingle from '../demos/ui/ex-tree-selection-single';
 
 /**
  * Live-demo registry: maps a `:::demo <key>` directive to a real Weave component.
@@ -265,6 +334,15 @@ export const demos: Record<string, Component> = {
   'ex-badge-max': ExBadgeMax,
   'ex-badge-position': ExBadgePosition,
   'ex-badge-variants': ExBadgeVariants,
+  'ex-bottom-sheet-actions': ExBottomSheetActions,
+  'ex-bottom-sheet-after-closed': ExBottomSheetAfterClosed,
+  'ex-bottom-sheet-basic': ExBottomSheetBasic,
+  'ex-bottom-sheet-content-factory': ExBottomSheetContentFactory,
+  'ex-bottom-sheet-header': ExBottomSheetHeader,
+  'ex-bottom-sheet-no-drag': ExBottomSheetNoDrag,
+  'ex-bottom-sheet-non-dismissable': ExBottomSheetNonDismissable,
+  'ex-bottom-sheet-on-close': ExBottomSheetOnClose,
+  'ex-bottom-sheet-scrolling': ExBottomSheetScrolling,
   'ex-button-aria-current': ExButtonAriaCurrent,
   'ex-button-class': ExButtonClass,
   'ex-button-content': ExButtonContent,
@@ -294,6 +372,11 @@ export const demos: Record<string, Component> = {
   'ex-chips-disabled': ExChipsDisabled,
   'ex-chips-readonly': ExChipsReadonly,
   'ex-chips-remove-label': ExChipsRemoveLabel,
+  'ex-context-menu-basic': ExContextMenuBasic,
+  'ex-context-menu-custom': ExContextMenuCustom,
+  'ex-context-menu-items': ExContextMenuItems,
+  'ex-context-menu-position': ExContextMenuPosition,
+  'ex-context-menu-strings': ExContextMenuStrings,
   'ex-datepicker-basic': ExDatepickerBasic,
   'ex-datepicker-bounds': ExDatepickerBounds,
   'ex-datepicker-clearable': ExDatepickerClearable,
@@ -303,6 +386,15 @@ export const demos: Record<string, Component> = {
   'ex-datepicker-format': ExDatepickerFormat,
   'ex-datepicker-position': ExDatepickerPosition,
   'ex-datepicker-states': ExDatepickerStates,
+  'ex-dialog-actions': ExDialogActions,
+  'ex-dialog-alert': ExDialogAlert,
+  'ex-dialog-basic': ExDialogBasic,
+  'ex-dialog-header': ExDialogHeader,
+  'ex-dialog-node-content': ExDialogNodeContent,
+  'ex-dialog-nondismissable': ExDialogNondismissable,
+  'ex-dialog-onclose': ExDialogOnclose,
+  'ex-dialog-result': ExDialogResult,
+  'ex-dialog-size': ExDialogSize,
   'ex-divider-custom': ExDividerCustom,
   'ex-divider-horizontal': ExDividerHorizontal,
   'ex-divider-semantic': ExDividerSemantic,
@@ -340,12 +432,31 @@ export const demos: Record<string, Component> = {
   'ex-list-meta': ExListMeta,
   'ex-list-plain': ExListPlain,
   'ex-list-reorderable': ExListReorderable,
+  'ex-menu-accessors': ExMenuAccessors,
+  'ex-menu-basic': ExMenuBasic,
+  'ex-menu-descriptions': ExMenuDescriptions,
+  'ex-menu-dividers-disabled': ExMenuDividersDisabled,
+  'ex-menu-position': ExMenuPosition,
+  'ex-menu-strings': ExMenuStrings,
+  'ex-menubar-basic': ExMenubarBasic,
+  'ex-menubar-class': ExMenubarClass,
+  'ex-menubar-descriptions': ExMenubarDescriptions,
+  'ex-menubar-disabled-items': ExMenubarDisabledItems,
+  'ex-menubar-disabled-menu': ExMenubarDisabledMenu,
+  'ex-menubar-dividers': ExMenubarDividers,
+  'ex-menubar-select-object': ExMenubarSelectObject,
   'ex-paginator-basic': ExPaginatorBasic,
   'ex-paginator-disabled': ExPaginatorDisabled,
   'ex-paginator-jump': ExPaginatorJump,
   'ex-paginator-label-class': ExPaginatorLabelClass,
   'ex-paginator-page-size': ExPaginatorPageSize,
   'ex-paginator-window': ExPaginatorWindow,
+  'ex-popover-edit-basic': ExPopoverEditBasic,
+  'ex-popover-edit-custom-editor': ExPopoverEditCustomEditor,
+  'ex-popover-edit-disabled': ExPopoverEditDisabled,
+  'ex-popover-edit-placeholder': ExPopoverEditPlaceholder,
+  'ex-popover-edit-position': ExPopoverEditPosition,
+  'ex-popover-edit-table': ExPopoverEditTable,
   'ex-progress-bar-class': ExProgressBarClass,
   'ex-progress-bar-determinate': ExProgressBarDeterminate,
   'ex-progress-bar-indeterminate': ExProgressBarIndeterminate,
@@ -391,12 +502,29 @@ export const demos: Record<string, Component> = {
   'ex-slider-range': ExSliderRange,
   'ex-slider-step': ExSliderStep,
   'ex-slider-uncontrolled': ExSliderUncontrolled,
+  'ex-snackbar-action': ExSnackbarAction,
+  'ex-snackbar-basic': ExSnackbarBasic,
+  'ex-snackbar-duration': ExSnackbarDuration,
+  'ex-snackbar-politeness': ExSnackbarPoliteness,
+  'ex-snackbar-positions': ExSnackbarPositions,
+  'ex-snackbar-queue': ExSnackbarQueue,
+  'ex-snackbar-ref': ExSnackbarRef,
   'ex-stepper-basic': ExStepperBasic,
   'ex-stepper-disabled': ExStepperDisabled,
   'ex-stepper-external-nav': ExStepperExternalNav,
   'ex-stepper-labels': ExStepperLabels,
   'ex-stepper-linear': ExStepperLinear,
   'ex-stepper-optional': ExStepperOptional,
+  'ex-table-basic': ExTableBasic,
+  'ex-table-custom-cells': ExTableCustomCells,
+  'ex-table-empty': ExTableEmpty,
+  'ex-table-expandable': ExTableExpandable,
+  'ex-table-hidden': ExTableHidden,
+  'ex-table-resizable': ExTableResizable,
+  'ex-table-selection': ExTableSelection,
+  'ex-table-single-select': ExTableSingleSelect,
+  'ex-table-sorting': ExTableSorting,
+  'ex-table-sticky': ExTableSticky,
   'ex-tabs-activate-on-focus': ExTabsActivateOnFocus,
   'ex-tabs-basic': ExTabsBasic,
   'ex-tabs-class': ExTabsClass,
@@ -425,6 +553,16 @@ export const demos: Record<string, Component> = {
   'ex-tooltip-disabled': ExTooltipDisabled,
   'ex-tooltip-on-button': ExTooltipOnButton,
   'ex-tooltip-positions': ExTooltipPositions,
+  'ex-tree-accessors': ExTreeAccessors,
+  'ex-tree-controlled': ExTreeControlled,
+  'ex-tree-expandable': ExTreeExpandable,
+  'ex-tree-flat': ExTreeFlat,
+  'ex-tree-labelled': ExTreeLabelled,
+  'ex-tree-nested': ExTreeNested,
+  'ex-tree-node-content': ExTreeNodeContent,
+  'ex-tree-reorderable': ExTreeReorderable,
+  'ex-tree-selection-multiple': ExTreeSelectionMultiple,
+  'ex-tree-selection-single': ExTreeSelectionSingle,
   'button-events': ButtonEvents,
   'button-variants': ButtonVariants,
   'button-disabled': ButtonDisabled,

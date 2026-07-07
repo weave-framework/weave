@@ -1,0 +1,12 @@
+<div style="display:flex; flex-direction:column; gap:10px;">
+  <style>
+    .app-bar {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 2px 6px;
+      background: var(--bg-subtle);
+    }
+  </style>
+  <Menubar menus={{ menus }} onSelect={{ onSelect }} label={{ 'App bar' }} class={{ 'app-bar' }} />
+  <span style="color:var(--fg-muted)">Picked: {{ picked() || '—' }}</span>
+</div>
