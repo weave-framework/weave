@@ -33,6 +33,12 @@ export interface MenuOptions<T = MenuItem> extends OptionAccessors<T> {
    * for a plain action menu.
    */
   selected?: string | (() => string | undefined);
+  /**
+   * Custom row content: returns a DOM node rendered as the row body in place of the default
+   * label span — a flag, an icon, a colour swatch, an avatar + text, any authored markup.
+   * `optionLabel` still drives the accessible name + typeahead. Omit for plain text rows.
+   */
+  optionContent?: (item: T) => Node;
   /** Is this option a hairline separator? Default: `item.divider`. */
   isDivider?: (item: T) => boolean;
   /**
@@ -59,6 +65,7 @@ export function menu<T = MenuItem>(trigger: HTMLElement, options: MenuOptions<T>
       focusFirst,
       isDivider: options.isDivider,
       selected: options.selected,
+      optionContent: options.optionContent,
       optionValue: options.optionValue,
       optionLabel: options.optionLabel,
       optionDescription: options.optionDescription,

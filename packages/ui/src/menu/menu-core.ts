@@ -64,6 +64,13 @@ export interface OpenMenuConfig<T> extends OptionAccessors<T> {
    * open, so it stays in sync as the value changes. Omit for a plain action menu.
    */
   selected?: string | (() => string | undefined);
+  /**
+   * Custom row content. Returns a DOM node rendered as the row body in place of the default
+   * label/description spans — a flag, an icon, a colour swatch, an avatar + text, any authored
+   * markup. `optionLabel` still drives the accessible name (`aria-label`) and typeahead, so
+   * keyboard search keeps working even when the visible content is custom. Omit for text rows.
+   */
+  optionContent?: (item: T) => Node;
   /** Called with the chosen option (value string, or the whole object — see `emit`). */
   onSelect: (selected: string | T) => void;
   /** Called after the panel is torn down. `returnFocus` = closed via keyboard/selection. */
@@ -170,19 +177,30 @@ export function openMenuPanel<T>(cfg: OpenMenuConfig<T>): MenuHandle | null {
     } else {
       btn.setAttribute('role', 'menuitem');
     }
-    // Label (+ optional description) live in a body column so the check sits in a left gutter.
+    // The row body — the default label (+ optional description), or author-supplied custom
+    // content — lives in a body column so the check sits in a left gutter for value-picker rows.
     const body: HTMLElement = selectable ? document.createElement('span') : btn;
     if (selectable) body.className = 'weave-menu__body';
-    const label: HTMLElement = document.createElement('span');
-    label.className = 'weave-menu__label';
-    label.textContent = optLabel(it, cfg);
-    body.appendChild(label);
-    const description: string | undefined = optDescription(it, cfg);
-    if (description) {
-      const desc: HTMLElement = document.createElement('span');
-      desc.className = 'weave-menu__description';
-      desc.textContent = description;
-      body.appendChild(desc);
+    const custom: Node | undefined = cfg.optionContent ? cfg.optionContent(it) : undefined;
+    if (custom) {
+      // Author-controlled row content (a flag, an icon, a swatch, an avatar + text…) replaces
+      // the default label/description spans. `optionLabel` still supplies the accessible name
+      // (aria-label, below) and typeahead, so keyboard search keeps working even though the
+      // visible content is custom markup. FW-9.
+      body.appendChild(custom);
+      btn.setAttribute('aria-label', optLabel(it, cfg));
+    } else {
+      const label: HTMLElement = document.createElement('span');
+      label.className = 'weave-menu__label';
+      label.textContent = optLabel(it, cfg);
+      body.appendChild(label);
+      const description: string | undefined = optDescription(it, cfg);
+      if (description) {
+        const desc: HTMLElement = document.createElement('span');
+        desc.className = 'weave-menu__description';
+        desc.textContent = description;
+        body.appendChild(desc);
+      }
     }
     if (selectable) btn.appendChild(body);
     if (optDisabled(it, cfg)) {

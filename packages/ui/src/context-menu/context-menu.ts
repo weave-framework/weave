@@ -33,6 +33,12 @@ export interface ContextMenuOptions<T = MenuItem> extends OptionAccessors<T> {
   /** Mark a chosen value with a check (`role=menuitemradio`), turning it into a value picker.
    *  Pass a getter so the mark tracks the value; read on every open. See {@link MenuOptions.selected}. */
   selected?: string | (() => string | undefined);
+  /**
+   * Custom row content: returns a DOM node rendered as the row body in place of the default
+   * label span — a flag, an icon, a colour swatch, an avatar + text, any authored markup.
+   * `optionLabel` still drives the accessible name + typeahead. Omit for plain text rows.
+   */
+  optionContent?: (item: T) => Node;
   /** Is this option a hairline separator? Default: `item.divider`. */
   isDivider?: (item: T) => boolean;
   /**
@@ -59,6 +65,7 @@ export function contextMenu<T = MenuItem>(host: HTMLElement, options: ContextMen
       focusFirst,
       isDivider: options.isDivider,
       selected: options.selected,
+      optionContent: options.optionContent,
       optionValue: options.optionValue,
       optionLabel: options.optionLabel,
       optionDescription: options.optionDescription,

@@ -1,6 +1,6 @@
 import { test, assert } from '../../../../tools/harness.js';
 import { overlayContainer } from '@weave-framework/ui/cdk';
-import { contextMenu, type MenuItem } from '@weave-framework/ui/context-menu';
+import { contextMenu, type MenuItem, type ContextMenuOptions } from '@weave-framework/ui/context-menu';
 
 const ITEMS: MenuItem[] = [
   { value: 'copy', label: 'Copy' },
@@ -109,6 +109,27 @@ test('context-menu: position anchors the panel to the host object, ignoring the 
   const top: number = parseFloat(wrapper.style.top);
   assert.ok(Math.abs(left - 200) < 2, `anchored to host left, not pointer (got ${left})`);
   assert.ok(top >= 160 && top < 185, `just below the host bottom (160 = 120+40, got ${top})`);
+  cleanup();
+  host.remove();
+});
+
+test('context-menu: optionContent renders custom row markup, shared via the menu core (FW-9)', () => {
+  const host: HTMLDivElement = document.createElement('div');
+  host.tabIndex = 0;
+  document.body.appendChild(host);
+  const swatch = (item: MenuItem): Node => {
+    const dot: HTMLElement = document.createElement('i');
+    dot.className = 'demo-swatch';
+    dot.dataset.value = item.value;
+    return dot;
+  };
+  const opts: ContextMenuOptions = { items: ITEMS, onSelect: (): void => {}, optionContent: swatch };
+  const cleanup: () => void = contextMenu(host, opts);
+  rightClick(host);
+  const rows: HTMLButtonElement[] = items();
+  assert.equal(rows[0].querySelector('.weave-menu__label'), null, 'no default label span');
+  assert.equal(rows[0].querySelector('.demo-swatch')?.getAttribute('data-value'), 'copy', 'custom content rendered');
+  assert.equal(rows[0].getAttribute('aria-label'), 'Copy', 'optionLabel still the accessible name');
   cleanup();
   host.remove();
 });

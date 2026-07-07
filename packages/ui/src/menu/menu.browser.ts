@@ -333,3 +333,110 @@ test('menu: without `selected`, rows stay plain role=menuitem (no radio) — bac
   assert.equal(items()[0].getAttribute('aria-checked'), null, 'no aria-checked on a plain action menu');
   teardown(trigger, cleanup);
 });
+
+/* ─────────────────────── custom row content (`optionContent`) — FW-9 ─────────────────────── */
+
+interface Lang {
+  value: string;
+  label: string;
+}
+const LANGS: Lang[] = [
+  { value: 'en', label: 'English' },
+  { value: 'nl', label: 'Nederlands' },
+  { value: 'lt', label: 'Lietuvių' },
+];
+// A flag-swatch + native-name row — the language-picker case FW-9 exists to support.
+function flagRow(l: Lang): Node {
+  const row: HTMLElement = document.createElement('span');
+  row.className = 'demo-flag-row';
+  const flag: HTMLElement = document.createElement('i');
+  flag.className = 'demo-flag';
+  flag.dataset.flag = l.value;
+  const name: HTMLElement = document.createElement('span');
+  name.className = 'demo-flag-name';
+  name.textContent = l.label;
+  row.append(flag, name);
+  return row;
+}
+
+function mountLang(over: Partial<MenuOptions<Lang>> = {}): {
+  trigger: HTMLButtonElement;
+  picked: Array<string | Lang>;
+  cleanup: () => void;
+} {
+  const trigger: HTMLButtonElement = document.createElement('button');
+  document.body.appendChild(trigger);
+  const picked: Array<string | Lang> = [];
+  const cleanup: () => void = menu<Lang>(trigger, {
+    items: LANGS,
+    optionContent: flagRow,
+    onSelect: (v) => picked.push(v),
+    ...over,
+  });
+  return { trigger, picked, cleanup };
+}
+
+test('menu: optionContent renders custom row markup in place of the default label span (FW-9)', () => {
+  const { trigger, cleanup } = mountLang();
+  trigger.click();
+  const rows: HTMLButtonElement[] = items();
+  assert.equal(rows.length, 3, 'one row per option');
+  // The default label span is NOT emitted — the author's markup is the row body instead.
+  assert.equal(rows[0].querySelector('.weave-menu__label'), null, 'no default label span');
+  assert.ok(rows[0].querySelector('.demo-flag-row'), 'custom content is the row body');
+  assert.equal(rows[0].querySelector('.demo-flag')?.getAttribute('data-flag'), 'en');
+  assert.equal(rows[0].querySelector('.demo-flag-name')?.textContent, 'English');
+  teardown(trigger, cleanup);
+});
+
+test('menu: with optionContent, optionLabel still drives the accessible name (aria-label) (FW-9)', () => {
+  const { trigger, cleanup } = mountLang();
+  trigger.click();
+  assert.equal(
+    items()[1].getAttribute('aria-label'),
+    'Nederlands',
+    'aria-label = optionLabel even when the visible content is custom',
+  );
+  teardown(trigger, cleanup);
+});
+
+test('menu: with optionContent, typeahead still matches the optionLabel (FW-9)', () => {
+  const { trigger, cleanup } = mountLang();
+  openByKeyboard(trigger); // first row highlighted
+  key(panel() as HTMLElement, 'n'); // "Nederlands"
+  assert.equal(document.activeElement, items()[1], 'typeahead jumped to Nederlands via optionLabel');
+  teardown(trigger, cleanup);
+});
+
+test('menu: optionContent composes with `selected` — the check AND custom content both render (FW-9)', () => {
+  const { trigger, cleanup } = mountLang({ selected: 'nl' });
+  trigger.click();
+  assert.ok(panel()!.classList.contains('weave-menu--selectable'), 'still a value picker');
+  const nl: HTMLButtonElement = items()[1];
+  assert.equal(nl.getAttribute('role'), 'menuitemradio');
+  assert.equal(nl.getAttribute('aria-checked'), 'true', 'the selected row is checked');
+  assert.ok(nl.querySelector('.weave-menu__check'), 'the check gutter is present');
+  // The custom content lives inside the body column, next to the check — not lost.
+  assert.ok(
+    nl.querySelector('.weave-menu__body .demo-flag-row'),
+    'custom content sits in the body column alongside the check',
+  );
+  assert.equal(nl.getAttribute('aria-label'), 'Nederlands', 'accessible name preserved on the radio row');
+  teardown(trigger, cleanup);
+});
+
+test('menu: selecting a custom-content row still emits its value (FW-9)', () => {
+  const { trigger, picked, cleanup } = mountLang();
+  trigger.click();
+  items()[2].click();
+  assert.deepEqual(picked, ['lt'], 'value emitted from the custom-content row');
+  teardown(trigger, cleanup);
+});
+
+test('menu: without optionContent, rows keep the default label span and no aria-label (back-compat, FW-9)', () => {
+  const { trigger, cleanup } = mount();
+  trigger.click();
+  assert.ok(items()[0].querySelector('.weave-menu__label'), 'default label span still rendered');
+  assert.equal(items()[0].getAttribute('aria-label'), null, 'no aria-label added to default text rows');
+  teardown(trigger, cleanup);
+});
