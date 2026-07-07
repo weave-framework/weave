@@ -30,6 +30,9 @@ export interface ContextMenuOptions<T = MenuItem> extends OptionAccessors<T> {
   items: T[];
   /** Called with the chosen option (value string, or the whole object — see `emit`). */
   onSelect: (selected: string | T) => void;
+  /** Mark a chosen value with a check (`role=menuitemradio`), turning it into a value picker.
+   *  Pass a getter so the mark tracks the value; read on every open. See {@link MenuOptions.selected}. */
+  selected?: string | (() => string | undefined);
   /** Is this option a hairline separator? Default: `item.divider`. */
   isDivider?: (item: T) => boolean;
   /**
@@ -55,6 +58,7 @@ export function contextMenu<T = MenuItem>(host: HTMLElement, options: ContextMen
       positions: objectAnchored ? buildPositions(options.position, 'bottom-start') : POINTER_POSITIONS,
       focusFirst,
       isDivider: options.isDivider,
+      selected: options.selected,
       optionValue: options.optionValue,
       optionLabel: options.optionLabel,
       optionDescription: options.optionDescription,

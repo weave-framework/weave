@@ -24,6 +24,7 @@ function mount(over: Partial<MenuOptions> = {}): {
     items: over.items ?? ITEMS,
     onSelect: (v) => selected.push(v),
     position: over.position,
+    selected: over.selected,
   });
   return { trigger, selected, cleanup };
 }
@@ -288,4 +289,47 @@ test('menu: cleanup closes the panel and strips the trigger ARIA (no leak)', () 
   assert.equal(trigger.getAttribute('aria-haspopup'), null, 'aria-haspopup removed');
   assert.equal(trigger.getAttribute('aria-expanded'), null, 'aria-expanded removed');
   trigger.remove();
+});
+
+/* ─────────────────────────── value picker (`selected`) ─────────────────────────── */
+
+test('menu: `selected` marks the matching row role=menuitemradio + aria-checked (value picker)', () => {
+  const { trigger, cleanup } = mount({ selected: 'dup' });
+  trigger.click();
+  assert.ok(panel()!.classList.contains('weave-menu--selectable'), 'panel is a selectable menu');
+  const rows: HTMLButtonElement[] = items();
+  // enabled non-divider rows: Edit, Duplicate, Delete (archive is disabled → excluded from items())
+  const byLabel = (l: string): HTMLButtonElement =>
+    rows.find((r) => r.querySelector('.weave-menu__label')?.textContent === l)!;
+  assert.equal(byLabel('Duplicate').getAttribute('role'), 'menuitemradio');
+  assert.equal(byLabel('Duplicate').getAttribute('aria-checked'), 'true', 'the selected value is checked');
+  assert.equal(byLabel('Edit').getAttribute('aria-checked'), 'false', 'others are unchecked');
+  assert.ok(byLabel('Duplicate').querySelector('.weave-menu__check'), 'a check gutter is rendered');
+  teardown(trigger, cleanup);
+});
+
+test('menu: a `selected` getter is re-read on every open, so the check follows the value', () => {
+  let current = 'edit';
+  const { trigger, cleanup } = mount({ selected: () => current });
+  const checkedLabel = (): string | undefined =>
+    items().find((r) => r.getAttribute('aria-checked') === 'true')
+      ?.querySelector('.weave-menu__label')?.textContent ?? undefined;
+
+  trigger.click();
+  assert.equal(checkedLabel(), 'Edit', 'first open checks the current value');
+  trigger.click(); // close
+
+  current = 'del';
+  trigger.click();
+  assert.equal(checkedLabel(), 'Delete', 're-open reflects the new value (getter re-read)');
+  teardown(trigger, cleanup);
+});
+
+test('menu: without `selected`, rows stay plain role=menuitem (no radio) — back-compat', () => {
+  const { trigger, cleanup } = mount();
+  trigger.click();
+  assert.ok(!panel()!.classList.contains('weave-menu--selectable'));
+  assert.equal(items()[0].getAttribute('role'), 'menuitem');
+  assert.equal(items()[0].getAttribute('aria-checked'), null, 'no aria-checked on a plain action menu');
+  teardown(trigger, cleanup);
 });

@@ -12,6 +12,8 @@ $tokens: (
     // Subtext (description) under a row's label — lighter than the label.
     item-description: ref.ref('color.sub'),
     divider: ref.ref('color.line'),
+    // The ✓ on the selected row of a value-picker menu (`selected` option).
+    check: ref.ref('color.accent'),
   ),
   size: (
     min-width: 180px,

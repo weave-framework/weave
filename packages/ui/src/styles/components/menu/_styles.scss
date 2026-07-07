@@ -57,4 +57,35 @@
     margin: var(--weave-menu-padding-y) 0;
     background: var(--weave-menu-divider);
   }
+
+  // Value-picker rows (menu `selected`): a leading check gutter + a body column for the
+  // label/description, so labels align whether or not a row is checked.
+  .weave-menu__item--radio {
+    flex-direction: row;
+    align-items: center;
+    gap: var(--weave-menu-item-padding-x);
+  }
+
+  .weave-menu__body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--weave-menu-item-gap);
+    min-width: 0;
+  }
+
+  .weave-menu__check {
+    flex: 0 0 auto;
+    position: relative;
+    width: 9px;
+    height: 9px;
+  }
+
+  // The ✓ shows only on the checked row (aria-checked drives it — no state class needed).
+  .weave-menu__item--radio[aria-checked='true'] .weave-menu__check::after {
+    @include helpers.checkmark(var(--weave-menu-check));
+    position: absolute;
+    top: 0;
+    left: 1px;
+    transform: rotate(45deg);
+  }
 }

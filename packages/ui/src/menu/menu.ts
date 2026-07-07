@@ -26,6 +26,13 @@ export interface MenuOptions<T = MenuItem> extends OptionAccessors<T> {
   items: T[];
   /** Called with the chosen option (value string, or the whole object — see `emit`). */
   onSelect: (selected: string | T) => void;
+  /**
+   * Make it a **value picker**: the item whose value equals this shows a check
+   * (`role=menuitemradio` + `aria-checked`) — e.g. the current language/view. Pass a getter
+   * (`selected: () => lang()`) so the mark tracks the value; it's read on every open. Omit
+   * for a plain action menu.
+   */
+  selected?: string | (() => string | undefined);
   /** Is this option a hairline separator? Default: `item.divider`. */
   isDivider?: (item: T) => boolean;
   /**
@@ -51,6 +58,7 @@ export function menu<T = MenuItem>(trigger: HTMLElement, options: MenuOptions<T>
       positions: buildPositions(options.position, 'bottom-start'),
       focusFirst,
       isDivider: options.isDivider,
+      selected: options.selected,
       optionValue: options.optionValue,
       optionLabel: options.optionLabel,
       optionDescription: options.optionDescription,

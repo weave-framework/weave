@@ -15,6 +15,7 @@ import {
   type PositionOrigin,
 } from '../cdk/index.js';
 import {
+  optValue,
   optLabel,
   optDescription,
   optDisabled,
@@ -57,6 +58,12 @@ export interface OpenMenuConfig<T> extends OptionAccessors<T> {
   focusFirst: boolean;
   /** Is this option a hairline separator (not selectable)? Default: `item.divider`. */
   isDivider?: (item: T) => boolean;
+  /**
+   * Turns the menu into a **value picker**: the item whose value equals this is marked
+   * `role=menuitemradio` + `aria-checked` with a leading check. A getter is read on every
+   * open, so it stays in sync as the value changes. Omit for a plain action menu.
+   */
+  selected?: string | (() => string | undefined);
   /** Called with the chosen option (value string, or the whole object — see `emit`). */
   onSelect: (selected: string | T) => void;
   /** Called after the panel is torn down. `returnFocus` = closed via keyboard/selection. */
@@ -129,8 +136,14 @@ export function openMenuPanel<T>(cfg: OpenMenuConfig<T>): MenuHandle | null {
     }
   }
 
+  // A value-picker menu (selection marking) when `selected` is supplied. A getter is read
+  // now, at open time, so the check reflects the current value on every re-open.
+  const selectedValue: string | undefined =
+    typeof cfg.selected === 'function' ? cfg.selected() : cfg.selected;
+  const selectable: boolean = selectedValue !== undefined && selectedValue !== null;
+
   const panel: HTMLElement = document.createElement('div');
-  panel.className = 'weave-menu';
+  panel.className = selectable ? 'weave-menu weave-menu--selectable' : 'weave-menu';
   panel.setAttribute('role', 'menu');
   for (const it of cfg.items) {
     if (isDivider(it)) {
@@ -142,20 +155,36 @@ export function openMenuPanel<T>(cfg: OpenMenuConfig<T>): MenuHandle | null {
     }
     const btn: HTMLButtonElement = document.createElement('button');
     btn.type = 'button';
-    btn.className = 'weave-menu__item';
-    btn.setAttribute('role', 'menuitem');
+    btn.className = selectable ? 'weave-menu__item weave-menu__item--radio' : 'weave-menu__item';
     btn.tabIndex = -1; // roving: focus is moved programmatically
+    // Value-picker rows are radios (aria-checked); plain action rows are menuitems.
+    const checked: boolean = selectable && optValue(it, cfg) === selectedValue;
+    if (selectable) {
+      btn.setAttribute('role', 'menuitemradio');
+      btn.setAttribute('aria-checked', checked ? 'true' : 'false');
+      // Empty gutter span; the ✓ glyph is drawn by CSS off `[aria-checked=true]`.
+      const check: HTMLElement = document.createElement('span');
+      check.className = 'weave-menu__check';
+      check.setAttribute('aria-hidden', 'true');
+      btn.appendChild(check);
+    } else {
+      btn.setAttribute('role', 'menuitem');
+    }
+    // Label (+ optional description) live in a body column so the check sits in a left gutter.
+    const body: HTMLElement = selectable ? document.createElement('span') : btn;
+    if (selectable) body.className = 'weave-menu__body';
     const label: HTMLElement = document.createElement('span');
     label.className = 'weave-menu__label';
     label.textContent = optLabel(it, cfg);
-    btn.appendChild(label);
+    body.appendChild(label);
     const description: string | undefined = optDescription(it, cfg);
     if (description) {
       const desc: HTMLElement = document.createElement('span');
       desc.className = 'weave-menu__description';
       desc.textContent = description;
-      btn.appendChild(desc);
+      body.appendChild(desc);
     }
+    if (selectable) btn.appendChild(body);
     if (optDisabled(it, cfg)) {
       btn.disabled = true;
       btn.setAttribute('aria-disabled', 'true');
