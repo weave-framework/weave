@@ -17,10 +17,11 @@ import {
   type MenuHandle,
   type MenuItem,
   type MenuPosition,
+  type MenuRowContext,
   type OptionAccessors,
 } from '../menu/menu-core.js';
 
-export type { MenuItem, MenuPosition, OptionAccessors } from '../menu/menu-core.js';
+export type { MenuItem, MenuPosition, MenuRowContext, OptionAccessors } from '../menu/menu-core.js';
 
 // Pointer-anchored fallback order (down-right first, then the other quadrants).
 const POINTER_POSITIONS: MenuPosition[] = ['bottom-start', 'top-start', 'bottom-end', 'top-end'];
@@ -39,6 +40,13 @@ export interface ContextMenuOptions<T = MenuItem> extends OptionAccessors<T> {
    * `optionLabel` still drives the accessible name + typeahead. Omit for plain text rows.
    */
   optionContent?: (item: T) => Node;
+  /**
+   * Per-row **template** — an authored `@snippet` taking the row context and returning the
+   * row body; renders the ENTIRE row (weave stamps no default label/check), so it owns the
+   * layout, marker and selected/active styling. `optionLabel` still drives the accessible
+   * name + typeahead; `selected` still sets the ARIA. See {@link MenuOptions.itemTemplate}.
+   */
+  itemTemplate?: (row: MenuRowContext<T>) => Node;
   /** Is this option a hairline separator? Default: `item.divider`. */
   isDivider?: (item: T) => boolean;
   /**
@@ -66,6 +74,7 @@ export function contextMenu<T = MenuItem>(host: HTMLElement, options: ContextMen
       isDivider: options.isDivider,
       selected: options.selected,
       optionContent: options.optionContent,
+      itemTemplate: options.itemTemplate,
       optionValue: options.optionValue,
       optionLabel: options.optionLabel,
       optionDescription: options.optionDescription,

@@ -134,6 +134,36 @@ test('context-menu: optionContent renders custom row markup, shared via the menu
   host.remove();
 });
 
+test('context-menu: itemTemplate renders each row from a template, shared via the menu core (FW-10)', () => {
+  const host: HTMLDivElement = document.createElement('div');
+  host.tabIndex = 0;
+  document.body.appendChild(host);
+  const opts: ContextMenuOptions = {
+    items: ITEMS,
+    selected: 'paste',
+    onSelect: (): void => {},
+    itemTemplate: (row): Node => {
+      const s: HTMLElement = document.createElement('span');
+      s.className = 'ctx-row';
+      s.dataset.value = row.value;
+      s.dataset.checked = String(row.checked);
+      s.textContent = row.label;
+      return s;
+    },
+  };
+  const cleanup: () => void = contextMenu(host, opts);
+  rightClick(host);
+  const rows: HTMLButtonElement[] = items();
+  assert.ok(rows[0].classList.contains('weave-menu__item--templated'), 'templated row');
+  assert.equal(rows[0].querySelector('.weave-menu__label'), null, 'no default label span');
+  assert.equal(rows[0].querySelector('.ctx-row')?.getAttribute('data-value'), 'copy', 'template bound to the item');
+  assert.equal(rows[1].querySelector('.ctx-row')?.getAttribute('data-checked'), 'true', 'checked state passed to the template');
+  assert.equal(rows[1].getAttribute('aria-checked'), 'true', 'ARIA still set from selected');
+  assert.equal(rows[0].getAttribute('aria-label'), 'Copy', 'optionLabel is the accessible name');
+  cleanup();
+  host.remove();
+});
+
 test('context-menu: cleanup removes the listeners and closes any open panel', () => {
   const { host, cleanup } = mount();
   rightClick(host);

@@ -1,6 +1,7 @@
 import { test, assert } from '../../../../tools/harness.js';
+import { signal, effect } from '@weave-framework/runtime';
 import { overlayContainer, type ConnectedPosition } from '@weave-framework/ui/cdk';
-import { menu, type MenuItem, type MenuOptions } from '@weave-framework/ui/menu';
+import { menu, type MenuItem, type MenuOptions, type MenuRowContext } from '@weave-framework/ui/menu';
 import { buildPositions } from './menu-core.js';
 
 const ITEMS: MenuItem[] = [
@@ -438,5 +439,163 @@ test('menu: without optionContent, rows keep the default label span and no aria-
   trigger.click();
   assert.ok(items()[0].querySelector('.weave-menu__label'), 'default label span still rendered');
   assert.equal(items()[0].getAttribute('aria-label'), null, 'no aria-label added to default text rows');
+  teardown(trigger, cleanup);
+});
+
+/* ─────────────────────── per-row template (`itemTemplate`) — FW-10 ─────────────────────── */
+
+// A per-row template that owns the whole row: name + a trailing mark on the checked row + a
+// reactive `is-active` class (driven by an effect, exactly as a compiled `{{ row.active() }}`
+// binding would be). Records the row context it was called with, for assertions.
+const tplContexts: MenuRowContext<Lang>[] = [];
+function tplRow(row: MenuRowContext<Lang>): Node {
+  tplContexts.push(row);
+  const span: HTMLElement = document.createElement('span');
+  span.className = 'lang-row';
+  span.dataset.index = String(row.index);
+  span.dataset.value = row.item.value;
+  span.dataset.checked = String(row.checked);
+  const name: HTMLElement = document.createElement('span');
+  name.className = 'lang-row__name';
+  name.textContent = row.item.label;
+  span.appendChild(name);
+  if (row.checked) {
+    const mark: HTMLElement = document.createElement('b');
+    mark.className = 'lang-row__mark'; // trailing marker — the template's job, not weave's
+    mark.textContent = '✓';
+    span.appendChild(mark);
+  }
+  effect(() => {
+    span.classList.toggle('is-active', row.active());
+  });
+  return span;
+}
+
+function mountTpl(over: Partial<MenuOptions<Lang>> = {}): {
+  trigger: HTMLButtonElement;
+  picked: Array<string | Lang>;
+  cleanup: () => void;
+} {
+  tplContexts.length = 0;
+  const trigger: HTMLButtonElement = document.createElement('button');
+  document.body.appendChild(trigger);
+  const picked: Array<string | Lang> = [];
+  const cleanup: () => void = menu<Lang>(trigger, {
+    items: LANGS,
+    itemTemplate: tplRow,
+    onSelect: (v) => picked.push(v),
+    ...over,
+  });
+  return { trigger, picked, cleanup };
+}
+
+test('menu: itemTemplate renders the whole row from the template — no default label/check gutter (FW-10)', () => {
+  const { trigger, cleanup } = mountTpl({ selected: 'nl' });
+  trigger.click();
+  const rows: HTMLButtonElement[] = items();
+  assert.equal(rows.length, 3);
+  assert.ok(rows[0].classList.contains('weave-menu__item--templated'), 'row is a templated item');
+  assert.ok(rows[0].querySelector('.lang-row'), 'the template is the row body');
+  assert.equal(rows[0].querySelector('.weave-menu__label'), null, 'no default label span');
+  assert.equal(rows[0].querySelector('.weave-menu__check'), null, 'no forced check gutter');
+  // Even though `selected` is set, the visual selectable gutter class is NOT applied (the
+  // marker is the template's job now).
+  assert.ok(!panel()!.classList.contains('weave-menu--selectable'), 'no forced selectable gutter layout');
+  teardown(trigger, cleanup);
+});
+
+test('menu: itemTemplate gets the full row context (item/value/index/checked) (FW-10)', () => {
+  const { trigger, cleanup } = mountTpl({ selected: 'nl' });
+  trigger.click();
+  assert.deepEqual(
+    tplContexts.map((c) => c.value),
+    ['en', 'nl', 'lt'],
+    'one context per row, in order',
+  );
+  assert.deepEqual(tplContexts.map((c) => c.index), [0, 1, 2], 'zero-based row index');
+  assert.deepEqual(tplContexts.map((c) => c.checked), [false, true, false], 'checked = the selected value');
+  assert.equal(tplContexts[0].item.label, 'English', 'item is the source JSON object');
+  // The template placed a trailing mark only on the checked (nl) row.
+  assert.equal(items()[0].querySelector('.lang-row__mark'), null, 'unchecked row has no mark');
+  assert.ok(items()[1].querySelector('.lang-row__mark'), 'checked row shows the template mark (trailing)');
+  teardown(trigger, cleanup);
+});
+
+test('menu: with itemTemplate + selected, the row still carries role=menuitemradio + aria-checked + aria-label (FW-10)', () => {
+  const { trigger, cleanup } = mountTpl({ selected: 'nl' });
+  trigger.click();
+  const nl: HTMLButtonElement = items()[1];
+  assert.equal(nl.getAttribute('role'), 'menuitemradio', 'ARIA semantics preserved');
+  assert.equal(nl.getAttribute('aria-checked'), 'true');
+  assert.equal(items()[0].getAttribute('aria-checked'), 'false');
+  assert.equal(nl.getAttribute('aria-label'), 'Nederlands', 'optionLabel is the accessible name');
+  teardown(trigger, cleanup);
+});
+
+test('menu: itemTemplate row.active() is reactive — the highlighted row updates as you arrow (FW-10)', () => {
+  const { trigger, cleanup } = mountTpl();
+  openByKeyboard(trigger); // first row highlighted
+  const rows: HTMLButtonElement[] = items();
+  assert.ok(rows[0].querySelector('.lang-row')!.classList.contains('is-active'), 'first row active on open');
+  assert.ok(!rows[1].querySelector('.lang-row')!.classList.contains('is-active'), 'second row not active');
+  key(panel() as HTMLElement, 'ArrowDown');
+  assert.ok(!rows[0].querySelector('.lang-row')!.classList.contains('is-active'), 'first row no longer active');
+  assert.ok(rows[1].querySelector('.lang-row')!.classList.contains('is-active'), 'active moved to the second row');
+  teardown(trigger, cleanup);
+});
+
+test('menu: with itemTemplate, typeahead still matches optionLabel + selecting emits the value (FW-10)', () => {
+  const { trigger, picked, cleanup } = mountTpl();
+  openByKeyboard(trigger);
+  key(panel() as HTMLElement, 'l'); // "Lietuvių"
+  assert.equal(document.activeElement, items()[2], 'typeahead jumped via optionLabel');
+  items()[2].click();
+  assert.deepEqual(picked, ['lt'], 'selecting a templated row emits its value');
+  teardown(trigger, cleanup);
+});
+
+test('menu: itemTemplate takes precedence over optionContent (FW-10)', () => {
+  const { trigger, cleanup } = mountTpl({ optionContent: () => document.createTextNode('SHOULD-NOT-APPEAR') });
+  trigger.click();
+  assert.ok(items()[0].querySelector('.lang-row'), 'the template wins');
+  assert.equal(items()[0].textContent?.includes('SHOULD-NOT-APPEAR'), false, 'optionContent ignored when a template is set');
+  teardown(trigger, cleanup);
+});
+
+test('menu: itemTemplate bindings are torn down on close — no leak (FW-10)', () => {
+  const ext = signal(0);
+  let runs = 0;
+  const trigger: HTMLButtonElement = document.createElement('button');
+  document.body.appendChild(trigger);
+  const cleanup: () => void = menu<Lang>(trigger, {
+    items: LANGS,
+    itemTemplate: (row: MenuRowContext<Lang>): Node => {
+      const s: HTMLElement = document.createElement('span');
+      effect(() => {
+        ext(); // subscribe to an external signal so we can prove the effect is (or isn't) live
+        runs++;
+        s.textContent = row.item.label;
+      });
+      return s;
+    },
+    onSelect: (): void => {},
+  });
+  trigger.click();
+  const afterOpen: number = runs; // one run per row (3)
+  ext.set(1);
+  assert.ok(runs > afterOpen, 'row effects re-run while the menu is open (live bindings)');
+  const live: number = runs;
+  trigger.click(); // close
+  ext.set(2);
+  assert.equal(runs, live, 'no row effect re-ran after close — the row root was disposed');
+  cleanup();
+  trigger.remove();
+});
+
+test('menu: without itemTemplate, the default text rendering is unchanged (back-compat, FW-10)', () => {
+  const { trigger, cleanup } = mount();
+  trigger.click();
+  assert.ok(items()[0].querySelector('.weave-menu__label'), 'default label span still rendered');
+  assert.ok(!items()[0].classList.contains('weave-menu__item--templated'), 'no templated modifier');
   teardown(trigger, cleanup);
 });

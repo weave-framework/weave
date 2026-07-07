@@ -6,6 +6,7 @@
  * Esc/Tab close), plus a transparent click-away backdrop. Internal — not a public subpath;
  * `menu.ts` / `context-menu.ts` are the surfaces. Zero-dep.
  */
+import { root } from '@weave-framework/runtime';
 import {
   createOverlay,
   connectedPosition,
@@ -44,6 +45,37 @@ export interface MenuItem {
   divider?: boolean;
 }
 
+/**
+ * The full per-row context handed to an {@link OpenMenuConfig.itemTemplate}. The template
+ * (an authored `@snippet`) owns the whole row — layout, marker (position + icon), and
+ * selected/active styling — binding these fields.
+ */
+export interface MenuRowContext<T> {
+  /** The row's data object — every field of the source JSON item (bind `row.item.*`). */
+  item: T;
+  /** Accessor-resolved value (`optionValue`). */
+  value: string;
+  /** Accessor-resolved label (`optionLabel`) — also the accessible name + typeahead text. */
+  label: string;
+  /** Accessor-resolved subtext (`optionDescription`), if any. */
+  description: string | undefined;
+  /** Is the row disabled (greyed, skipped by keyboard nav, not selectable). */
+  disabled: boolean;
+  /** Zero-based position among the (non-divider) rows. */
+  index: number;
+  /**
+   * True when the row's value equals the menu's `selected` (the value-picker mark). A
+   * snapshot taken at open time — same semantics as the built-in check (re-read on re-open).
+   */
+  checked: boolean;
+  /**
+   * Reactive: true while this row is the keyboard-highlighted (roving-focused) one. Read it
+   * in a binding (`class:is-active={{ row.active() }}`, `@if (row.active())`) to restyle the
+   * active row live as the user arrows through. Always false for a disabled row.
+   */
+  active: () => boolean;
+}
+
 export interface OpenMenuConfig<T> extends OptionAccessors<T> {
   /** What the panel is anchored to — a trigger element, or a virtual point. */
   origin: PositionOrigin;
@@ -71,6 +103,17 @@ export interface OpenMenuConfig<T> extends OptionAccessors<T> {
    * keyboard search keeps working even when the visible content is custom. Omit for text rows.
    */
   optionContent?: (item: T) => Node;
+  /**
+   * Per-row **template** (an authored `@snippet`), invoked once per row with its full
+   * {@link MenuRowContext} and returning the row body. When supplied it renders the ENTIRE
+   * row — weave stamps no default label/check markup — so the template owns the layout,
+   * the marker (position + icon) and the selected/active styling. `optionLabel` still drives
+   * the accessible name + typeahead, and `selected` still sets `role=menuitemradio` +
+   * `aria-checked`; only the *visible* marker becomes the template's job. Takes precedence
+   * over {@link optionContent}. Its reactive bindings are owned by the panel and disposed on
+   * close. Omit for the default text rows.
+   */
+  itemTemplate?: (row: MenuRowContext<T>) => Node;
   /** Called with the chosen option (value string, or the whole object — see `emit`). */
   onSelect: (selected: string | T) => void;
   /** Called after the panel is torn down. `returnFocus` = closed via keyboard/selection. */
@@ -95,6 +138,8 @@ export function openMenuPanel<T>(cfg: OpenMenuConfig<T>): MenuHandle | null {
 
   let itemEls: HTMLButtonElement[] = []; // enabled items only, index-aligned with `enabled()`
   let closed: boolean = false;
+  // Disposes the reactive owner behind `itemTemplate` rows (their bindings' effects), if any.
+  let rowsDispose: (() => void) | null = null;
   const km: ListKeyManager<T> = listKeyManager<T>(enabled, {
     orientation: 'vertical',
     wrap: true,
@@ -116,6 +161,7 @@ export function openMenuPanel<T>(cfg: OpenMenuConfig<T>): MenuHandle | null {
   function close(returnFocus: boolean): void {
     if (closed) return;
     closed = true;
+    rowsDispose?.(); // tear down any row-template bindings before the DOM goes
     ref.dispose();
     cfg.onClose?.(returnFocus);
   }
@@ -149,69 +195,114 @@ export function openMenuPanel<T>(cfg: OpenMenuConfig<T>): MenuHandle | null {
     typeof cfg.selected === 'function' ? cfg.selected() : cfg.selected;
   const selectable: boolean = selectedValue !== undefined && selectedValue !== null;
 
+  // A per-row template (FW-10) owns the WHOLE row: layout, marker, selected/active styling.
+  // When present weave stamps no default label/check gutter — `selected` still sets the ARIA
+  // (radio + aria-checked) but the visible marker is the template's job. Its reactive bindings
+  // are created inside `root()` and torn down (via `rowsDispose`) when the panel closes.
+  const templated: boolean = typeof cfg.itemTemplate === 'function';
+
   const panel: HTMLElement = document.createElement('div');
-  panel.className = selectable ? 'weave-menu weave-menu--selectable' : 'weave-menu';
+  panel.className = selectable && !templated ? 'weave-menu weave-menu--selectable' : 'weave-menu';
   panel.setAttribute('role', 'menu');
-  for (const it of cfg.items) {
-    if (isDivider(it)) {
-      const sep: HTMLElement = document.createElement('div');
-      sep.className = 'weave-menu__divider';
-      sep.setAttribute('role', 'separator');
-      panel.appendChild(sep);
-      continue;
-    }
-    const btn: HTMLButtonElement = document.createElement('button');
-    btn.type = 'button';
-    btn.className = selectable ? 'weave-menu__item weave-menu__item--radio' : 'weave-menu__item';
-    btn.tabIndex = -1; // roving: focus is moved programmatically
-    // Value-picker rows are radios (aria-checked); plain action rows are menuitems.
-    const checked: boolean = selectable && optValue(it, cfg) === selectedValue;
-    if (selectable) {
-      btn.setAttribute('role', 'menuitemradio');
-      btn.setAttribute('aria-checked', checked ? 'true' : 'false');
-      // Empty gutter span; the ✓ glyph is drawn by CSS off `[aria-checked=true]`.
-      const check: HTMLElement = document.createElement('span');
-      check.className = 'weave-menu__check';
-      check.setAttribute('aria-hidden', 'true');
-      btn.appendChild(check);
-    } else {
-      btn.setAttribute('role', 'menuitem');
-    }
-    // The row body — the default label (+ optional description), or author-supplied custom
-    // content — lives in a body column so the check sits in a left gutter for value-picker rows.
-    const body: HTMLElement = selectable ? document.createElement('span') : btn;
-    if (selectable) body.className = 'weave-menu__body';
-    const custom: Node | undefined = cfg.optionContent ? cfg.optionContent(it) : undefined;
-    if (custom) {
-      // Author-controlled row content (a flag, an icon, a swatch, an avatar + text…) replaces
-      // the default label/description spans. `optionLabel` still supplies the accessible name
-      // (aria-label, below) and typeahead, so keyboard search keeps working even though the
-      // visible content is custom markup. FW-9.
-      body.appendChild(custom);
-      btn.setAttribute('aria-label', optLabel(it, cfg));
-    } else {
-      const label: HTMLElement = document.createElement('span');
-      label.className = 'weave-menu__label';
-      label.textContent = optLabel(it, cfg);
-      body.appendChild(label);
-      const description: string | undefined = optDescription(it, cfg);
-      if (description) {
-        const desc: HTMLElement = document.createElement('span');
-        desc.className = 'weave-menu__description';
-        desc.textContent = description;
-        body.appendChild(desc);
+
+  let rowIndex: number = -1; // 0-based across non-divider rows
+  let enabledIndex: number = -1; // 0-based across enabled rows (aligns with `km` + `itemEls`)
+
+  const buildRows = (): void => {
+    for (const it of cfg.items) {
+      if (isDivider(it)) {
+        const sep: HTMLElement = document.createElement('div');
+        sep.className = 'weave-menu__divider';
+        sep.setAttribute('role', 'separator');
+        panel.appendChild(sep);
+        continue;
       }
+      const disabled: boolean = optDisabled(it, cfg);
+      rowIndex += 1;
+      const myEnabledIndex: number = disabled ? -1 : (enabledIndex += 1);
+
+      const btn: HTMLButtonElement = document.createElement('button');
+      btn.type = 'button';
+      btn.tabIndex = -1; // roving: focus is moved programmatically
+      // Value-picker rows are radios (aria-checked); plain action rows are menuitems.
+      const checked: boolean = selectable && optValue(it, cfg) === selectedValue;
+
+      if (templated) {
+        // The author's row template is the entire row — no check gutter / body column.
+        btn.className = 'weave-menu__item weave-menu__item--templated';
+        btn.setAttribute('role', selectable ? 'menuitemradio' : 'menuitem');
+        if (selectable) btn.setAttribute('aria-checked', checked ? 'true' : 'false');
+        const rowCtx: MenuRowContext<T> = {
+          item: it,
+          value: optValue(it, cfg),
+          label: optLabel(it, cfg),
+          description: optDescription(it, cfg),
+          disabled,
+          index: rowIndex,
+          checked,
+          active: disabled ? (): boolean => false : (): boolean => km.activeIndex() === myEnabledIndex,
+        };
+        btn.appendChild(cfg.itemTemplate!(rowCtx));
+        // The visible content is custom, so `optionLabel` provides the accessible name.
+        btn.setAttribute('aria-label', optLabel(it, cfg));
+      } else {
+        btn.className = selectable ? 'weave-menu__item weave-menu__item--radio' : 'weave-menu__item';
+        if (selectable) {
+          btn.setAttribute('role', 'menuitemradio');
+          btn.setAttribute('aria-checked', checked ? 'true' : 'false');
+          // Empty gutter span; the ✓ glyph is drawn by CSS off `[aria-checked=true]`.
+          const check: HTMLElement = document.createElement('span');
+          check.className = 'weave-menu__check';
+          check.setAttribute('aria-hidden', 'true');
+          btn.appendChild(check);
+        } else {
+          btn.setAttribute('role', 'menuitem');
+        }
+        // The row body — the default label (+ optional description), or author-supplied custom
+        // content — lives in a body column so the check sits in a left gutter for value-picker rows.
+        const body: HTMLElement = selectable ? document.createElement('span') : btn;
+        if (selectable) body.className = 'weave-menu__body';
+        const custom: Node | undefined = cfg.optionContent ? cfg.optionContent(it) : undefined;
+        if (custom) {
+          // Author-controlled row content (a flag, an icon, a swatch, an avatar + text…) replaces
+          // the default label/description spans. `optionLabel` still supplies the accessible name
+          // (aria-label, below) and typeahead, so keyboard search keeps working even though the
+          // visible content is custom markup. FW-9.
+          body.appendChild(custom);
+          btn.setAttribute('aria-label', optLabel(it, cfg));
+        } else {
+          const label: HTMLElement = document.createElement('span');
+          label.className = 'weave-menu__label';
+          label.textContent = optLabel(it, cfg);
+          body.appendChild(label);
+          const description: string | undefined = optDescription(it, cfg);
+          if (description) {
+            const desc: HTMLElement = document.createElement('span');
+            desc.className = 'weave-menu__description';
+            desc.textContent = description;
+            body.appendChild(desc);
+          }
+        }
+        if (selectable) btn.appendChild(body);
+      }
+
+      if (disabled) {
+        btn.disabled = true;
+        btn.setAttribute('aria-disabled', 'true');
+      } else {
+        itemEls.push(btn);
+        btn.addEventListener('click', () => select(it));
+      }
+      panel.appendChild(btn);
     }
-    if (selectable) btn.appendChild(body);
-    if (optDisabled(it, cfg)) {
-      btn.disabled = true;
-      btn.setAttribute('aria-disabled', 'true');
-    } else {
-      itemEls.push(btn);
-      btn.addEventListener('click', () => select(it));
-    }
-    panel.appendChild(btn);
-  }
+  };
+
+  // Templated rows carry reactive bindings — build them inside a disposable root owner so
+  // their effects tear down on close. The default (text) path creates no effects, so it stays
+  // outside a root (byte-for-byte unchanged).
+  if (templated) root((dispose) => ((rowsDispose = dispose), buildRows()));
+  else buildRows();
+
   panel.addEventListener('keydown', onKeydown);
 
   ref.onBackdropClick(() => close(false));

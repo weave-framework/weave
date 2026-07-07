@@ -73,6 +73,16 @@
     min-width: 0;
   }
 
+  // A row rendered from an author-supplied template (menu `itemTemplate`) owns its whole
+  // layout: drop weave's default row padding/gap so the template controls spacing and a
+  // selected/active background can run full-bleed. The :hover/:focus tint above still applies
+  // (roving highlight) unless the template paints its own. The template's node is the sole child.
+  .weave-menu__item--templated {
+    display: block;
+    padding: 0;
+    gap: 0;
+  }
+
   .weave-menu__check {
     flex: 0 0 auto;
     position: relative;

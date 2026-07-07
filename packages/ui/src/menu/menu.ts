@@ -15,10 +15,11 @@ import {
   type MenuHandle,
   type MenuItem,
   type MenuPosition,
+  type MenuRowContext,
   type OptionAccessors,
 } from './menu-core.js';
 
-export type { MenuItem, MenuPosition, OptionAccessors } from './menu-core.js';
+export type { MenuItem, MenuPosition, MenuRowContext, OptionAccessors } from './menu-core.js';
 
 export interface MenuOptions<T = MenuItem> extends OptionAccessors<T> {
   /** The options — the default `{value,label,description?,disabled?,divider?}`, plain strings,
@@ -39,6 +40,15 @@ export interface MenuOptions<T = MenuItem> extends OptionAccessors<T> {
    * `optionLabel` still drives the accessible name + typeahead. Omit for plain text rows.
    */
   optionContent?: (item: T) => Node;
+  /**
+   * Per-row **template** — an authored `@snippet` taking the row context and returning the
+   * row body. When supplied it renders the ENTIRE row (weave stamps no default label/check),
+   * so the template owns the layout, the marker (its position + icon) and the selected/active
+   * styling — binding `row.item.*`, `row.checked`, `row.active()`, `row.index`, `row.disabled`.
+   * `optionLabel` still drives the accessible name + typeahead; `selected` still sets the ARIA.
+   * Takes precedence over {@link optionContent}. Omit for plain text rows.
+   */
+  itemTemplate?: (row: MenuRowContext<T>) => Node;
   /** Is this option a hairline separator? Default: `item.divider`. */
   isDivider?: (item: T) => boolean;
   /**
@@ -66,6 +76,7 @@ export function menu<T = MenuItem>(trigger: HTMLElement, options: MenuOptions<T>
       isDivider: options.isDivider,
       selected: options.selected,
       optionContent: options.optionContent,
+      itemTemplate: options.itemTemplate,
       optionValue: options.optionValue,
       optionLabel: options.optionLabel,
       optionDescription: options.optionDescription,
