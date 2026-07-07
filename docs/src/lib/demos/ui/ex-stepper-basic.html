@@ -1,0 +1,6 @@
+<div style="max-width:460px;">
+  <Stepper steps={{ steps }} value={{ idx() }} onChange={{ setIdx }} onComplete={{ submit }} />
+  <p style="color:var(--fg-muted); margin-top:10px;">
+    On step {{ idx() + 1 }} of {{ steps.length }}.{{ done() ? ' Finished!' : '' }}
+  </p>
+</div>

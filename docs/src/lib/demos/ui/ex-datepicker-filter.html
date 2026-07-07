@@ -1,0 +1,4 @@
+<div style="max-width:280px; display:flex; flex-direction:column; gap:10px;">
+  <Datepicker value={{ date() }} onChange={{ setDate }} dateFilter={{ isWeekday }} label={{ 'Weekdays only' }} placeholder={{ 'Pick a weekday' }} />
+  <span style="color:var(--fg-muted)">Selected: {{ fmt(date()) }}</span>
+</div>

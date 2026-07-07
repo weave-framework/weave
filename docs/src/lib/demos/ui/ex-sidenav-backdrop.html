@@ -1,0 +1,12 @@
+<div style="display:flex; flex-direction:column; gap:10px;">
+  <Button on:click={{ toggle }}>{{ open() ? 'Close' : 'Open' }} drawer</Button>
+  <div style="height:200px; border:1px solid var(--border); border-radius:6px; overflow:hidden;">
+    <Sidenav mode={{ 'push' }} backdrop={{ true }} opened={{ open() }} onOpenedChange={{ setOpen }}>
+      <nav slot="drawer" style="width:150px; padding:16px; box-sizing:border-box;">
+        <strong>Drawer</strong>
+        <div style="margin-top:10px;"><code>push</code> + forced backdrop.</div>
+      </nav>
+      <div style="padding:16px;"><code>backdrop={{ true }}</code> shows the scrim even in <code>push</code> mode, which normally has none.</div>
+    </Sidenav>
+  </div>
+</div>

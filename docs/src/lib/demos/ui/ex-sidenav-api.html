@@ -1,0 +1,16 @@
+<div style="display:flex; flex-direction:column; gap:10px;">
+  <div style="display:flex; gap:8px;">
+    <Button on:click={{ open }}>open()</Button>
+    <Button on:click={{ close }} variant={{ 'outline' }}>close()</Button>
+    <Button on:click={{ toggle }} variant={{ 'ghost' }}>toggle()</Button>
+  </div>
+  <div style="height:200px; border:1px solid var(--border); border-radius:6px; overflow:hidden;">
+    <Sidenav mode={{ 'over' }} defaultOpened={{ false }} api={{ onApi }}>
+      <nav slot="drawer" style="width:160px; padding:16px; box-sizing:border-box;">
+        <strong>Drawer</strong>
+        <div style="margin-top:10px;">Driven by the imperative handle.</div>
+      </nav>
+      <div style="padding:16px;">The buttons call <code>api.open()</code> / <code>close()</code> / <code>toggle()</code>.</div>
+    </Sidenav>
+  </div>
+</div>

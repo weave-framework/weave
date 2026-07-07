@@ -107,6 +107,15 @@ import ExChipsControl from '../demos/ui/ex-chips-control';
 import ExChipsDisabled from '../demos/ui/ex-chips-disabled';
 import ExChipsReadonly from '../demos/ui/ex-chips-readonly';
 import ExChipsRemoveLabel from '../demos/ui/ex-chips-remove-label';
+import ExDatepickerBasic from '../demos/ui/ex-datepicker-basic';
+import ExDatepickerBounds from '../demos/ui/ex-datepicker-bounds';
+import ExDatepickerClearable from '../demos/ui/ex-datepicker-clearable';
+import ExDatepickerControl from '../demos/ui/ex-datepicker-control';
+import ExDatepickerEditable from '../demos/ui/ex-datepicker-editable';
+import ExDatepickerFilter from '../demos/ui/ex-datepicker-filter';
+import ExDatepickerFormat from '../demos/ui/ex-datepicker-format';
+import ExDatepickerPosition from '../demos/ui/ex-datepicker-position';
+import ExDatepickerStates from '../demos/ui/ex-datepicker-states';
 import ExDividerCustom from '../demos/ui/ex-divider-custom';
 import ExDividerHorizontal from '../demos/ui/ex-divider-horizontal';
 import ExDividerSemantic from '../demos/ui/ex-divider-semantic';
@@ -126,11 +135,30 @@ import ExFormFieldManualError from '../demos/ui/ex-form-field-manual-error';
 import ExFormFieldUnlabelled from '../demos/ui/ex-form-field-unlabelled';
 import ExFormFieldWrapCheckbox from '../demos/ui/ex-form-field-wrap-checkbox';
 import ExFormFieldWrapSelect from '../demos/ui/ex-form-field-wrap-select';
+import ExGridListBasic from '../demos/ui/ex-grid-list-basic';
+import ExGridListClass from '../demos/ui/ex-grid-list-class';
+import ExGridListCustomized from '../demos/ui/ex-grid-list-customized';
+import ExGridListItems from '../demos/ui/ex-grid-list-items';
+import ExGridListSpan from '../demos/ui/ex-grid-list-span';
+import ExGridListTiles from '../demos/ui/ex-grid-list-tiles';
 import ExIconColor from '../demos/ui/ex-icon-color';
 import ExIconLabel from '../demos/ui/ex-icon-label';
 import ExIconName from '../demos/ui/ex-icon-name';
 import ExIconSrc from '../demos/ui/ex-icon-src';
 import ExIconSvg from '../demos/ui/ex-icon-svg';
+import ExListBasic from '../demos/ui/ex-list-basic';
+import ExListClass from '../demos/ui/ex-list-class';
+import ExListDisabled from '../demos/ui/ex-list-disabled';
+import ExListDisabledRow from '../demos/ui/ex-list-disabled-row';
+import ExListMeta from '../demos/ui/ex-list-meta';
+import ExListPlain from '../demos/ui/ex-list-plain';
+import ExListReorderable from '../demos/ui/ex-list-reorderable';
+import ExPaginatorBasic from '../demos/ui/ex-paginator-basic';
+import ExPaginatorDisabled from '../demos/ui/ex-paginator-disabled';
+import ExPaginatorJump from '../demos/ui/ex-paginator-jump';
+import ExPaginatorLabelClass from '../demos/ui/ex-paginator-label-class';
+import ExPaginatorPageSize from '../demos/ui/ex-paginator-page-size';
+import ExPaginatorWindow from '../demos/ui/ex-paginator-window';
 import ExProgressBarClass from '../demos/ui/ex-progress-bar-class';
 import ExProgressBarDeterminate from '../demos/ui/ex-progress-bar-determinate';
 import ExProgressBarIndeterminate from '../demos/ui/ex-progress-bar-indeterminate';
@@ -156,6 +184,14 @@ import ExSelectOptions from '../demos/ui/ex-select-options';
 import ExSelectPosition from '../demos/ui/ex-select-position';
 import ExSelectStates from '../demos/ui/ex-select-states';
 import ExSelectValidation from '../demos/ui/ex-select-validation';
+import ExSidenavApi from '../demos/ui/ex-sidenav-api';
+import ExSidenavBackdrop from '../demos/ui/ex-sidenav-backdrop';
+import ExSidenavBasic from '../demos/ui/ex-sidenav-basic';
+import ExSidenavClass from '../demos/ui/ex-sidenav-class';
+import ExSidenavControlled from '../demos/ui/ex-sidenav-controlled';
+import ExSidenavModes from '../demos/ui/ex-sidenav-modes';
+import ExSidenavPosition from '../demos/ui/ex-sidenav-position';
+import ExSidenavResponsive from '../demos/ui/ex-sidenav-responsive';
 import ExSlideToggleBasic from '../demos/ui/ex-slide-toggle-basic';
 import ExSlideToggleForms from '../demos/ui/ex-slide-toggle-forms';
 import ExSlideToggleName from '../demos/ui/ex-slide-toggle-name';
@@ -168,6 +204,12 @@ import ExSliderFormat from '../demos/ui/ex-slider-format';
 import ExSliderRange from '../demos/ui/ex-slider-range';
 import ExSliderStep from '../demos/ui/ex-slider-step';
 import ExSliderUncontrolled from '../demos/ui/ex-slider-uncontrolled';
+import ExStepperBasic from '../demos/ui/ex-stepper-basic';
+import ExStepperDisabled from '../demos/ui/ex-stepper-disabled';
+import ExStepperExternalNav from '../demos/ui/ex-stepper-external-nav';
+import ExStepperLabels from '../demos/ui/ex-stepper-labels';
+import ExStepperLinear from '../demos/ui/ex-stepper-linear';
+import ExStepperOptional from '../demos/ui/ex-stepper-optional';
 import ExTabsActivateOnFocus from '../demos/ui/ex-tabs-activate-on-focus';
 import ExTabsBasic from '../demos/ui/ex-tabs-basic';
 import ExTabsClass from '../demos/ui/ex-tabs-class';
@@ -176,11 +218,26 @@ import ExTabsDisabled from '../demos/ui/ex-tabs-disabled';
 import ExTabsDisabledAll from '../demos/ui/ex-tabs-disabled-all';
 import ExTabsLabel from '../demos/ui/ex-tabs-label';
 import ExTabsUncontrolled from '../demos/ui/ex-tabs-uncontrolled';
+import ExTimepickerBasic from '../demos/ui/ex-timepicker-basic';
+import ExTimepickerBounds from '../demos/ui/ex-timepicker-bounds';
+import ExTimepickerClass from '../demos/ui/ex-timepicker-class';
+import ExTimepickerClearable from '../demos/ui/ex-timepicker-clearable';
+import ExTimepickerControl from '../demos/ui/ex-timepicker-control';
+import ExTimepickerFormat from '../demos/ui/ex-timepicker-format';
+import ExTimepickerPlaceholder from '../demos/ui/ex-timepicker-placeholder';
+import ExTimepickerPosition from '../demos/ui/ex-timepicker-position';
+import ExTimepickerStates from '../demos/ui/ex-timepicker-states';
+import ExTimepickerStep from '../demos/ui/ex-timepicker-step';
 import ExToolbarClass from '../demos/ui/ex-toolbar-class';
 import ExToolbarInk from '../demos/ui/ex-toolbar-ink';
 import ExToolbarParts from '../demos/ui/ex-toolbar-parts';
 import ExToolbarRole from '../demos/ui/ex-toolbar-role';
 import ExToolbarSticky from '../demos/ui/ex-toolbar-sticky';
+import ExTooltipBasic from '../demos/ui/ex-tooltip-basic';
+import ExTooltipDelay from '../demos/ui/ex-tooltip-delay';
+import ExTooltipDisabled from '../demos/ui/ex-tooltip-disabled';
+import ExTooltipOnButton from '../demos/ui/ex-tooltip-on-button';
+import ExTooltipPositions from '../demos/ui/ex-tooltip-positions';
 
 /**
  * Live-demo registry: maps a `:::demo <key>` directive to a real Weave component.
@@ -237,6 +294,15 @@ export const demos: Record<string, Component> = {
   'ex-chips-disabled': ExChipsDisabled,
   'ex-chips-readonly': ExChipsReadonly,
   'ex-chips-remove-label': ExChipsRemoveLabel,
+  'ex-datepicker-basic': ExDatepickerBasic,
+  'ex-datepicker-bounds': ExDatepickerBounds,
+  'ex-datepicker-clearable': ExDatepickerClearable,
+  'ex-datepicker-control': ExDatepickerControl,
+  'ex-datepicker-editable': ExDatepickerEditable,
+  'ex-datepicker-filter': ExDatepickerFilter,
+  'ex-datepicker-format': ExDatepickerFormat,
+  'ex-datepicker-position': ExDatepickerPosition,
+  'ex-datepicker-states': ExDatepickerStates,
   'ex-divider-custom': ExDividerCustom,
   'ex-divider-horizontal': ExDividerHorizontal,
   'ex-divider-semantic': ExDividerSemantic,
@@ -256,11 +322,30 @@ export const demos: Record<string, Component> = {
   'ex-form-field-unlabelled': ExFormFieldUnlabelled,
   'ex-form-field-wrap-checkbox': ExFormFieldWrapCheckbox,
   'ex-form-field-wrap-select': ExFormFieldWrapSelect,
+  'ex-grid-list-basic': ExGridListBasic,
+  'ex-grid-list-class': ExGridListClass,
+  'ex-grid-list-customized': ExGridListCustomized,
+  'ex-grid-list-items': ExGridListItems,
+  'ex-grid-list-span': ExGridListSpan,
+  'ex-grid-list-tiles': ExGridListTiles,
   'ex-icon-color': ExIconColor,
   'ex-icon-label': ExIconLabel,
   'ex-icon-name': ExIconName,
   'ex-icon-src': ExIconSrc,
   'ex-icon-svg': ExIconSvg,
+  'ex-list-basic': ExListBasic,
+  'ex-list-class': ExListClass,
+  'ex-list-disabled': ExListDisabled,
+  'ex-list-disabled-row': ExListDisabledRow,
+  'ex-list-meta': ExListMeta,
+  'ex-list-plain': ExListPlain,
+  'ex-list-reorderable': ExListReorderable,
+  'ex-paginator-basic': ExPaginatorBasic,
+  'ex-paginator-disabled': ExPaginatorDisabled,
+  'ex-paginator-jump': ExPaginatorJump,
+  'ex-paginator-label-class': ExPaginatorLabelClass,
+  'ex-paginator-page-size': ExPaginatorPageSize,
+  'ex-paginator-window': ExPaginatorWindow,
   'ex-progress-bar-class': ExProgressBarClass,
   'ex-progress-bar-determinate': ExProgressBarDeterminate,
   'ex-progress-bar-indeterminate': ExProgressBarIndeterminate,
@@ -286,6 +371,14 @@ export const demos: Record<string, Component> = {
   'ex-select-position': ExSelectPosition,
   'ex-select-states': ExSelectStates,
   'ex-select-validation': ExSelectValidation,
+  'ex-sidenav-api': ExSidenavApi,
+  'ex-sidenav-backdrop': ExSidenavBackdrop,
+  'ex-sidenav-basic': ExSidenavBasic,
+  'ex-sidenav-class': ExSidenavClass,
+  'ex-sidenav-controlled': ExSidenavControlled,
+  'ex-sidenav-modes': ExSidenavModes,
+  'ex-sidenav-position': ExSidenavPosition,
+  'ex-sidenav-responsive': ExSidenavResponsive,
   'ex-slide-toggle-basic': ExSlideToggleBasic,
   'ex-slide-toggle-forms': ExSlideToggleForms,
   'ex-slide-toggle-name': ExSlideToggleName,
@@ -298,6 +391,12 @@ export const demos: Record<string, Component> = {
   'ex-slider-range': ExSliderRange,
   'ex-slider-step': ExSliderStep,
   'ex-slider-uncontrolled': ExSliderUncontrolled,
+  'ex-stepper-basic': ExStepperBasic,
+  'ex-stepper-disabled': ExStepperDisabled,
+  'ex-stepper-external-nav': ExStepperExternalNav,
+  'ex-stepper-labels': ExStepperLabels,
+  'ex-stepper-linear': ExStepperLinear,
+  'ex-stepper-optional': ExStepperOptional,
   'ex-tabs-activate-on-focus': ExTabsActivateOnFocus,
   'ex-tabs-basic': ExTabsBasic,
   'ex-tabs-class': ExTabsClass,
@@ -306,11 +405,26 @@ export const demos: Record<string, Component> = {
   'ex-tabs-disabled-all': ExTabsDisabledAll,
   'ex-tabs-label': ExTabsLabel,
   'ex-tabs-uncontrolled': ExTabsUncontrolled,
+  'ex-timepicker-basic': ExTimepickerBasic,
+  'ex-timepicker-bounds': ExTimepickerBounds,
+  'ex-timepicker-class': ExTimepickerClass,
+  'ex-timepicker-clearable': ExTimepickerClearable,
+  'ex-timepicker-control': ExTimepickerControl,
+  'ex-timepicker-format': ExTimepickerFormat,
+  'ex-timepicker-placeholder': ExTimepickerPlaceholder,
+  'ex-timepicker-position': ExTimepickerPosition,
+  'ex-timepicker-states': ExTimepickerStates,
+  'ex-timepicker-step': ExTimepickerStep,
   'ex-toolbar-class': ExToolbarClass,
   'ex-toolbar-ink': ExToolbarInk,
   'ex-toolbar-parts': ExToolbarParts,
   'ex-toolbar-role': ExToolbarRole,
   'ex-toolbar-sticky': ExToolbarSticky,
+  'ex-tooltip-basic': ExTooltipBasic,
+  'ex-tooltip-delay': ExTooltipDelay,
+  'ex-tooltip-disabled': ExTooltipDisabled,
+  'ex-tooltip-on-button': ExTooltipOnButton,
+  'ex-tooltip-positions': ExTooltipPositions,
   'button-events': ButtonEvents,
   'button-variants': ButtonVariants,
   'button-disabled': ButtonDisabled,

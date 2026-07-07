@@ -1,0 +1,8 @@
+<div style="max-width:460px;">
+  <Stepper steps={{ steps }} value={{ idx() }} onChange={{ setIdx }} linear={{ true }} />
+  <div style="margin-top:12px;">
+    @if (idx() < 2) {
+      <Button variant={{ 'outline' }} on:click={{ completeCurrent }}>Mark step {{ idx() + 1 }} complete</Button>
+    }
+  </div>
+</div>

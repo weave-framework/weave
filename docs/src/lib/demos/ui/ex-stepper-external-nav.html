@@ -1,0 +1,7 @@
+<div style="max-width:460px;">
+  <Stepper steps={{ steps }} value={{ idx() }} onChange={{ setIdx }} showNav={{ false }} />
+  <div style="display:flex; gap:10px; margin-top:12px;">
+    <Button variant={{ 'outline' }} disabled={{ atStart() }} on:click={{ back }}>Previous</Button>
+    <Button disabled={{ atEnd() }} on:click={{ next }}>Next</Button>
+  </div>
+</div>

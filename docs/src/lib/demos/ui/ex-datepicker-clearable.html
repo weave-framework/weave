@@ -1,0 +1,4 @@
+<div style="max-width:280px; display:flex; flex-direction:column; gap:10px;">
+  <Datepicker value={{ date() }} onChange={{ setDate }} label={{ 'Date' }} clearable={{ true }} clearLabel={{ 'Reset date' }} />
+  <span style="color:var(--fg-muted)">Selected: {{ fmt(date()) }}</span>
+</div>

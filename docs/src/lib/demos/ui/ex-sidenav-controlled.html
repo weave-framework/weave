@@ -1,0 +1,15 @@
+<div style="display:flex; flex-direction:column; gap:10px;">
+  <div style="display:flex; gap:8px; align-items:center;">
+    <Button on:click={{ toggle }}>{{ open() ? 'Close' : 'Open' }} menu</Button>
+    <span style="color:var(--fg-muted)">opened = {{ open() }}</span>
+  </div>
+  <div style="height:200px; border:1px solid var(--border); border-radius:6px; overflow:hidden;">
+    <Sidenav mode={{ 'over' }} opened={{ open() }} onOpenedChange={{ setOpen }}>
+      <nav slot="drawer" style="width:160px; padding:16px; box-sizing:border-box;">
+        <strong>Menu</strong>
+        <div style="margin-top:10px;">Press Esc or click the backdrop to close.</div>
+      </nav>
+      <div style="padding:16px;">The button, Esc and the backdrop all funnel through <code>onOpenedChange</code>.</div>
+    </Sidenav>
+  </div>
+</div>

@@ -1,0 +1,19 @@
+<div style="display:flex; flex-direction:column; gap:10px;">
+  <div style="display:flex; gap:8px;">
+    <Button on:click={{ () => pick('side') }} variant={{ mode() === 'side' ? 'primary' : 'ghost' }}>side</Button>
+    <Button on:click={{ () => pick('over') }} variant={{ mode() === 'over' ? 'primary' : 'ghost' }}>over</Button>
+    <Button on:click={{ () => pick('push') }} variant={{ mode() === 'push' ? 'primary' : 'ghost' }}>push</Button>
+  </div>
+  <div style="height:200px; border:1px solid var(--border); border-radius:6px; overflow:hidden;">
+    <Sidenav mode={{ mode() }} opened={{ opened() }} onOpenedChange={{ setOpened }}>
+      <nav slot="drawer" style="width:150px; padding:16px; box-sizing:border-box;">
+        <strong>Drawer</strong>
+        <div style="margin-top:10px;">Mode: <code>{{ mode() }}</code></div>
+      </nav>
+      <div style="padding:16px;">
+        Content in <code>{{ mode() }}</code> mode.
+        <div style="margin-top:8px;"><Button on:click={{ () => setOpened(true) }}>Reopen drawer</Button></div>
+      </div>
+    </Sidenav>
+  </div>
+</div>

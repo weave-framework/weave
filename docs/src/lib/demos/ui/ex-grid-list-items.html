@@ -1,0 +1,7 @@
+<GridList>
+  @for (photo of photos(); track photo.id) {
+    <div class={{ photo.featured ? 'weave-grid-list__tile weave-grid-list__tile--accent' : 'weave-grid-list__tile' }}>
+      {{ photo.label }}
+    </div>
+  }
+</GridList>
