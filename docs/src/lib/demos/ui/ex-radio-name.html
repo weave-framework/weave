@@ -1,0 +1,10 @@
+<div style="display:flex; flex-direction:column; gap:10px;">
+  <RadioGroup
+    options={{ sizes }}
+    value={{ size() }}
+    onChange={{ setSize }}
+    name={{ 'size' }}
+    class={{ 'my-radio-group' }}
+    label={{ 'Size' }} />
+  <span style="color:var(--fg-muted)">Chosen: {{ size() }}</span>
+</div>

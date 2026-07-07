@@ -1,0 +1,9 @@
+<div style="display:flex; flex-direction:column; gap:12px;">
+  <SlideToggle
+    checked={{ subscribe() }}
+    onChange={{ setSubscribe }}
+    name={{ 'notifications' }}
+    class={{ 'my-toggle' }}
+    label={{ 'Email notifications' }} />
+  <span style="color:var(--fg-muted)">Submits as <code>notifications={{ subscribe() ? 'on' : '' }}</code></span>
+</div>

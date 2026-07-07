@@ -1,0 +1,11 @@
+<div style="display:flex; flex-direction:column; gap:18px;">
+  <div style="display:flex; flex-direction:column; gap:8px;">
+    <strong>Per-option: <code>team</code> disabled</strong>
+    <RadioGroup options={{ plans }} value={{ plan() }} onChange={{ setPlan }} label={{ 'Plan' }} />
+    <span style="color:var(--fg-muted)">Chosen: {{ plan() }}</span>
+  </div>
+  <div style="display:flex; flex-direction:column; gap:8px;">
+    <strong>Whole group disabled</strong>
+    <RadioGroup options={{ plans }} value={{ locked() }} disabled={{ true }} label={{ 'Plan (locked)' }} />
+  </div>
+</div>

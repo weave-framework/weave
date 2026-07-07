@@ -213,11 +213,19 @@ const examples: NavSection = {
     {
       label: 'Components',
       items: [
+        { label: 'Badge', path: '/examples/components/badge' },
         { label: 'Button', path: '/examples/components/button' },
+        { label: 'Button Toggle', path: '/examples/components/button-toggle' },
+        { label: 'Card', path: '/examples/components/card' },
         { label: 'Checkbox', path: '/examples/components/checkbox' },
+        { label: 'Divider', path: '/examples/components/divider' },
         { label: 'Input', path: '/examples/components/input' },
+        { label: 'Radio Group', path: '/examples/components/radio' },
+        { label: 'Ripple', path: '/examples/components/ripple' },
         { label: 'Select', path: '/examples/components/select' },
+        { label: 'Slide Toggle', path: '/examples/components/slide-toggle' },
         { label: 'Slider', path: '/examples/components/slider' },
+        { label: 'Toolbar', path: '/examples/components/toolbar' },
       ],
     },
     {

@@ -62,18 +62,47 @@ import DashboardApp from '../demos/examples/dashboard-app';
 import SettingsApp from '../demos/examples/settings-app';
 import WizardApp from '../demos/examples/wizard-app';
 import KanbanApp from '../demos/examples/kanban-app';
+import ExBadgeClass from '../demos/ui/ex-badge-class';
+import ExBadgeCount from '../demos/ui/ex-badge-count';
+import ExBadgeLabel from '../demos/ui/ex-badge-label';
+import ExBadgeMax from '../demos/ui/ex-badge-max';
+import ExBadgePosition from '../demos/ui/ex-badge-position';
+import ExBadgeVariants from '../demos/ui/ex-badge-variants';
 import ExButtonAriaCurrent from '../demos/ui/ex-button-aria-current';
 import ExButtonClass from '../demos/ui/ex-button-class';
 import ExButtonContent from '../demos/ui/ex-button-content';
 import ExButtonDisabled from '../demos/ui/ex-button-disabled';
 import ExButtonEvents from '../demos/ui/ex-button-events';
+import ExButtonToggleClass from '../demos/ui/ex-button-toggle-class';
+import ExButtonToggleDisabled from '../demos/ui/ex-button-toggle-disabled';
+import ExButtonToggleIcons from '../demos/ui/ex-button-toggle-icons';
+import ExButtonToggleMulti from '../demos/ui/ex-button-toggle-multi';
+import ExButtonToggleOptionDisabled from '../demos/ui/ex-button-toggle-option-disabled';
+import ExButtonToggleSingle from '../demos/ui/ex-button-toggle-single';
 import ExButtonType from '../demos/ui/ex-button-type';
 import ExButtonVariants from '../demos/ui/ex-button-variants';
+import ExCardClass from '../demos/ui/ex-card-class';
+import ExCardInteractive from '../demos/ui/ex-card-interactive';
+import ExCardMedia from '../demos/ui/ex-card-media';
+import ExCardMinimal from '../demos/ui/ex-card-minimal';
+import ExCardParts from '../demos/ui/ex-card-parts';
 import ExCheckboxBasic from '../demos/ui/ex-checkbox-basic';
 import ExCheckboxForms from '../demos/ui/ex-checkbox-forms';
 import ExCheckboxName from '../demos/ui/ex-checkbox-name';
 import ExCheckboxStates from '../demos/ui/ex-checkbox-states';
 import ExCheckboxTristate from '../demos/ui/ex-checkbox-tristate';
+import ExDividerCustom from '../demos/ui/ex-divider-custom';
+import ExDividerHorizontal from '../demos/ui/ex-divider-horizontal';
+import ExDividerSemantic from '../demos/ui/ex-divider-semantic';
+import ExDividerVertical from '../demos/ui/ex-divider-vertical';
+import ExRadioBasic from '../demos/ui/ex-radio-basic';
+import ExRadioDisabled from '../demos/ui/ex-radio-disabled';
+import ExRadioForms from '../demos/ui/ex-radio-forms';
+import ExRadioName from '../demos/ui/ex-radio-name';
+import ExRippleBasic from '../demos/ui/ex-ripple-basic';
+import ExRippleCentered from '../demos/ui/ex-ripple-centered';
+import ExRippleDisabled from '../demos/ui/ex-ripple-disabled';
+import ExRippleReactive from '../demos/ui/ex-ripple-reactive';
 import ExSelectAdornments from '../demos/ui/ex-select-adornments';
 import ExSelectBasic from '../demos/ui/ex-select-basic';
 import ExSelectClearable from '../demos/ui/ex-select-clearable';
@@ -83,6 +112,10 @@ import ExSelectOptions from '../demos/ui/ex-select-options';
 import ExSelectPosition from '../demos/ui/ex-select-position';
 import ExSelectStates from '../demos/ui/ex-select-states';
 import ExSelectValidation from '../demos/ui/ex-select-validation';
+import ExSlideToggleBasic from '../demos/ui/ex-slide-toggle-basic';
+import ExSlideToggleForms from '../demos/ui/ex-slide-toggle-forms';
+import ExSlideToggleName from '../demos/ui/ex-slide-toggle-name';
+import ExSlideToggleStates from '../demos/ui/ex-slide-toggle-states';
 import ExSliderBasic from '../demos/ui/ex-slider-basic';
 import ExSliderClass from '../demos/ui/ex-slider-class';
 import ExSliderControl from '../demos/ui/ex-slider-control';
@@ -91,6 +124,11 @@ import ExSliderFormat from '../demos/ui/ex-slider-format';
 import ExSliderRange from '../demos/ui/ex-slider-range';
 import ExSliderStep from '../demos/ui/ex-slider-step';
 import ExSliderUncontrolled from '../demos/ui/ex-slider-uncontrolled';
+import ExToolbarClass from '../demos/ui/ex-toolbar-class';
+import ExToolbarInk from '../demos/ui/ex-toolbar-ink';
+import ExToolbarParts from '../demos/ui/ex-toolbar-parts';
+import ExToolbarRole from '../demos/ui/ex-toolbar-role';
+import ExToolbarSticky from '../demos/ui/ex-toolbar-sticky';
 
 /**
  * Live-demo registry: maps a `:::demo <key>` directive to a real Weave component.
@@ -102,18 +140,47 @@ import ExSliderUncontrolled from '../demos/ui/ex-slider-uncontrolled';
  */
 export const demos: Record<string, Component> = {
   counter: CounterDemo,
+  'ex-badge-class': ExBadgeClass,
+  'ex-badge-count': ExBadgeCount,
+  'ex-badge-label': ExBadgeLabel,
+  'ex-badge-max': ExBadgeMax,
+  'ex-badge-position': ExBadgePosition,
+  'ex-badge-variants': ExBadgeVariants,
   'ex-button-aria-current': ExButtonAriaCurrent,
   'ex-button-class': ExButtonClass,
   'ex-button-content': ExButtonContent,
   'ex-button-disabled': ExButtonDisabled,
   'ex-button-events': ExButtonEvents,
+  'ex-button-toggle-class': ExButtonToggleClass,
+  'ex-button-toggle-disabled': ExButtonToggleDisabled,
+  'ex-button-toggle-icons': ExButtonToggleIcons,
+  'ex-button-toggle-multi': ExButtonToggleMulti,
+  'ex-button-toggle-option-disabled': ExButtonToggleOptionDisabled,
+  'ex-button-toggle-single': ExButtonToggleSingle,
   'ex-button-type': ExButtonType,
   'ex-button-variants': ExButtonVariants,
+  'ex-card-class': ExCardClass,
+  'ex-card-interactive': ExCardInteractive,
+  'ex-card-media': ExCardMedia,
+  'ex-card-minimal': ExCardMinimal,
+  'ex-card-parts': ExCardParts,
   'ex-checkbox-basic': ExCheckboxBasic,
   'ex-checkbox-forms': ExCheckboxForms,
   'ex-checkbox-name': ExCheckboxName,
   'ex-checkbox-states': ExCheckboxStates,
   'ex-checkbox-tristate': ExCheckboxTristate,
+  'ex-divider-custom': ExDividerCustom,
+  'ex-divider-horizontal': ExDividerHorizontal,
+  'ex-divider-semantic': ExDividerSemantic,
+  'ex-divider-vertical': ExDividerVertical,
+  'ex-radio-basic': ExRadioBasic,
+  'ex-radio-disabled': ExRadioDisabled,
+  'ex-radio-forms': ExRadioForms,
+  'ex-radio-name': ExRadioName,
+  'ex-ripple-basic': ExRippleBasic,
+  'ex-ripple-centered': ExRippleCentered,
+  'ex-ripple-disabled': ExRippleDisabled,
+  'ex-ripple-reactive': ExRippleReactive,
   'ex-select-adornments': ExSelectAdornments,
   'ex-select-basic': ExSelectBasic,
   'ex-select-clearable': ExSelectClearable,
@@ -123,6 +190,10 @@ export const demos: Record<string, Component> = {
   'ex-select-position': ExSelectPosition,
   'ex-select-states': ExSelectStates,
   'ex-select-validation': ExSelectValidation,
+  'ex-slide-toggle-basic': ExSlideToggleBasic,
+  'ex-slide-toggle-forms': ExSlideToggleForms,
+  'ex-slide-toggle-name': ExSlideToggleName,
+  'ex-slide-toggle-states': ExSlideToggleStates,
   'ex-slider-basic': ExSliderBasic,
   'ex-slider-class': ExSliderClass,
   'ex-slider-control': ExSliderControl,
@@ -131,6 +202,11 @@ export const demos: Record<string, Component> = {
   'ex-slider-range': ExSliderRange,
   'ex-slider-step': ExSliderStep,
   'ex-slider-uncontrolled': ExSliderUncontrolled,
+  'ex-toolbar-class': ExToolbarClass,
+  'ex-toolbar-ink': ExToolbarInk,
+  'ex-toolbar-parts': ExToolbarParts,
+  'ex-toolbar-role': ExToolbarRole,
+  'ex-toolbar-sticky': ExToolbarSticky,
   'button-events': ButtonEvents,
   'button-variants': ButtonVariants,
   'button-disabled': ButtonDisabled,

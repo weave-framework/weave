@@ -1,0 +1,5 @@
+<div style="display:flex; gap:24px; flex-wrap:wrap; align-items:center;">
+  <Badge content={{ count() || '' }}><Icon name={{ 'bell' }} label={{ 'Notifications' }} /></Badge>
+  <button on:click={{ inc }}>Add one</button>
+  <button on:click={{ clear }}>Clear</button>
+</div>
