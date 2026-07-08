@@ -8,6 +8,8 @@ $tokens: (
     text: ref.ref('color.sub'),
     text-active: ref.ref('color.ink'),
     marker: ref.ref('color.accent'),
+    // Opt-in sliding indicator (slidingIndicator) — its fill; app re-skins to a pill.
+    indicator: ref.ref('color.accent'),
     line: ref.ref('color.line'),
     disabled-text: ref.ref('color.sub'),
     panel-text: ref.ref('color.ink'),
@@ -19,6 +21,9 @@ $tokens: (
     gap: 7px,
     panel-padding-y: 14px,
     duration: ref.ref('motion.fast'),
+    // Sliding indicator: its default thickness (a bottom underline) + the slide/resize speed.
+    indicator-height: 2px,
+    indicator-duration: ref.ref('motion.sheet'),
   ),
   typography: (
     tab-size: 13px,

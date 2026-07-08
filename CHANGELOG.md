@@ -10,6 +10,10 @@
 > `pnpm publish:packages`) — pushing code does **not** publish to npm. (The scheme started at
 > `0.2.0`; the line crossed `1.0.0` on 2026-07-05 when the public API was frozen.)
 
+## 1.5.3 — 2026-07-08
+
+- **1.5.3 — feat(ui):** `<Tabs>` `slidingIndicator` (FW-13) — opt-in animated marker. When set, the framework renders one `.weave-tabs__indicator` in the tab list and slides + resizes it (`transform: translateX` + `width`) to the active tab's box on every selection and on resize (ResizeObserver), the CSS transition doing the animation. Default look is a bottom accent underline (`--weave-tabs-indicator-*` tokens); app CSS re-skins it to a pill. Off by default (Weave has no sliding marker unless asked); torn down (observer disconnected) on unmount. Composes with `tabTemplate`.
+
 ## 1.5.2 — 2026-07-08
 
 - **1.5.2 — feat(ui):** `<Tabs>` `tabTemplate` (FW-12) — an authored `@snippet` renders the whole content of each `role="tab"` button (icon + label, badge, two lines) from the tab's `TabRowContext` (`item` + `data`, `label`, `index`, reactive `selected`, `disabled`). `<Tabs>`/`TabItem` are now generic over the item payload (`data?: T`). The framework keeps the button, ARIA, roving tabindex and panels; `label` stays the accessible name. Re-renders per tab on `selected` change, bindings owned/disposed cleanly. Omit → the default label span (back-compatible). Mirrors the menu's `itemTemplate` (FW-10).

@@ -171,6 +171,30 @@ By default activation is **manual** — Arrow keys move focus, Enter / Space / c
 ~~~
 :::
 
+## Sliding indicator — `slidingIndicator`
+
+Opt into an animated marker that **slides and resizes** to the active tab. The framework renders one
+`.weave-tabs__indicator` element inside the list and, on every selection (and on resize), sets its
+`transform: translateX()` + `width` to the active tab's box — the CSS transition does the rest. The
+default look is a bottom accent underline; app CSS re-skins `.weave-tabs__indicator` to a pill (fill,
+radius, full height). Off by default — Weave has no sliding marker unless asked.
+
+:::demo ex-tabs-sliding-indicator
+
+:::tabs
+~~~html title="app.html"
+<Tabs tabs={{ tabs }} value={{ idx() }} onChange={{ setIdx }} slidingIndicator={{ true }} />
+~~~
+~~~scss title="app.scss"
+// Re-skin the default underline into a sliding pill:
+.weave-tabs__indicator {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--surface-active);
+}
+~~~
+:::
+
 ## Custom tab-button content — `tabTemplate`
 
 `tabTemplate` hands `<Tabs>` an authored `@snippet` that renders the **whole** content of each

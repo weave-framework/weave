@@ -23,7 +23,7 @@
  *   <Tabs tabs={{ tabs }} value={{ index() }} onChange={{ setIndex }} />
  */
 
-import { signal, computed, effect, root, onMount, type Signal } from '@weave-framework/runtime';
+import { signal, computed, effect, root, onMount, onDispose, type Signal } from '@weave-framework/runtime';
 import { listKeyManager, type ListKeyManager } from '../cdk/key-manager.js';
 
 /** A tab panel's content: a DOM node, a plain string, or a factory returning a node. */
@@ -86,11 +86,22 @@ export interface TabsProps<T = unknown> {
    * fully back-compatible.
    */
   tabTemplate?: (row: TabRowContext<T>) => Node;
+  /**
+   * Opt-in: render one animated `.weave-tabs__indicator` element inside the tab list that slides +
+   * resizes (`transform: translateX` + `width`) to the active tab's box on every selection (and on
+   * resize). Default false — the static `::before` accent marker. The framework owns the element +
+   * geometry; app CSS owns the look (fill, radius, height). Weave has no sliding marker by default,
+   * so this must be asked for.
+   */
+  slidingIndicator?: boolean;
 }
 
 export const template: string =
   '<div class={{ rootClass() }} ref={{ host }}>' +
   '<div class="weave-tabs__list" role="tablist" aria-label={{ label() }} on:keydown={{ onKeydown }}>' +
+  '@if (hasIndicator()) {' +
+  '<div class="weave-tabs__indicator" ref={{ indicator }} aria-hidden="true"></div>' +
+  '}' +
   '@for (tab of tabs(); track $index) {' +
   '<button class="weave-tabs__tab" type="button" role="tab" id={{ tabId($index) }}' +
   ' aria-controls={{ panelId($index) }} aria-selected={{ selectedAttr($index) }}' +
@@ -110,10 +121,12 @@ export const template: string =
 
 export interface TabsContext<T = unknown> {
   host: Signal<Element | null>;
+  indicator: Signal<Element | null>;
   tabs: () => TabItem<T>[];
   rootClass: () => string;
   label: () => string | undefined;
   hasTemplate: () => boolean;
+  hasIndicator: () => boolean;
   tabId: (index: number) => string;
   panelId: (index: number) => string;
   selectedAttr: (index: number) => string;
@@ -135,6 +148,7 @@ function toNode(content: TabContent): Node {
 
 export function setup<T = unknown>(props: TabsProps<T>): TabsContext<T> {
   const host: Signal<Element | null> = signal<Element | null>(null);
+  const indicator: Signal<Element | null> = signal<Element | null>(null);
   const uid: number = (_uid += 1);
   const uncontrolled: Signal<number> = signal<number>(props.defaultIndex ?? 0);
 
@@ -142,6 +156,7 @@ export function setup<T = unknown>(props: TabsProps<T>): TabsContext<T> {
   const selectedIndex = (): number => (props.value !== undefined ? props.value : uncontrolled());
   const isTabDisabled = (tab: TabItem<T>): boolean => !!props.disabled || !!tab.disabled;
   const hasTemplate = (): boolean => typeof props.tabTemplate === 'function';
+  const hasIndicator = (): boolean => !!props.slidingIndicator;
 
   const tabId = (index: number): string => `weave-tabs-${uid}-tab-${index}`;
   const panelId = (index: number): string => `weave-tabs-${uid}-panel-${index}`;
@@ -201,31 +216,53 @@ export function setup<T = unknown>(props: TabsProps<T>): TabsContext<T> {
       panels[i]?.append(toNode(tab.content));
     });
 
-    const tpl: TabsProps<T>['tabTemplate'] = props.tabTemplate;
-    if (!tpl) return;
     const buttons: NodeListOf<HTMLElement> = el.querySelectorAll<HTMLElement>('.weave-tabs__tab');
-    tabs().forEach((tab, i) => {
-      const btn: HTMLElement | undefined = buttons[i];
-      if (!btn) return;
-      const isSelected: () => boolean = computed(() => i === selectedIndex());
-      effect(() => {
-        const selected: boolean = isSelected();
-        return root((dispose) => {
-          btn.replaceChildren(
-            tpl({ item: tab, label: tab.label, index: i, selected, disabled: isTabDisabled(tab) })
-          );
-          return dispose;
+
+    const tpl: TabsProps<T>['tabTemplate'] = props.tabTemplate;
+    if (tpl) {
+      tabs().forEach((tab, i) => {
+        const btn: HTMLElement | undefined = buttons[i];
+        if (!btn) return;
+        const isSelected: () => boolean = computed(() => i === selectedIndex());
+        effect(() => {
+          const selected: boolean = isSelected();
+          return root((dispose) => {
+            btn.replaceChildren(
+              tpl({ item: tab, label: tab.label, index: i, selected, disabled: isTabDisabled(tab) })
+            );
+            return dispose;
+          });
         });
       });
-    });
+    }
+
+    // FW-13 sliding indicator: measure the active tab's box and slide the indicator to it on every
+    // selection change (reactive) and on any resize (ResizeObserver → a bump signal). Geometry only;
+    // the CSS transition does the animation. Torn down with the component (observer disconnected).
+    if (props.slidingIndicator) {
+      const bump: Signal<number> = signal<number>(0);
+      const ro: ResizeObserver = new ResizeObserver(() => bump.set(bump() + 1));
+      ro.observe(el);
+      onDispose(() => ro.disconnect());
+      effect(() => {
+        bump(); // re-measure on any resize
+        const active: HTMLElement | undefined = buttons[selectedIndex()];
+        const ind: Element | null = indicator();
+        if (!(ind instanceof HTMLElement) || !active) return;
+        ind.style.transform = `translateX(${active.offsetLeft}px)`;
+        ind.style.width = `${active.offsetWidth}px`;
+      });
+    }
   });
 
   return {
     host,
+    indicator,
     tabs,
     rootClass: (): string => (props.class ? `weave-tabs ${props.class}` : 'weave-tabs'),
     label: (): string | undefined => props.label,
     hasTemplate,
+    hasIndicator,
     tabId,
     panelId,
     selectedAttr: (index): string => (index === selectedIndex() ? 'true' : 'false'),

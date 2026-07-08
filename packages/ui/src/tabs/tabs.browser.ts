@@ -18,14 +18,15 @@ const rt: typeof dom & { signal: typeof signal; effect: typeof effect } = { ...d
 const tick = (): Promise<void> => new Promise<void>((r) => queueMicrotask(r));
 
 const SCOPE: string[] = [
-  'host', 'tabs', 'rootClass', 'label', 'hasTemplate', 'tabId', 'panelId', 'selectedAttr',
-  'disabledAttr', 'ariaLabel', 'tabTabindex', 'isHidden', 'select', 'onKeydown',
+  'host', 'indicator', 'tabs', 'rootClass', 'label', 'hasTemplate', 'hasIndicator', 'tabId', 'panelId',
+  'selectedAttr', 'disabledAttr', 'ariaLabel', 'tabTabindex', 'isHidden', 'select', 'onKeydown',
 ];
 
 interface Mounted {
   root: HTMLElement;
   tabsEls: HTMLButtonElement[];
   panels: HTMLElement[];
+  indicator: HTMLElement | null;
   dispose: () => void;
 }
 
@@ -46,6 +47,7 @@ function mount(props: TabsProps): Mounted {
     root,
     tabsEls: Array.from(root.querySelectorAll<HTMLButtonElement>('.weave-tabs__tab')),
     panels: Array.from(root.querySelectorAll<HTMLElement>('.weave-tabs__panel')),
+    indicator: root.querySelector<HTMLElement>('.weave-tabs__indicator'),
     dispose: (): void => { disposeOwner(owner); root.remove(); },
   };
 }
@@ -320,4 +322,52 @@ test('tabTemplate rows are torn down on unmount — no effect fires after dispos
   idx.set(2); // would re-run a live row effect; must be a no-op after dispose
   await tick();
   assert.equal(renders, afterMount, 'no row re-render after dispose (owner torn down)');
+});
+
+/* ─────────────────────────── FW-13 · slidingIndicator ─────────────────────────── */
+
+test('no slidingIndicator → no indicator element (back-compatible) (FW-13)', () => {
+  const { root, indicator, dispose } = mount({ tabs: TABS });
+  assert.equal(indicator, null, 'no indicator without the opt-in');
+  assert.equal(root.querySelector('.weave-tabs__indicator'), null);
+  dispose();
+});
+
+test('slidingIndicator renders exactly one decorative indicator inside the tab list (FW-13)', () => {
+  const { root, indicator, dispose } = mount({ tabs: TABS, slidingIndicator: true });
+  assert.ok(indicator, 'indicator element rendered');
+  assert.equal(root.querySelectorAll('.weave-tabs__indicator').length, 1, 'exactly one');
+  assert.equal(indicator!.getAttribute('aria-hidden'), 'true', 'decorative (aria-hidden)');
+  assert.ok(indicator!.closest('.weave-tabs__list'), 'sits inside the tab list');
+  dispose();
+});
+
+test('slidingIndicator positions the indicator to the active tab box on mount (FW-13)', async () => {
+  const { tabsEls, indicator, dispose } = mount({ tabs: TABS, slidingIndicator: true, defaultIndex: 0 });
+  await tick();
+  assert.equal(indicator!.style.transform, `translateX(${tabsEls[0].offsetLeft}px)`, 'translateX = active tab offsetLeft');
+  assert.equal(indicator!.style.width, `${tabsEls[0].offsetWidth}px`, 'width = active tab offsetWidth');
+  assert.notEqual(indicator!.style.width, '', 'geometry actually measured');
+  dispose();
+});
+
+test('slidingIndicator slides + resizes to the clicked tab (FW-13)', async () => {
+  const { tabsEls, indicator, dispose } = mount({ tabs: TABS, slidingIndicator: true });
+  await tick();
+  const before: string = indicator!.style.transform;
+  tabsEls[2].click();
+  await tick();
+  assert.equal(indicator!.style.transform, `translateX(${tabsEls[2].offsetLeft}px)`, 'slid to tab 2 offsetLeft');
+  assert.equal(indicator!.style.width, `${tabsEls[2].offsetWidth}px`, 'resized to tab 2 width');
+  assert.notEqual(indicator!.style.transform, before, 'geometry moved from the initial tab');
+  dispose();
+});
+
+test('slidingIndicator + tabTemplate compose (FW-13)', async () => {
+  const { root, indicator, dispose } = mount({ tabs: ICON_TABS, tabTemplate: iconRow, slidingIndicator: true } as TabsProps);
+  await tick();
+  assert.ok(indicator, 'indicator rendered alongside a custom tab template');
+  assert.ok(root.querySelector('.weave-tabs__tab .tpl-btn'), 'tab template still renders');
+  assert.notEqual(indicator!.style.width, '', 'indicator still measured with a custom template');
+  dispose();
 });

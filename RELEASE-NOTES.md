@@ -7,6 +7,12 @@ the previous one. For the granular, per-version log see [CHANGELOG.md](CHANGELOG
 
 ### ✨ Features — `@weave-framework/ui`
 
+- **Tabs — sliding indicator (`slidingIndicator`).** Opt into an animated marker that slides and
+  resizes to the active tab. The framework renders one `.weave-tabs__indicator` in the list and, on
+  every selection (and on resize), sets its `transform: translateX()` + `width` to the active tab's
+  box — the CSS transition animates it. Default look is a bottom accent underline
+  (`--weave-tabs-indicator-*` tokens); app CSS re-skins it to a pill. Off by default. Composes with
+  `tabTemplate`.
 - **Tabs — custom tab-button content (`tabTemplate`).** Hand `<Tabs>` an authored `@snippet` and it
   renders the whole content of each `role="tab"` button — an icon before the label, a badge, two
   lines — from each tab's `TabRowContext` (`item` + your `data` payload, `label`, `index`, reactive

@@ -11,8 +11,26 @@
 
   // The tab row sits over a 1px rule (design).
   .weave-tabs__list {
+    position: relative; // anchors the opt-in sliding indicator
     display: flex;
     border-bottom: 1px solid var(--weave-tabs-line);
+  }
+
+  // Opt-in (slidingIndicator): one element the framework slides + resizes to the active tab's box
+  // via inline `transform: translateX()` + `width` (set in JS). Default look = a bottom underline in
+  // the accent colour; app CSS re-skins it to a pill (fill, radius, full height). `transform` +
+  // `width` transition together so it slides AND grows. Honours reduced-motion via the global mixin.
+  .weave-tabs__indicator {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: var(--weave-tabs-indicator-height);
+    background: var(--weave-tabs-indicator);
+    transition:
+      transform var(--weave-tabs-indicator-duration) ease,
+      width var(--weave-tabs-indicator-duration) ease;
+    will-change: transform, width;
+    pointer-events: none;
   }
 
   .weave-tabs__tab {

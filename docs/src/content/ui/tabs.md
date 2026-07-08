@@ -65,6 +65,7 @@ skipping disabled), **Home / End** jump to the ends, and the panel is focusable.
 | `onChange` | `(index: number) => void` | — | Called with the next index on selection. |
 | `defaultIndex` | `number` | `0` | Uncontrolled initial index. |
 | `activateOnFocus` | `boolean` | `false` | Selection follows focus as you arrow. |
+| `slidingIndicator` | `boolean` | `false` | Render an animated `.weave-tabs__indicator` that slides + resizes to the active tab. App CSS owns its look. |
 | `disabled` | `boolean` | `false` | Disable the whole tab set. |
 | `label` | `string` | — | Accessible name for the `role="tablist"`. |
 | `tabTemplate` | `(row: TabRowContext<T>) => Node` | — | Renders the whole content of each tab button (replacing the default label span) from the tab's data + state. See below. |
