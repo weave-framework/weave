@@ -3,6 +3,16 @@
 Human-readable highlights, one section per release — everything notable that landed since
 the previous one. For the granular, per-version log see [CHANGELOG.md](CHANGELOG.md).
 
+## Unreleased
+
+### 🔒 Security
+
+- **prettier-plugin — ReDoS hardening.** The `<script>`/`<style>`/`lang` detection regexes in the
+  plugin's `parse.ts` no longer use the ambiguous `(\s[^>]*)?` form that CodeQL flagged as polynomial
+  backtracking (5 `js/polynomial-redos` alerts). They now use a zero-width `(?=[\s>])` assertion and
+  read `lang` from the captured `<style>` attributes, not a second whole-document scan. Formatting
+  behaviour is unchanged.
+
 ## 1.5.0 — 2026-07-07
 
 Everything since **1.4.0** (developed locally as `1.4.1`→`1.4.22` in batch mode, released here as a

@@ -50,6 +50,18 @@ await esbuild({
   outfile: compilerOut,
 });
 const { parseTemplate } = await import(pathToFileURL(compilerOut).href);
+// The tag-detection regexes, bundled straight from parse.ts, for the ReDoS sentinel.
+const parseOut = join(cacheDir, 'parse-for-test.mjs');
+await esbuild({
+  entryPoints: [join(here, '..', 'src', 'parse.ts')],
+  bundle: true,
+  format: 'esm',
+  platform: 'node',
+  target: 'node18',
+  external: ['prettier'],
+  outfile: parseOut,
+});
+const { SCRIPT_OPEN, STYLE_OPEN, STYLE_LANG } = await import(pathToFileURL(parseOut).href);
 
 const fmt = (src, filepath) => prettier.format(src, { parser: 'weave', plugins: [plugin], filepath });
 
@@ -145,6 +157,33 @@ const  count=signal(0)
   const html = `<div><p>hi</p></div>`;
   const f = await prettier.format(html, { parser: 'html' });
   ok(!f.includes('weave'), 'plain HTML via parser:"html" is unaffected by the plugin');
+}
+
+/* ── 5. <style lang="scss"> routes to the scss printer (exercises the STYLE_OPEN capture →
+      STYLE_LANG-on-attributes path from the ReDoS-hardening rewrite) ── */
+{
+  const src = `<script>\nconst x = 1\n</script>\n<div>{{ x }}</div>\n<style lang="scss">\n$c:red;.x{color:$c}\n</style>`;
+  const f1 = await fmt(src, 'Themed.weave');
+  // The css printer can't parse `$c` (leaves it raw); the scss printer formats it with spacing.
+  ok(/\$c: red;/.test(f1), '<style lang="scss"> is formatted via the scss printer (lang detected on the tag)');
+}
+
+/* ── 6. ReDoS hardening — pin the tag-detection regexes' shape + semantics. CodeQL js/polynomial-redos
+      flagged the old ambiguous `(\s[^>]*)?` (where `\s ⊆ [^>]`); the hardened forms below drop that
+      overlap for a zero-width `(?=[\s>])` assertion and read `lang` only from the captured tag attrs. ── */
+{
+  ok(SCRIPT_OPEN instanceof RegExp && STYLE_OPEN instanceof RegExp && STYLE_LANG instanceof RegExp, 'detection regexes exported from parse.ts');
+  // Structural guard: the ambiguous `\s[^>]*` overlap CodeQL flagged must be gone from every regex.
+  const noOverlap = (re) => !/\\s\[\^>\]/.test(re.source);
+  ok(noOverlap(SCRIPT_OPEN) && noOverlap(STYLE_OPEN) && noOverlap(STYLE_LANG), 'no `\\s[^>]*` overlap remains (the polynomial-backtracking witness)');
+  // Detection semantics preserved: real tags match, look-alikes do not.
+  ok(SCRIPT_OPEN.test('<script>') && SCRIPT_OPEN.test('<script type="module">'), 'SCRIPT_OPEN matches real <script> tags');
+  ok(!SCRIPT_OPEN.test('<scripting>') && !SCRIPT_OPEN.test('<scriptx>'), 'SCRIPT_OPEN rejects <script>-prefixed look-alikes');
+  ok(STYLE_OPEN.test('<style>') && STYLE_OPEN.test('<style lang="scss">') && !STYLE_OPEN.test('<styled>'), 'STYLE_OPEN matches real <style> tags only');
+  // lang read from the STYLE_OPEN capture (group 1 = the tag attributes), not the whole document.
+  const sm = '<style lang="scss" nonce="x">.a{}'.match(STYLE_OPEN);
+  ok(sm && (sm[1].match(STYLE_LANG)?.[1] ?? '').toLowerCase() === 'scss', 'STYLE_OPEN captures attrs → STYLE_LANG reads lang="scss" from them');
+  ok(('' /* bare <style> */).match(STYLE_LANG) === null, 'STYLE_LANG on empty attrs → no lang (defaults to css)');
 }
 
 console.log(failures ? `\n✖ ${failures} check(s) failed\n` : '\n✓ all checks passed\n');

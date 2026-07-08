@@ -10,9 +10,13 @@ import { format } from 'prettier';
 import type { Options, ParserOptions } from 'prettier';
 import type { SfcBlock, WeaveRoot } from './ast.js';
 
-const SCRIPT_OPEN: RegExp = /<script(\s[^>]*)?>/i;
-const STYLE_OPEN: RegExp = /<style(\s[^>]*)?>/i;
-const STYLE_LANG: RegExp = /<style[^>]*\blang\s*=\s*["']?(scss|sass|css)/i;
+// Linear (no catastrophic backtracking): a zero-width `(?=[\s>])` assertion replaces the ambiguous
+// `\s[^>]*` (where `\s ⊆ [^>]`), and `[^>]*>` has disjoint char classes. `STYLE_LANG` runs on the
+// captured attribute slice (STYLE_OPEN group 1), never the whole document — so `lang` can only match
+// inside the actual `<style …>` tag.
+export const SCRIPT_OPEN: RegExp = /<script(?=[\s>])[^>]*>/i;
+export const STYLE_OPEN: RegExp = /<style(?=[\s>])([^>]*)>/i;
+export const STYLE_LANG: RegExp = /\blang\s*=\s*["']?(scss|sass|css)/i;
 
 export async function parseWeave(text: string, options: ParserOptions): Promise<WeaveRoot> {
   if (!isSfc(text, options)) {
@@ -37,7 +41,7 @@ export async function parseWeave(text: string, options: ParserOptions): Promise<
   }
   const styleM: RegExpMatchArray | null = text.match(STYLE_OPEN);
   if (loc.styles && styleM) {
-    const langM: RegExpMatchArray | null = text.match(STYLE_LANG);
+    const langM: RegExpMatchArray | null = (styleM[1] ?? '').match(STYLE_LANG);
     const parser: string = langM && (langM[1] === 'scss' || langM[1] === 'sass') ? 'scss' : 'css';
     blocks.push({
       kind: 'style',

@@ -10,6 +10,10 @@
 > `pnpm publish:packages`) — pushing code does **not** publish to npm. (The scheme started at
 > `0.2.0`; the line crossed `1.0.0` on 2026-07-05 when the public API was frozen.)
 
+## 1.5.1 — 2026-07-08
+
+- **1.5.1 — fix(prettier-plugin), security:** hardened the SFC/template tag-detection regexes in `parse.ts` against polynomial ReDoS (CodeQL `js/polynomial-redos`, 5 alerts). The ambiguous `(\s[^>]*)?` (where `\s ⊆ [^>]`) is replaced by a zero-width `(?=[\s>])` assertion, and `lang` is now read from the captured `<style>` attribute slice instead of a second full-document scan. Detection semantics unchanged; smoke tests + a regression sentinel added.
+
 ## 1.5.0 — 2026-07-07
 
 Released from the local batch `1.4.1`→`1.4.22` (npm went `1.4.0` → `1.5.0` directly). Per-step log:
