@@ -1,0 +1,15 @@
+<div style="max-width:460px; display:flex; flex-direction:column; gap:8px;">
+  <Tabs
+    tabs={{ tabs }}
+    value={{ idx() }}
+    onChange={{ setIdx }}
+    tabTemplate={{ tabButton }}
+    label={{ 'Account settings' }}
+  />
+  <span style="color:var(--fg-muted)">Active: {{ tabs[idx()].label }}</span>
+
+  @snippet tabButton(row) {
+    <Icon name={{ row.item.data.icon }} />
+    <span>{{ row.label }}</span>
+  }
+</div>

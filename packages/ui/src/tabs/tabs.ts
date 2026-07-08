@@ -13,28 +13,58 @@
  * move focus; **activation is manual by default** (Enter/Space/click selects) or follows
  * focus when `activateOnFocus`.
  *
+ * Each tab button renders its `label` by default; pass **`tabTemplate`** (an authored
+ * `@snippet`, parallels the menu's `itemTemplate` — FW-10/FW-12) to render the whole
+ * button content — an icon before the label, a badge, two lines — from the tab's data +
+ * state. The framework still owns the `<button role=tab>`, ARIA, roving tabindex and the
+ * panels; the template only fills the button's inner content.
+ *
  *   import Tabs from '@weave-framework/ui/tabs';
  *   <Tabs tabs={{ tabs }} value={{ index() }} onChange={{ setIndex }} />
  */
 
-import { signal, onMount, type Signal } from '@weave-framework/runtime';
+import { signal, computed, effect, root, onMount, type Signal } from '@weave-framework/runtime';
 import { listKeyManager, type ListKeyManager } from '../cdk/key-manager.js';
 
 /** A tab panel's content: a DOM node, a plain string, or a factory returning a node. */
 export type TabContent = Node | string | (() => Node);
 
-export interface TabItem {
-  /** Tab label text. */
+export interface TabItem<T = unknown> {
+  /** Tab label text — also the accessible name (`aria-label`) + typeahead when templated. */
   label: string;
   /** Panel content, shown when this tab is active. */
   content: TabContent;
   /** Disable just this tab (not selectable, skipped in keyboard nav). */
   disabled?: boolean;
+  /** Arbitrary payload a {@link TabsProps.tabTemplate} can read (e.g. `{ icon: 'shield' }`). */
+  data?: T;
 }
 
-export interface TabsProps {
+/**
+ * The per-tab context handed to a {@link TabsProps.tabTemplate}. The template (an authored
+ * `@snippet`) renders the whole button content — icon/label/badge — binding these fields.
+ * Parallels the menu's `MenuRowContext` (FW-10).
+ */
+export interface TabRowContext<T = unknown> {
+  /** The tab's data object (bind `row.item.label`, `row.item.data.*`). */
+  item: TabItem<T>;
+  /** The tab's label — also the accessible name + typeahead text. */
+  label: string;
+  /** Zero-based position in the tab strip. */
+  index: number;
+  /**
+   * True when this is the active tab. A snapshot; the template re-renders when it flips, so
+   * you can restyle the active tab from it — or keep relying on the `[aria-selected='true']`
+   * CSS hook the framework maintains on the button.
+   */
+  selected: boolean;
+  /** Is this tab disabled (greyed, skipped by keyboard nav, not selectable). */
+  disabled: boolean;
+}
+
+export interface TabsProps<T = unknown> {
   /** The tabs, left to right. */
-  tabs: TabItem[];
+  tabs: TabItem<T>[];
   /** Controlled selected index. */
   value?: number;
   /** Called with the next index on selection. */
@@ -49,6 +79,13 @@ export interface TabsProps {
   label?: string;
   /** Extra classes, forwarded onto the container. */
   class?: string;
+  /**
+   * Renders the WHOLE content of each `role="tab"` button (replacing the default label span
+   * + accent marker) from the tab's {@link TabRowContext}. The framework keeps the button,
+   * ARIA, roving tabindex and panels. Omit for the default (label span + `::before` marker) —
+   * fully back-compatible.
+   */
+  tabTemplate?: (row: TabRowContext<T>) => Node;
 }
 
 export const template: string =
@@ -57,9 +94,11 @@ export const template: string =
   '@for (tab of tabs(); track $index) {' +
   '<button class="weave-tabs__tab" type="button" role="tab" id={{ tabId($index) }}' +
   ' aria-controls={{ panelId($index) }} aria-selected={{ selectedAttr($index) }}' +
-  ' aria-disabled={{ disabledAttr(tab) }} tabindex={{ tabTabindex($index) }}' +
+  ' aria-disabled={{ disabledAttr(tab) }} aria-label={{ ariaLabel(tab) }} tabindex={{ tabTabindex($index) }}' +
   ' on:click={{ () => select($index) }}>' +
+  '@if (!hasTemplate()) {' +
   '<span class="weave-tabs__label">{{ tab.label }}</span>' +
+  '}' +
   '</button>' +
   '}' +
   '</div>' +
@@ -69,15 +108,17 @@ export const template: string =
   '}' +
   '</div>';
 
-export interface TabsContext {
+export interface TabsContext<T = unknown> {
   host: Signal<Element | null>;
-  tabs: () => TabItem[];
+  tabs: () => TabItem<T>[];
   rootClass: () => string;
   label: () => string | undefined;
+  hasTemplate: () => boolean;
   tabId: (index: number) => string;
   panelId: (index: number) => string;
   selectedAttr: (index: number) => string;
-  disabledAttr: (tab: TabItem) => string | undefined;
+  disabledAttr: (tab: TabItem<T>) => string | undefined;
+  ariaLabel: (tab: TabItem<T>) => string | undefined;
   tabTabindex: (index: number) => number;
   isHidden: (index: number) => boolean;
   select: (index: number) => void;
@@ -92,19 +133,20 @@ function toNode(content: TabContent): Node {
   return content;
 }
 
-export function setup(props: TabsProps): TabsContext {
+export function setup<T = unknown>(props: TabsProps<T>): TabsContext<T> {
   const host: Signal<Element | null> = signal<Element | null>(null);
   const uid: number = (_uid += 1);
   const uncontrolled: Signal<number> = signal<number>(props.defaultIndex ?? 0);
 
-  const tabs = (): TabItem[] => props.tabs ?? [];
+  const tabs = (): TabItem<T>[] => props.tabs ?? [];
   const selectedIndex = (): number => (props.value !== undefined ? props.value : uncontrolled());
-  const isTabDisabled = (tab: TabItem): boolean => !!props.disabled || !!tab.disabled;
+  const isTabDisabled = (tab: TabItem<T>): boolean => !!props.disabled || !!tab.disabled;
+  const hasTemplate = (): boolean => typeof props.tabTemplate === 'function';
 
   const tabId = (index: number): string => `weave-tabs-${uid}-tab-${index}`;
   const panelId = (index: number): string => `weave-tabs-${uid}-panel-${index}`;
 
-  const manager: ListKeyManager<TabItem> = listKeyManager(tabs, {
+  const manager: ListKeyManager<TabItem<T>> = listKeyManager(tabs, {
     orientation: 'horizontal',
     wrap: true,
     skipDisabled: true,
@@ -123,7 +165,7 @@ export function setup(props: TabsProps): TabsContext {
   };
 
   const select = (index: number): void => {
-    const tab: TabItem | undefined = tabs()[index];
+    const tab: TabItem<T> | undefined = tabs()[index];
     if (!tab || isTabDisabled(tab)) return;
     manager.setActiveItem(index); // roving tab stop follows the interaction
     if (index === selectedIndex()) return;
@@ -147,13 +189,34 @@ export function setup(props: TabsProps): TabsContext {
     }
   };
 
-  // Panel contents are arbitrary — append them into their panels once in the DOM.
+  // Panel contents are arbitrary — append them into their panels once in the DOM. When a
+  // `tabTemplate` is supplied, fill each tab button with its rendered content too: reactive
+  // per tab (rebuilt only when THAT tab's selected state flips), the render's bindings owned
+  // by a `root` disposed before the next render (and on unmount) so nothing leaks.
   onMount(() => {
     const el: Element | null = host();
     if (!el) return;
     const panels: NodeListOf<HTMLElement> = el.querySelectorAll<HTMLElement>('.weave-tabs__panel');
     tabs().forEach((tab, i) => {
       panels[i]?.append(toNode(tab.content));
+    });
+
+    const tpl: TabsProps<T>['tabTemplate'] = props.tabTemplate;
+    if (!tpl) return;
+    const buttons: NodeListOf<HTMLElement> = el.querySelectorAll<HTMLElement>('.weave-tabs__tab');
+    tabs().forEach((tab, i) => {
+      const btn: HTMLElement | undefined = buttons[i];
+      if (!btn) return;
+      const isSelected: () => boolean = computed(() => i === selectedIndex());
+      effect(() => {
+        const selected: boolean = isSelected();
+        return root((dispose) => {
+          btn.replaceChildren(
+            tpl({ item: tab, label: tab.label, index: i, selected, disabled: isTabDisabled(tab) })
+          );
+          return dispose;
+        });
+      });
     });
   });
 
@@ -162,10 +225,12 @@ export function setup(props: TabsProps): TabsContext {
     tabs,
     rootClass: (): string => (props.class ? `weave-tabs ${props.class}` : 'weave-tabs'),
     label: (): string | undefined => props.label,
+    hasTemplate,
     tabId,
     panelId,
     selectedAttr: (index): string => (index === selectedIndex() ? 'true' : 'false'),
     disabledAttr: (tab): string | undefined => (isTabDisabled(tab) ? 'true' : undefined),
+    ariaLabel: (tab): string | undefined => (hasTemplate() ? tab.label : undefined),
     tabTabindex: (index): number => {
       if (isTabDisabled(tabs()[index])) return -1;
       return index === rovingIndex() ? 0 : -1;

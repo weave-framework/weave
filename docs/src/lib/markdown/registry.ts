@@ -282,6 +282,7 @@ import ExTabsContent from '../demos/ui/ex-tabs-content';
 import ExTabsDisabled from '../demos/ui/ex-tabs-disabled';
 import ExTabsDisabledAll from '../demos/ui/ex-tabs-disabled-all';
 import ExTabsLabel from '../demos/ui/ex-tabs-label';
+import ExTabsTemplate from '../demos/ui/ex-tabs-template';
 import ExTabsUncontrolled from '../demos/ui/ex-tabs-uncontrolled';
 import ExTimepickerBasic from '../demos/ui/ex-timepicker-basic';
 import ExTimepickerBounds from '../demos/ui/ex-timepicker-bounds';
@@ -544,6 +545,7 @@ export const demos: Record<string, Component> = {
   'ex-tabs-disabled': ExTabsDisabled,
   'ex-tabs-disabled-all': ExTabsDisabledAll,
   'ex-tabs-label': ExTabsLabel,
+  'ex-tabs-template': ExTabsTemplate,
   'ex-tabs-uncontrolled': ExTabsUncontrolled,
   'ex-timepicker-basic': ExTimepickerBasic,
   'ex-timepicker-bounds': ExTimepickerBounds,

@@ -5,6 +5,16 @@ the previous one. For the granular, per-version log see [CHANGELOG.md](CHANGELOG
 
 ## Unreleased
 
+### ✨ Features — `@weave-framework/ui`
+
+- **Tabs — custom tab-button content (`tabTemplate`).** Hand `<Tabs>` an authored `@snippet` and it
+  renders the whole content of each `role="tab"` button — an icon before the label, a badge, two
+  lines — from each tab's `TabRowContext` (`item` + your `data` payload, `label`, `index`, reactive
+  `selected`, `disabled`). The framework still owns the button, ARIA, roving tabindex and panels;
+  `label` stays the accessible name. `<Tabs>`/`TabItem` are now generic over the payload
+  (`data?: T`). Omit `tabTemplate` for the default label span — fully back-compatible. Mirrors the
+  menu's `itemTemplate` (FW-10/FW-12).
+
 ### 🔒 Security
 
 - **prettier-plugin — ReDoS hardening.** The `<script>`/`<style>`/`lang` detection regexes in the

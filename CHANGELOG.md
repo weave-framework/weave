@@ -10,6 +10,10 @@
 > `pnpm publish:packages`) — pushing code does **not** publish to npm. (The scheme started at
 > `0.2.0`; the line crossed `1.0.0` on 2026-07-05 when the public API was frozen.)
 
+## 1.5.2 — 2026-07-08
+
+- **1.5.2 — feat(ui):** `<Tabs>` `tabTemplate` (FW-12) — an authored `@snippet` renders the whole content of each `role="tab"` button (icon + label, badge, two lines) from the tab's `TabRowContext` (`item` + `data`, `label`, `index`, reactive `selected`, `disabled`). `<Tabs>`/`TabItem` are now generic over the item payload (`data?: T`). The framework keeps the button, ARIA, roving tabindex and panels; `label` stays the accessible name. Re-renders per tab on `selected` change, bindings owned/disposed cleanly. Omit → the default label span (back-compatible). Mirrors the menu's `itemTemplate` (FW-10).
+
 ## 1.5.1 — 2026-07-08
 
 - **1.5.1 — fix(prettier-plugin), security:** hardened the SFC/template tag-detection regexes in `parse.ts` against polynomial ReDoS (CodeQL `js/polynomial-redos`, 5 alerts). The ambiguous `(\s[^>]*)?` (where `\s ⊆ [^>]`) is replaced by a zero-width `(?=[\s>])` assertion, and `lang` is now read from the captured `<style>` attribute slice instead of a second full-document scan. Detection semantics unchanged; smoke tests + a regression sentinel added.

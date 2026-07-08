@@ -170,3 +170,42 @@ By default activation is **manual** — Arrow keys move focus, Enter / Space / c
 <Tabs tabs={{ tabs }} class={{ 'dense' }} />
 ~~~
 :::
+
+## Custom tab-button content — `tabTemplate`
+
+`tabTemplate` hands `<Tabs>` an authored `@snippet` that renders the **whole** content of each
+`role="tab"` button — an icon before the label, a badge, two lines — from the tab's
+[`TabRowContext`](/ui/tabs): `row.item` (with your `data` payload) plus `row.label`, `row.index`,
+`row.selected` and `row.disabled`. The framework still owns the button, ARIA, roving tabindex and
+the panels; `row.label` stays the accessible name (`aria-label`), and the active tab is styled via
+the `[aria-selected='true']` hook. It re-renders when a tab's `selected` flips. Omit it for the
+default label span — fully back-compatible. Mirrors the menu's
+[`itemTemplate`](/examples/components/menu).
+
+:::demo ex-tabs-template
+
+:::tabs
+~~~html title="app.html"
+<Tabs tabs={{ tabs }} value={{ idx() }} onChange={{ setIdx }} tabTemplate={{ tabButton }} />
+
+@snippet tabButton(row) {
+  <Icon name={{ row.item.data.icon }} />
+  <span>{{ row.label }}</span>
+}
+~~~
+~~~ts title="app.ts"
+import { signal } from '@weave-framework/runtime';
+import Tabs, { type TabItem } from '@weave-framework/ui/tabs';
+import Icon from '@weave-framework/ui/icon';
+
+export function setup() {
+  const idx = signal(0);
+  const tabs: TabItem<{ icon: string }>[] = [
+    { label: 'Profile',     content: 'Your public profile.',      data: { icon: 'user' } },
+    { label: 'Password',    content: 'Change your password.',     data: { icon: 'lock' } },
+    { label: 'Preferences', content: 'Theme, language and more.', data: { icon: 'settings' } },
+  ];
+  return { tabs, idx, setIdx: (i) => idx.set(i) };
+}
+~~~
+:::

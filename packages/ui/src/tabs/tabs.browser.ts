@@ -10,7 +10,7 @@ import {
 } from '@weave-framework/runtime';
 import * as dom from '@weave-framework/runtime/dom';
 import { compileTemplate } from '@weave-framework/compiler';
-import { setup, template, type TabsProps, type TabsContext, type TabItem } from '@weave-framework/ui/tabs';
+import { setup, template, type TabsProps, type TabsContext, type TabItem, type TabRowContext } from '@weave-framework/ui/tabs';
 
 const rt: typeof dom & { signal: typeof signal; effect: typeof effect } = { ...dom, signal, effect };
 
@@ -18,8 +18,8 @@ const rt: typeof dom & { signal: typeof signal; effect: typeof effect } = { ...d
 const tick = (): Promise<void> => new Promise<void>((r) => queueMicrotask(r));
 
 const SCOPE: string[] = [
-  'host', 'tabs', 'rootClass', 'label', 'tabId', 'panelId', 'selectedAttr',
-  'disabledAttr', 'tabTabindex', 'isHidden', 'select', 'onKeydown',
+  'host', 'tabs', 'rootClass', 'label', 'hasTemplate', 'tabId', 'panelId', 'selectedAttr',
+  'disabledAttr', 'ariaLabel', 'tabTabindex', 'isHidden', 'select', 'onKeydown',
 ];
 
 interface Mounted {
@@ -215,4 +215,109 @@ test('forwards a custom class onto the container', () => {
   const { root, dispose } = mount({ tabs: TABS, class: 'my-tabs' });
   assert.ok(root.classList.contains('weave-tabs') && root.classList.contains('my-tabs'));
   dispose();
+});
+
+/* ─────────────────────────── FW-12 · tabTemplate ─────────────────────────── */
+
+interface Ico { icon: string }
+const ICON_TABS: TabItem<Ico>[] = [
+  { label: 'Profile', content: 'p', data: { icon: 'user' } },
+  { label: 'Password', content: 'pw', data: { icon: 'lock' } },
+  { label: 'Security', content: 's', data: { icon: 'shield' } },
+];
+/** A plain-JS row factory (stands in for a compiled `@snippet`): icon glyph + label, active-marked. */
+const iconRow = (row: TabRowContext<Ico>): Node => {
+  const wrap: HTMLElement = document.createElement('span');
+  wrap.className = 'tpl-btn';
+  wrap.dataset.idx = String(row.index);
+  if (row.selected) wrap.classList.add('is-sel');
+  if (row.disabled) wrap.classList.add('is-disabled');
+  const ico: HTMLElement = document.createElement('i');
+  ico.className = 'tpl-ico';
+  ico.dataset.icon = row.item.data?.icon ?? '';
+  const lbl: HTMLElement = document.createElement('span');
+  lbl.className = 'tpl-label';
+  lbl.textContent = row.label;
+  wrap.append(ico, lbl);
+  return wrap;
+};
+
+test('tabTemplate renders the whole button content — icon + label — replacing the default label span (FW-12)', async () => {
+  const { tabsEls, dispose } = mount({ tabs: ICON_TABS, tabTemplate: iconRow } as TabsProps);
+  await tick();
+  tabsEls.forEach((btn, i) => {
+    assert.ok(btn.querySelector('.tpl-btn'), `tab ${i} has the custom template body`);
+    assert.equal(btn.querySelector('.tpl-ico')?.getAttribute('data-icon'), ICON_TABS[i].data!.icon, 'icon from row.item.data');
+    assert.equal(btn.querySelector('.tpl-label')?.textContent, ICON_TABS[i].label, 'label from row.label');
+    assert.equal(btn.querySelector('.weave-tabs__label'), null, 'default label span is NOT rendered when templated');
+  });
+  dispose();
+});
+
+test('tabTemplate: label still drives the accessible name (aria-label); framework keeps role/tabindex (FW-12)', async () => {
+  const { tabsEls, dispose } = mount({ tabs: ICON_TABS, tabTemplate: iconRow } as TabsProps);
+  await tick();
+  assert.equal(tabsEls[0].getAttribute('aria-label'), 'Profile', 'aria-label = label when templated');
+  assert.equal(tabsEls[0].getAttribute('role'), 'tab', 'framework still owns the button role');
+  assert.equal(tabsEls[0].getAttribute('tabindex'), '0', 'framework still owns roving tabindex');
+  assert.equal(tabsEls[1].getAttribute('tabindex'), '-1');
+  dispose();
+});
+
+test('no tabTemplate → default label span, no aria-label (back-compatible) (FW-12)', () => {
+  const { tabsEls, dispose } = mount({ tabs: TABS });
+  assert.equal(tabsEls[0].querySelector('.weave-tabs__label')?.textContent, 'Overview', 'default label span rendered');
+  assert.equal(tabsEls[0].getAttribute('aria-label'), null, 'no aria-label on the default (text is the name)');
+  dispose();
+});
+
+test('tabTemplate row context: item / label / index / selected / disabled are correct (FW-12)', async () => {
+  const seen: TabRowContext<Ico>[] = [];
+  const capture = (row: TabRowContext<Ico>): Node => { seen.push({ ...row }); return iconRow(row); };
+  const tabs: TabItem<Ico>[] = [
+    { label: 'Profile', content: 'p', data: { icon: 'user' } },
+    { label: 'Password', content: 'pw', data: { icon: 'lock' }, disabled: true },
+  ];
+  const { dispose } = mount({ tabs, tabTemplate: capture, defaultIndex: 0 } as TabsProps);
+  await tick();
+  const p0: TabRowContext<Ico> = seen.find((r) => r.index === 0)!;
+  const p1: TabRowContext<Ico> = seen.find((r) => r.index === 1)!;
+  assert.equal(p0.label, 'Profile');
+  assert.equal(p0.item.data?.icon, 'user', 'item carries the data payload');
+  assert.equal(p0.selected, true, 'index 0 is the selected tab');
+  assert.equal(p0.disabled, false);
+  assert.equal(p1.selected, false);
+  assert.equal(p1.disabled, true, 'disabled tab reported to the template');
+  dispose();
+});
+
+test('tabTemplate is reactive: selecting a tab re-renders it with the new selected state (FW-12)', async () => {
+  const { tabsEls, dispose } = mount({ tabs: ICON_TABS, tabTemplate: iconRow } as TabsProps);
+  await tick();
+  assert.ok(tabsEls[0].querySelector('.tpl-btn')?.classList.contains('is-sel'), 'first tab template is-sel on mount');
+  assert.ok(!tabsEls[2].querySelector('.tpl-btn')?.classList.contains('is-sel'), 'third tab not selected');
+  tabsEls[2].click();
+  await tick();
+  assert.ok(!tabsEls[0].querySelector('.tpl-btn')?.classList.contains('is-sel'), 'first tab no longer selected in template');
+  assert.ok(tabsEls[2].querySelector('.tpl-btn')?.classList.contains('is-sel'), 'selected state moved to the clicked tab');
+  dispose();
+});
+
+test('tabTemplate rows are torn down on unmount — no effect fires after dispose (FW-12)', async () => {
+  const idx: Signal<number> = signal<number>(0);
+  let renders: number = 0;
+  const counting = (row: TabRowContext<Ico>): Node => { renders += 1; return iconRow(row); };
+  const { dispose } = mount({
+    tabs: ICON_TABS,
+    tabTemplate: counting,
+    get value(): number { return idx(); },
+    onChange: (i): void => { idx.set(i); },
+  } as TabsProps);
+  await tick();
+  const afterMount: number = renders;
+  assert.ok(afterMount >= 3, 'each tab rendered once on mount');
+  dispose();
+  idx.set(2); // would re-run a live row effect; must be a no-op after dispose
+  await tick();
+  assert.equal(renders, afterMount, 'no row re-render after dispose (owner torn down)');
 });
