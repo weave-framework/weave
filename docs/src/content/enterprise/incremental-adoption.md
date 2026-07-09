@@ -83,3 +83,49 @@ nx check my-weave-app     # cached type-check
 ~~~
 
 Under the hood each target runs the existing `weave` CLI with `cwd` set to the project root, so the Weave build itself needs no Nx-specific changes — you get Nx caching, `nx affected`, and the project graph over your Weave apps for free. Generators scaffold projects and components: `nx g @weave-framework/nx:application`, `:library`, `:component`. The plugin depends on `@nx/devkit` (dev-time, correct for an Nx plugin); the Weave runtime stays zero-dependency.
+
+### Make a project use Weave — not the framework beside it
+
+In a **mixed workspace** (say Angular projects next to Weave ones — including a project you're migrating from Angular to Weave), Nx and your editor decide a project's tooling from that project's own config. A project keeps behaving like the old framework until three files say "this is Weave". Set them on the project and both the `nx` CLI and the editor switch over:
+
+1. **`weave.config.{ts,js,json}` at the project root** — this is the marker the inference plugin (and the CLI) key off. Its presence is what makes `nx build`/`serve`/`check` resolve to Weave. Without it, the project isn't a Weave project.
+
+2. **A project-local `tsconfig.json`** — scopes the project as its own TypeScript program, so the editor's TS service treats its `.ts` + `.html` pairs as Weave, not as part of a sibling framework's program:
+
+   ~~~jsonc title="apps/my-app/tsconfig.json"
+   {
+     "compilerOptions": {
+       "target": "ES2022", "module": "ESNext", "moduleResolution": "Bundler",
+       "lib": ["ES2022", "DOM", "DOM.Iterable"], "strict": true, "noEmit": true, "skipLibCheck": true
+     },
+     "include": ["src"]
+     // add "extends": "../../tsconfig.base.json" if you rely on workspace path mappings
+   }
+   ~~~
+
+3. **`.prettierrc` routing `*.html` to the `weave` parser** — so templates format instead of getting mangled (`nx g @weave-framework/nx:application` writes all three for you).
+
+**Migrating an existing project (e.g. Angular → Weave):** the project's `project.json` still carries the *old* framework's `build`/`serve`/`lint` targets, and that's what makes Nx — and the IDE — keep treating it (and its `.html` files) as that framework. Drop those targets and let the Weave plugin infer, or declare the Weave executors explicitly. A project-level `project.json` target **always wins** over any inferred one, so this is the reliable override:
+
+~~~jsonc title="apps/my-app/project.json"
+{
+  "name": "my-app",
+  "projectType": "application",
+  "sourceRoot": "apps/my-app/src",
+  "targets": {
+    // remove the old @angular-devkit / @nx/angular build, serve and lint targets, then:
+    "build":  { "executor": "@weave-framework/nx:build",  "options": { "config": "weave.config.ts" },
+                "outputs": ["{workspaceRoot}/dist/{projectRoot}"], "cache": true },
+    "serve":  { "executor": "@weave-framework/nx:serve",  "options": { "config": "weave.config.ts" } },
+    "check":  { "executor": "@weave-framework/nx:check", "cache": true }
+  }
+}
+~~~
+
+If two plugins try to infer the same target name (e.g. both a framework plugin and Weave want `build`), give the Weave plugin explicit target names in `nx.json` so they coexist — or just rely on the explicit `project.json` targets above, which outrank every inferred target:
+
+~~~jsonc title="nx.json"
+{ "plugins": [{ "plugin": "@weave-framework/nx/plugin", "options": { "buildTargetName": "build", "checkTargetName": "check" } }] }
+~~~
+
+Run `nx show project my-app --web` to see exactly which plugin each target comes from. Once the project declares Weave (the three files above) and no longer declares the old framework's targets, its `.html` files are Weave templates — a `.ts` + `.html` pair whose `.ts` exports `setup`, with no `@Component({ templateUrl })` referencing them — so the editor's Weave support (the VS Code extension or the WebStorm plugin) owns them and the old framework's template checker stops flagging them. If the templates still show native-HTML/other-framework errors after this, the project is still being seen as that framework somewhere — re-check its `project.json` targets and that its `.ts` files aren't decorated components.

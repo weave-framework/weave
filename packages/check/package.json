@@ -1,6 +1,6 @@
 {
   "name": "@weave-framework/check",
-  "version": "1.5.7",
+  "version": "1.5.8",
   "description": "Weave template type-checking — virtual .ts generation + tsc, mapped back to source.",
   "type": "module",
   "sideEffects": false,

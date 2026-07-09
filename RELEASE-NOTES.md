@@ -5,6 +5,15 @@ the previous one. For the granular, per-version log see [CHANGELOG.md](CHANGELOG
 
 ## Unreleased
 
+### ✨ Features & docs
+
+- **Nx — use Weave in a mixed workspace** (`@weave-framework/nx`). New guidance (and a scaffolded
+  project-local `tsconfig.json`) for making a project use Weave tooling when it sits next to another
+  framework — including migrating an Angular project. Three markers (`weave.config.*`, `tsconfig.json`,
+  `.prettierrc`) plus a `project.json` target override make both the `nx` CLI and your editor treat the
+  project — and its `.html` templates — as Weave rather than the framework beside it. See *Adopt Weave
+  one piece at a time → Make a project use Weave*.
+
 ### 🐞 Fixes
 
 - **Tabs — `tabTemplate` over dynamic `tabs`** (`@weave-framework/ui`). A custom tab-button template now

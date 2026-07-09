@@ -122,6 +122,7 @@ try {
   const tree = createTreeWithEmptyWorkspace();
   const appTask = await plugin.applicationGenerator(tree, { name: 'shop', style: 'scss' });
   ok(tree.exists('apps/shop/weave.config.ts'), 'app generator wrote weave.config.ts');
+  ok(tree.exists('apps/shop/tsconfig.json'), 'app generator wrote a project-local tsconfig.json (scopes it as a Weave TS project)');
   ok(tree.exists('apps/shop/src/app/app.html'), 'app generator wrote the root component template');
   ok(tree.read('apps/shop/weave.config.ts', 'utf-8').includes("styleLang: 'scss'"), 'app config honors style');
   const shopCfg = readProjectConfiguration(tree, 'shop');

@@ -47,6 +47,32 @@ export async function applicationGenerator(
       `  styleLang: '${style}',\n` +
       `});\n`
   );
+  // A project-local tsconfig (mirrors the create-weave standalone template). In a mixed Nx
+  // workspace this is what scopes the project as its OWN TypeScript program — so the editor's
+  // TS service (and any framework tooling that keys off a project's tsconfig, e.g. Angular's) sees
+  // it as a plain TS + Weave project, not part of a sibling framework. Self-contained on purpose
+  // (no `extends`) so it works whether or not the workspace has a `tsconfig.base.json`; add
+  // `"extends": "../../tsconfig.base.json"` yourself if you rely on workspace path mappings.
+  tree.write(
+    joinPathFragments(root, 'tsconfig.json'),
+    JSON.stringify(
+      {
+        compilerOptions: {
+          target: 'ES2022',
+          module: 'ESNext',
+          moduleResolution: 'Bundler',
+          lib: ['ES2022', 'DOM', 'DOM.Iterable'],
+          types: [],
+          strict: true,
+          noEmit: true,
+          skipLibCheck: true,
+        },
+        include: ['src'],
+      },
+      null,
+      2
+    ) + '\n'
+  );
   tree.write(
     joinPathFragments(root, 'src/index.html'),
     `<!doctype html>\n<html lang="en">\n  <head>\n    <meta charset="utf-8" />\n` +
