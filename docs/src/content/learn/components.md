@@ -36,7 +36,7 @@ The rules are short:
 
 - **`setup` runs once**, when the component is created. It's the constructor and the body rolled into one.
 - **It receives `props`** — the inputs from the parent.
-- **It returns an object** — every name in that object is visible to the template. Functions, signals, computeds, plain values: all fair game.
+- **It exposes names to the template** — either by returning an object, or, if you write no `return`, Weave synthesizes one for you ([see below](#you-can-skip-the-return)). Functions, signals, computeds, plain values: all fair game.
 - **The template reads those names.** Call signals/getters with `()` to read (and subscribe).
 
 Because `setup` runs once, you don't memoize anything or guard against re-renders — there are none. State you create lives for the life of the component, and reactivity updates the DOM in place.
@@ -44,6 +44,32 @@ Because `setup` runs once, you don't memoize anything or guard against re-render
 :::callout tip "Why a function and not a class?"
 A closure already gives you private state (locals) and a public surface (what you return) — so there's nothing for `private` or `this` to add. See [Why Weave?](/learn/why-weave#why-functions-not-classes) for the full reasoning, and [Lifecycle, context & DI](/learn/lifecycle-context-di) for the functional stand-ins for `extends`/`implements`.
 :::
+
+### You can skip the `return`
+
+The `return { … }` at the end of `setup` is optional. Leave it out and Weave synthesizes one for you — exposing exactly the names your template reads:
+
+:::tabs
+~~~ts title="counter.ts — no return"
+import { signal } from '@weave-framework/runtime';
+
+export function setup() {
+  const count = signal(0);
+  const inc = () => count.set((n) => n + 1);
+  // no return — Weave exposes `count` and `inc`, because the template names them
+}
+~~~
+~~~html title="counter.html"
+<button on:click={{ inc }}>{{ count() }}</button>
+~~~
+:::
+
+Two things worth knowing:
+
+- **Only what the template references is exposed.** A private helper, a timer, an intermediate value the template never names stays private — it is never added to the context. Nothing leaks.
+- **An explicit `return` turns this off.** The moment `setup` has a top-level `return`, Weave uses it verbatim and synthesizes nothing. Write one when you want to rename, reshape, or deliberately expose something the template doesn't read directly.
+
+Both styles type-check identically — hand-written or synthesized, the template is checked against the same context type.
 
 ### `setup` is optional, and flexible about its shape
 
@@ -355,10 +381,10 @@ Full override (write your own `template`) vs patch (`export const patch`) — pi
 
 ## A note on privacy
 
-Only what `setup` returns is visible to the template, and only props + `on:` events cross the boundary into a child. A component's internal signals and helpers stay private by construction — there's no `@ViewChild` reaching into a child's guts. When a deeply nested component needs shared state, lift it: a signal passed down, a [context](/learn/lifecycle-context-di) provided to a subtree, or a [store](/learn/store) shared app-wide.
+Only the names your template reads are visible to it — whether you return them by hand or let Weave synthesize the return — and only props + `on:` events cross the boundary into a child. A component's internal signals and helpers stay private by construction — there's no `@ViewChild` reaching into a child's guts. When a deeply nested component needs shared state, lift it: a signal passed down, a [context](/learn/lifecycle-context-di) provided to a subtree, or a [store](/learn/store) shared app-wide.
 
 :::callout info "What you just learned"
-A component is an optional `setup` (runs once, returns the template's names — may be omitted, `async`, or return nothing) + a template. Template and styles can come from a **sibling file**, an **inline string**, an **explicit file**, a **`styles` array**, or a **`.weave`** single file — and Weave fails loud on ambiguity (declaration *and* a sibling), a missing file, `${…}` in a backtick, or a non-static value. A tag is a child component iff it starts **uppercase**, and only static / `{{ }}` / `on:` attributes are legal on it. Props flow **down** as reactive getters (don't destructure); events flow **up** as callback props where `on:x` *is* `onX`; two-way means passing the **signal** itself. There's no default-props mechanism — default inside `setup`. A returned binding **shadows** a like-named prop. Slots project markup in (default, named, static `slot=`, whitespace-only falls back), and `@snippet`/`@render` reuse markup within a component.
+A component is an optional `setup` (runs once, exposes the template's names — return them or let Weave synthesize the return; may be omitted, `async`, or expose nothing) + a template. Template and styles can come from a **sibling file**, an **inline string**, an **explicit file**, a **`styles` array**, or a **`.weave`** single file — and Weave fails loud on ambiguity (declaration *and* a sibling), a missing file, `${…}` in a backtick, or a non-static value. A tag is a child component iff it starts **uppercase**, and only static / `{{ }}` / `on:` attributes are legal on it. Props flow **down** as reactive getters (don't destructure); events flow **up** as callback props where `on:x` *is* `onX`; two-way means passing the **signal** itself. There's no default-props mechanism — default inside `setup`. A returned binding **shadows** a like-named prop. Slots project markup in (default, named, static `slot=`, whitespace-only falls back), and `@snippet`/`@render` reuse markup within a component.
 :::
 
 [Next: Templates →](/learn/templates) · [Reference: @weave-framework/runtime →](/reference/runtime)

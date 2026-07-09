@@ -1,6 +1,6 @@
 {
   "name": "weave-monorepo",
-  "version": "1.5.10",
+  "version": "1.5.11",
   "description": "Weave — fine-grained reactive, signal-native UI framework. Compiled, TypeScript-first, no Virtual DOM.",
   "type": "module",
   "private": true,
@@ -22,7 +22,7 @@
     "verify:extend": "node tools/verify-extend.mjs",
     "verify:mcp": "node packages/mcp/test/stdio.smoke.mjs",
     "verify:prettier": "node packages/prettier-plugin/test/format.smoke.mjs",
-    "verify:check": "node packages/check/test/parse-error.smoke.mjs && node packages/check/test/snippet-type.smoke.mjs",
+    "verify:check": "node packages/check/test/parse-error.smoke.mjs && node packages/check/test/snippet-type.smoke.mjs && node packages/check/test/auto-return.smoke.mjs",
     "verify:cli-assets": "node packages/cli/test/styles-assets.smoke.mjs",
     "verify:nx": "node packages/nx/test/nx.smoke.mjs",
     "build:ls": "node packages/language-server/build.mjs",

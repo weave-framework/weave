@@ -436,7 +436,7 @@ const names = (list: HTMLElement): (string | undefined)[] =>
   Array.from(list.querySelectorAll<HTMLElement>('.weave-list__row')).map((r) => r.querySelector('.name')?.textContent ?? undefined);
 
 test('rowTemplate: rows loaded ASYNC (after mount) get their template body (FW-14 dynamic)', async () => {
-  const data: Signal<ListItem<Role>[]> = signal([]);
+  const data: Signal<ListItem<Role>[]> = signal<ListItem<Role>[]>([]);
   const { list, dispose } = mount({ selectable: false, get items() { return data(); }, rowTemplate: roleRow } as ListProps);
   await tick();
   assert.equal(list.querySelectorAll('.weave-list__row').length, 0, 'no rows before the fetch resolves');
@@ -470,7 +470,7 @@ test('rowTemplate: reload replaces rows and re-renders bodies (FW-14 dynamic)', 
 });
 
 test('rowTemplate: editing a row (SAME value, changed data) refreshes its body (FW-14 dynamic)', async () => {
-  const data: Signal<ListItem<Role>[]> = signal([{ value: 'a', title: 'A', data: { name: 'Alpha', color: '#111', users: 1 } }]);
+  const data: Signal<ListItem<Role>[]> = signal<ListItem<Role>[]>([{ value: 'a', title: 'A', data: { name: 'Alpha', color: '#111', users: 1 } }]);
   const { list, dispose } = mount({ selectable: false, get items() { return data(); }, rowTemplate: roleRow } as ListProps);
   await tick();
   assert.deepEqual(names(list), ['Alpha']);
@@ -484,7 +484,7 @@ test('rowTemplate: editing a row (SAME value, changed data) refreshes its body (
 test('rowTemplate: editing a row also refreshes non-name fields (pill count) (FW-14 dynamic)', async () => {
   const pill = (list: HTMLElement): (string | undefined)[] =>
     Array.from(list.querySelectorAll<HTMLElement>('.weave-list__row')).map((r) => r.querySelector('.pill')?.textContent ?? undefined);
-  const data: Signal<ListItem<Role>[]> = signal([{ value: 'a', title: 'A', data: { name: 'Alpha', color: '#111', users: 3 } }]);
+  const data: Signal<ListItem<Role>[]> = signal<ListItem<Role>[]>([{ value: 'a', title: 'A', data: { name: 'Alpha', color: '#111', users: 3 } }]);
   const { list, dispose } = mount({ selectable: false, get items() { return data(); }, rowTemplate: roleRow } as ListProps);
   await tick();
   assert.deepEqual(pill(list), ['3']);

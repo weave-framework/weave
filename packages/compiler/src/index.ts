@@ -14,6 +14,7 @@ export { applyPatches, type PatchOp } from './patch.js';
 export { parseTemplate, ParseError } from './parser.js';
 export { scopeCss, scopeAttr, hostAttr, hashCss } from './css.js';
 export { inferCtxNames } from './infer.js';
+export { injectAutoReturn, type AutoReturnResult } from './auto-return.js';
 export {
   rewrite,
   ctxScope,

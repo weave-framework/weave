@@ -3,6 +3,17 @@
 Human-readable highlights, one section per release — everything notable that landed since
 the previous one. For the granular, per-version log see [CHANGELOG.md](CHANGELOG.md).
 
+## Unreleased
+
+### ✨ Features
+
+- **Auto-expose — `setup` without a `return`.** A component's `setup` no longer needs to end with a
+  `return { … }` mirror of its bindings. Omit it and Weave synthesizes one, exposing exactly the names
+  the template reads — a private helper, a timer, an intermediate value the template never names stays
+  private. Writing an explicit top-level `return` opts out (it is used verbatim). The runtime module and
+  `weave check` apply the *same* transform, so the runtime context and the type-checked context are
+  identical. See *Learn → Components → You can skip the `return`*.
+
 ## 1.5.10 — 2026-07-09
 ### ✨ Features & docs
 

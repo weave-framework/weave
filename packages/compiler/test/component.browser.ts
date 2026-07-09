@@ -2,7 +2,7 @@ import { test, assert } from '../../../tools/harness.js';
 import { signal, computed, effect, root, onDispose, type Signal, type Computed } from '@weave-framework/runtime';
 import * as dom from '@weave-framework/runtime/dom';
 import {
-  compileTemplate, compileComponent, parseSfc, inferCtxNames, parseTemplate, extractSources,
+  compileTemplate, compileComponent, parseSfc, inferCtxNames, parseTemplate, extractSources, injectAutoReturn,
 } from '@weave-framework/compiler';
 
 const rt: typeof dom & {
@@ -313,6 +313,45 @@ test('compileComponent without setup emits defineComponent(render)', () => {
   const { code, css } = compileComponent({ template: '<p>hi</p>' });
   assert.ok(code.includes('export default defineComponent(render)'), code);
   assert.equal(css, '', 'no styles → empty css');
+});
+
+/* ──────────── auto-expose (setup without an explicit return) ──────────── */
+
+test('compileComponent auto-exposes the template names when setup omits return', () => {
+  const { code } = compileComponent({
+    script:
+      'import { signal } from "@weave-framework/runtime";\n' +
+      'export function setup(){ const count = signal(0); const inc = () => count.set((n) => n + 1); }',
+    template: '<button on:click={{inc}}>{{ count() }}</button>',
+  });
+  assert.ok(code.includes('return { count, inc };'), `expected an injected return; got:\n${code}`);
+  assert.ok(code.includes('export default defineComponent(render, setup)'), 'still wires setup + render');
+});
+
+test('compileComponent leaves an explicit return untouched (no duplicate)', () => {
+  const { code } = compileComponent({
+    script: 'export function setup(){ const count = 1; return { count }; }',
+    template: '<b>{{ count }}</b>',
+  });
+  assert.equal((code.match(/return \{/g) ?? []).length, 1, `exactly the author's return; got:\n${code}`);
+});
+
+test('an auto-exposed (return-injected) setup mounts and updates for real', () => {
+  // End-to-end: transform a return-less setup, then drive a real render with it.
+  const injected: string = injectAutoReturn(
+    'export function setup(){ const count = rt.signal(0); const inc = () => count.set((n) => n + 1); }',
+    ['count', 'inc']
+  ).code;
+  const setup = new Function('rt', injected.replace('export function', 'function') + '\nreturn setup;')(rt) as () => unknown;
+  const render: (ctx: unknown, slots?: unknown) => Node = compileRender('<button on:click={{inc}}>{{ count() }}</button>', ['count', 'inc']);
+  const C: dom.Component = dom.defineComponent(render as never, setup as never);
+  const h: HTMLElement = host();
+  const unmount: () => void = dom.mountComponent(C, h);
+  const btn: HTMLButtonElement = h.querySelector('button') as HTMLButtonElement;
+  assert.equal(btn.textContent, '0');
+  btn.click();
+  assert.equal(btn.textContent, '1', 'reactive binding from an auto-exposed setup');
+  unmount();
 });
 
 /* ──────────── RFC 0008 — component-file extension (`export const extend`) ──────────── */

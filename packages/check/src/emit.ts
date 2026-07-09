@@ -21,6 +21,7 @@ import {
   parseTemplate,
   parseSfcLoc,
   inferCtxNames,
+  injectAutoReturn,
   rewrite,
   type Scope,
   type TemplateNode,
@@ -28,6 +29,7 @@ import {
   type Attr,
   type SnippetNode,
   type ComponentSourceLoc,
+  type AutoReturnResult,
 } from '@weave-framework/compiler';
 
 const FOR_VARS: string[] = ['$index', '$count', '$first', '$last', '$even', '$odd'];
@@ -104,13 +106,24 @@ interface Builder {
   push(offset?: number): void;
 }
 
+/** Injection span (into `assemble`'s script) when auto-expose added a `return`, else undefined. */
+function injectionOf(auto: AutoReturnResult): { at: number; len: number } | undefined {
+  return auto.injectedAt !== undefined && auto.injectedLen !== undefined
+    ? { at: auto.injectedAt, len: auto.injectedLen }
+    : undefined;
+}
+
 /** Build a virtual module for a `.weave` SFC. */
 export function buildVirtualSfc(filePath: string, source: string): Virtual {
   const loc: ComponentSourceLoc = parseSfcLoc(source);
   const nodes: TemplateNode[] = parseTemplate(loc.template);
-  const body: Line[] = emit(nodes, new Set(inferCtxNames(nodes)));
+  const names: string[] = inferCtxNames(nodes);
+  const body: Line[] = emit(nodes, new Set(names));
   const hasSetup: boolean = HAS_SETUP.test(loc.script ?? '');
-  const asm: ReturnType<typeof assemble> = assemble(loc.script, hasSetup, body, loc.scriptOffset);
+  // Auto-expose: type the context off a synthesized `return` when setup omits one, so
+  // `ReturnType<typeof setup>` matches what the runtime module (loader) will also expose.
+  const auto: AutoReturnResult = hasSetup ? injectAutoReturn(loc.script ?? '', names) : { code: loc.script ?? '' };
+  const asm: ReturnType<typeof assemble> = assemble(auto.code || undefined, hasSetup, body, loc.scriptOffset, injectionOf(auto));
   return {
     path: filePath + '.ts',
     text: asm.text,
@@ -133,8 +146,11 @@ export function buildVirtualSeparate(
   htmlSource: string
 ): Virtual {
   const nodes: TemplateNode[] = parseTemplate(htmlSource);
-  const body: Line[] = emit(nodes, new Set(inferCtxNames(nodes)));
-  const asm: ReturnType<typeof assemble> = assemble(tsSource, HAS_SETUP.test(tsSource), body, 0);
+  const names: string[] = inferCtxNames(nodes);
+  const body: Line[] = emit(nodes, new Set(names));
+  const hasSetup: boolean = HAS_SETUP.test(tsSource);
+  const auto: AutoReturnResult = hasSetup ? injectAutoReturn(tsSource, names) : { code: tsSource };
+  const asm: ReturnType<typeof assemble> = assemble(auto.code || undefined, hasSetup, body, 0, injectionOf(auto));
   return {
     // Live at the real `.ts` path (shadowing disk) so a parent's `import Foo from
     // './foo'` resolves to this virtual — which carries the synthesized typed
@@ -418,7 +434,8 @@ function assemble(
   script: string | undefined,
   hasSetup: boolean,
   body: Line[],
-  scriptBaseOffset: number
+  scriptBaseOffset: number,
+  injection?: { at: number; len: number }
 ): { text: string; scriptLineCount: number; templateMap: Map<number, number>; mappings: WeaveMapping[] } {
   const out: string[] = [];
   const scriptLines: string[] = script ? script.split('\n') : [];
@@ -453,10 +470,24 @@ function assemble(
   out.push('export default __weaveDefault;'); // also forces module scope
 
   // Char-precise mappings. The script is embedded verbatim at the very top, so it
-  // maps 1:1 as a single run; template runs are placed by each line's offset.
+  // maps 1:1 as a single run; template runs are placed by each line's offset. When
+  // auto-expose injected a `return`, the script is embedded WITH that insertion, so
+  // it maps as two runs around the injected span (which maps to nothing) — the region
+  // before shifts by 0, the region after by the injected length.
   const mappings: WeaveMapping[] = [];
   if (script && script.length) {
-    mappings.push({ generatedOffset: 0, sourceOffset: scriptBaseOffset, length: script.length, source: 'script' });
+    if (injection) {
+      const { at, len } = injection;
+      if (at > 0) {
+        mappings.push({ generatedOffset: 0, sourceOffset: scriptBaseOffset, length: at, source: 'script' });
+      }
+      const tail: number = script.length - (at + len); // original chars after the injection point
+      if (tail > 0) {
+        mappings.push({ generatedOffset: at + len, sourceOffset: scriptBaseOffset + at, length: tail, source: 'script' });
+      }
+    } else {
+      mappings.push({ generatedOffset: 0, sourceOffset: scriptBaseOffset, length: script.length, source: 'script' });
+    }
   }
   const lineGenOffset: number[] = new Array<number>(out.length);
   let acc: number = 0;

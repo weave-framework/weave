@@ -18,6 +18,7 @@ import { parseTemplate } from './parser.js';
 import type { TemplateNode } from './ast.js';
 import { applyPatches, type PatchOp } from './patch.js';
 import { inferCtxNames } from './infer.js';
+import { injectAutoReturn } from './auto-return.js';
 import { scopeCss, scopeAttr, hostAttr, hashCss } from './css.js';
 
 export interface ComponentSource {
@@ -80,6 +81,9 @@ export function compileComponent(src: ComponentSource, opts: ComponentOptions = 
   const css: string = src.styles ? scopeCss(src.styles, hash) : '';
   const script: string = src.script ?? '';
   const hasSetup: boolean = HAS_SETUP.test(script);
+  // Auto-expose: when `setup` omits its `return`, synthesize one exposing exactly the
+  // names the template reads (`scope`). A setup that already returns is left untouched.
+  const exposed: string = hasSetup ? injectAutoReturn(script, scope).code : script;
 
   // A component-file EXTENSION (`export const extend = Base`, RFC 0008): the default export wraps
   // its own setup with the base's via `extendSetup(extend, setup?, extendProps?)`, so an instance
@@ -98,7 +102,7 @@ export function compileComponent(src: ComponentSource, opts: ComponentOptions = 
   }
 
   const code: string = [
-    script.trim(),
+    exposed.trim(),
     `import { defineComponent${extendImport} } from "@weave-framework/runtime/dom";`,
     renderBody,
     defaultExport,
