@@ -1,6 +1,6 @@
 {
   "name": "@weave-framework/nx",
-  "version": "1.5.8",
+  "version": "1.5.9",
   "description": "Nx plugin for Weave — inferred build/serve/check targets (crystal createNodesV2), executors, and generators, so a Weave app is a first-class project in an Nx monorepo.",
   "type": "module",
   "main": "./src/index.ts",

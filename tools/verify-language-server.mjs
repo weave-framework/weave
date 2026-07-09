@@ -214,6 +214,12 @@ try {
   const landsInTs = defs.some((d) => (d.uri || d.targetUri || '').toLowerCase().endsWith('card.ts'));
   if (landsInTs) pass('separate-file: go-to-definition on a template variable lands in Card.ts');
   else console.log(`… go-to-definition did not land in Card.ts (defs: ${JSON.stringify(defs.map((d) => d.uri || d.targetUri))}) — revisit in M9.0c`);
+  // …and specifically on the `const label` declaration (Card.ts line 2), NOT the
+  // `return { count, label }` shorthand (line 3) — the setup-return-shorthand→const redirect.
+  const defLine = (d) => (d.range || d.targetSelectionRange || d.targetRange || {}).start?.line;
+  const constLine = cardTsSource.split('\n').findIndex((l) => l.includes('const label')); // 2
+  if (defs.some((d) => defLine(d) === constLine)) pass(`separate-file: go-to-definition lands on the const decl (Card.ts:${constLine + 1}), not the return shorthand`);
+  else fail(`separate-file: go-to-definition landed on line ${JSON.stringify(defs.map(defLine))}, expected the const decl at line ${constLine} (return-shorthand→const redirect)`);
 
   /* ===== scenario 2b: component tags — known <Badge> (imported) + unknown <Nope> ===== */
   diags = await diagnose(panelHtmlUri, 'weave-html', panelHtmlSource);

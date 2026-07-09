@@ -18,6 +18,7 @@ import {
 import { create as createTypeScriptServices } from 'volar-service-typescript';
 import { create as createCssService } from 'volar-service-css';
 import { createWeaveLanguagePlugin } from './weave-language.js';
+import { withSetupConstRedirect } from './redirect-definition.js';
 
 const connection: ReturnType<typeof createConnection> = createConnection();
 const server: ReturnType<typeof createServer> = createServer(connection);
@@ -56,7 +57,7 @@ connection.onInitialize((params) => {
     createTypeScriptProject(tsdk.typescript, tsdk.diagnosticMessages, () => ({
       languagePlugins: [createWeaveLanguagePlugin(tsdk.typescript)],
     })),
-    [...createTypeScriptServices(tsdk.typescript), createCssService()]
+    [...withSetupConstRedirect(createTypeScriptServices(tsdk.typescript), tsdk.typescript), createCssService()]
   );
 });
 

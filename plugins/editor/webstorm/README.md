@@ -15,13 +15,17 @@ hover. Works for both `.weave` single-file components and the separate `.ts` + `
 In WebStorm: **Settings → Plugins → ⚙ (gear) → Install Plugin from Disk…** → pick the
 **latest** `weave-webstorm-*.zip` from this folder → **Restart**.
 
-- **`weave-webstorm-0.14.0.zip`** — current/complete: HTML syntax coloring, go-to-definition,
+- **`weave-webstorm-0.15.0.zip`** — current/complete: HTML syntax coloring, go-to-definition,
   hover, and red-squiggle diagnostics, plus the Weave logo. Built on the M10 unified `{{ }}`
-  binding syntax. Verified working on WebStorm 261 (2026.1). **0.14.0** registers the template
-  language substitutor `order="first"` so Weave `.html` templates are recognized even in a **mixed
-  Nx workspace that also has Angular** — where WebStorm's Angular support otherwise substitutes every
-  `.html` to `Angular2Html` first and left Weave templates showing native "unknown tag"/namespace
-  errors. Real Angular templates (a `.html` with an `@Component` sibling, not `setup`) are untouched.
+  binding syntax. Verified working on WebStorm 261 (2026.1).
+  - **0.15.0** — **go-to-definition** on a template binding (`{{ list }}`) now lands on the
+    `const list = …` declaration in `setup()`, not the `return { list, … }` shorthand it used to jump
+    to. (Language-server change — benefits the VS Code extension too on its next rebuild.)
+  - **0.14.0** — registers the template language substitutor `order="first"` so Weave `.html`
+    templates are recognized even in a **mixed Nx workspace that also has Angular** — where WebStorm's
+    Angular support otherwise substitutes every `.html` to `Angular2Html` first and left Weave templates
+    showing native "unknown tag"/namespace errors. Real Angular templates (a `.html` with an
+    `@Component` sibling, not `setup`) are untouched.
 
 > Template type errors are flagged on `{{ expr }}` text bindings and `attr={{expr}}` attribute
 > bindings (M10 — double braces everywhere; one syntax). A single brace in text content (`{x}`)
