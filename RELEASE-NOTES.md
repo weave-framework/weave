@@ -14,6 +14,11 @@ the previous one. For the granular, per-version log see [CHANGELOG.md](CHANGELOG
   `weave check` apply the *same* transform, so the runtime context and the type-checked context are
   identical. See *Learn → Components → You can skip the `return`*.
 
+- **No `void Tag;` for template-only component imports.** A child component you import but use only in a
+  template (`<Badge/>`) is recognized as used by the Weave editor tooling — it is no longer flagged
+  "unused import", so the `void Badge;` keep-alive lines are unnecessary (the imports stay, for
+  go-to-definition). Pinned by a regression test.
+
 ## 1.5.10 — 2026-07-09
 ### ✨ Features & docs
 

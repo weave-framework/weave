@@ -219,6 +219,8 @@ A tag is a **child component** when its name starts with an **uppercase letter**
 And because component tags compile to a function call with a props object, **static, dynamic (`{{ }}`), and `on:` attributes are the props/events surface of a `<Component>`**. One DOM directive is also allowed: **`use:` forwards its action to the component's single root element** (same lifecycle as on an element — see [`use:` on components](/learn/templates#use-on-components)). The other DOM-level directives — `class:`, `bind:`, `transition:`, `ref`, `show`, `.prop` — are compile errors on a component tag (they only mean something on a real element). Pass data as props instead.
 :::
 
+You make a child available the ordinary way — `import TaskCard from './task-card'`. It's used only in the template, never elsewhere in the `.ts`, but the [Weave editor tooling](/learn/tooling) recognizes a component-tag usage as a real use — so the import is **not** flagged "unused", and you don't need a `void TaskCard;` keep-alive line. (Without the tooling active, `tsc --noUnusedLocals` may still flag it; that's the only case a `void` line helps.)
+
 ## Two-way: pass the signal itself
 
 Sometimes a child should both read *and* write a parent's value. Don't invent a second event for that — just hand the child the **signal**, and it can read it (`sig()`) and set it (`sig.set(…)`):
