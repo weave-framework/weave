@@ -5,6 +5,14 @@ the previous one. For the granular, per-version log see [CHANGELOG.md](CHANGELOG
 
 ## Unreleased
 
+### 🐞 Fixes — `@weave-framework/ui`
+
+- **List — `rowTemplate` over dynamic `items`.** The custom row body now renders for rows that appear
+  *after* mount — async initial load, infinite-scroll append, reload after create/edit/delete. It was
+  wired once at mount over a static snapshot, so any list whose data isn't known synchronously showed
+  empty rows. Now the body mounts inside the reactive keyed list block, so create / append / replace /
+  remove all just work. API unchanged.
+
 ### ✨ Features — `@weave-framework/ui`
 
 - **List — custom row content (`rowTemplate`).** Hand a `<List>` an authored `@snippet` and it

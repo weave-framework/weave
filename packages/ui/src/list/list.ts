@@ -28,7 +28,7 @@
  *   <List selectable={{ false }} items={{ rows }} />
  */
 
-import { signal, computed, effect, root, onMount, type Signal } from '@weave-framework/runtime';
+import { signal, onMount, type Signal } from '@weave-framework/runtime';
 import { listKeyManager, type ListKeyManager } from '../cdk/key-manager.js';
 import { dropList, type DropEvent } from '../cdk/drag-drop.js';
 
@@ -102,6 +102,12 @@ export interface ListProps<T = unknown> {
   rowTemplate?: (row: ListRowContext<T>) => Node;
 }
 
+// When `hasTemplate()`, the row body is the authored template's Node, mounted reactively INSIDE the
+// keyed `@for` block via `@render` — so create / append / reload of `items` flows through the block's
+// `track item.value` diffing (no one-shot onMount snapshot). `@key (rowKey)` re-renders just this
+// row's body when its selected / disabled state flips (fresh ListRowContext), leaving the
+// framework-owned drag handle above it untouched. Otherwise the default title + meta spans.
+// NB: no `//` comments inside the concat below — the loader's static template extractor forbids them.
 export const template: string =
   '<div class={{ listClass() }} ref={{ host }} role={{ listRole() }} aria-label={{ label() }}' +
   ' on:keydown={{ onKeydown }}>' +
@@ -110,6 +116,11 @@ export const template: string =
   ' aria-disabled={{ ariaDisabled(item) }} tabindex={{ tabindexFor(item) }}' +
   ' on:click={{ (e) => activate(item, e) }}>' +
   '@if (reorderable()) {<span class="weave-list__drag-handle" aria-hidden="true">⠿</span>}' +
+  '@if (hasTemplate()) {' +
+  '@key (rowKey(item)) {' +
+  '@render (rowBody(item, $index))' +
+  '}' +
+  '}' +
   '@if (!hasTemplate()) {' +
   '<span class="weave-list__title">{{ item.title }}</span>' +
   '@if (item.meta) {<span class="weave-list__meta">{{ item.meta }}</span>}' +
@@ -130,6 +141,8 @@ export interface ListContext<T = unknown> {
   ariaSelected: (item: ListItem<T>) => string | undefined;
   ariaDisabled: (item: ListItem<T>) => string | undefined;
   tabindexFor: (item: ListItem<T>) => number | undefined;
+  rowKey: (item: ListItem<T>) => string;
+  rowBody: (item: ListItem<T>, index: number) => Node;
   activate: (item: ListItem<T>, event?: Event) => void;
   onKeydown: (event: KeyboardEvent) => void;
 }
@@ -158,41 +171,6 @@ export function setup<T = unknown>(props: ListProps<T>): ListContext<T> {
       orientation: 'vertical',
       keyboard: false, // the listbox owns Space/Arrows (selection + roving) — pointer-drag only
       onDrop: (event: DropEvent) => props.onReorder?.(event),
-    });
-  });
-
-  // rowTemplate: fill each row body with the rendered template, after the (framework-owned)
-  // drag handle. Reactive per row — rebuilt only when THAT row's selected state flips — with
-  // the render's bindings owned by a `root` disposed before the next render (and on unmount).
-  onMount(() => {
-    const tpl: ListProps<T>['rowTemplate'] = props.rowTemplate;
-    if (!tpl) return;
-    const el: Element | null = host();
-    if (!el) return;
-    const rows: NodeListOf<HTMLElement> = el.querySelectorAll<HTMLElement>('.weave-list__row');
-    items().forEach((item, i) => {
-      const rowEl: HTMLElement | undefined = rows[i];
-      if (!rowEl) return;
-      const rowSelected: () => boolean = computed(() => isSelected(item));
-      effect(() => {
-        const selected: boolean = rowSelected();
-        return root((dispose) => {
-          renderRowBody(
-            rowEl,
-            tpl({
-              item,
-              value: item.value,
-              title: item.title,
-              meta: item.meta,
-              data: item.data,
-              index: i,
-              selected,
-              disabled: isItemDisabled(item),
-            })
-          );
-          return dispose;
-        });
-      });
     });
   });
 
@@ -277,18 +255,23 @@ export function setup<T = unknown>(props: ListProps<T>): ListContext<T> {
       if (isItemDisabled(item)) return -1;
       return items().indexOf(item) === rovingIndex() ? 0 : -1;
     },
+    // The `@key` value: changing it re-renders this row's template body. Track the state the
+    // ListRowContext exposes reactively (selected / disabled) so a flip rebuilds the body.
+    rowKey: (item): string => `${isSelected(item)}:${isItemDisabled(item)}`,
+    // The row body Node — the authored `rowTemplate` fed this row's full ListRowContext.
+    // Only ever called under `@if (hasTemplate())`, so `rowTemplate` is defined.
+    rowBody: (item, index): Node =>
+      props.rowTemplate!({
+        item,
+        value: item.value,
+        title: item.title,
+        meta: item.meta,
+        data: item.data,
+        index,
+        selected: isSelected(item),
+        disabled: isItemDisabled(item),
+      }),
     activate,
     onKeydown,
   };
-}
-
-/**
- * Replace a row's template-rendered body while preserving a leading framework-owned drag
- * handle: remove every child after the handle (or all children when there is none), then
- * append the freshly rendered node.
- */
-function renderRowBody(rowEl: HTMLElement, node: Node): void {
-  const handle: Element | null = rowEl.querySelector(':scope > .weave-list__drag-handle');
-  while (rowEl.lastChild && rowEl.lastChild !== handle) rowEl.removeChild(rowEl.lastChild);
-  rowEl.appendChild(node);
 }

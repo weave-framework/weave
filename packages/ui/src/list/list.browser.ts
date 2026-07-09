@@ -23,7 +23,7 @@ const rt: typeof dom & { signal: typeof signal; effect: typeof effect } = { ...d
 
 const SCOPE: string[] = [
   'host', 'items', 'listClass', 'listRole', 'rowRole', 'reorderable', 'hasTemplate', 'label',
-  'ariaSelected', 'ariaDisabled', 'tabindexFor', 'activate', 'onKeydown',
+  'ariaSelected', 'ariaDisabled', 'tabindexFor', 'rowKey', 'rowBody', 'activate', 'onKeydown',
 ];
 const tick = (): Promise<void> => new Promise<void>((r) => queueMicrotask(r));
 
@@ -427,5 +427,44 @@ test('non-selectable + rowTemplate: rows render the template and stay inert (FW-
   assert.ok(rows.every((r) => r.querySelector('.list-item-main')), 'template body rendered in every row');
   rows[0].click();
   assert.equal(calls, 0, 'a non-selectable list is inert even with a template');
+  dispose();
+});
+
+/* ── FW-14 · rowTemplate over DYNAMIC items (async load / append / reload) ── */
+
+const names = (list: HTMLElement): (string | undefined)[] =>
+  Array.from(list.querySelectorAll<HTMLElement>('.weave-list__row')).map((r) => r.querySelector('.name')?.textContent ?? undefined);
+
+test('rowTemplate: rows loaded ASYNC (after mount) get their template body (FW-14 dynamic)', async () => {
+  const data: Signal<ListItem<Role>[]> = signal([]);
+  const { list, dispose } = mount({ selectable: false, get items() { return data(); }, rowTemplate: roleRow } as ListProps);
+  await tick();
+  assert.equal(list.querySelectorAll('.weave-list__row').length, 0, 'no rows before the fetch resolves');
+  data.set(ROLE_ROWS); // fetch resolves AFTER <List> mounted
+  await tick();
+  assert.deepEqual(names(list), ['Admin', 'Editor', 'Viewer'], 'every async-loaded row rendered its body');
+  dispose();
+});
+
+test('rowTemplate: appended rows (infinite scroll loadMore) get their body (FW-14 dynamic)', async () => {
+  const data: Signal<ListItem<Role>[]> = signal([ROLE_ROWS[0]]);
+  const { list, dispose } = mount({ selectable: false, get items() { return data(); }, rowTemplate: roleRow } as ListProps);
+  await tick();
+  assert.deepEqual(names(list), ['Admin'], 'first page rendered');
+  data.set([...data(), ROLE_ROWS[1], ROLE_ROWS[2]]); // loadMore() pushes a page
+  await tick();
+  assert.deepEqual(names(list), ['Admin', 'Editor', 'Viewer'], 'appended rows filled their bodies');
+  dispose();
+});
+
+test('rowTemplate: reload replaces rows and re-renders bodies (FW-14 dynamic)', async () => {
+  const data: Signal<ListItem<Role>[]> = signal(ROLE_ROWS);
+  const { list, dispose } = mount({ selectable: false, get items() { return data(); }, rowTemplate: roleRow } as ListProps);
+  await tick();
+  assert.deepEqual(names(list), ['Admin', 'Editor', 'Viewer']);
+  const fresh: ListItem<Role>[] = [{ value: 'owner', title: 'Owner', data: { name: 'Owner', color: '#000', users: 1 } }];
+  data.set(fresh); // create/edit/delete → reload with a new list
+  await tick();
+  assert.deepEqual(names(list), ['Owner'], 'reloaded row rendered its body');
   dispose();
 });
