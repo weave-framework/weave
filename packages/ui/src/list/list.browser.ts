@@ -468,3 +468,28 @@ test('rowTemplate: reload replaces rows and re-renders bodies (FW-14 dynamic)', 
   assert.deepEqual(names(list), ['Owner'], 'reloaded row rendered its body');
   dispose();
 });
+
+test('rowTemplate: editing a row (SAME value, changed data) refreshes its body (FW-14 dynamic)', async () => {
+  const data: Signal<ListItem<Role>[]> = signal([{ value: 'a', title: 'A', data: { name: 'Alpha', color: '#111', users: 1 } }]);
+  const { list, dispose } = mount({ selectable: false, get items() { return data(); }, rowTemplate: roleRow } as ListProps);
+  await tick();
+  assert.deepEqual(names(list), ['Alpha']);
+  // Admin edits the record in a modal → refetch → same key (value='a'), new data object.
+  data.set([{ value: 'a', title: 'A', data: { name: 'Alpha EDITED', color: '#111', users: 1 } }]);
+  await tick();
+  assert.deepEqual(names(list), ['Alpha EDITED'], 'the reused row refreshed its body — no app-side key hack');
+  dispose();
+});
+
+test('rowTemplate: editing a row also refreshes non-name fields (pill count) (FW-14 dynamic)', async () => {
+  const pill = (list: HTMLElement): (string | undefined)[] =>
+    Array.from(list.querySelectorAll<HTMLElement>('.weave-list__row')).map((r) => r.querySelector('.pill')?.textContent ?? undefined);
+  const data: Signal<ListItem<Role>[]> = signal([{ value: 'a', title: 'A', data: { name: 'Alpha', color: '#111', users: 3 } }]);
+  const { list, dispose } = mount({ selectable: false, get items() { return data(); }, rowTemplate: roleRow } as ListProps);
+  await tick();
+  assert.deepEqual(pill(list), ['3']);
+  data.set([{ value: 'a', title: 'A', data: { name: 'Alpha', color: '#111', users: 25 } }]); // same name, new count
+  await tick();
+  assert.deepEqual(pill(list), ['25'], 'every templated field refreshes, not just the name');
+  dispose();
+});

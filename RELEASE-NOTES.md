@@ -12,6 +12,10 @@ the previous one. For the granular, per-version log see [CHANGELOG.md](CHANGELOG
   wired once at mount over a static snapshot, so any list whose data isn't known synchronously showed
   empty rows. Now the body mounts inside the reactive keyed list block, so create / append / replace /
   remove all just work. API unchanged.
+- **List — `rowTemplate` refreshes edited rows.** A row whose `value` stays the same but whose data
+  changes (edit a record → refetch) now re-renders its body instead of keeping the stale one. The body
+  is re-keyed on the item's identity as well as its selected/disabled state, so every templated field
+  updates on a reload — no need to bake a data digest into the row key.
 
 ### ✨ Features — `@weave-framework/ui`
 

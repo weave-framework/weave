@@ -159,6 +159,18 @@ export function setup<T = unknown>(props: ListProps<T>): ListContext<T> {
   const isItemDisabled = (item: ListItem<T>): boolean => listDisabled() || !!item.disabled;
   const isSelected = (item: ListItem<T>): boolean => selectable() && props.value === item.value;
 
+  // A stable-per-object version, minted on first sight of each item object. `eachBlock` hands a
+  // FRESH object for the same `value` when the data is edited (reload), so a new version means the
+  // row's data changed — folding object identity into the string `rowKey` (which keyBlock compares
+  // by value) so an edited row's template body rebuilds, not just on a selected/disabled flip.
+  let rowVersion = 0;
+  const rowVersions: WeakMap<object, number> = new WeakMap<object, number>();
+  const versionOf = (item: ListItem<T>): number => {
+    let v: number | undefined = rowVersions.get(item as object);
+    if (v === undefined) rowVersions.set(item as object, (v = rowVersion += 1));
+    return v;
+  };
+
   // Reorder via the CDK dropList — only the drag handle starts a drag (row clicks still
   // select). Committed drops emit onReorder; the consumer reorders `items` (controlled).
   onMount(() => {
@@ -255,9 +267,10 @@ export function setup<T = unknown>(props: ListProps<T>): ListContext<T> {
       if (isItemDisabled(item)) return -1;
       return items().indexOf(item) === rovingIndex() ? 0 : -1;
     },
-    // The `@key` value: changing it re-renders this row's template body. Track the state the
-    // ListRowContext exposes reactively (selected / disabled) so a flip rebuilds the body.
-    rowKey: (item): string => `${isSelected(item)}:${isItemDisabled(item)}`,
+    // The `@key` value: changing it re-renders this row's template body. Keyed on the item's
+    // version (a data edit hands a fresh object → new version) plus the state the ListRowContext
+    // exposes reactively (selected / disabled), so both a data change and a state flip rebuild it.
+    rowKey: (item): string => `${versionOf(item)}:${isSelected(item)}:${isItemDisabled(item)}`,
     // The row body Node — the authored `rowTemplate` fed this row's full ListRowContext.
     // Only ever called under `@if (hasTemplate())`, so `rowTemplate` is defined.
     rowBody: (item, index): Node =>
