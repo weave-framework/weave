@@ -15,15 +15,17 @@ hover. Works for both `.weave` single-file components and the separate `.ts` + `
 In WebStorm: **Settings → Plugins → ⚙ (gear) → Install Plugin from Disk…** → pick the
 **latest** `weave-webstorm-*.zip` from this folder → **Restart**.
 
-- **`weave-webstorm-0.18.0.zip`** — current/complete: HTML syntax coloring, go-to-definition,
+- **`weave-webstorm-0.19.0.zip`** — current/complete: HTML syntax coloring, go-to-definition,
   hover, and red-squiggle diagnostics, plus the Weave logo. Built on the M10 unified `{{ }}`
   binding syntax. Verified working on WebStorm 261 (2026.1).
-  - **0.18.0** — the template lexer (`WeaveTemplateLexer extends HtmlLexer`) overrides
-    `getEmbeddedContentSupportList()` to keep only the built-in script/style embedding and drop every
-    **registered** `HtmlEmbeddedContentSupport` — notably the JavaScript plugin's, which embeds JS
-    into `on*` event-handler attribute values and flagged Weave `on*={{ … }}` bindings with a bogus
-    **"Missing }"** (the embedded JS `{{` parsed as unbalanced braces). Grounded in the IntelliJ
-    source (`BaseHtmlLexer.getEmbeddedContentSupportList()`), not a heuristic.
+  - **0.19.0** — the **"Missing }"** fix (0.18) narrowed to only the PARSER's lexer, and the
+    highlighter reverted to HTML delegation so **full HTML coloring returns**. The bogus "Missing }"
+    came from the parser's lexer building the JavaScript plugin's `on*`-attribute JS embedding into the
+    PSI; `WeaveTemplateLexer` (parser) drops all registered `HtmlEmbeddedContentSupport` so that's gone.
+    A `SyntaxHighlighter` only colors (never annotates errors), so it can safely stay HTML-based —
+    which is why 0.18's custom highlighter (that lost coloring) was unnecessary.
+  - **0.18.0** — first cut of the `getEmbeddedContentSupportList()` override (also changed the
+    highlighter lexer, which dropped coloring — superseded by 0.19.0).
   - **0.17.0** — the template highlighter lexes with a **plain `HtmlLexer`** and a direct
     token→color map instead of delegating to HTML's highlighter. HTML's *highlighting* lexer embeds
     JavaScript into `on*` event-handler attribute values; on a Weave `on*={{ … }}` binding that value
