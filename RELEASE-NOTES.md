@@ -3,6 +3,19 @@
 Human-readable highlights, one section per release — everything notable that landed since
 the previous one. For the granular, per-version log see [CHANGELOG.md](CHANGELOG.md).
 
+## Unreleased
+
+### 🐞 Fixes
+
+- **Tabs — `tabTemplate` over dynamic `tabs`** (`@weave-framework/ui`). A custom tab-button template now
+  renders (and refreshes) for tabs added or edited after mount, mirroring the `<List>` `rowTemplate` fix —
+  the body moved into the reactive keyed tab block. (Panel content still binds at mount; a tab strip is a
+  fixed set by design.)
+- **`weave check` — a `@snippet` satisfies a `(row) => Node` template prop** (`@weave-framework/check`).
+  Snippets are now typed `() => Node` instead of `() => void`, so authoring a `rowTemplate` / `itemTemplate` /
+  `tabTemplate` as a `@snippet` and passing it to a locally-typed component no longer reports a spurious
+  `'void' is not assignable to 'Node'` type error.
+
 ## 1.5.6 — 2026-07-09
 
 `<List>` gains a custom **row template** (FW-14) — the same escape hatch the menu (FW-10) and tabs

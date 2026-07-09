@@ -10,6 +10,11 @@
 > `pnpm publish:packages`) — pushing code does **not** publish to npm. (The scheme started at
 > `0.2.0`; the line crossed `1.0.0` on 2026-07-05 when the public API was frozen.)
 
+## Unreleased
+
+- **1.5.7 — fix(ui):** `<Tabs>` `tabTemplate` (FW-12) now renders over **dynamic** `tabs` — same fix as `<List>` FW-14: the button body moved from a one-shot `onMount` snapshot into the reactive keyed `@for` block (`@if (hasTemplate()) { @key (tabKey) { @render (tabBody) } }`), so tabs added/edited after mount get (and refresh) their template body. `tabKey` folds a per-tab WeakMap version + selected state. (Panel *content* still mounts in `onMount` — tabs are a fixed strip by design.)
+- **1.5.7 — fix(check):** a `@snippet` is now typed `() => Node` (was `() => void`), so passing one to a component's template prop typed `(row) => Node` (`rowTemplate` / `itemTemplate` / `tabTemplate` on a locally-typed component) no longer flags a spurious `'void' is not assignable to 'Node'` error in `weave check`. New `snippet-type` smoke pins it (part of `verify:check`).
+
 ## 1.5.6 — 2026-07-09
 
 - **1.5.6 — fix(ui):** `<List>` `rowTemplate` (FW-14 follow-up #2) now re-renders a row body when the item's **data** changes, not only on a selected/disabled flip. The body was keyed solely by `selected:disabled`, constant for a non-selectable list — so a reused row (`eachBlock` keyed by `item.value`) kept its stale body after an edit-then-reload (same id, new data). The `@key` now folds in a per-item version (a data edit hands a fresh object → new version), so editing a record refreshes every templated field with no app-side key hack. Selected/disabled re-render preserved.

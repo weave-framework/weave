@@ -23,7 +23,7 @@
  *   <Tabs tabs={{ tabs }} value={{ index() }} onChange={{ setIndex }} />
  */
 
-import { signal, computed, effect, root, onMount, onDispose, type Signal } from '@weave-framework/runtime';
+import { signal, effect, onMount, onDispose, type Signal } from '@weave-framework/runtime';
 import { listKeyManager, type ListKeyManager } from '../cdk/key-manager.js';
 
 /** A tab panel's content: a DOM node, a plain string, or a factory returning a node. */
@@ -107,6 +107,11 @@ export const template: string =
   ' aria-controls={{ panelId($index) }} aria-selected={{ selectedAttr($index) }}' +
   ' aria-disabled={{ disabledAttr(tab) }} aria-label={{ ariaLabel(tab) }} tabindex={{ tabTabindex($index) }}' +
   ' on:click={{ () => select($index) }}>' +
+  '@if (hasTemplate()) {' +
+  '@key (tabKey(tab, $index)) {' +
+  '@render (tabBody(tab, $index))' +
+  '}' +
+  '}' +
   '@if (!hasTemplate()) {' +
   '<span class="weave-tabs__label">{{ tab.label }}</span>' +
   '}' +
@@ -133,6 +138,8 @@ export interface TabsContext<T = unknown> {
   disabledAttr: (tab: TabItem<T>) => string | undefined;
   ariaLabel: (tab: TabItem<T>) => string | undefined;
   tabTabindex: (index: number) => number;
+  tabKey: (tab: TabItem<T>, index: number) => string;
+  tabBody: (tab: TabItem<T>, index: number) => Node;
   isHidden: (index: number) => boolean;
   select: (index: number) => void;
   onKeydown: (event: KeyboardEvent) => void;
@@ -157,6 +164,16 @@ export function setup<T = unknown>(props: TabsProps<T>): TabsContext<T> {
   const isTabDisabled = (tab: TabItem<T>): boolean => !!props.disabled || !!tab.disabled;
   const hasTemplate = (): boolean => typeof props.tabTemplate === 'function';
   const hasIndicator = (): boolean => !!props.slidingIndicator;
+
+  // A stable-per-object version (minted on first sight) so a re-keyed `tabs` array with edited
+  // data re-renders that button's template body, and its `@key` also folds in the selected state.
+  let tabVersion = 0;
+  const tabVersions: WeakMap<object, number> = new WeakMap<object, number>();
+  const versionOf = (tab: TabItem<T>): number => {
+    let v: number | undefined = tabVersions.get(tab as object);
+    if (v === undefined) tabVersions.set(tab as object, (v = tabVersion += 1));
+    return v;
+  };
 
   const tabId = (index: number): string => `weave-tabs-${uid}-tab-${index}`;
   const panelId = (index: number): string => `weave-tabs-${uid}-panel-${index}`;
@@ -204,10 +221,9 @@ export function setup<T = unknown>(props: TabsProps<T>): TabsContext<T> {
     }
   };
 
-  // Panel contents are arbitrary — append them into their panels once in the DOM. When a
-  // `tabTemplate` is supplied, fill each tab button with its rendered content too: reactive
-  // per tab (rebuilt only when THAT tab's selected state flips), the render's bindings owned
-  // by a `root` disposed before the next render (and on unmount) so nothing leaks.
+  // Panel contents are arbitrary — append them into their panels once in the DOM. (A tabTemplate
+  // button body is rendered reactively in the template's keyed `@for` via `@render` — see tabBody —
+  // so it survives a changing `tabs` set, unlike a one-shot onMount snapshot.)
   onMount(() => {
     const el: Element | null = host();
     if (!el) return;
@@ -217,24 +233,6 @@ export function setup<T = unknown>(props: TabsProps<T>): TabsContext<T> {
     });
 
     const buttons: NodeListOf<HTMLElement> = el.querySelectorAll<HTMLElement>('.weave-tabs__tab');
-
-    const tpl: TabsProps<T>['tabTemplate'] = props.tabTemplate;
-    if (tpl) {
-      tabs().forEach((tab, i) => {
-        const btn: HTMLElement | undefined = buttons[i];
-        if (!btn) return;
-        const isSelected: () => boolean = computed(() => i === selectedIndex());
-        effect(() => {
-          const selected: boolean = isSelected();
-          return root((dispose) => {
-            btn.replaceChildren(
-              tpl({ item: tab, label: tab.label, index: i, selected, disabled: isTabDisabled(tab) })
-            );
-            return dispose;
-          });
-        });
-      });
-    }
 
     // FW-13 sliding indicator: measure the active tab's box and slide the indicator to it on every
     // selection change (reactive) and on any resize (ResizeObserver → a bump signal). Geometry only;
@@ -272,6 +270,18 @@ export function setup<T = unknown>(props: TabsProps<T>): TabsContext<T> {
       if (isTabDisabled(tabs()[index])) return -1;
       return index === rovingIndex() ? 0 : -1;
     },
+    // `@key` value: re-render this tab's template body when its data (version) or selected state changes.
+    tabKey: (tab, index): string => `${versionOf(tab)}:${index === selectedIndex()}`,
+    // The tab button body Node — the authored `tabTemplate` fed this tab's TabRowContext. Only called
+    // under `@if (hasTemplate())`, so `tabTemplate` is defined.
+    tabBody: (tab, index): Node =>
+      props.tabTemplate!({
+        item: tab,
+        label: tab.label,
+        index,
+        selected: index === selectedIndex(),
+        disabled: isTabDisabled(tab),
+      }),
     isHidden: (index): boolean => index !== selectedIndex(),
     select,
     onKeydown,

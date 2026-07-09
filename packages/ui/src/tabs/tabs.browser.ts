@@ -19,7 +19,7 @@ const tick = (): Promise<void> => new Promise<void>((r) => queueMicrotask(r));
 
 const SCOPE: string[] = [
   'host', 'indicator', 'tabs', 'rootClass', 'label', 'hasTemplate', 'hasIndicator', 'tabId', 'panelId',
-  'selectedAttr', 'disabledAttr', 'ariaLabel', 'tabTabindex', 'isHidden', 'select', 'onKeydown',
+  'selectedAttr', 'disabledAttr', 'ariaLabel', 'tabTabindex', 'tabKey', 'tabBody', 'isHidden', 'select', 'onKeydown',
 ];
 
 interface Mounted {
@@ -322,6 +322,29 @@ test('tabTemplate rows are torn down on unmount — no effect fires after dispos
   idx.set(2); // would re-run a live row effect; must be a no-op after dispose
   await tick();
   assert.equal(renders, afterMount, 'no row re-render after dispose (owner torn down)');
+});
+
+test('tabTemplate: tabs added AFTER mount get their template body (FW-12 dynamic)', async () => {
+  const data: Signal<TabItem<Ico>[]> = signal<TabItem<Ico>[]>([ICON_TABS[0]]);
+  const { root, dispose } = mount({ get tabs(): TabItem<Ico>[] { return data(); }, tabTemplate: iconRow } as TabsProps);
+  await tick();
+  assert.equal(root.querySelectorAll('.weave-tabs__tab .tpl-label').length, 1, 'one templated tab at first');
+  data.set([...data(), ICON_TABS[1], ICON_TABS[2]]);
+  await tick();
+  const labels: (string | null)[] = Array.from(root.querySelectorAll('.weave-tabs__tab .tpl-label')).map((l) => l.textContent);
+  assert.deepEqual(labels, ['Profile', 'Password', 'Security'], 'appended tabs rendered their template bodies');
+  dispose();
+});
+
+test('tabTemplate: editing a tab (same position, new data) refreshes its body (FW-12 dynamic)', async () => {
+  const data: Signal<TabItem<Ico>[]> = signal<TabItem<Ico>[]>([{ label: 'Profile', content: 'p', data: { icon: 'user' } }]);
+  const { root, dispose } = mount({ get tabs(): TabItem<Ico>[] { return data(); }, tabTemplate: iconRow } as TabsProps);
+  await tick();
+  assert.equal(root.querySelector('.tpl-ico')?.getAttribute('data-icon'), 'user');
+  data.set([{ label: 'Profile', content: 'p', data: { icon: 'shield' } }]); // same position, new data object
+  await tick();
+  assert.equal(root.querySelector('.tpl-ico')?.getAttribute('data-icon'), 'shield', 'edited tab refreshed its template body');
+  dispose();
 });
 
 /* ─────────────────────────── FW-13 · slidingIndicator ─────────────────────────── */

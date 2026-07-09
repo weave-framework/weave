@@ -267,10 +267,15 @@ function emit(nodes: TemplateNode[], ctx: Set<string>): Line[] {
       for (const s of snippets) scope.add(s.name);
       for (const s of snippets) {
         const params: string = s.params.map((p) => `${p}: any`).join(', ');
-        push(`  const ${s.name} = (${params}): void => {`);
+        // A `@snippet` renders DOM, so type it `() => Node` (not `void`) — that's what a
+        // `@render` mounts AND what a template-prop like `rowTemplate`/`itemTemplate`/`tabTemplate`
+        // (typed `(row) => Node`) expects, so passing a snippet to one type-checks. The body is
+        // emitted as statements (no real return); a trailing typed return satisfies the annotation.
+        push(`  const ${s.name} = (${params}): Node => {`);
         const inner: Set<string> = new Set(scope);
         for (const p of s.params) inner.add(p);
         walk(s.children, inner);
+        push(`    return null as unknown as Node;`);
         push(`  };`);
       }
     }
