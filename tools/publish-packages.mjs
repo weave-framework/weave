@@ -13,8 +13,9 @@
  *   node tools/publish-packages.mjs --dry-run   # pack + validate, no upload
  *   node tools/publish-packages.mjs             # real publish (after `npm login`)
  *
- * Editor tooling (language-server, typescript-plugin) is intentionally NOT here —
- * publish those on their own track if/when desired.
+ * The bundled language-server is intentionally NOT here (it ships inside the editor plugins).
+ * `typescript-plugin` IS published — a WebStorm project installs it and wires it into tsconfig
+ * `compilerOptions.plugins` to get the synthesized default export (`.ts`-side TS1192 fix).
  */
 import { spawnSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
@@ -25,7 +26,7 @@ const dryRun = process.argv.includes('--dry-run');
 
 // Dependency order — a package's @weave deps must be on the registry first.
 // `weave-framework` is a deps-only meta-package (installs the core) — publish it LAST, after its deps exist.
-const ORDER = ['runtime', 'compiler', 'prettier-plugin', 'store', 'i18n', 'data', 'forms', 'router', 'ui', 'check', 'mcp', 'nx', 'cli', 'create-weave', 'weave-framework'];
+const ORDER = ['runtime', 'compiler', 'prettier-plugin', 'store', 'i18n', 'data', 'forms', 'router', 'ui', 'check', 'typescript-plugin', 'mcp', 'nx', 'cli', 'create-weave', 'weave-framework'];
 
 // Always build fresh dist/ before publishing the library + CLI packages.
 {

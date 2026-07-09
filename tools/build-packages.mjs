@@ -74,4 +74,8 @@ copyNonTsAssets('nx');
 run('npx', ['tsc', '-p', 'packages/cli/tsconfig.build.json'], 'tsc d.ts @weave-framework/cli');
 run('node', ['packages/cli/build.mjs'], 'esbuild bundle @weave-framework/cli');
 
+// TypeScript-plugin (the WebStorm/editor `.ts`-side default-export synthesizer): its own esbuild
+// bundle → dist/index.cjs. Published so a WebStorm project can install it and wire it into tsconfig.
+run('node', ['packages/typescript-plugin/build.mjs'], 'esbuild bundle @weave-framework/typescript-plugin');
+
 process.stdout.write('\n✓ All @weave-framework/* packages built to dist/\n');

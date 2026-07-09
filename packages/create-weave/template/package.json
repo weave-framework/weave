@@ -17,6 +17,7 @@
   },
   "devDependencies": {
     "@weave-framework/cli": "^1.0.0",
+    "@weave-framework/typescript-plugin": "^1.0.0",
     "typescript": "^5.7.0"
   }
 }

@@ -7,6 +7,12 @@ the previous one. For the granular, per-version log see [CHANGELOG.md](CHANGELOG
 
 ### ✨ Features & docs
 
+- **`@weave-framework/typescript-plugin` published to npm** — the `.ts`-side editor support. A tsserver
+  plugin that synthesizes the loader-generated default export so `import X from './x-component'` stops
+  reporting **TS1192 "no default export"** in WebStorm and other tsconfig-driven editors. Add
+  `"plugins": [{ "name": "@weave-framework/typescript-plugin" }]` to your `tsconfig.json` `compilerOptions`
+  and install it as a dev dependency; the Nx generator and `create-weave` template now scaffold both.
+
 - **Nx — use Weave in a mixed workspace** (`@weave-framework/nx`). New guidance (and a scaffolded
   project-local `tsconfig.json`) for making a project use Weave tooling when it sits next to another
   framework — including migrating an Angular project. Three markers (`weave.config.*`, `tsconfig.json`,

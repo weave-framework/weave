@@ -66,6 +66,9 @@ export async function applicationGenerator(
           strict: true,
           noEmit: true,
           skipLibCheck: true,
+          // Editor `.ts` support: the tsserver plugin synthesizes the loader-generated default export,
+          // so `import X from './x-component'` doesn't report TS1192 in VS Code / WebStorm.
+          plugins: [{ name: '@weave-framework/typescript-plugin' }],
         },
         include: ['src'],
       },
@@ -126,7 +129,11 @@ export async function applicationGenerator(
       '@weave-framework/i18n': WEAVE_DEP_RANGE,
       '@weave-framework/data': WEAVE_DEP_RANGE,
     },
-    { '@weave-framework/cli': WEAVE_DEP_RANGE, '@weave-framework/prettier-plugin': WEAVE_DEP_RANGE }
+    {
+      '@weave-framework/cli': WEAVE_DEP_RANGE,
+      '@weave-framework/prettier-plugin': WEAVE_DEP_RANGE,
+      '@weave-framework/typescript-plugin': WEAVE_DEP_RANGE, // wired into tsconfig plugins above
+    }
   );
 
   await formatFiles(tree);
