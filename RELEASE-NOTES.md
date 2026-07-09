@@ -3,7 +3,10 @@
 Human-readable highlights, one section per release — everything notable that landed since
 the previous one. For the granular, per-version log see [CHANGELOG.md](CHANGELOG.md).
 
-## Unreleased
+## 1.5.6 — 2026-07-09
+
+`<List>` gains a custom **row template** (FW-14) — the same escape hatch the menu (FW-10) and tabs
+(FW-12) have — plus two fixes so it holds up on real, data-driven admin lists. All additive.
 
 ### 🐞 Fixes — `@weave-framework/ui`
 

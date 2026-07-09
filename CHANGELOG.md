@@ -10,7 +10,7 @@
 > `pnpm publish:packages`) — pushing code does **not** publish to npm. (The scheme started at
 > `0.2.0`; the line crossed `1.0.0` on 2026-07-05 when the public API was frozen.)
 
-## Unreleased
+## 1.5.6 — 2026-07-09
 
 - **1.5.6 — fix(ui):** `<List>` `rowTemplate` (FW-14 follow-up #2) now re-renders a row body when the item's **data** changes, not only on a selected/disabled flip. The body was keyed solely by `selected:disabled`, constant for a non-selectable list — so a reused row (`eachBlock` keyed by `item.value`) kept its stale body after an edit-then-reload (same id, new data). The `@key` now folds in a per-item version (a data edit hands a fresh object → new version), so editing a record refreshes every templated field with no app-side key hack. Selected/disabled re-render preserved.
 - **1.5.5 — fix(ui):** `<List>` `rowTemplate` (FW-14 follow-up) now renders over **dynamic** `items`. The row body was wired once in `onMount` over a static `querySelectorAll` snapshot, so rows created *after* mount (async initial load, infinite-scroll append, reload after create/edit/delete) rendered **empty** (default title/meta suppressed). The body now mounts inside the reactive keyed `@for` block (`@render` guarded by `hasTemplate()`, wrapped in `@key(selected:disabled)` for the per-row selected/disabled re-render) — create / append / replace / remove all flow through the block's `track item.value` diffing. No `onMount`, no index-fragile `rows[i]`. API unchanged.
