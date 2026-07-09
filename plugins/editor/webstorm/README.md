@@ -15,9 +15,14 @@ hover. Works for both `.weave` single-file components and the separate `.ts` + `
 In WebStorm: **Settings → Plugins → ⚙ (gear) → Install Plugin from Disk…** → pick the
 **latest** `weave-webstorm-*.zip` from this folder → **Restart**.
 
-- **`weave-webstorm-0.15.0.zip`** — current/complete: HTML syntax coloring, go-to-definition,
+- **`weave-webstorm-0.16.0.zip`** — current/complete: HTML syntax coloring, go-to-definition,
   hover, and red-squiggle diagnostics, plus the Weave logo. Built on the M10 unified `{{ }}`
   binding syntax. Verified working on WebStorm 261 (2026.1).
+  - **0.16.0** — a Weave template now uses a dedicated **non-HTML file type** (was `HtmlFileType`,
+    kept only for the icon). Some WebStorm annotators key off the *file type* rather than the
+    language — notably the HTML event-handler-attribute JS handling, which flagged `on*={{ … }}`
+    bindings with a bogus **"Missing }"** (no language injection, so nothing to un-inject). The
+    dedicated file type keeps those file-type-gated HTML features off the template.
   - **0.15.0** — **go-to-definition** on a template binding (`{{ list }}`) now lands on the
     `const list = …` declaration in `setup()`, not the `return { list, … }` shorthand it used to jump
     to. (Language-server change — benefits the VS Code extension too on its next rebuild.)
