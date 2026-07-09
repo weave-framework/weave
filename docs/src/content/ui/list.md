@@ -63,9 +63,39 @@ Selectable, it's a `role="listbox"` of `role="option"` rows with `aria-selected`
 
 | Prop | Type | Default | Description |
 | --- | --- | --- | --- |
-| `items` | `ListItem[]` | — | The rows, each `{ value, title, meta?, disabled? }`. |
+| `items` | `ListItem<T>[]` | — | The rows, each `{ value, title, meta?, disabled?, data? }`. `data` is an arbitrary payload `rowTemplate` can read. |
 | `selectable` | `boolean` | `true` | Listbox (selectable) vs a plain semantic list. |
 | `value` | `string \| null` | — | Controlled selected key (single-select). |
 | `onChange` | `(value: string) => void` | — | Called with the next value on select. |
+| `reorderable` | `boolean` | `false` | Show a per-row drag handle and let rows be dragged to reorder. |
+| `onReorder` | `(event: DropEvent) => void` | — | Called on a committed reorder with `{ previousIndex, currentIndex }` (the list is controlled — you reorder `items`). |
+| `rowTemplate` | `(row: ListRowContext<T>) => Node` | — | Renders the whole body of each row (replacing the default title + meta spans) from the row's data + state. See below. |
 | `label` | `string` | — | Accessible name for the list. |
 | `class` | `string` | — | Extra classes forwarded onto the container. |
+
+### `rowTemplate` — custom row content
+
+Pass an authored `@snippet` as `rowTemplate` to render the whole body of each `.weave-list__row` —
+a colour dot, tag pills, a muted description, trailing action buttons. The framework still owns the
+row, its role, `aria-selected`, roving tabindex, keyboard nav and (when `reorderable`) the drag
+handle rendered **before** the template; the template only fills the row's inner content. `title`
+stays the accessible name + typeahead target, and the active row is styled via the
+`[aria-selected='true']` hook. It re-renders when a row's `selected` state flips. Omit it for the
+default title + meta spans — fully back-compatible. Parallels the menu's `itemTemplate` and tabs'
+`tabTemplate`. See the [Custom row content example](/examples/components/list).
+
+In *selectable* mode a click on an interactive descendant (a `button`, link or `[role="button"]`)
+inside the template does not toggle row selection — it stays that control's click.
+
+The snippet receives a `ListRowContext<T>`:
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `item` | `ListItem<T>` | The row's data object (bind `row.item.title`, `row.item.data.*`). |
+| `value` | `string` | The row's value/key. |
+| `title` | `string` | The row's title — also the accessible name + typeahead text. |
+| `meta` | `string \| undefined` | The row's meta text, if any. |
+| `data` | `T \| undefined` | The row's arbitrary payload (`item.data`). |
+| `index` | `number` | Zero-based position in the list. |
+| `selected` | `boolean` | True when this row is `aria-selected` (re-renders when it flips). |
+| `disabled` | `boolean` | True when this row is disabled. |

@@ -179,6 +179,7 @@ import ExListDisabledRow from '../demos/ui/ex-list-disabled-row';
 import ExListMeta from '../demos/ui/ex-list-meta';
 import ExListPlain from '../demos/ui/ex-list-plain';
 import ExListReorderable from '../demos/ui/ex-list-reorderable';
+import ExListRowTemplate from '../demos/ui/ex-list-row-template';
 import ExMenuAccessors from '../demos/ui/ex-menu-accessors';
 import ExMenuBasic from '../demos/ui/ex-menu-basic';
 import ExMenuCustom from '../demos/ui/ex-menu-custom';
@@ -443,6 +444,7 @@ export const demos: Record<string, Component> = {
   'ex-list-meta': ExListMeta,
   'ex-list-plain': ExListPlain,
   'ex-list-reorderable': ExListReorderable,
+  'ex-list-row-template': ExListRowTemplate,
   'ex-menu-accessors': ExMenuAccessors,
   'ex-menu-basic': ExMenuBasic,
   'ex-menu-custom': ExMenuCustom,

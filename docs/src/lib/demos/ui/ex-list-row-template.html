@@ -1,0 +1,26 @@
+<div style="max-width:460px; display:flex; flex-direction:column; gap:8px;">
+  <List selectable={{ false }} items={{ items }} rowTemplate={{ roleRow }} label={{ 'Roles' }} />
+  <span style="color:var(--fg-muted)">Last action: {{ lastAction() }}</span>
+
+  @snippet roleRow(row) {
+    <div style="flex:1; display:flex; flex-direction:column; gap:2px; min-width:0;">
+      <div style="display:flex; align-items:center; gap:8px;">
+        <span style={{ dot(row.data.color) }}></span>
+        <span style="font-weight:600;">{{ row.data.name }}</span>
+        <Badge variant={{ 'tag' }}>{{ row.data.users }} users</Badge>
+        @if (row.data.system) { <Badge variant={{ 'tag' }}>system</Badge> }
+      </div>
+      <span style="color:var(--fg-muted); font-size:13px;">{{ row.data.description }}</span>
+    </div>
+    <div style="display:flex; gap:4px; flex:none;">
+      <Button variant={{ 'icon' }} label={{ 'Edit' }} on:click={{ () => edit(row.data) }}>
+        <Icon name={{ 'pencil' }} />
+      </Button>
+      @if (!row.data.system) {
+        <Button variant={{ 'icon' }} label={{ 'Delete' }} on:click={{ () => remove(row.data) }}>
+          <Icon name={{ 'trash-2' }} />
+        </Button>
+      }
+    </div>
+  }
+</div>

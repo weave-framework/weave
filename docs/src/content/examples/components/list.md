@@ -161,3 +161,71 @@ export function setup() {
 }
 ~~~
 :::
+
+## Custom row content — `rowTemplate`
+
+`rowTemplate` hands `<List>` an authored `@snippet` that renders the **whole** body of each
+`.weave-list__row` — a colour dot, the name, tag pills, a muted description, trailing action
+buttons — from the row's [`ListRowContext`](/ui/list): `row.item` (with your `data` payload) plus
+`row.value`, `row.title`, `row.index`, `row.selected` and `row.disabled`. The framework still owns
+the row, its role, `aria-selected`, roving tabindex, keyboard nav and (when `reorderable`) the drag
+handle rendered **before** the template; `row.title` stays the accessible name + typeahead target.
+It re-renders when a row's `selected` flips. Omit it for the default title + meta — fully
+back-compatible. Mirrors the menu's [`itemTemplate`](/examples/components/menu) and tabs'
+[`tabTemplate`](/examples/components/tabs).
+
+On a non-selectable list (`selectable={{ false }}`) the row does not select, so trailing `<Button>`s
+are plain controls. In *selectable* mode a click on an interactive descendant (a `button`, link or
+`[role="button"]`) inside the template is ignored for selection — it stays that control's click.
+
+:::demo ex-list-row-template
+
+:::tabs
+~~~html title="app.html"
+<List selectable={{ false }} items={{ items }} rowTemplate={{ roleRow }} label={{ 'Roles' }} />
+
+@snippet roleRow(row) {
+  <div class="role-main">
+    <span class="role-dot" style={{ dot(row.data.color) }}></span>
+    <span class="role-name">{{ row.data.name }}</span>
+    <Badge variant={{ 'tag' }}>{{ row.data.users }} users</Badge>
+    @if (row.data.system) { <Badge variant={{ 'tag' }}>system</Badge> }
+    <p class="role-desc">{{ row.data.description }}</p>
+  </div>
+  <div class="role-actions">
+    <Button variant={{ 'icon' }} label={{ 'Edit' }} on:click={{ () => edit(row.data) }}>
+      <Icon name={{ 'pencil' }} />
+    </Button>
+    @if (!row.data.system) {
+      <Button variant={{ 'icon' }} label={{ 'Delete' }} on:click={{ () => remove(row.data) }}>
+        <Icon name={{ 'trash-2' }} />
+      </Button>
+    }
+  </div>
+}
+~~~
+~~~ts title="app.ts"
+import { signal } from '@weave-framework/runtime';
+import List, { type ListItem } from '@weave-framework/ui/list';
+import Badge from '@weave-framework/ui/badge';
+import Button from '@weave-framework/ui/button';
+import Icon from '@weave-framework/ui/icon';
+
+interface Role { id: string; name: string; color: string; users: number; system: boolean; description: string }
+
+export function setup() {
+  const roles: Role[] = [
+    { id: 'admin',  name: 'Admin',  color: '#e11d48', users: 3,  system: true,  description: 'Full access to every setting.' },
+    { id: 'editor', name: 'Editor', color: '#0d9488', users: 9,  system: false, description: 'Create and edit content.' },
+    { id: 'viewer', name: 'Viewer', color: '#3b82f6', users: 42, system: false, description: 'Read-only access.' },
+  ];
+  const items: ListItem<Role>[] = roles.map((r) => ({ value: r.id, title: r.name, data: r }));
+  return {
+    items,
+    dot: (color: string) => `background:${color}`,
+    edit: (r: Role) => console.log('edit', r.id),
+    remove: (r: Role) => console.log('delete', r.id),
+  };
+}
+~~~
+:::

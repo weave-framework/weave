@@ -3,6 +3,21 @@
 Human-readable highlights, one section per release — everything notable that landed since
 the previous one. For the granular, per-version log see [CHANGELOG.md](CHANGELOG.md).
 
+## Unreleased
+
+### ✨ Features — `@weave-framework/ui`
+
+- **List — custom row content (`rowTemplate`).** Hand a `<List>` an authored `@snippet` and it
+  renders the whole body of each row — a colour dot, the name, tag pills, a muted description,
+  trailing action buttons — from the row's `ListRowContext` (`item` + your `data` payload, plus
+  `value` / `title` / `meta` / `index` / `selected` / `disabled`). `<List>` and `ListItem` are now
+  generic over the payload (`data?: T`). The framework still owns the row, its role, `aria-selected`,
+  roving tabindex, keyboard nav and (when `reorderable`) the drag handle rendered *before* the
+  template; `title` stays the accessible name + typeahead. It re-renders when a row's `selected`
+  flips. In selectable mode a click on an interactive control inside the row (a `<Button>` / link) no
+  longer toggles row selection. Off by default → the current title + meta spans. Mirrors the menu's
+  `itemTemplate` (FW-10) and tabs' `tabTemplate` (FW-12).
+
 ## 1.5.3 — 2026-07-08
 
 Two opt-in `<Tabs>` enhancements (FW-12 `tabTemplate`, FW-13 `slidingIndicator`) plus a

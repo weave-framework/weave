@@ -15,29 +15,67 @@
  * forms (`use:control`) integration lands with the Checkbox pass that fixes the
  * control-binding convention.
  *
+ * Each row renders its `title` (+ optional `meta`) by default; pass **`rowTemplate`** (an
+ * authored `@snippet`, parallels the menu's `itemTemplate` — FW-10 — and the tabs'
+ * `tabTemplate` — FW-12) to render the whole row body — a colour dot, tag pills, a muted
+ * description, trailing action buttons — from the row's data + state. The framework still
+ * owns the `.weave-list__row`, its role (`option`/`listitem`), `aria-selected`, roving
+ * tabindex, keyboard nav and (when `reorderable`) the drag handle rendered *before* the
+ * template; the template only fills the row's inner content.
+ *
  *   import List from '@weave-framework/ui/list';
  *   <List items={{ rows }} value={{ selected() }} onChange={{ setSelected }} />
  *   <List selectable={{ false }} items={{ rows }} />
  */
 
-import { signal, onMount, type Signal } from '@weave-framework/runtime';
+import { signal, computed, effect, root, onMount, type Signal } from '@weave-framework/runtime';
 import { listKeyManager, type ListKeyManager } from '../cdk/key-manager.js';
 import { dropList, type DropEvent } from '../cdk/drag-drop.js';
 
-export interface ListItem {
-  /** The value this row carries (what `value`/`onChange` speak in). */
+export interface ListItem<T = unknown> {
+  /** The value this row carries (what `value`/`onChange` speak in) — also the row key. */
   value: string;
-  /** Primary text. */
+  /** Primary text — the accessible name + typeahead target. */
   title: string;
-  /** Secondary text, shown trailing/muted. */
+  /** Secondary text, shown trailing/muted (unused when a `rowTemplate` renders its own body). */
   meta?: string;
   /** Disable just this row (skipped in keyboard nav, not selectable). */
   disabled?: boolean;
+  /** Arbitrary payload a {@link ListProps.rowTemplate} can read (e.g. the source record). */
+  data?: T;
 }
 
-export interface ListProps {
+/**
+ * The per-row context handed to a {@link ListProps.rowTemplate}. The template (an authored
+ * `@snippet`) renders the whole row body — dot/name/pills/description/actions — binding these
+ * fields. Parallels the menu's `MenuRowContext` (FW-10) and tabs' `TabRowContext` (FW-12).
+ */
+export interface ListRowContext<T = unknown> {
+  /** The row's data object (bind `row.item.title`, `row.item.data.*`). */
+  item: ListItem<T>;
+  /** The row's value/key. */
+  value: string;
+  /** The row's title — also the accessible name + typeahead text. */
+  title: string;
+  /** The row's meta text, if any. */
+  meta?: string;
+  /** The row's arbitrary payload (`item.data`) — the app's source record. */
+  data?: T;
+  /** Zero-based position in the list. */
+  index: number;
+  /**
+   * True when this row is `aria-selected` (selectable mode). A snapshot; the template
+   * re-renders when it flips, so you can restyle the active row from it — or keep relying on
+   * the `[aria-selected='true']` CSS hook the framework maintains on the row.
+   */
+  selected: boolean;
+  /** Is this row disabled (greyed, skipped by keyboard nav, not selectable). */
+  disabled: boolean;
+}
+
+export interface ListProps<T = unknown> {
   /** The rows, top to bottom. */
-  items: ListItem[];
+  items: ListItem<T>[];
   /** Selectable (listbox) vs a plain semantic list. Default true. */
   selectable?: boolean;
   /** Controlled value: the selected row's key (single-select). */
@@ -54,6 +92,14 @@ export interface ListProps {
   label?: string;
   /** Extra classes, forwarded onto the container. */
   class?: string;
+  /**
+   * Renders the WHOLE body of each `.weave-list__row` (replacing the default title + meta
+   * spans) from the row's {@link ListRowContext}. The framework keeps the row, its role,
+   * `aria-selected`, roving tabindex, keyboard nav and (when `reorderable`) the drag handle,
+   * which stays framework-rendered *before* the template content. `title` still drives the
+   * accessible name + typeahead. Omit for the default (title + meta) — fully back-compatible.
+   */
+  rowTemplate?: (row: ListRowContext<T>) => Node;
 }
 
 export const template: string =
@@ -62,35 +108,43 @@ export const template: string =
   '@for (item of items(); track item.value) {' +
   '<div class="weave-list__row" role={{ rowRole() }} aria-selected={{ ariaSelected(item) }}' +
   ' aria-disabled={{ ariaDisabled(item) }} tabindex={{ tabindexFor(item) }}' +
-  ' on:click={{ () => activate(item) }}>' +
+  ' on:click={{ (e) => activate(item, e) }}>' +
   '@if (reorderable()) {<span class="weave-list__drag-handle" aria-hidden="true">⠿</span>}' +
+  '@if (!hasTemplate()) {' +
   '<span class="weave-list__title">{{ item.title }}</span>' +
   '@if (item.meta) {<span class="weave-list__meta">{{ item.meta }}</span>}' +
+  '}' +
   '</div>' +
   '}' +
   '</div>';
 
-export interface ListContext {
+export interface ListContext<T = unknown> {
   host: Signal<Element | null>;
-  items: () => ListItem[];
+  items: () => ListItem<T>[];
   listClass: () => string;
   listRole: () => string;
   rowRole: () => string | undefined;
   reorderable: () => boolean;
+  hasTemplate: () => boolean;
   label: () => string | undefined;
-  ariaSelected: (item: ListItem) => string | undefined;
-  ariaDisabled: (item: ListItem) => string | undefined;
-  tabindexFor: (item: ListItem) => number | undefined;
-  activate: (item: ListItem) => void;
+  ariaSelected: (item: ListItem<T>) => string | undefined;
+  ariaDisabled: (item: ListItem<T>) => string | undefined;
+  tabindexFor: (item: ListItem<T>) => number | undefined;
+  activate: (item: ListItem<T>, event?: Event) => void;
   onKeydown: (event: KeyboardEvent) => void;
 }
 
-export function setup(props: ListProps): ListContext {
+export function setup<T = unknown>(props: ListProps<T>): ListContext<T> {
   const host: Signal<Element | null> = signal<Element | null>(null);
 
-  const items = (): ListItem[] => props.items ?? [];
+  const items = (): ListItem<T>[] => props.items ?? [];
   const selectable = (): boolean => props.selectable !== false;
   const reorderable = (): boolean => !!props.reorderable;
+  const hasTemplate = (): boolean => typeof props.rowTemplate === 'function';
+
+  const listDisabled = (): boolean => !!props.disabled;
+  const isItemDisabled = (item: ListItem<T>): boolean => listDisabled() || !!item.disabled;
+  const isSelected = (item: ListItem<T>): boolean => selectable() && props.value === item.value;
 
   // Reorder via the CDK dropList — only the drag handle starts a drag (row clicks still
   // select). Committed drops emit onReorder; the consumer reorders `items` (controlled).
@@ -106,11 +160,43 @@ export function setup(props: ListProps): ListContext {
       onDrop: (event: DropEvent) => props.onReorder?.(event),
     });
   });
-  const listDisabled = (): boolean => !!props.disabled;
-  const isItemDisabled = (item: ListItem): boolean => listDisabled() || !!item.disabled;
-  const isSelected = (item: ListItem): boolean => selectable() && props.value === item.value;
 
-  const manager: ListKeyManager<ListItem> = listKeyManager(items, {
+  // rowTemplate: fill each row body with the rendered template, after the (framework-owned)
+  // drag handle. Reactive per row — rebuilt only when THAT row's selected state flips — with
+  // the render's bindings owned by a `root` disposed before the next render (and on unmount).
+  onMount(() => {
+    const tpl: ListProps<T>['rowTemplate'] = props.rowTemplate;
+    if (!tpl) return;
+    const el: Element | null = host();
+    if (!el) return;
+    const rows: NodeListOf<HTMLElement> = el.querySelectorAll<HTMLElement>('.weave-list__row');
+    items().forEach((item, i) => {
+      const rowEl: HTMLElement | undefined = rows[i];
+      if (!rowEl) return;
+      const rowSelected: () => boolean = computed(() => isSelected(item));
+      effect(() => {
+        const selected: boolean = rowSelected();
+        return root((dispose) => {
+          renderRowBody(
+            rowEl,
+            tpl({
+              item,
+              value: item.value,
+              title: item.title,
+              meta: item.meta,
+              data: item.data,
+              index: i,
+              selected,
+              disabled: isItemDisabled(item),
+            })
+          );
+          return dispose;
+        });
+      });
+    });
+  });
+
+  const manager: ListKeyManager<ListItem<T>> = listKeyManager(items, {
     orientation: 'vertical',
     wrap: true,
     skipDisabled: true,
@@ -124,7 +210,7 @@ export function setup(props: ListProps): ListContext {
   const rovingIndex = (): number => {
     const active: number = manager.activeIndex();
     if (active >= 0) return active;
-    const rows: ListItem[] = items();
+    const rows: ListItem<T>[] = items();
     const selected: number = rows.findIndex((r) => isSelected(r) && !isItemDisabled(r));
     if (selected >= 0) return selected;
     const firstEnabled: number = rows.findIndex((r) => !isItemDisabled(r));
@@ -138,8 +224,15 @@ export function setup(props: ListProps): ListContext {
     row?.focus();
   };
 
-  const activate = (item: ListItem): void => {
+  const activate = (item: ListItem<T>, event?: Event): void => {
     if (!selectable() || isItemDisabled(item)) return;
+    // A click that originated from an interactive descendant (a `<Button>`/link inside a
+    // `rowTemplate`) is that control's click, not a row selection — ignore it. Keyboard
+    // activation (Enter/Space) passes no event, so it always selects.
+    if (event) {
+      const target: Element | null = event.target as Element | null;
+      if (target?.closest('button, a, [role="button"]')) return;
+    }
     manager.setActiveItem(item); // roving tab stop follows the interaction
     if (props.value !== item.value) props.onChange?.(item.value);
   };
@@ -150,7 +243,7 @@ export function setup(props: ListProps): ListContext {
     // moves relative to the selected/focused row (not from index 0).
     if (manager.activeIndex() < 0) manager.setActiveItem(rovingIndex());
     if (event.key === ' ' || event.key === 'Enter') {
-      const item: ListItem | undefined = items()[manager.activeIndex()];
+      const item: ListItem<T> | undefined = items()[manager.activeIndex()];
       if (item) {
         activate(item);
         event.preventDefault();
@@ -175,6 +268,7 @@ export function setup(props: ListProps): ListContext {
     listRole: (): string => (selectable() ? 'listbox' : 'list'),
     rowRole: (): string | undefined => (selectable() ? 'option' : 'listitem'),
     reorderable,
+    hasTemplate,
     label: (): string | undefined => props.label,
     ariaSelected: (item): string | undefined => (selectable() ? (isSelected(item) ? 'true' : 'false') : undefined),
     ariaDisabled: (item): string | undefined => (selectable() && isItemDisabled(item) ? 'true' : undefined),
@@ -186,4 +280,15 @@ export function setup(props: ListProps): ListContext {
     activate,
     onKeydown,
   };
+}
+
+/**
+ * Replace a row's template-rendered body while preserving a leading framework-owned drag
+ * handle: remove every child after the handle (or all children when there is none), then
+ * append the freshly rendered node.
+ */
+function renderRowBody(rowEl: HTMLElement, node: Node): void {
+  const handle: Element | null = rowEl.querySelector(':scope > .weave-list__drag-handle');
+  while (rowEl.lastChild && rowEl.lastChild !== handle) rowEl.removeChild(rowEl.lastChild);
+  rowEl.appendChild(node);
 }

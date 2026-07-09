@@ -10,6 +10,10 @@
 > `pnpm publish:packages`) — pushing code does **not** publish to npm. (The scheme started at
 > `0.2.0`; the line crossed `1.0.0` on 2026-07-05 when the public API was frozen.)
 
+## Unreleased
+
+- **1.5.4 — feat(ui):** `<List>` `rowTemplate` (FW-14) — an authored `@snippet` renders the whole body of each `.weave-list__row` (colour dot, name, tag pills, description, trailing action buttons) from the row's `ListRowContext` (`item` + `data`, `value`, `title`, `meta`, `index`, reactive `selected`, `disabled`). `<List>`/`ListItem` are now generic over the item payload (`data?: T`). The framework keeps the row, its role, `aria-selected`, roving tabindex, keyboard nav and (when `reorderable`) the drag handle rendered before the template; `title` stays the accessible name + typeahead. Re-renders per row on `selected` change, bindings owned/disposed cleanly. In selectable mode a click on an interactive descendant (`button`/`a`/`[role=button]`) inside the template no longer toggles selection. Omit → the default title + meta spans (back-compatible). Mirrors the menu's `itemTemplate` (FW-10) and tabs' `tabTemplate` (FW-12).
+
 ## 1.5.3 — 2026-07-08
 
 - **1.5.3 — feat(ui):** `<Tabs>` `slidingIndicator` (FW-13) — opt-in animated marker. When set, the framework renders one `.weave-tabs__indicator` in the tab list and slides + resizes it (`transform: translateX` + `width`) to the active tab's box on every selection and on resize (ResizeObserver), the CSS transition doing the animation. Default look is a bottom accent underline (`--weave-tabs-indicator-*` tokens); app CSS re-skins it to a pill. Off by default (Weave has no sliding marker unless asked); torn down (observer disconnected) on unmount. Composes with `tabTemplate`.
