@@ -78,4 +78,8 @@ run('node', ['packages/cli/build.mjs'], 'esbuild bundle @weave-framework/cli');
 // bundle → dist/index.cjs. Published so a WebStorm project can install it and wire it into tsconfig.
 run('node', ['packages/typescript-plugin/build.mjs'], 'esbuild bundle @weave-framework/typescript-plugin');
 
+// Keep the create-weave template's bundled skill suite in sync with skills/ (source of truth),
+// so a scaffolded app ships them under its editor-skills directory.
+run('node', ['tools/sync-skills.mjs'], 'sync Weave skills → create-weave template');
+
 process.stdout.write('\n✓ All @weave-framework/* packages built to dist/\n');

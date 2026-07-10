@@ -1,0 +1,87 @@
+---
+name: weave-ui
+description: >-
+  The @weave-framework/ui component library — using its ready-made components AND
+  authoring new ones. Use this whenever you reach for UI building blocks (Button,
+  Input, Select, Dialog, Table, Menu, Tabs, Datepicker, Tooltip, List, Snackbar,
+  …), theme/token styling of them, forms integration, or when building a new
+  reusable styled component or CDK behavior primitive (overlay, focus, positioning,
+  drag-drop). Reach for it on any mention of a UI component, design system, theming,
+  "a dialog/table/dropdown/date picker", accessibility of a control, or "make a
+  reusable component". For plain templates use weave-templates.
+---
+
+# Weave UI (@weave-framework/ui)
+
+A Material+CDK-equivalent component library built ON Weave — signal-native,
+zero-dep, accessible (WAI-ARIA), themeable via SCSS tokens. Two audiences:
+**(1) consuming** the ready components, **(2) authoring** new ones. Each component
+is a subpath import; the dist ships a typed `export default`, so
+`import Button from '@weave-framework/ui/button'` just works.
+
+## Consuming components
+
+```ts
+import Button from '@weave-framework/ui/button';
+import Input from '@weave-framework/ui/input';
+import Dialog from '@weave-framework/ui/dialog';
+```
+```html
+<Input bind:value={{ name }} label="Name" />
+<Button variant="primary" on:click={{ save }} disabled={{ !valid() }}>Save</Button>
+```
+- Import each component from its subpath (`@weave-framework/ui/<name>`). Used only in the template? No `void` keep-alive needed with the editor tooling active (weave-component).
+- Props are passed as attributes; **`on:x` events are callback props**; **`bind:value`/`bind:checked`** wire two-way; a **bare** attribute is `true` (`<Button disabled>`).
+- Compose them — a component's `on:` and data props forward as documented per component.
+
+### The catalog (import name = subpath)
+
+`button` · `button-toggle` · `badge` · `card` · `divider` · `icon` · `toolbar` · `sidenav` · `menu` · `menubar` · `context-menu` · `tabs` · `stepper` · `expansion` · `list` · `grid-list` · `table` · `paginator` · `tree` · `input` · `form-field` · `select` · `autocomplete` · `checkbox` · `radio` · `slide-toggle` · `slider` · `chips` · `datepicker` · `timepicker` · `dialog` · `bottom-sheet` · `snackbar` · `tooltip` · `popover-edit` · `progress-bar` · `progress-spinner`.
+
+Form controls (`input`, `select`, `checkbox`, `radio`, `slide-toggle`, `slider`, `datepicker`, `chips`, `autocomplete`) integrate with **weave-forms** (`use:control`) and with `bind:`. Overlays (`dialog`, `menu`, `tooltip`, `snackbar`, `bottom-sheet`) sit on the CDK overlay/positioning layer.
+
+## Theming & tokens
+
+Components are styled entirely through **CSS custom properties (tokens)** — every value in a component's SCSS comes from a `var()` off that component's token schema, never a hardcoded literal. Theme by setting tokens (globally or scoped):
+
+```scss
+:root {
+  --w-button-bg: #4f46e5;
+  --w-button-fg: #fff;
+  --w-radius: 8px;
+}
+```
+Set brand/contrast tokens at the app root; component look follows. Dark mode / RTL are supported (logical CSS + `[dir=rtl]` handling).
+
+## Authoring a NEW UI component — the rules
+
+If a built-in falls short, follow these (they keep the library coherent):
+
+1. **No duplication (RULE #1).** Never re-create a Button/Input/Select — **compose** the existing one. A new component is built out of existing components + CDK primitives, not from scratch.
+2. **Only Weave**, signal-native, zero third-party deps. Behavior is in-house.
+3. **One style.** Every SCSS value comes from `var()` off the component's own **token schema** — no hard-coded colors/sizes. Define the token schema; expose sensible defaults.
+4. **Accessible.** WAI-ARIA roles/states, keyboard nav, focus management, `prefers-reduced-motion`. Use the CDK primitives rather than hand-rolling.
+5. **Native-first.** Prefer a real `<input>`/`<button>`/`<dialog>` + enhancement over a div soup.
+
+### CDK primitives (`@weave-framework/ui/cdk`) — the headless behavior layer
+
+Build interactive components on these instead of reinventing them: **Overlay** + connected **positioning**, **Portal**, **focus-trap** / **focus-monitor**, **live-announcer**, **key-managers** (list/tree, RTL-aware), **Observers**, **BreakpointObserver**, **virtual scroll**, **drag & drop**, **SelectionModel**, clipboard, date-adapter. They are unstyled and reusable — the same overlay powers dialog/menu/tooltip.
+
+### Component composition mechanics
+
+- Tags are PascalCase `<Component>`; `on:X` auto-forwards to the child root; shared look lives in shared SCSS mixins (`_helpers.scss`), shared token defaults in one place.
+- A component may **extend** another (RFC 0008: `export const extend = Base` for full override, or `export const patch = [...]` for declarative template patches) — reuse a base's behavior/markup instead of copying.
+
+## Patterns
+
+- **Forms**: `use:control={{ field }}` on `@weave-framework/ui` inputs, or `bind:value` for plain two-way (weave-forms).
+- **Lists**: `<List>` with a `rowTemplate` `@snippet` (typed) + `CursorList` + `InfiniteScroll` for large/cursor-paged data (weave-data).
+- **Overlays**: prefer the built-in `Dialog`/`Menu`/`Snackbar` over hand-rolled portals.
+- **Theme once** at the root via tokens; don't override component internals with `!important`.
+
+## Gotchas
+
+- Import from the **subpath** (`@weave-framework/ui/button`), not a barrel.
+- Don't hardcode style values in a new component — thread everything through `var()` tokens.
+- Don't duplicate an existing control — compose it.
+- Overlays/positioning: reach for the **CDK** primitives, not raw DOM math.

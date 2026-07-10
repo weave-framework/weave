@@ -40,6 +40,11 @@ the previous one. For the granular, per-version log see [CHANGELOG.md](CHANGELOG
 - **`bind:` on components.** `<Stepper bind:value={{ count }} />` now works — two-way is the same syntax on
   a component (passing the signal) as on a DOM `<input>`, instead of a compile error.
 
+- **A skill suite for building Weave apps.** Eleven focused, per-subsystem skills (component, reactivity,
+  templates, router, forms, store, i18n, data, ui, tooling — plus an orchestrator) that guide an AI editor
+  through building Weave apps of any complexity, each grounded in the real API. New apps scaffold them
+  automatically; existing apps copy the `skills/` folder into their editor's skills directory.
+
 ### 🐛 Fixes
 
 - **Arrow-parameter shadowing in templates.** A template expression whose inline arrow reuses a
