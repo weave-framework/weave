@@ -16,6 +16,8 @@ const rt: typeof dom & { signal: typeof signal; effect: typeof effect } = { ...d
 
 /** Flush microtasks (fires the deferred onMount content-append). */
 const tick = (): Promise<void> => new Promise<void>((r) => queueMicrotask(r));
+/** Await the next animation frame — for content that lays out a frame later + ResizeObserver ticks. */
+const raf = (): Promise<void> => new Promise<void>((r) => requestAnimationFrame(() => r()));
 
 const SCOPE: string[] = [
   'host', 'indicator', 'tabs', 'rootClass', 'label', 'hasTemplate', 'hasIndicator', 'tabId', 'panelId',
@@ -392,5 +394,91 @@ test('slidingIndicator + tabTemplate compose (FW-13)', async () => {
   assert.ok(indicator, 'indicator rendered alongside a custom tab template');
   assert.ok(root.querySelector('.weave-tabs__tab .tpl-btn'), 'tab template still renders');
   assert.notEqual(indicator!.style.width, '', 'indicator still measured with a custom template');
+  dispose();
+});
+
+/* ─────────────────────────── FW-15 · slidingIndicator + tabTemplate tracking ─────────────────────────── */
+
+test('slidingIndicator tracks the active tab when a tabTemplate is used — slides + resizes, never a zero-width circle (FW-15)', async () => {
+  const { tabsEls, indicator, dispose } = mount({ tabs: ICON_TABS, tabTemplate: iconRow, slidingIndicator: true } as TabsProps);
+  await tick();
+  // Starts under the first tab.
+  assert.equal(indicator!.style.transform, `translateX(${tabsEls[0].offsetLeft}px)`, 'starts at tab 0 offsetLeft');
+  assert.equal(indicator!.style.width, `${tabsEls[0].offsetWidth}px`, 'starts at tab 0 width');
+  // Click tab 1 → indicator must slide + resize to tab 1's actual box, not collapse near tab 0.
+  tabsEls[1].click();
+  await tick();
+  assert.notEqual(indicator!.style.width, '0px', 'never collapses to a zero-width circle');
+  assert.equal(indicator!.style.transform, `translateX(${tabsEls[1].offsetLeft}px)`, 'slid to the active tab offsetLeft');
+  assert.equal(indicator!.style.width, `${tabsEls[1].offsetWidth}px`, 'resized to the active tab width');
+  // And on to tab 2.
+  tabsEls[2].click();
+  await tick();
+  assert.equal(indicator!.style.transform, `translateX(${tabsEls[2].offsetLeft}px)`, 'tracks tab 2 offsetLeft');
+  assert.equal(indicator!.style.width, `${tabsEls[2].offsetWidth}px`, 'tracks tab 2 width');
+  dispose();
+});
+
+test('slidingIndicator re-measures when the active tab content lays out a FRAME LATER (FW-15)', async () => {
+  // The selected tab grows its content one animation frame after it renders (an async icon/label
+  // layout). The list is a fixed-width block, so its own box never changes — a list-only observer
+  // would miss the growth and leave the indicator stuck at the pre-layout width (the FW-15 bug).
+  const lateRow = (row: TabRowContext<Ico>): Node => {
+    const wrap: HTMLElement = document.createElement('span');
+    wrap.className = 'tpl-btn';
+    wrap.style.display = 'inline-block';
+    const lbl: HTMLElement = document.createElement('span');
+    lbl.textContent = row.label;
+    wrap.append(lbl);
+    if (row.selected) {
+      requestAnimationFrame(() => {
+        const grown: HTMLElement = document.createElement('span');
+        grown.style.display = 'inline-block';
+        grown.textContent = 'XXXXXXXXXXXXXXXXXXXX';
+        wrap.append(grown);
+      });
+    }
+    return wrap;
+  };
+  const { root, tabsEls, indicator, dispose } = mount({ tabs: ICON_TABS, tabTemplate: lateRow, slidingIndicator: true } as TabsProps);
+  const list: HTMLElement = root.querySelector<HTMLElement>('.weave-tabs__list')!;
+  list.style.width = '600px';
+  list.style.display = 'block';
+  await tick();
+  await raf();
+  await raf();
+  tabsEls[1].click();
+  await tick();
+  await raf();
+  await raf();
+  await raf();
+  assert.notEqual(indicator!.style.width, '0px', 'never a zero-width circle');
+  assert.equal(indicator!.style.width, `${tabsEls[1].offsetWidth}px`, 'indicator width follows the tab AFTER its late layout');
+  assert.equal(indicator!.style.transform, `translateX(${tabsEls[1].offsetLeft}px)`, 'indicator offset follows the grown tab');
+  dispose();
+});
+
+test('slidingIndicator re-measures when the tabs set itself changes (FW-15)', async () => {
+  const data: Signal<TabItem<Ico>[]> = signal<TabItem<Ico>[]>([ICON_TABS[0], ICON_TABS[1]]);
+  const idx: Signal<number> = signal<number>(1);
+  const { root, indicator, dispose } = mount({
+    get tabs(): TabItem<Ico>[] { return data(); },
+    tabTemplate: iconRow,
+    get value(): number { return idx(); },
+    onChange: (i): void => { idx.set(i); },
+    slidingIndicator: true,
+  } as TabsProps);
+  await tick();
+  await raf();
+  const active = (): HTMLElement => Array.from(root.querySelectorAll<HTMLElement>('.weave-tabs__tab'))[idx()];
+  assert.equal(indicator!.style.width, `${active().offsetWidth}px`, 'indicator on the active tab initially');
+  // Prepend a tab: the active tab (now index 2) shifts right — the indicator must follow it.
+  idx.set(2);
+  data.set([{ label: 'New', content: 'n', data: { icon: 'plus' } }, ...data()]);
+  await tick();
+  await raf();
+  await raf();
+  assert.equal(indicator!.style.transform, `translateX(${active().offsetLeft}px)`, 'indicator slid to the re-positioned active tab');
+  assert.equal(indicator!.style.width, `${active().offsetWidth}px`, 'indicator resized to it');
   dispose();
 });

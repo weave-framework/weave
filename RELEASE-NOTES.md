@@ -3,6 +3,19 @@
 Human-readable highlights, one section per release — everything notable that landed since
 the previous one. For the granular, per-version log see [CHANGELOG.md](CHANGELOG.md).
 
+## Unreleased
+
+### 🐛 Fixes
+
+- **`<Tabs>` sliding indicator tracks the active tab under a `tabTemplate` (FW-15).** Combining
+  `slidingIndicator` with a custom `tabTemplate` used to leave the indicator the wrong size and in the
+  wrong place on every switch — it collapsed to a tiny box (a small circle under a pill skin) parked near
+  the first tab, because its geometry was read off a list of tab buttons captured once at mount that goes
+  stale when the templated button bodies re-render. The indicator now always measures the **live** active
+  tab button, re-places on selection / `tabs`-set changes, catches content that lays out **a frame later**
+  (it observes the active button, not just the tab list), and never settles on a zero width. Plain
+  (no-`tabTemplate`) tabs are unchanged.
+
 ## 1.5.20 — 2026-07-10
 
 ### ✨ Features

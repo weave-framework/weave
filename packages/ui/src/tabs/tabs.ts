@@ -167,7 +167,7 @@ export function setup<T = unknown>(props: TabsProps<T>): TabsContext<T> {
 
   // A stable-per-object version (minted on first sight) so a re-keyed `tabs` array with edited
   // data re-renders that button's template body, and its `@key` also folds in the selected state.
-  let tabVersion = 0;
+  let tabVersion: number = 0;
   const tabVersions: WeakMap<object, number> = new WeakMap<object, number>();
   const versionOf = (tab: TabItem<T>): number => {
     let v: number | undefined = tabVersions.get(tab as object);
@@ -232,21 +232,34 @@ export function setup<T = unknown>(props: TabsProps<T>): TabsContext<T> {
       panels[i]?.append(toNode(tab.content));
     });
 
-    const buttons: NodeListOf<HTMLElement> = el.querySelectorAll<HTMLElement>('.weave-tabs__tab');
-
-    // FW-13 sliding indicator: measure the active tab's box and slide the indicator to it on every
-    // selection change (reactive) and on any resize (ResizeObserver → a bump signal). Geometry only;
-    // the CSS transition does the animation. Torn down with the component (observer disconnected).
+    // FW-13/FW-15 sliding indicator: slide + resize the indicator to the **currently-rendered**
+    // active tab button on every selection change, when the `tabs` set changes, and on any layout
+    // change (ResizeObserver → a bump signal). Geometry only; the CSS transition does the animation.
+    // Torn down with the component (observer disconnected).
     if (props.slidingIndicator) {
       const bump: Signal<number> = signal<number>(0);
       const ro: ResizeObserver = new ResizeObserver(() => bump.set(bump() + 1));
-      ro.observe(el);
+      ro.observe(el); // container resizes (wrap, viewport)
       onDispose(() => ro.disconnect());
       effect(() => {
-        bump(); // re-measure on any resize
-        const active: HTMLElement | undefined = buttons[selectedIndex()];
+        bump(); // re-measure on any observed resize
+        selectedIndex(); // …on selection change
+        tabs(); // …and when the tab set changes (added/removed/reordered → buttons re-rendered)
+        const root: Element | null = host();
         const ind: Element | null = indicator();
-        if (!(ind instanceof HTMLElement) || !active) return;
+        if (!(ind instanceof HTMLElement) || !root) return;
+        // Re-query the live active button each run — never a stale onMount snapshot. With a
+        // `tabTemplate` the button's body is re-rendered on selection, so a captured list would
+        // measure a detached / pre-layout element (width 0, wrong offset — the FW-15 bug).
+        const active: HTMLElement | null = root.querySelectorAll<HTMLElement>('.weave-tabs__tab')[selectedIndex()] ?? null;
+        if (!active) return;
+        // Observe the active button too: if its content (icon/label) finishes laying out a frame
+        // later — without changing the list's own box — this re-fires and we re-measure. Idempotent
+        // per element; observing prior buttons as well is harmless (re-measures the current one).
+        ro.observe(active);
+        // Never settle on a zero width (a body mid-re-render / not yet laid out); a later resize
+        // tick will re-place it once it has geometry, leaving the previous box until then.
+        if (active.offsetWidth === 0) return;
         ind.style.transform = `translateX(${active.offsetLeft}px)`;
         ind.style.width = `${active.offsetWidth}px`;
       });
