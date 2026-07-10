@@ -9,12 +9,14 @@ the previous one. For the granular, per-version log see [CHANGELOG.md](CHANGELOG
 
 - **`<Tabs>` sliding indicator tracks the active tab under a `tabTemplate` (FW-15).** Combining
   `slidingIndicator` with a custom `tabTemplate` used to leave the indicator the wrong size and in the
-  wrong place on every switch — it collapsed to a tiny box (a small circle under a pill skin) parked near
-  the first tab, because its geometry was read off a list of tab buttons captured once at mount that goes
-  stale when the templated button bodies re-render. The indicator now always measures the **live** active
-  tab button, re-places on selection / `tabs`-set changes, catches content that lays out **a frame later**
-  (it observes the active button, not just the tab list), and never settles on a zero width. Plain
-  (no-`tabTemplate`) tabs are unchanged.
+  wrong place — it collapsed to a small circle (under a pill skin) parked near the first tab, most stubbornly
+  when you **reversed direction** across the active tab. Two causes: its geometry was read off a list of tab
+  buttons captured once at mount (stale once templated bodies re-render), and it was measured *synchronously*
+  while the newly-active button's content was still being re-rendered for the new selection. The indicator
+  now always measures the **live** active button **on the next animation frame** — after its DOM + layout
+  have settled — so it lands on the correct position and full width for **every** selection, any direction,
+  any distance, and never captures a pre-render/partial box. It also re-places when the `tabs` set changes
+  and catches genuinely-later async resizes (font/icon load). Plain (no-`tabTemplate`) tabs are unchanged.
 
 ## 1.5.20 — 2026-07-10
 

@@ -235,33 +235,56 @@ export function setup<T = unknown>(props: TabsProps<T>): TabsContext<T> {
     // FW-13/FW-15 sliding indicator: slide + resize the indicator to the **currently-rendered**
     // active tab button on every selection change, when the `tabs` set changes, and on any layout
     // change (ResizeObserver → a bump signal). Geometry only; the CSS transition does the animation.
-    // Torn down with the component (observer disconnected).
+    // Torn down with the component (observer disconnected + any pending frame cancelled).
     if (props.slidingIndicator) {
       const bump: Signal<number> = signal<number>(0);
       const ro: ResizeObserver = new ResizeObserver(() => bump.set(bump() + 1));
       ro.observe(el); // container resizes (wrap, viewport)
-      onDispose(() => ro.disconnect());
-      effect(() => {
-        bump(); // re-measure on any observed resize
-        selectedIndex(); // …on selection change
-        tabs(); // …and when the tab set changes (added/removed/reordered → buttons re-rendered)
+      let frame: number = 0; // pending animation-frame handle (0 = none)
+
+      // Measure the LIVE active button and place the indicator on it. Reads the selection fresh, so a
+      // frame that coalesced several rapid selections lands on the final one.
+      const measure = (): void => {
+        frame = 0;
         const root: Element | null = host();
         const ind: Element | null = indicator();
         if (!(ind instanceof HTMLElement) || !root) return;
-        // Re-query the live active button each run — never a stale onMount snapshot. With a
-        // `tabTemplate` the button's body is re-rendered on selection, so a captured list would
-        // measure a detached / pre-layout element (width 0, wrong offset — the FW-15 bug).
-        const active: HTMLElement | null = root.querySelectorAll<HTMLElement>('.weave-tabs__tab')[selectedIndex()] ?? null;
+        const active: HTMLElement | null =
+          root.querySelectorAll<HTMLElement>('.weave-tabs__tab')[selectedIndex()] ?? null;
         if (!active) return;
-        // Observe the active button too: if its content (icon/label) finishes laying out a frame
-        // later — without changing the list's own box — this re-fires and we re-measure. Idempotent
-        // per element; observing prior buttons as well is harmless (re-measures the current one).
+        // Observe the active button too: a much-later async resize (web-font / lazy icon load, well
+        // after this frame) then re-fires this even when the list's own box is unchanged. Idempotent.
         ro.observe(active);
-        // Never settle on a zero width (a body mid-re-render / not yet laid out); a later resize
-        // tick will re-place it once it has geometry, leaving the previous box until then.
+        // Never settle on a zero width (still not laid out); a later resize tick re-places it.
         if (active.offsetWidth === 0) return;
         ind.style.transform = `translateX(${active.offsetLeft}px)`;
         ind.style.width = `${active.offsetWidth}px`;
+      };
+
+      // Measure AFTER the browser has re-rendered + laid out the active button for the *new*
+      // selection — never mid-flush. With a `tabTemplate`, changing selection re-renders the active
+      // button's body; measuring synchronously reads it pre-layout (a partial, icon-sized box — the
+      // FW-15 direction-reversal circle). Deferring to the next animation frame guarantees the DOM +
+      // layout have settled first. Coalesced: rapid selections cancel the pending frame so only the
+      // final one measures, and it never captures a partial width.
+      const schedule = (): void => {
+        if (typeof requestAnimationFrame !== 'function') {
+          measure();
+          return;
+        }
+        if (frame) cancelAnimationFrame(frame);
+        frame = requestAnimationFrame(measure);
+      };
+      onDispose(() => {
+        ro.disconnect();
+        if (frame) cancelAnimationFrame(frame);
+      });
+
+      effect(() => {
+        bump(); // re-schedule on any observed resize
+        selectedIndex(); // …on selection change
+        tabs(); // …and when the tab set changes (added/removed/reordered → buttons re-rendered)
+        schedule();
       });
     }
   });

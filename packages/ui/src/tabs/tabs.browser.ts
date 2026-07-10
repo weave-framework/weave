@@ -18,6 +18,8 @@ const rt: typeof dom & { signal: typeof signal; effect: typeof effect } = { ...d
 const tick = (): Promise<void> => new Promise<void>((r) => queueMicrotask(r));
 /** Await the next animation frame — for content that lays out a frame later + ResizeObserver ticks. */
 const raf = (): Promise<void> => new Promise<void>((r) => requestAnimationFrame(() => r()));
+/** Let the indicator settle: flush microtasks (onMount/render), then two frames (the deferred measure + any RO re-tick). */
+const settle = async (): Promise<void> => { await tick(); await raf(); await raf(); };
 
 const SCOPE: string[] = [
   'host', 'indicator', 'tabs', 'rootClass', 'label', 'hasTemplate', 'hasIndicator', 'tabId', 'panelId',
@@ -369,7 +371,7 @@ test('slidingIndicator renders exactly one decorative indicator inside the tab l
 
 test('slidingIndicator positions the indicator to the active tab box on mount (FW-13)', async () => {
   const { tabsEls, indicator, dispose } = mount({ tabs: TABS, slidingIndicator: true, defaultIndex: 0 });
-  await tick();
+  await settle();
   assert.equal(indicator!.style.transform, `translateX(${tabsEls[0].offsetLeft}px)`, 'translateX = active tab offsetLeft');
   assert.equal(indicator!.style.width, `${tabsEls[0].offsetWidth}px`, 'width = active tab offsetWidth');
   assert.notEqual(indicator!.style.width, '', 'geometry actually measured');
@@ -378,10 +380,10 @@ test('slidingIndicator positions the indicator to the active tab box on mount (F
 
 test('slidingIndicator slides + resizes to the clicked tab (FW-13)', async () => {
   const { tabsEls, indicator, dispose } = mount({ tabs: TABS, slidingIndicator: true });
-  await tick();
+  await settle();
   const before: string = indicator!.style.transform;
   tabsEls[2].click();
-  await tick();
+  await settle();
   assert.equal(indicator!.style.transform, `translateX(${tabsEls[2].offsetLeft}px)`, 'slid to tab 2 offsetLeft');
   assert.equal(indicator!.style.width, `${tabsEls[2].offsetWidth}px`, 'resized to tab 2 width');
   assert.notEqual(indicator!.style.transform, before, 'geometry moved from the initial tab');
@@ -390,7 +392,7 @@ test('slidingIndicator slides + resizes to the clicked tab (FW-13)', async () =>
 
 test('slidingIndicator + tabTemplate compose (FW-13)', async () => {
   const { root, indicator, dispose } = mount({ tabs: ICON_TABS, tabTemplate: iconRow, slidingIndicator: true } as TabsProps);
-  await tick();
+  await settle();
   assert.ok(indicator, 'indicator rendered alongside a custom tab template');
   assert.ok(root.querySelector('.weave-tabs__tab .tpl-btn'), 'tab template still renders');
   assert.notEqual(indicator!.style.width, '', 'indicator still measured with a custom template');
@@ -401,19 +403,19 @@ test('slidingIndicator + tabTemplate compose (FW-13)', async () => {
 
 test('slidingIndicator tracks the active tab when a tabTemplate is used — slides + resizes, never a zero-width circle (FW-15)', async () => {
   const { tabsEls, indicator, dispose } = mount({ tabs: ICON_TABS, tabTemplate: iconRow, slidingIndicator: true } as TabsProps);
-  await tick();
+  await settle();
   // Starts under the first tab.
   assert.equal(indicator!.style.transform, `translateX(${tabsEls[0].offsetLeft}px)`, 'starts at tab 0 offsetLeft');
   assert.equal(indicator!.style.width, `${tabsEls[0].offsetWidth}px`, 'starts at tab 0 width');
   // Click tab 1 → indicator must slide + resize to tab 1's actual box, not collapse near tab 0.
   tabsEls[1].click();
-  await tick();
+  await settle();
   assert.notEqual(indicator!.style.width, '0px', 'never collapses to a zero-width circle');
   assert.equal(indicator!.style.transform, `translateX(${tabsEls[1].offsetLeft}px)`, 'slid to the active tab offsetLeft');
   assert.equal(indicator!.style.width, `${tabsEls[1].offsetWidth}px`, 'resized to the active tab width');
   // And on to tab 2.
   tabsEls[2].click();
-  await tick();
+  await settle();
   assert.equal(indicator!.style.transform, `translateX(${tabsEls[2].offsetLeft}px)`, 'tracks tab 2 offsetLeft');
   assert.equal(indicator!.style.width, `${tabsEls[2].offsetWidth}px`, 'tracks tab 2 width');
   dispose();
@@ -468,17 +470,73 @@ test('slidingIndicator re-measures when the tabs set itself changes (FW-15)', as
     onChange: (i): void => { idx.set(i); },
     slidingIndicator: true,
   } as TabsProps);
-  await tick();
-  await raf();
+  await settle();
   const active = (): HTMLElement => Array.from(root.querySelectorAll<HTMLElement>('.weave-tabs__tab'))[idx()];
   assert.equal(indicator!.style.width, `${active().offsetWidth}px`, 'indicator on the active tab initially');
   // Prepend a tab: the active tab (now index 2) shifts right — the indicator must follow it.
   idx.set(2);
   data.set([{ label: 'New', content: 'n', data: { icon: 'plus' } }, ...data()]);
-  await tick();
-  await raf();
-  await raf();
+  await settle();
   assert.equal(indicator!.style.transform, `translateX(${active().offsetLeft}px)`, 'indicator slid to the re-positioned active tab');
   assert.equal(indicator!.style.width, `${active().offsetWidth}px`, 'indicator resized to it');
+  dispose();
+});
+
+// A tabTemplate whose SELECTED body finishes a frame late: the icon is there immediately, the label
+// is appended on the next animation frame (mimics a nested component / async icon mounting). So a
+// button measured *synchronously* on selection is icon-only (a small, non-zero, pre-layout box — the
+// direction-reversal circle); its true full box only exists a frame later.
+const lateSelectedRow = (row: TabRowContext<Ico>): Node => {
+  const wrap: HTMLElement = document.createElement('span');
+  wrap.className = 'tpl-btn';
+  wrap.style.display = 'inline-block';
+  const ico: HTMLElement = document.createElement('i');
+  ico.style.display = 'inline-block';
+  ico.style.width = '10px';
+  ico.textContent = '*';
+  wrap.append(ico);
+  if (row.selected) {
+    requestAnimationFrame(() => {
+      const lbl: HTMLElement = document.createElement('span');
+      lbl.style.display = 'inline-block';
+      lbl.textContent = `${row.label}-XXXXXXXXXXXX`;
+      wrap.append(lbl);
+    });
+  }
+  return wrap;
+};
+
+test('slidingIndicator never captures a pre-layout (partial) width — it measures on the next frame, not mid-selection (FW-15)', async () => {
+  const { tabsEls, indicator, dispose } = mount({ tabs: ICON_TABS, tabTemplate: lateSelectedRow, slidingIndicator: true, defaultIndex: 0 } as TabsProps);
+  await settle(); // tab 0 fully laid out + measured
+  const tab0Width: string = indicator!.style.width;
+  const tab0Transform: string = indicator!.style.transform;
+  assert.equal(tab0Width, `${tabsEls[0].offsetWidth}px`, 'placed on tab 0 full box to start');
+  // Click tab 2. SYNCHRONOUSLY (same tick, before any frame) the newly-selected button is icon-only —
+  // a partial box. The indicator must NOT snap to it now; it must still show the previous (valid) box
+  // and only move once tab 2's layout has settled. A synchronous measurer would fail here.
+  tabsEls[2].click();
+  assert.equal(indicator!.style.width, tab0Width, 'no partial width applied on the selection tick');
+  assert.equal(indicator!.style.transform, tab0Transform, 'no partial reposition on the selection tick');
+  // After the frame, it lands exactly on tab 2's FULL box — never the icon-sized circle.
+  await settle();
+  assert.notEqual(indicator!.style.width, '0px', 'never a zero-width circle');
+  assert.equal(indicator!.style.transform, `translateX(${tabsEls[2].offsetLeft}px)`, 'slid to tab 2 full offsetLeft');
+  assert.equal(indicator!.style.width, `${tabsEls[2].offsetWidth}px`, 'resized to tab 2 full width');
+  dispose();
+});
+
+test('slidingIndicator tracks the active tab across direction reversals — any direction, any distance (FW-15)', async () => {
+  const { tabsEls, indicator, dispose } = mount({ tabs: ICON_TABS, tabTemplate: lateSelectedRow, slidingIndicator: true, defaultIndex: 0 } as TabsProps);
+  await settle();
+  // Sequence deliberately reverses direction and jumps across the active tab: 0→2 (right), 2→1
+  // (reverse, left of active), 1→2 (right), 2→0 (reverse, jump past), 0→1 (right).
+  for (const i of [2, 1, 2, 0, 1]) {
+    tabsEls[i].click();
+    await settle();
+    assert.notEqual(indicator!.style.width, '0px', `tab ${i}: no zero-width circle`);
+    assert.equal(indicator!.style.transform, `translateX(${tabsEls[i].offsetLeft}px)`, `tab ${i}: offset tracks the active tab`);
+    assert.equal(indicator!.style.width, `${tabsEls[i].offsetWidth}px`, `tab ${i}: width tracks the active tab`);
+  }
   dispose();
 });
