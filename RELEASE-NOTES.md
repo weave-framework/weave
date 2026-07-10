@@ -28,6 +28,10 @@ the previous one. For the granular, per-version log see [CHANGELOG.md](CHANGELOG
   empty string), so boolean props work as written and `weave check` no longer flags `'' vs boolean`. A
   quoted attribute still passes a string.
 
+- **Typed `@snippet` parameters.** Annotate a snippet parameter — `@snippet row(ctx: ListRowContext<Task>)`
+  — and its body is type-checked against the type (typos caught). Un-annotated parameters stay `any`. This
+  makes the `rowTemplate` / `itemTemplate` / `tabTemplate` authoring pattern fully typed.
+
 ### 🐛 Fixes
 
 - **Arrow-parameter shadowing in templates.** A template expression whose inline arrow reuses a

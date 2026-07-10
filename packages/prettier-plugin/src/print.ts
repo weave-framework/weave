@@ -86,8 +86,13 @@ function printNode(node: TemplateNode, options: ParserOptions): Doc {
       return printDefer(node, options);
     case 'await':
       return printAwait(node, options);
-    case 'snippet':
-      return ['@snippet ', node.name, '(', node.params.join(', '), ') {', printBody(node.children, options), '}'];
+    case 'snippet': {
+      // Re-attach any `name: Type` annotations so formatting doesn't drop them.
+      const params: string = node.params
+        .map((p, i) => (node.paramTypes?.[i] ? `${p}: ${node.paramTypes[i]}` : p))
+        .join(', ');
+      return ['@snippet ', node.name, '(', params, ') {', printBody(node.children, options), '}'];
+    }
     case 'render':
       return `@render (${node.expr})`;
     case 'key':

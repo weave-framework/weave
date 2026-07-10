@@ -11,6 +11,42 @@ const rt: typeof dom & {
   root: typeof root;
 } = { ...dom, signal, computed, effect, root };
 
+/* ──────────── A3 — typed @snippet parameters ──────────── */
+
+interface Snip { params: string[]; paramTypes?: (string | undefined)[] }
+const snip = (tpl: string): Snip =>
+  parseTemplate(tpl).find((n): n is TemplateNode & Snip => n.type === 'snippet') as unknown as Snip;
+
+test('@snippet parses a typed parameter (A3)', () => {
+  const s: Snip = snip('@snippet row(ctx: ListRowContext<Task>) { <b>{{ ctx.item }}</b> }');
+  assert.deepEqual(s.params, ['ctx']);
+  assert.deepEqual(s.paramTypes, ['ListRowContext<Task>']);
+});
+
+test('@snippet: a generic type with a comma is not split (A3)', () => {
+  const s: Snip = snip('@snippet r(m: Map<string, number>) { <b>x</b> }');
+  assert.deepEqual(s.params, ['m']);
+  assert.deepEqual(s.paramTypes, ['Map<string, number>']);
+});
+
+test('@snippet: an arrow-function type annotation survives (A3)', () => {
+  const s: Snip = snip('@snippet r(cb: (n: number) => void, x: string) { <b>x</b> }');
+  assert.deepEqual(s.params, ['cb', 'x']);
+  assert.deepEqual(s.paramTypes, ['(n: number) => void', 'string']);
+});
+
+test('@snippet: untyped params are unchanged, no paramTypes emitted (A3)', () => {
+  const s: Snip = snip('@snippet r(a, b) { <b>x</b> }');
+  assert.deepEqual(s.params, ['a', 'b']);
+  assert.equal(s.paramTypes, undefined);
+});
+
+test('@snippet: mixed typed/untyped params align by index (A3)', () => {
+  const s: Snip = snip('@snippet r(a, b: number) { <b>x</b> }');
+  assert.deepEqual(s.params, ['a', 'b']);
+  assert.deepEqual(s.paramTypes, [undefined, 'number']);
+});
+
 /** Compile a template (function mode) and instantiate it — runs the real runtime path. */
 function render(
   html: string,

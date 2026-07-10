@@ -324,14 +324,23 @@ class Parser {
     this.skipWs();
     if (this.peek() !== '(') throw new ParseError(`Expected '(' after @snippet ${name}`, this.pos);
     const rawParams: string = this.readParen();
-    const params: string[] = splitTopLevel(rawParams, ',').map((s) => s.trim()).filter(Boolean);
-    for (const p of params) {
-      if (!/^[A-Za-z_$][\w$]*$/.test(p)) {
-        throw new ParseError(`Invalid @snippet parameter '${p}' (identifiers only)`, this.pos);
+    // Each param is `name` or `name: Type` — the Type is verbatim TS (may contain
+    // generics with commas, arrow types, etc.), so split on type-aware depth.
+    const parts: string[] = splitTypeList(rawParams).map((s) => s.trim()).filter(Boolean);
+    const params: string[] = [];
+    const paramTypes: (string | undefined)[] = [];
+    let anyType: boolean = false;
+    for (const part of parts) {
+      const { name: pn, type: pt }: { name: string; type?: string } = splitNameType(part);
+      if (!/^[A-Za-z_$][\w$]*$/.test(pn)) {
+        throw new ParseError(`Invalid @snippet parameter '${part}' (expected 'name' or 'name: Type')`, this.pos);
       }
+      params.push(pn);
+      paramTypes.push(pt);
+      if (pt) anyType = true;
     }
     const children: TemplateNode[] = this.readBlockBody();
-    return { type: 'snippet', name, params, children };
+    return { type: 'snippet', name, params, ...(anyType ? { paramTypes } : {}), children };
   }
 
   parseKey(): KeyNode {
@@ -736,6 +745,55 @@ function splitTopLevel(s: string, sep: string): string[] {
   }
   out.push(s.slice(last));
   return out;
+}
+
+/** Depth step for a char, tracking () [] {} and generic <…> — but NOT the `>` of an
+ *  arrow `=>` (so `(n) => T` type annotations don't unbalance). Returns -1/0/+1. */
+function typeDepthStep(s: string, i: number): number {
+  const c: string = s[i];
+  if (c === '(' || c === '[' || c === '{' || c === '<') return 1;
+  if (c === ')' || c === ']' || c === '}') return -1;
+  if (c === '>') return s[i - 1] === '=' ? 0 : -1; // `=>` arrow, not a generic close
+  return 0;
+}
+
+/** Split a snippet param list on top-level commas, tracking type brackets so a
+ *  generic annotation (`row: Map<K, V>`) is not split at its inner comma. */
+function splitTypeList(s: string): string[] {
+  const out: string[] = [];
+  let depth: number = 0;
+  let last: number = 0;
+  for (let i: number = 0; i < s.length; i++) {
+    const c: string = s[i];
+    if (c === '"' || c === "'" || c === '`') {
+      i = skipStr(s, i);
+      continue;
+    }
+    depth += typeDepthStep(s, i);
+    if (c === ',' && depth === 0) {
+      out.push(s.slice(last, i));
+      last = i + 1;
+    }
+  }
+  out.push(s.slice(last));
+  return out;
+}
+
+/** Split a `name: Type` param at its first top-level `:` (type brackets respected). */
+function splitNameType(p: string): { name: string; type?: string } {
+  let depth: number = 0;
+  for (let i: number = 0; i < p.length; i++) {
+    const c: string = p[i];
+    if (c === '"' || c === "'" || c === '`') {
+      i = skipStr(p, i);
+      continue;
+    }
+    if (c === ':' && depth === 0) {
+      return { name: p.slice(0, i).trim(), type: p.slice(i + 1).trim() || undefined };
+    }
+    depth += typeDepthStep(p, i);
+  }
+  return { name: p.trim() };
 }
 
 function skipStr(s: string, start: number): number {

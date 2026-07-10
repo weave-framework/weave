@@ -1,6 +1,6 @@
 {
   "name": "@weave-framework/language-server",
-  "version": "1.5.15",
+  "version": "1.5.16",
   "description": "Weave language server — Volar-based IDE support (.weave + template type-checking) for VS Code and WebStorm.",
   "type": "module",
   "main": "./src/index.ts",

@@ -298,6 +298,8 @@ For repeated chunks *within one component*, you don't always need a whole child 
 </div>
 ~~~
 
+A parameter may carry a **type annotation** — `@snippet row(ctx: ListRowContext<Task>) { … }` — and the body is then type-checked against it (a typo in `ctx.item` is caught). Without one, a parameter is `any`.
+
 A snippet can even be passed to a child as a prop and `@render`-ed there — the Weave take on render props / scoped slots. Full syntax in [Templates](/learn/templates#snippets).
 
 ## When a binding and a prop share a name

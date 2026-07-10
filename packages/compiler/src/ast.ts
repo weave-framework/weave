@@ -128,6 +128,10 @@ export interface SnippetNode {
   name: string;
   /** parameter names (bare locals inside the body) */
   params: string[];
+  /** optional TS type annotation per param (`@snippet row(ctx: T)`), aligned to `params`;
+   *  present only when at least one param is annotated. Consumed by `@weave-framework/check`
+   *  (codegen ignores it — the emitted arrow is plain JS). */
+  paramTypes?: (string | undefined)[];
   children: TemplateNode[];
 }
 
