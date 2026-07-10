@@ -58,6 +58,18 @@ const gridKey = (k: string, shift: boolean = false): void => {
     .querySelector('.weave-datepicker__grid')!
     .dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: k, shiftKey: shift }));
 };
+const viewSwitch = (): HTMLButtonElement => document.body.querySelector('.weave-datepicker__view-switch') as HTMLButtonElement;
+const yearGrid = (): HTMLElement | null => document.body.querySelector('.weave-datepicker__year-grid');
+const monthGrid = (): HTMLElement | null => document.body.querySelector('.weave-datepicker__month-grid');
+const yearCells = (): HTMLButtonElement[] => Array.from(document.body.querySelectorAll<HTMLButtonElement>('.weave-datepicker__year-cell'));
+const monthCells = (): HTMLButtonElement[] => Array.from(document.body.querySelectorAll<HTMLButtonElement>('.weave-datepicker__month-cell'));
+const yearByText = (t: string): HTMLButtonElement => yearCells().find((c) => (c.textContent ?? '') === t) as HTMLButtonElement;
+const monthByText = (t: string): HTMLButtonElement => monthCells().find((c) => (c.textContent ?? '') === t) as HTMLButtonElement;
+const keyOn = (el: Element, k: string): void => {
+  el.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: k }));
+};
+const weekdayTexts = (): string[] =>
+  Array.from(document.body.querySelectorAll('.weave-datepicker__weekday')).map((e) => e.textContent ?? '');
 
 const matchRe = (s: string, re: RegExp, msg?: string): void => assert.ok(re.test(s), msg ?? `${JSON.stringify(s)} matches ${re}`);
 
@@ -278,5 +290,185 @@ test('datepicker: editable — empty text on blur clears the value', async () =>
   inputEl(m).value = '';
   inputEl(m).dispatchEvent(new FocusEvent('blur'));
   assert.equal(ctl.value(), null, 'blur with empty text clears');
+  m.dispose();
+});
+
+/* ── multi-view drill-down: day → year → month → day ── */
+test('datepicker: the day header is a button that opens the year grid (marks current + selected year)', async () => {
+  const m: Mounted = await mount({ control: dateField(JUN15), locale: 'en-US' });
+  field(m).click();
+  const sw: HTMLButtonElement = viewSwitch();
+  matchRe(sw.textContent ?? '', /June 2026/, 'day header shows month + year');
+  assert.equal(sw.getAttribute('aria-label'), 'Choose year', 'header names the year action');
+  sw.click();
+  assert.ok(yearGrid(), 'year grid opened in the same panel');
+  assert.equal(panel()!.querySelectorAll('.weave-datepicker__grid').length, 0, 'day grid replaced');
+  // 2026 % 24 = 10 → the page runs 2016–2039.
+  assert.ok(yearByText('2016') && yearByText('2039'), 'a 24-year page (2016–2039)');
+  matchRe(document.body.querySelector('.weave-datepicker__range-label')!.textContent ?? '', /2016.*2039/);
+  assert.equal(yearByText('2026').getAttribute('aria-selected'), 'true', 'selected value year marked');
+  assert.equal(yearByText('2026').getAttribute('data-focused'), 'true', 'focus starts on the selected year');
+  m.dispose();
+});
+
+test('datepicker: picking a year opens the month grid; picking a month opens that day calendar', async () => {
+  const ctl: DatepickerControl = dateField(JUN15);
+  const m: Mounted = await mount({ control: ctl, locale: 'en-US' });
+  field(m).click();
+  viewSwitch().click(); // → year grid
+  yearByText('2030').click(); // → month grid for 2030
+  assert.ok(monthGrid(), 'month grid opened');
+  assert.equal(viewSwitch().textContent, '2030', 'month view header shows the chosen year');
+  assert.equal(monthCells().length, 12, 'Jan–Dec');
+  monthByText('Mar').click(); // → day calendar for March 2030
+  assert.ok(document.body.querySelector('.weave-datepicker__grid'), 'back to the day grid');
+  matchRe(viewSwitch().textContent ?? '', /March 2030/, 'day header now March 2030');
+  cellByText('10').click(); // pick a day
+  assert.ok(ctl.value() && A.isSameDay(ctl.value() as Date, A.create(2030, 2, 10)), 'committed Mar 10, 2030');
+  assert.equal(panel(), null, 'panel closed after picking the day');
+  m.dispose();
+});
+
+test('datepicker: month view header switches back to the year grid', async () => {
+  const m: Mounted = await mount({ control: dateField(JUN15), locale: 'en-US' });
+  field(m).click();
+  viewSwitch().click();
+  yearByText('2028').click();
+  assert.ok(monthGrid());
+  viewSwitch().click(); // year button → back up to the year grid
+  assert.ok(yearGrid(), 'returned to the year grid');
+  assert.equal(monthGrid(), null, 'month grid replaced');
+  m.dispose();
+});
+
+/* ── year-grid paging + keyboard ── */
+test('datepicker: ‹ / › page the year grid by 24 years', async () => {
+  const m: Mounted = await mount({ control: dateField(JUN15), locale: 'en-US' });
+  field(m).click();
+  viewSwitch().click();
+  (document.body.querySelectorAll('.weave-datepicker__nav-button')[1] as HTMLButtonElement).click(); // › next page
+  assert.ok(yearByText('2040') && yearByText('2063'), 'jumped to 2040–2063');
+  (document.body.querySelector('.weave-datepicker__nav-button') as HTMLButtonElement).click(); // ‹ back
+  assert.ok(yearByText('2016'), 'back to 2016–2039');
+  m.dispose();
+});
+
+test('datepicker: year grid — arrows move focus (row = 4), Enter opens that year’s month grid', async () => {
+  const m: Mounted = await mount({ control: dateField(JUN15), locale: 'en-US' });
+  field(m).click();
+  viewSwitch().click();
+  keyOn(yearGrid()!, 'ArrowDown'); // 2026 → +4 → 2030
+  assert.equal(yearByText('2030').getAttribute('data-focused'), 'true', 'ArrowDown moved a row (4 years)');
+  keyOn(yearGrid()!, 'Enter');
+  assert.ok(monthGrid(), 'Enter drilled into the month grid');
+  assert.equal(viewSwitch().textContent, '2030');
+  m.dispose();
+});
+
+test('datepicker: month grid — arrows move focus (row = 3), Enter opens that month’s day calendar', async () => {
+  const m: Mounted = await mount({ control: dateField(JUN15), locale: 'en-US' });
+  field(m).click();
+  viewSwitch().click();
+  yearByText('2026').click(); // month grid, focus starts on June (index 5)
+  keyOn(monthGrid()!, 'ArrowDown'); // 5 → +3 → 8 (September)
+  assert.equal(monthByText('Sep').getAttribute('data-focused'), 'true', 'ArrowDown moved a row (3 months)');
+  keyOn(monthGrid()!, 'Enter');
+  matchRe(viewSwitch().textContent ?? '', /September 2026/, 'Enter opened September 2026');
+  m.dispose();
+});
+
+/* ── first day of week (default Monday, configurable) ── */
+test('datepicker: first day of week defaults to Monday', async () => {
+  const m: Mounted = await mount({ control: dateField(JUN15), locale: 'en-US' });
+  field(m).click();
+  assert.equal(weekdayTexts()[0], 'M', 'header starts on Monday by default');
+  assert.equal(weekdayTexts()[6], 'S', 'and ends on Sunday');
+  m.dispose();
+});
+
+test('datepicker: firstDayOfWeek is configurable (0 = Sunday)', async () => {
+  const m: Mounted = await mount({ control: dateField(JUN15), firstDayOfWeek: 0, locale: 'en-US' });
+  field(m).click();
+  assert.equal(weekdayTexts()[0], 'S', 'Sunday-first when firstDayOfWeek=0');
+  assert.equal(weekdayTexts()[1], 'M');
+  m.dispose();
+});
+
+test('datepicker: firstDayOfWeek shifts the leading blanks (Jun 1 2026 is a Monday)', async () => {
+  // Monday-first: Jun 1 (a Monday) is the first cell — no leading blanks.
+  const mon: Mounted = await mount({ control: dateField(JUN15), firstDayOfWeek: 1, locale: 'en-US' });
+  field(mon).click();
+  const firstCellMon: Element = document.body.querySelector('.weave-datepicker__grid .weave-datepicker__cell')!;
+  assert.ok(!firstCellMon.classList.contains('weave-datepicker__cell--blank'), 'Monday-first: no lead blank before Jun 1');
+  assert.equal(firstCellMon.textContent, '1');
+  mon.dispose();
+  // Sunday-first: one leading blank (Sun) before Monday Jun 1.
+  const sun: Mounted = await mount({ control: dateField(JUN15), firstDayOfWeek: 0, locale: 'en-US' });
+  field(sun).click();
+  const firstCellSun: Element = document.body.querySelector('.weave-datepicker__grid .weave-datepicker__cell')!;
+  assert.ok(firstCellSun.classList.contains('weave-datepicker__cell--blank'), 'Sunday-first: a lead blank before Jun 1');
+  sun.dispose();
+});
+
+/* ── i18n: translatable chrome labels ── */
+test('datepicker: labels override the calendar chrome strings (nav, view switch, dialog)', async () => {
+  const m: Mounted = await mount({
+    control: dateField(JUN15),
+    locale: 'en-US',
+    labels: {
+      prevMonth: 'Ankstesnis mėnuo',
+      nextMonth: 'Kitas mėnuo',
+      chooseYear: 'Rinktis metus',
+      calendarLabel: 'Pasirinkite datą',
+      prevYearRange: 'Ankstesni metai',
+    },
+  });
+  field(m).click();
+  assert.equal(panel()!.getAttribute('aria-label'), 'Pasirinkite datą', 'dialog name translated');
+  const navs: NodeListOf<HTMLButtonElement> = document.body.querySelectorAll('.weave-datepicker__nav-button');
+  assert.equal(navs[0].getAttribute('aria-label'), 'Ankstesnis mėnuo', 'prev month translated');
+  assert.equal(navs[1].getAttribute('aria-label'), 'Kitas mėnuo', 'next month translated');
+  assert.equal(viewSwitch().getAttribute('aria-label'), 'Rinktis metus', 'year switch translated');
+  viewSwitch().click();
+  assert.equal(
+    (document.body.querySelector('.weave-datepicker__nav-button') as HTMLButtonElement).getAttribute('aria-label'),
+    'Ankstesni metai',
+    'year-range nav translated'
+  );
+  m.dispose();
+});
+
+test('datepicker: labels.clear + labels.openCalendar translate the field buttons', async () => {
+  const m: Mounted = await mount({
+    control: dateField(JUN15),
+    clearable: true,
+    editable: true,
+    locale: 'en-US',
+    labels: { clear: 'Išvalyti', openCalendar: 'Atverti kalendorių' },
+  });
+  assert.equal((m.root.querySelector('.weave-datepicker__clear') as HTMLElement).getAttribute('aria-label'), 'Išvalyti');
+  assert.equal(iconButton(m).getAttribute('aria-label'), 'Atverti kalendorių');
+  m.dispose();
+});
+
+/* ── min/max in the year + month grids ── */
+test('datepicker: years fully outside min/max are disabled in the year grid', async () => {
+  const m: Mounted = await mount({ control: dateField(JUN15), min: A.create(2020, 0, 1), max: A.create(2030, 11, 31), locale: 'en-US' });
+  field(m).click();
+  viewSwitch().click();
+  assert.equal(yearByText('2019').disabled, true, 'before min year disabled');
+  assert.equal(yearByText('2031').disabled, true, 'after max year disabled');
+  assert.equal(yearByText('2025').disabled, false, 'in-range year enabled');
+  m.dispose();
+});
+
+test('datepicker: months fully outside min/max are disabled in the month grid', async () => {
+  const m: Mounted = await mount({ control: dateField(JUN15), min: A.create(2026, 5, 10), max: A.create(2026, 5, 20), locale: 'en-US' });
+  field(m).click();
+  viewSwitch().click();
+  yearByText('2026').click();
+  assert.equal(monthByText('May').disabled, true, 'May (entirely before min) disabled');
+  assert.equal(monthByText('Jul').disabled, true, 'July (entirely after max) disabled');
+  assert.equal(monthByText('Jun').disabled, false, 'June (has selectable days) enabled');
   m.dispose();
 });

@@ -5,6 +5,18 @@ the previous one. For the granular, per-version log see [CHANGELOG.md](CHANGELOG
 
 ## Unreleased
 
+### ✨ Features
+
+- **`<Datepicker>` — year & month drill-down, configurable first day of week, translatable chrome.**
+  Navigating far in time is now a couple of clicks: click the calendar's "Month Year" header to open a
+  **year grid** (pages of 24, ‹/› jump a page), pick a year for a **month grid** (Jan–Dec), pick a month to
+  land on that month's day calendar — all in the one popover, fully keyboard-navigable. A new
+  **`firstDayOfWeek`** prop (`0` Sunday … `6` Saturday) sets the grid's starting weekday, defaulting to
+  **Monday** (override per instance). A new **`labels`** prop translates all the calendar chrome strings
+  (nav buttons, year switch, dialog name, clear / open-calendar) — English by default, and since props are
+  reactive they can carry `t('…')` from i18n. Month / weekday / year text stays locale-driven. The day view
+  is unchanged for existing users.
+
 ### 🐛 Fixes
 
 - **`<Tabs>` sliding indicator tracks the active tab under a `tabTemplate` (FW-15).** Combining

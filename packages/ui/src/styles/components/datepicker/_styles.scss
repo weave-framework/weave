@@ -109,6 +109,11 @@
     margin-bottom: 6px;
   }
 
+  // Month view has no ‹/› (only 12 months) — centre the year switch.
+  .weave-datepicker__nav--center {
+    justify-content: center;
+  }
+
   .weave-datepicker__nav-button {
     @include helpers.field-reset;
     display: inline-flex;
@@ -134,6 +139,86 @@
     font-size: var(--weave-datepicker-month-label-size);
     font-weight: var(--weave-datepicker-month-label-weight);
     color: var(--weave-datepicker-text);
+  }
+
+  // The header label is a button in the day + month views (opens the year grid). It strips its
+  // native chrome and adds a hover affordance so it reads as tappable; the year view's range is a
+  // plain span (same type, no interaction).
+  .weave-datepicker__view-switch {
+    @include helpers.field-reset;
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px 6px;
+    border-radius: var(--weave-datepicker-cell-radius);
+    cursor: pointer;
+  }
+
+  .weave-datepicker__view-switch:hover {
+    background: var(--weave-datepicker-cell-hover);
+  }
+
+  .weave-datepicker__view-switch:focus-visible {
+    @include helpers.focus-ring($offset: -1px);
+  }
+
+  .weave-datepicker__range-label {
+    text-align: center;
+  }
+
+  // Year / month grids — a coarser drill-down. Fewer, wider cells than the day grid.
+  .weave-datepicker__year-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .weave-datepicker__month-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .weave-datepicker__year-cell,
+  .weave-datepicker__month-cell {
+    @include helpers.field-reset;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: var(--weave-datepicker-period-cell-height);
+    margin: 3px;
+    border-radius: var(--weave-datepicker-period-cell-radius);
+    color: var(--weave-datepicker-cell-text);
+    font-size: var(--weave-datepicker-font-size);
+    cursor: pointer;
+  }
+
+  .weave-datepicker__year-cell:not(:disabled):not(.weave-datepicker__year-cell--selected):hover,
+  .weave-datepicker__month-cell:not(:disabled):not(.weave-datepicker__month-cell--selected):hover {
+    background: var(--weave-datepicker-cell-hover);
+  }
+
+  .weave-datepicker__year-cell:focus-visible,
+  .weave-datepicker__month-cell:focus-visible {
+    @include helpers.focus-ring($offset: -1px);
+  }
+
+  // Current year / month = an inset accent ring (mirrors the day grid's "today").
+  .weave-datepicker__year-cell--today,
+  .weave-datepicker__month-cell--today {
+    box-shadow: inset 0 0 0 1px var(--weave-datepicker-today-ring);
+  }
+
+  // Selected year / month = accent fill + surface text (wins over the ring).
+  .weave-datepicker__year-cell--selected,
+  .weave-datepicker__month-cell--selected {
+    background: var(--weave-datepicker-selected-background);
+    color: var(--weave-datepicker-selected-text);
+    box-shadow: none;
+  }
+
+  .weave-datepicker__year-cell--disabled,
+  .weave-datepicker__month-cell--disabled {
+    color: var(--weave-datepicker-disabled-text);
+    cursor: default;
   }
 
   .weave-datepicker__weekdays {

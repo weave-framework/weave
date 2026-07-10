@@ -38,6 +38,9 @@ $tokens: (
     cell-radius: ref.ref('shape.radius'),
     nav-size: 26px,
     duration: ref.ref('motion.fast'),
+    // Year / month drill-down cells — wider, pill-radiused (fewer per row than days).
+    period-cell-height: 36px,
+    period-cell-radius: ref.ref('shape.radius'),
   ),
   typography: (
     font-size: 13px,
