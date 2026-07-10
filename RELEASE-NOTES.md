@@ -32,6 +32,11 @@ the previous one. For the granular, per-version log see [CHANGELOG.md](CHANGELOG
   — and its body is type-checked against the type (typos caught). Un-annotated parameters stay `any`. This
   makes the `rowTemplate` / `itemTemplate` / `tabTemplate` authoring pattern fully typed.
 
+- **Prop defaults — `export const propDefaults`.** Give a component static default prop values in one place
+  instead of `() => props.x ?? default` per prop. A prop the parent omits reads the default; one it passes
+  wins (and stays reactive). Defaulted props become optional for the parent, so `weave check` won't demand
+  them. `export const propDefaults = { size: 'md', variant: 'primary' };`
+
 ### 🐛 Fixes
 
 - **Arrow-parameter shadowing in templates.** A template expression whose inline arrow reuses a

@@ -84,13 +84,25 @@ Both styles type-check identically — hand-written or synthesized, the template
 // No exports needed.
 ~~~
 
-:::callout info "There is no default-props mechanism"
-Coming from React (`defaultProps`) or Angular (an `@Input` initializer)? Weave has **no** such thing. A prop that the parent didn't pass simply reads as `undefined`. Default it yourself, in `setup`, where you can see it:
+:::callout info "Prop defaults"
+A prop the parent didn't pass reads as `undefined`. Two ways to give it a default:
+
+**`export const propDefaults`** — a static object layered *under* props. A prop the parent omits reads the default; one it passes wins (and stays reactive). Defaulted props also become **optional for the parent** — `weave check` won't demand them:
+
+~~~ts
+export const propDefaults = { size: 'md', variant: 'primary' };
+export function setup(props: { size: 'sm' | 'md'; variant: string }) {
+  // props.size is 'md' when the parent omitted it
+}
+~~~
+
+Values must be static (no bindings). Passing `undefined` explicitly counts as *passed*, so the default applies only to an **absent** prop.
+
+Or default **inline in `setup`**, when the default depends on other state:
 
 ~~~ts
 export function setup(props: { size?: 'sm' | 'md' }) {
-  const size = () => props.size ?? 'md'; // your default lives here
-  return { size };
+  const size = () => props.size ?? 'md';
 }
 ~~~
 :::

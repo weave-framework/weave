@@ -34,6 +34,7 @@ import {
 
 const FOR_VARS: string[] = ['$index', '$count', '$first', '$last', '$even', '$odd'];
 const HAS_SETUP: RegExp = /export\s+(?:async\s+)?function\s+setup\b|export\s+(?:const|let|var)\s+setup\b/;
+const HAS_PROP_DEFAULTS: RegExp = /export\s+(?:const|let|var)\s+propDefaults\b/;
 
 /** A capitalized tag (`<TaskCard>`) is a child component, not a DOM element. */
 const isComponentTag = (tag: string): boolean => /^[A-Z]/.test(tag);
@@ -456,6 +457,9 @@ function assemble(
   out.push('type __WeaveAwaited<S> = S extends { data: () => infer D } ? NonNullable<D> : Awaited<S>;');
   // A child component's prop contract = the first parameter of its `setup`.
   out.push('type __WeavePropsOf<F> = F extends (props: infer P, ...rest: any[]) => any ? P : Record<string, never>;');
+  // With `export const propDefaults`, the defaulted keys become optional for a PARENT
+  // (setup still sees them as declared); a key in D but not P is ignored.
+  out.push('type __WeaveWithDefaults<P, D> = Omit<P, keyof D> & Partial<Pick<P, Extract<keyof D, keyof P>>>;');
   out.push('function __weave__(): void {');
 
   const bodyBase: number = out.length; // out index of body[0]
@@ -469,7 +473,9 @@ function assemble(
   // Synthesize the typed default export the loader emits at build time
   // (`defineComponent(render, setup)`), so a PARENT importing this component
   // type-checks the props it passes against this component's `setup` contract.
-  const propsType: string = hasSetup ? '__WeavePropsOf<typeof setup>' : 'Record<string, never>';
+  const baseProps: string = hasSetup ? '__WeavePropsOf<typeof setup>' : 'Record<string, never>';
+  const propsType: string =
+    script && HAS_PROP_DEFAULTS.test(script) ? `__WeaveWithDefaults<${baseProps}, typeof propDefaults>` : baseProps;
   out.push(`declare const __weaveDefault: (props: ${propsType}, slots?: Record<string, () => unknown>) => unknown;`);
   out.push('export default __weaveDefault;'); // also forces module scope
 

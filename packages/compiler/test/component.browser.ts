@@ -328,6 +328,35 @@ test('compileComponent without setup emits defineComponent(render)', () => {
   assert.equal(css, '', 'no styles → empty css');
 });
 
+/* ──────────── A2 — propDefaults ──────────── */
+
+test('compileComponent passes propDefaults as the 3rd defineComponent arg (A2)', () => {
+  const { code } = compileComponent({
+    script: 'export const propDefaults = { type: "button" };\nexport function setup(props){ return {}; }',
+    template: '<button>{{ type }}</button>',
+  });
+  assert.ok(code.includes('defineComponent(render, setup, propDefaults)'), `expected 3-arg wiring; got:\n${code}`);
+});
+
+test('propDefaults fills an absent prop; a passed prop wins and stays reactive (A2)', () => {
+  const render: (ctx: unknown, slots?: unknown) => Node = compileRender('<b>{{ size }}:{{ variant }}</b>', ['size', 'variant']);
+  const C: dom.Component = dom.defineComponent(render as never, undefined, { size: 'md', variant: 'primary' });
+  const v: Signal<string> = signal('secondary');
+  const node: Element = C({ get variant() { return v(); } }, {}) as Element; // parent passes only `variant`
+  host().appendChild(node);
+  assert.equal(node.textContent, 'md:secondary', 'absent `size` defaulted; passed `variant` used');
+  v.set('danger');
+  assert.equal(node.textContent, 'md:danger', 'a passed (reactive) prop still updates over defaults');
+});
+
+test('propDefaults: an explicitly-passed value (even falsy) beats the default (A2)', () => {
+  const render: (ctx: unknown, slots?: unknown) => Node = compileRender('<b>{{ String(open) }}</b>', ['open']);
+  const C: dom.Component = dom.defineComponent(render as never, undefined, { open: true });
+  const node: Element = C({ open: false }, {}) as Element; // explicit false must win
+  host().appendChild(node);
+  assert.equal(node.textContent, 'false', 'explicit false beats the `true` default');
+});
+
 /* ──────────── A1 — bare boolean attribute on a component ──────────── */
 
 test('a bare attribute on a component is the boolean prop true (A1)', () => {

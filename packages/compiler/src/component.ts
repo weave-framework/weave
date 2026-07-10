@@ -62,6 +62,8 @@ const HAS_SETUP: RegExp = /export\s+(?:async\s+)?function\s+setup\b|export\s+(?:
 const HAS_EXTEND: RegExp = /export\s+(?:const|let|var)\s+extend\b/;
 /** Optional `export function extendProps(props)` — the pre-base props seam (RFC 0008). */
 const HAS_EXTEND_PROPS: RegExp = /export\s+(?:async\s+)?function\s+extendProps\b|export\s+(?:const|let|var)\s+extendProps\b/;
+/** Optional `export const propDefaults = { … }` — static prop defaults layered under props. */
+const HAS_PROP_DEFAULTS: RegExp = /export\s+(?:const|let|var)\s+propDefaults\b/;
 
 /** Compile a `{ script, template, styles }` triple into a component module + scoped CSS. */
 export function compileComponent(src: ComponentSource, opts: ComponentOptions = {}): CompiledComponent {
@@ -98,7 +100,14 @@ export function compileComponent(src: ComponentSource, opts: ComponentOptions = 
     defaultExport = `export default defineComponent(render, extendSetup(${args.join(', ')}));`;
     extendImport = ', extendSetup';
   } else {
-    defaultExport = `export default defineComponent(${hasSetup ? 'render, setup' : 'render'});`;
+    // `export const propDefaults` → pass it as the 3rd arg (defineComponent layers it under props).
+    const parts: string[] = ['render'];
+    if (hasSetup) parts.push('setup');
+    if (HAS_PROP_DEFAULTS.test(script)) {
+      if (!hasSetup) parts.push('undefined');
+      parts.push('propDefaults');
+    }
+    defaultExport = `export default defineComponent(${parts.join(', ')});`;
   }
 
   const code: string = [

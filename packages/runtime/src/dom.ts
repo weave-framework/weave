@@ -1082,9 +1082,17 @@ export type Component = (props?: Record<string, unknown>, slots?: Record<string,
  */
 export function defineComponent(
   render: (ctx: Record<string, unknown>, slots: Record<string, () => Node>) => Node,
-  setup?: (props: Record<string, unknown>) => Record<string, unknown> | void
+  setup?: (props: Record<string, unknown>) => Record<string, unknown> | void,
+  defaults?: Record<string, unknown>
 ): Component {
-  const component: ComponentWithSetup = (props = {}, slots = {}) => {
+  const component: ComponentWithSetup = (rawProps = {}, slots = {}) => {
+    // `export const propDefaults = {…}` layers static defaults UNDER the parent's props:
+    // a prop the parent DID pass (its own, possibly reactive, getter) wins; a prop it did
+    // NOT pass reads the default. Passing `undefined` explicitly is "passed" (own key), so
+    // the default applies only to an ABSENT prop.
+    const props: Record<string, unknown> = defaults
+      ? Object.defineProperties(Object.create(defaults) as Record<string, unknown>, Object.getOwnPropertyDescriptors(rawProps))
+      : rawProps;
     const owner: Owner = createOwner(); // _parent = surrounding owner (context chain)
     onDispose(() => disposeOwner(owner)); // surrounding scope disposes this instance
     // Untrack the whole instance construction: a component's reactivity comes from its own internal

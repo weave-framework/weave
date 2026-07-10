@@ -1,6 +1,6 @@
 {
   "name": "@weave-framework/prettier-plugin",
-  "version": "1.5.16",
+  "version": "1.5.17",
   "description": "Prettier plugin for Weave templates — formats .weave SFCs and Weave-template .html files ({{ }}, @if/@for/@switch, on:/bind:/use: bindings) by reusing the Weave compiler's parser.",
   "type": "module",
   "main": "./src/index.ts",
