@@ -464,12 +464,18 @@ function compileFragment(
           eventKeys.push(k);
           break;
         }
+        case 'bind':
+          // Two-way on a component = pass the signal itself (by reference, NOT a getter),
+          // so the child can read (`prop()`) and write (`prop.set()`). `bind:value={{ x }}`
+          // → `value: x` — sugar for the "pass the signal" convention, uniform with elements.
+          props.push(`${propKey(attr.name)}: ${rewrite(attr.expr, sc).code}`);
+          break;
         case 'use':
           // `use:action` on a component forwards to its single root DOM element (below).
           uses.push(attr);
           break;
         default:
-          throw new Error(`'${attr.type}' binding on <${node.tag}> is not supported yet (props, on:event, use: only)`);
+          throw new Error(`'${attr.type}' binding on <${node.tag}> is not supported yet (props, on:event, use:, bind: only)`);
       }
     }
     if (eventKeys.length) props.push(`'$events': [${eventKeys.map((k) => JSON.stringify(k)).join(', ')}]`);

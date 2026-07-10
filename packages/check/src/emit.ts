@@ -251,6 +251,9 @@ function emit(nodes: TemplateNode[], ctx: Set<string>): Line[] {
         dataProps.push({ key: attr.name, staticVal: attr.bare ? 'true' : JSON.stringify(attr.value) });
       } else if (attr.type === 'attr') {
         dataProps.push({ key: attr.name, expr: attr.expr, srcOffset: attr.offset });
+      } else if (attr.type === 'bind') {
+        // `bind:value={{ sig }}` passes the signal itself — check it against the child's prop.
+        dataProps.push({ key: attr.name, expr: attr.expr, srcOffset: attr.offset });
       } else {
         emitAttr(attr, locals); // events / stray directives — checked, not part of props
       }

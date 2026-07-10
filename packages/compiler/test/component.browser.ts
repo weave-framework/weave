@@ -328,6 +328,32 @@ test('compileComponent without setup emits defineComponent(render)', () => {
   assert.equal(css, '', 'no styles → empty css');
 });
 
+/* ──────────── A5 — bind: on a component passes the signal ──────────── */
+
+test('bind:value on a component passes the signal by reference (A5)', () => {
+  const { code } = compileComponent({ template: '<Input bind:value={{ name }} />' });
+  assert.ok(/value:\s*ctx\.name/.test(code), `bind → signal ref; got:\n${code}`);
+  assert.ok(!/get value\(\)/.test(code), 'not a getter — the raw signal is passed');
+});
+
+test('an auto-exposed setup + bind: on a child wires two-way (A5, runtime)', () => {
+  // Child receives the signal as `value`, reads it and writes it back.
+  const childRender: (ctx: unknown, slots?: unknown) => Node = compileRender('<input on:input={{ (e) => value.set(e.target.value) }} />', ['value']);
+  const Child: dom.Component = dom.defineComponent(childRender as never, (props) => ({ value: props.value }));
+  const name: Signal<string> = signal('a');
+  const parentRender: (ctx: unknown) => Node = (() => {
+    const { code } = compileTemplate('<div><Child bind:value={{ name }} /></div>', { mode: 'function', scope: ['name'] });
+    const body: string = code.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;');
+    return new Function('rt', '_c', body)(rt, { Child }) as (ctx: unknown) => Node;
+  })();
+  const node: HTMLElement = parentRender({ name }) as HTMLElement;
+  host().appendChild(node);
+  const input: HTMLInputElement = node.querySelector('input') as HTMLInputElement;
+  input.value = 'typed';
+  input.dispatchEvent(new Event('input'));
+  assert.equal(name(), 'typed', 'child wrote back through the shared signal (two-way)');
+});
+
 /* ──────────── A2 — propDefaults ──────────── */
 
 test('compileComponent passes propDefaults as the 3rd defineComponent arg (A2)', () => {

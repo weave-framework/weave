@@ -37,6 +37,9 @@ the previous one. For the granular, per-version log see [CHANGELOG.md](CHANGELOG
   wins (and stays reactive). Defaulted props become optional for the parent, so `weave check` won't demand
   them. `export const propDefaults = { size: 'md', variant: 'primary' };`
 
+- **`bind:` on components.** `<Stepper bind:value={{ count }} />` now works — two-way is the same syntax on
+  a component (passing the signal) as on a DOM `<input>`, instead of a compile error.
+
 ### 🐛 Fixes
 
 - **Arrow-parameter shadowing in templates.** A template expression whose inline arrow reuses a
