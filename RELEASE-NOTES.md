@@ -44,6 +44,10 @@ the previous one. For the granular, per-version log see [CHANGELOG.md](CHANGELOG
   compiled to invalid JS (`(ctx.value) =>`) and broke the build. Codegen now leaves arrow parameters
   alone.
 
+- **`bind:group` with non-string signals.** A radio group bound to a `Signal<number>` now checks the right
+  option and writes back a number (not the string). And a form's async validation now settles precisely
+  (a reactive watch, not a timed poll).
+
 ## 1.5.10 — 2026-07-09
 ### ✨ Features & docs
 

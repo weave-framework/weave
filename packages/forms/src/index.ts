@@ -258,16 +258,22 @@ export function group<C extends Controls>(controls: C, opts: GroupOptions<C> = {
   const submitting: Signal<boolean> = signal(false);
   const submitError: Signal<unknown> = signal<unknown>(undefined);
 
-  // Resolve once async validation has settled (bounded poll — reactivity is sync, so
-  // this only ever waits on a debounced/in-flight async validator), then report validity.
+  // Resolve once async validation has settled. Reactivity is sync, so this only ever
+  // waits on a debounced/in-flight async validator — watch `validating()` flip to false
+  // (no polling, no latency quantum, no premature resolve mid-validation).
   const validateAsync = (): Promise<boolean> =>
     new Promise<boolean>((resolve) => {
-      let tries: number = 0;
-      const poll = (): void => {
-        if (!validating() || tries++ > 66) resolve(valid());
-        else setTimeout(poll, 30);
-      };
-      poll();
+      if (!validating()) {
+        resolve(valid());
+        return;
+      }
+      let stop: (() => void) | undefined;
+      stop = effect(() => {
+        if (!validating()) {
+          stop?.();
+          resolve(valid());
+        }
+      });
     });
 
   const submit =

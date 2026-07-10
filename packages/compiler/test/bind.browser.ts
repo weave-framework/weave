@@ -84,6 +84,23 @@ test('bind:group — radio selects by value', () => {
   assert.equal(pick(), 'a', 'radio → signal (selected value)');
 });
 
+test('bind:group — a numeric signal matches and writes back a number (B6)', () => {
+  const pick: Signal<number> = signal(2);
+  const wrap: Element = render(
+    '<div><input type="radio" name="n" value="1" bind:group={{pick}} />' +
+      '<input type="radio" name="n" value="2" bind:group={{pick}} /></div>',
+    { pick },
+    ['pick']
+  );
+  const [r1, r2] = [...wrap.querySelectorAll('input')] as HTMLInputElement[];
+  assert.equal(r2.checked, true, 'radio "2" checked for the number 2 (string-vs-number compare)');
+  assert.equal(r1.checked, false);
+  r1.checked = true;
+  fire(r1, 'change');
+  assert.equal(pick(), 1, 'radio → signal writes back a NUMBER, not the string "1"');
+  assert.equal(typeof pick(), 'number', 'the signal keeps its numeric type');
+});
+
 test('bind:value select — single', () => {
   const sel: Signal<string> = signal('y');
   const el: HTMLSelectElement = render(

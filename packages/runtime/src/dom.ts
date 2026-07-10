@@ -382,10 +382,15 @@ export function bindValue(el: Element, sig: Signal<unknown>, kind: 'value' | 'ch
   if (kind === 'group') {
     const radio: HTMLInputElement = el as HTMLInputElement;
     effect(() => {
-      radio.checked = sig() === radio.value;
+      // `radio.value` is always a string; compare stringwise so a non-string signal
+      // (e.g. `Signal<number>`) still matches its radio instead of never checking.
+      radio.checked = String(sig()) === radio.value;
     });
     el.addEventListener('change', () => {
-      if (radio.checked) sig.set(radio.value);
+      if (!radio.checked) return;
+      // Write back in the signal's own value type (numbers stay numbers), not the raw string.
+      const cur: unknown = sig();
+      sig.set(typeof cur === 'number' ? Number(radio.value) : radio.value);
     });
     return;
   }
