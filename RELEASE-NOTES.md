@@ -3,7 +3,7 @@
 Human-readable highlights, one section per release — everything notable that landed since
 the previous one. For the granular, per-version log see [CHANGELOG.md](CHANGELOG.md).
 
-## Unreleased
+## 1.5.20 — 2026-07-10
 
 ### ✨ Features
 
