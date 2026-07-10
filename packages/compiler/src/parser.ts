@@ -86,7 +86,7 @@ class Parser {
     while (!this.eof()) {
       if (stopAtBrace && this.peek() === '}') return out;
       if (this.src.startsWith('</', this.pos)) {
-        if (closeTag === null) throw new ParseError(`Unexpected closing tag at ${this.pos}`);
+        if (closeTag === null) throw new ParseError(`Unexpected closing tag at ${this.pos}`, this.pos);
         return out; // caller consumes the close tag
       }
       if (this.src.startsWith('{{', this.pos)) {
@@ -118,7 +118,7 @@ class Parser {
         else out.push({ type: 'text', value: text });
       }
     }
-    if (closeTag !== null) throw new ParseError(`Unclosed <${closeTag}>`);
+    if (closeTag !== null) throw new ParseError(`Unclosed <${closeTag}>`, this.pos);
     return out;
   }
 
@@ -137,7 +137,7 @@ class Parser {
       case 'render': return this.parseRender();
       case 'key': return this.parseKey();
       default:
-        throw new ParseError(`Unexpected @${kw} at ${this.pos} (no matching block)`);
+        throw new ParseError(`Unexpected @${kw} at ${this.pos} (no matching block)`, this.pos);
     }
   }
 
@@ -153,7 +153,7 @@ class Parser {
     if (semi.length === 2) {
       cond = semi[0].trim();
       const m: RegExpExecArray | null = /^as\s+([A-Za-z_$][\w$]*)$/.exec(semi[1].trim());
-      if (!m) throw new ParseError(`Expected 'as <name>' in @if, got '${semi[1].trim()}'`);
+      if (!m) throw new ParseError(`Expected 'as <name>' in @if, got '${semi[1].trim()}'`, this.pos);
       alias = m[1];
     }
     const condOffset: number = this.exprOffset(headStart, head, cond);
@@ -188,7 +188,7 @@ class Parser {
     const headStart: number = this.parenStart;
     const parts: string[] = splitTopLevel(head, ';').map((s) => s.trim());
     const m: RegExpExecArray | null = /^([A-Za-z_$][\w$]*)\s+of\s+([\s\S]+)$/.exec(parts[0]);
-    if (!m) throw new ParseError(`Expected '@for (item of list)', got '${parts[0]}'`);
+    if (!m) throw new ParseError(`Expected '@for (item of list)', got '${parts[0]}'`, this.pos);
     const item: string = m[1];
     const list: string = m[2].trim();
     let track: string | undefined;
@@ -219,7 +219,7 @@ class Parser {
     const exprOffset: number = this.exprOffset(this.parenStart, rawExpr, rawExpr.trim());
     const expr: string = rawExpr.trim();
     this.skipWs();
-    if (this.peek() !== '{') throw new ParseError(`Expected '{' after @switch at ${this.pos}`);
+    if (this.peek() !== '{') throw new ParseError(`Expected '{' after @switch at ${this.pos}`, this.pos);
     this.pos++;
     const cases: SwitchCase[] = [];
     for (;;) {
@@ -238,7 +238,7 @@ class Parser {
         this.pos += '@default'.length;
         cases.push({ children: this.readBlockBody() });
       } else {
-        throw new ParseError(`Expected @case/@default or '}' in @switch at ${this.pos}`);
+        throw new ParseError(`Expected @case/@default or '}' in @switch at ${this.pos}`, this.pos);
       }
     }
     return { type: 'switch', expr, exprOffset, cases };
@@ -248,15 +248,15 @@ class Parser {
     this.pos += 4; // @let
     this.skipWs();
     const name: string = this.readName();
-    if (!name) throw new ParseError(`Expected name after @let at ${this.pos}`);
+    if (!name) throw new ParseError(`Expected name after @let at ${this.pos}`, this.pos);
     this.skipWs();
-    if (this.peek() !== '=') throw new ParseError(`Expected '=' in @let ${name}`);
+    if (this.peek() !== '=') throw new ParseError(`Expected '=' in @let ${name}`, this.pos);
     this.pos++;
     const rawStart: number = this.pos;
     const raw: string = this.readUntilSemicolon();
     const expr: string = raw.trim();
     const exprOffset: number = rawStart + (raw.length - raw.trimStart().length);
-    if (this.peek() !== ';') throw new ParseError(`Expected ';' ending @let ${name}`);
+    if (this.peek() !== ';') throw new ParseError(`Expected ';' ending @let ${name}`, this.pos);
     this.pos++;
     return { type: 'let', name, expr, exprOffset };
   }
@@ -320,14 +320,14 @@ class Parser {
     this.pos += '@snippet'.length;
     this.skipWs();
     const name: string = this.readIdent();
-    if (!name) throw new ParseError(`Expected a snippet name after @snippet at ${this.pos}`);
+    if (!name) throw new ParseError(`Expected a snippet name after @snippet at ${this.pos}`, this.pos);
     this.skipWs();
-    if (this.peek() !== '(') throw new ParseError(`Expected '(' after @snippet ${name}`);
+    if (this.peek() !== '(') throw new ParseError(`Expected '(' after @snippet ${name}`, this.pos);
     const rawParams: string = this.readParen();
     const params: string[] = splitTopLevel(rawParams, ',').map((s) => s.trim()).filter(Boolean);
     for (const p of params) {
       if (!/^[A-Za-z_$][\w$]*$/.test(p)) {
-        throw new ParseError(`Invalid @snippet parameter '${p}' (identifiers only)`);
+        throw new ParseError(`Invalid @snippet parameter '${p}' (identifiers only)`, this.pos);
       }
     }
     const children: TemplateNode[] = this.readBlockBody();
@@ -339,7 +339,7 @@ class Parser {
     this.skipWs();
     const raw: string = this.readParen();
     const expr: string = raw.trim();
-    if (!expr) throw new ParseError(`@key () needs an expression`);
+    if (!expr) throw new ParseError(`@key () needs an expression`, this.pos);
     const exprOffset: number = this.exprOffset(this.parenStart, raw, expr);
     return { type: 'key', expr, exprOffset, children: this.readBlockBody() };
   }
@@ -347,10 +347,10 @@ class Parser {
   parseRender(): RenderNode {
     this.pos += '@render'.length;
     this.skipWs();
-    if (this.peek() !== '(') throw new ParseError(`Expected '(' after @render at ${this.pos}`);
+    if (this.peek() !== '(') throw new ParseError(`Expected '(' after @render at ${this.pos}`, this.pos);
     const raw: string = this.readParen();
     const expr: string = raw.trim();
-    if (!expr) throw new ParseError(`@render () needs an expression`);
+    if (!expr) throw new ParseError(`@render () needs an expression`, this.pos);
     return { type: 'render', expr, exprOffset: this.exprOffset(this.parenStart, raw, expr) };
   }
 
@@ -370,7 +370,7 @@ class Parser {
     if (this.peek() === '(') {
       const inner: string = this.readParen().trim();
       if (!/^[A-Za-z_$][\w$]*$/.test(inner)) {
-        throw new ParseError(`Expected an identifier alias in @then/@catch, got '${inner}'`);
+        throw new ParseError(`Expected an identifier alias in @then/@catch, got '${inner}'`, this.pos);
       }
       return inner;
     }
@@ -398,25 +398,25 @@ class Parser {
       if (on === 'viewport') return { kind: 'viewport' };
       if (on === 'interaction') return { kind: 'interaction' };
       if (on === 'hover') return { kind: 'hover' };
-      throw new ParseError(`Unknown @defer trigger 'on ${on}'`);
+      throw new ParseError(`Unknown @defer trigger 'on ${on}'`, this.pos);
     }
-    throw new ParseError(`Invalid @defer trigger '${h}' (use 'when <expr>', 'on idle|viewport|interaction|hover', 'on timer(ms)', or 'immediate')`);
+    throw new ParseError(`Invalid @defer trigger '${h}' (use 'when <expr>', 'on idle|viewport|interaction|hover', 'on timer(ms)', or 'immediate')`, this.pos);
   }
 
   /** `{ children }` */
   readBlockBody(): TemplateNode[] {
     this.skipWs();
-    if (this.peek() !== '{') throw new ParseError(`Expected '{' at ${this.pos}`);
+    if (this.peek() !== '{') throw new ParseError(`Expected '{' at ${this.pos}`, this.pos);
     this.pos++;
     const children: TemplateNode[] = this.parseChildren(null, true);
-    if (this.peek() !== '}') throw new ParseError(`Expected '}' closing block at ${this.pos}`);
+    if (this.peek() !== '}') throw new ParseError(`Expected '}' closing block at ${this.pos}`, this.pos);
     this.pos++;
     return children;
   }
 
   /** Read a balanced `( … )` and return the inner text (parens consumed). */
   readParen(): string {
-    if (this.peek() !== '(') throw new ParseError(`Expected '(' at ${this.pos}`);
+    if (this.peek() !== '(') throw new ParseError(`Expected '(' at ${this.pos}`, this.pos);
     this.pos++;
     const start: number = this.pos;
     let depth: number = 1;
@@ -433,7 +433,7 @@ class Parser {
       }
       this.pos++;
     }
-    if (depth !== 0) throw new ParseError('Unclosed ( in block head');
+    if (depth !== 0) throw new ParseError('Unclosed ( in block head', this.pos);
     const inner: string = this.src.slice(start, this.pos);
     this.parenStart = start;
     this.pos++; // )
@@ -504,7 +504,7 @@ class Parser {
     this.pos++; // <
     const tagOffset: number = this.pos;
     const tag: string = this.readName();
-    if (!tag) throw new ParseError(`Expected tag name at ${this.pos}`);
+    if (!tag) throw new ParseError(`Expected tag name at ${this.pos}`, this.pos);
     const attrs: Attr[] = this.parseAttrs(tag);
 
     this.skipWs();
@@ -513,7 +513,7 @@ class Parser {
       selfClosing = true;
       this.pos++;
     }
-    if (this.peek() !== '>') throw new ParseError(`Expected '>' for <${tag}> at ${this.pos}`);
+    if (this.peek() !== '>') throw new ParseError(`Expected '>' for <${tag}> at ${this.pos}`, this.pos);
     this.pos++; // >
 
     // Only lowercase HTML tags are void. A capitalized tag is a component (e.g. the
@@ -529,9 +529,9 @@ class Parser {
     if (!this.src.startsWith('</', this.pos)) throw new ParseError(`Unclosed <${tag}>`);
     this.pos += 2;
     const closeName: string = this.readName();
-    if (closeName !== tag) throw new ParseError(`Mismatched </${closeName}>, expected </${tag}>`);
+    if (closeName !== tag) throw new ParseError(`Mismatched </${closeName}>, expected </${tag}>`, this.pos);
     this.skipWs();
-    if (this.peek() !== '>') throw new ParseError(`Expected '>' closing </${tag}>`);
+    if (this.peek() !== '>') throw new ParseError(`Expected '>' closing </${tag}>`, this.pos);
     this.pos++;
 
     return { type: 'element', tag, tagOffset, attrs, children, selfClosing: false };
@@ -578,8 +578,8 @@ class Parser {
 
   classifyAttr(rawName: string, value: AttrValue): Attr {
     const exprOf = (): string => {
-      if (!value) throw new ParseError(`Binding '${rawName}' requires a value`);
-      if (value.kind !== 'expr') throw new ParseError(`Binding '${rawName}' needs {expr}, got a string`);
+      if (!value) throw new ParseError(`Binding '${rawName}' requires a value`, this.pos);
+      if (value.kind !== 'expr') throw new ParseError(`Binding '${rawName}' needs {expr}, got a string`, this.pos);
       return value.expr;
     };
     const offset: number | undefined = value && value.kind === 'expr' ? value.offset : undefined;
@@ -603,10 +603,10 @@ class Parser {
     if (rawName.startsWith('use:')) {
       // `use:action` (no arg) or `use:action={arg}`. The arg is optional.
       const name: string = rawName.slice(4);
-      if (!name) throw new ParseError(`'use:' requires an action name, e.g. use:tooltip`);
+      if (!name) throw new ParseError(`'use:' requires an action name, e.g. use:tooltip`, this.pos);
       const expr: string | undefined = value && value.kind === 'expr' ? value.expr : undefined;
       if (value && value.kind === 'static') {
-        throw new ParseError(`use:${name} needs {expr}, got a string`);
+        throw new ParseError(`use:${name} needs {expr}, got a string`, this.pos);
       }
       return { type: 'use', name, expr, offset };
     }
@@ -617,8 +617,8 @@ class Parser {
       const mode: 'both' | 'in' | 'out' = rawName.startsWith('transition:') ? 'both' : rawName.startsWith('in:') ? 'in' : 'out';
       const prefix: string = mode === 'both' ? 'transition:' : mode === 'in' ? 'in:' : 'out:';
       const name: string = rawName.slice(prefix.length);
-      if (!name) throw new ParseError(`'${prefix}' requires a transition function, e.g. ${prefix}fade`);
-      if (value && value.kind === 'static') throw new ParseError(`${rawName} needs {expr} params, got a string`);
+      if (!name) throw new ParseError(`'${prefix}' requires a transition function, e.g. ${prefix}fade`, this.pos);
+      if (value && value.kind === 'static') throw new ParseError(`${rawName} needs {expr} params, got a string`, this.pos);
       const expr: string | undefined = value && value.kind === 'expr' ? value.expr : undefined;
       return { type: 'transition', name, mode, expr, offset };
     }
@@ -651,7 +651,7 @@ class Parser {
       // text interpolation. One syntax everywhere; a single `{` is rejected so
       // the author can't accidentally fall back to the old form.
       if (!this.src.startsWith('{{', this.pos)) {
-        throw new ParseError(`Attribute bindings use double braces: write {{ expr }}, not { expr } (at ${this.pos})`);
+        throw new ParseError(`Attribute bindings use double braces: write {{ expr }}, not { expr } (at ${this.pos})`, this.pos);
       }
       const b: { expr: string; offset: number } = this.readDoubleBracedExpr();
       return { kind: 'expr', expr: b.expr, offset: b.offset };
@@ -690,7 +690,7 @@ class Parser {
       }
       this.pos++;
     }
-    if (this.eof()) throw new ParseError('Unclosed {{ expression');
+    if (this.eof()) throw new ParseError('Unclosed {{ expression', this.pos);
     const raw: string = this.src.slice(start, this.pos);
     this.pos += 2; // }}
     return { expr: raw.trim(), offset: start + (raw.length - raw.trimStart().length) };

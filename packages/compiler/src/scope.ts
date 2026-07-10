@@ -273,6 +273,13 @@ const NON_CTX: Set<string> = new Set([
   'encodeURIComponent', 'decodeURIComponent', 'encodeURI', 'decodeURI',
   'navigator', 'location', 'history', 'localStorage', 'sessionStorage',
   'fetch', 'URL', 'URLSearchParams',
+  // timers / scheduling
+  'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval',
+  'requestAnimationFrame', 'cancelAnimationFrame', 'queueMicrotask',
+  // common DOM globals a handler may call inline
+  'alert', 'confirm', 'prompt', 'performance', 'crypto',
+  'Event', 'CustomEvent', 'AbortController', 'FormData', 'Blob', 'File',
+  'Image', 'Audio', 'getComputedStyle', 'atob', 'btoa',
 ]);
 
 /** Collect arrow-function parameter names in `expr` (so they aren't treated as ctx). */

@@ -19,6 +19,11 @@ the previous one. For the granular, per-version log see [CHANGELOG.md](CHANGELOG
   "unused import", so the `void Badge;` keep-alive lines are unnecessary (the imports stay, for
   go-to-definition). Pinned by a regression test.
 
+- **Call common globals inline in templates.** `setTimeout`, `confirm`, `requestAnimationFrame`,
+  `FormData`, `crypto`, and other everyday DOM/timer globals now resolve to the real global inside a
+  template expression (e.g. `on:click={{ () => setTimeout(close, 200) }}`) instead of being mistaken for
+  component data. Parser errors also now point at the exact line, not the top of the file.
+
 ### 🐛 Fixes
 
 - **Arrow-parameter shadowing in templates.** A template expression whose inline arrow reuses a

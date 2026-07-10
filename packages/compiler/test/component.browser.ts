@@ -36,6 +36,19 @@ test('inferCtxNames excludes JS globals', () => {
   assert.deepEqual(inferCtxNames(parseTemplate('<b>{{ Math.max(n(), 5) }}</b>')), ['n']);
 });
 
+test('inferCtxNames excludes common DOM/timer globals (A4)', () => {
+  // Regression: `setTimeout`/`confirm`/etc. were inferred as ctx → compiled to
+  // `ctx.setTimeout(...)` → runtime TypeError. They must resolve to the real globals.
+  assert.deepEqual(
+    inferCtxNames(parseTemplate('<button on:click={{ () => setTimeout(close, 200) }}>x</button>')),
+    ['close']
+  );
+  assert.deepEqual(
+    inferCtxNames(parseTemplate('<button on:click={{ () => confirm(msg()) && remove() }}>x</button>')),
+    ['msg', 'remove']
+  );
+});
+
 test('inferCtxNames excludes arrow parameters', () => {
   const names: string[] = inferCtxNames(parseTemplate('<button on:click={{() => count.set(n => n + 1)}}>x</button>'));
   assert.deepEqual(names, ['count']);
