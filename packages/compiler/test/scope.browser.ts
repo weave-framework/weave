@@ -34,6 +34,19 @@ test('rewrite: ctx binding prefixes __ctx. and maps the name verbatim', () => {
   assertFullSourceCoverage(expr, r.segments);
 });
 
+test('rewrite: an arrow parameter shadows a same-named ctx binding (B1 — no `(ctx.x) =>`)', () => {
+  // Regression: with `value` in scope, `(value) => value * 2` compiled to
+  // `(ctx.value) => ctx.value * 2` — a SyntaxError. The arrow param must stay bare.
+  const r: ReturnType<typeof rewrite> = rewrite('items().map((value) => value * 2)', ctxScope(['items', 'value']), 'ctx');
+  assert.equal(r.code, 'ctx.items().map((value) => value * 2)');
+  assert.ok(!/\(ctx\.value\)\s*=>/.test(r.code), `arrow param must not be ctx-prefixed; got: ${r.code}`);
+  // a bare single-param arrow too
+  const r2: ReturnType<typeof rewrite> = rewrite('list().filter(item => item.ok)', ctxScope(['list', 'item']), 'ctx');
+  assert.equal(r2.code, 'ctx.list().filter(item => item.ok)');
+  // the outer ctx call is still rewritten; only the parameter is spared
+  assert.ok(r.code.startsWith('ctx.items()'), 'the ctx list call is still prefixed');
+});
+
 test('rewrite: trailing operators stay mapped after a ctx rewrite', () => {
   const expr: string = 'count + 1';
   const r: ReturnType<typeof rewrite> = rewrite(expr, ctxScope(['count']), '__ctx');

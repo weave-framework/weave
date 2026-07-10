@@ -67,6 +67,13 @@ export function rewrite(expr: string, scope: Scope, ctxRef: string = 'ctx'): Rew
   let i: number = 0;
   const n: number = expr.length;
 
+  // Arrow-function parameters are lexical locals, not ctx bindings — a template
+  // expression like `items().map((value) => value * 2)` must NOT rewrite `value`
+  // to `ctx.value` (which yields `(ctx.value) =>`, a syntax error) even when a
+  // same-named ctx binding exists. Same basis as `freeIdentifiers`, so inference
+  // and rewriting agree on what is a parameter.
+  const params: Set<string> = arrowParams(expr);
+
   const segments: RewriteSegment[] = [];
   // The current verbatim run, contiguous in both source and generated text.
   let runSrc: number = -1;
@@ -179,7 +186,7 @@ export function rewrite(expr: string, scope: Scope, ctxRef: string = 'ctx'): Rew
       const next: string = firstNonSpaceFrom(expr, j);
       const isObjectKey: boolean = (prev === '{' || prev === ',') && next === ':';
 
-      if (binding && !isProperty && !isObjectKey) {
+      if (binding && !isProperty && !isObjectKey && !params.has(name)) {
         // `{ name }` object shorthand must expand to `{ name: <value> }` — a bare `{ ctx.name }` /
         // `{ accessor() }` is a syntax error. Detect a shorthand key: between `{`|`,` and `,`|`}`.
         if (binding.kind !== 'local') {

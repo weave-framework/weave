@@ -19,6 +19,13 @@ the previous one. For the granular, per-version log see [CHANGELOG.md](CHANGELOG
   "unused import", so the `void Badge;` keep-alive lines are unnecessary (the imports stay, for
   go-to-definition). Pinned by a regression test.
 
+### 🐛 Fixes
+
+- **Arrow-parameter shadowing in templates.** A template expression whose inline arrow reuses a
+  component-binding name — e.g. `items().map((value) => value * 2)` where `value` is also a binding —
+  compiled to invalid JS (`(ctx.value) =>`) and broke the build. Codegen now leaves arrow parameters
+  alone.
+
 ## 1.5.10 — 2026-07-09
 ### ✨ Features & docs
 
