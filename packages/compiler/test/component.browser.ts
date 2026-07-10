@@ -328,6 +328,25 @@ test('compileComponent without setup emits defineComponent(render)', () => {
   assert.equal(css, '', 'no styles → empty css');
 });
 
+/* ──────────── A1 — bare boolean attribute on a component ──────────── */
+
+test('a bare attribute on a component is the boolean prop true (A1)', () => {
+  const { code } = compileComponent({ template: '<Button disabled>Save</Button>' });
+  assert.ok(/disabled:\s*true/.test(code), `bare → true; got:\n${code}`);
+});
+
+test('a quoted / explicitly-empty attribute on a component stays a string (A1)', () => {
+  const { code } = compileComponent({ template: '<Button label="Go" hint="">x</Button>' });
+  assert.ok(code.includes('label: "Go"'), `quoted stays string; got:\n${code}`);
+  assert.ok(/hint:\s*""/.test(code) && !/hint:\s*true/.test(code), `explicit empty stays ""; got:\n${code}`);
+});
+
+test('a bare attribute on a DOM element is unchanged (renders bare, not a prop)', () => {
+  const { code } = compileComponent({ template: '<button disabled>x</button>' });
+  assert.ok(code.includes('<button disabled>') || / disabled/.test(code), `native bare attr unchanged; got:\n${code}`);
+  assert.ok(!/disabled:\s*true/.test(code), 'native element does not build a props object');
+});
+
 /* ──────────── auto-expose (setup without an explicit return) ──────────── */
 
 test('compileComponent auto-exposes the template names when setup omits return', () => {

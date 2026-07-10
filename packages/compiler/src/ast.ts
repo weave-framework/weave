@@ -200,6 +200,9 @@ export interface StaticAttr {
   type: 'static';
   name: string;
   value: string;
+  /** True for a valueless attribute (`disabled`, no `=`). On a component tag this
+   *  becomes the boolean prop `true` (not the empty string `""`). */
+  bare?: boolean;
 }
 /** name={expr} */
 export interface ExprAttr {

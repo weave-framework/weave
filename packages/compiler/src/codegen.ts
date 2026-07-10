@@ -450,7 +450,9 @@ function compileFragment(
     for (const attr of node.attrs) {
       switch (attr.type) {
         case 'static':
-          props.push(`${propKey(attr.name)}: ${q(attr.value)}`);
+          // A bare attribute on a component (`<Button disabled>`) is the boolean prop
+          // `true`; a quoted `foo="x"` (or explicit empty `foo=""`) stays a string.
+          props.push(`${propKey(attr.name)}: ${attr.bare ? 'true' : q(attr.value)}`);
           break;
         case 'attr':
           // getter ⇒ the child re-reads through it, so the prop stays reactive

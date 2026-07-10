@@ -24,6 +24,10 @@ the previous one. For the granular, per-version log see [CHANGELOG.md](CHANGELOG
   template expression (e.g. `on:click={{ () => setTimeout(close, 200) }}`) instead of being mistaken for
   component data. Parser errors also now point at the exact line, not the top of the file.
 
+- **Bare boolean attributes on components.** `<Button disabled>` now passes the boolean `true` (not the
+  empty string), so boolean props work as written and `weave check` no longer flags `'' vs boolean`. A
+  quoted attribute still passes a string.
+
 ### 🐛 Fixes
 
 - **Arrow-parameter shadowing in templates.** A template expression whose inline arrow reuses a

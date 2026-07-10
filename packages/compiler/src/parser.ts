@@ -628,7 +628,9 @@ class Parser {
     if (value && value.kind === 'expr') {
       return { type: 'attr', name: rawName, expr: value.expr, offset };
     }
-    return { type: 'static', name: rawName, value: value ? value.text : '' };
+    // A valueless attribute (`disabled`, no `=`) is marked `bare` so a component tag
+    // can promote it to the boolean prop `true` (an explicit `disabled=""` stays "").
+    return { type: 'static', name: rawName, value: value ? value.text : '', ...(value === null ? { bare: true } : {}) };
   }
 
   readName(): string {

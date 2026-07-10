@@ -245,7 +245,9 @@ function emit(nodes: TemplateNode[], ctx: Set<string>): Line[] {
     for (const attr of node.attrs) {
       if (attr.type === 'static') {
         if (attr.name === 'slot') continue; // slot marker, stripped by codegen
-        dataProps.push({ key: attr.name, staticVal: JSON.stringify(attr.value) });
+        // A bare attribute (`<Button disabled>`) type-checks as the boolean `true`,
+        // matching what codegen emits; a quoted value stays a string literal.
+        dataProps.push({ key: attr.name, staticVal: attr.bare ? 'true' : JSON.stringify(attr.value) });
       } else if (attr.type === 'attr') {
         dataProps.push({ key: attr.name, expr: attr.expr, srcOffset: attr.offset });
       } else {
