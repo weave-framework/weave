@@ -188,6 +188,11 @@
       "types": "./src/datepicker/datepicker.ts",
       "import": "./src/datepicker/datepicker.ts"
     },
+    "./date-range-picker": {
+      "sass": "./src/styles/components/date-range-picker/_index.scss",
+      "types": "./src/date-range-picker/date-range-picker.ts",
+      "import": "./src/date-range-picker/date-range-picker.ts"
+    },
     "./timepicker": {
       "sass": "./src/styles/components/timepicker/_index.scss",
       "types": "./src/timepicker/timepicker.ts",
@@ -406,6 +411,11 @@
         "sass": "./src/styles/components/datepicker/_index.scss",
         "types": "./dist/datepicker/datepicker.d.ts",
         "import": "./dist/datepicker/datepicker.js"
+      },
+      "./date-range-picker": {
+        "sass": "./src/styles/components/date-range-picker/_index.scss",
+        "types": "./dist/date-range-picker/date-range-picker.d.ts",
+        "import": "./dist/date-range-picker/date-range-picker.js"
       },
       "./timepicker": {
         "sass": "./src/styles/components/timepicker/_index.scss",

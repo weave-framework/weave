@@ -1,0 +1,76 @@
+// date-range-picker — styles() mixin. An underline trigger field (shared field-underline helper,
+// like Datepicker) showing "start – end" + a calendar icon; the calendar popover is the shared
+// three-view engine visual (calendar() mixin, $range: true adds the in-between band + hover
+// preview). Forwarded by ./_index.scss.
+@use '../../helpers' as helpers;
+@use '../../calendar' as calendar;
+
+@mixin styles() {
+  .weave-date-range-picker {
+    display: block;
+  }
+
+  .weave-date-range-picker__field {
+    @include helpers.field-underline(
+      var(--weave-date-range-picker-border),
+      var(--weave-date-range-picker-focus),
+      var(--weave-date-range-picker-border-width)
+    );
+    display: flex;
+    align-items: center;
+    gap: var(--weave-date-range-picker-gap);
+    padding: var(--weave-date-range-picker-field-padding-y) 0;
+    color: var(--weave-date-range-picker-text);
+    font-size: var(--weave-date-range-picker-font-size);
+    font-weight: var(--weave-date-range-picker-weight);
+    line-height: 1.4;
+    cursor: pointer;
+  }
+
+  .weave-date-range-picker__value--placeholder {
+    color: var(--weave-date-range-picker-placeholder);
+  }
+
+  .weave-date-range-picker__spacer {
+    flex: 1 1 auto;
+  }
+
+  .weave-date-range-picker__clear {
+    @include helpers.clear-button(
+      var(--weave-date-range-picker-placeholder),
+      var(--weave-date-range-picker-text)
+    );
+  }
+
+  // A small calendar glyph (pure CSS: a bordered box with a filled header bar).
+  .weave-date-range-picker__icon {
+    position: relative;
+    flex: 0 0 auto;
+    width: var(--weave-date-range-picker-icon-size);
+    height: var(--weave-date-range-picker-icon-size);
+    border: 1.5px solid var(--weave-date-range-picker-icon);
+    border-radius: 2px;
+  }
+
+  .weave-date-range-picker__icon::before {
+    content: '';
+    position: absolute;
+    inset: -1.5px -1.5px auto -1.5px;
+    height: 3px;
+    background: var(--weave-date-range-picker-icon);
+    border-radius: 2px 2px 0 0;
+  }
+
+  .weave-date-range-picker--disabled .weave-date-range-picker__field {
+    color: var(--weave-date-range-picker-disabled-text);
+    cursor: default;
+  }
+
+  .weave-date-range-picker--invalid .weave-date-range-picker__field {
+    border-bottom-color: var(--weave-date-range-picker-error);
+    box-shadow: inset 0 -1px 0 0 var(--weave-date-range-picker-error);
+  }
+
+  // Calendar popover — the shared three-view engine visual, with range decorations.
+  @include calendar.calendar('date-range-picker', $range: true);
+}

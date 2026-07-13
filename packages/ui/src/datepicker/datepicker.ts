@@ -27,7 +27,7 @@
 import { signal, effect, onDispose, type Signal } from '@weave-framework/runtime';
 import { createOverlay, connectedPosition, createDateAdapter, type OverlayRef, type DateAdapter } from '../cdk/index.js';
 import { buildPositions, type MenuPosition } from '../shared/positions.js';
-import { createCalendarView, CALENDAR_LABEL_DEFAULTS, type CalendarView, type CalendarLabels } from './calendar-view.js';
+import { createCalendarView, CALENDAR_LABEL_DEFAULTS, type CalendarView, type CalendarLabels } from '../shared/calendar-view.js';
 
 /** The subset of a forms `Field<Date>` a Datepicker binds to. */
 export interface DatepickerControl {

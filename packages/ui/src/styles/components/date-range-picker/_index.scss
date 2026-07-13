@@ -1,0 +1,10 @@
+// DateRangePicker — a date-range field + calendar popover. Behavior lives in
+// date-range-picker.ts (trigger field + the shared CDK-overlay calendar engine); this is the
+// visual. An underline trigger field (shared field-underline helper, like Datepicker) showing
+// "start – end" with a calendar icon; the calendar reuses the shared calendar() mixin and adds
+// the in-between range band + hover preview.
+//
+// Barrel — forwards the split partials ($tokens + the styles() mixin).
+
+@forward 'tokens';
+@forward 'styles';

@@ -43,6 +43,7 @@
 @use 'components/table' as table;
 @use 'components/tree' as tree;
 @use 'components/datepicker' as datepicker;
+@use 'components/date-range-picker' as date-range-picker;
 @use 'components/timepicker' as timepicker;
 @use 'components/menubar' as menubar;
 @use 'components/popover-edit' as popover-edit;
@@ -83,6 +84,7 @@ $_builtins: (
   'table': table.$tokens,
   'tree': tree.$tokens,
   'datepicker': datepicker.$tokens,
+  'date-range-picker': date-range-picker.$tokens,
   'timepicker': timepicker.$tokens,
   'menubar': menubar.$tokens,
   'popover-edit': popover-edit.$tokens,
@@ -303,6 +305,10 @@ $_builtins: (
   @include overrides('datepicker', $map);
 }
 
+@mixin date-range-picker-overrides($map) {
+  @include overrides('date-range-picker', $map);
+}
+
 @mixin timepicker-overrides($map) {
   @include overrides('timepicker', $map);
 }
@@ -377,6 +383,7 @@ $_builtins: (
   @include table.styles();
   @include tree.styles();
   @include datepicker.styles();
+  @include date-range-picker.styles();
   @include timepicker.styles();
   @include menubar.styles();
   @include popover-edit.styles();
