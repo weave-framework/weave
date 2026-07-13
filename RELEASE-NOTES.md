@@ -3,6 +3,21 @@
 Human-readable highlights, one section per release — everything notable that landed since
 the previous one. For the granular, per-version log see [CHANGELOG.md](CHANGELOG.md).
 
+## Unreleased
+
+### 🐛 Fixes
+
+- **`<DateRangePicker>` — the second click now always registers (FW-17 follow-up).** Picking the
+  first date worked, but the second click often did nothing: while you moved the pointer toward the
+  end date, each hover rebuilt the whole day grid, so the day cell under the cursor was replaced
+  mid-click — the `mousedown` landed on the old node and the `mouseup` on the new one, and the
+  browser never fired a `click`. The hover preview now re-decorates the existing day cells **in
+  place** (a new shared `refreshDays()` on the calendar core) instead of rebuilding them, so cells
+  keep their identity and real clicks always land. Also stopped the value-sync effect from
+  re-rendering on hover (it was tracking the pending/hover signals through the day-cell decorator —
+  now runs untracked). `<Datepicker>` is unaffected. Pinned by a regression test that drives a real
+  `mousedown → hover → mouseup` and asserts the cell is never detached.
+
 ## 1.5.27 — 2026-07-13
 
 ### ✨ Features

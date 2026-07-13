@@ -143,6 +143,30 @@ test('date-range-picker: hovering while picking the end previews the span', asyn
   m.dispose();
 });
 
+test('date-range-picker: day cells survive a hover — the real second click still commits (no grid rebuild)', async () => {
+  // Regression: hovering while picking the end used to full-rebuild the grid, detaching the day
+  // cell under the pointer so a real mousedown+mouseup (split across a hover re-decorate) never
+  // fired `click`. The preview must now re-decorate in place, keeping each cell's identity.
+  const ctl: DateRangePickerControl = rangeField(null);
+  const m: Mounted = await mount({ control: ctl, locale: 'en-US' });
+  field(m).click();
+  cellByText('10').click(); // anchor
+  const before: HTMLButtonElement = cellByText('15');
+  hover('14'); // preview update — must NOT rebuild the grid
+  assert.equal(cellByText('15'), before, 'the day-15 button is the SAME element after a hover');
+  // A real interrupted click: mousedown → a mid-click hover re-decorate → mouseup, all on the SAME node.
+  const target: HTMLButtonElement = cellByText('15');
+  target.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+  hover('12'); // jitter: another preview update between down and up
+  assert.ok(target.isConnected, 'target day cell is still attached after a mid-click hover');
+  target.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+  target.click(); // fires because mousedown+mouseup shared the still-attached target
+  const v: DateRange = ctl.value() as DateRange;
+  assert.ok(v && A.isSameDay(v.start as Date, thisMonth(10)) && A.isSameDay(v.end as Date, thisMonth(15)), 'the second click committed the range');
+  assert.equal(panel(), null, 'panel closed after completing');
+  m.dispose();
+});
+
 test('date-range-picker: no preview band before an anchor is chosen', async () => {
   const m: Mounted = await mount({ control: rangeField(null), locale: 'en-US' });
   field(m).click();

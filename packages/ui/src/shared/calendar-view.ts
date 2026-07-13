@@ -84,6 +84,9 @@ export interface CalendarView {
   reset(base: Date): void;
   /** Re-render the current view in place (no focus side effect). */
   render(): void;
+  /** Re-decorate the existing day cells in place (hover / same-month selection) — no rebuild, so
+   *  cell elements stay put and real mouse clicks never break. No-op outside the day view. */
+  refreshDays(): void;
   /** Re-render then move DOM focus onto the active cell (nav / view switch / keyboard). */
   rerender(): void;
   /** Move DOM focus onto the active cell of the current view. */
@@ -114,6 +117,11 @@ export function createCalendarView(host: CalendarHost): CalendarView {
   let focusedYear: number = adapter.getYear(focusedDate);
   let focusedMonth: number = adapter.getMonth(focusedDate);
   let rangeStart: number = focusedYear - mod(focusedYear, YEARS_PER_PAGE);
+  // Live day cells (button + its date) for the current day view. Kept so hover/selection can
+  // re-decorate them **in place** (see refreshDays) instead of rebuilding the grid — a rebuild
+  // under the pointer detaches the cell mid-click (mousedown on the old node, mouseup on the new)
+  // so the `click` never fires. Repopulated on every day render.
+  const dayCells: Array<{ btn: HTMLButtonElement; date: Date }> = [];
 
   const minDate = (): Date | undefined => host.min?.();
   const maxDate = (): Date | undefined => host.max?.();
@@ -243,6 +251,7 @@ export function createCalendarView(host: CalendarHost): CalendarView {
   }
 
   function fillDayGrid(grid: HTMLElement, first: number): void {
+    dayCells.length = 0; // rebuilding the day grid — drop the previous cells' references
     const today: Date = adapter.today();
     const monthStart: Date = adapter.startOfMonth(viewMonth);
     const startWeekday: number = adapter.getDayOfWeek(monthStart);
@@ -296,7 +305,41 @@ export function createCalendarView(host: CalendarHost): CalendarView {
     if (isFocused) btn.setAttribute('data-focused', 'true');
     btn.addEventListener('click', () => activateDay(date));
     if (host.onHoverDay && !disabled) btn.addEventListener('mouseenter', () => host.onHoverDay!(date));
+    dayCells.push({ btn, date });
     return btn;
+  }
+
+  /**
+   * Re-decorate the existing day cells **in place** (selected / today / range / preview classes)
+   * without recreating them — for a hover preview or a selection that doesn't change the month.
+   * Keeps each cell's element identity stable so a real mouse click (mousedown + mouseup on the
+   * same node) always fires; a full re-render under the pointer would detach the node mid-click.
+   */
+  function refreshDays(): void {
+    if (view !== 'day') return;
+    const today: Date = adapter.today();
+    for (const { btn, date } of dayCells) {
+      const disabled: boolean = dateDisabled(date);
+      btn.className = `${p}__cell`; // reset to base, then re-derive every state class
+      if (disabled) btn.classList.add(`${p}__cell--disabled`);
+      if (host.isSelected(date)) {
+        btn.setAttribute('aria-selected', 'true');
+        btn.classList.add(`${p}__cell--selected`);
+      } else {
+        btn.removeAttribute('aria-selected');
+      }
+      if (adapter.isSameDay(date, today)) {
+        btn.setAttribute('aria-current', 'date');
+        btn.classList.add(`${p}__cell--today`);
+      } else {
+        btn.removeAttribute('aria-current');
+      }
+      host.decorateDay?.(date, btn, disabled);
+      const isFocused: boolean = adapter.isSameDay(date, focusedDate);
+      btn.tabIndex = isFocused ? 0 : -1;
+      if (isFocused) btn.setAttribute('data-focused', 'true');
+      else btn.removeAttribute('data-focused');
+    }
   }
 
   function activateDay(date: Date): void {
@@ -570,5 +613,5 @@ export function createCalendarView(host: CalendarHost): CalendarView {
     rangeStart = focusedYear - mod(focusedYear, YEARS_PER_PAGE);
   }
 
-  return { panel, reset, render, rerender, focusActive };
+  return { panel, reset, render, refreshDays, rerender, focusActive };
 }

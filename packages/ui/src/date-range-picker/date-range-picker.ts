@@ -24,7 +24,7 @@
  *   import DateRangePicker from '@weave-framework/ui/date-range-picker';
  *   <DateRangePicker control={{ form.controls.stay }} min={{ adapter.today() }} clearable={{ true }} />
  */
-import { signal, effect, onDispose, type Signal } from '@weave-framework/runtime';
+import { signal, effect, untrack, onDispose, type Signal } from '@weave-framework/runtime';
 import { createOverlay, connectedPosition, createDateAdapter, type OverlayRef, type DateAdapter } from '../cdk/index.js';
 import { buildPositions, type MenuPosition } from '../shared/positions.js';
 import { createCalendarView, CALENDAR_LABEL_DEFAULTS, type CalendarView, type CalendarLabels } from '../shared/calendar-view.js';
@@ -224,10 +224,11 @@ export function setup(props: DateRangePickerProps): DateRangePickerContext {
   const onSelectDay = (date: Date): void => {
     const anchor: Date | null = pendingStart();
     if (!anchor) {
-      // First click — start a fresh range at the anchor.
+      // First click — start a fresh range at the anchor. Re-decorate in place (same month) so the
+      // day cells keep their identity and the *second* click (a real mousedown+mouseup) still fires.
       pendingStart.set(adapter.clone(date));
       hoverDate.set(null);
-      calendar?.render();
+      calendar?.refreshDays();
       return;
     }
     // Second click — complete, ordering the two ends.
@@ -264,12 +265,12 @@ export function setup(props: DateRangePickerProps): DateRangePickerContext {
       onHoverDay: (date: Date): void => {
         if (!pendingStart()) return; // preview only while picking the end
         hoverDate.set(adapter.clone(date));
-        calendar?.render();
+        calendar?.refreshDays(); // in-place — never rebuild the grid under the pointer (breaks the click)
       },
       onHoverLeave: (): void => {
         if (!pendingStart() || !hoverDate()) return;
         hoverDate.set(null);
-        calendar?.render();
+        calendar?.refreshDays();
       },
       onEscape: (): void => closePanel(true),
     });
@@ -327,10 +328,13 @@ export function setup(props: DateRangePickerProps): DateRangePickerContext {
 
   const formatValue = (v: Date): string => adapter.format(v, props.displayFormat ?? { dateStyle: 'medium' });
 
-  // Re-render an open calendar when the external value changes. No focus steal.
+  // Re-render an open calendar when the EXTERNAL value changes. `render()` reads the pending /
+  // hover signals (via decorateDay), so it must run untracked — otherwise this effect would also
+  // re-run on every hover, rebuilding the grid under the pointer and breaking the click (the whole
+  // point of refreshDays). Depend only on the explicit `rawValue()` read above.
   effect(() => {
     rawValue();
-    if (open() && calendar) calendar.render();
+    if (open() && calendar) untrack(() => calendar!.render());
   });
   // Reflect forms validity as aria-invalid on the field.
   effect(() => {
