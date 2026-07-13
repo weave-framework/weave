@@ -1,0 +1,258 @@
+// Shared calendar-popover visual — the three drill-down grids (day / year / month) + nav that
+// back both `<Datepicker>` and `<DateRangePicker>`. The behavior is the shared
+// `createCalendarView` core; this is its one visual, parameterised by `$name` so each consumer
+// keeps its own token schema + class prefix (`weave-#{$name}__*`) while sharing this CSS
+// (UI RULE #1 — no duplication). Pass `$range: true` to emit the range-only day modifiers
+// (in-range fill + rounded ends + hover preview).
+@use 'helpers' as helpers;
+
+@mixin calendar($name, $range: false) {
+  $c: 'weave-#{$name}';
+
+  .#{$c}__panel {
+    @include helpers.overlay-panel;
+    width: var(--weave-#{$name}-panel-width);
+    padding: var(--weave-#{$name}-panel-padding);
+  }
+
+  .#{$c}__nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+  }
+
+  // Month view has no ‹/› (only 12 months) — centre the year switch.
+  .#{$c}__nav--center {
+    justify-content: center;
+  }
+
+  .#{$c}__nav-button {
+    @include helpers.field-reset;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--weave-#{$name}-nav-size);
+    height: var(--weave-#{$name}-nav-size);
+    border-radius: 50%;
+    color: var(--weave-#{$name}-nav);
+    cursor: pointer;
+  }
+
+  .#{$c}__nav-button:hover {
+    color: var(--weave-#{$name}-nav-hover);
+    background: var(--weave-#{$name}-cell-hover);
+  }
+
+  .#{$c}__nav-button:focus-visible {
+    @include helpers.focus-ring;
+  }
+
+  .#{$c}__month-label {
+    font-size: var(--weave-#{$name}-month-label-size);
+    font-weight: var(--weave-#{$name}-month-label-weight);
+    color: var(--weave-#{$name}-text);
+  }
+
+  // The header label is a button in the day + month views (opens the year grid). It strips its
+  // native chrome and adds a hover affordance so it reads as tappable; the year view's range is a
+  // plain span (same type, no interaction).
+  .#{$c}__view-switch {
+    @include helpers.field-reset;
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px 6px;
+    border-radius: var(--weave-#{$name}-cell-radius);
+    cursor: pointer;
+  }
+
+  .#{$c}__view-switch:hover {
+    background: var(--weave-#{$name}-cell-hover);
+  }
+
+  .#{$c}__view-switch:focus-visible {
+    @include helpers.focus-ring($offset: -1px);
+  }
+
+  .#{$c}__range-label {
+    text-align: center;
+  }
+
+  // Year / month grids — a coarser drill-down. Fewer, wider cells than the day grid.
+  .#{$c}__year-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .#{$c}__month-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .#{$c}__year-cell,
+  .#{$c}__month-cell {
+    @include helpers.field-reset;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: var(--weave-#{$name}-period-cell-height);
+    margin: 3px;
+    border-radius: var(--weave-#{$name}-period-cell-radius);
+    color: var(--weave-#{$name}-cell-text);
+    font-size: var(--weave-#{$name}-font-size);
+    cursor: pointer;
+  }
+
+  .#{$c}__year-cell:not(:disabled):not(.#{$c}__year-cell--selected):hover,
+  .#{$c}__month-cell:not(:disabled):not(.#{$c}__month-cell--selected):hover {
+    background: var(--weave-#{$name}-cell-hover);
+  }
+
+  .#{$c}__year-cell:focus-visible,
+  .#{$c}__month-cell:focus-visible {
+    @include helpers.focus-ring($offset: -1px);
+  }
+
+  // Current year / month = an inset accent ring (mirrors the day grid's "today").
+  .#{$c}__year-cell--today,
+  .#{$c}__month-cell--today {
+    box-shadow: inset 0 0 0 1px var(--weave-#{$name}-today-ring);
+  }
+
+  // Selected year / month = accent fill + surface text (wins over the ring).
+  .#{$c}__year-cell--selected,
+  .#{$c}__month-cell--selected {
+    background: var(--weave-#{$name}-selected-background);
+    color: var(--weave-#{$name}-selected-text);
+    box-shadow: none;
+  }
+
+  .#{$c}__year-cell--disabled,
+  .#{$c}__month-cell--disabled {
+    color: var(--weave-#{$name}-disabled-text);
+    cursor: default;
+  }
+
+  .#{$c}__weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    margin-bottom: 2px;
+  }
+
+  .#{$c}__weekday {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: var(--weave-#{$name}-cell-size);
+    color: var(--weave-#{$name}-weekday);
+    font-size: var(--weave-#{$name}-weekday-size);
+    font-weight: 400;
+  }
+
+  .#{$c}__row {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+  }
+
+  .#{$c}__cell {
+    @include helpers.field-reset;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--weave-#{$name}-cell-size);
+    height: var(--weave-#{$name}-cell-size);
+    margin: 1px auto;
+    border-radius: var(--weave-#{$name}-cell-radius);
+    color: var(--weave-#{$name}-cell-text);
+    font-size: var(--weave-#{$name}-cell-size);
+    cursor: pointer;
+  }
+
+  // A non-day slot (leading/trailing blank).
+  .#{$c}__cell--blank {
+    cursor: default;
+  }
+
+  .#{$c}__cell:not(:disabled):not(.#{$c}__cell--selected):hover {
+    background: var(--weave-#{$name}-cell-hover);
+  }
+
+  .#{$c}__cell:focus-visible {
+    @include helpers.focus-ring($offset: -1px);
+  }
+
+  // Today = an inset accent ring (design).
+  .#{$c}__cell--today {
+    box-shadow: inset 0 0 0 1px var(--weave-#{$name}-today-ring);
+  }
+
+  // Selected = accent fill + white (design) — wins over today's ring.
+  .#{$c}__cell--selected {
+    background: var(--weave-#{$name}-selected-background);
+    color: var(--weave-#{$name}-selected-text);
+    box-shadow: none;
+  }
+
+  .#{$c}__cell--disabled {
+    color: var(--weave-#{$name}-disabled-text);
+    cursor: default;
+  }
+
+  @if $range {
+    // ── range-only day modifiers ──
+    // In-between days: a tinted band. The band is drawn edge-to-edge behind the pill via an
+    // ::before so consecutive in-range cells read as one continuous strip (the pill's own
+    // rounded corners stay for hover/focus). `start`/`end` cap the strip on the inside.
+    .#{$c}__cell--in-range::before,
+    .#{$c}__cell--range-start::before,
+    .#{$c}__cell--range-end::before {
+      content: '';
+      position: absolute;
+      inset: 0 0 0 0;
+      z-index: -1;
+      background: var(--weave-#{$name}-in-range-background);
+    }
+
+    // Give the day cells a stacking context so the ::before band sits behind the number.
+    .#{$c}__cell {
+      position: relative;
+      isolation: isolate;
+    }
+
+    // Cap the band inside the endpoints (rounded on the outer side, flush toward the middle).
+    .#{$c}__cell--range-start::before {
+      inset-inline-start: 50%;
+    }
+
+    .#{$c}__cell--range-end::before {
+      inset-inline-end: 50%;
+    }
+
+    // A single-day range (start === end) needs no band.
+    .#{$c}__cell--range-start.#{$c}__cell--range-end::before {
+      content: none;
+    }
+
+    // Hover preview while picking the end: a lighter band + a dashed ring on the previewed end.
+    .#{$c}__cell--preview::before {
+      content: '';
+      position: absolute;
+      inset: 0 0 0 0;
+      z-index: -1;
+      background: var(--weave-#{$name}-preview-background);
+    }
+
+    .#{$c}__cell--preview-start::before {
+      inset-inline-start: 50%;
+    }
+
+    .#{$c}__cell--preview-end::before {
+      inset-inline-end: 50%;
+    }
+
+    .#{$c}__cell--preview-edge {
+      box-shadow: inset 0 0 0 1px var(--weave-#{$name}-preview-edge);
+    }
+  }
+}
