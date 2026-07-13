@@ -1,6 +1,6 @@
 {
   "name": "@weave-framework/ui",
-  "version": "1.5.23",
+  "version": "1.5.27",
   "description": "Weave UI — signal-native component library (Material+CDK equivalent) with the Weave design system. Ships SCSS; zero third-party runtime deps.",
   "type": "module",
   "sideEffects": false,
