@@ -157,6 +157,7 @@ const ui: NavSection = {
       label: 'Pickers',
       items: [
         { label: 'Datepicker', path: '/ui/datepicker' },
+        { label: 'DateRangePicker', path: '/ui/date-range-picker' },
         { label: 'Timepicker', path: '/ui/timepicker' },
       ],
     },
@@ -223,6 +224,7 @@ const examples: NavSection = {
         { label: 'Chips', path: '/examples/components/chips' },
         { label: 'Context Menu', path: '/examples/components/context-menu' },
         { label: 'Datepicker', path: '/examples/components/datepicker' },
+        { label: 'DateRangePicker', path: '/examples/components/date-range-picker' },
         { label: 'Dialog', path: '/examples/components/dialog' },
         { label: 'Divider', path: '/examples/components/divider' },
         { label: 'Expansion Panel', path: '/examples/components/expansion' },

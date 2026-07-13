@@ -1,0 +1,4 @@
+<div style="max-width:300px; display:flex; flex-direction:column; gap:10px;">
+  <DateRangePicker value={{ range() }} onChange={{ setRange }} label={{ 'Stay' }} placeholder={{ 'Pick a date range' }} clearable={{ true }} />
+  <span style="color:var(--fg-muted)">Selected: {{ fmt(range()) }}</span>
+</div>

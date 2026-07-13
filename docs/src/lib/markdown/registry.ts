@@ -36,6 +36,7 @@ import SelectMultiple from '../demos/ui/select-multiple';
 import ChipsBasic from '../demos/ui/chips-basic';
 import SliderBasic from '../demos/ui/slider-basic';
 import DatepickerBasic from '../demos/ui/datepicker-basic';
+import DateRangePickerBasic from '../demos/ui/date-range-picker-basic';
 import TimepickerBasic from '../demos/ui/timepicker-basic';
 import ProgressBarDemo from '../demos/ui/progress-bar-demo';
 import ProgressSpinnerDemo from '../demos/ui/progress-spinner-demo';
@@ -133,6 +134,9 @@ import ExDatepickerFilter from '../demos/ui/ex-datepicker-filter';
 import ExDatepickerFormat from '../demos/ui/ex-datepicker-format';
 import ExDatepickerPosition from '../demos/ui/ex-datepicker-position';
 import ExDatepickerStates from '../demos/ui/ex-datepicker-states';
+import ExDateRangePickerBasic from '../demos/ui/ex-date-range-picker-basic';
+import ExDateRangePickerBounds from '../demos/ui/ex-date-range-picker-bounds';
+import ExDateRangePickerControl from '../demos/ui/ex-date-range-picker-control';
 import ExDialogActions from '../demos/ui/ex-dialog-actions';
 import ExDialogAlert from '../demos/ui/ex-dialog-alert';
 import ExDialogBasic from '../demos/ui/ex-dialog-basic';
@@ -398,6 +402,9 @@ export const demos: Record<string, Component> = {
   'ex-datepicker-format': ExDatepickerFormat,
   'ex-datepicker-position': ExDatepickerPosition,
   'ex-datepicker-states': ExDatepickerStates,
+  'ex-date-range-picker-basic': ExDateRangePickerBasic,
+  'ex-date-range-picker-bounds': ExDateRangePickerBounds,
+  'ex-date-range-picker-control': ExDateRangePickerControl,
   'ex-dialog-actions': ExDialogActions,
   'ex-dialog-alert': ExDialogAlert,
   'ex-dialog-basic': ExDialogBasic,
@@ -618,6 +625,7 @@ export const demos: Record<string, Component> = {
   'slider-basic': SliderBasic,
   'autocomplete-basic': AutocompleteBasic,
   'datepicker-basic': DatepickerBasic,
+  'date-range-picker-basic': DateRangePickerBasic,
   'timepicker-basic': TimepickerBasic,
   'progress-bar-demo': ProgressBarDemo,
   'progress-spinner-demo': ProgressSpinnerDemo,
