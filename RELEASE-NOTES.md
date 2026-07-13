@@ -3,6 +3,29 @@
 Human-readable highlights, one section per release — everything notable that landed since
 the previous one. For the granular, per-version log see [CHANGELOG.md](CHANGELOG.md).
 
+## Unreleased
+
+### ✨ Features
+
+- **`<DateRangePicker>` — pick a start/end date range (FW-17).** A new
+  `@weave-framework/ui/date-range-picker`: an underline trigger field showing `start – end` plus the same
+  calendar popover as `<Datepicker>` (day → year → month drill-down, one month at a time). Selecting a range
+  is **two clicks** — the first sets the anchor, the second completes it (the ends are ordered for you, so
+  clicking before the anchor just makes it the new start); while you pick the end, **hovering previews** the
+  span (a tinted band with a dashed ring on the tentative end). The value is a `DateRange` —
+  `{ start, end }` of local-midnight `Date`s — bound the usual two ways (`value` + `onChange`, or a forms
+  `control` (`Field<DateRange>`)). Supports `min`/`max`/`dateFilter`, `firstDayOfWeek` (default Monday),
+  translatable `labels`, a configurable `separator`, `clearable`, and full keyboard nav. Closing the popover
+  before the second click discards the half-picked range.
+
+### 🔧 Internal
+
+- **Shared headless calendar engine.** The three drill-down calendar views (day/year/month grids, ‹/› nav,
+  view-switch header, roving focus, full keyboard) were pulled out of `<Datepicker>` into a reusable
+  `createCalendarView` core + a prefix-parameterised `calendar()` SCSS mixin, so `<Datepicker>` and
+  `<DateRangePicker>` share **one** engine and one visual with zero duplication. `<Datepicker>` is behaviourally
+  unchanged (its full test suite stays green).
+
 ## 1.5.23 — 2026-07-10
 
 ### ✨ Features
