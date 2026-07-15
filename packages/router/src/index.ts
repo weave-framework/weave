@@ -157,9 +157,46 @@ interface RouterState {
   /** Wrap this router's navigations in `document.startViewTransition` when supported. */
   vt: boolean;
 }
+/**
+ * Request-scoped location for a headless (SSR/SSG) render. There is no `window.location` on the server, so
+ * this is how the build tells the router which route to render. Consulted by {@link createState} for every
+ * router created after it is set; {@link setServerLocation} also updates an already-created router.
+ */
+let serverLocation: { pathname: string; search: string } | null = null;
+
+/** Split a URL into pathname + search, dropping any hash. */
+function splitUrl(url: string): { pathname: string; search: string } {
+  const noHash: string = url.split('#')[0];
+  const q: number = noHash.indexOf('?');
+  return q === -1
+    ? { pathname: noHash || '/', search: '' }
+    : { pathname: noHash.slice(0, q) || '/', search: noHash.slice(q) };
+}
+
+/**
+ * Seed the router's location for a headless (SSR/SSG) render — the server has no `window.location`, so this
+ * is how the build says which route to render. It (a) seeds every router created afterward (a `createRouter`
+ * inside the rendered component) and (b) updates the active router if one already exists (a module-level
+ * `createRouter`), so its resolution recomputes. No-op semantics in the browser: when a real `location` is
+ * present the router reads that instead, so calling this changes nothing there. Pass the internal path
+ * (basename is applied exactly as when reading `location`).
+ */
+export function setServerLocation(url: string): void {
+  serverLocation = splitUrl(url);
+  if (typeof location === 'undefined') {
+    batch(() => {
+      activeState.path.set(stripBase(serverLocation!.pathname));
+      activeState.search.set(serverLocation!.search);
+    });
+  }
+}
+
 function createState(): RouterState {
-  const path: Signal<string> = signal(typeof location !== 'undefined' ? stripBase(location.pathname) : '/');
-  const search: Signal<string> = signal(typeof location !== 'undefined' ? location.search : '');
+  const hasLoc: boolean = typeof location !== 'undefined';
+  const initPath: string = hasLoc ? location.pathname : serverLocation?.pathname ?? '/';
+  const initSearch: string = hasLoc ? location.search : serverLocation?.search ?? '';
+  const path: Signal<string> = signal(stripBase(initPath));
+  const search: Signal<string> = signal(initSearch);
   // Parsed query string as a reactive `{ key: value }` map (last value wins on repeats).
   const query: Computed<RouteParams> = computed<RouteParams>(() => {
     const out: RouteParams = {};
