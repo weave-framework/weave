@@ -133,9 +133,15 @@ No speculative building — a milestone waits for a real dogfooding-app pull.
 | Building ahead of need | I5 — every milestone gated on a real app requirement |
 | API drift | I1 — additive-only, `check` API-surface diff |
 
-## First concrete step
+## First concrete step — STARTED 2026-07-14
 
-Write **RFC 0009 — Serializable / Resumable Signal Core** (E0 spec only: wire format, resume
-contract, `mode:'resumable'` compile target, size budget). No code — the spec lets us size E0
-precisely before committing to it. In parallel, land the **`verify:size` gate** with today's baseline
-so "tiny" is protected from commit one.
+- ✅ **`verify:size` gate landed** (`tools/verify-size.mjs`, `pnpm verify:size`) — baseline reactive
+  4.3 KB · dom 16.6 KB · SPA core 20.9 KB gz; budgets 5/18/22 KB; proven to fail on overage. Runs in
+  the local pre-publish gate ritual alongside the other `verify:*`. Protects "tiny" from commit one.
+- ✅ **RFC 0009 — Serializable / Resumable Signal Core** drafted (`rfcs/0009-resumable-signal-core.md`):
+  wire format, `mode:'resumable'` compile target, resume contract (no `setup` re-run), headless DOM seam,
+  invariants-as-gates, milestones E0.1–E0.4. No code yet — the spec sizes E0.
+
+**Next:** implement **E0.1 (wire format)** — pure additive `serializeGraph`/`deserializeGraph` + round-trip
+tests, zero effect on existing apps (the smallest slice that de-risks the track). Open Qs for the user:
+fold this plan into `ROADMAP.md` as Phase E? confirm the docs site as the first SSG dogfood (per RFC 0001)?
