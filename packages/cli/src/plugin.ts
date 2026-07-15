@@ -40,6 +40,12 @@ export interface WeaveOptions {
   styleLang?: StyleLang;
   /** Dev mode: inject each component's CSS via JS instead of collecting it (default false). */
   dev?: boolean;
+  /**
+   * Phase E resumable build (E1.4). Compile every component in the `resumable` target (marker-isolated text,
+   * `data-won-*` events, an `adopt` variant + `$wid` state registration) so the SSG server render carries the
+   * resume markers and the client can adopt in place. Default false → the eager module is byte-for-byte.
+   */
+  resumable?: boolean;
 }
 
 /** A stable id derived from CSS text (djb2), so a `<style>` can be deduped. */
@@ -359,6 +365,7 @@ async function readBaseTemplate(spec: string, fromDir: string): Promise<BaseTemp
 export function weave(state: WeaveState, options: WeaveOptions = {}): Plugin {
   const styleLang: StyleLang = options.styleLang ?? 'css';
   const dev: boolean = options.dev ?? false;
+  const resumable: boolean = options.resumable ?? false;
 
   /** Emit a compiled component: collect its CSS (build) or inject it (dev). */
   const emit = (code: string, css: string, resolveDir: string): OnLoadResult => {
@@ -381,7 +388,7 @@ export function weave(state: WeaveState, options: WeaveOptions = {}): Plugin {
           ? await compileStyleSource(src.styles, styleLang, dirname(args.path))
           : undefined;
         try {
-          const { code, css, components } = compileComponent({ ...src, styles }, { filename: args.path });
+          const { code, css, components } = compileComponent({ ...src, styles }, { filename: args.path, resumable });
           const wired: string = injectChildImports(code, components, dirname(args.path), src.script, args.path);
           return emit(wired, css, dirname(args.path));
         } catch (e) {
@@ -426,7 +433,7 @@ export function weave(state: WeaveState, options: WeaveOptions = {}): Plugin {
           try {
             const compiled: CompiledComponent = compileComponent(
               { script: decl.script, template: base.template, patches },
-              { filename: args.path, hash: hashCss(base.filename) }
+              { filename: args.path, hash: hashCss(base.filename), resumable }
             );
             // Base-template child tags resolve relative to the BASE dir; inserted tags the extension
             // itself imports are skipped by injectChildImports (explicit import wins).
@@ -457,7 +464,7 @@ export function weave(state: WeaveState, options: WeaveOptions = {}): Plugin {
         try {
           const { code, css, components } = compileComponent(
             { script: decl.script, template: template.text, styles: styles.css },
-            { filename: args.path }
+            { filename: args.path, resumable }
           );
           const wired: string = injectChildImports(code, components, dir, decl.script, args.path);
           // Tell esbuild this module also depends on its template + style files, so a

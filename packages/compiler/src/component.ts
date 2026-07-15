@@ -121,10 +121,11 @@ export function compileComponent(src: ComponentSource, opts: ComponentOptions = 
     }
     defineExpr = `defineComponent(${parts.join(', ')})`;
   }
-  // Resumable: attach the render's `adopt` to the component so a parent can resume this child in place
-  // (adoptComponent reads `Comp.adopt`). `render.adopt` is undefined for a non-adoptable child → harmless.
+  // Resumable: attach the render's `adopt` + `handlers` to the component so a parent (adoptComponent reads
+  // `Comp.adopt`) and the client resume entry (`resumePage({ adopt: Root.adopt, handlers: Root.handlers })`) can
+  // reach them off the component itself. Both are undefined for a render with no adopt / no events → harmless.
   const defaultExport: string = opts.resumable
-    ? `const _wc = ${defineExpr};\n_wc.adopt = render.adopt;\nexport default _wc;`
+    ? `const _wc = ${defineExpr};\n_wc.adopt = render.adopt;\n_wc.handlers = render.handlers;\nexport default _wc;`
     : `export default ${defineExpr};`;
 
   const code: string = [

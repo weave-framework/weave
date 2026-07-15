@@ -66,9 +66,24 @@ ok(routedServer.includes('import { setServerLocation } from "@weave-framework/ro
 ok(/export function render\(route\)\s*\{\s*setServerLocation\(route \?\? "\/"\);/.test(routedServer), 'routed server entry: render(route) seeds the location before rendering');
 ok(!server.includes('setServerLocation'), 'non-routed server entry does NOT import the router (no dep)');
 
-// The client entry is unchanged CSR mount (resumePage is E1.3c) — the server HTML is a first-paint shell.
+// The eager client entry is a CSR mount — the server HTML is a first-paint shell for a remount.
 const client = generateEntry(join(rootDir, 'App.ts'), '#app', rootDir, []);
-ok(client.includes('mountComponent(Root, "#app")'), 'client entry: still a CSR mountComponent at the mount selector');
+ok(client.includes('mountComponent(Root, "#app")'), 'client entry (eager): CSR mountComponent at the mount selector');
+ok(!client.includes('resumePage'), 'eager client entry does NOT resume');
+
+// E1.4 — the RESUMABLE entry generators (islands). Server: renderPage captures the state map; client: adopt.
+const resumableServer = generateServerEntry(join(rootDir, 'App.ts'), rootDir, { resumable: true });
+ok(/export function render\(\)\s*\{\s*return renderPage\(Root, \{ resumable: true \}\);\s*\}/.test(resumableServer),
+  'resumable server entry: render() → renderPage(Root, { resumable: true })');
+const routedResumable = generateServerEntry(join(rootDir, 'App.ts'), rootDir, { routed: true, resumable: true });
+ok(routedResumable.includes('setServerLocation') && routedResumable.includes('renderPage(Root, { resumable: true })'),
+  'routed + resumable server entry: seeds location AND captures the state map');
+
+const resumeClient = generateEntry(join(rootDir, 'App.ts'), '#app', rootDir, [], { resume: true });
+ok(resumeClient.includes('import { resumePage } from "@weave-framework/runtime/graph"'), 'resume client entry: imports resumePage');
+ok(!resumeClient.includes('mountComponent'), 'resume client entry does NOT CSR-remount (adopts instead)');
+ok(resumeClient.includes('_m.firstElementChild') && /resumePage\(\{ root: _r, adopt: Root\.adopt, handlers: Root\.handlers \}\)/.test(resumeClient),
+  'resume client entry: resumePage adopts the mount target\'s first child with Root.adopt + Root.handlers');
 
 /* ── Part 2 — end-to-end `buildSsg` into a temp dir with a real component ── */
 

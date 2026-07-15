@@ -341,6 +341,7 @@ test('compileComponent resumable: attaches render.adopt to the component (nested
   assert.ok(code.includes('function render(ctx, slots)'), 'render is a local declaration');
   assert.ok(code.includes('function adopt(_r'), 'the resumable adopt variant is emitted');
   assert.ok(code.includes('_wc.adopt = render.adopt'), 'the component carries .adopt for a parent to resume it');
+  assert.ok(code.includes('_wc.handlers = render.handlers'), 'the component carries .handlers for the client resume entry (resumePage)');
   assert.ok(code.includes('export default _wc'), 'a single default export — the .adopt-tagged component');
   assert.ok(!/export default render;/.test(code), 'the raw `export default render` was stripped');
   assert.ok(code.includes('registerState(ctx.$wid'), 'the render self-registers its ctx under $wid for the snapshot');

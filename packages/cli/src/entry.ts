@@ -97,22 +97,45 @@ function importSpec(rootDir: string, file: string): string {
   return JSON.stringify(r.startsWith('.') ? r : './' + r);
 }
 
-/** Emit the app entry module: register discovered custom elements, then mount the root. */
+/**
+ * Emit the app CLIENT entry module: register discovered custom elements, then bring the root online.
+ *
+ * Two modes:
+ *  - **mount** (default) — `mountComponent(Root, selector)`: a fresh CSR render into the mount target.
+ *  - **resume** (E1.4, `resume: true`) — the islands client. Instead of re-rendering, ADOPT the server DOM the
+ *    SSG shell already placed inside the mount target: `resumePage({ root, adopt: Root.adopt, handlers:
+ *    Root.handlers })`, where `root` is the mount target's first element child (the server-rendered component
+ *    root the SSG shell wrapped in `<div id>`). `setup` never re-runs; static content ships 0 JS. Requires a
+ *    `resumable`-compiled bundle (so `Root.adopt`/`Root.handlers` exist). A missing server root (nothing
+ *    prerendered) is a no-op rather than a crash.
+ */
 export function generateEntry(
   rootComponent: string,
   mount: string,
   rootDir: string,
-  elements: CustomElement[]
+  elements: CustomElement[],
+  options: { resume?: boolean } = {}
 ): string {
   const spec = (file: string): string => importSpec(rootDir, file);
   const lines: string[] = [`import Root from ${spec(rootComponent)};`];
   elements.forEach((ce, i) => lines.push(`import __ce${i} from ${spec(ce.file)};`));
-  lines.push('import { mountComponent, defineCustomElement } from "@weave-framework/runtime/dom";');
-  // Register custom elements BEFORE mounting, so a tag is defined at first render.
+  lines.push(
+    options.resume
+      ? 'import { resumePage } from "@weave-framework/runtime/graph";\nimport { defineCustomElement } from "@weave-framework/runtime/dom";'
+      : 'import { mountComponent, defineCustomElement } from "@weave-framework/runtime/dom";'
+  );
+  // Register custom elements BEFORE bringing the root online, so a tag is defined at first render.
   elements.forEach((ce, i) =>
     lines.push(`defineCustomElement(${JSON.stringify(ce.tag)}, __ce${i}, { props: ${JSON.stringify(ce.props)} });`)
   );
-  lines.push(`mountComponent(Root, ${JSON.stringify(mount)});`);
+  if (options.resume) {
+    // Adopt the SSG-rendered DOM in place: the component root is the mount target's first element child.
+    lines.push(`const _m = document.querySelector(${JSON.stringify(mount)});`);
+    lines.push(`const _r = _m && _m.firstElementChild;`);
+    lines.push(`if (_r) resumePage({ root: _r, adopt: Root.adopt, handlers: Root.handlers });`);
+  } else {
+    lines.push(`mountComponent(Root, ${JSON.stringify(mount)});`);
+  }
   return lines.join('\n');
 }
 
@@ -136,15 +159,18 @@ export function generateEntry(
 export function generateServerEntry(
   rootComponent: string,
   rootDir: string,
-  options: { routed?: boolean } = {}
+  options: { routed?: boolean; resumable?: boolean } = {}
 ): string {
+  // Resumable (E1.4): `renderPage({ resumable: true })` captures the per-instance state map for the client to
+  // resume; the eager form snapshots nothing (first-paint-only shell for a CSR remount).
+  const opts: string = options.resumable ? `{ resumable: true }` : `{}`;
   const lines: string[] = [`import { renderPage } from "@weave-framework/runtime/server";`];
   if (options.routed) lines.push(`import { setServerLocation } from "@weave-framework/router";`);
   lines.push(`import Root from ${importSpec(rootDir, rootComponent)};`);
   lines.push(
     options.routed
-      ? `export function render(route) { setServerLocation(route ?? "/"); return renderPage(Root, {}); }`
-      : `export function render() { return renderPage(Root, {}); }`
+      ? `export function render(route) { setServerLocation(route ?? "/"); return renderPage(Root, ${opts}); }`
+      : `export function render() { return renderPage(Root, ${opts}); }`
   );
   return lines.join('\n');
 }
