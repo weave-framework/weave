@@ -30,6 +30,9 @@ const BUDGETS = [
     files: ['packages/runtime/dist/reactive.js', 'packages/runtime/dist/dom.js'],
     budget: 22_528, // 22 KB — the number that protects "tiny"
   },
+  // Phase E entries — opt-in, NOT part of the SPA core (0 bytes for apps that don't import them).
+  // runtime/serialize (E0.1): the wire-format codec, used by SSR-resume + local-first. Baseline 3.1 KB.
+  { label: 'runtime/serialize (E0.1 codec)', files: ['packages/runtime/dist/serialize.js'], budget: 4_096 },
 ];
 
 function gzBytes(relFiles) {

@@ -10,6 +10,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./dom": "./src/dom.ts",
+    "./serialize": "./src/serialize.ts",
     "./package.json": "./package.json"
   },
   "files": [
@@ -36,6 +37,10 @@
       "./dom": {
         "types": "./dist/dom.d.ts",
         "import": "./dist/dom.js"
+      },
+      "./serialize": {
+        "types": "./dist/serialize.d.ts",
+        "import": "./dist/serialize.js"
       },
       "./package.json": "./package.json"
     }
