@@ -2,6 +2,7 @@ import { test, assert } from '../../../tools/harness.js';
 import { signal, computed, effect, root, type Signal } from '@weave-framework/runtime';
 import * as dom from '@weave-framework/runtime/dom';
 import { resumeEvents, collectResumable, resumableHandler, handlerAttr, type ResumeHandler } from '@weave-framework/runtime/resume';
+import { snapshot, resume } from '@weave-framework/runtime/graph';
 import { compileTemplate } from '@weave-framework/compiler';
 
 /**
@@ -131,6 +132,59 @@ test('resumable: each @for row registers its OWN handler (instance-unique refs)'
   buttons[2].click();
   assert.equal(picked(), 30, 'third row too');
   ctl.dispose();
+});
+
+/* ──────────── E1.1: the emitted handlers(ctx) factory ──────────── */
+
+test('E1.1: resumable module emits a handlers(ctx) factory, attaches + exports it', () => {
+  const { code } = compileTemplate('<button on:click={{inc}}>{{ count() }}</button>', {
+    mode: 'module',
+    scope: ['count', 'inc'],
+    resumable: true,
+  });
+  assert.ok(code.includes('function handlers(ctx)'), 'emits a handlers factory');
+  assert.ok(code.includes('render.handlers = handlers'), 'attaches the factory to render');
+  assert.ok(code.includes('export { handlers }'), 'names it as an export');
+  assert.ok(code.includes('export default render'), 'default export stays render');
+});
+
+test('E1.1: a block-local (@for row) handler is NOT hoisted into the root factory', () => {
+  const { code } = compileTemplate(
+    '<div><button on:click={{root}}>r</button><ul>@for (n of items(); track n) { <li><button on:click={{() => pick.set(n)}}>{{ n }}</button></li> }</ul></div>',
+    { mode: 'module', scope: ['root', 'items', 'pick'], resumable: true }
+  );
+  // exactly ONE entry in the factory (the root button); the row handler stays in-render only
+  const body: string = code.slice(code.indexOf('function handlers(ctx)'));
+  const entries: number = (body.slice(0, body.indexOf('}')).match(/"w\d+":/g) ?? []).length;
+  assert.equal(entries, 1, 'only the root-fragment handler is in the factory (row handler excluded)');
+});
+
+test('E1.1: resume() drives the EMITTED factory end-to-end — no hand-authored handlers', () => {
+  // an INLINE handler that touches a signal (which IS in the snapshot); a named setup fn would need a
+  // lazily-imported chunk (deferred), but a signal-touching handler resumes from the graph alone.
+  const render = compileResumable('<button on:click={{() => count.set((c) => c + 1)}}>x</button>', ['count']);
+  assert.equal(typeof (render as { handlers?: unknown }).handlers, 'function', 'render carries the emitted factory');
+
+  // ── server ── render (stamps the marker) + snapshot the reactive state
+  const count: Signal<number> = signal(3);
+  const node = render({ count }) as HTMLButtonElement;
+  const container: HTMLElement = host();
+  container.appendChild(node);
+  assert.ok(node.getAttribute(handlerAttr('click'))!.startsWith('w0#'), 'server HTML carries the marker');
+  const wire = snapshot({ count });
+
+  // ── client ── resume with the EMITTED factory (render.handlers), never hand-authored
+  const app = resume(container, { snapshot: wire, handlers: (render as { handlers: (c: Record<string, unknown>) => Record<string, ResumeHandler> }).handlers });
+  assert.equal((app.ctx.count as Signal<number>)(), 3, 'resumed signal carries the server value');
+
+  const out: HTMLSpanElement = document.createElement('span');
+  container.appendChild(out);
+  effect(() => { out.textContent = String((app.ctx.count as Signal<number>)()); });
+
+  node.click();
+  assert.equal((app.ctx.count as Signal<number>)(), 4, 'the EMITTED handler mutated the resumed signal');
+  assert.equal(out.textContent, '4', 'reactivity flows — no hand-authored factory, setup never re-run');
+  app.dispose();
 });
 
 test('resumableHandler returns instance-unique ids and registers into the active session', () => {

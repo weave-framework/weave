@@ -53,6 +53,15 @@ class Gen {
   usedResume: Set<string> = new Set<string>(); // @weave-framework/runtime/resume helpers (resumable target)
   usedComponents: Set<string> = new Set<string>(); // PascalCase child tags referenced in module mode
   templates: string[] = [];
+  /**
+   * Resumable event sites in the ROOT render fragment (E1.1): `ref → handler expr`. The compiler emits a
+   * `handlers(ctx)` factory from these so `resume()` wires handlers with no hand-authoring. Only root-fragment
+   * sites are collected — a block-local handler (a `@for` row's) closes over locals not in `ctx`, so it needs
+   * serialized closure state (a later slice) and is left to the in-render `resumableHandler`.
+   */
+  resumableSites: Array<{ ref: string; code: string }> = [];
+  /** compileFragment nesting depth; 1 == the root render fragment (see {@link resumableSites}). */
+  fragmentDepth: number = 0;
   private tplN: number = 0;
   private fnN: number = 0;
   private refN: number = 0;
@@ -120,9 +129,18 @@ export function compileTemplateAst(ast: TemplateNode[], options: CompileOptions 
   const render: string = compileFragment(gen, ast, ctxScope(options.scope ?? []), 'render', 'ctx, slots', true);
   const components: string[] = [...gen.usedComponents];
 
+  // E1.1 — the resumable target also emits a `handlers(ctx)` factory (root-fragment event sites → handler
+  // over the resumed ctx), so `resume()` wires real handlers with no hand-authoring. It rides on `render`
+  // as `render.handlers` (function mode) and is a named export (module mode). Empty unless sites exist.
+  const handlersFn: string = gen.resumableSites.length
+    ? `function handlers(ctx) {\n  return { ${gen.resumableSites.map((s) => `${q(s.ref)}: ${s.code}`).join(', ')} };\n}`
+    : '';
+
   if (mode === 'function') {
-    const body: string = [...gen.templates, render, 'return render(ctx, {});'].join('\n');
-    return { code: body, components };
+    const parts: string[] = [...gen.templates, render];
+    if (handlersFn) parts.push(handlersFn, 'render.handlers = handlers;');
+    parts.push('return render(ctx, {});'); // tail unchanged → the function-mode `render` strip still applies
+    return { code: parts.join('\n'), components };
   }
 
   const domImport: string = `import { ${[...gen.used].sort().join(', ')} } from ${JSON.stringify(runtimeImport)};`;
@@ -134,7 +152,24 @@ export function compileTemplateAst(ast: TemplateNode[], options: CompileOptions 
   const resumeImport: string = gen.usedResume.size
     ? `import { ${[...gen.usedResume].sort().join(', ')} } from "@weave-framework/runtime/resume";\n`
     : '';
-  const code: string = [domImport + '\n' + coreImport + resumeImport, ...gen.templates, `export default ${render}`].join('\n');
+  const imports: string = domImport + '\n' + coreImport + resumeImport;
+
+  // With a handlers factory, emit `render` as a declaration so we can attach + export it alongside `handlers`;
+  // otherwise keep the exact eager shape (`export default function render …`) byte-for-byte.
+  if (handlersFn) {
+    const code: string = [
+      imports,
+      ...gen.templates,
+      render,
+      handlersFn,
+      'render.handlers = handlers;',
+      'export { handlers };',
+      'export default render;',
+    ].join('\n');
+    return { code, components };
+  }
+
+  const code: string = [imports, ...gen.templates, `export default ${render}`].join('\n');
   return { code, components };
 }
 
@@ -197,6 +232,7 @@ function compileFragment(
 ): string {
   const top: TemplateNode[] = trimTop(nodes);
   if (top.length === 0) throw new Error('Empty template fragment');
+  gen.fragmentDepth++; // 1 == this (root render) fragment; a nested block body compiles at depth ≥ 2
   // A component/slot compiles to a bare `<!---->`, so it can't be the clone root —
   // only a real DOM element qualifies for the single-root (clone) fast path. A
   // fragment root (component / multiple roots / text) returns a DocumentFragment;
@@ -433,7 +469,11 @@ function compileFragment(
           // Resumable target (E0.2b): emit a handler REFERENCE instead of an eager listener. The runtime
           // helper stamps `data-won-<event>` + registers the handler for a delegated resume dispatch.
           // once/capture/passive don't map onto the delegated path yet, so they're dropped here.
-          sink.push(`${gen.Hr('resumableHandler')}(${n}, ${q(attr.name)}, ${q(gen.ref())}, ${handler});`);
+          const ref: string = gen.ref();
+          sink.push(`${gen.Hr('resumableHandler')}(${n}, ${q(attr.name)}, ${q(ref)}, ${handler});`);
+          // Root-fragment handler → include in the emitted `handlers(ctx)` factory (E1.1). Block-local
+          // handlers close over locals absent from `ctx`, so they stay in-render only (deferred slice).
+          if (gen.fragmentDepth === 1) gen.resumableSites.push({ ref, code: handler });
           break;
         }
         const opts: string = eventOpts(attr.modifiers);
@@ -726,6 +766,7 @@ function compileFragment(
     'return _r;',
     ...childDecls,
   ];
+  gen.fragmentDepth--;
   return `function ${name}(${param}) {\n${body.map((l) => '  ' + l).join('\n')}\n}`;
 }
 
