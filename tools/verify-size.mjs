@@ -37,6 +37,13 @@ const BUDGETS = [
   { label: 'runtime/resume (E0.2a/b dispatch)', files: ['packages/runtime/dist/resume.js'], budget: 2_560 },
   // runtime/graph (E0.3): resume entry — signal codec + snapshot/resume glue over serialize + resume.
   { label: 'runtime/graph (E0.3 resume)', files: ['packages/runtime/dist/graph.js'], budget: 2_048 },
+  // runtime/server (E0.4): headless render — the in-house server DOM + parser + serializer + renderToString.
+  // Server-only, its own line — 0 bytes for a client SPA. Baseline 5.8 KB (server.js + server-dom.js).
+  {
+    label: 'runtime/server (E0.4 headless)',
+    files: ['packages/runtime/dist/server.js', 'packages/runtime/dist/server-dom.js'],
+    budget: 7_168,
+  },
 ];
 
 function gzBytes(relFiles) {

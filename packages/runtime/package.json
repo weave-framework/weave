@@ -13,6 +13,7 @@
     "./serialize": "./src/serialize.ts",
     "./resume": "./src/resume.ts",
     "./graph": "./src/graph.ts",
+    "./server": "./src/server.ts",
     "./package.json": "./package.json"
   },
   "files": [
@@ -51,6 +52,10 @@
       "./graph": {
         "types": "./dist/graph.d.ts",
         "import": "./dist/graph.js"
+      },
+      "./server": {
+        "types": "./dist/server.d.ts",
+        "import": "./dist/server.js"
       },
       "./package.json": "./package.json"
     }
