@@ -2,7 +2,7 @@ import { test, assert } from '../../../tools/harness.js';
 import { signal, computed, effect, root, type Signal } from '@weave-framework/runtime';
 import * as dom from '@weave-framework/runtime/dom';
 import { resumeEvents, collectResumable, resumableHandler, handlerAttr, type ResumeHandler } from '@weave-framework/runtime/resume';
-import { bindTextResumable, adoptText, blockStart, adoptIsland } from '@weave-framework/runtime/adopt';
+import { bindTextResumable, adoptText, blockStart, adoptIsland, after } from '@weave-framework/runtime/adopt';
 import { snapshot, resume, resumePage, SNAPSHOT_ID, type AdoptFn } from '@weave-framework/runtime/graph';
 import { compileTemplate } from '@weave-framework/compiler';
 
@@ -25,7 +25,8 @@ const rt: typeof dom & {
   adoptText: typeof adoptText;
   blockStart: typeof blockStart;
   adoptIsland: typeof adoptIsland;
-} = { ...dom, signal, computed, effect, root, resumableHandler, bindTextResumable, adoptText, blockStart, adoptIsland };
+  after: typeof after;
+} = { ...dom, signal, computed, effect, root, resumableHandler, bindTextResumable, adoptText, blockStart, adoptIsland, after };
 
 /** Compile in the `resumable` target and hand back the bare `(ctx, slots) => Node` render fn. */
 function compileResumable(html: string, scope: string[] = []): (ctx: unknown, slots?: unknown) => Element {
@@ -332,11 +333,12 @@ test('E1.2c-2: an adoptable @if emits an adopt fn (adoptIsland + ifBlock); non-a
   assert.ok(adoptBody.includes('adoptIsland('), 'the adopt render island-replays via adoptIsland');
   assert.ok(adoptBody.includes('ifBlock('), 'then re-runs the normal ifBlock against the cleared island');
 
-  // a reactive interp AFTER the block → its server index is unreachable → no adopt fn (CSR fallback)
-  const after = compileTemplate('<div>@if (show()) { <p>x</p> } {{ tail() }}</div>', {
+  // an ELEMENT with dynamics AFTER the block → its subtree index is unreachable → no adopt fn (leaf interps
+  // after a block ARE adoptable via the E1.2c-4 cursor, but a dynamic element after a block is not yet)
+  const afterEl = compileTemplate('<div>@if (show()) { <p>x</p> }<b>{{ tail() }}</b></div>', {
     mode: 'module', scope: ['show', 'tail'], resumable: true,
   });
-  assert.ok(!after.code.includes('render.adopt'), 'a bound node after a block blocks adopt (E1.2c cursor, later)');
+  assert.ok(!afterEl.code.includes('render.adopt'), 'a dynamic element after a block still blocks adopt (E1.2c-4 is leaf interps)');
 
   // a child component is not island-replayable yet → no adopt fn
   const comp = compileTemplate('<div>hi <Widget /></div>', {
@@ -422,6 +424,62 @@ test('E1.2c-3: adopt replays a @for island — the heading adopts in place, the 
   assert.deepEqual(rowText(), ['1', '2', '3', '4'], 'appending an item adds a row — the replayed @for is reactive');
   (app.ctx.items as Signal<number[]>).set([9, 1]);
   assert.deepEqual(rowText(), ['9', '1'], 'replacing the list reconciles rows — full @for reactivity resumed');
+  app.dispose();
+});
+
+/* ──────────── E1.2c-4: post-block cursor (a bound node AFTER a block) ──────────── */
+
+test('E1.2c-4: a reactive interp AFTER a block adopts via the cursor — emit shape', () => {
+  const { code } = compileTemplate('<div>@if (show()) { <p>x</p> }{{ tail() }}</div>', {
+    mode: 'module', scope: ['show', 'tail'], resumable: true,
+  });
+  assert.ok(code.includes('render.adopt'), 'a leaf interp after a block is now adoptable');
+  const adoptBody: string = code.slice(code.indexOf('function adopt(_r'));
+  assert.ok(/after\(_e\d+, 3\)/.test(adoptBody), 'the trailing interp binds via after(<blockEnd>, 3) — 3 = its $ + text + anchor');
+  assert.ok(/adoptIsland\(/.test(adoptBody) && /_e\d+ = /.test(adoptBody), 'the block captures its ] end anchor as the cursor base');
+});
+
+test('E1.2c-4: adopt resumes a block PLUS a trailing interp — the tail after the block updates in place', () => {
+  const render = compileResumable(
+    '<div><h4>{{ head() }}</h4>@if (show()) { <p>body</p> }{{ tail() }}</div>',
+    ['head', 'show', 'tail']
+  );
+  const adopt = (render as { adopt?: AdoptFn }).adopt;
+  assert.equal(typeof adopt, 'function', 'the fragment (pre-block text + block + post-block interp) is adoptable');
+
+  // ── server ──
+  const head: Signal<string> = signal('H');
+  const show: Signal<boolean> = signal(true);
+  const tail: Signal<string> = signal('T');
+  const serverNode = render({ head, show, tail }) as HTMLElement;
+  const wire = snapshot({ head, show, tail });
+  const serverHtml: string = serverNode.outerHTML;
+  assert.ok(serverHtml.includes('body') && serverHtml.replace(/<!--[^>]*-->/g, '').includes('T'), 'server rendered branch + tail');
+
+  // ── client ──
+  const container: HTMLElement = host();
+  container.innerHTML = serverHtml;
+  const div: HTMLElement = container.querySelector('div')!;
+  // the tail interp is the last child (its <!----> anchor); the text sits right before it (after its $ marker)
+  const tailAnchor: Comment = div.lastChild as Comment;
+  const tailNode: Text = tailAnchor.previousSibling as Text;
+  assert.equal(tailNode.data, 'T', 'the post-block tail text was found via the cursor (server value)');
+
+  const app = resume(div, { snapshot: wire, adopt });
+  assert.equal(div.querySelector('h4')!.textContent, 'H', 'pre-block <h4> adopted');
+
+  // the tail (reached by after(], 3)) is reactive in place — the SAME node, re-bound
+  (app.ctx.tail as Signal<string>).set('TAIL');
+  assert.equal(tailNode.data, 'TAIL', 'the post-block interp updates the EXISTING node in place — cursor bound the right one');
+
+  // and the block between them still island-replays reactively
+  (app.ctx.show as Signal<boolean>).set(false);
+  assert.ok(!div.querySelector('p'), 'the @if between the two texts toggles off');
+  assert.equal(tailNode.data, 'TAIL', 'toggling the block does NOT disturb the post-block tail (] is stable)');
+  (app.ctx.show as Signal<boolean>).set(true);
+  assert.ok(div.querySelector('p'), 'block back on');
+  (app.ctx.head as Signal<string>).set('HEAD');
+  assert.equal(div.querySelector('h4')!.textContent, 'HEAD', 'the pre-block text is reactive too');
   app.dispose();
 });
 

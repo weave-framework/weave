@@ -97,6 +97,19 @@ export function adoptIsland(start: Comment): Comment {
 }
 
 /**
+ * ADOPT side (E1.2c-4): the `n`-th following sibling of `node` — a small forward cursor. A node that sits
+ * AFTER a block can't be reached by a build-time child index (the block's content is runtime-variable), but
+ * the block's `]` end anchor is a stable reference and the nodes after it don't move across an island-replay,
+ * so the adopt render walks `after(blockEnd, offset)` to reach a post-block binding. `n` counts raw sibling
+ * steps (each static node = 1; a dynamic-text interp = 3 — its `$` marker, text, and anchor).
+ */
+export function after(node: Node, n: number): Node {
+  let x: Node = node;
+  for (let i = 0; i < n; i++) x = x.nextSibling!;
+  return x;
+}
+
+/**
  * CREATE side (the resumable server render): insert an isolated dynamic text node before `anchor` and keep
  * it updated. The leading `<!--$-->` marker keeps the text a distinct node in the serialized HTML so the
  * client can {@link adoptText} exactly it — even when a static run precedes it in the same element.

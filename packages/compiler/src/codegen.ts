@@ -339,6 +339,14 @@ function compileFragment(
     return out;
   };
 
+  // E1.2c-4 post-block cursor state (adopt walk). `blockEndVar` is the var holding the most recent adoptable
+  // block's `]` end anchor (set by emitIf/emitFor). When emitChildren is past that block, it sets
+  // `curInterpBase`/`curInterpOff` so a following reactive interp binds via `after(], offset)` instead of an
+  // (unknowable) absolute child index.
+  let blockEndVar: string = '';
+  let curInterpBase: string | null = null;
+  let curInterpOff: number = 0;
+
   // Resolve each dynamic node into a local BEFORE any binding runs: a binding
   // inserts nodes, which would shift the child indices later `child()` lookups
   // rely on. Capturing the (stable) node references up front avoids that.
@@ -379,30 +387,45 @@ function compileFragment(
       cur = new Map(cur);
       for (const nm of snippetNames) cur.set(nm, { kind: 'local' });
     }
-    // E1.2c-2 adoptability: a block inserts runtime-variable nodes, so at each level only ONE block is
-    // adopt-navigable and NOTHING needing indexed access may follow it. A non-@if/@switch block isn't
-    // island-replayable yet either. Tracked during the create walk (the adopt walk runs only if adoptable).
+    // E1.2c adoptability: a block inserts runtime-variable nodes, so at each level only ONE block is
+    // adopt-navigable. A following reactive interp is reachable via the E1.2c-4 post-block cursor; anything
+    // else needing indexed access after a block is not (yet). Tracked during the create walk.
     let sawBlock: boolean = false;
+    // E1.2c-4 adopt cursor: once past the level's adoptable block, a following reactive interp binds via
+    // `after(blockEnd, pbOff)`; pbOff accumulates the server-node count of the siblings between them.
+    let pbBase: string | null = null;
+    let pbOff: number = 0;
     for (const node of children) {
       if (node.type === 'let') {
+        if (!adopt && sawBlock) gen.adoptable = false; // a @let after a block isn't cursor-handled (rare)
         html += '<!---->'; // placeholder slot keeps child indices stable
         stmts.push(`const ${node.name} = ${gen.Hc('computed')}(() => (${rewrite(node.expr, cur).code}));`);
         cur = childScope(cur, { [node.name]: node.name });
+        if (adopt && pbBase) pbOff += 1; // the <!----> placeholder is one server node
         dom++;
         continue;
       }
       if (node.type === 'snippet') {
+        if (!adopt && sawBlock) gen.adoptable = false;
         emitSnippet(node, cur); // a declaration — no DOM position, no index consumed
         continue;
       }
       if (!adopt) {
-        if (sawBlock && hasDynamicDeep(node)) gen.adoptable = false; // indexed access past a block → unreachable
+        // a reactive interp after a block is adoptable (post-block cursor); an element with dynamics is not.
+        if (sawBlock && node.type !== 'interp' && hasDynamicDeep(node)) gen.adoptable = false;
         if (isBlockNode(node)) {
           if (sawBlock || !isAdoptableBlock(node)) gen.adoptable = false; // 2nd block, or a non-replayable one
           sawBlock = true;
         }
       }
+      // Hand a post-block reactive interp its cursor base/offset (read by the interp emitter); cleared otherwise.
+      curInterpBase = adopt && pbBase && node.type === 'interp' ? pbBase : null;
+      curInterpOff = pbOff;
       emitNode(node, [...basePath, dom], cur, isHost);
+      if (adopt) {
+        if (isAdoptableBlock(node)) { pbBase = blockEndVar; pbOff = 0; } // start the cursor at this block's ]
+        else if (pbBase) pbOff += node.type === 'interp' ? 3 : 1; // interp = $+text+anchor; else one node
+      }
       dom++;
     }
   }
@@ -442,6 +465,14 @@ function compileFragment(
         html += '<!---->';
         const { code, reactive } = rewrite(node.expr, sc);
         if (reactive) {
+          // Post-block (E1.2c-4): a reactive interp AFTER a block has no build-time index — walk from the
+          // block's `]` end anchor. `after(base, off+3)` is this interp's <!----> anchor (base=], then its
+          // $ marker, text, anchor). Emitted inline as a stmt (after the block's replay stmt defines `base`),
+          // so NO nodeDecl (which would run before `base` is bound) and no recordDyn (nothing indexes past it).
+          if (adopt && curInterpBase) {
+            stmts.push(`${gen.Ha('adoptText')}(${gen.Ha('after')}(${curInterpBase}, ${curInterpOff + 3}), () => (${code}));`);
+            return;
+          }
           // Record this dynamic text's position BEFORE resolving its node expr, so its own marker+text (and
           // any later sibling's adopt-index) are accounted for. The resumable target isolates it with a marker
           // (bindTextResumable) so the client can adopt exactly it (adjacent static+dynamic text would merge);
@@ -793,8 +824,16 @@ function compileFragment(
     const hasElse: boolean = node.branches[node.branches.length - 1].cond === undefined;
     if (!hasElse) lines.push('return null;');
 
-    const anchorArg: string = adopt ? `${gen.Ha('adoptIsland')}(${nodeExpr(path)})` : nodeExpr(path);
-    stmts.push(`${gen.H('ifBlock')}(${anchorArg}, () => { ${lines.join(' ')} });`);
+    if (adopt) {
+      // Capture the island's `]` end anchor into a var: emitChildren uses it as the base for any post-block
+      // sibling cursor (E1.2c-4), and ifBlock re-runs against it (fresh reactive branch).
+      const endVar: string = gen.fn('_e');
+      stmts.push(`const ${endVar} = ${gen.Ha('adoptIsland')}(${nodeExpr(path)});`);
+      stmts.push(`${gen.H('ifBlock')}(${endVar}, () => { ${lines.join(' ')} });`);
+      blockEndVar = endVar;
+    } else {
+      stmts.push(`${gen.H('ifBlock')}(${nodeExpr(path)}, () => { ${lines.join(' ')} });`);
+    }
   }
 
   function emitSwitch(node: SwitchNode, path: number[], sc: Scope): void {
@@ -809,8 +848,14 @@ function compileFragment(
     });
     if (!node.cases.some((c) => c.test === undefined)) lines.push('return null;');
 
-    const anchorArg: string = adopt ? `${gen.Ha('adoptIsland')}(${nodeExpr(path)})` : nodeExpr(path);
-    stmts.push(`${gen.H('ifBlock')}(${anchorArg}, () => { ${lines.join(' ')} });`);
+    if (adopt) {
+      const endVar: string = gen.fn('_e');
+      stmts.push(`const ${endVar} = ${gen.Ha('adoptIsland')}(${nodeExpr(path)});`);
+      stmts.push(`${gen.H('ifBlock')}(${endVar}, () => { ${lines.join(' ')} });`);
+      blockEndVar = endVar;
+    } else {
+      stmts.push(`${gen.H('ifBlock')}(${nodeExpr(path)}, () => { ${lines.join(' ')} });`);
+    }
   }
 
   function emitDefer(node: DeferNode, path: number[], sc: Scope): void {
@@ -895,8 +940,14 @@ function compileFragment(
     const list: string = rewrite(node.list, sc).code;
     const track: string = node.track ? rewrite(node.track, sc).code : '$index';
     const keyFn: string = `(${node.item}, $index) => ${track}`;
-    const anchorArg: string = adopt ? `${gen.Ha('adoptIsland')}(${nodeExpr(path)})` : nodeExpr(path);
-    stmts.push(`${gen.H('eachBlock')}(${anchorArg}, () => ${list}, ${keyFn}, ${rowFn}${emptyArg});`);
+    if (adopt) {
+      const endVar: string = gen.fn('_e');
+      stmts.push(`const ${endVar} = ${gen.Ha('adoptIsland')}(${nodeExpr(path)});`);
+      stmts.push(`${gen.H('eachBlock')}(${endVar}, () => ${list}, ${keyFn}, ${rowFn}${emptyArg});`);
+      blockEndVar = endVar;
+    } else {
+      stmts.push(`${gen.H('eachBlock')}(${nodeExpr(path)}, () => ${list}, ${keyFn}, ${rowFn}${emptyArg});`);
+    }
   }
 
   // walk
