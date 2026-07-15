@@ -328,6 +328,31 @@ test('compileComponent without setup emits defineComponent(render)', () => {
   assert.equal(css, '', 'no styles → empty css');
 });
 
+test('compileComponent resumable: attaches render.adopt to the component (nested-resume ready), one default export', () => {
+  const { code } = compileComponent(
+    {
+      script:
+        'import { signal } from "@weave-framework/runtime";\n' +
+        'export function setup(){ const label = signal("hi"); return { label }; }',
+      template: '<b>{{ label() }}</b>',
+    },
+    { filename: 'chip', resumable: true }
+  );
+  assert.ok(code.includes('function render(ctx, slots)'), 'render is a local declaration');
+  assert.ok(code.includes('function adopt(_r'), 'the resumable adopt variant is emitted');
+  assert.ok(code.includes('_wc.adopt = render.adopt'), 'the component carries .adopt for a parent to resume it');
+  assert.ok(code.includes('export default _wc'), 'a single default export — the .adopt-tagged component');
+  assert.ok(!/export default render;/.test(code), 'the raw `export default render` was stripped');
+  assert.ok(code.includes('registerState(ctx.$wid'), 'the render self-registers its ctx under $wid for the snapshot');
+  assert.ok(code.includes('from "@weave-framework/runtime/adopt"') && code.includes('from "@weave-framework/runtime/graph"'), 'imports the resumable entries');
+});
+
+test('compileComponent resumable: an eager build is unchanged (no adopt, direct default export)', () => {
+  const { code } = compileComponent({ template: '<b>{{ label() }}</b>', script: 'export function setup(){ return {}; }' });
+  assert.ok(code.includes('export default defineComponent('), 'eager keeps the direct default export');
+  assert.ok(!code.includes('.adopt') && !code.includes('registerState'), 'eager emits no adopt / no resume wiring');
+});
+
 /* ──────────── A5 — bind: on a component passes the signal ──────────── */
 
 test('bind:value on a component passes the signal by reference (A5)', () => {

@@ -40,6 +40,12 @@ export interface ComponentOptions {
   hash?: string;
   /** Resolved component path — used for the default hash and debugging. */
   filename?: string;
+  /**
+   * Phase E resumable build (E1.2c-6). Compiles the template in the `resumable` target (marker-isolated text,
+   * `data-won-*` events, an `adopt` variant) and attaches `render.adopt` to the component so a parent can
+   * resume this child in place via `adoptComponent`. Default false → the eager module is byte-for-byte.
+   */
+  resumable?: boolean;
 }
 
 export interface CompiledComponent {
@@ -76,9 +82,15 @@ export function compileComponent(src: ComponentSource, opts: ComponentOptions = 
   const scope: string[] = inferCtxNames(ast);
   // Stamp the `:host` root marker only when the styles actually use `:host` (else zero cost).
   const host: string | undefined = src.styles && /:host\b/.test(src.styles) ? hostAttr(hash) : undefined;
-  const compiled: CompileResult = compileTemplateAst(ast, { mode: 'module', scope, scopeAttr: attr, hostAttr: host });
-  // Demote the template module's default export to a local `render` we can wire up.
-  const renderBody: string = compiled.code.replace('export default function render', 'function render');
+  const compiled: CompileResult = compileTemplateAst(ast, { mode: 'module', scope, scopeAttr: attr, hostAttr: host, resumable: opts.resumable });
+  // Demote the template module's default export to a local `render` we can wire up:
+  //  - eager:     `export default function render …`  → `function render …`
+  //  - resumable: `render` is already a `function render` declaration; a trailing `export default render;`
+  //    (emitted alongside `export { handlers }` / `export { adopt }`) is stripped — the component's default
+  //    export is `defineComponent(...)`, and `render.adopt` is attached to it below.
+  const renderBody: string = compiled.code
+    .replace('export default function render', 'function render')
+    .replace(/\n?export default render;?\s*$/, '');
 
   const css: string = src.styles ? scopeCss(src.styles, hash) : '';
   const script: string = src.script ?? '';
@@ -92,12 +104,12 @@ export function compileComponent(src: ComponentSource, opts: ComponentOptions = 
   // reuses the base's setup context and this component's `setup(props, base)` overrides/adds on top.
   // Its own template is the full override (mode #1). A non-extension component is unchanged.
   const isExtension: boolean = HAS_EXTEND.test(script);
-  let defaultExport: string;
+  let defineExpr: string;
   let extendImport: string = '';
   if (isExtension) {
     const args: string[] = ['extend', hasSetup ? 'setup' : 'undefined'];
     if (HAS_EXTEND_PROPS.test(script)) args.push('extendProps');
-    defaultExport = `export default defineComponent(render, extendSetup(${args.join(', ')}));`;
+    defineExpr = `defineComponent(render, extendSetup(${args.join(', ')}))`;
     extendImport = ', extendSetup';
   } else {
     // `export const propDefaults` → pass it as the 3rd arg (defineComponent layers it under props).
@@ -107,8 +119,13 @@ export function compileComponent(src: ComponentSource, opts: ComponentOptions = 
       if (!hasSetup) parts.push('undefined');
       parts.push('propDefaults');
     }
-    defaultExport = `export default defineComponent(${parts.join(', ')});`;
+    defineExpr = `defineComponent(${parts.join(', ')})`;
   }
+  // Resumable: attach the render's `adopt` to the component so a parent can resume this child in place
+  // (adoptComponent reads `Comp.adopt`). `render.adopt` is undefined for a non-adoptable child → harmless.
+  const defaultExport: string = opts.resumable
+    ? `const _wc = ${defineExpr};\n_wc.adopt = render.adopt;\nexport default _wc;`
+    : `export default ${defineExpr};`;
 
   const code: string = [
     exposed.trim(),
