@@ -33,6 +33,8 @@ const BUDGETS = [
   // Phase E entries — opt-in, NOT part of the SPA core (0 bytes for apps that don't import them).
   // runtime/serialize (E0.1): the wire-format codec, used by SSR-resume + local-first. Baseline 3.1 KB.
   { label: 'runtime/serialize (E0.1 codec)', files: ['packages/runtime/dist/serialize.js'], budget: 4_096 },
+  // runtime/resume (E0.2a): resumable event dispatch. Baseline 1.6 KB.
+  { label: 'runtime/resume (E0.2a dispatch)', files: ['packages/runtime/dist/resume.js'], budget: 2_560 },
 ];
 
 function gzBytes(relFiles) {
