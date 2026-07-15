@@ -12,6 +12,7 @@
     "./dom": "./src/dom.ts",
     "./serialize": "./src/serialize.ts",
     "./resume": "./src/resume.ts",
+    "./adopt": "./src/adopt.ts",
     "./graph": "./src/graph.ts",
     "./server": "./src/server.ts",
     "./document": "./src/document.ts",
@@ -49,6 +50,10 @@
       "./resume": {
         "types": "./dist/resume.d.ts",
         "import": "./dist/resume.js"
+      },
+      "./adopt": {
+        "types": "./dist/adopt.d.ts",
+        "import": "./dist/adopt.js"
       },
       "./graph": {
         "types": "./dist/graph.d.ts",
