@@ -2,8 +2,8 @@ import { test, assert } from '../../../tools/harness.js';
 import { signal, computed, effect, root, type Signal } from '@weave-framework/runtime';
 import * as dom from '@weave-framework/runtime/dom';
 import { resumeEvents, collectResumable, resumableHandler, handlerAttr, type ResumeHandler } from '@weave-framework/runtime/resume';
-import { bindTextResumable, adoptText, blockStart, adoptIsland, blockEndOf, clearBlock, after } from '@weave-framework/runtime/adopt';
-import { snapshot, resume, resumePage, SNAPSHOT_ID, type AdoptFn } from '@weave-framework/runtime/graph';
+import { bindTextResumable, adoptText, blockStart, adoptIsland, blockEndOf, clearBlock, after, adoptComponent } from '@weave-framework/runtime/adopt';
+import { snapshot, resume, resumePage, SNAPSHOT_ID, collectStates, registerState, ROOT_ID, type AdoptFn } from '@weave-framework/runtime/graph';
 import { compileTemplate } from '@weave-framework/compiler';
 
 /**
@@ -28,7 +28,9 @@ const rt: typeof dom & {
   blockEndOf: typeof blockEndOf;
   clearBlock: typeof clearBlock;
   after: typeof after;
-} = { ...dom, signal, computed, effect, root, resumableHandler, bindTextResumable, adoptText, blockStart, adoptIsland, blockEndOf, clearBlock, after };
+  adoptComponent: typeof adoptComponent;
+  registerState: typeof registerState;
+} = { ...dom, signal, computed, effect, root, resumableHandler, bindTextResumable, adoptText, blockStart, adoptIsland, blockEndOf, clearBlock, after, adoptComponent, registerState };
 
 /** Compile in the `resumable` target and hand back the bare `(ctx, slots) => Node` render fn. */
 function compileResumable(html: string, scope: string[] = []): (ctx: unknown, slots?: unknown) => Element {
@@ -284,13 +286,13 @@ test('E1.2b-2: adopt indices compound — each preceding dynamic text shifts a s
   assert.ok(/child\(_r, 3, 2\)/.test(nestedAdopt), 'the <p> shifted to 3 by the preceding text; its inner text at 2');
 });
 
-test('E1.2b-2: a resumable fragment with a not-yet-adoptable block (a component) emits NO adopt fn — falls back to CSR', () => {
-  const { code } = compileTemplate('<div>hi <Widget /></div>', {
+test('E1.2b-2: a resumable fragment with a not-yet-adoptable construct (a <slot>) emits NO adopt fn — falls back to CSR', () => {
+  const { code } = compileTemplate('<div><slot /></div>', {
     mode: 'module',
     scope: [],
     resumable: true,
   });
-  assert.ok(!code.includes('render.adopt'), 'a child component is not island-replayable yet (nested resume is later)');
+  assert.ok(!code.includes('render.adopt'), 'a <slot> is not adopt-navigable yet (falls back to CSR)');
 });
 
 /* ──────────── E1.2c: block-boundary markers (cursor-walk foundation) ──────────── */
@@ -342,11 +344,11 @@ test('E1.2c-2: an adoptable @if emits an adopt fn (adoptIsland + ifBlock); non-a
   });
   assert.ok(!afterEl.code.includes('render.adopt'), 'an element with a nested block after a block still blocks adopt (E1.2c-5 is flat subtrees)');
 
-  // a child component is not island-replayable yet → no adopt fn
-  const comp = compileTemplate('<div>hi <Widget /></div>', {
-    mode: 'module', scope: [], resumable: true,
+  // a use:-component is not adopt-staged yet → no adopt fn
+  const useComp = compileTemplate('<div><Widget use:tip /></div>', {
+    mode: 'module', scope: ['tip'], resumable: true,
   });
-  assert.ok(!comp.code.includes('render.adopt'), 'a component stays CSR fallback (nested resume is later)');
+  assert.ok(!useComp.code.includes('render.adopt'), 'a use:-component stays CSR fallback (its action wiring is later)');
 });
 
 test('E1.2c-2: adopt replays an @if island — statics adopt in place, the block re-renders REACTIVELY', () => {
@@ -540,14 +542,14 @@ test('E1.2c-5: adopt resumes a block PLUS a trailing element subtree — the ele
 
 /* ──────────── E1.2c-6a: multi-root fragments ──────────── */
 
-test('E1.2c-6a: a multi-root fragment is adoptable (was single-root only); a component root still is not', () => {
+test('E1.2c-6a: a multi-root fragment is adoptable (was single-root only); a <slot> fragment still is not', () => {
   const multi = compileTemplate('<span>{{ a() }}</span><b>{{ c() }}</b>', {
     mode: 'module', scope: ['a', 'c'], resumable: true,
   });
   assert.ok(multi.code.includes('render.adopt'), 'two element roots now emit an adopt fn');
 
-  const comp = compileTemplate('<Foo />text', { mode: 'module', scope: [], resumable: true });
-  assert.ok(!comp.code.includes('render.adopt'), 'a component at the root still opts out (nested resume later)');
+  const slotted = compileTemplate('<div><slot /></div>', { mode: 'module', scope: [], resumable: true });
+  assert.ok(!slotted.code.includes('render.adopt'), 'a <slot> opts out (not adopt-navigable yet)');
 });
 
 test('E1.2c-6a: adopt resumes a MULTI-ROOT fragment in place against the mount container', () => {
@@ -579,6 +581,53 @@ test('E1.2c-6a: adopt resumes a MULTI-ROOT fragment in place against the mount c
   assert.equal(span.textContent, 'AA', 'the first root is reactive in place');
   (app.ctx.c as Signal<number>).set(2);
   assert.equal(bold.textContent, '2', 'the second root is reactive in place — both roots resumed');
+  app.dispose();
+});
+
+/* ──────────── E1.2c-6: component (nested) resume ──────────── */
+
+test('E1.2c-6: adopt resumes a static CHILD component in place — child setup never re-runs, both reactive', () => {
+  // compile the child (resumable) and wrap it as a real component (as the loader/component.ts would)
+  const childCode: string = compileTemplate('<b>{{ label() }}</b>', { mode: 'function', scope: ['label'], resumable: true }).code;
+  const childRender = new Function('rt', '_c', childCode.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;'))(rt, {}) as ((ctx: unknown, slots?: unknown) => Node) & { adopt?: AdoptFn };
+  let childSetups: number = 0;
+  const Child = dom.defineComponent(
+    childRender as never,
+    (props: Record<string, unknown>) => { childSetups++; return { label: signal((props.start as string) ?? 'x') }; }
+  ) as dom.Component & { adopt?: AdoptFn };
+  Child.adopt = childRender.adopt; // component.ts attaches render.adopt to the component in the resumable target
+
+  // compile the parent, referencing Child via _c
+  const parentCode: string = compileTemplate('<div><h1>{{ title() }}</h1><Child /></div>', { mode: 'function', scope: ['title'], resumable: true }).code;
+  const parentRender = new Function('rt', '_c', parentCode.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;'))(rt, { Child }) as ((ctx: unknown, slots?: unknown) => Element) & { adopt?: AdoptFn };
+  assert.equal(typeof parentRender.adopt, 'function', 'the parent (with a static child component) is adoptable');
+
+  // ── server ── render + collect the child ctx; snapshot the whole { $root, c0 } map
+  const title: Signal<string> = signal('T');
+  const box: HTMLElement = host();
+  const states = collectStates(() => { box.appendChild(parentRender({ title }, {})); });
+  assert.ok(states.c0, 'the static child self-registered its ctx under c0 (via the $wid preamble)');
+  assert.equal(childSetups, 1, 'child setup ran once on the server');
+  states[ROOT_ID] = { title };
+  const wire = snapshot(states);
+  const serverHtml: string = (box.firstElementChild as HTMLElement).outerHTML;
+
+  // ── client ── fresh parse + resume
+  const client: HTMLElement = host();
+  client.innerHTML = serverHtml;
+  const div: HTMLElement = client.querySelector('div')!;
+  const app = resume(div, { snapshot: wire, adopt: parentRender.adopt });
+  assert.equal(childSetups, 1, 'RESUME did NOT re-run the child setup — resumed, not re-rendered');
+
+  // parent text adopted + reactive
+  assert.equal(div.querySelector('h1')!.textContent, 'T', 'parent <h1> adopted');
+  (app.ctx.title as Signal<string>).set('TITLE');
+  assert.equal(div.querySelector('h1')!.textContent, 'TITLE', 'parent text reactive in place');
+
+  // child adopted in place + reactive via its resumed ctx in the states map
+  assert.equal(div.querySelector('b')!.textContent, 'x', 'child <b> adopted with its server value');
+  (app.states.c0 as { label: Signal<string> }).label.set('LBL');
+  assert.equal(div.querySelector('b')!.textContent, 'LBL', 'the resumed CHILD component is reactive in place — nested resume works');
   app.dispose();
 });
 

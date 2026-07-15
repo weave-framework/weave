@@ -52,6 +52,7 @@ class Gen {
   usedCore: Set<string> = new Set<string>(); // @weave-framework/runtime primitives (computed, …)
   usedResume: Set<string> = new Set<string>(); // @weave-framework/runtime/resume helpers (resumable target)
   usedAdopt: Set<string> = new Set<string>(); // @weave-framework/runtime/adopt helpers (resumable target)
+  usedGraph: Set<string> = new Set<string>(); // @weave-framework/runtime/graph helpers (resumable target)
   usedComponents: Set<string> = new Set<string>(); // PascalCase child tags referenced in module mode
   templates: string[] = [];
   /**
@@ -100,6 +101,16 @@ class Gen {
     this.usedAdopt.add(name);
     return this.mode === 'function' ? `rt.${name}` : name;
   }
+  /** Reference a `@weave-framework/runtime/graph` helper (resumable target only; via `rt.` in function mode). */
+  Hg(name: string): string {
+    this.usedGraph.add(name);
+    return this.mode === 'function' ? `rt.${name}` : name;
+  }
+  /** A stable, per-compile component-instance id (`c0`, `c1`, …) — the resume snapshot key for a static child. */
+  componentN: number = 0;
+  componentId(): string {
+    return `c${this.componentN++}`;
+  }
   /** A stable, per-compile event-site id (`w0`, `w1`, …) — the resumable handler reference prefix. */
   ref(): string {
     return `w${this.refN++}`;
@@ -139,8 +150,17 @@ export function compileTemplateAst(ast: TemplateNode[], options: CompileOptions 
   const runtimeImport: string = options.runtimeImport ?? '@weave-framework/runtime/dom';
   const gen: Gen = new Gen(mode, options.scopeAttr, options.hostAttr, options.resumable ?? false);
 
+  // E1.2c-6: a resumable component's render self-registers its ctx for the snapshot when the parent tagged
+  // this instance with a `$wid` prop (a static-position child) — so the client resumes it without re-running
+  // setup. No-op at runtime outside a collectStates() session (client / SPA), and never emitted for eager.
+  // Register a PLAIN copy of the component's OWN bindings (`{...ctx}` — the signals setup returned): the ctx
+  // itself has props on its prototype (not serializable, and reconnected by the parent), and `$wid` is a prop
+  // too, so both are naturally excluded. Reactive props / computeds inside a resumed child are a known gap.
+  const renderPreamble: string = gen.resumable
+    ? `if (ctx.$wid !== undefined) ${gen.Hg('registerState')}(ctx.$wid, { ...ctx });`
+    : '';
   // isHost: the render fragment's top-level elements are the component's roots → `:host`.
-  const render: string = compileFragment(gen, ast, ctxScope(options.scope ?? []), 'render', 'ctx, slots', true);
+  const render: string = compileFragment(gen, ast, ctxScope(options.scope ?? []), 'render', 'ctx, slots', true, 'create', renderPreamble);
   const components: string[] = [...gen.usedComponents];
 
   // E1.1 — the resumable target also emits a `handlers(ctx)` factory (root-fragment event sites → handler
@@ -156,6 +176,7 @@ export function compileTemplateAst(ast: TemplateNode[], options: CompileOptions 
   // create walk recorded where dynamic-text markers land), and re-binds via `adoptText` in place — events are
   // left to `resume()`'s delegated dispatch. `resume()` runs it to make a resumed page interactive WITHOUT a
   // client re-render (no `setup`). A non-flat fragment emits none → the resumed page falls back to CSR.
+  gen.componentN = 0; // reset so the adopt walk assigns the SAME c0,c1,… ids as the create walk (same order)
   const adoptFn: string = gen.resumable && gen.adoptable
     ? compileFragment(gen, ast, ctxScope(options.scope ?? []), 'adopt', 'ctx, slots', true, 'adopt')
     : '';
@@ -182,7 +203,11 @@ export function compileTemplateAst(ast: TemplateNode[], options: CompileOptions 
   const adoptImport: string = gen.usedAdopt.size
     ? `import { ${[...gen.usedAdopt].sort().join(', ')} } from "@weave-framework/runtime/adopt";\n`
     : '';
-  const imports: string = domImport + '\n' + coreImport + resumeImport + adoptImport;
+  // Same separate-entry rationale: the resume-collection + component-adopt helpers live in runtime/graph.
+  const graphImport: string = gen.usedGraph.size
+    ? `import { ${[...gen.usedGraph].sort().join(', ')} } from "@weave-framework/runtime/graph";\n`
+    : '';
+  const imports: string = domImport + '\n' + coreImport + resumeImport + adoptImport + graphImport;
 
   // With a handlers factory or an adopt variant, emit `render` as a declaration so we can attach + export the
   // extras alongside it; otherwise keep the exact eager shape (`export default function render …`) byte-for-byte.
@@ -230,6 +255,11 @@ const TRANSITION_PHASES: Set<string> = new Set<string>(['enterstart', 'enterend'
 /** A block the adopt walk can island-replay: clear its server DOM + re-run its helper. @if/@switch (E1.2c-2), @for (E1.2c-3). */
 function isAdoptableBlock(node: TemplateNode): boolean {
   return node.type === 'if' || node.type === 'switch' || node.type === 'for';
+}
+
+/** A child component `<Foo/>` — adopt-navigable in place via nested resume (E1.2c-6), not island-replayed. */
+function isComponentNode(node: TemplateNode): boolean {
+  return node.type === 'element' && /^[A-Z]/.test((node as ElementNode).tag);
 }
 
 /** Any control-flow construct that inserts a runtime-variable node count before its anchor (component/slot too). */
@@ -320,7 +350,8 @@ function compileFragment(
   name: string,
   param: string = '',
   isHost: boolean = false,
-  variant: 'create' | 'adopt' = 'create'
+  variant: 'create' | 'adopt' = 'create',
+  preamble: string = ''
 ): string {
   const top: TemplateNode[] = trimTop(nodes);
   if (top.length === 0) throw new Error('Empty template fragment');
@@ -492,7 +523,9 @@ function compileFragment(
           }
         }
         if (isBlockNode(node)) {
-          if (sawBlock || !isAdoptableBlock(node)) gen.adoptable = false; // 2nd block, or a non-replayable one
+          // adoptable at a static position if it island-replays (@if/@switch/@for) OR is a resumable child
+          // component; a 2nd block/component per level, or a slot/w:element/@defer/@await/@key, opts out.
+          if (sawBlock || !(isAdoptableBlock(node) || isComponentNode(node))) gen.adoptable = false;
           sawBlock = true;
         }
       }
@@ -511,7 +544,8 @@ function compileFragment(
       }
       emitNode(node, [...basePath, dom], cur, isHost);
       if (adopt) {
-        if (isAdoptableBlock(node)) { pbBase = blockEndVar; pbOff = 0; } // start the cursor at this block's ]
+        // an island block AND a resumable child component both leave `blockEndVar` = their `]` → the cursor base
+        if (isAdoptableBlock(node) || isComponentNode(node)) { pbBase = blockEndVar; pbOff = 0; }
         else if (pbBase) pbOff += node.type === 'interp' ? 3 : 1; // interp = $+text+anchor; else one node
       }
       dom++;
@@ -769,8 +803,7 @@ function compileFragment(
   }
 
   function emitComponent(node: ElementNode, path: number[], sc: Scope): void {
-    gen.adoptable = false;
-    blockAnchor(path); // anchor the component mounts before
+    blockAnchor(path); // anchor the component mounts before (bracketed like a block for the cursor)
     const anchorVar: string = nodeExpr(path);
 
     // Props: `x="s"` static, `x={expr}` lazy/reactive getter, `on:evt` → onEvt handler.
@@ -813,6 +846,15 @@ function compileFragment(
     }
     if (eventKeys.length) props.push(`'$events': [${eventKeys.map((k) => JSON.stringify(k)).join(', ')}]`);
 
+    // E1.2c-6: a STATIC-position (depth-1) resumable component is a resume boundary. Give it a snapshot id;
+    // the create mount tags the child with `$wid` (so the child self-registers its ctx) and the adopt walk
+    // resumes it in place via adoptComponent. A `use:` component isn't staged for adopt (kills adoptability);
+    // a block-nested component (depth ≥ 2) re-renders under its block's island-replay (no id, no adopt).
+    const resumableChild: boolean = gen.resumable && gen.fragmentDepth === 1 && uses.length === 0;
+    const cid: string = resumableChild ? gen.componentId() : '';
+    if (uses.length > 0) gen.adoptable = false;
+    if (resumableChild && !adopt) props.push(`'$wid': ${q(cid)}`);
+
     // Slots: group children by a static `slot="name"` (default otherwise); strip the attr.
     const groups: Map<string, TemplateNode[]> = new Map<string, TemplateNode[]>();
     for (const child of node.children) {
@@ -841,6 +883,17 @@ function compileFragment(
     const propsObj: string = props.length ? `{ ${props.join(', ')} }` : '{}';
     const slotsObj: string = slots.length ? `{ ${slots.join(', ')} }` : '{}';
     const mountExpr: string = `${gen.Comp(node.tag)}(${propsObj}, ${slotsObj})`;
+
+    // Adopt walk: resume the child in place (nested resume) — adoptComponent uses `Comp.adopt` + `states[cid]`,
+    // falling back to clear + re-mount (the `mountExpr` thunk) if the child isn't resumable. Capture the child's
+    // `]` end anchor as the post-component cursor base (a following sibling reaches over the child's subtree).
+    if (adopt && resumableChild) {
+      const endVar: string = gen.fn('_e');
+      nodeDecls.push(`const ${endVar} = ${gen.Ha('blockEndOf')}(${anchorVar});`);
+      blockEndVar = endVar;
+      stmts.push(`${gen.Ha('adoptComponent')}(${anchorVar}, ${q(cid)}, ${gen.Comp(node.tag)}, _st, () => ${mountExpr});`);
+      return;
+    }
 
     if (uses.length === 0) {
       stmts.push(`${gen.H('mountChild')}(${anchorVar}, ${mountExpr});`);
@@ -1024,7 +1077,9 @@ function compileFragment(
   // adoptable @if/@switch island-replays via `adoptIsland` + `ifBlock`, so its branch fns ride in childDecls.
   if (adopt) {
     gen.fragmentDepth--;
-    const sig: string = param ? `_r, ${param}` : '_r';
+    // `_st` is the resume states map (E1.2c-6) — threaded so a child component's adoptComponent can look up its
+    // ctx by id and pass it on to the child's own nested children. Undefined for a fragment with no components.
+    const sig: string = param ? `_r, ${param}, _st` : '_r, _st';
     const b: string[] = [...nodeDecls, ...stmts, 'return _r;', ...childDecls];
     return `function ${name}(${sig}) {\n${b.map((l) => '  ' + l).join('\n')}\n}`;
   }
@@ -1039,6 +1094,7 @@ function compileFragment(
   const ctor: string = singleRoot ? gen.H('clone') : gen.H('cloneFragment');
   const tplVar: string = gen.tpl(html, svgRoot);
   const body: string[] = [
+    ...(preamble ? [preamble] : []), // E1.2c-6: a resumable render self-registers its ctx if the parent tagged it
     `const _r = ${ctor}(${tplVar});`,
     ...nodeDecls,
     ...stmts,

@@ -79,7 +79,11 @@ export function collectStates(fn: () => void): Record<string, unknown> {
   }
 }
 
-/** Register a resumable component instance's ctx under its compile-time id. No-op outside {@link collectStates}. */
+/**
+ * Register a resumable component instance's ctx under its compile-time id — called from a resumable component's
+ * OWN render preamble when the parent tagged it with a `$wid` prop (static-position child). No-op outside a
+ * {@link collectStates} session (so it costs nothing on the client / in a plain SPA — no runtime/dom change).
+ */
 export function registerState(id: string, ctx: unknown): void {
   if (collector) collector[id] = ctx;
 }
@@ -95,7 +99,12 @@ export type HandlerFactory = (ctx: Record<string, unknown>) => Record<string, Re
  * server-rendered `root` IN PLACE against the resumed `ctx` — no `clone`, no re-render, no `setup`. The
  * compiler emits it as `render.adopt` for a flat single-root resumable component; absent for others.
  */
-export type AdoptFn = (root: Element, ctx: Record<string, unknown>, slots?: Record<string, unknown>) => unknown;
+export type AdoptFn = (
+  root: Element,
+  ctx: Record<string, unknown>,
+  slots?: Record<string, unknown>,
+  states?: Record<string, unknown>,
+) => unknown;
 
 export interface ResumeOptions {
   /** The serialized reactive state from the server ({@link snapshot}). */
@@ -114,8 +123,10 @@ export interface ResumeOptions {
 }
 
 export interface ResumeApp {
-  /** The rebuilt reactive state (live signals) — produced by deserialize, NOT by re-running setup. */
+  /** The rebuilt ROOT reactive state (live signals) — produced by deserialize, NOT by re-running setup. */
   ctx: Record<string, unknown>;
+  /** The full resumed state map (E1.2c-6): the root ctx plus every child component instance's ctx by id. */
+  states: Record<string, unknown>;
   /** Tear down the delegated resume listeners. */
   dispose: () => void;
 }
@@ -168,12 +179,17 @@ export function resumePage(options: ResumePageOptions): ResumeApp {
  * `handlers(ctx)`, by exact id then by site prefix) and invokes it against the resumed graph.
  */
 export function resume(root: Element, options: ResumeOptions): ResumeApp {
-  const ctx: Record<string, unknown> = deserialize(options.snapshot) as Record<string, unknown>;
+  // The snapshot is either a single root ctx (E1.2b) or a multi-instance map `{ $root, c0, c1, … }` (E1.2c-6).
+  // A `$root` key means the map form — the root ctx lives there and the whole map is the component states.
+  const decoded: Record<string, unknown> = deserialize(options.snapshot) as Record<string, unknown>;
+  const isMap: boolean = decoded != null && ROOT_ID in decoded;
+  const ctx: Record<string, unknown> = (isMap ? decoded[ROOT_ID] : decoded) as Record<string, unknown>;
+  const states: Record<string, unknown> = decoded;
   // Adopt the server DOM's reactive bindings in place FIRST (E1.2b-2), inside a reactive root so the
   // re-attached effects are owned + disposable — no re-render, `setup` never runs. Then arm delegated events.
   let disposeAdopt: () => void = () => {};
   if (options.adopt) reactiveRoot((dispose) => {
-    options.adopt!(root, ctx, {});
+    options.adopt!(root, ctx, {}, states);
     disposeAdopt = dispose;
   });
   const table: Record<string, ResumeHandler> = options.handlers ? options.handlers(ctx) : {};
@@ -181,5 +197,5 @@ export function resume(root: Element, options: ResumeOptions): ResumeApp {
     resolve: (id) => table[id] ?? table[siteOf(id)],
     extraEvents: options.extraEvents,
   });
-  return { ctx, dispose: () => { ctl.dispose(); disposeAdopt(); } };
+  return { ctx, states, dispose: () => { ctl.dispose(); disposeAdopt(); } };
 }

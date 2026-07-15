@@ -109,6 +109,42 @@ export function after(node: Node, n: number): Node {
   return x;
 }
 
+/** The shape the compiler attaches to a resumable component: its render's adopt variant, for nested resume. */
+interface AdoptableComponent {
+  (props?: Record<string, unknown>, slots?: Record<string, () => Node>): Node;
+  adopt?: (root: Node, ctx: Record<string, unknown>, slots: Record<string, unknown>, states: Record<string, unknown>) => unknown;
+}
+
+/**
+ * ADOPT side (E1.2c-6): resume a static-position CHILD component in place — nested resume. `start` is the
+ * component's `[` boundary marker; the child's single server root is `start.nextSibling`. If the child is
+ * resumable (`Comp.adopt` present) and its ctx was snapshotted (`states[id]`), re-attach its bindings against
+ * that ctx WITHOUT re-running its `setup`, and thread `states` down for its own nested children. Otherwise
+ * fall back: clear the server subtree and re-mount fresh via `mount` (a plain CSR island for that child).
+ */
+export function adoptComponent(
+  start: Comment,
+  id: string,
+  Comp: AdoptableComponent,
+  states: Record<string, unknown> | undefined,
+  mount: () => Node | null,
+): void {
+  const end: Comment = blockEndOf(start);
+  const ctx: unknown = states && states[id];
+  const root: ChildNode | null = start.nextSibling as ChildNode | null;
+  if (Comp && Comp.adopt && ctx !== undefined && root && root !== end) {
+    Comp.adopt(root, ctx as Record<string, unknown>, {}, states as Record<string, unknown>);
+    return;
+  }
+  // fallback — child not resumable (no adopt / no snapshot): clear its server DOM and re-mount (CSR island)
+  clearBlock(start, end);
+  const node: Node | null = mount();
+  if (node) {
+    const list: ChildNode[] = node instanceof DocumentFragment ? ([...node.childNodes] as ChildNode[]) : [node as ChildNode];
+    for (const n of list) end.parentNode!.insertBefore(n, end);
+  }
+}
+
 /**
  * CREATE side (the resumable server render): insert an isolated dynamic text node before `anchor` and keep
  * it updated. The leading `<!--$-->` marker keeps the text a distinct node in the serialized HTML so the
