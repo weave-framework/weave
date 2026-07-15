@@ -333,9 +333,10 @@ function compileFragment(
   // reconciler can still move/remove it as one unit.
   const sole: ElementNode | null = top.length === 1 && top[0].type === 'element' ? (top[0] as ElementNode) : null;
   const singleRoot: boolean = !!sole && !/^[A-Z]/.test(sole.tag) && sole.tag !== 'slot';
-  // Adopt (E1.2b-2) navigates the SERVER root in place — only a single root element can BE that root; a
-  // multi-root / component / text-root fragment returns a DocumentFragment, so it isn't adopt-navigable yet.
-  if (variant === 'create' && gen.fragmentDepth === 1 && !singleRoot) gen.adoptable = false;
+  // Adopt navigation keys off `_r`: for a single root element `_r` IS that element (children under it); for a
+  // multi-root / text-root fragment (E1.2c-6a) `_r` is the mount CONTAINER and the top-level nodes are its
+  // children — either way `child(_r, i)` reaches them, so both adopt. A component/slot at the root still opts
+  // out via emitComponent/emitSlot (nested resume is later).
 
   let html: string = '';
   const stmts: string[] = [];

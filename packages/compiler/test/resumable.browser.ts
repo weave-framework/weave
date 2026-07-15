@@ -538,6 +538,50 @@ test('E1.2c-5: adopt resumes a block PLUS a trailing element subtree — the ele
   app.dispose();
 });
 
+/* ──────────── E1.2c-6a: multi-root fragments ──────────── */
+
+test('E1.2c-6a: a multi-root fragment is adoptable (was single-root only); a component root still is not', () => {
+  const multi = compileTemplate('<span>{{ a() }}</span><b>{{ c() }}</b>', {
+    mode: 'module', scope: ['a', 'c'], resumable: true,
+  });
+  assert.ok(multi.code.includes('render.adopt'), 'two element roots now emit an adopt fn');
+
+  const comp = compileTemplate('<Foo />text', { mode: 'module', scope: [], resumable: true });
+  assert.ok(!comp.code.includes('render.adopt'), 'a component at the root still opts out (nested resume later)');
+});
+
+test('E1.2c-6a: adopt resumes a MULTI-ROOT fragment in place against the mount container', () => {
+  // two sibling roots + a bare text-interp root — the top level is the mount container, not one element
+  const render = compileResumable('<span>{{ a() }}</span> <b>{{ c() }}</b>', ['a', 'c']);
+  const adopt = (render as { adopt?: AdoptFn }).adopt;
+  assert.equal(typeof adopt, 'function', 'the multi-root fragment carries an adopt fn');
+
+  // ── server ── render the fragment into a container, snapshot
+  const a: Signal<string> = signal('A');
+  const c: Signal<number> = signal(1);
+  const mount: HTMLElement = host();
+  mount.appendChild(render({ a, c })); // a DocumentFragment of [<span>, ' ', <b>]
+  const wire = snapshot({ a, c });
+  const serverHtml: string = mount.innerHTML;
+  assert.ok(serverHtml.includes('A') && serverHtml.includes('<b'), 'server rendered both roots');
+
+  // ── client ── fresh parse into a container; resume against the CONTAINER (it holds the roots)
+  const container: HTMLElement = host();
+  container.innerHTML = serverHtml;
+  const app = resume(container, { snapshot: wire, adopt });
+
+  const span: HTMLElement = container.querySelector('span')!;
+  const bold: HTMLElement = container.querySelector('b')!;
+  assert.equal(span.textContent, 'A', 'first root adopted');
+  assert.equal(bold.textContent, '1', 'second root adopted');
+
+  (app.ctx.a as Signal<string>).set('AA');
+  assert.equal(span.textContent, 'AA', 'the first root is reactive in place');
+  (app.ctx.c as Signal<number>).set(2);
+  assert.equal(bold.textContent, '2', 'the second root is reactive in place — both roots resumed');
+  app.dispose();
+});
+
 test('E1.2b-2: adopt re-binds the SERVER text node in place — signal update flows, node identity kept, no re-render', () => {
   const render = compileResumable('<button on:click={{() => count.set((c) => c + 1)}}>Count: {{ count() }}</button>', ['count']);
   const adopt = (render as { adopt?: AdoptFn }).adopt;
