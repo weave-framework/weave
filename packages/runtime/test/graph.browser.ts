@@ -2,7 +2,7 @@ import { test, assert } from '../../../tools/harness.js';
 import { signal, effect, type Signal } from '@weave-framework/runtime';
 import { serialize, deserialize, SerializeError } from '@weave-framework/runtime/serialize';
 import { handlerAttr } from '@weave-framework/runtime/resume';
-import { snapshot, resume } from '@weave-framework/runtime/graph';
+import { snapshot, resume, collectStates, registerState, ROOT_ID } from '@weave-framework/runtime/graph';
 
 /**
  * E0.3 — the resume entry (`@weave-framework/runtime/graph`). Rebuild a component's reactive state from a
@@ -51,6 +51,46 @@ test('serialize: the codec claims a signal (a function) but an unclaimed functio
     threw = e instanceof SerializeError;
   }
   assert.ok(threw, 'a plain (unclaimed) function is still a SerializeError — the guard is intact');
+});
+
+/* ── E1.2c-6.1: per-instance state collection (the multi-component snapshot map) ── */
+
+test('collectStates: gathers each registered component ctx into one map, keyed by id; no-op outside a session', () => {
+  registerState('c9', { x: signal(1) }); // outside a session → dropped, no throw
+  const a: Signal<number> = signal(1);
+  const b: Signal<string> = signal('b');
+  const states = collectStates(() => {
+    registerState('c0', { a });
+    registerState('c1', { b });
+  });
+  assert.deepEqual(Object.keys(states).sort(), ['c0', 'c1'], 'only the in-session registrations are collected');
+  assert.is((states.c0 as { a: Signal<number> }).a, a, 'the ctx is stored by reference');
+  // the session is restored after collectStates returns → a later registerState is again a no-op
+  registerState('c2', { late: signal(9) });
+  const empty = collectStates(() => {});
+  assert.deepEqual(Object.keys(empty), [], 'the collector reset — a post-session registerState leaked nothing');
+});
+
+test('collectStates: the whole map snapshots + resumes, sharing a signal across components by structural sharing', () => {
+  // a signal SHARED by two component instances (e.g. a store) must deserialize to ONE instance, not two
+  const shared: Signal<number> = signal(10);
+  const states = collectStates(() => {
+    registerState('c0', { own: signal('a'), shared });
+    registerState('c1', { own: signal('b'), shared });
+  });
+  states[ROOT_ID] = { title: signal('root') };
+
+  const back = deserialize(snapshot(states)) as Record<string, Record<string, Signal<unknown>>>;
+  assert.deepEqual(Object.keys(back).sort(), ['c0', 'c1', ROOT_ID].sort(), 'root + both instances round-trip');
+  assert.ok(isLiveSignal(back.c0.own) && isLiveSignal(back[ROOT_ID].title), 'each ctx rebuilt with live signals');
+  assert.is(back.c0.shared, back.c1.shared, 'the shared signal deserialized to ONE instance (structural sharing held)');
+  assert.ok(back.c0.own !== back.c1.own, 'the per-instance signals stayed distinct');
+
+  // the shared, resumed signal is reactive and drives both consumers
+  let seen = 0;
+  effect(() => { (back.c1.shared as Signal<number>)(); seen++; });
+  (back.c0.shared as Signal<number>).set(11);
+  assert.equal(seen, 2, 'writing the shared signal via one instance re-runs an effect reading it via the other');
 });
 
 /* ── the resumability invariant + a full resumed click ── */

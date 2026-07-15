@@ -42,8 +42,10 @@ const BUDGETS = [
   // core (20.9 KB) is untouched; this entry never ships to a plain client SPA. Baseline 2.5 KB after E1.2c-2.
   { label: 'runtime/adopt (E1.2a/c DOM adopt)', files: ['packages/runtime/dist/adopt.js'], budget: 3_072 },
   // runtime/graph (E0.3/E1.2): resume entry — signal codec + snapshot/resume + resumePage (SSG client entry).
-  // Budget raised 2048 → 2560 (deliberate) when E1.2 added resumePage + SNAPSHOT_ID; still a lean resume entry.
-  { label: 'runtime/graph (E0.3/E1.2 resume)', files: ['packages/runtime/dist/graph.js'], budget: 2_560 },
+  // Budget raised 2048 → 2560 (E1.2 resumePage + SNAPSHOT_ID) → 3072 (E1.2c-6 per-instance state collection:
+  // collectStates / registerState / ROOT_ID — the multi-component snapshot map). Resumable-only, 0 for a plain
+  // SPA (I3; SPA core 20.9 KB flat). Still a lean resume entry.
+  { label: 'runtime/graph (E0.3/E1.2 resume)', files: ['packages/runtime/dist/graph.js'], budget: 3_072 },
   // runtime/server (E0.4): headless render — the in-house server DOM + parser + serializer + renderToString.
   // Server-only, its own line — 0 bytes for a client SPA (I3). Baseline 5.8 KB; budget raised 7168 → 7680
   // (deliberate) when E1.3d added the SSG document-<title> capture (settable server `document.title` +

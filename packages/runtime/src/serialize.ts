@@ -111,8 +111,12 @@ export function serialize(value: unknown, options?: SerializeOptions): Wire {
   const seen = new Map<unknown, number>();
 
   // Reference types (+ strings) are shared; primitives are cheap and never cause cycles, so they get a
-  // fresh node each time (simpler, and sharing them buys little).
-  const shareable = (v: unknown): boolean => (typeof v === 'object' && v !== null) || typeof v === 'string';
+  // fresh node each time (simpler, and sharing them buys little). Functions are shareable too: a
+  // custom-type-claimed function (a Weave signal) that appears in several component ctxs (a shared store)
+  // must encode ONCE and back-reference — so it deserializes to ONE live instance, not diverging copies.
+  // An UNCLAIMED function still throws in `encode` (below), so this never weakens the guard.
+  const shareable = (v: unknown): boolean =>
+    (typeof v === 'object' && v !== null) || typeof v === 'string' || typeof v === 'function';
 
   const ref = (v: unknown): number => {
     if (shareable(v) && seen.has(v)) return seen.get(v) as number;

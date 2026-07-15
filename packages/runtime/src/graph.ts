@@ -52,6 +52,39 @@ export function snapshot(state: Record<string, unknown>): Wire {
 }
 
 /**
+ * The key under which the ROOT component's ctx lives in a multi-instance snapshot map (E1.2c-6). Static-position
+ * child component instances live under their compiler-assigned ids (`c0`, `c1`, …); a `$` prefix can't collide
+ * with those, so the map stays a flat `{ [$root]: rootCtx, c0: …, c1: … }` that `serialize` dedups by reference.
+ */
+export const ROOT_ID: string = '$root';
+
+/**
+ * Per-instance state collection (E1.2c-6). A resumable SERVER render collects each component instance's ctx —
+ * so the client can resume it WITHOUT re-running `setup`. `collectStates(fn)` runs a render with a session
+ * active and returns the `{ id → ctx }` map every {@link registerState} call filled; the caller adds the root
+ * under {@link ROOT_ID} and {@link snapshot}s the whole map (one blob — a signal shared across components
+ * serializes once, by structural sharing). Nestable/reentrant-safe; a no-op outside a session.
+ */
+let collector: Record<string, unknown> | null = null;
+
+export function collectStates(fn: () => void): Record<string, unknown> {
+  const prev: Record<string, unknown> | null = collector;
+  const states: Record<string, unknown> = {};
+  collector = states;
+  try {
+    fn();
+    return states;
+  } finally {
+    collector = prev;
+  }
+}
+
+/** Register a resumable component instance's ctx under its compile-time id. No-op outside {@link collectStates}. */
+export function registerState(id: string, ctx: unknown): void {
+  if (collector) collector[id] = ctx;
+}
+
+/**
  * A factory binding handler site-refs to handlers over the RESUMED ctx. In the full pipeline the compiler
  * emits this (extracted from the resumable render); E0.3 hand-authors it, which is what pins the contract.
  */
