@@ -16,13 +16,14 @@
  *   // client:
  *   const { ctx } = resume(root, { snapshot: wire, handlers: (c) => ({ w0: () => c.count.set((n) => n + 1) }) });
  *
- * Scope (E0.3): the graph rebuild + lazy-handler contract — the heart of resumability. Automatic DOM-binding
- * *adoption* (running the compiled render in adopt mode so bindings re-attach to the server DOM without
- * hand-wiring) is the headless DOM seam, E0.4. Per-instance captured closure state (each `@for` row's own
- * handler data) needs serialized lexical scope — a later slice; a component-level handler that closes over
- * `ctx` resumes today.
+ * Scope: the graph rebuild + lazy-handler contract (E0.3) plus DOM-binding *adoption* (E1.2b-2) — pass the
+ * compiled render's `adopt` fn as `options.adopt` and resume re-attaches its reactive bindings to the server
+ * DOM in place (no re-render, no `setup`). Adopt is emitted for flat single-root components today; blocks
+ * (`@if`/`@for`/components) need the marker cursor walk (E1.2c) and fall back to CSR. Per-instance captured
+ * closure state (each `@for` row's own handler data) needs serialized lexical scope — a later slice; a
+ * component-level handler that closes over `ctx` resumes today.
  */
-import { signal, type Signal } from './reactive.js';
+import { signal, root as reactiveRoot, type Signal } from './reactive.js';
 import { serialize, deserialize, registerSerializableType, type Wire } from './serialize.js';
 import { resumeEvents, type ResumeHandler, type ResumeControl } from './resume.js';
 
@@ -56,6 +57,13 @@ export function snapshot(state: Record<string, unknown>): Wire {
  */
 export type HandlerFactory = (ctx: Record<string, unknown>) => Record<string, ResumeHandler>;
 
+/**
+ * The compiled render's ADOPT variant (E1.2b-2): re-attach the render's reactive DOM bindings to the
+ * server-rendered `root` IN PLACE against the resumed `ctx` — no `clone`, no re-render, no `setup`. The
+ * compiler emits it as `render.adopt` for a flat single-root resumable component; absent for others.
+ */
+export type AdoptFn = (root: Element, ctx: Record<string, unknown>, slots?: Record<string, unknown>) => unknown;
+
 export interface ResumeOptions {
   /** The serialized reactive state from the server ({@link snapshot}). */
   snapshot: Wire;
@@ -63,6 +71,12 @@ export interface ResumeOptions {
   handlers: HandlerFactory;
   /** Extra delegated event types to arm even if absent at scan time (see `resumeEvents`). */
   extraEvents?: string[];
+  /**
+   * The compiled render's adopt variant (typically `render.adopt`). When present, resume re-attaches the
+   * render's reactive DOM bindings to the existing server DOM in place (E1.2b-2) so signal updates flow
+   * without a client re-render. When absent, only events resume (the DOM is whatever the server produced).
+   */
+  adopt?: AdoptFn;
 }
 
 export interface ResumeApp {
@@ -88,6 +102,8 @@ export interface ResumePageOptions {
   handlers: HandlerFactory;
   /** Extra delegated event types (see `resumeEvents`). */
   extraEvents?: string[];
+  /** The compiled render's adopt variant (typically `render.adopt`) — re-attaches reactive DOM in place (E1.2b-2). */
+  adopt?: AdoptFn;
   /** Where to read the snapshot `<script>` from (default: the global `document`). */
   document?: Document;
 }
@@ -102,7 +118,12 @@ export function resumePage(options: ResumePageOptions): ResumeApp {
   const el: HTMLElement | null = doc.getElementById(SNAPSHOT_ID);
   if (!el) throw new Error(`resumePage: no snapshot <script id="${SNAPSHOT_ID}"> found in the document.`);
   const wire: Wire = JSON.parse(el.textContent || 'null') as Wire;
-  return resume(options.root, { snapshot: wire, handlers: options.handlers, extraEvents: options.extraEvents });
+  return resume(options.root, {
+    snapshot: wire,
+    handlers: options.handlers,
+    extraEvents: options.extraEvents,
+    adopt: options.adopt,
+  });
 }
 
 /**
@@ -113,10 +134,17 @@ export function resumePage(options: ResumePageOptions): ResumeApp {
  */
 export function resume(root: Element, options: ResumeOptions): ResumeApp {
   const ctx: Record<string, unknown> = deserialize(options.snapshot) as Record<string, unknown>;
+  // Adopt the server DOM's reactive bindings in place FIRST (E1.2b-2), inside a reactive root so the
+  // re-attached effects are owned + disposable — no re-render, `setup` never runs. Then arm delegated events.
+  let disposeAdopt: () => void = () => {};
+  if (options.adopt) reactiveRoot((dispose) => {
+    options.adopt!(root, ctx, {});
+    disposeAdopt = dispose;
+  });
   const table: Record<string, ResumeHandler> = options.handlers(ctx);
   const ctl: ResumeControl = resumeEvents(root, {
     resolve: (id) => table[id] ?? table[siteOf(id)],
     extraEvents: options.extraEvents,
   });
-  return { ctx, dispose: () => ctl.dispose() };
+  return { ctx, dispose: () => { ctl.dispose(); disposeAdopt(); } };
 }

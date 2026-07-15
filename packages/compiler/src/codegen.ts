@@ -63,6 +63,14 @@ class Gen {
   resumableSites: Array<{ ref: string; code: string }> = [];
   /** compileFragment nesting depth; 1 == the root render fragment (see {@link resumableSites}). */
   fragmentDepth: number = 0;
+  /**
+   * E1.2b-2: whether the ROOT fragment is "flat-adoptable" — a single root element carrying only static
+   * structure + reactive text/attr bindings + events (no blocks/components/slots, no non-reactive interp,
+   * no use|bind|ref|transition). Set false the moment the create walk hits anything the adopt render can't
+   * navigate in place yet (those need the marker cursor walk — E1.2c). Gates whether an `adopt(_r, …)`
+   * variant is emitted alongside `render`; when false, a resumed page falls back to CSR (unchanged).
+   */
+  adoptable: boolean = true;
   private tplN: number = 0;
   private fnN: number = 0;
   private refN: number = 0;
@@ -142,9 +150,20 @@ export function compileTemplateAst(ast: TemplateNode[], options: CompileOptions 
     ? `function handlers(ctx) {\n  return { ${gen.resumableSites.map((s) => `${q(s.ref)}: ${s.code}`).join(', ')} };\n}`
     : '';
 
+  // E1.2b-2 — the resumable target ALSO emits an `adopt(_r, ctx, slots)` variant of the render for the
+  // FLAT case (single root element, only reactive text/attr bindings + events). It takes the server-rendered
+  // root instead of cloning a template, navigates to each dynamic anchor by its SHIFTED server index (the
+  // create walk recorded where dynamic-text markers land), and re-binds via `adoptText` in place — events are
+  // left to `resume()`'s delegated dispatch. `resume()` runs it to make a resumed page interactive WITHOUT a
+  // client re-render (no `setup`). A non-flat fragment emits none → the resumed page falls back to CSR.
+  const adoptFn: string = gen.resumable && gen.adoptable
+    ? compileFragment(gen, ast, ctxScope(options.scope ?? []), 'adopt', 'ctx, slots', true, 'adopt')
+    : '';
+
   if (mode === 'function') {
     const parts: string[] = [...gen.templates, render];
     if (handlersFn) parts.push(handlersFn, 'render.handlers = handlers;');
+    if (adoptFn) parts.push(adoptFn, 'render.adopt = adopt;');
     parts.push('return render(ctx, {});'); // tail unchanged → the function-mode `render` strip still applies
     return { code: parts.join('\n'), components };
   }
@@ -165,16 +184,15 @@ export function compileTemplateAst(ast: TemplateNode[], options: CompileOptions 
     : '';
   const imports: string = domImport + '\n' + coreImport + resumeImport + adoptImport;
 
-  // With a handlers factory, emit `render` as a declaration so we can attach + export it alongside `handlers`;
-  // otherwise keep the exact eager shape (`export default function render …`) byte-for-byte.
-  if (handlersFn) {
+  // With a handlers factory or an adopt variant, emit `render` as a declaration so we can attach + export the
+  // extras alongside it; otherwise keep the exact eager shape (`export default function render …`) byte-for-byte.
+  if (handlersFn || adoptFn) {
     const code: string = [
       imports,
       ...gen.templates,
       render,
-      handlersFn,
-      'render.handlers = handlers;',
-      'export { handlers };',
+      ...(handlersFn ? [handlersFn, 'render.handlers = handlers;', 'export { handlers };'] : []),
+      ...(adoptFn ? [adoptFn, 'render.adopt = adopt;', 'export { adopt };'] : []),
       'export default render;',
     ].join('\n');
     return { code, components };
@@ -239,11 +257,13 @@ function compileFragment(
   scope: Scope,
   name: string,
   param: string = '',
-  isHost: boolean = false
+  isHost: boolean = false,
+  variant: 'create' | 'adopt' = 'create'
 ): string {
   const top: TemplateNode[] = trimTop(nodes);
   if (top.length === 0) throw new Error('Empty template fragment');
   gen.fragmentDepth++; // 1 == this (root render) fragment; a nested block body compiles at depth ≥ 2
+  const adopt: boolean = variant === 'adopt';
   // A component/slot compiles to a bare `<!---->`, so it can't be the clone root —
   // only a real DOM element qualifies for the single-root (clone) fast path. A
   // fragment root (component / multiple roots / text) returns a DocumentFragment;
@@ -251,10 +271,36 @@ function compileFragment(
   // reconciler can still move/remove it as one unit.
   const sole: ElementNode | null = top.length === 1 && top[0].type === 'element' ? (top[0] as ElementNode) : null;
   const singleRoot: boolean = !!sole && !/^[A-Z]/.test(sole.tag) && sole.tag !== 'slot';
+  // Adopt (E1.2b-2) navigates the SERVER root in place — only a single root element can BE that root; a
+  // multi-root / component / text-root fragment returns a DocumentFragment, so it isn't adopt-navigable yet.
+  if (variant === 'create' && gen.fragmentDepth === 1 && !singleRoot) gen.adoptable = false;
 
   let html: string = '';
   const stmts: string[] = [];
   const childDecls: string[] = [];
+
+  // E1.2b-2 — per-parent record of reactive-text child indices (in PRISTINE order). Each such interp inserts
+  // a marker + text node (2) before its anchor at render time, so in adopt mode a node's server index is its
+  // pristine index shifted by 2 for every dynamic-text sibling at or before it in the same parent.
+  const dynText: Map<string, number[]> = new Map<string, number[]>();
+  const recordDyn = (basePath: number[], idx: number): void => {
+    const k: string = basePath.join(',');
+    const arr: number[] | undefined = dynText.get(k);
+    if (arr) arr.push(idx);
+    else dynText.set(k, [idx]);
+  };
+  const adoptIndices = (path: number[]): number[] => {
+    const out: number[] = [];
+    for (let level = 0; level < path.length; level++) {
+      const parentKey: string = path.slice(0, level).join(',');
+      const idx: number = path[level];
+      const dyns: number[] | undefined = dynText.get(parentKey);
+      let shift: number = 0;
+      if (dyns) for (const d of dyns) if (d <= idx) shift += 2; // < shifts it; == is its own marker+text
+      out.push(idx + shift);
+    }
+    return out;
+  };
 
   // Resolve each dynamic node into a local BEFORE any binding runs: a binding
   // inserts nodes, which would shift the child indices later `child()` lookups
@@ -269,7 +315,8 @@ function compileFragment(
     if (!v) {
       v = `_n${nodeVarN++}`;
       nodeVars.set(key, v);
-      nodeDecls.push(`const ${v} = ${gen.H('child')}(_r, ${path.join(', ')});`);
+      const idxPath: number[] = adopt ? adoptIndices(path) : path; // adopt walks the SHIFTED server DOM
+      nodeDecls.push(`const ${v} = ${gen.H('child')}(_r, ${idxPath.join(', ')});`);
     }
     return v;
   };
@@ -310,11 +357,13 @@ function compileFragment(
   }
 
   function emitRender(node: RenderNode, path: number[], sc: Scope): void {
+    gen.adoptable = false; // blocks/components insert a variable node count → need the marker cursor walk (E1.2c)
     html += '<!---->';
     stmts.push(`${gen.H('mountChild')}(${nodeExpr(path)}, ${rewrite(node.expr, sc).code});`);
   }
 
   function emitKey(node: KeyNode, path: number[], sc: Scope): void {
+    gen.adoptable = false;
     html += '<!---->';
     const contentFn: string = gen.fn();
     childDecls.push(compileFragment(gen, node.children, sc, contentFn));
@@ -333,15 +382,24 @@ function compileFragment(
       case 'interp': {
         html += '<!---->';
         const { code, reactive } = rewrite(node.expr, sc);
-        // The resumable target isolates a reactive text node with a marker (bindTextResumable) so the client
-        // can adopt exactly it (adjacent static+dynamic text would otherwise merge). Static text and the eager
-        // target are byte-for-byte unchanged.
-        const bind: string = gen.resumable ? gen.Ha('bindTextResumable') : gen.H('bindText');
-        stmts.push(
-          reactive
-            ? `${bind}(${nodeExpr(path)}, () => (${code}));`
-            : `${gen.H('setText')}(${nodeExpr(path)}, ${code});`
-        );
+        if (reactive) {
+          // Record this dynamic text's position BEFORE resolving its node expr, so its own marker+text (and
+          // any later sibling's adopt-index) are accounted for. The resumable target isolates it with a marker
+          // (bindTextResumable) so the client can adopt exactly it (adjacent static+dynamic text would merge);
+          // the adopt walk re-binds the EXISTING node via adoptText. Eager is byte-for-byte unchanged.
+          recordDyn(path.slice(0, -1), path[path.length - 1]);
+          const bind: string = adopt
+            ? gen.Ha('adoptText')
+            : gen.resumable
+              ? gen.Ha('bindTextResumable')
+              : gen.H('bindText');
+          stmts.push(`${bind}(${nodeExpr(path)}, () => (${code}));`);
+        } else {
+          // A non-reactive interp sets text once with NO marker → it shifts indices and merges with adjacent
+          // static text on the client, so a fragment containing one is not adopt-safe yet (E1.2c). Fall back.
+          gen.adoptable = false;
+          stmts.push(`${gen.H('setText')}(${nodeExpr(path)}, ${code});`);
+        }
         return;
       }
       case 'element':
@@ -408,6 +466,7 @@ function compileFragment(
    * element (re-run whenever the tag changes).
    */
   function emitDynamicElement(node: ElementNode, path: number[], sc: Scope): void {
+    gen.adoptable = false;
     html += '<!---->';
     const anchor: string = nodeExpr(path);
     let tagExpr: string = '""';
@@ -465,6 +524,7 @@ function compileFragment(
         sink.push(`${gen.H('bindShow')}(${n}, () => (${rewrite(attr.expr, sc).code}));`);
         break;
       case 'transition': {
+        gen.adoptable = false; // a transition wires a lifecycle effect the adopt walk doesn't stage yet (E1.2c)
         // transition:fn / in:fn / out:fn → transition(el, fn, params, mode). The
         // params are a snapshot (re-read at play time via the fn); the fn resolves to ctx.
         const fn: string = rewrite(attr.name, sc).code;
@@ -479,6 +539,10 @@ function compileFragment(
           sink.push(`${gen.H('transitionEvent')}(${n}, ${q(attr.name)}, ${rewrite(attr.expr, sc).code});`);
           break;
         }
+        // Adopt (E1.2b-2): DOM events are re-armed by `resume()`'s delegated dispatch off the `data-won-*`
+        // markers the server render stamped — the adopt walk must NOT re-wire them here (that's the whole
+        // point of resumability). The create walk still records the site + emits the resumable ref below.
+        if (adopt) break;
         const handler: string = wrapHandler(attr, sc);
         if (gen.resumable) {
           // Resumable target (E0.2b): emit a handler REFERENCE instead of an eager listener. The runtime
@@ -496,9 +560,11 @@ function compileFragment(
         break;
       }
       case 'ref':
+        gen.adoptable = false; // ref capture / use / bind establish node-tied wiring adopt doesn't stage yet
         sink.push(`${gen.H('setRef')}(${rewrite(attr.expr, sc).code}, ${n});`);
         break;
       case 'use': {
+        gen.adoptable = false;
         // `use:action={arg}` → applyAction(el, action, () => (arg)). The action is the `name`
         // identifier (rewritten against ctx); the arg is passed as a getter, so a reactive
         // action's `update(arg)` re-runs when it changes (see applyAction / ActionResult).
@@ -513,6 +579,7 @@ function compileFragment(
         break;
       }
       case 'bind': {
+        gen.adoptable = false;
         // bind:value / bind:checked / bind:group → two-way `bindValue`. The
         // expression must resolve to a writable signal (passed by reference, not
         // called): `bind:value={count}` → `bindValue(el, ctx.count, 'value')`.
@@ -524,6 +591,7 @@ function compileFragment(
   }
 
   function emitComponent(node: ElementNode, path: number[], sc: Scope): void {
+    gen.adoptable = false;
     html += '<!---->'; // anchor the component mounts before
     const anchorVar: string = nodeExpr(path);
 
@@ -620,6 +688,7 @@ function compileFragment(
   }
 
   function emitSlot(node: ElementNode, path: number[], sc: Scope): void {
+    gen.adoptable = false;
     html += '<!---->';
     const anchorVar: string = nodeExpr(path);
     const nameAttr: Attr | undefined = node.attrs.find((a) => a.type === 'static' && a.name === 'name');
@@ -637,6 +706,7 @@ function compileFragment(
   }
 
   function emitIf(node: IfNode, path: number[], sc: Scope): void {
+    gen.adoptable = false;
     html += '<!---->';
     const head: IfBranch = node.branches[0];
     let aliasVar: string | undefined;
@@ -666,6 +736,7 @@ function compileFragment(
   }
 
   function emitSwitch(node: SwitchNode, path: number[], sc: Scope): void {
+    gen.adoptable = false;
     html += '<!---->';
     const names: string[] = node.cases.map(() => gen.fn());
     node.cases.forEach((c, i) => childDecls.push(compileFragment(gen, c.children, sc, names[i])));
@@ -681,6 +752,7 @@ function compileFragment(
   }
 
   function emitDefer(node: DeferNode, path: number[], sc: Scope): void {
+    gen.adoptable = false;
     html += '<!---->';
     const contentFn: string = gen.fn();
     childDecls.push(compileFragment(gen, node.children, sc, contentFn));
@@ -697,6 +769,7 @@ function compileFragment(
   }
 
   function emitAwait(node: AwaitNode, path: number[], sc: Scope): void {
+    gen.adoptable = false;
     html += '<!---->';
     const anchorVar: string = nodeExpr(path);
     const source: string = `() => (${rewrite(node.expr, sc).code})`;
@@ -735,6 +808,7 @@ function compileFragment(
   }
 
   function emitFor(node: ForNode, path: number[], sc: Scope): void {
+    gen.adoptable = false;
     html += '<!---->';
     const rowFn: string = gen.fn();
     const forScope: Scope = childScope(sc, {
@@ -764,6 +838,17 @@ function compileFragment(
   // walk
   if (singleRoot) emitElement(sole!, [], scope, isHost);
   else emitChildren(top, [], scope, isHost);
+
+  // Adopt variant (E1.2b-2): no template + no clone — the server-rendered root is passed in as `_r`. The
+  // bindings re-attach in place (adoptText / bind*), navigating the SHIFTED server indices computed above.
+  // Flat by construction (a non-flat fragment never reaches here — gen.adoptable is false → no adopt walk),
+  // so there are no childDecls to emit.
+  if (adopt) {
+    gen.fragmentDepth--;
+    const sig: string = param ? `_r, ${param}` : '_r';
+    const b: string[] = [...nodeDecls, ...stmts, 'return _r;'];
+    return `function ${name}(${sig}) {\n${b.map((l) => '  ' + l).join('\n')}\n}`;
+  }
 
   // A fragment whose top-level element(s) are SVG-only tags (a `@for` row / `@if`
   // branch / component root of `<path>`, `<g>`, …) must be parsed in the SVG

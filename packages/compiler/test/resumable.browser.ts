@@ -2,8 +2,8 @@ import { test, assert } from '../../../tools/harness.js';
 import { signal, computed, effect, root, type Signal } from '@weave-framework/runtime';
 import * as dom from '@weave-framework/runtime/dom';
 import { resumeEvents, collectResumable, resumableHandler, handlerAttr, type ResumeHandler } from '@weave-framework/runtime/resume';
-import { bindTextResumable } from '@weave-framework/runtime/adopt';
-import { snapshot, resume, resumePage, SNAPSHOT_ID } from '@weave-framework/runtime/graph';
+import { bindTextResumable, adoptText } from '@weave-framework/runtime/adopt';
+import { snapshot, resume, resumePage, SNAPSHOT_ID, type AdoptFn } from '@weave-framework/runtime/graph';
 import { compileTemplate } from '@weave-framework/compiler';
 
 /**
@@ -22,7 +22,8 @@ const rt: typeof dom & {
   root: typeof root;
   resumableHandler: typeof resumableHandler;
   bindTextResumable: typeof bindTextResumable;
-} = { ...dom, signal, computed, effect, root, resumableHandler, bindTextResumable };
+  adoptText: typeof adoptText;
+} = { ...dom, signal, computed, effect, root, resumableHandler, bindTextResumable, adoptText };
 
 /** Compile in the `resumable` target and hand back the bare `(ctx, slots) => Node` render fn. */
 function compileResumable(html: string, scope: string[] = []): (ctx: unknown, slots?: unknown) => Element {
@@ -240,6 +241,89 @@ test('E1.2: resumePage throws loudly when the snapshot script is missing', () =>
     threw = true;
   }
   assert.ok(threw, 'a missing snapshot <script> is a loud error, not a silent no-op');
+});
+
+/* ──────────── E1.2b-2: the adopt-mode render (re-attach in place, no re-render) ──────────── */
+
+test('E1.2b-2: a flat resumable module emits + exports an adopt(_r,…) fn — adoptText, shifted index, no events', () => {
+  const { code } = compileTemplate('<button on:click={{inc}}>Count: {{ count() }}</button>', {
+    mode: 'module',
+    scope: ['count', 'inc'],
+    resumable: true,
+  });
+  assert.ok(code.includes('function adopt(_r'), 'emits an adopt(_r, …) fn taking the server root');
+  assert.ok(code.includes('render.adopt = adopt'), 'attaches it to render');
+  assert.ok(code.includes('export { adopt }'), 'exports it');
+  assert.ok(code.includes('adoptText('), 'adopt re-binds reactive text via adoptText');
+  assert.ok(code.includes('from "@weave-framework/runtime/adopt"'), 'imports the adopt entry');
+  // The reactive-text anchor is pristine child 1 (after "Count: "); its own marker+text push it to server
+  // index 3, and adopt navigates that shifted position — NOT the pristine 1 the create render clones to.
+  const adoptBody: string = code.slice(code.indexOf('function adopt(_r'));
+  assert.ok(/child\(_r, 3\)/.test(adoptBody), 'navigates the SHIFTED server index (pristine 1 + marker/text)');
+  assert.ok(!adoptBody.slice(0, adoptBody.indexOf('render.adopt')).includes('resumableHandler'),
+    'adopt skips events — resume() re-arms them via the data-won markers (delegated dispatch)');
+});
+
+test('E1.2b-2: adopt indices compound — each preceding dynamic text shifts a sibling by 2, across nesting', () => {
+  // <p>{{a}}{{b}}</p>: a at pristine 0 → server 2 (own marker+text); b at pristine 1 → server 5 (a's 2 + own 2).
+  const flat = compileTemplate('<p>{{ a() }}{{ b() }}</p>', { mode: 'module', scope: ['a', 'b'], resumable: true });
+  const flatAdopt: string = flat.code.slice(flat.code.indexOf('function adopt(_r'));
+  assert.ok(/child\(_r, 2\)/.test(flatAdopt), 'first dynamic text → server index 2 (its own marker+text)');
+  assert.ok(/child\(_r, 5\)/.test(flatAdopt), 'second dynamic text → server index 5 (preceding 2 + its own 2)');
+
+  // <div>{{a}}<p>{{b}}</p></div>: a → server 2; the <p> is shifted to server 3 by a's marker+text, and b
+  // inside <p> is at server 2 — so b's node is child(_r, 3, 2). Proves the shift applies per-level.
+  const nested = compileTemplate('<div>{{ a() }}<p>{{ b() }}</p></div>', { mode: 'module', scope: ['a', 'b'], resumable: true });
+  const nestedAdopt: string = nested.code.slice(nested.code.indexOf('function adopt(_r'));
+  assert.ok(/child\(_r, 2\)/.test(nestedAdopt), 'the div-level dynamic text is at server index 2');
+  assert.ok(/child\(_r, 3, 2\)/.test(nestedAdopt), 'the <p> shifted to 3 by the preceding text; its inner text at 2');
+});
+
+test('E1.2b-2: a non-flat resumable fragment (contains a block) emits NO adopt fn — falls back to CSR', () => {
+  const { code } = compileTemplate('<div>@if (on()) { <b>{{ x() }}</b> }</div>', {
+    mode: 'module',
+    scope: ['on', 'x'],
+    resumable: true,
+  });
+  assert.ok(!code.includes('render.adopt'), 'a fragment with a block emits no adopt fn (the cursor walk is E1.2c)');
+});
+
+test('E1.2b-2: adopt re-binds the SERVER text node in place — signal update flows, node identity kept, no re-render', () => {
+  const render = compileResumable('<button on:click={{() => count.set((c) => c + 1)}}>Count: {{ count() }}</button>', ['count']);
+  const adopt = (render as { adopt?: AdoptFn }).adopt;
+  const handlers = (render as { handlers?: (c: Record<string, unknown>) => Record<string, ResumeHandler> }).handlers;
+  assert.equal(typeof adopt, 'function', 'the resumable render carries an adopt fn');
+
+  // ── server ── render the resumable target (stamps the data-won marker + isolates the dynamic text) + snapshot
+  const serverCount: Signal<number> = signal(7);
+  const serverNode = render({ count: serverCount }) as HTMLButtonElement;
+  const wire = snapshot({ count: serverCount });
+  const serverHtml: string = serverNode.outerHTML; // exactly what renderPage would serialize
+
+  // ── client ── a FRESH parse of the server HTML: dead DOM, no live bindings carried over from the render above
+  const container: HTMLElement = host();
+  container.innerHTML = serverHtml;
+  const btn: HTMLButtonElement = container.querySelector('button')!;
+  const marker: ChildNode = [...btn.childNodes].find((n) => n.nodeType === 8 && (n as Comment).data === '$')!;
+  const clientText: Text = marker.nextSibling as Text;
+  assert.equal(clientText.data, '7', 'the client parsed the server-rendered value, isolated by its marker');
+
+  // resume with the EMITTED adopt + handlers — no hand-authoring, no setup (ctx comes from the snapshot). The
+  // resume root IS the component's single root element (what render returns / adopt navigates from as `_r`).
+  const app = resume(btn, {
+    snapshot: wire,
+    handlers: handlers as (c: Record<string, unknown>) => Record<string, ResumeHandler>,
+    adopt,
+  });
+  assert.equal((app.ctx.count as Signal<number>)(), 7, 'resumed the server value from the snapshot');
+  assert.is((btn.childNodes[2] as Text), clientText, 'adopt re-bound the EXISTING server text node (no re-creation)');
+  assert.equal(btn.childNodes.length, 4, 'no extra nodes inserted on adopt (static "Count: ", marker, text, anchor)');
+
+  btn.click();
+  assert.equal((app.ctx.count as Signal<number>)(), 8, 'the delegated resume dispatch fired the handler against the rebuilt graph');
+  assert.equal(clientText.data, '8', 'the adopted text node updated IN PLACE — reactivity flows through adopt');
+  assert.equal(btn.textContent, 'Count: 8', 'the button reads the updated value');
+  app.dispose();
 });
 
 test('resumableHandler returns instance-unique ids and registers into the active session', () => {
