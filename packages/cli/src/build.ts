@@ -10,9 +10,10 @@ import { weave, type WeaveState } from './plugin.js';
 import { entryPlugin, VIRTUAL_ENTRY } from './entry.js';
 import { compileStyleFileWithAssets, type StyleAsset, type StyleLang } from './styles.js';
 import { injectHtml } from './html.js';
-// The DOM-free document assembler (renderDocument + PageArtifact) — the server render itself runs inside the
-// bundled server entry, which installs the headless DOM; here we only stitch strings, so no DOM is imported.
-import { renderDocument, type PageArtifact } from '@weave-framework/runtime/document';
+import { prerender } from './prerender.js';
+// The DOM-free document types — the server render itself runs inside the bundled server entry (which installs
+// the headless DOM); `prerender` assembles each document from strings, so no DOM is imported here.
+import type { PageArtifact, DocumentOptions } from '@weave-framework/runtime/document';
 
 export interface BuildConfig {
   /** Hand-written entry module (absolute). Mutually exclusive with {@link virtualEntry}. */
@@ -90,22 +91,24 @@ export async function build(config: BuildConfig): Promise<void> {
   }
 }
 
-/** Config for {@link buildSsg} — the SPA client bundle plus a server entry to render the root headlessly. */
+/** Config for {@link buildSsg} — the SPA client bundle plus a server entry to render each route headlessly. */
 export interface SsgBuildConfig {
   /** Framework-generated CLIENT entry (Level C) — the CSR `mountComponent` bundle (`main.js`). */
   virtualEntry: { code: string; resolveDir: string };
-  /** Framework-generated SERVER entry — `render()` → {@link PageArtifact} (from `generateServerEntry`). */
+  /** Framework-generated SERVER entry — `render(route)` → {@link PageArtifact} (from `generateServerEntry`). */
   serverEntry: { code: string; resolveDir: string };
   /** Mount selector — must be an `#id` (the SSG shell wraps the rendered app in a `<div id>` for CSR to adopt). */
   mount: string;
+  /** Routes to prerender — one static `index.html` per route (default `['/']`, i.e. root-only). */
+  routes?: string[];
   outDir: string;
   minify?: boolean;
   styleLang?: StyleLang;
   styles?: string[];
   publicDir?: string;
-  /** `<title>` for the generated document. */
+  /** `<title>` for the generated documents. */
   title?: string;
-  /** `<html lang>` for the generated document. */
+  /** `<html lang>` for the generated documents. */
   lang?: string;
 }
 
@@ -121,47 +124,47 @@ function mountId(selector: string): string {
   return m[1];
 }
 
-/** Bundle the server entry for Node, import it, and call its `render()` to get the page artifact. */
-async function renderServerEntry(
+/** A loaded server entry: call `render(route)` per route, then `dispose()` to remove the temp bundle. */
+interface ServerRenderer {
+  render: (route?: string) => PageArtifact | Promise<PageArtifact>;
+  dispose: () => Promise<void>;
+}
+
+/** Bundle the server entry for Node and import it ONCE, returning its `render(route)` + a cleanup handle. */
+async function loadServerEntry(
   serverEntry: { code: string; resolveDir: string },
   styleLang?: StyleLang,
   minify?: boolean
-): Promise<PageArtifact> {
+): Promise<ServerRenderer> {
   const dir: string = await mkdtemp(join(tmpdir(), 'weave-ssg-'));
   const state: WeaveState = { css: [] }; // the server render needs no CSS collection — discarded
-  try {
-    await esbuild({
-      entryPoints: [{ in: VIRTUAL_ENTRY, out: 'server' }],
-      bundle: true,
-      format: 'esm',
-      platform: 'node',
-      outdir: dir,
-      outExtension: { '.js': '.mjs' }, // a bare .js in a temp dir is CommonJS to Node; force ESM
-      minify: minify ?? false,
-      plugins: [weave(state, { styleLang }), entryPlugin(serverEntry.code, serverEntry.resolveDir)],
-    });
-    const mod: { render: () => PageArtifact | Promise<PageArtifact> } = (await import(
-      pathToFileURL(join(dir, 'server.mjs')).href
-    )) as { render: () => PageArtifact | Promise<PageArtifact> };
-    return await mod.render();
-  } finally {
-    await rm(dir, { recursive: true, force: true });
-  }
+  await esbuild({
+    entryPoints: [{ in: VIRTUAL_ENTRY, out: 'server' }],
+    bundle: true,
+    format: 'esm',
+    platform: 'node',
+    outdir: dir,
+    outExtension: { '.js': '.mjs' }, // a bare .js in a temp dir is CommonJS to Node; force ESM
+    minify: minify ?? false,
+    plugins: [weave(state, { styleLang }), entryPlugin(serverEntry.code, serverEntry.resolveDir)],
+  });
+  const mod: ServerRenderer = (await import(pathToFileURL(join(dir, 'server.mjs')).href)) as ServerRenderer;
+  return { render: mod.render, dispose: () => rm(dir, { recursive: true, force: true }) };
 }
 
 /**
- * `weave build --ssg` (Phase E, E1.3b) — root-render static generation. Build the client CSR bundle (main.js +
- * app.css + public root) exactly like {@link build}, THEN render the root component headlessly to HTML and
- * write a complete `index.html`: the server HTML inside the `#id` mount target, plus the client entry that
- * mounts over it. First paint + SEO come from the server HTML; interactivity comes from the CSR client.
+ * `weave build --ssg` (Phase E, E1.3b/c) — static generation. Build the client CSR bundle (main.js + app.css +
+ * public root) exactly like {@link build}, THEN render each route headlessly and write a complete
+ * `<route>/index.html`: the server HTML inside the `#id` mount target, plus the client entry that mounts over
+ * it. First paint + SEO come from the server HTML; interactivity comes from the CSR client.
  *
- * Root-only for now: it renders the configured `root` with no router. Per-route SSG (rendering each route's
- * component with its own state) is router-SSR — the next slice (E1.3c). `resumePage` (adopt the server DOM
- * instead of re-rendering) also lands then, once real per-page state is captured.
+ * Root-only (E1.3b) renders one route (`/`); with the router-aware server entry (E1.3c) each route in
+ * {@link SsgBuildConfig.routes} is rendered with `setServerLocation` so the router resolves it headlessly.
+ * `resumePage` (adopt the server DOM instead of re-rendering) is a later slice, once per-page state is captured.
  */
 export async function buildSsg(config: SsgBuildConfig): Promise<void> {
   // 1. The client bundle + app.css + public root — same output as a normal build, minus the HTML shell
-  //    (we generate the document below instead of injecting into a hand-written index).
+  //    (we generate the documents below instead of injecting into a hand-written index).
   await build({
     virtualEntry: config.virtualEntry,
     outDir: config.outDir,
@@ -171,13 +174,22 @@ export async function buildSsg(config: SsgBuildConfig): Promise<void> {
     publicDir: config.publicDir,
     clean: true,
   });
-  // 2. Render the root headlessly.
-  const artifact: PageArtifact = await renderServerEntry(config.serverEntry, config.styleLang, config.minify);
-  // 3. Assemble + write the document: server HTML inside the mount target, snapshot, client entry, styles.
+  // 2. Render each route headlessly (bundle + import the server entry once), writing a document per route.
   const id: string = mountId(config.mount);
-  const doc: string = renderDocument(
-    { html: `<div id="${id}">${artifact.html}</div>`, snapshotScript: artifact.snapshotScript },
-    { title: config.title, head: '<link rel="stylesheet" href="/app.css">', entry: '/main.js', lang: config.lang }
-  );
-  await writeFile(join(config.outDir, 'index.html'), doc);
+  const head: string = '<link rel="stylesheet" href="/app.css">';
+  const server: ServerRenderer = await loadServerEntry(config.serverEntry, config.styleLang, config.minify);
+  try {
+    await prerender({
+      outDir: config.outDir,
+      routes: config.routes ?? ['/'],
+      render: async (route: string): Promise<PageArtifact> => {
+        const artifact: PageArtifact = await server.render(route);
+        // Wrap the server HTML in the #id mount target so the client CSR mounts over it.
+        return { html: `<div id="${id}">${artifact.html}</div>`, snapshotScript: artifact.snapshotScript };
+      },
+      document: (): DocumentOptions => ({ title: config.title, head, entry: '/main.js', lang: config.lang }),
+    });
+  } finally {
+    await server.dispose();
+  }
 }

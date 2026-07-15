@@ -54,20 +54,24 @@ export async function main(argv: string[]): Promise<void> {
             console.error('weave build --ssg needs a config `root` component — it renders the root headlessly.');
             process.exit(1);
           }
+          // Routed when the app uses file-based routing or prerenders any non-root route: the server entry
+          // then imports the router's SSR seam. A pure root-only app (only `/`) stays router-free (no dep).
+          const routed: boolean = config.routesDir != null || config.ssgRoutes.some((r) => r !== '/');
           await buildSsg({
             virtualEntry: virtualEntryFor(config)!,
             serverEntry: {
-              code: generateServerEntry(config.rootComponent, config.root),
+              code: generateServerEntry(config.rootComponent, config.root, { routed }),
               resolveDir: config.root,
             },
             mount: config.mount,
+            routes: config.ssgRoutes,
             outDir,
             minify: config.minify,
             styleLang: config.styleLang,
             styles: config.styles,
             publicDir: config.publicDir,
           });
-          console.log(`weave build --ssg → ${outDir}/`);
+          console.log(`weave build --ssg → ${outDir}/ (${config.ssgRoutes.length} route${config.ssgRoutes.length === 1 ? '' : 's'})`);
           return;
         }
         await build({

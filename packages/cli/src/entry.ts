@@ -122,19 +122,31 @@ export function generateEntry(
  * the build assembles into the page document. Custom elements need no registration here — the headless DOM
  * serializes an unknown tag as a plain element, and interactivity is the client entry's job (CSR mount).
  *
- * The exported `render()` is what the build calls; keeping it a function (not a top-level side effect) lets
- * the build import the bundle once and drive it, and leaves room for `render(route)` when router-SSR lands.
+ * The exported `render(route)` is what the build calls per route; keeping it a function (not a top-level side
+ * effect) lets the build import the bundle once and drive it route by route.
  *
  * `runtime/server` is imported FIRST, on purpose: its module body installs the headless DOM as globals, and
  * the root's compiled module creates its `<template>` at evaluation time (`document.createElement`) — so the
  * server shim must be installed before the root module is evaluated. ESM evaluates imports in source order.
+ *
+ * `routed` (E1.3c): when the app uses the router, also import `setServerLocation` and seed it with the route
+ * before rendering, so the router resolves that path headlessly. A non-routed app must NOT import the router
+ * (it may not even depend on it) — so the plain root-only form is kept for that case.
  */
-export function generateServerEntry(rootComponent: string, rootDir: string): string {
-  return [
-    `import { renderPage } from "@weave-framework/runtime/server";`,
-    `import Root from ${importSpec(rootDir, rootComponent)};`,
-    `export function render() { return renderPage(Root, {}); }`,
-  ].join('\n');
+export function generateServerEntry(
+  rootComponent: string,
+  rootDir: string,
+  options: { routed?: boolean } = {}
+): string {
+  const lines: string[] = [`import { renderPage } from "@weave-framework/runtime/server";`];
+  if (options.routed) lines.push(`import { setServerLocation } from "@weave-framework/router";`);
+  lines.push(`import Root from ${importSpec(rootDir, rootComponent)};`);
+  lines.push(
+    options.routed
+      ? `export function render(route) { setServerLocation(route ?? "/"); return renderPage(Root, {}); }`
+      : `export function render() { return renderPage(Root, {}); }`
+  );
+  return lines.join('\n');
 }
 
 /** esbuild plugin that serves the generated entry `code` for the {@link VIRTUAL_ENTRY} specifier. */

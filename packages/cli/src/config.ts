@@ -67,6 +67,8 @@ export interface WeaveConfig {
   styles?: string[];
   dev?: { port?: number; proxy?: ProxyTable };
   build?: { minify?: boolean };
+  /** Static generation (`weave build --ssg`): the routes to prerender, one `index.html` each (default `['/']`). */
+  ssg?: { routes?: string[] };
 }
 
 /** Identity helper so a `weave.config.ts` gets full type-checking + inference. */
@@ -96,6 +98,8 @@ export interface ResolvedConfig {
   /** Dev-server proxy table (see {@link ProxyTable}), or undefined. */
   proxy?: ProxyTable;
   minify: boolean;
+  /** Routes to prerender with `weave build --ssg` (default `['/']`). */
+  ssgRoutes: string[];
 }
 
 const CONFIG_NAMES: string[] = ['weave.config.ts', 'weave.config.js', 'weave.config.mjs', 'weave.config.json'];
@@ -171,5 +175,6 @@ function resolveConfig(raw: WeaveConfig, root: string): ResolvedConfig {
     port: raw.dev?.port,
     proxy: raw.dev?.proxy,
     minify: raw.build?.minify ?? true,
+    ssgRoutes: raw.ssg?.routes ?? ['/'],
   };
 }
