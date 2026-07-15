@@ -35,8 +35,11 @@ const BUDGETS = [
   { label: 'runtime/serialize (E0.1 codec)', files: ['packages/runtime/dist/serialize.js'], budget: 4_096 },
   // runtime/resume (E0.2a/b): resumable event dispatch + handler registration. Baseline 2.4 KB.
   { label: 'runtime/resume (E0.2a/b dispatch)', files: ['packages/runtime/dist/resume.js'], budget: 2_560 },
-  // runtime/adopt (E1.2a): DOM-adoption primitives (marker text bind + adopt). Server+client, own line. Baseline <1 KB.
-  { label: 'runtime/adopt (E1.2a DOM adopt)', files: ['packages/runtime/dist/adopt.js'], budget: 1_536 },
+  // runtime/adopt (E1.2a/c): DOM-adoption primitives. Server+client, own line — 0 bytes for a plain SPA (I3).
+  // Budget raised 1536 → 2560 (deliberate) when E1.2c added the block-boundary cursor foundation (blockStart /
+  // blockEndOf / clearBlock — the marker bracket-matching that lets adopt skip a control-flow block). The SPA
+  // core (20.9 KB) is untouched; this entry never ships to a plain client SPA. Baseline 2.2 KB after E1.2c.
+  { label: 'runtime/adopt (E1.2a/c DOM adopt)', files: ['packages/runtime/dist/adopt.js'], budget: 2_560 },
   // runtime/graph (E0.3/E1.2): resume entry — signal codec + snapshot/resume + resumePage (SSG client entry).
   // Budget raised 2048 → 2560 (deliberate) when E1.2 added resumePage + SNAPSHOT_ID; still a lean resume entry.
   { label: 'runtime/graph (E0.3/E1.2 resume)', files: ['packages/runtime/dist/graph.js'], budget: 2_560 },

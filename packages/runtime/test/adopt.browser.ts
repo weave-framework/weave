@@ -1,6 +1,6 @@
 import { test, assert } from '../../../tools/harness.js';
 import { signal, root } from '@weave-framework/runtime';
-import { bindTextResumable, adoptText, DYN_TEXT } from '@weave-framework/runtime/adopt';
+import { bindTextResumable, adoptText, DYN_TEXT, blockStart, blockEndOf, clearBlock } from '@weave-framework/runtime/adopt';
 
 /** Node types (avoid the Node global under the test bundler). */
 const TEXT = 3;
@@ -73,4 +73,51 @@ test('adoptText: missing server text (mismatch) falls back to creating one rathe
   assert.equal((t as Text).data, 'x', 'binds it');
   v.set('y');
   assert.equal((t as Text).data, 'y', 'updates it');
+});
+
+/* ──────────── E1.2c — block-boundary markers (cursor-walk foundation) ──────────── */
+
+test('blockStart: inserts a [ boundary marker right before the block anchor (create side)', () => {
+  const p: HTMLParagraphElement = document.createElement('p');
+  const anchor: Comment = document.createComment(']'); // the block end anchor
+  p.append(document.createTextNode('pre'), anchor);
+  const m: Comment = blockStart(anchor);
+  assert.equal(m.data, '[', 'returns the [ marker');
+  assert.is(anchor.previousSibling, m, 'the [ sits directly before the end anchor — content lands between them');
+  assert.equal(p.childNodes.length, 3, 'pre-text, [ marker, ] anchor');
+});
+
+test('blockEndOf: matches the balanced ] across a NESTED block (bracket depth, ignoring interp markers)', () => {
+  const p: HTMLParagraphElement = document.createElement('p');
+  // [ <b>x</b>  [ <i>y</i> <!--$-->t<!----> ]  tail ]  <span>after</span>
+  //  outer-start  nested-start  interp inside nested   nested-end  outer-end
+  p.innerHTML =
+    '<!--[--><b>x</b><!--[--><i>y</i><!--$-->t<!----><!--]-->tail<!--]--><span>after</span>';
+  const start: Comment = p.firstChild as Comment;
+  const end: Comment = blockEndOf(start);
+  assert.equal(end.data, ']', 'found a ] end anchor');
+  assert.is(end.nextSibling, p.querySelector('span'), 'matched the OUTER end (before <span>), skipping the nested block + its interp markers');
+});
+
+test('blockEndOf: throws loudly on unbalanced markers (no matching ])', () => {
+  const p: HTMLParagraphElement = document.createElement('p');
+  p.innerHTML = '<!--[--><b>x</b>'; // a [ with no matching ]
+  let threw: boolean = false;
+  try {
+    blockEndOf(p.firstChild as Comment);
+  } catch {
+    threw = true;
+  }
+  assert.ok(threw, 'an unbalanced marker set is a loud error, not a silent wrong match');
+});
+
+test('clearBlock: empties the region between the boundary markers, leaving markers + trailing content', () => {
+  const p: HTMLParagraphElement = document.createElement('p');
+  p.innerHTML = '<!--[--><b>x</b><!--[--><i>y</i><!--]-->tail<!--]--><span>after</span>';
+  const start: Comment = p.firstChild as Comment;
+  const end: Comment = blockEndOf(start);
+  clearBlock(start, end);
+  assert.is(start.nextSibling, end, 'all nodes strictly between [ and ] are gone (island cleared for replay)');
+  assert.ok(!p.querySelector('b') && !p.querySelector('i'), 'nested content removed too');
+  assert.ok(p.querySelector('span'), 'content AFTER the block is untouched');
 });

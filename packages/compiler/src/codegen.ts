@@ -321,6 +321,17 @@ function compileFragment(
     return v;
   };
 
+  // A control-flow block anchor (E1.2c). Eager: a plain `<!---->`. Resumable: a `]` end anchor plus a runtime
+  // `blockStart(anchor)` that inserts the `[` boundary marker before the block's content — so the client cursor
+  // can bound + skip the block by bracket-matching. `blockStart` is a stmt (runs after node refs are captured,
+  // before the block helper fills content), so refs stay valid. Returns the anchor node expr.
+  function blockAnchor(path: number[]): string {
+    html += gen.resumable ? '<!--]-->' : '<!---->';
+    const a: string = nodeExpr(path);
+    if (gen.resumable && !adopt) stmts.push(`${gen.Ha('blockStart')}(${a});`);
+    return a;
+  }
+
   function emitChildren(children: TemplateNode[], basePath: number[], sc: Scope, isHost: boolean = false): void {
     let dom: number = 0;
     // Hoist sibling snippet names so any sibling can `@render` them regardless of
@@ -358,13 +369,13 @@ function compileFragment(
 
   function emitRender(node: RenderNode, path: number[], sc: Scope): void {
     gen.adoptable = false; // blocks/components insert a variable node count → need the marker cursor walk (E1.2c)
-    html += '<!---->';
+    blockAnchor(path);
     stmts.push(`${gen.H('mountChild')}(${nodeExpr(path)}, ${rewrite(node.expr, sc).code});`);
   }
 
   function emitKey(node: KeyNode, path: number[], sc: Scope): void {
     gen.adoptable = false;
-    html += '<!---->';
+    blockAnchor(path);
     const contentFn: string = gen.fn();
     childDecls.push(compileFragment(gen, node.children, sc, contentFn));
     stmts.push(`${gen.H('keyBlock')}(${nodeExpr(path)}, () => ${rewrite(node.expr, sc).code}, ${contentFn});`);
@@ -467,7 +478,7 @@ function compileFragment(
    */
   function emitDynamicElement(node: ElementNode, path: number[], sc: Scope): void {
     gen.adoptable = false;
-    html += '<!---->';
+    blockAnchor(path);
     const anchor: string = nodeExpr(path);
     let tagExpr: string = '""';
     const build: string[] = [];
@@ -592,7 +603,7 @@ function compileFragment(
 
   function emitComponent(node: ElementNode, path: number[], sc: Scope): void {
     gen.adoptable = false;
-    html += '<!---->'; // anchor the component mounts before
+    blockAnchor(path); // anchor the component mounts before
     const anchorVar: string = nodeExpr(path);
 
     // Props: `x="s"` static, `x={expr}` lazy/reactive getter, `on:evt` → onEvt handler.
@@ -689,7 +700,7 @@ function compileFragment(
 
   function emitSlot(node: ElementNode, path: number[], sc: Scope): void {
     gen.adoptable = false;
-    html += '<!---->';
+    blockAnchor(path);
     const anchorVar: string = nodeExpr(path);
     const nameAttr: Attr | undefined = node.attrs.find((a) => a.type === 'static' && a.name === 'name');
     const name: string = nameAttr ? (nameAttr as StaticAttr).value : 'default';
@@ -707,7 +718,7 @@ function compileFragment(
 
   function emitIf(node: IfNode, path: number[], sc: Scope): void {
     gen.adoptable = false;
-    html += '<!---->';
+    blockAnchor(path);
     const head: IfBranch = node.branches[0];
     let aliasVar: string | undefined;
     if (head.alias) {
@@ -737,7 +748,7 @@ function compileFragment(
 
   function emitSwitch(node: SwitchNode, path: number[], sc: Scope): void {
     gen.adoptable = false;
-    html += '<!---->';
+    blockAnchor(path);
     const names: string[] = node.cases.map(() => gen.fn());
     node.cases.forEach((c, i) => childDecls.push(compileFragment(gen, c.children, sc, names[i])));
 
@@ -753,7 +764,7 @@ function compileFragment(
 
   function emitDefer(node: DeferNode, path: number[], sc: Scope): void {
     gen.adoptable = false;
-    html += '<!---->';
+    blockAnchor(path);
     const contentFn: string = gen.fn();
     childDecls.push(compileFragment(gen, node.children, sc, contentFn));
 
@@ -770,7 +781,7 @@ function compileFragment(
 
   function emitAwait(node: AwaitNode, path: number[], sc: Scope): void {
     gen.adoptable = false;
-    html += '<!---->';
+    blockAnchor(path);
     const anchorVar: string = nodeExpr(path);
     const source: string = `() => (${rewrite(node.expr, sc).code})`;
 
@@ -809,7 +820,7 @@ function compileFragment(
 
   function emitFor(node: ForNode, path: number[], sc: Scope): void {
     gen.adoptable = false;
-    html += '<!---->';
+    blockAnchor(path);
     const rowFn: string = gen.fn();
     const forScope: Scope = childScope(sc, {
       [node.item]: '_row.item',

@@ -23,8 +23,64 @@ import { effect } from './reactive.js';
 /** Marker-comment data that isolates a dynamic text node from a preceding static run. @internal */
 export const DYN_TEXT: string = '$';
 
+/**
+ * Block-boundary markers (E1.2c). A control-flow block (`@if`/`@for`/component/…) inserts a runtime-VARIABLE
+ * number of nodes before its `<!---->` anchor, so build-time child indices can't reach the block's extent or
+ * anything after it. The resumable render brackets each block's content with a leading `[` marker ({@link
+ * blockStart}) and an `]` end anchor (its comment data), so a client cursor can find a block's boundaries and
+ * skip past it by bracket-matching ({@link blockEndOf}) — nested blocks nest their own `[`…`]` pairs.
+ * @internal
+ */
+export const BLOCK_START: string = '[';
+/** The block end-anchor's comment data — the resumable target emits `<!--]-->` where eager emits `<!---->`. @internal */
+export const BLOCK_END: string = ']';
+
 function stringify(v: unknown): string {
   return v == null || v === false ? '' : String(v);
+}
+
+/**
+ * CREATE side (the resumable server render): insert a `[` boundary marker immediately before a block's `]`
+ * end anchor, BEFORE the block helper (`ifBlock`/`eachBlock`) fills content in front of that anchor — so the
+ * block's rendered nodes land between `[` and `]` and the client can bound the region. Returns the marker.
+ */
+export function blockStart(anchor: Comment): Comment {
+  const m: Comment = document.createComment(BLOCK_START);
+  anchor.parentNode!.insertBefore(m, anchor);
+  return m;
+}
+
+/**
+ * ADOPT side: given a block's `[` start marker, return its matching `]` end anchor by bracket-depth matching
+ * (each nested `[` +1, each `]` −1; the `]` that returns to depth 0 is this block's end). Interp `$` markers
+ * and plain interp anchors are ignored. Throws on unbalanced markers (a corrupt / non-resumable render).
+ */
+export function blockEndOf(start: Comment): Comment {
+  let depth: number = 1;
+  let n: Node | null = start.nextSibling;
+  while (n) {
+    if (n.nodeType === 8 /* Comment */) {
+      const d: string = (n as Comment).data;
+      if (d === BLOCK_START) depth++;
+      else if (d === BLOCK_END && --depth === 0) return n as Comment;
+    }
+    n = n.nextSibling;
+  }
+  throw new Error('adopt: unbalanced block markers — no matching "]" for a "[" start.');
+}
+
+/**
+ * ADOPT side: remove the server-rendered nodes strictly between a block's `[` start and `]` end (its markers
+ * kept). Used to clear a block's server DOM before re-running its live helper — the island-replay path
+ * (E1.2c): statics/text around a block adopt in place while the block itself re-renders reactively.
+ */
+export function clearBlock(start: Comment, end: Comment): void {
+  let n: ChildNode | null = start.nextSibling as ChildNode | null;
+  while (n && n !== end) {
+    const next: ChildNode | null = n.nextSibling as ChildNode | null;
+    n.remove();
+    n = next;
+  }
 }
 
 /**

@@ -2,7 +2,7 @@ import { test, assert } from '../../../tools/harness.js';
 import { signal, computed, effect, root, type Signal } from '@weave-framework/runtime';
 import * as dom from '@weave-framework/runtime/dom';
 import { resumeEvents, collectResumable, resumableHandler, handlerAttr, type ResumeHandler } from '@weave-framework/runtime/resume';
-import { bindTextResumable, adoptText } from '@weave-framework/runtime/adopt';
+import { bindTextResumable, adoptText, blockStart } from '@weave-framework/runtime/adopt';
 import { snapshot, resume, resumePage, SNAPSHOT_ID, type AdoptFn } from '@weave-framework/runtime/graph';
 import { compileTemplate } from '@weave-framework/compiler';
 
@@ -23,7 +23,8 @@ const rt: typeof dom & {
   resumableHandler: typeof resumableHandler;
   bindTextResumable: typeof bindTextResumable;
   adoptText: typeof adoptText;
-} = { ...dom, signal, computed, effect, root, resumableHandler, bindTextResumable, adoptText };
+  blockStart: typeof blockStart;
+} = { ...dom, signal, computed, effect, root, resumableHandler, bindTextResumable, adoptText, blockStart };
 
 /** Compile in the `resumable` target and hand back the bare `(ctx, slots) => Node` render fn. */
 function compileResumable(html: string, scope: string[] = []): (ctx: unknown, slots?: unknown) => Element {
@@ -286,6 +287,36 @@ test('E1.2b-2: a non-flat resumable fragment (contains a block) emits NO adopt f
     resumable: true,
   });
   assert.ok(!code.includes('render.adopt'), 'a fragment with a block emits no adopt fn (the cursor walk is E1.2c)');
+});
+
+/* ──────────── E1.2c: block-boundary markers (cursor-walk foundation) ──────────── */
+
+test('E1.2c: the resumable render brackets a block with [ … ] markers (adopt-ready), block stays reactive', () => {
+  const show: Signal<boolean> = signal(true);
+  const render = compileResumable('<div>@if (show()) { <i>hi</i> }</div>', ['show']);
+  const div: HTMLElement = render({ show }) as HTMLElement;
+  const i: HTMLElement = div.querySelector('i')!;
+  assert.equal((i.previousSibling as Comment).data, '[', 'a [ boundary marker sits right before the branch content');
+  assert.equal((i.nextSibling as Comment).data, ']', 'the block end anchor carries the ] data (right after the content)');
+  // eager stays byte-for-byte — a plain <!----> anchor, no [ marker
+  const eager = compileTemplate('<div>@if (show()) { <i>hi</i> }</div>', { mode: 'module', scope: ['show'] });
+  assert.ok(!eager.code.includes('blockStart') && !eager.code.includes(']'), 'eager target keeps a plain anchor, no brackets');
+  // the block is still live — toggling removes the branch (brackets are inert to the reactive machinery)
+  show.set(false);
+  assert.ok(!div.querySelector('i'), 'the @if still reacts (the [ / ] markers do not disturb ifBlock)');
+  show.set(true);
+  assert.ok(div.querySelector('i'), 're-renders on toggle back');
+});
+
+test('E1.2c: the resumable module emits blockStart + a ] anchor; imports it from runtime/adopt', () => {
+  const { code } = compileTemplate('<ul>@for (n of items(); track n) { <li>{{ n }}</li> }</ul>', {
+    mode: 'module',
+    scope: ['items'],
+    resumable: true,
+  });
+  assert.ok(code.includes('blockStart('), 'brackets the @for block with a runtime blockStart');
+  assert.ok(code.includes('from "@weave-framework/runtime/adopt"'), 'imports blockStart from the adopt entry');
+  assert.ok(/template\("[^"]*<!--\]-->/.test(code), 'the block end anchor is emitted as a ] comment in the template');
 });
 
 test('E1.2b-2: adopt re-binds the SERVER text node in place — signal update flows, node identity kept, no re-render', () => {
