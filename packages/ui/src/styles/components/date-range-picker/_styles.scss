@@ -43,22 +43,12 @@
   }
 
   // A small calendar glyph (pure CSS: a bordered box with a filled header bar).
+  // Calendar icon — wraps the lucide `calendar` <Icon>; size via the icon-size var, color inherits.
   .weave-date-range-picker__icon {
-    position: relative;
+    display: inline-flex;
     flex: 0 0 auto;
-    width: var(--weave-date-range-picker-icon-size);
-    height: var(--weave-date-range-picker-icon-size);
-    border: 1.5px solid var(--weave-date-range-picker-icon);
-    border-radius: 2px;
-  }
-
-  .weave-date-range-picker__icon::before {
-    content: '';
-    position: absolute;
-    inset: -1.5px -1.5px auto -1.5px;
-    height: 3px;
-    background: var(--weave-date-range-picker-icon);
-    border-radius: 2px 2px 0 0;
+    color: var(--weave-date-range-picker-icon);
+    --weave-icon-size: var(--weave-date-range-picker-icon-size);
   }
 
   .weave-date-range-picker--disabled .weave-date-range-picker__field {

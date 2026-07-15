@@ -14,6 +14,7 @@ import { setup, template, type PaginatorProps, type PaginatorContext, type PageE
 import * as InputMod from '@weave-framework/ui/input';
 import * as SelectMod from '@weave-framework/ui/select';
 import * as ButtonMod from '@weave-framework/ui/button';
+import * as IconMod from '@weave-framework/ui/icon';
 import { toComponent } from '../internal/compose.js';
 
 const rt: typeof dom & { signal: typeof signal; effect: typeof effect } = { ...dom, signal, effect };
@@ -47,11 +48,12 @@ function mount(props: PaginatorProps): Mounted {
       r: unknown,
       k: unknown
     ) => HTMLElement;
-    // Page/nav buttons are <Button>, the jump field <Input>, the page-size <Select>.
+    // Page/nav buttons are <Button>, the jump field <Input>, the page-size <Select> — which itself
+    // composes <Icon> (its chevron), so Icon is passed as the Select's own child map.
     return fn(ctx, rt, {
       Button: toComponent(ButtonMod as never),
       Input: toComponent(InputMod as never),
-      Select: toComponent(SelectMod as never),
+      Select: toComponent(SelectMod as never, { Icon: toComponent(IconMod as never) }),
     });
   });
   document.body.appendChild(nav);

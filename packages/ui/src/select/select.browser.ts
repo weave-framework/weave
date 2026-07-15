@@ -4,6 +4,8 @@ import * as dom from '@weave-framework/runtime/dom';
 import { compileTemplate } from '@weave-framework/compiler';
 import { overlayContainer } from '@weave-framework/ui/cdk';
 import { setup, template, type SelectProps, type SelectContext, type SelectValue } from '@weave-framework/ui/select';
+import * as IconMod from '@weave-framework/ui/icon';
+import { toComponent } from '../internal/compose.js';
 
 const rt: typeof dom & { signal: typeof signal; effect: typeof effect } = { ...dom, signal, effect };
 const tick = (): Promise<void> => new Promise<void>((r) => queueMicrotask(r));
@@ -46,7 +48,7 @@ function mount(props: SelectProps<Opt>, slots: Record<string, () => Node> = {}):
       '_c',
       code.replace('return render(ctx, {});', 'return render;'),
     ) as MakeRender;
-    return make(ctx, rt, {})(ctx, slots);
+    return make(ctx, rt, { Icon: toComponent(IconMod as never) })(ctx, slots);
   });
   document.body.appendChild(root);
   return {
@@ -89,6 +91,13 @@ test('select: renders a combobox trigger showing the placeholder when empty', ()
   assert.equal(field.querySelector('.weave-select__value')?.textContent, 'Pick one');
   assert.ok(field.querySelector('.weave-select__value--placeholder'), 'value shows as placeholder');
   assert.equal(panel(), null, 'closed initially');
+  dispose();
+});
+
+test('select: the chevron is a lucide chevron-down <Icon> (not a CSS caret)', () => {
+  const { field, dispose } = mount({ options: OPTS });
+  const chevron: Element | null = field.querySelector('.weave-select__chevron');
+  assert.ok(chevron?.querySelector('.weave-icon svg'), 'chevron renders a lucide svg');
   dispose();
 });
 

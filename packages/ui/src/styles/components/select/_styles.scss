@@ -32,13 +32,12 @@
     flex: 1 1 auto;
   }
 
-  // A CSS down-caret.
+  // The lucide `chevron-down` <Icon>; rotates 180° when open (below). Size via the icon-size var, color inherits.
   .weave-select__chevron {
-    width: 0;
-    height: 0;
-    border-left: 4px solid transparent;
-    border-right: 4px solid transparent;
-    border-top: 5px solid var(--weave-select-chevron);
+    display: inline-flex;
+    flex: 0 0 auto;
+    color: var(--weave-select-chevron);
+    --weave-icon-size: var(--weave-select-chevron-size);
     transition: transform var(--weave-select-duration) ease;
   }
 

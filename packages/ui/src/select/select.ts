@@ -73,7 +73,7 @@ export const template: string =
   '<button type="button" class="weave-select__clear" tabindex="-1" aria-label={{ clearLabel() }} on:click={{ onClearClick }}>×</button>' +
   '}' +
   '<span class="weave-select__suffix"><slot name="suffix"></slot></span>' +
-  '<span class="weave-select__chevron" aria-hidden="true"></span>' +
+  '<span class="weave-select__chevron" aria-hidden="true"><Icon name={{ \'chevron-down\' }} /></span>' +
   '</div>' +
   '</div>';
 

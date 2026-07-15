@@ -4,6 +4,8 @@ import * as dom from '@weave-framework/runtime/dom';
 import { compileTemplate, inferCtxNames, parseTemplate } from '@weave-framework/compiler';
 import { createDateAdapter, setDirection, type DateAdapter } from '@weave-framework/ui/cdk';
 import { setup, template, type DatepickerProps, type DatepickerContext, type DatepickerControl } from '@weave-framework/ui/datepicker';
+import * as IconMod from '@weave-framework/ui/icon';
+import { toComponent } from '../internal/compose.js';
 
 const rt: typeof dom & { signal: typeof signal; effect: typeof effect } = { ...dom, signal, effect };
 const tick = (): Promise<void> => new Promise<void>((r) => queueMicrotask(r));
@@ -25,7 +27,7 @@ async function mount(props: DatepickerProps): Promise<Mounted> {
     const ctx: DatepickerContext = setup(props);
     const { code } = compileTemplate(template, { mode: 'function', scope: SCOPE });
     const make: MakeRender = new Function('ctx', 'rt', '_c', code.replace('return render(ctx, {});', 'return render;')) as MakeRender;
-    return make(ctx, rt, {})(ctx, {});
+    return make(ctx, rt, { Icon: toComponent(IconMod as never) })(ctx, {});
   });
   document.body.appendChild(root);
   await tick();
@@ -76,6 +78,13 @@ const matchRe = (s: string, re: RegExp, msg?: string): void => assert.ok(re.test
 const JUN15: Date = A.create(2026, 5, 15);
 
 /* ── field ── */
+test('datepicker: the field icon is a lucide calendar <Icon> (not a CSS drawing)', async () => {
+  const m: Mounted = await mount({ control: dateField(JUN15), locale: 'en-US' });
+  const icon: Element | null = m.root.querySelector('.weave-datepicker__icon');
+  assert.ok(icon?.querySelector('.weave-icon svg'), 'calendar renders a lucide svg');
+  m.dispose();
+});
+
 test('datepicker: aria-controls on the field points at the open calendar panel (clears on close)', async () => {
   const m: Mounted = await mount({ control: dateField(JUN15), locale: 'en-US' });
   const f: HTMLElement = field(m);

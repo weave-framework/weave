@@ -11,6 +11,8 @@ import {
   type DateRangePickerControl,
   type DateRange,
 } from '@weave-framework/ui/date-range-picker';
+import * as IconMod from '@weave-framework/ui/icon';
+import { toComponent } from '../internal/compose.js';
 
 const rt: typeof dom & { signal: typeof signal; effect: typeof effect } = { ...dom, signal, effect };
 const tick = (): Promise<void> => new Promise<void>((r) => queueMicrotask(r));
@@ -32,7 +34,7 @@ async function mount(props: DateRangePickerProps): Promise<Mounted> {
     const ctx: DateRangePickerContext = setup(props);
     const { code } = compileTemplate(template, { mode: 'function', scope: SCOPE });
     const make: MakeRender = new Function('ctx', 'rt', '_c', code.replace('return render(ctx, {});', 'return render;')) as MakeRender;
-    return make(ctx, rt, {})(ctx, {});
+    return make(ctx, rt, { Icon: toComponent(IconMod as never) })(ctx, {});
   });
   document.body.appendChild(root);
   await tick();
@@ -79,6 +81,13 @@ test('date-range-picker: renders a combobox field; placeholder shows when empty'
   assert.equal(f.getAttribute('aria-haspopup'), 'dialog');
   matchRe(f.textContent ?? '', /Pick a range/);
   assert.ok(m.root.querySelector('.weave-date-range-picker__value--placeholder'));
+  m.dispose();
+});
+
+test('date-range-picker: the field icon is a lucide calendar <Icon>', async () => {
+  const m: Mounted = await mount({ control: rangeField(null), locale: 'en-US' });
+  const icon: Element | null = m.root.querySelector('.weave-date-range-picker__icon');
+  assert.ok(icon?.querySelector('.weave-icon svg'), 'calendar renders a lucide svg');
   m.dispose();
 });
 

@@ -68,22 +68,12 @@
   }
 
   // A small calendar glyph (pure CSS: a bordered box with a filled header bar).
+  // Calendar icon — wraps the lucide `calendar` <Icon>; size via the icon-size var, color inherits.
   .weave-datepicker__icon {
-    position: relative;
+    display: inline-flex;
     flex: 0 0 auto;
-    width: var(--weave-datepicker-icon-size);
-    height: var(--weave-datepicker-icon-size);
-    border: 1.5px solid var(--weave-datepicker-icon);
-    border-radius: 2px;
-  }
-
-  .weave-datepicker__icon::before {
-    content: '';
-    position: absolute;
-    inset: -1.5px -1.5px auto -1.5px;
-    height: 3px;
-    background: var(--weave-datepicker-icon);
-    border-radius: 2px 2px 0 0;
+    color: var(--weave-datepicker-icon);
+    --weave-icon-size: var(--weave-datepicker-icon-size);
   }
 
   .weave-datepicker--disabled .weave-datepicker__field {
