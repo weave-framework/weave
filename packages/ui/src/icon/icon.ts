@@ -65,6 +65,10 @@ function scrubSvg(el: Element): void {
  */
 export function sanitizeSvg(markup: string): string {
   if (!markup) return '';
+  // Headless SSR/SSG has no `DOMParser`, so we cannot safely scrub here. Fail closed — emit nothing rather
+  // than un-sanitized markup (which could carry `on*`/`javascript:` and would run when the browser parses the
+  // server HTML, before the client takes over). The client re-renders the icon (CSR) and sanitizes it then.
+  if (typeof DOMParser === 'undefined') return '';
   const doc: Document = new DOMParser().parseFromString(markup, 'image/svg+xml');
   const root: Element | null = doc.documentElement;
   if (!root || root.nodeName.toLowerCase() === 'parsererror' || doc.querySelector('parsererror')) return '';

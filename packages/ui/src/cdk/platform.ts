@@ -6,8 +6,15 @@
  * the static, always-available baseline both build on.
  */
 
-/** True when running in a browser (a `document` exists). The SSR-safe guard. */
-export const isBrowser: boolean = typeof document !== 'undefined';
+/**
+ * True when running in a real browser. Detected via `window`, NOT `document`: Weave's headless render
+ * (`runtime/server`) installs a `document` shim as a global so components can build their DOM tree on the
+ * server — so `typeof document` is true there too. `window` is the honest browser signal (the shim never
+ * installs it), so this stays false during SSR/SSG and every `isBrowser` guard below correctly skips the
+ * browser-only paths (layout reads, `matchMedia`, `documentElement.dir`, listeners) that would otherwise
+ * touch APIs the shim doesn't provide.
+ */
+export const isBrowser: boolean = typeof window !== 'undefined';
 
 let _passive: boolean | undefined;
 
