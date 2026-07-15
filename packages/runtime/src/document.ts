@@ -13,6 +13,8 @@ export interface PageArtifact {
   html: string;
   /** A `<script type="application/weave" id="…">` embedding the serialized state, for `resumePage()`. */
   snapshotScript: string;
+  /** The `document.title` the render set (if any) — used as the page `<title>` unless overridden. */
+  title?: string;
 }
 
 /** Options for {@link renderDocument}. */
@@ -32,7 +34,9 @@ export function scriptSafe(json: string): string {
 
 /** Assemble a complete HTML document from a {@link PageArtifact} — the SSG output for one page. */
 export function renderDocument(artifact: PageArtifact, options: DocumentOptions = {}): string {
-  const { title = '', head = '', entry, lang } = options;
+  // An explicit option wins; else the title the render captured (document.title); else none.
+  const title: string = options.title ?? artifact.title ?? '';
+  const { head = '', entry, lang } = options;
   return (
     `<!DOCTYPE html>\n<html${lang ? ` lang="${lang}"` : ''}>\n<head>\n<meta charset="utf-8">\n` +
     (title ? `<title>${title}</title>\n` : '') +

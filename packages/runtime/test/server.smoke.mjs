@@ -144,6 +144,23 @@ console.log('verify:server — headless render to string\n');
   ok(doc.includes(artifact.html) && doc.includes(SNAPSHOT_ID) && doc.includes('<script type="module" src="/app.js">'), 'document embeds the page, snapshot, and client entry');
 }
 
+// 7) renderPage captures document.title set during render; renderDocument uses it (option still wins)
+{
+  const { code } = compileTemplate('<h1>{{ t }}</h1>', { mode: 'function', scope: ['t'] });
+  const renderFn = new Function('rt', '_c', code.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;'))(rt, {});
+  const Titled = rt.defineComponent(renderFn, () => { document.title = 'Signals — Weave'; return { t: 'Signals' }; });
+  const artifact = renderPage(Titled, {});
+  ok(artifact.title === 'Signals — Weave', 'renderPage captures document.title set during render');
+
+  const doc = renderDocument(artifact, { entry: '/app.js' }); // no explicit title → the captured one
+  ok(doc.includes('<title>Signals — Weave</title>'), 'renderDocument falls back to the captured title');
+  ok(renderDocument(artifact, { title: 'Override' }).includes('<title>Override</title>'), 'an explicit title still wins');
+
+  // a later render with no title resets — the prior route's title must not leak
+  const Plain = rt.defineComponent(renderFn, () => ({ t: 'x' }));
+  ok(renderPage(Plain, {}).title === undefined, 'title is reset between renders (no leak)');
+}
+
 console.log('');
 if (failures) {
   console.error(`✖ ${failures} server-render check(s) failed.`);

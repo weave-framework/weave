@@ -184,8 +184,13 @@ export async function buildSsg(config: SsgBuildConfig): Promise<void> {
       routes: config.routes ?? ['/'],
       render: async (route: string): Promise<PageArtifact> => {
         const artifact: PageArtifact = await server.render(route);
-        // Wrap the server HTML in the #id mount target so the client CSR mounts over it.
-        return { html: `<div id="${id}">${artifact.html}</div>`, snapshotScript: artifact.snapshotScript };
+        // Wrap the server HTML in the #id mount target so the client CSR mounts over it; keep the captured
+        // title so `renderDocument` fills each page's <title>.
+        return {
+          html: `<div id="${id}">${artifact.html}</div>`,
+          snapshotScript: artifact.snapshotScript,
+          title: artifact.title,
+        };
       },
       document: (): DocumentOptions => ({ title: config.title, head, entry: '/main.js', lang: config.lang }),
     });

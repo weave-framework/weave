@@ -39,11 +39,13 @@ const BUDGETS = [
   // Budget raised 2048 → 2560 (deliberate) when E1.2 added resumePage + SNAPSHOT_ID; still a lean resume entry.
   { label: 'runtime/graph (E0.3/E1.2 resume)', files: ['packages/runtime/dist/graph.js'], budget: 2_560 },
   // runtime/server (E0.4): headless render — the in-house server DOM + parser + serializer + renderToString.
-  // Server-only, its own line — 0 bytes for a client SPA. Baseline 5.8 KB (server.js + server-dom.js).
+  // Server-only, its own line — 0 bytes for a client SPA (I3). Baseline 5.8 KB; budget raised 7168 → 7680
+  // (deliberate) when E1.3d added the SSG document-<title> capture (settable server `document.title` +
+  // renderPage read-back). The SPA core (20.9 KB) is untouched — this line never ships to a browser.
   {
     label: 'runtime/server (E0.4 headless)',
     files: ['packages/runtime/dist/server.js', 'packages/runtime/dist/server-dom.js', 'packages/runtime/dist/document.js'],
-    budget: 7_168,
+    budget: 7_680,
   },
 ];
 

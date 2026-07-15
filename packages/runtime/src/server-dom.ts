@@ -460,6 +460,9 @@ function makeDocument(): Record<string, unknown> {
     createDocumentFragment: (): SFragment => new SFragment(),
     querySelector: (sel: string): SElement | null => body.querySelector(sel),
     body,
+    // A settable `document.title` so an app that sets it during render (e.g. a route-title effect) has a
+    // place to write; the SSG render reads it back to fill the page's <title>.
+    title: '',
   };
 }
 

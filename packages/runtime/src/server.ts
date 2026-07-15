@@ -54,9 +54,14 @@ export function renderPage(
   component: Component,
   options: { props?: Record<string, unknown>; state?: Record<string, unknown> } = {}
 ): PageArtifact {
+  // Reset the shared title so a prior route's value never leaks; the render may set `document.title`
+  // (e.g. a route-title effect), which we capture below for the page's <title>.
+  const doc: { title?: string } | undefined = (globalThis as { document?: { title?: string } }).document;
+  if (doc) doc.title = '';
   const html: string = renderComponent(component, options.props);
   const json: string = scriptSafe(JSON.stringify(snapshot(options.state ?? {})));
-  return { html, snapshotScript: `<script type="application/weave" id="${SNAPSHOT_ID}">${json}</script>` };
+  const title: string | undefined = doc?.title || undefined;
+  return { html, snapshotScript: `<script type="application/weave" id="${SNAPSHOT_ID}">${json}</script>`, title };
 }
 
 // The document-assembly layer is DOM-free — re-exported here for convenience, defined in `./document`.
