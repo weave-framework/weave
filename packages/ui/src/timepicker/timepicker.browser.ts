@@ -3,6 +3,8 @@ import { signal, effect, createOwner, runInOwner, disposeOwner, type Signal, typ
 import * as dom from '@weave-framework/runtime/dom';
 import { compileTemplate, inferCtxNames, parseTemplate } from '@weave-framework/compiler';
 import { setup, template, type TimepickerProps, type TimepickerContext, type TimepickerControl, type TimeValue } from '@weave-framework/ui/timepicker';
+import * as IconMod from '@weave-framework/ui/icon';
+import { toComponent } from '../internal/compose.js';
 
 const rt: typeof dom & { signal: typeof signal; effect: typeof effect } = { ...dom, signal, effect };
 const tick = (): Promise<void> => new Promise<void>((r) => queueMicrotask(r));
@@ -23,7 +25,7 @@ async function mount(props: TimepickerProps): Promise<Mounted> {
     const ctx: TimepickerContext = setup(props);
     const { code } = compileTemplate(template, { mode: 'function', scope: SCOPE });
     const make: MakeRender = new Function('ctx', 'rt', '_c', code.replace('return render(ctx, {});', 'return render;')) as MakeRender;
-    return make(ctx, rt, {})(ctx, {});
+    return make(ctx, rt, { Icon: toComponent(IconMod as never) })(ctx, {});
   });
   document.body.appendChild(root);
   await tick();
@@ -90,6 +92,20 @@ test('timepicker: clicking opens hour:minute spinner columns + AM/PM (12h)', asy
   assert.equal(colValue(cols()[0]), '9', 'hour');
   assert.equal(colValue(cols()[1]), '30', 'minute');
   assert.equal(ampm()!.textContent, 'AM');
+  m.dispose();
+});
+
+test('timepicker: uses lucide icons — clock <Icon> in the field, chevron svgs in the spinners', async () => {
+  const m: Mounted = await mount({ control: timeField(T0930), locale: 'en-US' });
+  // Clock: the composed <Icon> rendered a real svg (not the old CSS-drawn ring).
+  const clock: Element | null = field(m).querySelector('.weave-timepicker__icon');
+  assert.ok(clock?.querySelector('.weave-icon svg'), 'clock is a composed <Icon> rendering a lucide svg');
+  // Spinners: chevron svgs, not ▲/▼ glyph text.
+  field(m).click();
+  await tick();
+  const upBtn: HTMLButtonElement = up(cols()[0]);
+  assert.ok(upBtn.querySelector('svg'), 'increment spinner is a lucide chevron svg');
+  assert.equal((upBtn.textContent ?? '').trim(), '', 'no ▲ glyph text on the spinner');
   m.dispose();
 });
 

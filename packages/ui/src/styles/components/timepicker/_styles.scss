@@ -1,6 +1,6 @@
 // timepicker — styles() mixin. An underline trigger field (shared field-underline helper) with
-// a clock icon; the panel reuses the overlay-panel chrome and lays out hour/minute spinner
-// columns (each a role=spinbutton with ▲/▼) + an AM/PM toggle. Forwarded by ./_index.scss.
+// a lucide `clock` icon; the panel reuses the overlay-panel chrome and lays out hour/minute spinner
+// columns (each a role=spinbutton with lucide chevron-up/down) + an AM/PM toggle. Forwarded by ./_index.scss.
 @use '../../helpers' as helpers;
 
 @mixin styles() {
@@ -37,25 +37,12 @@
     @include helpers.clear-button(var(--weave-timepicker-placeholder), var(--weave-timepicker-text));
   }
 
-  // A clock glyph (pure CSS: a ring with two hands).
+  // Clock icon — wraps the lucide `clock` <Icon>; size + color flow to it via the icon-size var + currentColor.
   .weave-timepicker__icon {
-    position: relative;
+    display: inline-flex;
     flex: 0 0 auto;
-    width: var(--weave-timepicker-icon-size);
-    height: var(--weave-timepicker-icon-size);
-    border: 1.5px solid var(--weave-timepicker-icon);
-    border-radius: 50%;
-  }
-
-  .weave-timepicker__icon::before {
-    content: '';
-    position: absolute;
-    left: 50%;
-    top: 25%;
-    width: 1.5px;
-    height: 30%;
-    background: var(--weave-timepicker-icon);
-    transform: translateX(-50%);
+    color: var(--weave-timepicker-icon);
+    --weave-icon-size: var(--weave-timepicker-icon-size);
   }
 
   .weave-timepicker--disabled .weave-timepicker__field {
@@ -104,8 +91,14 @@
     width: var(--weave-timepicker-spin-size);
     height: var(--weave-timepicker-spin-size);
     color: var(--weave-timepicker-spin);
-    font-size: var(--weave-timepicker-spin-glyph-size);
     cursor: pointer;
+  }
+
+  // The lucide chevron svg (from the icon registry) — sized off the spin-glyph token, stroke from the icon token.
+  .weave-timepicker__spin svg {
+    width: var(--weave-timepicker-spin-glyph-size);
+    height: var(--weave-timepicker-spin-glyph-size);
+    stroke-width: var(--weave-icon-stroke);
   }
 
   .weave-timepicker__spin:hover {

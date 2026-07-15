@@ -18,6 +18,7 @@
 import { signal, effect, onDispose, type Signal } from '@weave-framework/runtime';
 import { createOverlay, connectedPosition, type OverlayRef } from '../cdk/index.js';
 import { buildPositions, type MenuPosition } from '../shared/positions.js';
+import { activeIcons } from '../icon/icons.js';
 
 /** A time of day, 24-hour internally. */
 export interface TimeValue {
@@ -77,7 +78,7 @@ export const template: string =
   '@if (showClear()) {' +
   '<button type="button" class="weave-timepicker__clear" tabindex="-1" aria-label={{ clearLabel() }} on:click={{ onClearClick }}>×</button>' +
   '}' +
-  '<span class="weave-timepicker__icon" aria-hidden="true"></span>' +
+  '<span class="weave-timepicker__icon" aria-hidden="true"><Icon name={{ \'clock\' }} /></span>' +
   '</div>' +
   '</div>';
 
@@ -117,6 +118,12 @@ export function setup(props: TimepickerProps): TimepickerContext {
 
   const resolved: Intl.ResolvedDateTimeFormatOptions = new Intl.DateTimeFormat(props.locale, { hour: 'numeric' }).resolvedOptions();
   const use24: boolean = props.use24 ?? !resolved.hour12;
+
+  // Spinner arrows are lucide chevrons from the active icon registry (resolved once, with the
+  // component's context in scope) — the same source `<Icon>` uses, not hand-drawn glyphs.
+  const icons = activeIcons();
+  const chevronUp: string = icons.resolve('chevron-up') ?? '';
+  const chevronDown: string = icons.resolve('chevron-down') ?? '';
 
   let overlay: OverlayRef | null = null;
   let panel: HTMLElement | null = null;
@@ -181,12 +188,12 @@ export function setup(props: TimepickerProps): TimepickerContext {
   };
 
   /* ── panel ── */
-  function spinButton(glyph: string, label: string, onClick: () => void): HTMLButtonElement {
+  function spinButton(svg: string, label: string, onClick: () => void): HTMLButtonElement {
     const b: HTMLButtonElement = document.createElement('button');
     b.type = 'button';
     b.className = 'weave-timepicker__spin';
     b.setAttribute('aria-label', label);
-    b.textContent = glyph;
+    b.innerHTML = svg; // a lucide chevron (from the icon registry)
     b.addEventListener('click', onClick);
     return b;
   }
@@ -205,10 +212,10 @@ export function setup(props: TimepickerProps): TimepickerContext {
       col.setAttribute('aria-valuemin', '0');
       col.setAttribute('aria-valuemax', '59');
     }
-    const up: HTMLButtonElement = spinButton('▲', `Increment ${kind}`, inc);
+    const up: HTMLButtonElement = spinButton(chevronUp, `Increment ${kind}`, inc);
     const value: HTMLElement = document.createElement('span');
     value.className = 'weave-timepicker__col-value';
-    const down: HTMLButtonElement = spinButton('▼', `Decrement ${kind}`, dec);
+    const down: HTMLButtonElement = spinButton(chevronDown, `Decrement ${kind}`, dec);
     col.append(up, value, down);
     col.addEventListener('keydown', (e: KeyboardEvent) => {
       if (e.key === 'ArrowUp') {
