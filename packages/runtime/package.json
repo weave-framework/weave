@@ -12,6 +12,7 @@
     "./dom": "./src/dom.ts",
     "./serialize": "./src/serialize.ts",
     "./resume": "./src/resume.ts",
+    "./graph": "./src/graph.ts",
     "./package.json": "./package.json"
   },
   "files": [
@@ -46,6 +47,10 @@
       "./resume": {
         "types": "./dist/resume.d.ts",
         "import": "./dist/resume.js"
+      },
+      "./graph": {
+        "types": "./dist/graph.d.ts",
+        "import": "./dist/graph.js"
       },
       "./package.json": "./package.json"
     }

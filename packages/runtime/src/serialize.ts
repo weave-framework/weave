@@ -138,14 +138,19 @@ export function serialize(value: unknown, options?: SerializeOptions): Wire {
       return ['p', n];
     }
     if (t === 'bigint') return ['big', (v as bigint).toString()];
+    // Custom types are consulted FIRST for any non-primitive — so a registered {@link SerializableType}
+    // can claim even a FUNCTION (e.g. a Weave signal, encoded as its value; see runtime/graph). Only an
+    // UNCLAIMED function/symbol is non-serializable.
+    if (t === 'function' || t === 'object') {
+      for (const type of types) {
+        if (type.test(v)) return ['cls', type.tag, ref(type.encode(v))];
+      }
+    }
     if (t === 'function' || t === 'symbol') {
       throw new SerializeError(`Cannot serialize a ${t}${t === 'function' ? ' (register a SerializableType, or use a resumable handler ref)' : ''}.`);
     }
-    // objects
+    // objects (null handled above; custom types already tried)
     const obj: object = v as object;
-    for (const type of types) {
-      if (type.test(obj)) return ['cls', type.tag, ref(type.encode(obj))];
-    }
     if (obj instanceof Date) return ['date', obj.getTime()];
     if (obj instanceof RegExp) return ['re', obj.source, obj.flags];
     if (Array.isArray(obj)) return ['arr', obj.map((el) => ref(el))];
