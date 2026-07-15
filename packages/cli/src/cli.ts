@@ -69,10 +69,16 @@ export async function main(argv: string[]): Promise<void> {
           const routes: string[] =
             config.ssgRoutes ?? (config.routesDir ? staticRoutePaths(config.routesDir) : ['/']);
           const routed: boolean = config.routesDir != null || routes.some((r) => r !== '/');
+          // Islands mode (E1.4): both entries switch to resume — the client adopts the server DOM in place.
+          const resume: boolean = config.ssgResume ?? false;
+          const clientElements: CustomElement[] = discoverCustomElements(config.root);
           await buildSsg({
-            virtualEntry: virtualEntryFor(config)!,
+            virtualEntry: {
+              code: generateEntry(config.rootComponent, config.mount, config.root, clientElements, { resume }),
+              resolveDir: config.root,
+            },
             serverEntry: {
-              code: generateServerEntry(config.rootComponent, config.root, { routed }),
+              code: generateServerEntry(config.rootComponent, config.root, { routed, resumable: resume }),
               resolveDir: config.root,
             },
             mount: config.mount,
@@ -82,6 +88,7 @@ export async function main(argv: string[]): Promise<void> {
             styleLang: config.styleLang,
             styles: config.styles,
             publicDir: config.publicDir,
+            resume,
           });
           console.log(`weave build --ssg → ${outDir}/ (${routes.length} route${routes.length === 1 ? '' : 's'})`);
           return;

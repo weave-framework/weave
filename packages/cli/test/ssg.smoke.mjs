@@ -27,6 +27,10 @@ const entry = `
   export { generateServerEntry, generateEntry, discoverCustomElements } from './packages/cli/src/entry.ts';
   export { buildSsg } from './packages/cli/src/build.ts';
   export { staticRoutePaths } from './packages/cli/src/routes.ts';
+  // Re-exporting from runtime/graph forces its module (and its top-level signal (de)serializer registration)
+  // into this bundle, so the embedded snapshot round-trips here. A bare side-effect import gets tree-shaken.
+  export { ROOT_ID } from '@weave-framework/runtime/graph';
+  export { deserialize } from '@weave-framework/runtime/serialize';
 `;
 const cacheDir = join(repo, 'node_modules', '.weave');
 mkdirSync(cacheDir, { recursive: true });
@@ -42,7 +46,7 @@ await esbuild({
   external: ['esbuild'],
   outfile: out,
 });
-const { generateServerEntry, generateEntry, discoverCustomElements, buildSsg, staticRoutePaths } = await import(pathToFileURL(out).href);
+const { generateServerEntry, generateEntry, discoverCustomElements, buildSsg, staticRoutePaths, deserialize } = await import(pathToFileURL(out).href);
 
 console.log('verify:ssg — SSG build plumbing\n');
 
@@ -212,9 +216,68 @@ try {
   rmSync(pages, { recursive: true, force: true });
 }
 
+/* ── Part 5 — E1.4 ISLANDS: buildSsg({ resume: true }) — resumable bundles, embedded state map, adopt client ── */
+
+const iapp = mkdtempSync(join(here, '.smoke-ssg-iapp-'));
+const iout = mkdtempSync(join(here, '.smoke-ssg-iout-'));
+try {
+  // A real interactive component: setup returns a writable signal AND a handler function. The handler must NOT
+  // break the snapshot (it is dropped as non-state) — the whole build completing proves the strip works.
+  writeFileSync(
+    join(iapp, 'App.ts'),
+    `import { signal, type Signal } from '@weave-framework/runtime';\n` +
+      `export function setup(): { count: Signal<number>; inc: () => void } {\n` +
+      `  const count = signal(3);\n` +
+      `  const inc = () => count.set((n) => n + 1);\n` +
+      `  return { count, inc };\n}\n`
+  );
+  writeFileSync(
+    join(iapp, 'App.html'),
+    `<main class="app"><h1>Islands</h1><button on:click={{ inc }}>count {{ count() }}</button></main>`
+  );
+
+  const rootComponent = join(iapp, 'App.ts');
+  await buildSsg({
+    virtualEntry: { code: generateEntry(rootComponent, '#app', iapp, discoverCustomElements(iapp), { resume: true }), resolveDir: iapp },
+    serverEntry: { code: generateServerEntry(rootComponent, iapp, { resumable: true }), resolveDir: iapp },
+    mount: '#app',
+    outDir: iout,
+    minify: false,
+    styleLang: 'css',
+    title: 'Islands',
+    lang: 'en',
+    resume: true,
+  });
+
+  const index = join(iout, 'index.html');
+  ok(existsSync(index), 'islands: index.html was written (build completed — the handler function did not break the snapshot)');
+  const doc = existsSync(index) ? readFileSync(index, 'utf8') : '';
+
+  // (a) the server render used the RESUMABLE target: data-won event marker + dynamic-text marker in the HTML
+  ok(/data-won-click="w0#\d+"/.test(doc), 'islands: resumable event marker (data-won-click) in the server HTML');
+  ok(doc.includes('<!--$-->'), 'islands: dynamic-text marker isolates the reactive text for adopt');
+  ok(/count <!--\$-->3<!---->/.test(doc), 'islands: server evaluated the binding (count() → 3, isolated by its marker)');
+
+  // (b) the embedded snapshot is the per-instance MAP — $root present, count round-trips, inc dropped
+  const m = doc.match(/<script type="application\/weave" id="__weave_snapshot__">([\s\S]*?)<\/script>/);
+  ok(!!m, 'islands: the snapshot <script> is embedded');
+  const wire = m ? JSON.parse(m[1].replace(/\\u003c/g, '<')) : null;
+  const state = wire ? deserialize(wire) : null;
+  ok(state && typeof state === 'object' && '$root' in state, 'islands: snapshot is the instance-state map (has $root)');
+  ok(state && typeof state.$root.count === 'function' && state.$root.count() === 3, 'islands: $root.count round-trips as a live signal @ 3');
+  ok(state && !('inc' in state.$root), 'islands: the handler `inc` was dropped from the captured state (re-derived on the client)');
+
+  // (c) the client bundle is the RESUME entry (adopts) — not a CSR remount
+  const mainJs = readFileSync(join(iout, 'main.js'), 'utf8');
+  ok(mainJs.includes('resumePage') && !/\bmountComponent\(/.test(mainJs), 'islands: client bundle resumes (resumePage), no CSR mountComponent');
+} finally {
+  rmSync(iapp, { recursive: true, force: true });
+  rmSync(iout, { recursive: true, force: true });
+}
+
 console.log('');
 if (failures) {
   console.error(`✖ ${failures} ssg check(s) failed.`);
   process.exit(1);
 }
-console.log('✓ SSG build works end-to-end — root-render (E1.3b) + routed per-route (E1.3c) + route derivation.');
+console.log('✓ SSG build works end-to-end — root-render (E1.3b) + routed (E1.3c) + route derivation + islands resume (E1.4).');

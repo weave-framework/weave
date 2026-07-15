@@ -83,9 +83,24 @@ export function collectStates(fn: () => void): Record<string, unknown> {
  * Register a resumable component instance's ctx under its compile-time id — called from a resumable component's
  * OWN render preamble when the parent tagged it with a `$wid` prop (static-position child). No-op outside a
  * {@link collectStates} session (so it costs nothing on the client / in a plain SPA — no runtime/dom change).
+ *
+ * Only SERIALIZABLE state is captured: writable signals + plain data. A raw handler function (`inc: () => …`)
+ * is NOT state — the client re-derives it from the render's `handlers` factory over the resumed ctx — and
+ * `serialize` would throw on it, so it is dropped here. Signals are callable too, but the signal codec claims
+ * them (isSignal), so they are kept. (A `computed` is a bare getter with no writable surface, so it is dropped
+ * with the handlers — a template that binds a computed on a resumed component is a known gap: expose a writable
+ * signal instead. Nested functions deeper than the top level are left to `serialize`'s guard.)
  */
 export function registerState(id: string, ctx: unknown): void {
-  if (collector) collector[id] = ctx;
+  if (!collector) return;
+  const src: Record<string, unknown> = ctx as Record<string, unknown>;
+  const clean: Record<string, unknown> = {};
+  for (const key of Object.keys(src)) {
+    const v: unknown = src[key];
+    if (typeof v === 'function' && !isSignal(v)) continue; // a handler/computed — re-derived, not state
+    clean[key] = v;
+  }
+  collector[id] = clean;
 }
 
 /**

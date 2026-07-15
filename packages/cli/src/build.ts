@@ -31,6 +31,8 @@ export interface BuildConfig {
   index?: string;
   /** Wipe the output dir before building so it is a clean, self-contained artifact (default false — config mode opts in). */
   clean?: boolean;
+  /** Phase E (E1.4): compile every component in the `resumable` target (for an SSG-resume client bundle). Default false. */
+  resumable?: boolean;
 }
 
 export async function build(config: BuildConfig): Promise<void> {
@@ -50,7 +52,7 @@ export async function build(config: BuildConfig): Promise<void> {
     outdir: outDir,
     minify: config.minify ?? true,
     plugins: [
-      weave(state, { styleLang: config.styleLang }),
+      weave(state, { styleLang: config.styleLang, resumable: config.resumable }),
       ...(ve ? [entryPlugin(ve.code, ve.resolveDir)] : []),
     ],
   });
@@ -110,6 +112,14 @@ export interface SsgBuildConfig {
   title?: string;
   /** `<html lang>` for the generated documents. */
   lang?: string;
+  /**
+   * Phase E (E1.4) — the islands mode. Compile BOTH bundles in the `resumable` target, so the server render
+   * embeds the per-instance state snapshot + resume markers and the client entry ADOPTS that DOM in place
+   * (`resumePage`) instead of a CSR remount. The caller must have generated the entries to match — the client
+   * with `generateEntry(..., { resume: true })`, the server with `generateServerEntry(..., { resumable: true })`.
+   * Default false → today's first-paint-shell + CSR-remount.
+   */
+  resume?: boolean;
 }
 
 /** The mount `#id` an SSG shell wraps the app in. Fails loud if the selector is not a plain `#id`. */
@@ -134,7 +144,8 @@ interface ServerRenderer {
 async function loadServerEntry(
   serverEntry: { code: string; resolveDir: string },
   styleLang?: StyleLang,
-  minify?: boolean
+  minify?: boolean,
+  resumable?: boolean
 ): Promise<ServerRenderer> {
   const dir: string = await mkdtemp(join(tmpdir(), 'weave-ssg-'));
   const state: WeaveState = { css: [] }; // the server render needs no CSS collection — discarded
@@ -146,7 +157,7 @@ async function loadServerEntry(
     outdir: dir,
     outExtension: { '.js': '.mjs' }, // a bare .js in a temp dir is CommonJS to Node; force ESM
     minify: minify ?? false,
-    plugins: [weave(state, { styleLang }), entryPlugin(serverEntry.code, serverEntry.resolveDir)],
+    plugins: [weave(state, { styleLang, resumable }), entryPlugin(serverEntry.code, serverEntry.resolveDir)],
   });
   const mod: ServerRenderer = (await import(pathToFileURL(join(dir, 'server.mjs')).href)) as ServerRenderer;
   return { render: mod.render, dispose: () => rm(dir, { recursive: true, force: true }) };
@@ -160,7 +171,10 @@ async function loadServerEntry(
  *
  * Root-only (E1.3b) renders one route (`/`); with the router-aware server entry (E1.3c) each route in
  * {@link SsgBuildConfig.routes} is rendered with `setServerLocation` so the router resolves it headlessly.
- * `resumePage` (adopt the server DOM instead of re-rendering) is a later slice, once per-page state is captured.
+ *
+ * `config.resume` (E1.4) flips both bundles to the `resumable` target: the server render embeds a per-instance
+ * state snapshot + resume markers, and the client entry ADOPTS that DOM in place (`resumePage`) rather than
+ * CSR-remounting — static content ships 0 JS. Default (false) is the first-paint-shell + CSR-remount.
  */
 export async function buildSsg(config: SsgBuildConfig): Promise<void> {
   // 1. The client bundle + app.css + public root — same output as a normal build, minus the HTML shell
@@ -173,11 +187,12 @@ export async function buildSsg(config: SsgBuildConfig): Promise<void> {
     styles: config.styles,
     publicDir: config.publicDir,
     clean: true,
+    resumable: config.resume,
   });
   // 2. Render each route headlessly (bundle + import the server entry once), writing a document per route.
   const id: string = mountId(config.mount);
   const head: string = '<link rel="stylesheet" href="/app.css">';
-  const server: ServerRenderer = await loadServerEntry(config.serverEntry, config.styleLang, config.minify);
+  const server: ServerRenderer = await loadServerEntry(config.serverEntry, config.styleLang, config.minify, config.resume);
   try {
     await prerender({
       outDir: config.outDir,

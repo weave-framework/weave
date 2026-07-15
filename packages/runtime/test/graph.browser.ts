@@ -71,6 +71,21 @@ test('collectStates: gathers each registered component ctx into one map, keyed b
   assert.deepEqual(Object.keys(empty), [], 'the collector reset — a post-session registerState leaked nothing');
 });
 
+test('registerState: drops raw handler functions (not state) but keeps signals — so the ctx serializes', () => {
+  const count: Signal<number> = signal(2);
+  const inc = (): void => count.set((n) => n + 1);
+  const states = collectStates(() => {
+    registerState('c0', { count, inc, label: 'hi' });
+  });
+  const c0 = states.c0 as Record<string, unknown>;
+  assert.is(c0.count, count, 'the writable signal is kept (it IS state)');
+  assert.equal(c0.label, 'hi', 'plain data is kept');
+  assert.ok(!('inc' in c0), 'the handler function was dropped (re-derived on the client, and unserializable)');
+  // proof the captured ctx now crosses the wire (a raw function would have thrown in serialize)
+  const back = deserialize(snapshot(states)) as Record<string, Record<string, unknown>>;
+  assert.ok(typeof back.c0.count === 'function' && (back.c0.count as Signal<number>)() === 2, 'the filtered ctx round-trips (count @ 2)');
+});
+
 test('collectStates: the whole map snapshots + resumes, sharing a signal across components by structural sharing', () => {
   // a signal SHARED by two component instances (e.g. a store) must deserialize to ONE instance, not two
   const shared: Signal<number> = signal(10);

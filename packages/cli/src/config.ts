@@ -67,8 +67,13 @@ export interface WeaveConfig {
   styles?: string[];
   dev?: { port?: number; proxy?: ProxyTable };
   build?: { minify?: boolean };
-  /** Static generation (`weave build --ssg`): the routes to prerender, one `index.html` each (default `['/']`). */
-  ssg?: { routes?: string[] };
+  /**
+   * Static generation (`weave build --ssg`): the routes to prerender, one `index.html` each (default `['/']`).
+   * `resume` (Phase E, E1.4) opts into the islands build — the server embeds a per-instance state snapshot and
+   * the client ADOPTS that DOM in place instead of a CSR remount (`setup` never re-runs; static content ships
+   * 0 JS). Default (false) is the first-paint-shell + CSR-remount.
+   */
+  ssg?: { routes?: string[]; resume?: boolean };
 }
 
 /** Identity helper so a `weave.config.ts` gets full type-checking + inference. */
@@ -100,6 +105,8 @@ export interface ResolvedConfig {
   minify: boolean;
   /** Explicit routes to prerender with `weave build --ssg`; when unset, they are derived from `routesDir`. */
   ssgRoutes?: string[];
+  /** Islands mode (E1.4): SSG server embeds the state snapshot + the client resumes/adopts (see {@link WeaveConfig.ssg}). */
+  ssgResume?: boolean;
 }
 
 const CONFIG_NAMES: string[] = ['weave.config.ts', 'weave.config.js', 'weave.config.mjs', 'weave.config.json'];
@@ -176,5 +183,6 @@ function resolveConfig(raw: WeaveConfig, root: string): ResolvedConfig {
     proxy: raw.dev?.proxy,
     minify: raw.build?.minify ?? true,
     ssgRoutes: raw.ssg?.routes,
+    ssgResume: raw.ssg?.resume,
   };
 }
