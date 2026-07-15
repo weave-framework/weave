@@ -51,6 +51,7 @@ class Gen {
   used: Set<string> = new Set<string>(); // @weave-framework/runtime/dom helpers
   usedCore: Set<string> = new Set<string>(); // @weave-framework/runtime primitives (computed, …)
   usedResume: Set<string> = new Set<string>(); // @weave-framework/runtime/resume helpers (resumable target)
+  usedAdopt: Set<string> = new Set<string>(); // @weave-framework/runtime/adopt helpers (resumable target)
   usedComponents: Set<string> = new Set<string>(); // PascalCase child tags referenced in module mode
   templates: string[] = [];
   /**
@@ -84,6 +85,11 @@ class Gen {
   /** Reference a `@weave-framework/runtime/resume` helper (resumable target only; via `rt.` in function mode). */
   Hr(name: string): string {
     this.usedResume.add(name);
+    return this.mode === 'function' ? `rt.${name}` : name;
+  }
+  /** Reference a `@weave-framework/runtime/adopt` helper (resumable target only; via `rt.` in function mode). */
+  Ha(name: string): string {
+    this.usedAdopt.add(name);
     return this.mode === 'function' ? `rt.${name}` : name;
   }
   /** A stable, per-compile event-site id (`w0`, `w1`, …) — the resumable handler reference prefix. */
@@ -152,7 +158,12 @@ export function compileTemplateAst(ast: TemplateNode[], options: CompileOptions 
   const resumeImport: string = gen.usedResume.size
     ? `import { ${[...gen.usedResume].sort().join(', ')} } from "@weave-framework/runtime/resume";\n`
     : '';
-  const imports: string = domImport + '\n' + coreImport + resumeImport;
+  // Same separate-entry rationale as resume: the adopt helpers live in `@weave-framework/runtime/adopt`, so
+  // an eager build never imports them (SPA core stays flat; invariant I3).
+  const adoptImport: string = gen.usedAdopt.size
+    ? `import { ${[...gen.usedAdopt].sort().join(', ')} } from "@weave-framework/runtime/adopt";\n`
+    : '';
+  const imports: string = domImport + '\n' + coreImport + resumeImport + adoptImport;
 
   // With a handlers factory, emit `render` as a declaration so we can attach + export it alongside `handlers`;
   // otherwise keep the exact eager shape (`export default function render …`) byte-for-byte.
@@ -322,9 +333,13 @@ function compileFragment(
       case 'interp': {
         html += '<!---->';
         const { code, reactive } = rewrite(node.expr, sc);
+        // The resumable target isolates a reactive text node with a marker (bindTextResumable) so the client
+        // can adopt exactly it (adjacent static+dynamic text would otherwise merge). Static text and the eager
+        // target are byte-for-byte unchanged.
+        const bind: string = gen.resumable ? gen.Ha('bindTextResumable') : gen.H('bindText');
         stmts.push(
           reactive
-            ? `${gen.H('bindText')}(${nodeExpr(path)}, () => (${code}));`
+            ? `${bind}(${nodeExpr(path)}, () => (${code}));`
             : `${gen.H('setText')}(${nodeExpr(path)}, ${code});`
         );
         return;

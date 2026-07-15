@@ -2,6 +2,7 @@ import { test, assert } from '../../../tools/harness.js';
 import { signal, computed, effect, root, type Signal } from '@weave-framework/runtime';
 import * as dom from '@weave-framework/runtime/dom';
 import { resumeEvents, collectResumable, resumableHandler, handlerAttr, type ResumeHandler } from '@weave-framework/runtime/resume';
+import { bindTextResumable } from '@weave-framework/runtime/adopt';
 import { snapshot, resume, resumePage, SNAPSHOT_ID } from '@weave-framework/runtime/graph';
 import { compileTemplate } from '@weave-framework/compiler';
 
@@ -20,7 +21,8 @@ const rt: typeof dom & {
   effect: typeof effect;
   root: typeof root;
   resumableHandler: typeof resumableHandler;
-} = { ...dom, signal, computed, effect, root, resumableHandler };
+  bindTextResumable: typeof bindTextResumable;
+} = { ...dom, signal, computed, effect, root, resumableHandler, bindTextResumable };
 
 /** Compile in the `resumable` target and hand back the bare `(ctx, slots) => Node` render fn. */
 function compileResumable(html: string, scope: string[] = []): (ctx: unknown, slots?: unknown) => Element {
@@ -47,17 +49,22 @@ test('resumable module emits a handler ref + imports from runtime/resume, not li
   assert.ok(code.includes('resumableHandler('), 'emits a resumable handler ref');
   assert.ok(code.includes('"click"') && code.includes('"w0"'), 'passes the event + a stable site ref');
   assert.ok(!code.includes('listen('), 'no eager listener in the resumable target');
-  assert.ok(code.includes('bindText('), 'non-event bindings are unchanged');
+  // Reactive text isolates via bindTextResumable (adopt marker) in this target, imported from runtime/adopt.
+  assert.ok(code.includes('bindTextResumable('), 'reactive text uses the marker-isolating bind');
+  assert.ok(code.includes('from "@weave-framework/runtime/adopt"'), 'imports the adopt entry');
+  assert.ok(!/\bbindText\(/.test(code), 'no plain eager bindText in the resumable target');
 });
 
-test('eager (default) target is unchanged — listen(), no resume import', () => {
+test('eager (default) target is unchanged — listen(), plain bindText, no resume/adopt import', () => {
   const { code } = compileTemplate('<button on:click={{inc}}>{{ count() }}</button>', {
     mode: 'module',
     scope: ['count', 'inc'],
   });
   assert.ok(code.includes('listen('), 'still wires an eager listener');
+  assert.ok(code.includes('bindText('), 'plain bindText (byte-for-byte eager)');
   assert.ok(!code.includes('resumableHandler('), 'no resumable ref');
-  assert.ok(!code.includes('runtime/resume'), 'never imports the resume entry');
+  assert.ok(!code.includes('bindTextResumable('), 'no adopt marker bind');
+  assert.ok(!code.includes('runtime/resume') && !code.includes('runtime/adopt'), 'never imports resume/adopt');
 });
 
 test('each event site gets a distinct stable ref (w0, w1, …)', () => {
@@ -67,6 +74,18 @@ test('each event site gets a distinct stable ref (w0, w1, …)', () => {
     resumable: true,
   });
   assert.ok(code.includes('"w0"') && code.includes('"w1"'), 'two sites → two refs');
+});
+
+test('resumable render isolates reactive text with a $ marker (adopt-ready)', () => {
+  const x: Signal<string> = signal('world');
+  const render = compileResumable('<p>Hello, {{ x() }}!</p>', ['x']);
+  const p: HTMLElement = render({ x }) as HTMLElement;
+  assert.equal(p.textContent, 'Hello, world!', 'renders the value inline');
+  const marker: ChildNode | undefined = [...p.childNodes].find((n) => n.nodeType === 8 && (n as Comment).data === '$');
+  assert.ok(marker, 'a $ marker isolates the dynamic text so adjacent static text cannot merge with it');
+  assert.equal((marker!.nextSibling as Text).data, 'world', 'the dynamic text is the node right after the marker');
+  x.set('there');
+  assert.equal(p.textContent, 'Hello, there!', 'updates reactively');
 });
 
 /* ──────────── behaviour: a resumed click ──────────── */
