@@ -14,6 +14,7 @@
     "./resume": "./src/resume.ts",
     "./graph": "./src/graph.ts",
     "./server": "./src/server.ts",
+    "./document": "./src/document.ts",
     "./package.json": "./package.json"
   },
   "files": [
@@ -56,6 +57,10 @@
       "./server": {
         "types": "./dist/server.d.ts",
         "import": "./dist/server.js"
+      },
+      "./document": {
+        "types": "./dist/document.d.ts",
+        "import": "./dist/document.js"
       },
       "./package.json": "./package.json"
     }

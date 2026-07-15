@@ -35,13 +35,14 @@ const BUDGETS = [
   { label: 'runtime/serialize (E0.1 codec)', files: ['packages/runtime/dist/serialize.js'], budget: 4_096 },
   // runtime/resume (E0.2a/b): resumable event dispatch + handler registration. Baseline 2.4 KB.
   { label: 'runtime/resume (E0.2a/b dispatch)', files: ['packages/runtime/dist/resume.js'], budget: 2_560 },
-  // runtime/graph (E0.3): resume entry — signal codec + snapshot/resume glue over serialize + resume.
-  { label: 'runtime/graph (E0.3 resume)', files: ['packages/runtime/dist/graph.js'], budget: 2_048 },
+  // runtime/graph (E0.3/E1.2): resume entry — signal codec + snapshot/resume + resumePage (SSG client entry).
+  // Budget raised 2048 → 2560 (deliberate) when E1.2 added resumePage + SNAPSHOT_ID; still a lean resume entry.
+  { label: 'runtime/graph (E0.3/E1.2 resume)', files: ['packages/runtime/dist/graph.js'], budget: 2_560 },
   // runtime/server (E0.4): headless render — the in-house server DOM + parser + serializer + renderToString.
   // Server-only, its own line — 0 bytes for a client SPA. Baseline 5.8 KB (server.js + server-dom.js).
   {
     label: 'runtime/server (E0.4 headless)',
-    files: ['packages/runtime/dist/server.js', 'packages/runtime/dist/server-dom.js'],
+    files: ['packages/runtime/dist/server.js', 'packages/runtime/dist/server-dom.js', 'packages/runtime/dist/document.js'],
     budget: 7_168,
   },
 ];
