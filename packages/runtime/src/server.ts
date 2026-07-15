@@ -18,7 +18,7 @@
  */
 import { installServerDom, serializeNode, type SNode } from './server-dom.js';
 import { createOwner, runInOwner, disposeOwner, type Owner } from './reactive.js';
-import { snapshot, SNAPSHOT_ID } from './graph.js';
+import { snapshot, collectStates, ROOT_ID, SNAPSHOT_ID } from './graph.js';
 import { scriptSafe, type PageArtifact } from './document.js';
 import type { Component } from './dom.js';
 
@@ -46,20 +46,34 @@ export function renderComponent(component: Component, props?: Record<string, unk
 }
 
 /**
- * Render a component to its SSG artifact (E1.2): the component HTML plus a snapshot `<script>` carrying the
- * reactive `state` the client `resumePage()` rebuilds. `props`/`state` are the same signals the component
- * reads (via props/context) and that get serialized — hand them the writable state so it round-trips.
+ * Render a component to its SSG artifact: the component HTML plus a snapshot `<script>` the client
+ * `resumePage()` rebuilds its reactive graph from. Two capture modes:
+ *  - **resumable** (E1.4, `resumable: true`) — the islands path. A `resumable`-compiled render self-registers
+ *    each instance's ctx via its `$wid` preamble; we tag the root `$wid = $root`, run inside {@link collectStates},
+ *    and snapshot the `{ $root, c0, … }` instance-state map (a shared signal serializes once). `options.state`
+ *    is ignored — the map IS the state.
+ *  - **explicit** (E1.2, default) — snapshot the caller's `state` record (byte-for-byte prior behaviour;
+ *    `collectStates` is inert for an eager render, which never calls `registerState`).
  */
 export function renderPage(
   component: Component,
-  options: { props?: Record<string, unknown>; state?: Record<string, unknown> } = {}
+  options: { props?: Record<string, unknown>; state?: Record<string, unknown>; resumable?: boolean } = {}
 ): PageArtifact {
   // Reset the shared title so a prior route's value never leaks; the render may set `document.title`
   // (e.g. a route-title effect), which we capture below for the page's <title>.
   const doc: { title?: string } | undefined = (globalThis as { document?: { title?: string } }).document;
   if (doc) doc.title = '';
-  const html: string = renderComponent(component, options.props);
-  const json: string = scriptSafe(JSON.stringify(snapshot(options.state ?? {})));
+  // Tag the root so its resumable render registers its ctx under `$root` (the child-`$wid` mechanism, applied
+  // to the root). Harmless for an eager component — it has no `$wid` preamble, so the prop is just ignored.
+  const props: Record<string, unknown> | undefined = options.resumable
+    ? { ...options.props, $wid: ROOT_ID }
+    : options.props;
+  let html: string = '';
+  const states: Record<string, unknown> = collectStates(() => {
+    html = renderComponent(component, props);
+  });
+  const wire: unknown = options.resumable ? snapshot(states) : snapshot(options.state ?? {});
+  const json: string = scriptSafe(JSON.stringify(wire));
   const title: string | undefined = doc?.title || undefined;
   return { html, snapshotScript: `<script type="application/weave" id="${SNAPSHOT_ID}">${json}</script>`, title };
 }

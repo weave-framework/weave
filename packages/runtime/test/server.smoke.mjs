@@ -31,10 +31,11 @@ const entry = `
   import { signal, computed, effect, root } from '@weave-framework/runtime';
   import { resumableHandler } from '@weave-framework/runtime/resume';
   import { deserialize } from '@weave-framework/runtime/serialize';
-  import { SNAPSHOT_ID } from '@weave-framework/runtime/graph';
+  import { SNAPSHOT_ID, ROOT_ID, collectStates, registerState } from '@weave-framework/runtime/graph';
+  import { bindTextResumable, adoptText, blockStart, adoptIsland, blockEndOf, clearBlock, after, adoptComponent } from '@weave-framework/runtime/adopt';
   import { compileTemplate } from '@weave-framework/compiler';
-  export const rt = { ...dom, signal, computed, effect, root, resumableHandler };
-  export { renderToString, renderComponent, renderPage, renderDocument, compileTemplate, signal, dom, deserialize, SNAPSHOT_ID };
+  export const rt = { ...dom, signal, computed, effect, root, resumableHandler, bindTextResumable, adoptText, blockStart, adoptIsland, blockEndOf, clearBlock, after, adoptComponent, registerState };
+  export { renderToString, renderComponent, renderPage, renderDocument, compileTemplate, signal, dom, deserialize, SNAPSHOT_ID, ROOT_ID };
 `;
 
 const cacheDir = join(repo, 'node_modules', '.weave');
@@ -48,7 +49,14 @@ await esbuild({
   target: 'node18',
   outfile: out,
 });
-const { rt, renderToString, renderComponent, renderPage, renderDocument, compileTemplate, signal, deserialize, SNAPSHOT_ID } = await import(pathToFileURL(out).href);
+const { rt, renderToString, renderComponent, renderPage, renderDocument, compileTemplate, signal, deserialize, SNAPSHOT_ID, ROOT_ID } = await import(pathToFileURL(out).href);
+
+/** Compile a template (function mode) and return the bare render fn (with `.adopt`/`.handlers` attached). */
+function compileRender(html, scope, opts = {}, children = {}) {
+  const { code } = compileTemplate(html, { mode: 'function', scope, ...opts });
+  const body = code.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;');
+  return new Function('rt', '_c', body)(rt, children);
+}
 
 /** Compile a template (function mode) and instantiate its render against the headless DOM. */
 function render(html, ctx, scope, opts = {}) {
@@ -159,6 +167,49 @@ console.log('verify:server — headless render to string\n');
   // a later render with no title resets — the prior route's title must not leak
   const Plain = rt.defineComponent(renderFn, () => ({ t: 'x' }));
   ok(renderPage(Plain, {}).title === undefined, 'title is reset between renders (no leak)');
+}
+
+// 8) E1.4 — the ISLANDS path: a resumable-compiled component renders headlessly (markers + block boundaries
+//    serialize), and renderPage({ resumable: true }) captures the per-instance state MAP ({ $root, c0 }) that
+//    the client resumePage rebuilds. This is the SSG↔resume seam end-to-end, headless.
+{
+  // child: a resumable component that self-registers its ctx (via the $wid preamble the parent stamps)
+  const childRender = compileRender('<b>{{ label() }}</b>', ['label'], { resumable: true });
+  let childSetups = 0;
+  const Child = rt.defineComponent(childRender, (props) => { childSetups++; return { label: signal(props.start ?? 'x') }; });
+  Child.adopt = childRender.adopt;
+
+  // parent: static <Child/> plus its own reactive text — the whole adoptable component tree
+  const parentRender = compileRender('<div><h1>{{ title() }}</h1><Child /></div>', ['title'], { resumable: true }, { Child });
+  const Parent = rt.defineComponent(parentRender, (props) => ({ title: signal(props.title ?? 'T') }));
+  Parent.adopt = parentRender.adopt;
+
+  const art = renderPage(Parent, { props: { title: 'Home' }, resumable: true });
+
+  // (a) resumable-CREATE render runs under the headless DOM + serializes: real HTML with the marker + child
+  ok(art.html.includes('<h1>') && art.html.includes('Home') && art.html.includes('<b>') && art.html.includes('x'),
+    `resumable component renders headless (got: ${art.html})`);
+  ok(childSetups === 1, 'child setup ran exactly once on the server (rendered, not double-rendered)');
+  ok(art.html.includes('$'), 'dynamic-text marker (\\uXXXX / $) serialized into the server HTML');
+
+  // (b) the snapshot is the per-instance MAP: $root (the parent) + c0 (the static child), each round-tripping
+  const json = art.snapshotScript.replace(/^[^>]*>/, '').replace(/<\/script>$/, '').replace(/\\u003c/g, '<');
+  const map = deserialize(JSON.parse(json));
+  ok(map && typeof map === 'object' && ROOT_ID in map, 'snapshot is the instance-state MAP keyed by id');
+  ok(typeof map[ROOT_ID].title === 'function' && map[ROOT_ID].title() === 'Home', 'root ($root) ctx round-trips (title @ Home)');
+  ok(map.c0 && typeof map.c0.label === 'function' && map.c0.label() === 'x', 'static child (c0) ctx round-trips (label @ x)');
+}
+
+// 9) E1.4 — eager renderPage is unchanged: no $wid tagging, snapshots the explicit `state`, no instance map
+{
+  const eagerRender = compileRender('<p>{{ t }}</p>', ['t']);
+  const Eager = rt.defineComponent(eagerRender, (props) => ({ t: props.t }));
+  const n = signal(5);
+  const art = renderPage(Eager, { props: { t: 'hi' }, state: { n } });
+  const json = art.snapshotScript.replace(/^[^>]*>/, '').replace(/<\/script>$/, '').replace(/\\u003c/g, '<');
+  const state = deserialize(JSON.parse(json));
+  ok(!(ROOT_ID in state) && typeof state.n === 'function' && state.n() === 5,
+    'eager renderPage still snapshots the explicit state (no instance map, byte-for-byte E1.2)');
 }
 
 console.log('');

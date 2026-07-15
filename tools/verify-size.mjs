@@ -49,12 +49,13 @@ const BUDGETS = [
   { label: 'runtime/graph (E0.3/E1.2 resume)', files: ['packages/runtime/dist/graph.js'], budget: 3_584 },
   // runtime/server (E0.4): headless render — the in-house server DOM + parser + serializer + renderToString.
   // Server-only, its own line — 0 bytes for a client SPA (I3). Baseline 5.8 KB; budget raised 7168 → 7680
-  // (deliberate) when E1.3d added the SSG document-<title> capture (settable server `document.title` +
-  // renderPage read-back). The SPA core (20.9 KB) is untouched — this line never ships to a browser.
+  // (E1.3d SSG document-<title> capture) → 8192 (E1.4 the islands capture: `renderPage({ resumable })` wraps
+  // the render in `collectStates` + tags the root `$root` + snapshots the per-instance state map, pulling in
+  // collectStates/ROOT_ID). Deliberate — the SPA core (20.9 KB) is untouched; this line never ships to a browser.
   {
     label: 'runtime/server (E0.4 headless)',
     files: ['packages/runtime/dist/server.js', 'packages/runtime/dist/server-dom.js', 'packages/runtime/dist/document.js'],
-    budget: 7_680,
+    budget: 8_192,
   },
 ];
 
