@@ -2,7 +2,7 @@ import { test, assert } from '../../../tools/harness.js';
 import { signal, computed, effect, root, type Signal } from '@weave-framework/runtime';
 import * as dom from '@weave-framework/runtime/dom';
 import { resumeEvents, collectResumable, resumableHandler, handlerAttr, type ResumeHandler } from '@weave-framework/runtime/resume';
-import { bindTextResumable, adoptText, blockStart, adoptIsland, after } from '@weave-framework/runtime/adopt';
+import { bindTextResumable, adoptText, blockStart, adoptIsland, blockEndOf, clearBlock, after } from '@weave-framework/runtime/adopt';
 import { snapshot, resume, resumePage, SNAPSHOT_ID, type AdoptFn } from '@weave-framework/runtime/graph';
 import { compileTemplate } from '@weave-framework/compiler';
 
@@ -25,8 +25,10 @@ const rt: typeof dom & {
   adoptText: typeof adoptText;
   blockStart: typeof blockStart;
   adoptIsland: typeof adoptIsland;
+  blockEndOf: typeof blockEndOf;
+  clearBlock: typeof clearBlock;
   after: typeof after;
-} = { ...dom, signal, computed, effect, root, resumableHandler, bindTextResumable, adoptText, blockStart, adoptIsland, after };
+} = { ...dom, signal, computed, effect, root, resumableHandler, bindTextResumable, adoptText, blockStart, adoptIsland, blockEndOf, clearBlock, after };
 
 /** Compile in the `resumable` target and hand back the bare `(ctx, slots) => Node` render fn. */
 function compileResumable(html: string, scope: string[] = []): (ctx: unknown, slots?: unknown) => Element {
@@ -330,15 +332,15 @@ test('E1.2c-2: an adoptable @if emits an adopt fn (adoptIsland + ifBlock); non-a
   });
   assert.ok(ok.code.includes('render.adopt'), 'an adoptably-positioned @if emits an adopt fn');
   const adoptBody: string = ok.code.slice(ok.code.indexOf('function adopt(_r'));
-  assert.ok(adoptBody.includes('adoptIsland('), 'the adopt render island-replays via adoptIsland');
+  assert.ok(adoptBody.includes('blockEndOf(') && adoptBody.includes('clearBlock('), 'the adopt render clears the server island in place');
   assert.ok(adoptBody.includes('ifBlock('), 'then re-runs the normal ifBlock against the cleared island');
 
-  // an ELEMENT with dynamics AFTER the block → its subtree index is unreachable → no adopt fn (leaf interps
-  // after a block ARE adoptable via the E1.2c-4 cursor, but a dynamic element after a block is not yet)
-  const afterEl = compileTemplate('<div>@if (show()) { <p>x</p> }<b>{{ tail() }}</b></div>', {
-    mode: 'module', scope: ['show', 'tail'], resumable: true,
+  // an element with a NESTED BLOCK after a block → its subtree isn't fixed-structure → no adopt fn (a
+  // BLOCK-FREE element after a block IS adoptable via the E1.2c-5 cursor; a nested-block one is not yet)
+  const afterEl = compileTemplate('<div>@if (show()) { <p>x</p> }<section>@if (more()) { <i>y</i> }</section></div>', {
+    mode: 'module', scope: ['show', 'more'], resumable: true,
   });
-  assert.ok(!afterEl.code.includes('render.adopt'), 'a dynamic element after a block still blocks adopt (E1.2c-4 is leaf interps)');
+  assert.ok(!afterEl.code.includes('render.adopt'), 'an element with a nested block after a block still blocks adopt (E1.2c-5 is flat subtrees)');
 
   // a child component is not island-replayable yet → no adopt fn
   const comp = compileTemplate('<div>hi <Widget /></div>', {
@@ -436,7 +438,7 @@ test('E1.2c-4: a reactive interp AFTER a block adopts via the cursor — emit sh
   assert.ok(code.includes('render.adopt'), 'a leaf interp after a block is now adoptable');
   const adoptBody: string = code.slice(code.indexOf('function adopt(_r'));
   assert.ok(/after\(_e\d+, 3\)/.test(adoptBody), 'the trailing interp binds via after(<blockEnd>, 3) — 3 = its $ + text + anchor');
-  assert.ok(/adoptIsland\(/.test(adoptBody) && /_e\d+ = /.test(adoptBody), 'the block captures its ] end anchor as the cursor base');
+  assert.ok(/blockEndOf\(/.test(adoptBody) && /_e\d+ = /.test(adoptBody), 'the block captures its ] end anchor as the cursor base');
 });
 
 test('E1.2c-4: adopt resumes a block PLUS a trailing interp — the tail after the block updates in place', () => {
@@ -480,6 +482,59 @@ test('E1.2c-4: adopt resumes a block PLUS a trailing interp — the tail after t
   assert.ok(div.querySelector('p'), 'block back on');
   (app.ctx.head as Signal<string>).set('HEAD');
   assert.equal(div.querySelector('h4')!.textContent, 'HEAD', 'the pre-block text is reactive too');
+  app.dispose();
+});
+
+/* ──────────── E1.2c-5: post-block element (a block-free element after a block) ──────────── */
+
+test('E1.2c-5: an element with dynamics AFTER a block adopts — its subtree rebases onto a cursor var', () => {
+  const { code } = compileTemplate('<div>@if (show()) { <p>x</p> }<footer>© {{ year() }}</footer></div>', {
+    mode: 'module', scope: ['show', 'year'], resumable: true,
+  });
+  assert.ok(code.includes('render.adopt'), 'a block-free element after a block is adoptable');
+  const adoptBody: string = code.slice(code.indexOf('function adopt(_r'));
+  assert.ok(/_p\d+ = after\(_e\d+, 1\)/.test(adoptBody), 'the <footer> is captured via after(<blockEnd>, 1) as a cursor var');
+  assert.ok(/child\(_p\d+/.test(adoptBody), 'its <footer> subtree navigation rebases onto that cursor var');
+});
+
+test('E1.2c-5: adopt resumes a block PLUS a trailing element subtree — the element text is reactive in place', () => {
+  const render = compileResumable(
+    '<div><h5>{{ head() }}</h5>@if (show()) { <p>body</p> }<footer>© {{ year() }} <b>{{ org() }}</b></footer></div>',
+    ['head', 'show', 'year', 'org']
+  );
+  const adopt = (render as { adopt?: AdoptFn }).adopt;
+  assert.equal(typeof adopt, 'function', 'the fragment (block + trailing element subtree) is adoptable');
+
+  // ── server ──
+  const head: Signal<string> = signal('H');
+  const show: Signal<boolean> = signal(true);
+  const year: Signal<number> = signal(2026);
+  const org: Signal<string> = signal('Weave');
+  const serverNode = render({ head, show, year, org }) as HTMLElement;
+  const wire = snapshot({ head, show, year, org });
+
+  // ── client ──
+  const container: HTMLElement = host();
+  container.innerHTML = serverNode.outerHTML;
+  const div: HTMLElement = container.querySelector('div')!;
+  const footer: HTMLElement = div.querySelector('footer')!;
+  const bold: HTMLElement = footer.querySelector('b')!;
+  const app = resume(div, { snapshot: wire, adopt });
+
+  assert.ok(footer.textContent!.includes('2026') && footer.textContent!.includes('Weave'), 'the post-block <footer> subtree is present');
+
+  // both dynamic texts inside the post-block element are reactive in place
+  (app.ctx.year as Signal<number>).set(2027);
+  assert.ok(footer.textContent!.includes('2027'), 'the year interp inside the post-block <footer> updates');
+  (app.ctx.org as Signal<string>).set('WeaveFW');
+  assert.equal(bold.textContent, 'WeaveFW', 'a nested interp deeper in the post-block subtree updates too');
+
+  // the block between the header and the footer still island-replays
+  (app.ctx.show as Signal<boolean>).set(false);
+  assert.ok(!div.querySelector('p'), 'the @if between them toggles off');
+  assert.ok(footer.textContent!.includes('2027'), 'toggling the block does not disturb the post-block element');
+  (app.ctx.head as Signal<string>).set('HEAD');
+  assert.equal(div.querySelector('h5')!.textContent, 'HEAD', 'the pre-block header stays reactive');
   app.dispose();
 });
 

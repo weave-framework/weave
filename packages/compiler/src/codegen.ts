@@ -265,6 +265,31 @@ function hasDynamicDeep(node: TemplateNode): boolean {
 }
 
 /**
+ * Whether a node's subtree contains a control-flow block or a component/slot — the constructs that insert a
+ * runtime-variable node count. A post-block ELEMENT is adopt-navigable (E1.2c-5) only when this is false: its
+ * subtree has fixed structure, so once the element node is found via the cursor its descendants index normally.
+ */
+function hasBlockDeep(node: TemplateNode): boolean {
+  switch (node.type) {
+    case 'if':
+    case 'for':
+    case 'switch':
+    case 'defer':
+    case 'await':
+    case 'key':
+    case 'render':
+      return true;
+    case 'element': {
+      const el: ElementNode = node as ElementNode;
+      if (/^[A-Z]/.test(el.tag) || el.tag === 'slot' || el.tag === 'w:element') return true;
+      return el.children.some(hasBlockDeep);
+    }
+    default:
+      return false; // text / comment / interp / let / snippet
+  }
+}
+
+/**
  * PascalCase child-component tag → kebab-case module basename (`SlideToggle` → `slide-toggle`).
  * Used by the loader to resolve a `<Foo>` tag to its sibling component module by convention.
  */
@@ -326,9 +351,12 @@ function compileFragment(
     if (arr) arr.push(idx);
     else dynText.set(k, [idx]);
   };
-  const adoptIndices = (path: number[]): number[] => {
+  // Server child indices for `path`, levels [start, end) — the block-free adopt navigation. Each preceding
+  // dynamic-text sibling at a level adds 2 (its marker+text). `start > 0` computes only a SUFFIX, used when a
+  // post-block element rebases its subtree onto a cursor var (E1.2c-5) instead of the fragment root.
+  const adoptIndicesFrom = (path: number[], start: number): number[] => {
     const out: number[] = [];
-    for (let level = 0; level < path.length; level++) {
+    for (let level = start; level < path.length; level++) {
       const parentKey: string = path.slice(0, level).join(',');
       const idx: number = path[level];
       const dyns: number[] | undefined = dynText.get(parentKey);
@@ -337,6 +365,17 @@ function compileFragment(
       out.push(idx + shift);
     }
     return out;
+  };
+
+  // Post-block subtree rebasing (E1.2c-5): pathKey → the cursor var holding that node (an element reached via
+  // `after(blockEnd, off)`) + its path length, so deeper nodeExpr calls navigate `child(<var>, …suffix)`.
+  const nodeOverride: Map<string, { baseVar: string; prefixLen: number }> = new Map();
+  const findOverride = (path: number[]): { baseVar: string; prefixLen: number } | null => {
+    for (let len = path.length; len >= 1; len--) {
+      const e = nodeOverride.get(path.slice(0, len).join(','));
+      if (e) return e;
+    }
+    return null;
   };
 
   // E1.2c-4 post-block cursor state (adopt walk). `blockEndVar` is the var holding the most recent adoptable
@@ -358,9 +397,22 @@ function compileFragment(
     const key: string = path.join(',');
     let v: string | undefined = nodeVars.get(key);
     if (!v) {
+      // Post-block subtree (E1.2c-5): a prefix of `path` is a cursor var → navigate relative to it.
+      const ov = adopt ? findOverride(path) : null;
+      if (ov) {
+        if (path.length === ov.prefixLen) {
+          nodeVars.set(key, ov.baseVar);
+          return ov.baseVar;
+        }
+        v = `_n${nodeVarN++}`;
+        nodeVars.set(key, v);
+        const suffix: number[] = adoptIndicesFrom(path, ov.prefixLen);
+        nodeDecls.push(`const ${v} = ${gen.H('child')}(${ov.baseVar}, ${suffix.join(', ')});`);
+        return v;
+      }
       v = `_n${nodeVarN++}`;
       nodeVars.set(key, v);
-      const idxPath: number[] = adopt ? adoptIndices(path) : path; // adopt walks the SHIFTED server DOM
+      const idxPath: number[] = adopt ? adoptIndicesFrom(path, 0) : path; // adopt walks the SHIFTED server DOM
       nodeDecls.push(`const ${v} = ${gen.H('child')}(_r, ${idxPath.join(', ')});`);
     }
     return v;
@@ -375,6 +427,24 @@ function compileFragment(
     const a: string = nodeExpr(path);
     if (gen.resumable && !adopt) stmts.push(`${gen.Ha('blockStart')}(${a});`);
     return a;
+  }
+
+  // Emit a control-flow block's replay. `mk(anchorVar)` builds the ifBlock/eachBlock call string from the
+  // anchor var. Create: the anchor is the block's own `<!---->` (nodeExpr). Adopt (island-replay): compute the
+  // `]` end anchor as a NODEDECL (`blockEndOf` on the intact server DOM — so a post-block cursor capture can
+  // reference it in the node-capture phase), clear the server island, then replay against `]`. `blockEndVar`
+  // is exposed to emitChildren as the post-block cursor base (E1.2c-4/5).
+  function emitBlockReplay(path: number[], mk: (anchorVar: string) => string): void {
+    if (!adopt) {
+      stmts.push(mk(nodeExpr(path)));
+      return;
+    }
+    const blk: string = nodeExpr(path);
+    const endVar: string = gen.fn('_e');
+    nodeDecls.push(`const ${endVar} = ${gen.Ha('blockEndOf')}(${blk});`);
+    blockEndVar = endVar;
+    stmts.push(`${gen.Ha('clearBlock')}(${blk}, ${endVar});`);
+    stmts.push(mk(endVar));
   }
 
   function emitChildren(children: TemplateNode[], basePath: number[], sc: Scope, isHost: boolean = false): void {
@@ -411,16 +481,33 @@ function compileFragment(
         continue;
       }
       if (!adopt) {
-        // a reactive interp after a block is adoptable (post-block cursor); an element with dynamics is not.
-        if (sawBlock && node.type !== 'interp' && hasDynamicDeep(node)) gen.adoptable = false;
+        // Adoptability after a block (post-block cursor): a reactive interp, static text, or a BLOCK-FREE
+        // element adopts; a nested-block element, or anything else needing indexed access, does not yet.
+        if (sawBlock) {
+          if (node.type === 'element' && !isBlockNode(node)) {
+            if (hasBlockDeep(node)) gen.adoptable = false;
+          } else if (node.type !== 'interp' && node.type !== 'text' && node.type !== 'comment') {
+            gen.adoptable = false;
+          }
+        }
         if (isBlockNode(node)) {
           if (sawBlock || !isAdoptableBlock(node)) gen.adoptable = false; // 2nd block, or a non-replayable one
           sawBlock = true;
         }
       }
-      // Hand a post-block reactive interp its cursor base/offset (read by the interp emitter); cleared otherwise.
-      curInterpBase = adopt && pbBase && node.type === 'interp' ? pbBase : null;
-      curInterpOff = pbOff;
+      // Post-block cursor setup (adopt walk): a following interp binds via after(], off) inline; a following
+      // block-free element with dynamics is captured as a cursor var so its subtree rebases onto it (override).
+      curInterpBase = null;
+      if (adopt && pbBase) {
+        if (node.type === 'interp') {
+          curInterpBase = pbBase;
+          curInterpOff = pbOff;
+        } else if (node.type === 'element' && !isBlockNode(node) && hasDynamicDeep(node)) {
+          const pv: string = gen.fn('_p');
+          nodeDecls.push(`const ${pv} = ${gen.Ha('after')}(${pbBase}, ${pbOff + 1});`);
+          nodeOverride.set([...basePath, dom].join(','), { baseVar: pv, prefixLen: basePath.length + 1 });
+        }
+      }
       emitNode(node, [...basePath, dom], cur, isHost);
       if (adopt) {
         if (isAdoptableBlock(node)) { pbBase = blockEndVar; pbOff = 0; } // start the cursor at this block's ]
@@ -824,16 +911,7 @@ function compileFragment(
     const hasElse: boolean = node.branches[node.branches.length - 1].cond === undefined;
     if (!hasElse) lines.push('return null;');
 
-    if (adopt) {
-      // Capture the island's `]` end anchor into a var: emitChildren uses it as the base for any post-block
-      // sibling cursor (E1.2c-4), and ifBlock re-runs against it (fresh reactive branch).
-      const endVar: string = gen.fn('_e');
-      stmts.push(`const ${endVar} = ${gen.Ha('adoptIsland')}(${nodeExpr(path)});`);
-      stmts.push(`${gen.H('ifBlock')}(${endVar}, () => { ${lines.join(' ')} });`);
-      blockEndVar = endVar;
-    } else {
-      stmts.push(`${gen.H('ifBlock')}(${nodeExpr(path)}, () => { ${lines.join(' ')} });`);
-    }
+    emitBlockReplay(path, (a) => `${gen.H('ifBlock')}(${a}, () => { ${lines.join(' ')} })`);
   }
 
   function emitSwitch(node: SwitchNode, path: number[], sc: Scope): void {
@@ -848,14 +926,7 @@ function compileFragment(
     });
     if (!node.cases.some((c) => c.test === undefined)) lines.push('return null;');
 
-    if (adopt) {
-      const endVar: string = gen.fn('_e');
-      stmts.push(`const ${endVar} = ${gen.Ha('adoptIsland')}(${nodeExpr(path)});`);
-      stmts.push(`${gen.H('ifBlock')}(${endVar}, () => { ${lines.join(' ')} });`);
-      blockEndVar = endVar;
-    } else {
-      stmts.push(`${gen.H('ifBlock')}(${nodeExpr(path)}, () => { ${lines.join(' ')} });`);
-    }
+    emitBlockReplay(path, (a) => `${gen.H('ifBlock')}(${a}, () => { ${lines.join(' ')} })`);
   }
 
   function emitDefer(node: DeferNode, path: number[], sc: Scope): void {
@@ -940,14 +1011,7 @@ function compileFragment(
     const list: string = rewrite(node.list, sc).code;
     const track: string = node.track ? rewrite(node.track, sc).code : '$index';
     const keyFn: string = `(${node.item}, $index) => ${track}`;
-    if (adopt) {
-      const endVar: string = gen.fn('_e');
-      stmts.push(`const ${endVar} = ${gen.Ha('adoptIsland')}(${nodeExpr(path)});`);
-      stmts.push(`${gen.H('eachBlock')}(${endVar}, () => ${list}, ${keyFn}, ${rowFn}${emptyArg});`);
-      blockEndVar = endVar;
-    } else {
-      stmts.push(`${gen.H('eachBlock')}(${nodeExpr(path)}, () => ${list}, ${keyFn}, ${rowFn}${emptyArg});`);
-    }
+    emitBlockReplay(path, (a) => `${gen.H('eachBlock')}(${a}, () => ${list}, ${keyFn}, ${rowFn}${emptyArg})`);
   }
 
   // walk
