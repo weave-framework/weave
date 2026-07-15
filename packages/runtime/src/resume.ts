@@ -112,3 +112,58 @@ export function resumeEvents(root: Element, options: ResumeOptions): ResumeContr
     },
   };
 }
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * E0.2b — resumable handler registration (the compiler's `resumable` target).
+ *
+ * In `resumable` mode the codegen emits `resumableHandler(node, event, siteRef, fn)` in place of an
+ * eager `listen(...)`. Instead of attaching a live listener, it (a) stamps the element with
+ * `data-won-<event>="<id>"` so a delegated {@link resumeEvents} can find it after load, and (b) records
+ * `id → fn` in the active {@link collectResumable} session for the resume resolver to look up. This is
+ * the seam the full resume entry (E0.3) and headless server render (E0.4) build on.
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+/** A collecting session: generated instance-id → handler, plus a monotonic counter for uniqueness. */
+interface HandlerSink {
+  map: Map<string, ResumeHandler>;
+  n: number;
+}
+let activeSink: HandlerSink | null = null;
+let fallbackN: number = 0;
+
+/**
+ * Stamp a resumable handler reference onto `node` and register its handler.
+ *
+ * The id is INSTANCE-unique — `siteRef#<n>` where `<n>` is a per-session counter — so repeated rows of a
+ * `@for` each get their own handler rather than a shared one. `siteRef` (assigned by the compiler per
+ * event site) is the stable prefix a later chunk-splitter (E0.3) maps to an importable handler export.
+ * Returns the generated id. Note: `once`/`capture`/`passive` listener options are not carried by the
+ * delegated resume path yet — a resumable build ignores those modifiers (the guard modifiers
+ * `preventDefault`/`stopPropagation`/`self` still apply, since they live in the handler body).
+ */
+export function resumableHandler(node: Element, event: string, siteRef: string, handler: ResumeHandler): string {
+  const n: number = activeSink ? activeSink.n++ : fallbackN++;
+  const id: string = `${siteRef}#${n}`;
+  node.setAttribute(PREFIX + event, id);
+  if (activeSink) activeSink.map.set(id, handler);
+  return id;
+}
+
+/**
+ * Run `render` while collecting every {@link resumableHandler} it triggers into a fresh registry, then
+ * return the rendered node alongside that `id → handler` map. This is what a server render (or the E0.2b
+ * test) uses to pair the emitted `data-won-*` markers with resolvable handlers. Nestable — restores the
+ * previous session on exit. Only handlers registered DURING this call are captured; rows a `@for` adds
+ * later (after the session closes) fall outside it (full dynamic-row resume is E0.3).
+ */
+export function collectResumable<T>(render: () => T): { node: T; handlers: Map<string, ResumeHandler> } {
+  const prev: HandlerSink | null = activeSink;
+  const sink: HandlerSink = { map: new Map<string, ResumeHandler>(), n: 0 };
+  activeSink = sink;
+  try {
+    const node: T = render();
+    return { node, handlers: sink.map };
+  } finally {
+    activeSink = prev;
+  }
+}

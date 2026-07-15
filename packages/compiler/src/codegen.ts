@@ -26,6 +26,14 @@ export interface CompileOptions {
   scopeAttr?: string;
   /** `:host` attribute (e.g. `data-w-a1b2c3-h`) stamped on the template's root element(s). */
   hostAttr?: string;
+  /**
+   * Phase E (E0.2b) opt-in target. When true, DOM event handlers compile to resumable references —
+   * `resumableHandler(node, event, siteRef, fn)` from `@weave-framework/runtime/resume` in place of an
+   * eager `listen(...)` — so the server-rendered HTML carries `data-won-<event>` markers and no listener
+   * is wired until the first interaction (see RFC 0009). Default false → the eager path is byte-for-byte
+   * unchanged, and the resume entry is never imported (0 bytes for a plain SPA).
+   */
+  resumable?: boolean;
 }
 
 export interface CompileResult {
@@ -42,15 +50,18 @@ export interface CompileResult {
 class Gen {
   used: Set<string> = new Set<string>(); // @weave-framework/runtime/dom helpers
   usedCore: Set<string> = new Set<string>(); // @weave-framework/runtime primitives (computed, …)
+  usedResume: Set<string> = new Set<string>(); // @weave-framework/runtime/resume helpers (resumable target)
   usedComponents: Set<string> = new Set<string>(); // PascalCase child tags referenced in module mode
   templates: string[] = [];
   private tplN: number = 0;
   private fnN: number = 0;
+  private refN: number = 0;
 
   constructor(
     public mode: 'module' | 'function',
     public scopeAttr?: string,
-    public hostAttr?: string
+    public hostAttr?: string,
+    public resumable: boolean = false
   ) {}
 
   H(name: string): string {
@@ -60,6 +71,15 @@ class Gen {
   Hc(name: string): string {
     this.usedCore.add(name);
     return this.mode === 'function' ? `rt.${name}` : name;
+  }
+  /** Reference a `@weave-framework/runtime/resume` helper (resumable target only; via `rt.` in function mode). */
+  Hr(name: string): string {
+    this.usedResume.add(name);
+    return this.mode === 'function' ? `rt.${name}` : name;
+  }
+  /** A stable, per-compile event-site id (`w0`, `w1`, …) — the resumable handler reference prefix. */
+  ref(): string {
+    return `w${this.refN++}`;
   }
   /**
    * Reference a child component: from the `_c` map in function mode, bare (imported)
@@ -94,7 +114,7 @@ export function compileTemplate(input: string, options: CompileOptions = {}): Co
 export function compileTemplateAst(ast: TemplateNode[], options: CompileOptions = {}): CompileResult {
   const mode: 'module' | 'function' = options.mode ?? 'module';
   const runtimeImport: string = options.runtimeImport ?? '@weave-framework/runtime/dom';
-  const gen: Gen = new Gen(mode, options.scopeAttr, options.hostAttr);
+  const gen: Gen = new Gen(mode, options.scopeAttr, options.hostAttr, options.resumable ?? false);
 
   // isHost: the render fragment's top-level elements are the component's roots → `:host`.
   const render: string = compileFragment(gen, ast, ctxScope(options.scope ?? []), 'render', 'ctx, slots', true);
@@ -109,7 +129,12 @@ export function compileTemplateAst(ast: TemplateNode[], options: CompileOptions 
   const coreImport: string = gen.usedCore.size
     ? `import { ${[...gen.usedCore].sort().join(', ')} } from "@weave-framework/runtime";\n`
     : '';
-  const code: string = [domImport + '\n' + coreImport, ...gen.templates, `export default ${render}`].join('\n');
+  // The resumable target references `@weave-framework/runtime/resume` — a separate entry, so an eager
+  // build never imports it (SPA core stays flat; invariant I3). Empty (no line) unless resumable events exist.
+  const resumeImport: string = gen.usedResume.size
+    ? `import { ${[...gen.usedResume].sort().join(', ')} } from "@weave-framework/runtime/resume";\n`
+    : '';
+  const code: string = [domImport + '\n' + coreImport + resumeImport, ...gen.templates, `export default ${render}`].join('\n');
   return { code, components };
 }
 
@@ -398,12 +423,19 @@ function compileFragment(
       }
       case 'event': {
         // The four transition lifecycle moments are not DOM events — route them to the
-        // element's transition instead of addEventListener.
+        // element's transition instead of addEventListener (unchanged in the resumable target too).
         if (TRANSITION_PHASES.has(attr.name)) {
           sink.push(`${gen.H('transitionEvent')}(${n}, ${q(attr.name)}, ${rewrite(attr.expr, sc).code});`);
           break;
         }
         const handler: string = wrapHandler(attr, sc);
+        if (gen.resumable) {
+          // Resumable target (E0.2b): emit a handler REFERENCE instead of an eager listener. The runtime
+          // helper stamps `data-won-<event>` + registers the handler for a delegated resume dispatch.
+          // once/capture/passive don't map onto the delegated path yet, so they're dropped here.
+          sink.push(`${gen.Hr('resumableHandler')}(${n}, ${q(attr.name)}, ${q(gen.ref())}, ${handler});`);
+          break;
+        }
         const opts: string = eventOpts(attr.modifiers);
         sink.push(`${gen.H('listen')}(${n}, ${q(attr.name)}, ${handler}${opts ? `, ${opts}` : ''});`);
         break;
