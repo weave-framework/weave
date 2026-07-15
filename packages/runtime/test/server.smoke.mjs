@@ -26,13 +26,15 @@ const eq = (actual, expected, msg) => ok(actual === expected, `${msg}${actual ==
 // Bundle an entry that imports runtime/server FIRST (installs the headless-DOM globals), then the runtime
 // + compiler, and re-exports what the test drives. Everything shares this Node process's globalThis.
 const entry = `
-  import { renderToString, renderComponent } from '@weave-framework/runtime/server';
+  import { renderToString, renderComponent, renderPage, renderDocument } from '@weave-framework/runtime/server';
   import * as dom from '@weave-framework/runtime/dom';
   import { signal, computed, effect, root } from '@weave-framework/runtime';
   import { resumableHandler } from '@weave-framework/runtime/resume';
+  import { deserialize } from '@weave-framework/runtime/serialize';
+  import { SNAPSHOT_ID } from '@weave-framework/runtime/graph';
   import { compileTemplate } from '@weave-framework/compiler';
   export const rt = { ...dom, signal, computed, effect, root, resumableHandler };
-  export { renderToString, renderComponent, compileTemplate, signal, dom };
+  export { renderToString, renderComponent, renderPage, renderDocument, compileTemplate, signal, dom, deserialize, SNAPSHOT_ID };
 `;
 
 const cacheDir = join(repo, 'node_modules', '.weave');
@@ -46,7 +48,7 @@ await esbuild({
   target: 'node18',
   outfile: out,
 });
-const { rt, renderToString, renderComponent, compileTemplate, signal } = await import(pathToFileURL(out).href);
+const { rt, renderToString, renderComponent, renderPage, renderDocument, compileTemplate, signal, deserialize, SNAPSHOT_ID } = await import(pathToFileURL(out).href);
 
 /** Compile a template (function mode) and instantiate its render against the headless DOM. */
 function render(html, ctx, scope, opts = {}) {
@@ -119,6 +121,27 @@ console.log('verify:server — headless render to string\n');
   const renderFn = new Function('rt', '_c', code.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;'))(rt, {});
   const App = rt.defineComponent(renderFn, (props) => ({ title: props.title }));
   eq(renderComponent(App, { title: 'Weave SSR' }), '<h1>Weave SSR<!----></h1>', 'renderComponent mounts a defineComponent to a string');
+}
+
+// 6) the SSG page artifact: renderPage → HTML + a snapshot <script> that round-trips the state
+{
+  const { code } = compileTemplate('<h1>{{ title }}</h1>', { mode: 'function', scope: ['title'] });
+  const renderFn = new Function('rt', '_c', code.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;'))(rt, {});
+  const App = rt.defineComponent(renderFn, (props) => ({ title: props.title }));
+
+  const count = signal(41);
+  const artifact = renderPage(App, { props: { title: 'Docs' }, state: { count } });
+  ok(artifact.html.includes('<h1>Docs'), 'renderPage renders the component HTML');
+  ok(artifact.snapshotScript.includes(`id="${SNAPSHOT_ID}"`) && artifact.snapshotScript.includes('application/weave'), 'emits the snapshot <script>');
+
+  // the embedded snapshot round-trips the reactive state (parse the JSON out of the <script>)
+  const json = artifact.snapshotScript.replace(/^[^>]*>/, '').replace(/<\/script>$/, '').replace(/\\u003c/g, '<');
+  const state = deserialize(JSON.parse(json));
+  ok(typeof state.count === 'function' && state.count() === 41, 'snapshot round-trips the reactive state (a live signal @ 41)');
+
+  const doc = renderDocument(artifact, { title: 'Weave', entry: '/app.js', lang: 'en' });
+  ok(doc.startsWith('<!DOCTYPE html>') && doc.includes('<html lang="en">'), 'renderDocument emits a full document');
+  ok(doc.includes(artifact.html) && doc.includes(SNAPSHOT_ID) && doc.includes('<script type="module" src="/app.js">'), 'document embeds the page, snapshot, and client entry');
 }
 
 console.log('');

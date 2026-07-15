@@ -2,7 +2,7 @@ import { test, assert } from '../../../tools/harness.js';
 import { signal, computed, effect, root, type Signal } from '@weave-framework/runtime';
 import * as dom from '@weave-framework/runtime/dom';
 import { resumeEvents, collectResumable, resumableHandler, handlerAttr, type ResumeHandler } from '@weave-framework/runtime/resume';
-import { snapshot, resume } from '@weave-framework/runtime/graph';
+import { snapshot, resume, resumePage, SNAPSHOT_ID } from '@weave-framework/runtime/graph';
 import { compileTemplate } from '@weave-framework/compiler';
 
 /**
@@ -185,6 +185,42 @@ test('E1.1: resume() drives the EMITTED factory end-to-end — no hand-authored 
   assert.equal((app.ctx.count as Signal<number>)(), 4, 'the EMITTED handler mutated the resumed signal');
   assert.equal(out.textContent, '4', 'reactivity flows — no hand-authored factory, setup never re-run');
   app.dispose();
+});
+
+test('E1.2: resumePage reads the embedded snapshot <script> and resumes (SSG client entry)', () => {
+  // server: render the resumable component + embed the state snapshot exactly as renderPage would
+  const render = compileResumable('<button on:click={{() => count.set((c) => c + 1)}}>x</button>', ['count']);
+  const count: Signal<number> = signal(10);
+  const container: HTMLElement = host();
+  container.appendChild(render({ count }));
+  const script: HTMLScriptElement = document.createElement('script');
+  script.type = 'application/weave';
+  script.id = SNAPSHOT_ID;
+  script.textContent = JSON.stringify(snapshot({ count }));
+  document.body.appendChild(script);
+
+  // client: resumePage finds the snapshot by id, deserializes, and wires the emitted factory — no hand-authoring
+  const app = resumePage({
+    root: container,
+    handlers: (render as { handlers: (c: Record<string, unknown>) => Record<string, ResumeHandler> }).handlers,
+  });
+  assert.equal((app.ctx.count as Signal<number>)(), 10, 'resumePage rebuilt the state from the embedded snapshot');
+
+  (container.querySelector('button') as HTMLButtonElement).click();
+  assert.equal((app.ctx.count as Signal<number>)(), 11, 'a click resumed the lazy handler against the rebuilt graph');
+
+  app.dispose();
+  script.remove();
+});
+
+test('E1.2: resumePage throws loudly when the snapshot script is missing', () => {
+  let threw: boolean = false;
+  try {
+    resumePage({ root: host(), handlers: () => ({}) });
+  } catch {
+    threw = true;
+  }
+  assert.ok(threw, 'a missing snapshot <script> is a loud error, not a silent no-op');
 });
 
 test('resumableHandler returns instance-unique ids and registers into the active session', () => {

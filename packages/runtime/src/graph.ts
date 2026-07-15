@@ -78,6 +78,33 @@ function siteOf(id: string): string {
   return hash === -1 ? id : id.slice(0, hash);
 }
 
+/** The id of the `<script type="application/weave">` a server render embeds the state snapshot into. */
+export const SNAPSHOT_ID: string = '__weave_snapshot__';
+
+export interface ResumePageOptions {
+  /** The server-rendered root to resume (its subtree carries the `data-won-*` markers). */
+  root: Element;
+  /** Map handler site-refs → handlers over the resumed ctx (typically a compiled module's `render.handlers`). */
+  handlers: HandlerFactory;
+  /** Extra delegated event types (see `resumeEvents`). */
+  extraEvents?: string[];
+  /** Where to read the snapshot `<script>` from (default: the global `document`). */
+  document?: Document;
+}
+
+/**
+ * Client entry for an SSG/SSR page (E1.2): read the embedded state snapshot (the `SNAPSHOT_ID` script that
+ * `renderPage` emitted) and {@link resume} `root` against it — lazy handlers, no `setup`. Throws loudly if
+ * the snapshot script is missing. Returns the {@link ResumeApp}.
+ */
+export function resumePage(options: ResumePageOptions): ResumeApp {
+  const doc: Document = options.document ?? (globalThis as { document?: Document }).document!;
+  const el: HTMLElement | null = doc.getElementById(SNAPSHOT_ID);
+  if (!el) throw new Error(`resumePage: no snapshot <script id="${SNAPSHOT_ID}"> found in the document.`);
+  const wire: Wire = JSON.parse(el.textContent || 'null') as Wire;
+  return resume(options.root, { snapshot: wire, handlers: options.handlers, extraEvents: options.extraEvents });
+}
+
 /**
  * Resume a server-rendered subtree: rebuild its reactive graph from `snapshot` and wire its handlers
  * lazily against the existing DOM — WITHOUT calling `setup`. Returns the rebuilt `ctx` (live signals) and a
