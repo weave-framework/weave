@@ -124,11 +124,15 @@ export function generateEntry(
  *
  * The exported `render()` is what the build calls; keeping it a function (not a top-level side effect) lets
  * the build import the bundle once and drive it, and leaves room for `render(route)` when router-SSR lands.
+ *
+ * `runtime/server` is imported FIRST, on purpose: its module body installs the headless DOM as globals, and
+ * the root's compiled module creates its `<template>` at evaluation time (`document.createElement`) — so the
+ * server shim must be installed before the root module is evaluated. ESM evaluates imports in source order.
  */
 export function generateServerEntry(rootComponent: string, rootDir: string): string {
   return [
-    `import Root from ${importSpec(rootDir, rootComponent)};`,
     `import { renderPage } from "@weave-framework/runtime/server";`,
+    `import Root from ${importSpec(rootDir, rootComponent)};`,
     `export function render() { return renderPage(Root, {}); }`,
   ].join('\n');
 }

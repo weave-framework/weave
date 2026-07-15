@@ -1,11 +1,11 @@
 /** Weave CLI entry — `weave build` / `weave dev` / `weave check` / `weave routes`. */
 
-import { build } from './build.js';
+import { build, buildSsg } from './build.js';
 import { dev } from './dev.js';
 import { generateRoutes } from './routes.js';
 import { loadConfig } from './config.js';
 import type { ResolvedConfig } from './config.js';
-import { discoverCustomElements, generateEntry, type CustomElement } from './entry.js';
+import { discoverCustomElements, generateEntry, generateServerEntry, type CustomElement } from './entry.js';
 import { checkProject, type Diagnostic } from '@weave-framework/check';
 
 function flag(args: string[], name: string): string | undefined {
@@ -47,6 +47,29 @@ export async function main(argv: string[]): Promise<void> {
         // passes the workspace-root `dist/<project>` path); with no flag the config value stands, so
         // a standalone `weave build` is unchanged.
         const outDir: string = flag(rest, '--out') ?? config.outDir;
+        // `--ssg` (Phase E, E1.3b): static generation — render the root headlessly to HTML, then the client
+        // CSR-mounts over it. Needs a generated bootstrap (a `root` component to render); `entry` mode opts out.
+        if (rest.includes('--ssg')) {
+          if (!config.rootComponent) {
+            console.error('weave build --ssg needs a config `root` component — it renders the root headlessly.');
+            process.exit(1);
+          }
+          await buildSsg({
+            virtualEntry: virtualEntryFor(config)!,
+            serverEntry: {
+              code: generateServerEntry(config.rootComponent, config.root),
+              resolveDir: config.root,
+            },
+            mount: config.mount,
+            outDir,
+            minify: config.minify,
+            styleLang: config.styleLang,
+            styles: config.styles,
+            publicDir: config.publicDir,
+          });
+          console.log(`weave build --ssg → ${outDir}/`);
+          return;
+        }
         await build({
           entry: config.entry,
           virtualEntry: virtualEntryFor(config),
@@ -141,7 +164,7 @@ export async function main(argv: string[]): Promise<void> {
   }
 
   console.error(
-    'usage: weave <build|dev|check|routes|mcp> [entry|paths…] [--config file] [--out dir] [--serve dir] [--port n] [--no-minify] [--eager]'
+    'usage: weave <build|dev|check|routes|mcp> [entry|paths…] [--config file] [--out dir] [--serve dir] [--port n] [--no-minify] [--eager] [--ssg]'
   );
   process.exit(1);
 }
