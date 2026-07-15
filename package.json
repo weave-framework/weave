@@ -21,6 +21,7 @@
     "verify:size": "node tools/verify-size.mjs",
     "verify:server": "node packages/runtime/test/server.smoke.mjs",
     "verify:prerender": "node packages/cli/test/prerender.smoke.mjs",
+    "verify:ssg": "node packages/cli/test/ssg.smoke.mjs",
     "verify:dev-proxy": "node tools/verify-dev-proxy.mjs",
     "verify:extend": "node tools/verify-extend.mjs",
     "verify:mcp": "node packages/mcp/test/stdio.smoke.mjs",

@@ -91,6 +91,12 @@ function extractProps(src: string): string[] {
   return props;
 }
 
+/** A JSON import specifier for `file` relative to `rootDir` (POSIX-slashed, `.ts` dropped, `./`-anchored). */
+function importSpec(rootDir: string, file: string): string {
+  const r: string = relative(rootDir, file).split(sep).join('/').replace(/\.ts$/, '');
+  return JSON.stringify(r.startsWith('.') ? r : './' + r);
+}
+
 /** Emit the app entry module: register discovered custom elements, then mount the root. */
 export function generateEntry(
   rootComponent: string,
@@ -98,10 +104,7 @@ export function generateEntry(
   rootDir: string,
   elements: CustomElement[]
 ): string {
-  const spec = (file: string): string => {
-    const r: string = relative(rootDir, file).split(sep).join('/').replace(/\.ts$/, '');
-    return JSON.stringify(r.startsWith('.') ? r : './' + r);
-  };
+  const spec = (file: string): string => importSpec(rootDir, file);
   const lines: string[] = [`import Root from ${spec(rootComponent)};`];
   elements.forEach((ce, i) => lines.push(`import __ce${i} from ${spec(ce.file)};`));
   lines.push('import { mountComponent, defineCustomElement } from "@weave-framework/runtime/dom";');
@@ -111,6 +114,23 @@ export function generateEntry(
   );
   lines.push(`mountComponent(Root, ${JSON.stringify(mount)});`);
   return lines.join('\n');
+}
+
+/**
+ * Emit the SSG **server** entry (Phase E, E1.3b). Bundled for Node and executed at build time: it imports the
+ * root component and renders it headlessly to a {@link PageArtifact} (component HTML + state snapshot), which
+ * the build assembles into the page document. Custom elements need no registration here — the headless DOM
+ * serializes an unknown tag as a plain element, and interactivity is the client entry's job (CSR mount).
+ *
+ * The exported `render()` is what the build calls; keeping it a function (not a top-level side effect) lets
+ * the build import the bundle once and drive it, and leaves room for `render(route)` when router-SSR lands.
+ */
+export function generateServerEntry(rootComponent: string, rootDir: string): string {
+  return [
+    `import Root from ${importSpec(rootDir, rootComponent)};`,
+    `import { renderPage } from "@weave-framework/runtime/server";`,
+    `export function render() { return renderPage(Root, {}); }`,
+  ].join('\n');
 }
 
 /** esbuild plugin that serves the generated entry `code` for the {@link VIRTUAL_ENTRY} specifier. */
