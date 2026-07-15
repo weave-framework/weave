@@ -84,6 +84,19 @@ export function clearBlock(start: Comment, end: Comment): void {
 }
 
 /**
+ * ADOPT side (E1.2c-2): the island-replay entry for a control-flow block. Given the block's `[` start marker
+ * (the adopt render navigates to it by computed index — `[` sits at the block anchor's template position),
+ * clear the server-rendered content and return the `]` end anchor so the caller can re-run the block's normal
+ * helper (`ifBlock`) against it — a fresh, fully REACTIVE branch. The static/text nodes AROUND the block stay
+ * adopted in place; only the block subtree re-renders. After the clear, `]` is `start.nextSibling`.
+ */
+export function adoptIsland(start: Comment): Comment {
+  const end: Comment = blockEndOf(start);
+  clearBlock(start, end);
+  return end;
+}
+
+/**
  * CREATE side (the resumable server render): insert an isolated dynamic text node before `anchor` and keep
  * it updated. The leading `<!--$-->` marker keeps the text a distinct node in the serialized HTML so the
  * client can {@link adoptText} exactly it — even when a static run precedes it in the same element.

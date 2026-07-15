@@ -36,10 +36,11 @@ const BUDGETS = [
   // runtime/resume (E0.2a/b): resumable event dispatch + handler registration. Baseline 2.4 KB.
   { label: 'runtime/resume (E0.2a/b dispatch)', files: ['packages/runtime/dist/resume.js'], budget: 2_560 },
   // runtime/adopt (E1.2a/c): DOM-adoption primitives. Server+client, own line — 0 bytes for a plain SPA (I3).
-  // Budget raised 1536 → 2560 (deliberate) when E1.2c added the block-boundary cursor foundation (blockStart /
-  // blockEndOf / clearBlock — the marker bracket-matching that lets adopt skip a control-flow block). The SPA
-  // core (20.9 KB) is untouched; this entry never ships to a plain client SPA. Baseline 2.2 KB after E1.2c.
-  { label: 'runtime/adopt (E1.2a/c DOM adopt)', files: ['packages/runtime/dist/adopt.js'], budget: 2_560 },
+  // Grown across E1.2c (block adopt lands incrementally): E1.2a marker text-bind → E1.2c-1 block-boundary
+  // cursor (blockStart/blockEndOf/clearBlock) → E1.2c-2 adoptIsland (@if/@switch island-replay). Budget
+  // 1536 → 2560 → 3072 (deliberate, forward-looking so each block type doesn't trip a micro-bump). The SPA
+  // core (20.9 KB) is untouched; this entry never ships to a plain client SPA. Baseline 2.5 KB after E1.2c-2.
+  { label: 'runtime/adopt (E1.2a/c DOM adopt)', files: ['packages/runtime/dist/adopt.js'], budget: 3_072 },
   // runtime/graph (E0.3/E1.2): resume entry — signal codec + snapshot/resume + resumePage (SSG client entry).
   // Budget raised 2048 → 2560 (deliberate) when E1.2 added resumePage + SNAPSHOT_ID; still a lean resume entry.
   { label: 'runtime/graph (E0.3/E1.2 resume)', files: ['packages/runtime/dist/graph.js'], budget: 2_560 },

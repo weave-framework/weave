@@ -67,8 +67,9 @@ export type AdoptFn = (root: Element, ctx: Record<string, unknown>, slots?: Reco
 export interface ResumeOptions {
   /** The serialized reactive state from the server ({@link snapshot}). */
   snapshot: Wire;
-  /** Map handler site-refs → handlers over the resumed ctx. */
-  handlers: HandlerFactory;
+  /** Map handler site-refs → handlers over the resumed ctx. Optional — a render with no resumable events (e.g.
+   *  an adopt-only fragment) emits no `handlers` factory; resume then just re-attaches DOM bindings. */
+  handlers?: HandlerFactory;
   /** Extra delegated event types to arm even if absent at scan time (see `resumeEvents`). */
   extraEvents?: string[];
   /**
@@ -98,8 +99,9 @@ export const SNAPSHOT_ID: string = '__weave_snapshot__';
 export interface ResumePageOptions {
   /** The server-rendered root to resume (its subtree carries the `data-won-*` markers). */
   root: Element;
-  /** Map handler site-refs → handlers over the resumed ctx (typically a compiled module's `render.handlers`). */
-  handlers: HandlerFactory;
+  /** Map handler site-refs → handlers over the resumed ctx (typically a compiled module's `render.handlers`).
+   *  Optional — absent when the render has no resumable events (see {@link ResumeOptions.handlers}). */
+  handlers?: HandlerFactory;
   /** Extra delegated event types (see `resumeEvents`). */
   extraEvents?: string[];
   /** The compiled render's adopt variant (typically `render.adopt`) — re-attaches reactive DOM in place (E1.2b-2). */
@@ -141,7 +143,7 @@ export function resume(root: Element, options: ResumeOptions): ResumeApp {
     options.adopt!(root, ctx, {});
     disposeAdopt = dispose;
   });
-  const table: Record<string, ResumeHandler> = options.handlers(ctx);
+  const table: Record<string, ResumeHandler> = options.handlers ? options.handlers(ctx) : {};
   const ctl: ResumeControl = resumeEvents(root, {
     resolve: (id) => table[id] ?? table[siteOf(id)],
     extraEvents: options.extraEvents,

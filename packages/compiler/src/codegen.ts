@@ -227,6 +227,43 @@ const SVG_TAGS: Set<string> = new Set<string>([
 /** `on:<phase>` names that are transition lifecycle hooks, not DOM events. */
 const TRANSITION_PHASES: Set<string> = new Set<string>(['enterstart', 'enterend', 'leavestart', 'leaveend']);
 
+/** A block the adopt walk can island-replay (E1.2c-2): clear its server DOM + re-run its helper. @if/@switch. */
+function isAdoptableBlock(node: TemplateNode): boolean {
+  return node.type === 'if' || node.type === 'switch';
+}
+
+/** Any control-flow construct that inserts a runtime-variable node count before its anchor (component/slot too). */
+function isBlockNode(node: TemplateNode): boolean {
+  if (node.type === 'element') {
+    const el: ElementNode = node as ElementNode;
+    return /^[A-Z]/.test(el.tag) || el.tag === 'slot' || el.tag === 'w:element';
+  }
+  return node.type === 'if' || node.type === 'for' || node.type === 'switch'
+    || node.type === 'defer' || node.type === 'await' || node.type === 'key' || node.type === 'render';
+}
+
+/**
+ * Whether a node (or any descendant) needs INDEXED DOM access on adopt — i.e. it is anything but pure static
+ * structure: an interp, a binding, a control-flow block, or a component/slot. Used to gate block adoptability:
+ * once a block's runtime-variable content sits at a level, no such node may FOLLOW it (its server index is
+ * unknowable). Pure-static text/elements after a block are fine (nothing navigates to them).
+ */
+function hasDynamicDeep(node: TemplateNode): boolean {
+  switch (node.type) {
+    case 'text':
+    case 'comment':
+      return false;
+    case 'element': {
+      const el: ElementNode = node as ElementNode;
+      if (/^[A-Z]/.test(el.tag) || el.tag === 'slot' || el.tag === 'w:element') return true;
+      if (el.attrs.some((a) => a.type !== 'static')) return true;
+      return el.children.some(hasDynamicDeep);
+    }
+    default:
+      return true; // interp / if / for / switch / defer / await / key / render / snippet / let
+  }
+}
+
 /**
  * PascalCase child-component tag → kebab-case module basename (`SlideToggle` → `slide-toggle`).
  * Used by the loader to resolve a `<Foo>` tag to its sibling component module by convention.
@@ -342,6 +379,10 @@ function compileFragment(
       cur = new Map(cur);
       for (const nm of snippetNames) cur.set(nm, { kind: 'local' });
     }
+    // E1.2c-2 adoptability: a block inserts runtime-variable nodes, so at each level only ONE block is
+    // adopt-navigable and NOTHING needing indexed access may follow it. A non-@if/@switch block isn't
+    // island-replayable yet either. Tracked during the create walk (the adopt walk runs only if adoptable).
+    let sawBlock: boolean = false;
     for (const node of children) {
       if (node.type === 'let') {
         html += '<!---->'; // placeholder slot keeps child indices stable
@@ -353,6 +394,13 @@ function compileFragment(
       if (node.type === 'snippet') {
         emitSnippet(node, cur); // a declaration — no DOM position, no index consumed
         continue;
+      }
+      if (!adopt) {
+        if (sawBlock && hasDynamicDeep(node)) gen.adoptable = false; // indexed access past a block → unreachable
+        if (isBlockNode(node)) {
+          if (sawBlock || !isAdoptableBlock(node)) gen.adoptable = false; // 2nd block, or a non-replayable one
+          sawBlock = true;
+        }
       }
       emitNode(node, [...basePath, dom], cur, isHost);
       dom++;
@@ -717,7 +765,9 @@ function compileFragment(
   }
 
   function emitIf(node: IfNode, path: number[], sc: Scope): void {
-    gen.adoptable = false;
+    // E1.2c-2: @if is adopt-navigable (island-replay) when positioned adoptably — the emitChildren tracker
+    // decides; no blanket opt-out here. In adopt mode the anchor expr resolves to the block's `[` marker,
+    // and `adoptIsland` clears the server branch + returns the `]` for `ifBlock` to repopulate reactively.
     blockAnchor(path);
     const head: IfBranch = node.branches[0];
     let aliasVar: string | undefined;
@@ -743,12 +793,12 @@ function compileFragment(
     const hasElse: boolean = node.branches[node.branches.length - 1].cond === undefined;
     if (!hasElse) lines.push('return null;');
 
-    stmts.push(`${gen.H('ifBlock')}(${nodeExpr(path)}, () => { ${lines.join(' ')} });`);
+    const anchorArg: string = adopt ? `${gen.Ha('adoptIsland')}(${nodeExpr(path)})` : nodeExpr(path);
+    stmts.push(`${gen.H('ifBlock')}(${anchorArg}, () => { ${lines.join(' ')} });`);
   }
 
   function emitSwitch(node: SwitchNode, path: number[], sc: Scope): void {
-    gen.adoptable = false;
-    blockAnchor(path);
+    blockAnchor(path); // adopt-navigable like @if (island-replay); emitChildren gates positional adoptability
     const names: string[] = node.cases.map(() => gen.fn());
     node.cases.forEach((c, i) => childDecls.push(compileFragment(gen, c.children, sc, names[i])));
 
@@ -759,7 +809,8 @@ function compileFragment(
     });
     if (!node.cases.some((c) => c.test === undefined)) lines.push('return null;');
 
-    stmts.push(`${gen.H('ifBlock')}(${nodeExpr(path)}, () => { ${lines.join(' ')} });`);
+    const anchorArg: string = adopt ? `${gen.Ha('adoptIsland')}(${nodeExpr(path)})` : nodeExpr(path);
+    stmts.push(`${gen.H('ifBlock')}(${anchorArg}, () => { ${lines.join(' ')} });`);
   }
 
   function emitDefer(node: DeferNode, path: number[], sc: Scope): void {
@@ -850,14 +901,13 @@ function compileFragment(
   if (singleRoot) emitElement(sole!, [], scope, isHost);
   else emitChildren(top, [], scope, isHost);
 
-  // Adopt variant (E1.2b-2): no template + no clone — the server-rendered root is passed in as `_r`. The
-  // bindings re-attach in place (adoptText / bind*), navigating the SHIFTED server indices computed above.
-  // Flat by construction (a non-flat fragment never reaches here — gen.adoptable is false → no adopt walk),
-  // so there are no childDecls to emit.
+  // Adopt variant (E1.2b-2 / E1.2c): no template + no clone — the server-rendered root is passed in as `_r`.
+  // Bindings re-attach in place (adoptText / bind*), navigating the SHIFTED server indices computed above; an
+  // adoptable @if/@switch island-replays via `adoptIsland` + `ifBlock`, so its branch fns ride in childDecls.
   if (adopt) {
     gen.fragmentDepth--;
     const sig: string = param ? `_r, ${param}` : '_r';
-    const b: string[] = [...nodeDecls, ...stmts, 'return _r;'];
+    const b: string[] = [...nodeDecls, ...stmts, 'return _r;', ...childDecls];
     return `function ${name}(${sig}) {\n${b.map((l) => '  ' + l).join('\n')}\n}`;
   }
 

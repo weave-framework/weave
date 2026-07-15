@@ -2,7 +2,7 @@ import { test, assert } from '../../../tools/harness.js';
 import { signal, computed, effect, root, type Signal } from '@weave-framework/runtime';
 import * as dom from '@weave-framework/runtime/dom';
 import { resumeEvents, collectResumable, resumableHandler, handlerAttr, type ResumeHandler } from '@weave-framework/runtime/resume';
-import { bindTextResumable, adoptText, blockStart } from '@weave-framework/runtime/adopt';
+import { bindTextResumable, adoptText, blockStart, adoptIsland } from '@weave-framework/runtime/adopt';
 import { snapshot, resume, resumePage, SNAPSHOT_ID, type AdoptFn } from '@weave-framework/runtime/graph';
 import { compileTemplate } from '@weave-framework/compiler';
 
@@ -24,7 +24,8 @@ const rt: typeof dom & {
   bindTextResumable: typeof bindTextResumable;
   adoptText: typeof adoptText;
   blockStart: typeof blockStart;
-} = { ...dom, signal, computed, effect, root, resumableHandler, bindTextResumable, adoptText, blockStart };
+  adoptIsland: typeof adoptIsland;
+} = { ...dom, signal, computed, effect, root, resumableHandler, bindTextResumable, adoptText, blockStart, adoptIsland };
 
 /** Compile in the `resumable` target and hand back the bare `(ctx, slots) => Node` render fn. */
 function compileResumable(html: string, scope: string[] = []): (ctx: unknown, slots?: unknown) => Element {
@@ -280,13 +281,13 @@ test('E1.2b-2: adopt indices compound — each preceding dynamic text shifts a s
   assert.ok(/child\(_r, 3, 2\)/.test(nestedAdopt), 'the <p> shifted to 3 by the preceding text; its inner text at 2');
 });
 
-test('E1.2b-2: a non-flat resumable fragment (contains a block) emits NO adopt fn — falls back to CSR', () => {
-  const { code } = compileTemplate('<div>@if (on()) { <b>{{ x() }}</b> }</div>', {
+test('E1.2b-2: a resumable fragment with a not-yet-adoptable block (@for) emits NO adopt fn — falls back to CSR', () => {
+  const { code } = compileTemplate('<ul>@for (n of xs(); track n) { <li>{{ n }}</li> }</ul>', {
     mode: 'module',
-    scope: ['on', 'x'],
+    scope: ['xs'],
     resumable: true,
   });
-  assert.ok(!code.includes('render.adopt'), 'a fragment with a block emits no adopt fn (the cursor walk is E1.2c)');
+  assert.ok(!code.includes('render.adopt'), '@for is not island-replayable yet (E1.2c-2 does @if/@switch only)');
 });
 
 /* ──────────── E1.2c: block-boundary markers (cursor-walk foundation) ──────────── */
@@ -317,6 +318,72 @@ test('E1.2c: the resumable module emits blockStart + a ] anchor; imports it from
   assert.ok(code.includes('blockStart('), 'brackets the @for block with a runtime blockStart');
   assert.ok(code.includes('from "@weave-framework/runtime/adopt"'), 'imports blockStart from the adopt entry');
   assert.ok(/template\("[^"]*<!--\]-->/.test(code), 'the block end anchor is emitted as a ] comment in the template');
+});
+
+/* ──────────── E1.2c-2: @if island-replay adopt ──────────── */
+
+test('E1.2c-2: an adoptable @if emits an adopt fn (adoptIsland + ifBlock); non-adoptable positions do not', () => {
+  // @if as the last indexed thing at its level → adoptable (island-replay)
+  const ok = compileTemplate('<div><h1>{{ t() }}</h1>@if (show()) { <p>{{ b() }}</p> }</div>', {
+    mode: 'module', scope: ['t', 'show', 'b'], resumable: true,
+  });
+  assert.ok(ok.code.includes('render.adopt'), 'an adoptably-positioned @if emits an adopt fn');
+  const adoptBody: string = ok.code.slice(ok.code.indexOf('function adopt(_r'));
+  assert.ok(adoptBody.includes('adoptIsland('), 'the adopt render island-replays via adoptIsland');
+  assert.ok(adoptBody.includes('ifBlock('), 'then re-runs the normal ifBlock against the cleared island');
+
+  // a reactive interp AFTER the block → its server index is unreachable → no adopt fn (CSR fallback)
+  const after = compileTemplate('<div>@if (show()) { <p>x</p> } {{ tail() }}</div>', {
+    mode: 'module', scope: ['show', 'tail'], resumable: true,
+  });
+  assert.ok(!after.code.includes('render.adopt'), 'a bound node after a block blocks adopt (E1.2c cursor, later)');
+
+  // @for is not island-replayable yet → no adopt fn
+  const forBlock = compileTemplate('<ul>@for (n of items(); track n) { <li>{{ n }}</li> }</ul>', {
+    mode: 'module', scope: ['items'], resumable: true,
+  });
+  assert.ok(!forBlock.code.includes('render.adopt'), '@for stays CSR fallback for now');
+});
+
+test('E1.2c-2: adopt replays an @if island — statics adopt in place, the block re-renders REACTIVELY', () => {
+  const render = compileResumable('<div><h1>{{ title() }}</h1>@if (show()) { <p>{{ body() }}</p> }</div>', ['title', 'show', 'body']);
+  const adopt = (render as { adopt?: AdoptFn }).adopt;
+  const handlers = (render as { handlers?: (c: Record<string, unknown>) => Record<string, ResumeHandler> }).handlers;
+  assert.equal(typeof adopt, 'function', 'the @if fragment carries an adopt fn');
+
+  // ── server ── render (resumable: markers + [ … ] brackets) with the branch shown, then snapshot
+  const title: Signal<string> = signal('Hi');
+  const show: Signal<boolean> = signal(true);
+  const body: Signal<string> = signal('shown');
+  const serverNode = render({ title, show, body }) as HTMLElement;
+  const wire = snapshot({ title, show, body });
+  const serverHtml: string = serverNode.outerHTML;
+  assert.ok(serverHtml.includes('shown') && serverHtml.includes('<!--[-->'), 'server rendered the live branch inside [ … ]');
+
+  // ── client ── fresh parse (dead DOM), then resume with the emitted adopt + handlers
+  const container: HTMLElement = host();
+  container.innerHTML = serverHtml;
+  const div: HTMLElement = container.querySelector('div')!;
+  const app = resume(div, {
+    snapshot: wire,
+    handlers: handlers as (c: Record<string, unknown>) => Record<string, ResumeHandler>,
+    adopt,
+  });
+
+  // the <h1> static/text ADOPTED in place (not re-created) — and reactive against the resumed signal
+  assert.equal(div.querySelector('h1')!.textContent, 'Hi', 'h1 text present after adopt');
+  (app.ctx.title as Signal<string>).set('Hello');
+  assert.equal(div.querySelector('h1')!.textContent, 'Hello', 'h1 text adopted in place — updates from the resumed graph');
+
+  // the @if island REPLAYED — its branch is now a fresh, fully reactive render
+  assert.equal(div.querySelector('p')!.textContent, 'shown', 'the branch body rendered');
+  (app.ctx.body as Signal<string>).set('changed');
+  assert.equal(div.querySelector('p')!.textContent, 'changed', 'the replayed island is reactive (body updates)');
+  (app.ctx.show as Signal<boolean>).set(false);
+  assert.ok(!div.querySelector('p'), 'the @if toggles OFF after resume');
+  (app.ctx.show as Signal<boolean>).set(true);
+  assert.ok(div.querySelector('p'), 'and back ON — full control-flow reactivity resumed');
+  app.dispose();
 });
 
 test('E1.2b-2: adopt re-binds the SERVER text node in place — signal update flows, node identity kept, no re-render', () => {
