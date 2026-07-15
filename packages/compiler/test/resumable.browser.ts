@@ -281,13 +281,13 @@ test('E1.2b-2: adopt indices compound — each preceding dynamic text shifts a s
   assert.ok(/child\(_r, 3, 2\)/.test(nestedAdopt), 'the <p> shifted to 3 by the preceding text; its inner text at 2');
 });
 
-test('E1.2b-2: a resumable fragment with a not-yet-adoptable block (@for) emits NO adopt fn — falls back to CSR', () => {
-  const { code } = compileTemplate('<ul>@for (n of xs(); track n) { <li>{{ n }}</li> }</ul>', {
+test('E1.2b-2: a resumable fragment with a not-yet-adoptable block (a component) emits NO adopt fn — falls back to CSR', () => {
+  const { code } = compileTemplate('<div>hi <Widget /></div>', {
     mode: 'module',
-    scope: ['xs'],
+    scope: [],
     resumable: true,
   });
-  assert.ok(!code.includes('render.adopt'), '@for is not island-replayable yet (E1.2c-2 does @if/@switch only)');
+  assert.ok(!code.includes('render.adopt'), 'a child component is not island-replayable yet (nested resume is later)');
 });
 
 /* ──────────── E1.2c: block-boundary markers (cursor-walk foundation) ──────────── */
@@ -338,11 +338,11 @@ test('E1.2c-2: an adoptable @if emits an adopt fn (adoptIsland + ifBlock); non-a
   });
   assert.ok(!after.code.includes('render.adopt'), 'a bound node after a block blocks adopt (E1.2c cursor, later)');
 
-  // @for is not island-replayable yet → no adopt fn
-  const forBlock = compileTemplate('<ul>@for (n of items(); track n) { <li>{{ n }}</li> }</ul>', {
-    mode: 'module', scope: ['items'], resumable: true,
+  // a child component is not island-replayable yet → no adopt fn
+  const comp = compileTemplate('<div>hi <Widget /></div>', {
+    mode: 'module', scope: [], resumable: true,
   });
-  assert.ok(!forBlock.code.includes('render.adopt'), '@for stays CSR fallback for now');
+  assert.ok(!comp.code.includes('render.adopt'), 'a component stays CSR fallback (nested resume is later)');
 });
 
 test('E1.2c-2: adopt replays an @if island — statics adopt in place, the block re-renders REACTIVELY', () => {
@@ -383,6 +383,45 @@ test('E1.2c-2: adopt replays an @if island — statics adopt in place, the block
   assert.ok(!div.querySelector('p'), 'the @if toggles OFF after resume');
   (app.ctx.show as Signal<boolean>).set(true);
   assert.ok(div.querySelector('p'), 'and back ON — full control-flow reactivity resumed');
+  app.dispose();
+});
+
+/* ──────────── E1.2c-3: @for island-replay adopt ──────────── */
+
+test('E1.2c-3: adopt replays a @for island — the heading adopts in place, the list re-renders REACTIVELY', () => {
+  const render = compileResumable(
+    '<div><h2>{{ title() }}</h2><ul>@for (n of items(); track n) { <li>{{ n }}</li> }</ul></div>',
+    ['title', 'items']
+  );
+  const adopt = (render as { adopt?: AdoptFn }).adopt;
+  assert.equal(typeof adopt, 'function', 'a fragment whose last indexed thing is a @for emits an adopt fn');
+
+  // ── server ── render the list + snapshot
+  const title: Signal<string> = signal('Nums');
+  const items: Signal<number[]> = signal([1, 2, 3]);
+  const serverNode = render({ title, items }) as HTMLElement;
+  const wire = snapshot({ title, items });
+  const serverHtml: string = serverNode.outerHTML;
+  assert.ok(/<li[^>]*>1<\/li>/.test(serverHtml.replace(/<!--[^>]*-->/g, '')), 'server rendered the rows');
+
+  // ── client ── fresh parse + resume (no handlers factory — the list has no events)
+  const container: HTMLElement = host();
+  container.innerHTML = serverHtml;
+  const div: HTMLElement = container.querySelector('div')!;
+  const app = resume(div, { snapshot: wire, adopt });
+
+  // heading adopted in place + reactive
+  assert.equal(div.querySelector('h2')!.textContent, 'Nums', 'the <h2> text is present after adopt');
+  (app.ctx.title as Signal<string>).set('Numbers');
+  assert.equal(div.querySelector('h2')!.textContent, 'Numbers', '<h2> adopted in place — updates from the resumed graph');
+
+  // the @for island replayed — rows are live + keyed-reactive
+  const rowText = (): string[] => [...div.querySelectorAll('li')].map((li) => li.textContent!);
+  assert.deepEqual(rowText(), ['1', '2', '3'], 'the rows rendered after replay');
+  (app.ctx.items as Signal<number[]>).set([1, 2, 3, 4]);
+  assert.deepEqual(rowText(), ['1', '2', '3', '4'], 'appending an item adds a row — the replayed @for is reactive');
+  (app.ctx.items as Signal<number[]>).set([9, 1]);
+  assert.deepEqual(rowText(), ['9', '1'], 'replacing the list reconciles rows — full @for reactivity resumed');
   app.dispose();
 });
 

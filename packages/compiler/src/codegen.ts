@@ -227,9 +227,9 @@ const SVG_TAGS: Set<string> = new Set<string>([
 /** `on:<phase>` names that are transition lifecycle hooks, not DOM events. */
 const TRANSITION_PHASES: Set<string> = new Set<string>(['enterstart', 'enterend', 'leavestart', 'leaveend']);
 
-/** A block the adopt walk can island-replay (E1.2c-2): clear its server DOM + re-run its helper. @if/@switch. */
+/** A block the adopt walk can island-replay: clear its server DOM + re-run its helper. @if/@switch (E1.2c-2), @for (E1.2c-3). */
 function isAdoptableBlock(node: TemplateNode): boolean {
-  return node.type === 'if' || node.type === 'switch';
+  return node.type === 'if' || node.type === 'switch' || node.type === 'for';
 }
 
 /** Any control-flow construct that inserts a runtime-variable node count before its anchor (component/slot too). */
@@ -870,7 +870,8 @@ function compileFragment(
   }
 
   function emitFor(node: ForNode, path: number[], sc: Scope): void {
-    gen.adoptable = false;
+    // E1.2c-3: @for island-replays like @if — adopt clears the server rows + re-runs eachBlock (fresh reactive
+    // rows). Positional adoptability is gated by emitChildren (≤1 block/level, nothing indexed after it).
     blockAnchor(path);
     const rowFn: string = gen.fn();
     const forScope: Scope = childScope(sc, {
@@ -894,7 +895,8 @@ function compileFragment(
     const list: string = rewrite(node.list, sc).code;
     const track: string = node.track ? rewrite(node.track, sc).code : '$index';
     const keyFn: string = `(${node.item}, $index) => ${track}`;
-    stmts.push(`${gen.H('eachBlock')}(${nodeExpr(path)}, () => ${list}, ${keyFn}, ${rowFn}${emptyArg});`);
+    const anchorArg: string = adopt ? `${gen.Ha('adoptIsland')}(${nodeExpr(path)})` : nodeExpr(path);
+    stmts.push(`${gen.H('eachBlock')}(${anchorArg}, () => ${list}, ${keyFn}, ${rowFn}${emptyArg});`);
   }
 
   // walk
