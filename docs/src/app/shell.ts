@@ -116,6 +116,8 @@ export function setup(): ShellSetup {
   // smooth-scroll to the URL's anchor if it has one, else ease the new page up to the top.
   effect(() => {
     currentPath(); // track route changes
+    // Browser-only scroll management — skip during headless SSR/SSG (no `window`/`location`).
+    if (typeof window === 'undefined') return;
     const hash: string = location.hash;
     const pane: HTMLElement | null = document.querySelector('.weave-sidenav__content');
     // Kick the smooth scroll SYNCHRONOUSLY here — this effect runs before RouterView swaps the

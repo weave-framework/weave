@@ -1,4 +1,4 @@
-import { onMount, signal, type Signal } from '@weave-framework/runtime';
+import { onMount, effect, signal, type Signal } from '@weave-framework/runtime';
 import { parse } from '../markdown/parse';
 import { renderDoc } from '../markdown/render';
 import { scrollToHash } from '../util/scroll';
@@ -17,11 +17,16 @@ interface DocPageSetup {
 export function setup(props: DocPageProps): DocPageSetup {
   const host = signal<Element | null>(null);
 
-  onMount(() => {
+  // Build the content during render (an effect runs synchronously as the `ref` sets `host`), so it is
+  // present in the server-rendered HTML too — not deferred to a browser-only lifecycle. Append once.
+  effect(() => {
     const el = host();
-    if (!el) return;
+    if (!el || el.childNodes.length) return;
     el.append(renderDoc(parse(props.source ?? '')));
-    // Honor a deep-link anchor once the content (and its heading ids) exist.
+  });
+
+  // Deep-link anchor scroll is browser-only — onMount never fires during SSR, so `location` is safe here.
+  onMount(() => {
     if (location.hash) scrollToHash(location.hash);
   });
 
