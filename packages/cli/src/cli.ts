@@ -2,7 +2,7 @@
 
 import { build, buildSsg } from './build.js';
 import { dev } from './dev.js';
-import { generateRoutes } from './routes.js';
+import { generateRoutes, staticRoutePaths } from './routes.js';
 import { loadConfig } from './config.js';
 import type { ResolvedConfig } from './config.js';
 import { discoverCustomElements, generateEntry, generateServerEntry, type CustomElement } from './entry.js';
@@ -62,9 +62,13 @@ export async function main(argv: string[]): Promise<void> {
             console.error('weave build --ssg needs a config `root` component — it renders the root headlessly.');
             process.exit(1);
           }
-          // Routed when the app uses file-based routing or prerenders any non-root route: the server entry
-          // then imports the router's SSR seam. A pure root-only app (only `/`) stays router-free (no dep).
-          const routed: boolean = config.routesDir != null || config.ssgRoutes.some((r) => r !== '/');
+          // Routes to prerender: an explicit `ssg.routes`, else every static route derived from `routesDir`
+          // (file-based routing), else just `/` (a root-only app). Routed when file-based routing is in play
+          // or any non-root route is prerendered — the server entry then imports the router's SSR seam; a pure
+          // root-only app stays router-free (no dep).
+          const routes: string[] =
+            config.ssgRoutes ?? (config.routesDir ? staticRoutePaths(config.routesDir) : ['/']);
+          const routed: boolean = config.routesDir != null || routes.some((r) => r !== '/');
           await buildSsg({
             virtualEntry: virtualEntryFor(config)!,
             serverEntry: {
@@ -72,14 +76,14 @@ export async function main(argv: string[]): Promise<void> {
               resolveDir: config.root,
             },
             mount: config.mount,
-            routes: config.ssgRoutes,
+            routes,
             outDir,
             minify: config.minify,
             styleLang: config.styleLang,
             styles: config.styles,
             publicDir: config.publicDir,
           });
-          console.log(`weave build --ssg → ${outDir}/ (${config.ssgRoutes.length} route${config.ssgRoutes.length === 1 ? '' : 's'})`);
+          console.log(`weave build --ssg → ${outDir}/ (${routes.length} route${routes.length === 1 ? '' : 's'})`);
           return;
         }
         await build({

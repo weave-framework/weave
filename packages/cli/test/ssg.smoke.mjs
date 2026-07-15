@@ -26,6 +26,7 @@ const ok = (cond, msg) => {
 const entry = `
   export { generateServerEntry, generateEntry, discoverCustomElements } from './packages/cli/src/entry.ts';
   export { buildSsg } from './packages/cli/src/build.ts';
+  export { staticRoutePaths } from './packages/cli/src/routes.ts';
 `;
 const cacheDir = join(repo, 'node_modules', '.weave');
 mkdirSync(cacheDir, { recursive: true });
@@ -41,7 +42,7 @@ await esbuild({
   external: ['esbuild'],
   outfile: out,
 });
-const { generateServerEntry, generateEntry, discoverCustomElements, buildSsg } = await import(pathToFileURL(out).href);
+const { generateServerEntry, generateEntry, discoverCustomElements, buildSsg, staticRoutePaths } = await import(pathToFileURL(out).href);
 
 console.log('verify:ssg — SSG build plumbing\n');
 
@@ -173,9 +174,32 @@ try {
   rmSync(rout, { recursive: true, force: true });
 }
 
+/* ── Part 4 — staticRoutePaths derives the prerender list from a pages dir (skips :param + *) ── */
+
+const pages = mkdtempSync(join(here, '.smoke-ssg-pages-'));
+try {
+  mkdirSync(join(pages, 'learn'));
+  mkdirSync(join(pages, 'user'));
+  const page = (p) => writeFileSync(p, 'export const template = "<i>x</i>";\n');
+  page(join(pages, 'index.ts')); // → /
+  page(join(pages, 'about.ts')); // → /about
+  page(join(pages, 'learn', 'index.ts')); // → /learn
+  page(join(pages, 'learn', 'signals.ts')); // → /learn/signals
+  page(join(pages, 'user', '[id].ts')); // dynamic → skipped
+  page(join(pages, '[...rest].ts')); // catch-all → skipped
+
+  const paths = staticRoutePaths(pages);
+  ok(
+    JSON.stringify(paths) === JSON.stringify(['/', '/about', '/learn', '/learn/signals']),
+    `staticRoutePaths lists static routes, skips :param + * (got ${JSON.stringify(paths)})`
+  );
+} finally {
+  rmSync(pages, { recursive: true, force: true });
+}
+
 console.log('');
 if (failures) {
   console.error(`✖ ${failures} ssg check(s) failed.`);
   process.exit(1);
 }
-console.log('✓ SSG build works end-to-end — root-render (E1.3b) + routed per-route (E1.3c).');
+console.log('✓ SSG build works end-to-end — root-render (E1.3b) + routed per-route (E1.3c) + route derivation.');

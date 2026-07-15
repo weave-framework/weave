@@ -34,6 +34,28 @@ export interface GenerateRoutesOptions {
   lazy?: boolean;
 }
 
+/**
+ * Every STATIC route path under `dir`, for `weave build --ssg` to prerender — one URL per leaf page, with
+ * `:param` and `*` (catch-all) routes skipped (they have no single static URL). Index pages resolve to their
+ * folder path (`index.*` → `/`, `learn/index.*` → `/learn`). A layout folder (`_layout`) contributes its
+ * children's paths, not itself. Returns `/`-prefixed, deduped, sorted paths.
+ */
+export function staticRoutePaths(dir: string): string[] {
+  const routes: FileRoute[] = fileToRoutes(scanRoutes(dir));
+  const out: string[] = [];
+  const walk = (list: FileRoute[], prefix: string): void => {
+    for (const r of list) {
+      const full: string = r.path === '' ? prefix : prefix ? `${prefix}/${r.path}` : r.path;
+      if (r.children && r.children.length) walk(r.children, full);
+      else if (r.file) out.push(full);
+    }
+  };
+  walk(routes, '');
+  const isStatic = (p: string): boolean =>
+    !p.split('/').some((s) => s.startsWith(':') || s === '*' || s.startsWith('*'));
+  return [...new Set(out.filter(isStatic))].map((p) => '/' + p).sort();
+}
+
 /** Scan `dir`, build the manifest, and write the generated routes module. Returns its path. */
 export function generateRoutes(dir: string, opts: GenerateRoutesOptions = {}): string {
   const files: string[] = scanRoutes(dir);
