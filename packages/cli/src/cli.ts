@@ -13,11 +13,16 @@ function flag(args: string[], name: string): string | undefined {
   return i >= 0 ? args[i + 1] : undefined;
 }
 
-/** Regenerate the file-based routes module from the pages dir (when configured). */
-function syncRoutes(config: ResolvedConfig): void {
+/**
+ * Regenerate the file-based routes module from the pages dir (when configured). `eager` (SSG) emits static
+ * imports instead of `lazy()` chunks: the headless server render is synchronous, so a lazy chunk's async
+ * import would not resolve in time and the route would render empty. A later normal `dev`/`build` rewrites it
+ * lazy again (the file is git-ignored).
+ */
+function syncRoutes(config: ResolvedConfig, eager: boolean = false): void {
   if (!config.routesDir) return;
-  const written: string = generateRoutes(config.routesDir, { lazy: true });
-  console.log(`weave routes → ${written}`);
+  const written: string = generateRoutes(config.routesDir, { lazy: !eager });
+  console.log(`weave routes → ${written}${eager ? ' (eager, for --ssg)' : ''}`);
 }
 
 /** Build the framework-owned entry (Level C) when the config declares a `root` component. */
@@ -42,14 +47,17 @@ export async function main(argv: string[]): Promise<void> {
   if (cmd === 'build') {
     try {
       if (config) {
-        syncRoutes(config); // file-based routing: regenerate routes.gen.ts before bundling
+        const ssg: boolean = rest.includes('--ssg');
+        // file-based routing: regenerate routes.gen.ts before bundling — eager for --ssg (synchronous
+        // headless render), lazy otherwise (code-split SPA chunks).
+        syncRoutes(config, ssg);
         // An explicit `--out` overrides the config's `outDir` (used by `@weave-framework/nx`, which
         // passes the workspace-root `dist/<project>` path); with no flag the config value stands, so
         // a standalone `weave build` is unchanged.
         const outDir: string = flag(rest, '--out') ?? config.outDir;
         // `--ssg` (Phase E, E1.3b): static generation — render the root headlessly to HTML, then the client
         // CSR-mounts over it. Needs a generated bootstrap (a `root` component to render); `entry` mode opts out.
-        if (rest.includes('--ssg')) {
+        if (ssg) {
           if (!config.rootComponent) {
             console.error('weave build --ssg needs a config `root` component — it renders the root headlessly.');
             process.exit(1);
