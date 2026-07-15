@@ -62,6 +62,17 @@ export function setup(): ShellSetup {
 
   const groups = (): NavGroup[] => current().groups;
 
+  // Per-route document title — a flat path → label lookup over every nav item. The effect runs during render,
+  // so the SSG server render captures `document.title` for each page's <title> (and the live app updates too).
+  const labelByPath: Map<string, string> = new Map(
+    sections.flatMap((s) => s.groups.flatMap((g) => g.items.map((it) => [it.path, it.label] as const))),
+  );
+  effect(() => {
+    const path: string = currentPath().replace(/\/+$/, '') || '/'; // tolerate a trailing slash (direct SSG loads)
+    const label: string | undefined = labelByPath.get(path);
+    document.title = label ? `${label} — Weave` : 'Weave — Documentation';
+  });
+
   // Build a group's links as a Node for an Expansion body — composing the REAL router <Link>
   // (a callable component returning an <a> with navigation + active state), not a re-created link.
   // `exact`: every sidebar item is a distinct leaf page, so match the path exactly. Without it,
