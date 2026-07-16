@@ -737,3 +737,35 @@ test('E1.13: a component `on:` whose handler cannot be inlined is REPORTED (it w
   assert.ok(warnings && warnings.some((w) => /handler `toggle`/.test(w) && /will not work after resume/.test(w)),
     `a dead component-event handler must warn; got ${JSON.stringify(warnings)}`);
 });
+
+/* ──────────── E1.14 — the compiler says WHY a component cannot be adopted ──────────── */
+
+test('E1.14: a non-adoptable template REPORTS its cause (the whole subtree would silently client-render)', () => {
+  // `gen.adoptable = false` used to be set in ~17 places with no diagnostic at all — so a component whose
+  // entire subtree fell back to client rendering said nothing. That silence is what made a docs page look
+  // resumed when nothing had run. Each cause must now name itself, and name the construct in the author's terms.
+  const { warnings } = compileComponent(
+    { script: 'export function setup(){ return {}; }', template: '<div><b use:tooltip>x</b></div>' },
+    { filename: 'na', resumable: true }
+  );
+  assert.ok(warnings && warnings.some((w) => /cannot be resumed/.test(w) && /use:tooltip/.test(w)),
+    `must name the offending construct; got ${JSON.stringify(warnings)}`);
+});
+
+test('E1.14: the cause names the NODE as authored, not an AST type', () => {
+  // "an `element` node" is useless in a 200-line template; `<Link>` is actionable (this is exactly how the
+  // real docs blocker was finally located).
+  const { warnings } = compileComponent(
+    { script: 'export function setup(){ return {}; }', template: '<div><Foo /><Link>x</Link></div>' },
+    { filename: 'na2', resumable: true }
+  );
+  assert.ok(warnings && warnings.some((w) => /`<Link>`/.test(w)), `must name <Link>; got ${JSON.stringify(warnings)}`);
+});
+
+test('E1.14: an adoptable component reports nothing', () => {
+  const { warnings } = compileComponent(
+    { script: 'import { signal } from "@weave-framework/runtime";\nexport function setup(){ const n = signal(0); return { n }; }', template: '<p>{{ n() }}</p>' },
+    { filename: 'ok2', resumable: true }
+  );
+  assert.ok(!warnings, `a fully adoptable component is silent; got ${JSON.stringify(warnings)}`);
+});

@@ -11,8 +11,8 @@
 
 import { parseTemplate, VOID } from './parser.js';
 import type {
-  TemplateNode, ElementNode, Attr, StaticAttr, EventAttr, UseAttr, IfNode, IfBranch, ForNode, SwitchNode,
-  DeferNode, DeferTrigger, AwaitNode, SnippetNode, RenderNode, KeyNode,
+  TemplateNode, ElementNode, InterpNode, Attr, StaticAttr, EventAttr, UseAttr, IfNode, IfBranch, ForNode,
+  SwitchNode, DeferNode, DeferTrigger, AwaitNode, SnippetNode, RenderNode, KeyNode,
 } from './ast.js';
 import { rewrite, ctxScope, childScope, type Scope, type Binding } from './scope.js';
 
@@ -67,6 +67,12 @@ export interface CompileResult {
    * Empty when every site is inline or was inlined. {@link compileComponent} turns these into build warnings.
    */
   deadHandlers?: string[];
+  /**
+   * Phase E (E1.14) — resumable target only: why this component's render could NOT be adopted (empty when it
+   * can). A non-adoptable render means the ENTIRE component subtree is client-rendered on resume — the single
+   * most consequential downgrade in the feature, and until now a completely silent one.
+   */
+  notAdoptable?: string[];
 }
 
 class Gen {
@@ -76,6 +82,21 @@ class Gen {
   inlined?: ReadonlyMap<string, string>;
   /** E1.7 — handler names still emitted as a bare `ctx.<name>`, i.e. DEAD after resume. */
   deadHandlers: string[] = [];
+  /**
+   * E1.14 — why this fragment cannot be adopted, in the order the walk hit each cause.
+   *
+   * `adoptable` starts true and is switched off in ~17 places; each was SILENT, so a component whose whole
+   * subtree fell back to client rendering said nothing at all — the single most misleading failure in the
+   * feature (it made a docs page look resumed when nothing had run). Recording the reason costs nothing —
+   * the compiler already knows it — and {@link compileComponent} turns it into a build warning.
+   */
+  notAdoptable: string[] = [];
+
+  /** Mark this fragment un-adoptable, saying WHY (first cause wins; the rest are noise once it's off). */
+  cannotAdopt(reason: string): void {
+    if (this.adoptable && !this.notAdoptable.includes(reason)) this.notAdoptable.push(reason);
+    this.adoptable = false;
+  }
   usedResume: Set<string> = new Set<string>(); // @weave-framework/runtime/resume helpers (resumable target)
   usedAdopt: Set<string> = new Set<string>(); // @weave-framework/runtime/adopt helpers (resumable target)
   usedGraph: Set<string> = new Set<string>(); // @weave-framework/runtime/graph helpers (resumable target)
@@ -269,11 +290,11 @@ export function compileTemplateAst(ast: TemplateNode[], options: CompileOptions 
       ...(adoptFn ? [adoptFn, 'render.adopt = adopt;', 'export { adopt };'] : []),
       'export default render;',
     ].join('\n');
-    return { code, components, deadHandlers: gen.deadHandlers };
+    return { code, components, deadHandlers: gen.deadHandlers, notAdoptable: gen.notAdoptable };
   }
 
   const code: string = [imports, ...gen.templates, `export default ${render}`].join('\n');
-  return { code, components, deadHandlers: gen.deadHandlers };
+  return { code, components, deadHandlers: gen.deadHandlers, notAdoptable: gen.notAdoptable };
 }
 
 /**
@@ -548,7 +569,7 @@ function compileFragment(
     let pbOff: number = 0;
     for (const node of children) {
       if (node.type === 'let') {
-        if (!adopt && sawBlock) gen.adoptable = false; // a @let after a block isn't cursor-handled (rare)
+        if (!adopt && sawBlock) gen.cannotAdopt('a `@let` after a control-flow block'); // not cursor-handled (rare)
         html += '<!---->'; // placeholder slot keeps child indices stable
         stmts.push(`const ${node.name} = ${gen.Hc('computed')}(() => (${rewrite(node.expr, cur).code}));`);
         cur = childScope(cur, { [node.name]: node.name });
@@ -557,7 +578,7 @@ function compileFragment(
         continue;
       }
       if (node.type === 'snippet') {
-        if (!adopt && sawBlock) gen.adoptable = false;
+        if (!adopt && sawBlock) gen.cannotAdopt('a `@snippet` after a control-flow block');
         emitSnippet(node, cur); // a declaration — no DOM position, no index consumed
         continue;
       }
@@ -566,15 +587,15 @@ function compileFragment(
         // element adopts; a nested-block element, or anything else needing indexed access, does not yet.
         if (sawBlock) {
           if (node.type === 'element' && !isBlockNode(node)) {
-            if (hasBlockDeep(node)) gen.adoptable = false;
+            if (hasBlockDeep(node)) gen.cannotAdopt(`\`${describe(node)}\` (it contains a control-flow block) placed after another block`);
           } else if (node.type !== 'interp' && node.type !== 'text' && node.type !== 'comment') {
-            gen.adoptable = false;
+            gen.cannotAdopt(`\`${describe(node)}\` placed after a control-flow block`);
           }
         }
         if (isBlockNode(node)) {
           // adoptable at a static position if it island-replays (@if/@switch/@for) OR is a resumable child
           // component; a 2nd block/component per level, or a slot/w:element/@defer/@await/@key, opts out.
-          if (sawBlock || !(isAdoptableBlock(node) || isComponentNode(node))) gen.adoptable = false;
+          if (sawBlock || !(isAdoptableBlock(node) || isComponentNode(node))) gen.cannotAdopt(`a \`${node.type}\` node after a control-flow block`);
           sawBlock = true;
         }
       }
@@ -610,13 +631,13 @@ function compileFragment(
   }
 
   function emitRender(node: RenderNode, path: number[], sc: Scope): void {
-    gen.adoptable = false; // blocks/components insert a variable node count → need the marker cursor walk (E1.2c)
+    gen.cannotAdopt('a `@snippet` definition'); // variable node count → needs the marker cursor walk (E1.2c)
     blockAnchor(path);
     stmts.push(`${gen.H('mountChild')}(${nodeExpr(path)}, ${rewrite(node.expr, sc).code});`);
   }
 
   function emitKey(node: KeyNode, path: number[], sc: Scope): void {
-    gen.adoptable = false;
+    gen.cannotAdopt('an `@key` block');
     blockAnchor(path);
     const contentFn: string = gen.fn();
     childDecls.push(compileFragment(gen, node.children, sc, contentFn));
@@ -658,7 +679,7 @@ function compileFragment(
         } else {
           // A non-reactive interp sets text once with NO marker → it shifts indices and merges with adjacent
           // static text on the client, so a fragment containing one is not adopt-safe yet (E1.2c). Fall back.
-          gen.adoptable = false;
+            gen.cannotAdopt(`a NON-reactive interpolation \`{{ ${node.expr.trim()} }}\` — it merges with adjacent static text; call it (\`{{ ${node.expr.trim()}() }}\`) or wrap it in its own element`);
           stmts.push(`${gen.H('setText')}(${nodeExpr(path)}, ${code});`);
         }
         return;
@@ -727,7 +748,7 @@ function compileFragment(
    * element (re-run whenever the tag changes).
    */
   function emitDynamicElement(node: ElementNode, path: number[], sc: Scope): void {
-    gen.adoptable = false;
+    gen.cannotAdopt('a dynamic `<w:element this={…}>`');
     blockAnchor(path);
     const anchor: string = nodeExpr(path);
     let tagExpr: string = '""';
@@ -785,7 +806,7 @@ function compileFragment(
         sink.push(`${gen.H('bindShow')}(${n}, () => (${rewrite(attr.expr, sc).code}));`);
         break;
       case 'transition': {
-        gen.adoptable = false; // a transition wires a lifecycle effect the adopt walk doesn't stage yet (E1.2c)
+        gen.cannotAdopt(`a \`${attr.name}\` transition`); // a lifecycle effect the adopt walk doesn't stage yet
         // transition:fn / in:fn / out:fn → transition(el, fn, params, mode). The
         // params are a snapshot (re-read at play time via the fn); the fn resolves to ctx.
         const fn: string = rewrite(attr.name, sc).code;
@@ -821,11 +842,11 @@ function compileFragment(
         break;
       }
       case 'ref':
-        gen.adoptable = false; // ref capture / use / bind establish node-tied wiring adopt doesn't stage yet
+          gen.cannotAdopt('a `ref` capture'); // node-tied wiring the adopt walk doesn't stage yet
         sink.push(`${gen.H('setRef')}(${rewrite(attr.expr, sc).code}, ${n});`);
         break;
       case 'use': {
-        gen.adoptable = false;
+          gen.cannotAdopt(`a \`use:${attr.name}\` action`);
         // `use:action={arg}` → applyAction(el, action, () => (arg)). The action is the `name`
         // identifier (rewritten against ctx); the arg is passed as a getter, so a reactive
         // action's `update(arg)` re-runs when it changes (see applyAction / ActionResult).
@@ -840,7 +861,7 @@ function compileFragment(
         break;
       }
       case 'bind': {
-        gen.adoptable = false;
+          gen.cannotAdopt(`a \`bind:${attr.name}\` two-way binding`);
         // bind:value / bind:checked / bind:group → two-way `bindValue`. The
         // expression must resolve to a writable signal (passed by reference, not
         // called): `bind:value={count}` → `bindValue(el, ctx.count, 'value')`.
@@ -904,7 +925,7 @@ function compileFragment(
     // a block-nested component (depth ≥ 2) re-renders under its block's island-replay (no id, no adopt).
     const resumableChild: boolean = gen.resumable && gen.fragmentDepth === 1 && uses.length === 0;
     const cid: string = resumableChild ? gen.componentId() : '';
-    if (uses.length > 0) gen.adoptable = false;
+    if (uses.length > 0) gen.cannotAdopt(`a \`use:\` action on <${node.tag}>`);
     if (resumableChild && !adopt) props.push(`'$wid': ${q(cid)}`);
 
     // Slots: group children by a static `slot="name"` (default otherwise); strip the attr.
@@ -986,7 +1007,7 @@ function compileFragment(
   }
 
   function emitSlot(node: ElementNode, path: number[], sc: Scope): void {
-    gen.adoptable = false;
+    gen.cannotAdopt('a `<slot>`');
     blockAnchor(path);
     const anchorVar: string = nodeExpr(path);
     const nameAttr: Attr | undefined = node.attrs.find((a) => a.type === 'static' && a.name === 'name');
@@ -1051,7 +1072,7 @@ function compileFragment(
   }
 
   function emitDefer(node: DeferNode, path: number[], sc: Scope): void {
-    gen.adoptable = false;
+    gen.cannotAdopt('an `@defer` block');
     blockAnchor(path);
     const contentFn: string = gen.fn();
     childDecls.push(compileFragment(gen, node.children, sc, contentFn));
@@ -1068,7 +1089,7 @@ function compileFragment(
   }
 
   function emitAwait(node: AwaitNode, path: number[], sc: Scope): void {
-    gen.adoptable = false;
+    gen.cannotAdopt('an `@await` block');
     blockAnchor(path);
     const anchorVar: string = nodeExpr(path);
     const source: string = `() => (${rewrite(node.expr, sc).code})`;
@@ -1205,6 +1226,28 @@ function q(s: string): string {
 /** Object-literal key: bare when a valid identifier, quoted otherwise. */
 function propKey(name: string): string {
   return /^[A-Za-z_$][\w$]*$/.test(name) ? name : JSON.stringify(name);
+}
+
+/** Name a node the way its author wrote it (`<RouterView>`, `@for`), so a diagnostic points at real source. */
+function describe(node: TemplateNode): string {
+  switch (node.type) {
+    case 'element':
+      return `<${(node as ElementNode).tag}>`;
+    case 'interp':
+      return `{{ ${(node as InterpNode).expr.trim()} }}`;
+    case 'if':
+    case 'for':
+    case 'switch':
+    case 'defer':
+    case 'await':
+    case 'key':
+    case 'let':
+    case 'snippet':
+    case 'render':
+      return `@${node.type}`;
+    default:
+      return node.type;
+  }
 }
 
 /**

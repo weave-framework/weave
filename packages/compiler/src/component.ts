@@ -267,6 +267,16 @@ export function compileComponent(src: ComponentSource, opts: ComponentOptions = 
   // E1.5/E1.6 — a resumable build reports what will NOT survive resume. A dead handler site is ground truth
   // from the codegen (whatever the cause); the reason comes from the extraction when it knows one.
   const warnings: string[] = resumed ? [...resumed.warnings] : [];
+  // E1.14 — the big one: a render that cannot be adopted means this component's WHOLE subtree is re-rendered
+  // on the client (its setup re-runs; nothing below it resumes). It used to be entirely silent, which is what
+  // made a docs page look resumed when nothing had run at all.
+  if (opts.resumable && compiled.notAdoptable?.length) {
+    warnings.push(
+      `this component cannot be resumed — its template uses ${compiled.notAdoptable.join('; and ')}. ` +
+        `The whole subtree will be client-rendered instead (setup re-runs). Remove or move that construct to ` +
+        `make the component adoptable.`
+    );
+  }
   for (const name of compiled.deadHandlers ?? []) {
     const why: string | undefined = resumed?.reasons.get(name);
     warnings.push(
