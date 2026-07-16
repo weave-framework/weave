@@ -430,11 +430,190 @@ export function unresolvedRefs(
   name?: string,
   ignore?: string,
 ): string[] {
+  // E1.18 — `freeIdentifiers` is the TEMPLATE basis, and a template has no type annotations (its `:` is a
+  // ternary). Setup code has both, so analysing it raw reported TYPE names as ctx refs and the body's own
+  // locals as unresolved: the real `<Checkbox>` warned that its handler "reads `el`, `HTMLInputElement`,
+  // `next`, `boolean`, `props`" when only `props` was true. Strip the annotations, then treat the body's own
+  // declarations as what they are — locals. Analysis only; the EMIT still inlines the source verbatim (it is
+  // TS inside a TS module, so esbuild erases the types).
+  const src: string = stripDeclTypes(source);
+  const locals: Set<string> = declaredLocals(src);
   const out: string[] = [];
-  for (const id of freeIdentifiers(source)) {
+  for (const id of freeIdentifiers(src)) {
     if (id === name || id === ignore) continue; // self-reference, or the emitted callee (`computed`)
-    if (params.includes(id)) continue; // its own parameter (a local)
+    if (params.includes(id) || locals.has(id)) continue; // its own parameter / its own local
     if (!ctxNames.has(id) && !out.includes(id)) out.push(id);
+  }
+  return out;
+}
+
+/**
+ * Blank out TS type annotations in the two positions where a `:` cannot be anything else — after a
+ * `const`/`let`/`var` name, and after a parameter list. Everywhere else a `:` is ambiguous (a ternary, an
+ * object key), so it is left alone: this is a narrowing pass for the analysis, not a TS stripper.
+ */
+function stripDeclTypes(src: string): string {
+  let out: string = '';
+  let i: number = 0;
+  const n: number = src.length;
+  while (i < n) {
+    const op: number = skipOpaque(src, i); // strings / template literals / comments — never annotations
+    if (op > i) {
+      out += src.slice(i, op);
+      i = op;
+      continue;
+    }
+    // `const x: T = …` / `let x: T` — after a declared name, a `:` is always the annotation.
+    const kw: string | null = startsWithWord(src, i, 'const') ? 'const' : startsWithWord(src, i, 'let') ? 'let' : startsWithWord(src, i, 'var') ? 'var' : null;
+    if (kw && isTokenStart(src, i)) {
+      let j: number = skipWs(src, i + kw.length);
+      const s: number = j;
+      while (j < n && ID_CHAR.test(src[j])) j++;
+      if (j > s) {
+        const k: number = skipWs(src, j);
+        if (src[k] === ':') {
+          out += src.slice(i, j) + ' ';
+          i = endOfAnnotation(src, k + 1, ['=', ';', ',', ')']);
+          continue;
+        }
+      }
+      out += src.slice(i, j);
+      i = j;
+      continue;
+    }
+    // An arrow's PARAMETER list — `(e: KeyboardEvent, n: number = 2) =>`. Only strip when the `)` is followed
+    // by `=>` (optionally through a return type), so a plain CALL's parens are never touched.
+    if (src[i] === '(') {
+      const close: number = matchDelimited(src, i, '(', ')');
+      if (close > i && isArrowParams(src, close)) {
+        out += `(${stripParamTypes(src.slice(i + 1, close))})`;
+        i = close + 1;
+        continue;
+      }
+    }
+    // `(…): T =>` / `(…): T {` — after a parameter list, a `:` is always the return type.
+    if (src[i] === ')') {
+      const k: number = skipWs(src, i + 1);
+      if (src[k] === ':') {
+        out += ') ';
+        i = endOfAnnotation(src, k + 1, ['=>', '{', ';']);
+        continue;
+      }
+    }
+    out += src[i];
+    i++;
+  }
+  return out;
+}
+
+/** Is the `)` at `close` the end of an ARROW's parameter list (possibly through a `: ReturnType`)? */
+function isArrowParams(src: string, close: number): boolean {
+  let k: number = skipWs(src, close + 1);
+  if (src[k] === ':') k = skipWs(src, endOfAnnotation(src, k + 1, ['=>', '{', ';']));
+  return src.startsWith('=>', k);
+}
+
+/**
+ * Strip each parameter's `: Type` from an arrow's parameter list. A `:` counts only BEFORE that parameter's
+ * `=`, so a DEFAULT VALUE — real code, possibly reading ctx — survives intact, including a ternary default
+ * (`n = pick ? 1 : 2`), whose `:` must not be mistaken for an annotation.
+ */
+function stripParamTypes(params: string): string {
+  const out: string[] = [];
+  for (const part of splitTop(params)) {
+    let depth: number = 0;
+    let cut: number = -1;
+    for (let i = 0; i < part.length; i++) {
+      const op: number = skipOpaque(part, i);
+      if (op > i) {
+        i = op - 1;
+        continue;
+      }
+      const c: string = part[i];
+      if (c === '(' || c === '[' || c === '{' || c === '<') depth++;
+      else if (c === ')' || c === ']' || c === '}' || c === '>') depth--;
+      else if (depth === 0 && c === '=' && part[i + 1] !== '>' && part[i - 1] !== '=' && part[i - 1] !== '!') break; // a default → keep the rest
+      else if (depth === 0 && c === ':') {
+        cut = i;
+        break;
+      }
+    }
+    if (cut < 0) {
+      out.push(part);
+      continue;
+    }
+    const eq: number = endOfAnnotation(part, cut + 1, ['=']);
+    out.push(part.slice(0, cut) + ' ' + part.slice(eq));
+  }
+  return out.join(',');
+}
+
+/** Split a parameter list on top-level commas. */
+function splitTop(src: string): string[] {
+  const out: string[] = [];
+  let depth: number = 0;
+  let start: number = 0;
+  for (let i = 0; i < src.length; i++) {
+    const op: number = skipOpaque(src, i);
+    if (op > i) {
+      i = op - 1;
+      continue;
+    }
+    const c: string = src[i];
+    if (c === '(' || c === '[' || c === '{' || c === '<') depth++;
+    else if (c === ')' || c === ']' || c === '}' || c === '>') depth--;
+    else if (c === ',' && depth === 0) {
+      out.push(src.slice(start, i));
+      start = i + 1;
+    }
+  }
+  out.push(src.slice(start));
+  return out;
+}
+
+/** Scan past an annotation body to the first of `stops` at depth 0 (a type may nest `<>`/`()`/`{}`/`[]`). */
+function endOfAnnotation(src: string, i: number, stops: readonly string[]): number {
+  const n: number = src.length;
+  while (i < n) {
+    const op: number = skipOpaque(src, i);
+    if (op > i) {
+      i = op;
+      continue;
+    }
+    for (const s of stops) if (src.startsWith(s, i)) return i;
+    const c: string = src[i];
+    if (c === '(' || c === '[' || c === '{' || c === '<') {
+      const close: number = c === '<' ? skipTypeArgs(src, i) : matchDelimited(src, i, c, c === '(' ? ')' : c === '[' ? ']' : '}') + 1;
+      if (close <= i) return i; // unbalanced → stop here rather than run away
+      i = close;
+      continue;
+    }
+    i++;
+  }
+  return n;
+}
+
+/** Every name this code declares itself (`const`/`let`/`var`, at any depth) — locals, not unresolved refs. */
+function declaredLocals(src: string): Set<string> {
+  const out: Set<string> = new Set<string>();
+  let i: number = 0;
+  const n: number = src.length;
+  while (i < n) {
+    const op: number = skipOpaque(src, i);
+    if (op > i) {
+      i = op;
+      continue;
+    }
+    const kw: string | null = startsWithWord(src, i, 'const') ? 'const' : startsWithWord(src, i, 'let') ? 'let' : startsWithWord(src, i, 'var') ? 'var' : null;
+    if (kw && isTokenStart(src, i)) {
+      let j: number = skipWs(src, i + kw.length);
+      const s: number = j;
+      while (j < n && ID_CHAR.test(src[j])) j++;
+      if (j > s) out.add(src.slice(s, j)); // a destructuring pattern declares no bare name here → skipped
+      i = j;
+      continue;
+    }
+    i++;
   }
   return out;
 }

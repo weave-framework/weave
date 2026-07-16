@@ -1,5 +1,5 @@
 import { test, assert } from '../../../tools/harness.js';
-import { extractSetupHandlers, extractSetupBindings, extractModuleImports, isInlinable, isDerivable, type SetupHandler } from '@weave-framework/compiler';
+import { extractSetupHandlers, extractSetupBindings, extractModuleImports, isInlinable, isDerivable, unresolvedRefs, type SetupHandler } from '@weave-framework/compiler';
 
 /**
  * E1.5 — named-handler resume. `extractSetupHandlers` pulls each top-level `setup` binding that is a function
@@ -168,4 +168,81 @@ test('module imports are collected — they are what a re-derived initializer ma
   assert.ok(imports.has('Home'), 'default');
   assert.ok(imports.has('util'), 'namespace');
   assert.equal(imports.size, 4, 'a side-effect-only import contributes nothing');
+});
+
+/* ──────────── E1.18: the analysis must not read TYPES or a handler's own locals as ctx refs ──────────── */
+
+test('E1.18: a handler`s own block-body locals and TYPE annotations are not unresolved refs', () => {
+  // The real `<Checkbox>` shape. It warned that `onNativeChange` "reads `el`, `HTMLInputElement`, `next`,
+  // `boolean`, `props`" — but `el`/`next` are the handler's OWN locals and `HTMLInputElement`/`boolean` are
+  // TYPE names, erased at runtime. Only `props` is a genuine unresolved ref. False causes make every warning
+  // untrustworthy and refuse handlers that would have inlined fine.
+  const script: string = setup(
+    '  const input = signal(null);\n' +
+      '  const onNativeChange = (): void => {\n' +
+      '    const el: HTMLInputElement | null = input();\n' +
+      '    if (!el) return;\n' +
+      '    const next: boolean = el.checked;\n' +
+      '    input.set(el);\n' +
+      '  };\n' +
+      '  return { input, onNativeChange };'
+  );
+  const h = extractSetupHandlers(script).get('onNativeChange')!;
+  assert.ok(h, 'the handler was extracted');
+  assert.deepEqual(
+    unresolvedRefs(h.source, new Set(['input']), h.params, 'onNativeChange').sort(),
+    [],
+    'no false causes — the locals and the type names are gone, and `input` is in ctx',
+  );
+  assert.ok(isInlinable(h, new Set(['input']), 'onNativeChange'), 'so it inlines instead of being refused');
+});
+
+test('E1.18: a REAL unresolved ref still reports, and reports only itself', () => {
+  const script: string = setup(
+    '  const input = signal(null);\n' +
+      '  const onChange = (): void => {\n' +
+      '    const el: HTMLInputElement | null = input();\n' +
+      '    const next: boolean = !!el;\n' +
+      '    missing.set(next);\n' +
+      '  };\n' +
+      '  return { input, onChange };'
+  );
+  const h = extractSetupHandlers(script).get('onChange')!;
+  assert.deepEqual(
+    unresolvedRefs(h.source, new Set(['input']), h.params, 'onChange'),
+    ['missing'],
+    'the genuine culprit is named, and nothing else is',
+  );
+});
+
+test('E1.18: a local declared in the handler does not mask a same-named ctx binding elsewhere', () => {
+  // `count` is a ctx signal AND a local name in another handler — the local must not make the ctx ref vanish
+  // from a DIFFERENT handler's analysis (the locals set is per-handler, not global).
+  const script: string = setup(
+    '  const count = signal(0);\n' +
+      '  const a = (): void => { const tmp: number = 1; count.set(tmp); };\n' +
+      '  const b = (): void => { missing.set(count()); };\n' +
+      '  return { count, a, b };'
+  );
+  const hs = extractSetupHandlers(script);
+  assert.deepEqual(unresolvedRefs(hs.get('a')!.source, new Set(['count']), [], 'a'), [], 'a: tmp is its own local');
+  assert.deepEqual(unresolvedRefs(hs.get('b')!.source, new Set(['count']), [], 'b'), ['missing'], 'b: unaffected by a`s local');
+});
+
+test('E1.18: a PARAMETER type annotation is not a ref, but a default value still is', () => {
+  // `<Sidenav>`'s `onKeydown` blamed `KeyboardEvent` — a param type. A param DEFAULT is real code though, so
+  // the strip must stop at the `=`; and a ternary default (`= a ? b : c`) has a `:` that must survive.
+  const script: string = setup(
+    '  const step = signal(1);\n' +
+      '  const onKeydown = (e: KeyboardEvent, mode: "a" | "b" = "a", n: number = pick ? 1 : 2): void => {\n' +
+      '    step.set(e.key.length + n + mode.length);\n' +
+      '  };\n' +
+      '  return { step, onKeydown };'
+  );
+  const h = extractSetupHandlers(script).get('onKeydown')!;
+  assert.deepEqual(
+    unresolvedRefs(h.source, new Set(['step']), h.params, 'onKeydown'),
+    ['pick'],
+    'the param TYPES are gone; only `pick` — read by a default VALUE — is a genuine ref',
+  );
 });
