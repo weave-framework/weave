@@ -363,15 +363,43 @@ test('E1.5: a NAMED handler is inlined into the factory — `{{ inc }}` resumes 
   assert.ok(!/"w0":\s*ctx\.inc\b/.test(code), 'no bare ctx.inc — it is undefined on the client (a function cannot serialize)');
 });
 
-test('E1.5 fail-safe: a handler calling ANOTHER setup function is NOT inlined (falls back, never a ReferenceError)', () => {
-  // A plain local (`const step = 2`) is re-derivable since E1.11, so it no longer blocks inlining. A FUNCTION
-  // is different: it is dropped from the snapshot and `derive` never rebuilds functions — so a handler calling
-  // one cannot resolve, and must fall back rather than emit a body that throws on the first click.
+test('E1.19: a handler calling a setup-local HELPER inlines — the helper is rebuilt as a factory local', () => {
+  // A helper is dropped from the snapshot like any function, and `derive` never rebuilds functions — so until
+  // E1.19 a handler calling one was refused (the commonest real cause left on the docs site: `setOpened`,
+  // `openPanel`, `rovingIndex`). It does not need to cross the wire: the factory can simply re-declare it over
+  // the resumed ctx, exactly as it inlines a handler body.
   const { code } = compileComponent(
     { script: counter('const helper = () => count.set(0);\nconst inc = () => helper();'), template: '<button on:click={{ inc }}>{{ count() }}</button>' },
     { filename: 'ctr2', resumable: true }
   );
-  assert.ok(/"w0":\s*ctx\.inc\b/.test(code), '`helper` never reaches the client → keep ctx.inc rather than inline a broken body');
+  const factory: string = code.split('function handlers(')[1]?.split('\n}')[0] ?? '';
+  assert.ok(/const helper = \(\) => ctx\.count\.set\(0\)/.test(factory),
+    `the helper is declared in the factory, rewritten over ctx; got:\n${factory}`);
+  assert.ok(/"w0":\s*\(\) => helper\(\)/.test(factory), 'and the site inlines to a call of that local, not ctx.inc');
+  assert.ok(!/"w0":\s*ctx\.inc\b/.test(code), 'the old fall-back is gone');
+});
+
+test('E1.19: mutually recursive helpers both resolve (a single declaration-order pass would refuse one)', () => {
+  const { code } = compileComponent(
+    {
+      script: counter('const ping = () => pong();\nconst pong = () => count.set(1);\nconst inc = () => ping();'),
+      template: '<button on:click={{ inc }}>{{ count() }}</button>',
+    },
+    { filename: 'ctr2c', resumable: true }
+  );
+  const factory: string = code.split('function handlers(')[1]?.split('\n}')[0] ?? '';
+  assert.ok(/const ping =/.test(factory) && /const pong =/.test(factory), `both helpers emitted; got:\n${factory}`);
+  assert.ok(/"w0":\s*\(\) => ping\(\)/.test(factory), 'and the site resolves through them');
+});
+
+test('E1.19 fail-safe: a handler reading something genuinely unreachable still falls back to ctx.<name>', () => {
+  // `props` is the parent's live object — it cannot cross the wire and nothing rebuilds it, so the site must
+  // stay inert-but-safe rather than emit a body that throws on the first click.
+  const { code } = compileComponent(
+    { script: counter('const inc = () => count.set(props.start);'), template: '<button on:click={{ inc }}>{{ count() }}</button>' },
+    { filename: 'ctr2d', resumable: true }
+  );
+  assert.ok(/"w0":\s*ctx\.inc\b/.test(code), 'keep ctx.inc rather than inline a body that reads an absent `props`');
 });
 
 test('E1.11: a handler reading a plain setup local IS inlined — `derive` rebuilds the local', () => {
@@ -729,8 +757,9 @@ test('E1.13: a component `on:` whose handler cannot be inlined is REPORTED (it w
       script:
         'import { signal } from "@weave-framework/runtime";\n' +
         'import Button from "./button";\n' +
-        'export function setup(){ const theme = signal("light"); const helper = () => theme.set("dark");\n' +
-        '  const toggle = () => helper();\n  return { theme, toggle }; }',
+        // (this used a setup-local helper until E1.19 made those factory locals; `props` is still unreachable)
+        'export function setup(props){ const theme = signal("light");\n' +
+        '  const toggle = () => theme.set(props.next);\n  return { theme, toggle }; }',
       template: '<div><Button on:click={{ toggle }}>x</Button></div>',
     },
     { filename: 'cev2', resumable: true }

@@ -93,16 +93,19 @@ const HAS_PROP_DEFAULTS: RegExp = /export\s+(?:const|let|var)\s+propDefaults\b/;
 function resumableSetup(script: string, scope: string[]): {
   handlers: ReadonlyMap<string, string>;
   computeds: ReadonlyMap<string, string>;
+  /** E1.19 — setup's own helper functions, re-declared inside the `handlers(ctx)` factory. */
+  locals: ReadonlyMap<string, string>;
   /** Why a binding was refused, keyed by name — the caller turns these into build warnings. */
   reasons: Map<string, string>;
   warnings: string[];
 } {
   const handlers: Map<string, string> = new Map();
   const computeds: Map<string, string> = new Map();
+  const locals: Map<string, string> = new Map();
   const reasons: Map<string, string> = new Map();
   const warnings: string[] = [];
   const found: SetupBindings = extractSetupBindings(script);
-  if (found.handlers.size === 0 && found.computeds.size === 0) return { handlers, computeds, reasons, warnings };
+  if (found.handlers.size === 0 && found.computeds.size === 0) return { handlers, computeds, locals, reasons, warnings };
 
   // The ctx names available on the resumed client = the template scope PLUS any signal/data that setup RETURNS
   // but the template never references (mutated only by a handler, shown only via a computed) — it's serialized
@@ -157,17 +160,42 @@ function resumableSetup(script: string, scope: string[]): {
     sc.set(name, { kind: 'ctx' }); // …and its refs must rewrite to `ctx.<name>` even if the template never reads it
   }
 
-  // Handlers second — so a handler that reads a derived computed (`() => count.set(doubled())`) inlines too.
+  // E1.19 — setup's own FUNCTIONS, re-declared as locals of the `handlers(ctx)` factory. A function is dropped
+  // from the snapshot and `derive` never rebuilds one, so a handler calling a helper used to be refused — the
+  // commonest real cause left on the docs site (`setOpened`, `openPanel`, `rovingIndex`). But a helper need not
+  // cross the wire: the factory can re-declare it over the resumed ctx exactly as it inlines a handler body,
+  // and it is built once per instance, so the locals are shared by every site just as setup's closure was.
+  // They stay OUT of `sc`: a reference must rewrite to the bare factory local, not to `ctx.<name>`.
+  // Fixed point, because helpers may be mutually recursive — declaration order alone would refuse one.
+  const emittable: Set<string> = new Set(resolvable);
+  for (const name of found.handlers.keys()) emittable.add(name); // assume all, then withdraw what cannot resolve
+  for (let changed = true; changed; ) {
+    changed = false;
+    for (const [name, fn] of found.handlers) {
+      if (!emittable.has(name)) continue;
+      if (unresolvedRefs(fn.source, union(emittable, imports), fn.params, name).length === 0) continue;
+      emittable.delete(name);
+      changed = true;
+    }
+  }
+  // Declaration order: setup ran in it, so a helper's own dependencies are already bound by the time it is
+  // called. (A `const` TDZ only bites on a call during the factory body, which never happens — all sites are
+  // arrows invoked later.)
+  for (const [name, fn] of found.handlers) {
+    if (emittable.has(name)) locals.set(name, rewrite(fn.source, sc).code);
+  }
+
+  // Handlers last — so a handler may read a derived computed (`() => count.set(doubled())`) AND call a helper.
   for (const [name, handler] of found.handlers) {
     if (!scope.includes(name)) continue; // the template never references it
-    const missing: string[] = unresolvedRefs(handler.source, union(resolvable, imports), handler.params, name);
+    const missing: string[] = unresolvedRefs(handler.source, union(emittable, imports), handler.params, name);
     if (missing.length) {
       reasons.set(name, blame(missing));
       continue; // the warning is raised by the caller, which knows whether it is actually a handler SITE
     }
     handlers.set(name, rewrite(handler.source, sc).code);
   }
-  return { handlers, computeds, reasons, warnings };
+  return { handlers, computeds, locals, reasons, warnings };
 }
 
 /** The union of two name sets (what a re-derived initializer may reference). */
@@ -208,6 +236,7 @@ export function compileComponent(src: ComponentSource, opts: ComponentOptions = 
     resumable: opts.resumable,
     resumableHandlers: resumed?.handlers,
     resumableDerived: resumed?.computeds,
+    resumableLocals: resumed?.locals,
   });
   // Demote the template module's default export to a local `render` we can wire up:
   //  - eager:     `export default function render …`  → `function render …`

@@ -284,3 +284,36 @@ test('E1.18: a ref mentioned ONLY in a comment is not resurrected, but real code
   assert.deepEqual(unresolvedRefs(h.source, new Set(['step']), h.params, 'go'), ['realMissing'],
     'only the genuine one, from real code');
 });
+
+test('E1.19: an arrow with a return type AND an expression body extracts its whole body', () => {
+  // `(opt: T): boolean => opt.v === sel()` — the extractor stopped at the return type and produced a source
+  // ending in `=>`, i.e. NO BODY. It was invisible while such helpers were never emitted; E1.19 emits them, so
+  // the real <ButtonToggle> compiled to `const isSelected = (opt: ButtonToggleOption): boolean =>;` and the
+  // BUILD failed with `Unexpected ";"`. A block body was fine, which is why 1374 tests never saw it.
+  const hs = extractSetupHandlers(
+    setup(
+      '  const sel = signal("a");\n' +
+        '  const isSelected = (opt: { value: string }): boolean => opt.value === sel();\n' +
+        '  const plain = (x: number): number => x * 2;\n' +
+        '  return { sel, isSelected, plain };'
+    )
+  );
+  assert.ok(/opt\.value === sel\(\)\s*$/.test(hs.get('isSelected')!.source), `body kept; got: ${hs.get('isSelected')?.source}`);
+  assert.ok(/x \* 2\s*$/.test(hs.get('plain')!.source), `body kept; got: ${hs.get('plain')?.source}`);
+  assert.ok(!/=>\s*$/.test(hs.get('isSelected')!.source), 'and the source never ends at the arrow (that emitted `=>;`)');
+});
+
+test('E1.19: an arrow whose body starts on the NEXT LINE keeps its body — the real <ButtonToggle> shape', () => {
+  // This is what actually broke the build: the body sits on the line AFTER `=>`, which is how prettier wraps a
+  // long ternary. Same-line bodies extracted fine, so nothing caught it.
+  const hs = extractSetupHandlers(
+    setup(
+      '  const sel = signal("a");\n' +
+        '  const isSelected = (opt: { value: string }): boolean =>\n' +
+        '    sel() === opt.value ? true : false;\n' +
+        '  return { sel, isSelected };'
+    )
+  );
+  assert.ok(!/=>\s*$/.test(hs.get('isSelected')!.source), `must not end at the arrow; got: ${hs.get('isSelected')?.source}`);
+  assert.ok(/opt\.value \? true : false\s*$/.test(hs.get('isSelected')!.source), `whole body; got: ${hs.get('isSelected')?.source}`);
+});

@@ -857,7 +857,14 @@ function declEnd(src: string, i: number): number {
       depth--;
     } else if (depth === 0 && (c === ';' || c === ',')) return i;
     else if (depth === 0 && c === '\n') {
-      // ASI: a newline ends the initializer unless the next real token continues the expression.
+      // ASI: a newline ends the initializer only when the expression is COMPLETE. It is not if the last real
+      // token is a dangling operator — `const f = (o: T): boolean =>\n  a ? b : c;` is how a long arrow wraps,
+      // and cutting at the newline yielded a source ending in `=>`, which the emit turned into
+      // `const f = (o: T): boolean =>;` — a BUILD failure, invisible until E1.19 started emitting helpers.
+      if (danglingOperator(src, i)) {
+        i++;
+        continue;
+      }
       const next: number = skipWs(src, i);
       const nc: string = src[next] ?? '';
       if (nc !== '.' && nc !== '?' && nc !== ')' && nc !== ']') return i;
@@ -865,6 +872,16 @@ function declEnd(src: string, i: number): number {
     i++;
   }
   return src.length;
+}
+
+/** Does the code before the newline at `i` end mid-expression (a trailing operator)? `a++` / `a--` do not. */
+function danglingOperator(src: string, i: number): boolean {
+  let k: number = i - 1;
+  while (k >= 0 && /[ \t\r]/.test(src[k])) k--;
+  if (k < 0) return false;
+  const c: string = src[k];
+  if ((c === '+' || c === '-') && src[k - 1] === c) return false; // `a++` / `a--` — the expression is complete
+  return /[+\-*/%&|^?:=<>,([{.!~]/.test(c);
 }
 
 /** Is `init` a function expression (arrow / `function`)? Returns it normalized, else null. */

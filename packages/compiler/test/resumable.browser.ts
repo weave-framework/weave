@@ -643,6 +643,38 @@ test('E1.2c-6: adopt resumes a static CHILD component in place — child setup n
   app.dispose();
 });
 
+/* ──────────── E1.19: setup-local helpers as factory locals ──────────── */
+
+test('E1.19: a resumed click runs through a setup HELPER rebuilt as a factory local — real click, real state', () => {
+  // The emit shape is checked in component.browser.ts; this is the part that matters — the factory local must
+  // actually exist and be callable when the delegated dispatch fires on a client that never ran `setup`.
+  const { code } = compileTemplate('<button on:click={{ inc }}>{{ count() }}</button>', {
+    mode: 'function',
+    scope: ['count', 'inc'],
+    resumable: true,
+    resumableHandlers: new Map([['inc', '() => bump(2)']]),          // the site body calls the helper…
+    resumableLocals: new Map([['bump', '(by) => ctx.count.set((n) => n + by)']]), // …which the factory declares
+  });
+  const render = new Function('rt', '_c', code.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;'))(rt, {}) as
+    ((ctx: unknown, slots?: unknown) => Element) & { adopt?: AdoptFn; handlers?: (c: Record<string, unknown>) => Record<string, ResumeHandler> };
+
+  const serverCount: Signal<number> = signal(5);
+  const serverNode = serverRender(() => render({ count: serverCount, inc: () => {} })) as HTMLButtonElement;
+  const wire = snapshot({ count: serverCount }); // `inc` and `bump` are functions — neither crosses the wire
+
+  const container: HTMLElement = host();
+  container.innerHTML = serverNode.outerHTML;
+  const btn: HTMLButtonElement = container.querySelector('button')!;
+  const app = resume(btn, { snapshot: wire, adopt: render.adopt, handlers: render.handlers });
+
+  btn.click();
+  assert.equal((app.ctx.count as Signal<number>)(), 7, 'the click ran the helper (5 + 2) — the factory local resolved');
+  btn.click();
+  assert.equal((app.ctx.count as Signal<number>)(), 9, 'and it is the SAME local across clicks, as setup`s closure was');
+  assert.equal(btn.textContent, '9', 'the adopted text node reflects it');
+  app.dispose();
+});
+
 /* ──────────── E1.17: <slot> ──────────── */
 
 test('E1.17: a <slot> component adopts — its own state resumes, setup never re-runs, and the projected content renders', () => {

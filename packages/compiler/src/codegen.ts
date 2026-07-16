@@ -50,6 +50,13 @@ export interface CompileOptions {
    * `if (ctx.x === undefined)`, so a binding that DID survive (a signal with the server's value) is kept.
    */
   resumableDerived?: ReadonlyMap<string, string>;
+  /**
+   * Phase E (E1.19) — `name → rewritten function`, in declaration order: `setup`'s own helper FUNCTIONS,
+   * re-declared as locals of the `handlers(ctx)` factory. A function never crosses the snapshot and `derive`
+   * cannot rebuild one, so a handler calling a helper would be refused — but it needs no wire: the factory
+   * re-declares it over the resumed ctx, once per instance, exactly as setup's closure held it.
+   */
+  resumableLocals?: ReadonlyMap<string, string>;
 }
 
 export interface CompileResult {
@@ -222,8 +229,10 @@ export function compileTemplateAst(ast: TemplateNode[], options: CompileOptions 
   // Sites left as a bare `ctx.<name>` are the ones that will be DEAD after resume — whatever the cause (not
   // extractable, not inlinable, reassigned). `inlineHandler` records them on `gen` so a component-level `on:`
   // (E1.13, handled during the walk) and a DOM site report through ONE list.
+  // E1.19 — setup's helper functions, re-declared ahead of the site map so an inlined body can call them.
+  const factoryLocals: string = [...(options.resumableLocals ?? [])].map(([n, code]) => `  const ${n} = ${code};\n`).join('');
   const handlersFn: string = gen.resumableSites.length
-    ? `function handlers(ctx) {\n  return { ${gen.resumableSites.map((s) => `${q(s.ref)}: ${inlineHandler(gen, s.code)}`).join(', ')} };\n}`
+    ? `function handlers(ctx) {\n${factoryLocals}  return { ${gen.resumableSites.map((s) => `${q(s.ref)}: ${inlineHandler(gen, s.code)}`).join(', ')} };\n}`
     : '';
 
   // E1.6 — rebuild each `computed` over the resumed ctx. Emitted in declaration order, so a computed that
