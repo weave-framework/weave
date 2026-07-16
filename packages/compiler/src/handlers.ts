@@ -510,8 +510,12 @@ function stripDeclTypes(src: string): string {
     if (src[i] === '(') {
       const close: number = matchDelimited(src, i, '(', ')');
       if (close > i && isArrowParams(src, close)) {
-        out += `(${stripParamTypes(src.slice(i + 1, close))})`;
+        out += `(${stripParamTypes(src.slice(i + 1, close))}) `;
         i = close + 1;
+        // …and its RETURN type, here: consuming the `)` above is what stopped the `)`-then-`:` branch below from
+        // ever seeing it, so `(): DOMRect | null => {…}` was blamed for reading `DOMRect`.
+        const k: number = skipWs(src, i);
+        if (src[k] === ':') i = endOfAnnotation(src, k + 1, ['=>', '{', ';']);
         continue;
       }
     }

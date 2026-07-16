@@ -385,3 +385,23 @@ test('E1.30: a reassigned VALUE is still extracted (a reassigned FUNCTION is not
   assert.ok(!f.handlers.has('mut'), 'a reassigned FUNCTION is still dropped — its body is not stable');
   assert.ok(f.handlers.has('start'), 'and the handler that mutates the flag is untouched');
 });
+
+test('E1.31: an arrow`s RETURN type is not a ref, with or without parameters', () => {
+  // `(): DOMRect | null => {…}` — the param branch consumed the `)`, so the branch that strips a return type
+  // never saw it, and the real <Slider>'s `trackRect` was blamed for reading `DOMRect`. That refusal cascaded:
+  // `valueFromClientX` calls it, and both pointer handlers call that.
+  const script: string = setup(
+    '  const host = signal(null);\n' +
+      '  const rect = (): DOMRect | null => {\n' +
+      '    const el: Element | null = host();\n' +
+      '    return el ? el.getBoundingClientRect() : null;\n' +
+      '  };\n' +
+      '  const at = (x: number): number => (rect()?.width ?? 0) + x;\n' +
+      '  return { host };'
+  );
+  const hs = extractSetupHandlers(script);
+  assert.deepEqual(unresolvedRefs(hs.get('rect')!.source, new Set(['host']), hs.get('rect')!.params, 'rect'), [],
+    'a bare `()` with a return type');
+  assert.deepEqual(unresolvedRefs(hs.get('at')!.source, new Set(['rect']), hs.get('at')!.params, 'at'), [],
+    'and one with parameters');
+});
