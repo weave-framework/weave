@@ -345,7 +345,8 @@ const TRANSITION_PHASES: Set<string> = new Set<string>(['enterstart', 'enterend'
  */
 function isAdoptableBlock(node: TemplateNode): boolean {
   if (node.type === 'element') return (node as ElementNode).tag === 'slot';
-  return node.type === 'if' || node.type === 'switch' || node.type === 'for';
+  return node.type === 'if' || node.type === 'switch' || node.type === 'for'
+    || node.type === 'key' || node.type === 'render'; // E1.24 — same island-replay shape
 }
 
 /** A child component `<Foo/>` — adopt-navigable in place via nested resume (E1.2c-6), not island-replayed. */
@@ -599,7 +600,8 @@ function compileFragment(
         continue;
       }
       if (node.type === 'snippet') {
-        if (!adopt && sawBlock) gen.cannotAdopt('a `@snippet` after a control-flow block');
+        // E1.24 — no refusal: a `@snippet` is a DECLARATION. It compiles to a function and emits no node, so it
+        // cannot shift any index; the old "not cursor-handled" gate had nothing to handle.
         emitSnippet(node, cur); // a declaration — no DOM position, no index consumed
         continue;
       }
@@ -658,17 +660,19 @@ function compileFragment(
   }
 
   function emitRender(node: RenderNode, path: number[], sc: Scope): void {
-    gen.cannotAdopt('a `@snippet` definition'); // variable node count → needs the marker cursor walk (E1.2c)
+    // E1.24 — island-replay, like `@if`/`<slot>`: clear the server copy and re-mount the snippet's output at
+    // the `]` anchor. The snippet fn is compiled into THIS fragment and closes over the resumed ctx, so the
+    // replay yields the same content, live — while everything around it adopts in place.
     blockAnchor(path);
-    stmts.push(`${gen.H('mountChild')}(${nodeExpr(path)}, ${rewrite(node.expr, sc).code});`);
+    emitBlockReplay(path, (a) => `${gen.H('mountChild')}(${a}, ${rewrite(node.expr, sc).code});`);
   }
 
   function emitKey(node: KeyNode, path: number[], sc: Scope): void {
-    gen.cannotAdopt('an `@key` block');
     blockAnchor(path);
     const contentFn: string = gen.fn();
     childDecls.push(compileFragment(gen, node.children, sc, contentFn));
-    stmts.push(`${gen.H('keyBlock')}(${nodeExpr(path)}, () => ${rewrite(node.expr, sc).code}, ${contentFn});`);
+    // E1.24 — `keyBlock` has the same shape as `ifBlock`: re-run it against the cleared island's `]` anchor.
+    emitBlockReplay(path, (a) => `${gen.H('keyBlock')}(${a}, () => ${rewrite(node.expr, sc).code}, ${contentFn});`);
   }
 
   function emitNode(node: TemplateNode, path: number[], sc: Scope, isHost: boolean = false): void {

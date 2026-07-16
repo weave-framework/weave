@@ -644,6 +644,52 @@ test('E1.2c-6: adopt resumes a static CHILD component in place — child setup n
   app.dispose();
 });
 
+/* ──────────── E1.24: @key, @render, @snippet ──────────── */
+
+test('E1.24: a `@snippet` after a block does not block adopt — it consumes no DOM position at all', () => {
+  // A `@snippet` is a DECLARATION: it compiles to a function and emits no node, so it cannot shift any index.
+  // The refusal ("not cursor-handled") had nothing to handle.
+  const { code } = compileTemplate(
+    '<div>@if (a()) { <i>x</i> }@snippet row(v) { <b>{{ v }}</b> }@render (row(n()))</div>',
+    { mode: 'module', scope: ['a', 'n'], resumable: true },
+  );
+  assert.ok(code.includes('render.adopt'), 'a @snippet + @render after a block is adoptable');
+});
+
+test('E1.24: `@key` and `@render` island-replay on adopt — the statics around them stay put', () => {
+  const render = compileResumable(
+    '<div><h1>{{ t() }}</h1>@key (k()) { <i>K{{ n() }}</i> }</div>',
+    ['t', 'k', 'n'],
+  );
+  const adopt = (render as { adopt?: AdoptFn }).adopt;
+  assert.equal(typeof adopt, 'function', 'an @key block is adoptable (it replays like @if)');
+
+  const t: Signal<string> = signal('T');
+  const k: Signal<number> = signal(1);
+  const n: Signal<number> = signal(5);
+  const serverNode = serverRender(() => render({ t, k, n })) as HTMLElement;
+  const wire = snapshot({ t, k, n });
+  assert.equal(serverNode.querySelector('i')!.textContent, 'K5', 'server rendered the keyed block');
+
+  const container: HTMLElement = host();
+  container.innerHTML = serverNode.outerHTML;
+  const div: HTMLElement = container.querySelector('div')!;
+  const h1: HTMLElement = div.querySelector('h1')!;
+  const app = resume(div, { snapshot: wire, adopt });
+
+  assert.is(div.querySelector('h1'), h1, 'the heading before it was ADOPTED, not re-created');
+  assert.equal(h1.textContent, 'T', 'with its server value');
+  assert.equal(div.querySelectorAll('i').length, 1, 'the keyed block replayed once — no duplicate');
+
+  (app.ctx.n as Signal<number>).set(9);
+  assert.equal(div.querySelector('i')!.textContent, 'K9', 'the block is reactive after resume');
+  (app.ctx.t as Signal<string>).set('T2');
+  assert.equal(h1.textContent, 'T2', 'and the adopted heading is still bound in place');
+  (app.ctx.k as Signal<number>).set(2);
+  assert.equal(div.querySelectorAll('i').length, 1, 'a key change still re-creates exactly one block');
+  app.dispose();
+});
+
 /* ──────────── E1.23: an element with its own block, after a block ──────────── */
 
 test('E1.23: an element containing a block, placed AFTER a block, adopts — both blocks stay reactive', () => {
