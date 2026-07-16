@@ -4,7 +4,7 @@ import * as dom from '@weave-framework/runtime/dom';
 import { resumeEvents, collectResumable, resumableHandler, handlerAttr, type ResumeHandler } from '@weave-framework/runtime/resume';
 import { bindTextResumable, adoptText, blockStart, adoptIsland, blockEndOf, clearBlock, after, adoptComponent } from '@weave-framework/runtime/adopt';
 import { snapshot, resume, resumePage, SNAPSHOT_ID, collectStates, registerState, ROOT_ID, type AdoptFn } from '@weave-framework/runtime/graph';
-import { compileTemplate } from '@weave-framework/compiler';
+import { compileTemplate, compileComponent } from '@weave-framework/compiler';
 
 /**
  * E0.2b — the compiler's `resumable` target. DOM event handlers compile to `resumableHandler(...)` refs
@@ -1360,4 +1360,129 @@ test('E1.8: a static <Child> with its OWN on:click resumes — the click runs th
   btn.click();
   assert.equal(btn.textContent, '2', 'and it stays live');
   app.dispose();
+});
+
+/* ──────────── E1.47: setup's bare effects ──────────── */
+
+test('E1.47: a bare `effect()` in setup is REBUILT by derive — it binds no name, so it used to vanish silently', () => {
+  // The real shape this was found on: the docs shell keeps `document.title` in sync with the route from a bare
+  // `effect(…)` in setup. Nothing NAMES it, so `resumableDerived` never carried it: the page adopted, stayed
+  // reactive, and the title simply froze at whatever the server rendered and never tracked another navigation.
+  const { code } = compileComponent({
+    template: '<p>{{ label() }}</p>',
+    script: `import { signal, effect, computed } from '@weave-framework/runtime';
+export function setup() {
+  const path = signal('/a');
+  const seen = signal('');
+  const label = computed(() => path());
+  effect(() => { seen.set('saw:' + path()); });
+  return { path, seen, label };
+}`,
+  }, { resumable: true, filename: 'Titled.ts' });
+
+  assert.ok(code.includes('function derive'), 'derive is emitted');
+  assert.ok(/derive[\s\S]*effect\(\(\) => \{ ctx\.seen\.set\('saw:' \+ ctx\.path\(\)\); \}\)/.test(code),
+    'the bare effect is re-emitted inside derive, ctx-rewritten');
+  assert.ok(code.includes('render.adopt = adopt;'), 'and the component still adopts — an effect is rebuildable, not a refusal');
+  assert.ok(!/cannot be resumed/.test(code), 'no refusal was raised');
+});
+
+test('E1.47: the rebuilt effect is LIVE on a resumed page — it re-subscribes, not just re-runs once', () => {
+  const { code } = compileTemplate('<p>{{ shown() }}</p>', {
+    mode: 'function',
+    scope: ['shown'],
+    resumable: true,
+    resumableDerived: new Map([['shown', 'rt.computed(() => ctx.mirror())']]),
+    resumableEffects: ['rt.effect(() => ctx.mirror.set(ctx.src()))'],
+  });
+  const render = new Function('rt', '_c', code.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;'))(rt, {}) as
+    ((ctx: unknown) => Element) & { adopt?: AdoptFn; derive?: (c: Record<string, unknown>) => unknown };
+
+  // ── server ── setup ran for real: src → effect → mirror → shown
+  const src: Signal<string> = signal('one');
+  const mirror: Signal<string> = signal('');
+  root(() => { effect(() => mirror.set(src())); });
+  const shown = computed(() => mirror());
+  const serverHtml: string = (render({ shown }) as HTMLElement).outerHTML;
+  assert.ok(serverHtml.includes('one'), 'the server ran the effect and rendered through it');
+
+  // ── client ── only the SIGNALS cross the wire; the effect and the computed do not
+  const container: HTMLElement = host();
+  container.innerHTML = serverHtml;
+  const p: HTMLElement = container.querySelector('p')!;
+  const app = resume(p, { snapshot: snapshot({ src, mirror }), adopt: render.adopt, derive: render.derive });
+  assert.equal(p.textContent, 'one', 'resumed in place at the server value');
+
+  // the proof: pushing the SOURCE must flow through the rebuilt effect into mirror → shown → the adopted DOM
+  (app.ctx.src as Signal<string>).set('two');
+  assert.equal((app.ctx.mirror as Signal<string>)(), 'two', 'the rebuilt effect re-subscribed and fired');
+  assert.equal(p.textContent, 'two', 'and it drove the adopted DOM — the graph is complete again');
+  app.dispose();
+});
+
+test('E1.47 DoD: WITHOUT the rebuilt effect the same resumed page goes stale (the bug, reproduced)', () => {
+  const { code } = compileTemplate('<p>{{ shown() }}</p>', {
+    mode: 'function',
+    scope: ['shown'],
+    resumable: true,
+    resumableDerived: new Map([['shown', 'rt.computed(() => ctx.mirror())']]),
+    // resumableEffects omitted — exactly what the compiler emitted before E1.47
+  });
+  const render = new Function('rt', '_c', code.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;'))(rt, {}) as
+    ((ctx: unknown) => Element) & { adopt?: AdoptFn; derive?: (c: Record<string, unknown>) => unknown };
+
+  const src: Signal<string> = signal('one');
+  const mirror: Signal<string> = signal('');
+  root(() => { effect(() => mirror.set(src())); });
+  const shown = computed(() => mirror());
+  const container: HTMLElement = host();
+  container.innerHTML = (render({ shown }) as HTMLElement).outerHTML;
+  const p: HTMLElement = container.querySelector('p')!;
+  const app = resume(p, { snapshot: snapshot({ src, mirror }), adopt: render.adopt, derive: render.derive });
+
+  assert.equal(p.textContent, 'one', 'it still adopts and still LOOKS right — which is why this was invisible');
+  (app.ctx.src as Signal<string>).set('two');
+  assert.equal((app.ctx.mirror as Signal<string>)(), 'one', 'no effect: the source moved and nothing listened');
+  assert.equal(p.textContent, 'one', 'the page is stale — reactive, adopted, and quietly wrong');
+  app.dispose();
+});
+
+test('E1.47: an effect that cannot be rebuilt refuses the whole component — it has no name to degrade', () => {
+  const { code, warnings } = compileComponent({
+    template: '<p>{{ label() }}</p>',
+    script: `import { signal, effect, computed } from '@weave-framework/runtime';
+export function setup(props) {
+  const label = computed(() => 'x');
+  effect(() => { mysteryBus.push(label()); });
+  return { label };
+}`,
+  }, { resumable: true, filename: 'Bussed.ts' });
+  // `mysteryBus` is declared nowhere, imported nowhere and returned nowhere — the effect cannot be re-emitted.
+  // (A setup LOCAL is not this case: derive rebuilds one from its initializer like any other binding.)
+  // NB: probe the EMIT (`render.adopt = adopt;`), not `render.adopt` — compileComponent always writes
+  // `_wc.adopt = render.adopt;`, which is undefined when no adopt fn exists but still matches a loose search.
+  assert.ok(!code.includes('render.adopt = adopt;'), 'the component opts out of adopting rather than lose the effect');
+  assert.ok(!/function derive[\s\S]*mysteryBus/.test(code), 'and the refused effect is not emitted into derive either');
+  assert.ok(warnings.some((w) => /`effect\(\)` in setup\(\)/.test(w) && /`mysteryBus`/.test(w)),
+    'and it says which name it could not resolve');
+});
+
+test('E1.47: a REGEX literal is opaque to the free-identifier scan — `$` and `[a-z]` are not variables', () => {
+  // `currentPath().replace(/\/+$/, '')` — the docs shell's real line. The scan read `$` as a free identifier,
+  // so the title effect was refused for reading a variable that does not exist. `rewrite` never mis-emitted
+  // these (it only touches names it knows), so the cost was ANALYSIS only — silent, wrong refusals.
+  // String.raw — the backslash must reach the compiler AS a backslash. In a plain template literal `\/`
+  // collapses to `/`, so the line becomes `replace(//+$/…` — a COMMENT. The regex vanishes and the test
+  // passes for the wrong reason; it did exactly that until the same case was run from a file with no escaping.
+  const script: string = String.raw`import { signal, effect, computed } from '@weave-framework/runtime';
+export function setup() {
+  const path = signal('/a/');
+  const label = computed(() => path());
+  effect(() => { path.set(path().replace(/\/+$/, '').replace(/[a-z]+/, 'x')); });
+  return { path, label };
+}`;
+  assert.ok(script.includes(String.raw`replace(/\/+$/`), 'the script really carries the regex, not a collapsed comment');
+  const { code, warnings } = compileComponent({ template: '<p>{{ label() }}</p>', script }, { resumable: true, filename: 'Rx.ts' });
+  assert.ok(code.includes('render.adopt = adopt;'), 'a regex in an effect no longer refuses the component');
+  assert.equal(warnings?.length ?? 0, 0, 'no phantom `$`/`a`/`z` refusal');
 });

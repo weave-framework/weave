@@ -58,6 +58,13 @@ export interface CompileOptions {
    */
   resumableLocals?: ReadonlyMap<string, string>;
   /**
+   * Phase E (E1.47) — `setup`'s bare `effect(…)` statements, ctx-rewritten, in source order. They bind no name,
+   * so `resumableDerived` never carried them and a resumed page silently lost them: the docs shell's per-route
+   * `document.title` effect stopped tracking, so the title froze at the server's value. `derive` re-runs them
+   * after the bindings they read, inside the reactive root that owns the resume, so they dispose with it.
+   */
+  resumableEffects?: readonly string[];
+  /**
    * Phase E (E1.45) — a reason the CALLER already knows this fragment cannot be adopted, even though nothing in
    * the template says so. `compileComponent` uses it for a lifecycle hook registered in `setup`: resume never
    * runs setup, so the hook is never registered and its DOM work never happens. The component still compiles to
@@ -271,11 +278,15 @@ export function compileTemplateAst(ast: TemplateNode[], options: CompileOptions 
   // so every handler calling that helper was refused.
   // E1.27 — the SAME setup helpers the factory declares, because setup was one scope: an initializer very often
   // calls one (`signal(autoMode() ? … : …)`). Declared first; they are arrows, so nothing runs until called.
+  // E1.47 — setup's bare `effect(…)`s ride out on `derive` too, AFTER the bindings (an effect reads them) and
+  // unguarded: unlike a binding there is nothing on ctx to check, and re-running one is the whole point —
+  // it re-subscribes and replays a first pass over the resumed values, which is what the server already did.
+  const setupEffects: string = (options.resumableEffects ?? []).map((code) => `\n  ${code};`).join('');
   const setupLocals: string = [...(options.resumableLocals ?? [])].map(([n, code]) => `  const ${n} = ${code};\n`).join('');
-  const deriveFn: string = gen.resumable && options.resumableDerived?.size
-    ? `function derive(ctx, props) {\n${setupLocals}${[...options.resumableDerived]
+  const deriveFn: string = gen.resumable && (options.resumableDerived?.size || setupEffects)
+    ? `function derive(ctx, props) {\n${setupLocals}${[...(options.resumableDerived ?? [])]
         .map(([name, code]) => `  if (ctx.${name} === undefined) ctx.${name} = ${code};`)
-        .join('\n')}\n  return ctx;\n}`
+        .join('\n')}${setupEffects}\n  return ctx;\n}`
     : '';
 
   // E1.2b-2 — the resumable target ALSO emits an `adopt(_r, ctx, slots)` variant of the render for the

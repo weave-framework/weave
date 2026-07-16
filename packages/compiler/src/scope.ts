@@ -413,6 +413,15 @@ export function freeIdentifiers(expr: string, outerParams?: ReadonlySet<string>)
       i = k;
       continue;
     }
+    // A REGEX literal is opaque: its contents are pattern syntax, not code. Without this, `path.replace(/\/+$/,
+    // '')` reported `$` as a free identifier and `/[a-z]+/` reported `a` and `z` — names nothing declares, so
+    // every enclosing handler/computed/effect was refused for reading a variable that does not exist. `rewrite`
+    // never mis-emitted these (it only touches names it already knows), so this only ever cost ANALYSIS, in
+    // silence: the binding was dropped from the resumed graph and blamed on a phantom.
+    if (c === '/' && startsRegex(expr, i)) {
+      i = scanRegex(expr, i);
+      continue;
+    }
     if (ID_START.test(c)) {
       let j: number = i + 1;
       while (j < n && ID_CHAR.test(expr[j])) j++;
@@ -449,4 +458,50 @@ function scanString(s: string, start: number): number {
     i++;
   }
   return s.length;
+}
+
+/**
+ * Is the `/` at `i` the start of a regex literal rather than division? The standard rule: division can only
+ * FOLLOW a value, so a `/` after an identifier, number, `)`, `]` or a string/template close is division and
+ * anything else begins a regex. A keyword that ends in a letter (`return /re/`, `typeof`) reads as a value by
+ * that test, so those are named — the ones that can precede a regex in real code.
+ */
+function startsRegex(s: string, i: number): boolean {
+  const before: string = s.slice(0, i);
+  const prev: string = lastNonSpace(before);
+  if (prev === '') return true; // a regex at the very start of the expression
+  if (/[)\]]/.test(prev)) return false;
+  if (ID_CHAR.test(prev)) {
+    // …but only if the word is a VALUE. `return /x/` and `typeof /x/` are regexes; `a / b` is division.
+    const m: RegExpExecArray | null = /([A-Za-z_$][A-Za-z0-9_$]*)\s*$/.exec(before);
+    return !!m && REGEX_PRECEDERS.has(m[1]);
+  }
+  return true; // an operator, `(`, `,`, `=`, `:` … → a regex
+}
+
+/** Words after which a `/` opens a regex, not a division. */
+const REGEX_PRECEDERS: ReadonlySet<string> = new Set([
+  'return', 'typeof', 'instanceof', 'in', 'of', 'new', 'delete', 'void', 'case', 'do', 'else', 'yield', 'await',
+]);
+
+/** Past the regex literal starting at `i` (its flags included). A `[…]` class may hold an unescaped `/`. */
+function scanRegex(s: string, start: number): number {
+  let i: number = start + 1;
+  let inClass: boolean = false;
+  while (i < s.length) {
+    const c: string = s[i];
+    if (c === '\\') {
+      i += 2;
+      continue;
+    }
+    if (c === '[') inClass = true;
+    else if (c === ']') inClass = false;
+    else if (c === '/' && !inClass) {
+      i++;
+      while (i < s.length && ID_CHAR.test(s[i])) i++; // flags
+      return i;
+    } else if (c === '\n') return start + 1; // unterminated → not a regex after all; step past the `/`
+    i++;
+  }
+  return start + 1;
 }

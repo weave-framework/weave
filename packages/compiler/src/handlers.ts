@@ -173,6 +173,14 @@ export interface SetupDerived {
   source: string;
 }
 
+/** A top-level bare call statement in setup — `effect(() => …);` (E1.47). */
+export interface SetupCall {
+  /** The callee identifier as WRITTEN, so the caller can tell an `effect` from any other bare call. */
+  callee: string;
+  /** The whole call expression, `effect(…)` included — it is re-emitted verbatim (ctx-rewritten). */
+  source: string;
+}
+
 /** Every extractable top-level `setup` binding, split by shape. */
 export interface SetupBindings {
   /** `const inc = () => …` — event handlers (E1.5). */
@@ -180,6 +188,13 @@ export interface SetupBindings {
   /** Non-function bindings, re-derived on resume (E1.6/E1.11). Insertion order = source order, which is also
    *  dependency order — an initializer can only read a binding declared before it. */
   computeds: Map<string, SetupDerived>;
+  /**
+   * E1.47 — bare call STATEMENTS (`effect(() => { document.title = … })`). They bind no name, so nothing
+   * referenced them and they were dropped from the resumed graph in silence: the page adopted, stayed
+   * reactive, and simply stopped doing whatever the effect did. Source order is preserved (an effect reads
+   * bindings declared before it). Only the callee + source; the caller decides which callees to rebuild.
+   */
+  calls: SetupCall[];
 }
 
 /** The callee of a re-derivable binding — excluded from the free-identifier check (the emit imports it). */
@@ -367,7 +382,8 @@ export function setupCallsHook(script: string, names: ReadonlySet<string>): stri
 export function extractSetupBindings(script: string): SetupBindings {
   const out: Map<string, SetupHandler> = new Map();
   const computeds: Map<string, SetupDerived> = new Map();
-  const empty: SetupBindings = { handlers: out, computeds };
+  const calls: SetupCall[] = [];
+  const empty: SetupBindings = { handlers: out, computeds, calls };
   const open: number | null = locateSetupBody(script);
   if (open === null) return empty;
   const close: number = matchDelimited(script, open, '{', '}');
@@ -416,6 +432,14 @@ export function extractSetupBindings(script: string): SetupBindings {
         continue;
       }
     }
+    // E1.47 — `effect(() => …);` and friends: a bare call statement, binding no name. Read before the
+    // declaration branch so `effect` is not mistaken for the start of some other construct.
+    const call: { call: SetupCall; end: number } | null = readCallStmt(script, i);
+    if (call) {
+      calls.push(call.call);
+      i = call.end;
+      continue;
+    }
     // `const inc = <initializer>` (also let/var — but only when never reassigned; see below).
     if (startsWithWord(script, i, 'const') || startsWithWord(script, i, 'let') || startsWithWord(script, i, 'var')) {
       const kwLen: number = startsWithWord(script, i, 'const') ? 5 : startsWithWord(script, i, 'let') ? 3 : 3;
@@ -456,6 +480,31 @@ export function extractSetupBindings(script: string): SetupBindings {
   }
   return empty;
 }
+
+/**
+ * E1.47 — a top-level bare call STATEMENT at `i`: a plain identifier callee immediately applied, `effect(…)`.
+ * Null for anything else, deliberately: a member call (`props.api?.()`, `console.log(…)`) is not a bare
+ * identifier, and a call that is part of a larger expression is not a statement — `isTokenStart` + the
+ * depth-0 caller guarantee we are at the head of one. Returns the callee and the whole `effect(…)` source
+ * so the caller can rebuild it verbatim.
+ */
+function readCallStmt(script: string, i: number): { call: SetupCall; end: number } | null {
+  const callee: string = readIdent(script, i);
+  if (!callee) return null;
+  // A keyword that happens to be followed by `(` (`if (…)`, `for (…)`, `return (…)`) is control flow, not a call.
+  if (STMT_KEYWORDS.has(callee)) return null;
+  const open: number = skipWs(script, i + callee.length);
+  if (script[open] !== '(') return null;
+  const close: number = matchDelimited(script, open, '(', ')');
+  if (close < 0) return null;
+  return { call: { callee, source: script.slice(i, close + 1) }, end: close + 1 };
+}
+
+/** Words that can be followed by `(` without heading a call — control flow, operators, declarations. */
+const STMT_KEYWORDS: ReadonlySet<string> = new Set([
+  'if', 'for', 'while', 'switch', 'catch', 'return', 'typeof', 'void', 'delete', 'await', 'new', 'do', 'with',
+  'function', 'class', 'const', 'let', 'var', 'async', 'else', 'try', 'yield', 'in', 'of', 'instanceof', 'throw',
+]);
 
 /**
  * `name: <value>` entries of setup's `return { … }` object. A shorthand (`count,`) is a REFERENCE, not a

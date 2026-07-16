@@ -97,14 +97,23 @@ function resumableSetup(script: string, scope: string[]): {
   locals: ReadonlyMap<string, string>;
   /** Why a binding was refused, keyed by name — the caller turns these into build warnings. */
   reasons: Map<string, string>;
+  /** E1.47 — setup's bare `effect(…)` statements, ctx-rewritten, in source order. Re-run by `derive`. */
+  effects: string[];
+  /** E1.47 — why an effect could not be rebuilt. An effect has no name to degrade, so any entry here means
+   *  the whole component cannot adopt; the caller turns the first into the refusal reason. */
+  effectRefusals: string[];
   warnings: string[];
 } {
   const handlers: Map<string, string> = new Map();
   const computeds: Map<string, string> = new Map();
   const locals: Map<string, string> = new Map();
   const reasons: Map<string, string> = new Map();
+  const effects: string[] = [];
+  const effectRefusals: string[] = [];
   const warnings: string[] = [];
   const found: SetupBindings = extractSetupBindings(script);
+  // E1.47 — which local names mean the runtime's `effect` (an aliased import included, as for hooks).
+  const effectLocals: ReadonlySet<string> = effectNames(extractModuleImports(script), script);
   // NO early return on an empty `found`. A setup that only `return`s an object literal declares no `const` at
   // all — the real `<Button>`'s shape — yet its returned MODULE names still need deriving (see below). Bailing
   // here meant such a component got no `derive` whatsoever, so a `use:ripple` had no action on the client.
@@ -231,6 +240,26 @@ function resumableSetup(script: string, scope: string[]): {
     if (settled.has(name) && scope.includes(name)) computeds.set(name, name);
   }
 
+  // E1.47 — setup's bare `effect(…)` statements. They bind no name, so nothing above ever looked at them and
+  // they vanished from the resumed graph SILENTLY: the page adopted and stayed reactive, but the docs shell's
+  // per-route `document.title` effect was simply never re-registered, so the title froze at whatever the server
+  // rendered and never tracked another navigation. Unlike an `onMount` (E1.45), an effect DID run on the server,
+  // so re-creating it here is not new work — it re-establishes a subscription and re-runs a first pass over the
+  // SAME resumed values, exactly as derive already does for every computed initializer.
+  // Emitted after the bindings and helpers above, because an effect reads them.
+  for (const call of found.calls) {
+    if (!effectLocals.has(call.callee)) continue; // some other bare call — not ours to rebuild
+    const missing: string[] = unresolvedRefs(call.source, union(settled, imports), [], '');
+    if (missing.length) {
+      // Nothing names an effect, so there is no binding to blame and no way to degrade it on its own: the
+      // component cannot be adopted at all. Say so — the subtree then client-renders, which runs setup and
+      // the effect with it.
+      effectRefusals.push(blame(rootCause(missing)));
+      continue;
+    }
+    effects.push(rewrite(call.source, sc).code);
+  }
+
   // Handlers last — so a handler may read a derived binding (`() => count.set(doubled())`) AND call a helper.
   for (const [name, handler] of found.handlers) {
     if (!scope.includes(name)) continue; // the template never references it
@@ -243,7 +272,21 @@ function resumableSetup(script: string, scope: string[]): {
     }
     handlers.set(name, rewrite(handler.source, sc).code);
   }
-  return { handlers, computeds, locals, reasons, warnings };
+  return { handlers, computeds, locals, reasons, effects, effectRefusals, warnings };
+}
+
+/**
+ * The LOCAL names of the runtime's `effect` in this module (E1.47) — `import { effect as watch }` included, on
+ * the same reasoning as {@link hookNames}. Only `effect`: a `computed` is a BINDING (derive already rebuilds it
+ * by name), and `onMount`/`onDispose` are hooks, which E1.45 governs.
+ */
+function effectNames(imports: ReadonlySet<string>, script: string): Set<string> {
+  const out: Set<string> = new Set();
+  for (const local of imports) {
+    const m: RegExpExecArray | null = new RegExp(`\\b(effect)\\s+as\\s+${local}\\b`).exec(script);
+    if (m || local === 'effect') out.add(local);
+  }
+  return out;
 }
 
 /**
@@ -309,10 +352,18 @@ export function compileComponent(src: ComponentSource, opts: ComponentOptions = 
     resumable: opts.resumable,
     // Not `resumable: false` — the component still compiles to the resumable target (its server render must
     // stamp the markers its PARENT's cursor walks, and its children still register). Only ADOPT is off.
-    cannotAdopt: hook ? `a \`${hook}()\` lifecycle hook in setup()` : undefined,
+    // E1.47 — an effect that cannot be rebuilt is a whole-component refusal: it names nothing, so there is no
+    // single binding to degrade and no way for the author to see it go missing. A hook (E1.45) wins the report
+    // when both apply — it is the harder limit (an onMount can never resume; an effect merely could not here).
+    cannotAdopt: hook
+      ? `a \`${hook}()\` lifecycle hook in setup()`
+      : resumed?.effectRefusals.length
+        ? `an \`effect()\` in setup() that reads ${resumed.effectRefusals[0]}`
+        : undefined,
     resumableHandlers: resumed?.handlers,
     resumableDerived: resumed?.computeds,
     resumableLocals: resumed?.locals,
+    resumableEffects: resumed?.effects,
   });
   // Demote the template module's default export to a local `render` we can wire up:
   //  - eager:     `export default function render …`  → `function render …`
