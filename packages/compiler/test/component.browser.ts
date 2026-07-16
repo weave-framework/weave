@@ -548,3 +548,50 @@ test('compileComponent: an extension with no own setup passes undefined for it',
     `expected extendSetup(extend, undefined); got:\n${code}`
   );
 });
+
+/* ──────────── E1.6 — computeds re-derived on resume ──────────── */
+
+test('E1.6: computeds compile to a derive(ctx) — the resumed page rebuilds what could not serialize', () => {
+  const { code } = compileComponent(
+    {
+      script:
+        'import { signal, computed } from "@weave-framework/runtime";\n' +
+        'export function setup(): { count: Signal<number>; doubled: () => number; inc: () => void } {\n' +
+        '  const count = signal(3);\n' +
+        '  const doubled = computed(() => count() * 2);\n' +
+        '  const inc = () => count.set((n) => n + 1);\n' +
+        '  return { count, doubled, inc };\n}',
+      template: '<button on:click={{ inc }}>{{ count() }} / {{ doubled() }}</button>',
+    },
+    { filename: 'dbl', resumable: true }
+  );
+  assert.ok(/function derive\(ctx\)/.test(code), 'a derive(ctx) is emitted');
+  assert.ok(/ctx\.doubled = computed\(\(\) => ctx\.count\(\) \* 2\)/.test(code), `the computed is rebuilt over the resumed ctx; got:\n${code}`);
+  assert.ok(code.includes('_wc.derive = render.derive'), 'the component carries .derive for resumePage / adoptComponent');
+  assert.ok(/from "@weave-framework\/runtime"/.test(code) && /\bcomputed\b/.test(code), 'computed is imported for the derive');
+});
+
+test('E1.6: a computed touching a non-ctx local is NOT derived (fail-safe), and eager emits no derive', () => {
+  const unsafe = compileComponent(
+    {
+      script:
+        'import { signal, computed } from "@weave-framework/runtime";\n' +
+        'export function setup() {\n  const count = signal(1);\n  const factor = 3;\n' +
+        '  const scaled = computed(() => count() * factor);\n  return { count, scaled };\n}',
+      template: '<p>{{ scaled() }}</p>',
+    },
+    { filename: 'unsafe', resumable: true }
+  );
+  assert.ok(!/ctx\.scaled = /.test(unsafe.code), '`factor` never reaches the client → no derive rather than a broken one');
+
+  const eager = compileComponent(
+    {
+      script:
+        'import { signal, computed } from "@weave-framework/runtime";\n' +
+        'export function setup() {\n  const count = signal(1);\n  const doubled = computed(() => count() * 2);\n  return { count, doubled };\n}',
+      template: '<p>{{ doubled() }}</p>',
+    },
+    { filename: 'eagerdbl' }
+  );
+  assert.ok(!eager.code.includes('function derive'), 'eager emits no derive (byte-for-byte)');
+});

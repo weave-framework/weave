@@ -121,6 +121,15 @@ export type AdoptFn = (
   states?: Record<string, unknown>,
 ) => unknown;
 
+/**
+ * The compiled render's computed re-deriver (E1.6) — `render.derive`. `registerState` drops every function
+ * from the snapshot, which is right for a handler (the `handlers` factory rebuilds it) but fatal for a
+ * `computed`: the template CALLS it, so a resumed `ctx.doubled` of `undefined` throws and takes the whole
+ * page's resume with it. The compiler emits this from the `computed(…)` declarations in `setup`, rewritten
+ * against ctx, and it re-assigns each onto the resumed ctx in declaration order.
+ */
+export type DeriveFn = (ctx: Record<string, unknown>) => unknown;
+
 export interface ResumeOptions {
   /** The serialized reactive state from the server ({@link snapshot}). */
   snapshot: Wire;
@@ -135,6 +144,12 @@ export interface ResumeOptions {
    * without a client re-render. When absent, only events resume (the DOM is whatever the server produced).
    */
   adopt?: AdoptFn;
+  /**
+   * The compiled render's computed re-deriver (typically `render.derive`, E1.6). A `computed` cannot cross the
+   * snapshot, so it is rebuilt here over the resumed signals — BEFORE `adopt`, since the render's bindings
+   * call it (`{{ doubled() }}`). Absent when the component declares no computeds.
+   */
+  derive?: DeriveFn;
 }
 
 export interface ResumeApp {
@@ -165,6 +180,8 @@ export interface ResumePageOptions {
   extraEvents?: string[];
   /** The compiled render's adopt variant (typically `render.adopt`) — re-attaches reactive DOM in place (E1.2b-2). */
   adopt?: AdoptFn;
+  /** The compiled render's computed re-deriver (typically `render.derive`) — runs before adopt (E1.6). */
+  derive?: DeriveFn;
   /** Where to read the snapshot `<script>` from (default: the global `document`). */
   document?: Document;
 }
@@ -184,6 +201,7 @@ export function resumePage(options: ResumePageOptions): ResumeApp {
     handlers: options.handlers,
     extraEvents: options.extraEvents,
     adopt: options.adopt,
+    derive: options.derive,
   });
 }
 
@@ -203,8 +221,11 @@ export function resume(root: Element, options: ResumeOptions): ResumeApp {
   // Adopt the server DOM's reactive bindings in place FIRST (E1.2b-2), inside a reactive root so the
   // re-attached effects are owned + disposable — no re-render, `setup` never runs. Then arm delegated events.
   let disposeAdopt: () => void = () => {};
-  if (options.adopt) reactiveRoot((dispose) => {
-    options.adopt!(root, ctx, {}, states);
+  if (options.adopt || options.derive) reactiveRoot((dispose) => {
+    // Rebuild the computeds BEFORE adopt (E1.6): the render's bindings call them, and a computed created
+    // here is owned by this root, so it disposes with the rest.
+    if (options.derive) options.derive(ctx);
+    if (options.adopt) options.adopt(root, ctx, {}, states);
     disposeAdopt = dispose;
   });
   const table: Record<string, ResumeHandler> = options.handlers ? options.handlers(ctx) : {};

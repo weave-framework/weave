@@ -86,8 +86,8 @@ ok(routedResumable.includes('setServerLocation') && routedResumable.includes('re
 const resumeClient = generateEntry(join(rootDir, 'App.ts'), '#app', rootDir, [], { resume: true });
 ok(resumeClient.includes('import { resumePage } from "@weave-framework/runtime/graph"'), 'resume client entry: imports resumePage');
 ok(!resumeClient.includes('mountComponent'), 'resume client entry does NOT CSR-remount (adopts instead)');
-ok(resumeClient.includes('_m.firstElementChild') && /resumePage\(\{ root: _r, adopt: Root\.adopt, handlers: Root\.handlers \}\)/.test(resumeClient),
-  'resume client entry: resumePage adopts the mount target\'s first child with Root.adopt + Root.handlers');
+ok(resumeClient.includes('_m.firstElementChild') && /resumePage\(\{ root: _r, adopt: Root\.adopt, handlers: Root\.handlers, derive: Root\.derive \}\)/.test(resumeClient),
+  'resume client entry: resumePage adopts the mount target\'s first child with Root.adopt + .handlers + .derive');
 
 /* ── Part 2 — end-to-end `buildSsg` into a temp dir with a real component ── */
 

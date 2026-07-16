@@ -746,3 +746,69 @@ test('E1.5 DoD: WITHOUT the inlining the same named handler is dead (proves the 
   assert.equal(btn.textContent, '3', 'the DOM never changed');
   app.dispose();
 });
+
+/* ──────────── E1.6 — computeds re-derived on resume ──────────── */
+
+/**
+ * The gap this closes was worse than a dead button: a `computed` is dropped from the snapshot (no writable
+ * surface to serialize), but the template CALLS it — so `ctx.doubled()` threw and took the WHOLE resume down
+ * (adopt never finished, no events armed, page inert). `derive(ctx)` rebuilds it over the resumed signals
+ * before adopt runs.
+ */
+function compileComputed(computeds?: Map<string, string>): ((ctx: unknown, slots?: unknown) => Element) & {
+  adopt?: AdoptFn;
+  derive?: (ctx: Record<string, unknown>) => unknown;
+} {
+  const { code } = compileTemplate('<p>{{ doubled() }}</p>', {
+    mode: 'function',
+    scope: ['doubled'],
+    resumable: true,
+    resumableComputeds: computeds,
+  });
+  const body: string = code.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;');
+  return new Function('rt', '_c', body)(rt, {});
+}
+
+test('E1.6: a computed is REBUILT on resume — the page adopts and stays reactive through the derived value', () => {
+  const render = compileComputed(new Map([['doubled', '() => ctx.count() * 2']]));
+  assert.equal(typeof render.derive, 'function', 'the render carries a derive');
+
+  // ── server ── the real setup ctx; the snapshot carries ONLY the signal (registerState drops the computed)
+  const count: Signal<number> = signal(3);
+  const doubled = computed(() => count() * 2);
+  const node = render({ doubled }) as HTMLElement;
+  const serverHtml: string = node.outerHTML;
+  const wire = snapshot({ count });
+
+  // ── client ── fresh parse + resume
+  const container: HTMLElement = host();
+  container.innerHTML = serverHtml;
+  const p: HTMLElement = container.querySelector('p')!;
+  assert.equal(p.textContent, '6', 'the server rendered the computed value');
+
+  const app = resume(p, { snapshot: wire, adopt: render.adopt, derive: render.derive });
+  assert.equal(p.textContent, '6', 'resumed in place — the derived computed matches the server value');
+  assert.equal(typeof app.ctx.doubled, 'function', 'the computed was rebuilt onto the resumed ctx');
+
+  // and it is LIVE: setting the underlying signal flows through the rebuilt computed into the adopted DOM
+  (app.ctx.count as Signal<number>).set(10);
+  assert.equal(p.textContent, '20', 'the rebuilt computed is reactive against the resumed signal');
+  app.dispose();
+});
+
+test('E1.6 DoD: WITHOUT derive the same page THROWS on resume (this was killing the whole page, not one button)', () => {
+  const render = compileComputed(); // no resumableComputeds → no derive emitted
+  const count: Signal<number> = signal(3);
+  const doubled = computed(() => count() * 2);
+  const container: HTMLElement = host();
+  container.innerHTML = (render({ doubled }) as HTMLElement).outerHTML;
+  const p: HTMLElement = container.querySelector('p')!;
+
+  let threw: string = '';
+  try {
+    resume(p, { snapshot: snapshot({ count }), adopt: render.adopt });
+  } catch (e) {
+    threw = (e as Error).message;
+  }
+  assert.ok(/doubled is not a function/.test(threw), `resume throws without the rebuild (got: ${threw || 'no error'})`);
+});

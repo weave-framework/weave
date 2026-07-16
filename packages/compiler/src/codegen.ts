@@ -42,6 +42,13 @@ export interface CompileOptions {
    * is identical to writing the handler inline. Only entries proven safe are present.
    */
   resumableHandlers?: ReadonlyMap<string, string>;
+  /**
+   * Phase E (E1.6) — `name → rewritten computed(…) call`, in declaration order. A `computed` is dropped from
+   * the snapshot (it has no writable surface to serialize), but the template CALLS it, so a resumed
+   * `ctx.doubled` of `undefined` throws and kills the whole resume. These become a `derive(ctx)` the client
+   * runs after deserialize and BEFORE adopt, rebuilding each computed over the resumed signals.
+   */
+  resumableComputeds?: ReadonlyMap<string, string>;
 }
 
 export interface CompileResult {
@@ -188,6 +195,16 @@ export function compileTemplateAst(ast: TemplateNode[], options: CompileOptions 
     ? `function handlers(ctx) {\n  return { ${gen.resumableSites.map((s) => `${q(s.ref)}: ${siteCode(s.code)}`).join(', ')} };\n}`
     : '';
 
+  // E1.6 — rebuild each `computed` over the resumed ctx. Emitted in declaration order, so a computed that
+  // reads an earlier one sees it already assigned. The client runs this after deserialize, before adopt.
+  // The callee comes from the codegen's core-import reference (`computed` / `rt.computed`), never the user's
+  // bare name — a `new Function` body has no `computed` in scope.
+  const deriveFn: string = gen.resumable && options.resumableComputeds?.size
+    ? `function derive(ctx) {\n${[...options.resumableComputeds]
+        .map(([name, args]) => `  ctx.${name} = ${gen.Hc('computed')}(${args});`)
+        .join('\n')}\n  return ctx;\n}`
+    : '';
+
   // E1.2b-2 — the resumable target ALSO emits an `adopt(_r, ctx, slots)` variant of the render for the
   // FLAT case (single root element, only reactive text/attr bindings + events). It takes the server-rendered
   // root instead of cloning a template, navigates to each dynamic anchor by its SHIFTED server index (the
@@ -202,6 +219,7 @@ export function compileTemplateAst(ast: TemplateNode[], options: CompileOptions 
   if (mode === 'function') {
     const parts: string[] = [...gen.templates, render];
     if (handlersFn) parts.push(handlersFn, 'render.handlers = handlers;');
+    if (deriveFn) parts.push(deriveFn, 'render.derive = derive;');
     if (adoptFn) parts.push(adoptFn, 'render.adopt = adopt;');
     parts.push('return render(ctx, {});'); // tail unchanged → the function-mode `render` strip still applies
     return { code: parts.join('\n'), components };
@@ -229,12 +247,13 @@ export function compileTemplateAst(ast: TemplateNode[], options: CompileOptions 
 
   // With a handlers factory or an adopt variant, emit `render` as a declaration so we can attach + export the
   // extras alongside it; otherwise keep the exact eager shape (`export default function render …`) byte-for-byte.
-  if (handlersFn || adoptFn) {
+  if (handlersFn || adoptFn || deriveFn) {
     const code: string = [
       imports,
       ...gen.templates,
       render,
       ...(handlersFn ? [handlersFn, 'render.handlers = handlers;', 'export { handlers };'] : []),
+      ...(deriveFn ? [deriveFn, 'render.derive = derive;', 'export { derive };'] : []),
       ...(adoptFn ? [adoptFn, 'render.adopt = adopt;', 'export { adopt };'] : []),
       'export default render;',
     ].join('\n');

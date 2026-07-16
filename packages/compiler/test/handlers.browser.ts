@@ -1,5 +1,5 @@
 import { test, assert } from '../../../tools/harness.js';
-import { extractSetupHandlers, isInlinable, type SetupHandler } from '@weave-framework/compiler';
+import { extractSetupHandlers, extractSetupBindings, isInlinable, isDerivable, type SetupHandler } from '@weave-framework/compiler';
 
 /**
  * E1.5 — named-handler resume. `extractSetupHandlers` pulls each top-level `setup` binding that is a function
@@ -128,4 +128,27 @@ test('finds handlers in an arrow setup, annotated or not', () => {
   assert.ok(plain.has('inc'), 'arrow setup');
   const annotated = extractSetupHandlers('export const setup = (props): { inc: () => void } => {\n  const inc = () => count.set(1);\n  return { inc };\n};');
   assert.ok(annotated.has('inc'), 'annotated arrow setup');
+});
+
+/* ──────────── E1.6 — computeds re-derived on resume ──────────── */
+
+test('extracts computed() declarations, in source order, keeping only the args', () => {
+  const b = extractSetupBindings(
+    setup('  const count = signal(1);\n  const doubled = computed(() => count() * 2);\n  const quad = computed(() => doubled() * 2);\n  const inc = () => count.set(1);\n  return { count, doubled, quad, inc };')
+  );
+  assert.deepEqual([...b.computeds.keys()], ['doubled', 'quad'], 'both computeds, in DECLARATION order (= dependency order)');
+  assert.equal(b.computeds.get('doubled')!.args, '() => count() * 2', 'args only — the callee is re-attached by the emit');
+  assert.ok(b.handlers.has('inc') && !b.handlers.has('doubled'), 'a computed is not a handler');
+});
+
+test('a computed is only derivable when its body resolves on the client', () => {
+  const c = (args: string) => ({ source: `computed(${args})`, args });
+  assert.ok(isDerivable(c('() => count() * 2'), new Set(['count'])), 'reads a snapshotted signal');
+  assert.ok(!isDerivable(c('() => count() * factor'), new Set(['count'])), 'a non-ctx setup local → refuse');
+  assert.ok(isDerivable(c('() => doubled() + 1'), new Set(['doubled'])), 'reads an EARLIER computed (already derived)');
+});
+
+test('fail-safe: only a plain `computed(…)` initializer is recognised', () => {
+  const b = extractSetupBindings(setup('  const a = computed(() => 1).valueOf;\n  const c = memo(() => 1);\n  return { a, c };'));
+  assert.equal(b.computeds.size, 0, 'a member access on the call / an unknown factory → not recognised (no wrong derive)');
 });

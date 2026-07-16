@@ -19,7 +19,7 @@ import type { TemplateNode } from './ast.js';
 import { applyPatches, type PatchOp } from './patch.js';
 import { inferCtxNames } from './infer.js';
 import { injectAutoReturn } from './auto-return.js';
-import { extractSetupHandlers, isInlinable, type SetupHandler } from './handlers.js';
+import { extractSetupBindings, isInlinable, isDerivable, type SetupBindings } from './handlers.js';
 import { rewrite, ctxScope } from './scope.js';
 import { scopeCss, scopeAttr, hostAttr, hashCss } from './css.js';
 
@@ -83,18 +83,38 @@ const HAS_PROP_DEFAULTS: RegExp = /export\s+(?:const|let|var)\s+propDefaults\b/;
  * ReferenceError on the first click. Refusing leaves the site as `ctx.<name>` — today's inert-but-safe
  * behaviour — rather than trading a dead button for a crash. Recursion is fine (the factory binds the name).
  */
-function inlineSetupHandlers(script: string, scope: string[]): ReadonlyMap<string, string> {
-  const out: Map<string, string> = new Map();
-  const found: Map<string, SetupHandler> = extractSetupHandlers(script);
-  if (found.size === 0) return out;
-  const resolvable: Set<string> = new Set(scope.filter((name) => !found.has(name)));
+function resumableSetup(script: string, scope: string[]): {
+  handlers: ReadonlyMap<string, string>;
+  computeds: ReadonlyMap<string, string>;
+} {
+  const handlers: Map<string, string> = new Map();
+  const computeds: Map<string, string> = new Map();
+  const found: SetupBindings = extractSetupBindings(script);
+  if (found.handlers.size === 0 && found.computeds.size === 0) return { handlers, computeds };
   const sc = ctxScope(scope);
-  for (const [name, handler] of found) {
-    if (!resolvable.has(name) && !scope.includes(name)) continue; // the template never references it
-    if (!isInlinable(handler, resolvable, name)) continue;
-    out.set(name, rewrite(handler.source, sc).code);
+
+  // What an inlined body may reference: the bindings that survive to the client. Signals + plain data do
+  // (the snapshot carries them); handlers and computeds do NOT — `registerState` drops every function. A
+  // computed comes BACK via `derive`, so once we prove one derivable it becomes resolvable for the rest.
+  const resolvable: Set<string> = new Set(
+    scope.filter((name) => !found.handlers.has(name) && !found.computeds.has(name))
+  );
+
+  // Computeds first, in declaration order: each may read the signals plus any earlier computed. `derive`
+  // emits them in this same order, so the assignment order matches the dependency order.
+  for (const [name, computed] of found.computeds) {
+    if (!isDerivable(computed, resolvable, name)) continue;
+    computeds.set(name, rewrite(computed.args, sc).code);
+    resolvable.add(name); // now live in the resumed ctx → a later computed / a handler may use it
   }
-  return out;
+
+  // Handlers second — so a handler that reads a derived computed (`() => count.set(doubled())`) inlines too.
+  for (const [name, handler] of found.handlers) {
+    if (!scope.includes(name)) continue; // the template never references it
+    if (!isInlinable(handler, resolvable, name)) continue;
+    handlers.set(name, rewrite(handler.source, sc).code);
+  }
+  return { handlers, computeds };
 }
 
 /** Compile a `{ script, template, styles }` triple into a component module + scoped CSS. */
@@ -108,10 +128,18 @@ export function compileComponent(src: ComponentSource, opts: ComponentOptions = 
   const scope: string[] = inferCtxNames(ast);
   // Stamp the `:host` root marker only when the styles actually use `:host` (else zero cost).
   const host: string | undefined = src.styles && /:host\b/.test(src.styles) ? hostAttr(hash) : undefined;
-  // E1.5 — resumable only: inline each named handler's `setup` body so `on:click={{ inc }}` resumes.
-  const resumableHandlers: ReadonlyMap<string, string> | undefined =
-    opts.resumable && src.script ? inlineSetupHandlers(src.script, scope) : undefined;
-  const compiled: CompileResult = compileTemplateAst(ast, { mode: 'module', scope, scopeAttr: attr, hostAttr: host, resumable: opts.resumable, resumableHandlers });
+  // E1.5/E1.6 — resumable only: inline each named handler's `setup` body (`on:click={{ inc }}`) and re-derive
+  // each `computed` over the resumed ctx (`{{ doubled() }}`), neither of which can cross the snapshot.
+  const resumed = opts.resumable && src.script ? resumableSetup(src.script, scope) : undefined;
+  const compiled: CompileResult = compileTemplateAst(ast, {
+    mode: 'module',
+    scope,
+    scopeAttr: attr,
+    hostAttr: host,
+    resumable: opts.resumable,
+    resumableHandlers: resumed?.handlers,
+    resumableComputeds: resumed?.computeds,
+  });
   // Demote the template module's default export to a local `render` we can wire up:
   //  - eager:     `export default function render …`  → `function render …`
   //  - resumable: `render` is already a `function render` declaration; a trailing `export default render;`
@@ -150,11 +178,12 @@ export function compileComponent(src: ComponentSource, opts: ComponentOptions = 
     }
     defineExpr = `defineComponent(${parts.join(', ')})`;
   }
-  // Resumable: attach the render's `adopt` + `handlers` to the component so a parent (adoptComponent reads
-  // `Comp.adopt`) and the client resume entry (`resumePage({ adopt: Root.adopt, handlers: Root.handlers })`) can
-  // reach them off the component itself. Both are undefined for a render with no adopt / no events → harmless.
+  // Resumable: attach the render's `adopt` + `handlers` + `derive` to the component so a parent
+  // (adoptComponent reads `Comp.adopt`/`Comp.derive`) and the client resume entry (`resumePage({ adopt:
+  // Root.adopt, handlers: Root.handlers, derive: Root.derive })`) reach them off the component itself. Each
+  // is undefined for a render with no adopt / no events / no computeds → harmless.
   const defaultExport: string = opts.resumable
-    ? `const _wc = ${defineExpr};\n_wc.adopt = render.adopt;\n_wc.handlers = render.handlers;\nexport default _wc;`
+    ? `const _wc = ${defineExpr};\n_wc.adopt = render.adopt;\n_wc.handlers = render.handlers;\n_wc.derive = render.derive;\nexport default _wc;`
     : `export default ${defineExpr};`;
 
   const code: string = [

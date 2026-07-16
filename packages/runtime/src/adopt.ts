@@ -113,6 +113,8 @@ export function after(node: Node, n: number): Node {
 interface AdoptableComponent {
   (props?: Record<string, unknown>, slots?: Record<string, () => Node>): Node;
   adopt?: (root: Node, ctx: Record<string, unknown>, slots: Record<string, unknown>, states: Record<string, unknown>) => unknown;
+  /** E1.6 — rebuilds the child's own `computed`s onto its resumed ctx (they cannot cross the snapshot). */
+  derive?: (ctx: Record<string, unknown>) => unknown;
 }
 
 /**
@@ -133,6 +135,8 @@ export function adoptComponent(
   const ctx: unknown = states && states[id];
   const root: ChildNode | null = start.nextSibling as ChildNode | null;
   if (Comp && Comp.adopt && ctx !== undefined && root && root !== end) {
+    // Rebuild the child's computeds onto its resumed ctx BEFORE adopting — its bindings call them (E1.6).
+    if (Comp.derive) Comp.derive(ctx as Record<string, unknown>);
     Comp.adopt(root, ctx as Record<string, unknown>, {}, states as Record<string, unknown>);
     return;
   }

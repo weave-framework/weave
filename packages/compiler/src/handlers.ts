@@ -144,6 +144,37 @@ export interface SetupHandler {
 }
 
 /**
+ * A `setup` binding declared as `computed(…)` (E1.6), extracted so the client can RE-DERIVE it.
+ *
+ * A computed is a bare getter with no writable surface, so the signal codec doesn't claim it and
+ * `registerState` drops it — but unlike a handler, the template CALLS it (`{{ doubled() }}`), so a resumed
+ * `ctx.doubled` of `undefined` throws and takes the whole page's resume down with it. The compiler therefore
+ * emits a `derive(ctx)` that rebuilds each computed over the resumed ctx before adopt runs.
+ */
+export interface SetupComputed {
+  /** The full `computed(…)` call source — what the free-identifier check reads. */
+  source: string;
+  /**
+   * Just the ARGUMENTS, i.e. the text inside `computed( … )`. The emit re-attaches the callee itself via the
+   * codegen's core-import reference (`computed` in module mode, `rt.computed` in function mode), so the user's
+   * bare `computed` name is never emitted — it would be undefined in a `new Function` body.
+   */
+  args: string;
+}
+
+/** Every extractable top-level `setup` binding, split by shape. */
+export interface SetupBindings {
+  /** `const inc = () => …` — event handlers (E1.5). */
+  handlers: Map<string, SetupHandler>;
+  /** `const doubled = computed(() => …)` — re-derived on resume (E1.6). Insertion order = source order,
+   *  which is also dependency order (a computed can only read one declared before it). */
+  computeds: Map<string, SetupComputed>;
+}
+
+/** The callee of a re-derivable binding — excluded from the free-identifier check (the emit imports it). */
+export const COMPUTED_CALLEE: string = 'computed';
+
+/**
  * Extract every top-level `setup` binding whose initializer is a function, keyed by name:
  * `const inc = (…) => …` · `const inc = function (…) { … }` · `function inc(…) { … }` (incl. `async`).
  *
@@ -153,11 +184,23 @@ export interface SetupHandler {
  * `setup`'s body can't be located (a concise arrow body, an annotated signature) — the fail-safe path.
  */
 export function extractSetupHandlers(script: string): Map<string, SetupHandler> {
+  return extractSetupBindings(script).handlers;
+}
+
+/**
+ * The one-pass scanner behind {@link extractSetupHandlers}: every top-level `setup` binding, split into
+ * handlers (`const inc = () => …`, `function inc(){}`, incl. `async`) and computeds (`const doubled =
+ * computed(() => …)`). Same fail-safe contract — an unlocatable body, a reassigned/destructured/computed
+ * binding, or a nested helper yields nothing rather than a guess.
+ */
+export function extractSetupBindings(script: string): SetupBindings {
   const out: Map<string, SetupHandler> = new Map();
+  const computeds: Map<string, SetupComputed> = new Map();
+  const empty: SetupBindings = { handlers: out, computeds };
   const open: number | null = locateSetupBody(script);
-  if (open === null) return out;
+  if (open === null) return empty;
   const close: number = matchDelimited(script, open, '{', '}');
-  if (close < 0) return out;
+  if (close < 0) return empty;
 
   let i: number = open + 1;
   let depth: number = 0; // nesting INSIDE the body — only depth 0 is a top-level statement
@@ -209,6 +252,10 @@ export function extractSetupHandlers(script: string): Map<string, SetupHandler> 
       if (parsed) {
         const handler: SetupHandler | null = asFunctionExpr(parsed.init);
         if (handler) out.set(parsed.name, handler);
+        else {
+          const c: SetupComputed | null = asComputedCall(parsed.init);
+          if (c) computeds.set(parsed.name, c);
+        }
         i = parsed.end;
         continue;
       }
@@ -220,7 +267,35 @@ export function extractSetupHandlers(script: string): Map<string, SetupHandler> 
   for (const name of [...out.keys()]) {
     if (isReassigned(script, open, close, name)) out.delete(name);
   }
-  return out;
+  for (const name of [...computeds.keys()]) {
+    if (isReassigned(script, open, close, name)) computeds.delete(name);
+  }
+  return empty;
+}
+
+/** `computed( … )` at `init` → its source + args. Null for anything else (an aliased import is not
+ *  recognised — fail-safe: no derive, rather than a wrong one). */
+function asComputedCall(init: string): SetupComputed | null {
+  const src: string = init.trim();
+  if (!startsWithWord(src, 0, COMPUTED_CALLEE)) return null;
+  const p: number = skipWs(src, COMPUTED_CALLEE.length);
+  if (src[p] !== '(') return null;
+  const rp: number = matchDelimited(src, p, '(', ')');
+  if (rp !== src.length - 1) return null; // the whole initializer must BE the call (not `computed(…).x`)
+  return { source: src, args: src.slice(p + 1, rp) };
+}
+
+/**
+ * Can `computed`'s body be re-derived over the resumed ctx? Same rule as {@link isInlinable}, minus the
+ * callee itself (`computed` is imported by the emitted `derive`, not read from ctx) and its own name.
+ * `resolvable` must include the computeds declared BEFORE this one — a computed may read an earlier one.
+ */
+export function isDerivable(computed: SetupComputed, resolvable: ReadonlySet<string>, name?: string): boolean {
+  for (const id of freeIdentifiers(computed.source)) {
+    if (id === COMPUTED_CALLEE || id === name) continue;
+    if (!resolvable.has(id)) return false;
+  }
+  return true;
 }
 
 /**

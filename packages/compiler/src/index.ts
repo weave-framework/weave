@@ -15,7 +15,15 @@ export { parseTemplate, ParseError } from './parser.js';
 export { scopeCss, scopeAttr, hostAttr, hashCss } from './css.js';
 export { inferCtxNames } from './infer.js';
 export { injectAutoReturn, type AutoReturnResult } from './auto-return.js';
-export { extractSetupHandlers, isInlinable, type SetupHandler } from './handlers.js';
+export {
+  extractSetupHandlers,
+  extractSetupBindings,
+  isInlinable,
+  isDerivable,
+  type SetupHandler,
+  type SetupComputed,
+  type SetupBindings,
+} from './handlers.js';
 export {
   rewrite,
   ctxScope,

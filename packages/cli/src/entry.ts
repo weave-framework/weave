@@ -132,7 +132,7 @@ export function generateEntry(
     // Adopt the SSG-rendered DOM in place: the component root is the mount target's first element child.
     lines.push(`const _m = document.querySelector(${JSON.stringify(mount)});`);
     lines.push(`const _r = _m && _m.firstElementChild;`);
-    lines.push(`if (_r) resumePage({ root: _r, adopt: Root.adopt, handlers: Root.handlers });`);
+    lines.push(`if (_r) resumePage({ root: _r, adopt: Root.adopt, handlers: Root.handlers, derive: Root.derive });`);
   } else {
     lines.push(`mountComponent(Root, ${JSON.stringify(mount)});`);
   }
