@@ -849,7 +849,9 @@ function compileFragment(
         break;
       }
       case 'ref':
-          gen.cannotAdopt('a `ref` capture'); // node-tied wiring the adopt walk doesn't stage yet
+        // E1.16 — adoptable: a ref is not state and never can be (a DOM node cannot cross the wire), but adopt
+        // does not need it to. `n` already resolves to the ADOPTED node, so the same setRef binds the resumed
+        // signal to the element on the page, exactly as the create path binds it to the created one.
         sink.push(`${gen.H('setRef')}(${rewrite(attr.expr, sc).code}, ${n});`);
         break;
       case 'use': {

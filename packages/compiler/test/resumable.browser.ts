@@ -641,6 +641,45 @@ test('E1.2c-6: adopt resumes a static CHILD component in place — child setup n
   app.dispose();
 });
 
+/* ──────────── E1.16: element refs ──────────── */
+
+test('E1.16: a `ref` capture adopts — the ref re-binds to the ADOPTED server node, never crossing the wire', () => {
+  // An element ref is not state and never can be: a DOM node cannot be serialized, which is why every
+  // ref-holding component was dropped to CSR (52 `ref` refusals + 228 instance drops on the docs site — one
+  // problem). But adopt does not NEED it on the wire: the walk already resolves the node, so `setRef` binds the
+  // resumed signal to the adopted element exactly as the create path binds it to the created one.
+  const { code } = compileTemplate('<div><p ref={{ host }}>{{ count() }}</p></div>', {
+    mode: 'function',
+    scope: ['count', 'host'],
+    resumable: true,
+    resumableDerived: new Map([['host', 'rt.signal(null)']]), // as compileComponent emits for `const host = signal(null)`
+  });
+  const render = new Function('rt', '_c', code.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;'))(rt, {}) as
+    ((ctx: unknown, slots?: unknown) => Element) & { adopt?: AdoptFn; derive?: (c: Record<string, unknown>) => unknown };
+  assert.equal(typeof render.adopt, 'function', 'a template with a `ref` is adoptable — the adopt walk HAS the node');
+
+  // ── server ── the ref captures the SERVER node; only `count` crosses the wire
+  const serverCount: Signal<number> = signal(7);
+  const serverHost: Signal<Element | null> = signal<Element | null>(null);
+  const serverNode = serverRender(() => render({ count: serverCount, host: serverHost })) as HTMLElement;
+  assert.equal((serverHost() as Element)?.tagName, 'P', 'the server render captured its own <p> into the ref');
+  const serverHtml: string = serverNode.outerHTML;
+  const wire = snapshot({ count: serverCount });
+
+  // ── client ── fresh parse; `host` is absent from the snapshot, so derive rebuilds it as an empty signal
+  const container: HTMLElement = host();
+  container.innerHTML = serverHtml;
+  const div: HTMLElement = container.querySelector('div')!;
+  const clientP: HTMLElement = div.querySelector('p')!;
+  const app = resume(div, { snapshot: wire, adopt: render.adopt, derive: render.derive });
+
+  const bound = (app.ctx.host as Signal<Element | null>)();
+  assert.ok(bound, 'the ref is populated after resume (it was rebuilt, then bound by the adopt walk)');
+  assert.is(bound as Element, clientP, 'the ref points at the ADOPTED server <p> — the very node on the page');
+  assert.ok(bound !== (serverHost() as Element), 'and not at the stale server-render node');
+  app.dispose();
+});
+
 /* ──────────── E1.15: sibling components after a block ──────────── */
 
 /** Compile `<el>{{ label() }}</el>` as a real resumable component, counting its setup runs. */

@@ -2,7 +2,7 @@ import { test, assert } from '../../../tools/harness.js';
 import { signal, effect, type Signal } from '@weave-framework/runtime';
 import { serialize, deserialize, SerializeError } from '@weave-framework/runtime/serialize';
 import { handlerAttr } from '@weave-framework/runtime/resume';
-import { snapshot, resume, collectStates, registerState, ROOT_ID } from '@weave-framework/runtime/graph';
+import { snapshot, resume, collectStates, registerState, finalizeStates, ROOT_ID, type DroppedState } from '@weave-framework/runtime/graph';
 
 /**
  * E0.3 — the resume entry (`@weave-framework/runtime/graph`). Rebuild a component's reactive state from a
@@ -84,6 +84,41 @@ test('registerState: drops raw handler functions (not state) but keeps signals �
   // proof the captured ctx now crosses the wire (a raw function would have thrown in serialize)
   const back = deserialize(snapshot(states)) as Record<string, Record<string, unknown>>;
   assert.ok(typeof back.c0.count === 'function' && (back.c0.count as Signal<number>)() === 2, 'the filtered ctx round-trips (count @ 2)');
+});
+
+test('E1.16: finalizeStates keeps an instance whose DERIVED binding turned unserializable — it drops the KEY, not the ctx', () => {
+  // The element-ref shape, which is why 228 instances dropped on the docs site. `registerState` probes `host`
+  // when the component registers — it is `signal(null)` then, and serializes fine, so it is KEPT. The render
+  // then runs `setRef`, so by snapshot time it holds a DOM node. finalizeStates re-probes (E1.9) and used to
+  // drop the whole instance, even though `host` is a derived key the client rebuilds and adopt re-binds.
+  const host: Signal<unknown> = signal(null);
+  const count: Signal<number> = signal(5);
+  const dropped: DroppedState[] = [];
+  const states = collectStates(() => {
+    registerState('c0', { count, host }, ['host']); // `host` is derived → derive() rebuilds it client-side
+  }, dropped);
+  assert.ok(states.c0, 'registerState kept the instance (host was still null, hence serializable)');
+
+  host.set(document.createElement('p')); // ← what setRef does, AFTER registerState has already run
+  finalizeStates(states, dropped);
+
+  assert.ok(states.c0, 'the instance SURVIVES — a derived key going unserializable is not a hole');
+  assert.ok(!('host' in (states.c0 as Record<string, unknown>)), 'the offending derived key is dropped from the snapshot');
+  assert.equal(dropped.length, 0, 'and it is not reported as a failure — this is the designed path, not degradation');
+  const back = deserialize(snapshot(states)) as Record<string, Record<string, unknown>>;
+  assert.equal((back.c0.count as Signal<number>)(), 5, 'the rest of the ctx still crosses the wire');
+});
+
+test('E1.16: finalizeStates still drops the whole instance when a NON-derived binding turns unserializable', () => {
+  // The exemption must stay narrow: nothing rebuilds a plain binding, so the render would bind against
+  // `undefined` — half a ctx is worse than none (E1.9).
+  const stash: Signal<unknown> = signal(null);
+  const dropped: DroppedState[] = [];
+  const states = collectStates(() => { registerState('c0', { stash }, ['other']); }, dropped);
+  stash.set(document.createElement('p'));
+  finalizeStates(states, dropped);
+  assert.ok(!states.c0, 'the instance is dropped (the client CSR-mounts it instead)');
+  assert.equal(dropped[0]?.key, 'stash', 'and the report NAMES the binding at fault');
 });
 
 test('collectStates: the whole map snapshots + resumes, sharing a signal across components by structural sharing', () => {

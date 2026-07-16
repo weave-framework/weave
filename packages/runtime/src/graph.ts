@@ -74,6 +74,13 @@ export interface DroppedState {
 
 let droppedSink: DroppedState[] | null = null;
 
+/**
+ * Per-instance derived-key lists, keyed by the states map so they live exactly as long as it (E1.11/E1.16).
+ * {@link registerState} learns them from the compiled component; {@link finalizeStates} needs them too, and it
+ * runs after the session has closed — hence a map rather than session state.
+ */
+const derivedKeys: WeakMap<object, Record<string, readonly string[]>> = new WeakMap();
+
 export function collectStates(fn: () => void, dropped?: DroppedState[]): Record<string, unknown> {
   const prev: Record<string, unknown> | null = collector;
   const prevDropped: DroppedState[] | null = droppedSink;
@@ -105,6 +112,11 @@ export function collectStates(fn: () => void, dropped?: DroppedState[]): Record<
  */
 export function registerState(id: string, ctx: unknown, derived?: readonly string[]): void {
   if (!collector) return;
+  if (derived?.length) {
+    let m: Record<string, readonly string[]> | undefined = derivedKeys.get(collector);
+    if (!m) { m = {}; derivedKeys.set(collector, m); }
+    m[id] = derived; // finalizeStates re-probes after the render and needs the same exemption
+  }
   const src: Record<string, unknown> = ctx as Record<string, unknown>;
   const clean: Record<string, unknown> = {};
   for (const key of Object.keys(src)) {
@@ -135,8 +147,14 @@ export function registerState(id: string, ctx: unknown, derived?: readonly strin
  * say). The value the snapshot actually encodes is the one at the END, so the decisive check belongs here;
  * without it the build dies on `snapshot()` with no clue which component was at fault (dogfound on the docs
  * site). A dropped instance simply CSR-mounts on the client, and the caller reports it.
+ *
+ * E1.16 — a DERIVED key that turns unserializable is NOT a drop: `derive(ctx)` rebuilds it client-side, so only
+ * the key leaves the snapshot and the instance still resumes. This is the normal life of an element `ref` —
+ * `signal(null)` when the component registered (serializable, hence kept), a DOM node once `setRef` ran. The
+ * exemption stays narrow: nothing rebuilds a plain binding, so that still drops the whole ctx (E1.9).
  */
 export function finalizeStates(states: Record<string, unknown>, dropped?: DroppedState[]): void {
+  const derived: Record<string, readonly string[]> = derivedKeys.get(states) ?? {};
   for (const id of Object.keys(states)) {
     const ctx: Record<string, unknown> = states[id] as Record<string, unknown>;
     if (ctx == null || typeof ctx !== 'object') continue;
@@ -144,6 +162,10 @@ export function finalizeStates(states: Record<string, unknown>, dropped?: Droppe
       try {
         serialize(ctx[key]);
       } catch (e) {
+        if (derived[id]?.includes(key)) {
+          delete ctx[key];
+          continue;
+        }
         if (dropped) dropped.push({ id, key, reason: (e as Error).message });
         delete states[id];
         break;
