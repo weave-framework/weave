@@ -904,3 +904,22 @@ test('E1.21: a `use:` action adopts when it resolves; it still opts out when it 
   assert.ok(!/function adopt\(/.test(bad.code), 'an unrebuildable action still opts the fragment out');
   assert.ok(bad.warnings?.some((w) => /use:tip/.test(w)), `and names itself; got ${JSON.stringify(bad.warnings)}`);
 });
+
+test('E1.22: a `use:` on a COMPONENT adopts — the action lands on the ADOPTED root, once', () => {
+  // A different path from E1.21's element case: emitComponent forced `resumableChild = false` whenever a
+  // `use:` was present, so there was no cid and no adoptComponent call at all — the emit fell through to the
+  // CREATE path, which on an adopt walk would insert a duplicate. `<Button use:ripple>` is 20 sites on the docs.
+  const { code } = compileComponent(
+    {
+      script: 'import { ripple } from "./ripple";\nimport Button from "./button";\nexport function setup(){ return { ripple }; }',
+      template: '<div><Button use:ripple>x</Button></div>',
+    },
+    { filename: 'uc1', resumable: true }
+  );
+  assert.ok(/function adopt\(/.test(code), 'a `use:` on a component no longer refuses the whole fragment');
+  const adoptPart: string = code.split('function adopt(')[1] ?? '';
+  assert.ok(/const \w+ = [\w.]*adoptComponent\(/.test(adoptPart),
+    `adopt resumes the child and captures the returned root; got:\n${adoptPart.slice(0, 500)}`);
+  assert.ok(/applyAction\(/.test(adoptPart), 'and forwards the action onto it');
+  assert.ok(!/mountChild\(/.test(adoptPart), 'without ALSO mounting a fresh copy — that was the duplicate');
+});

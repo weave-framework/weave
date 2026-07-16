@@ -960,9 +960,16 @@ function compileFragment(
     // the create mount tags the child with `$wid` (so the child self-registers its ctx) and the adopt walk
     // resumes it in place via adoptComponent. A `use:` component isn't staged for adopt (kills adoptability);
     // a block-nested component (depth ≥ 2) re-renders under its block's island-replay (no id, no adopt).
-    const resumableChild: boolean = gen.resumable && gen.fragmentDepth === 1 && uses.length === 0;
+    const resumableChild: boolean = gen.resumable && gen.fragmentDepth === 1;
     const cid: string = resumableChild ? gen.componentId() : '';
-    if (uses.length > 0) gen.cannotAdopt(`a \`use:\` action on <${node.tag}>`);
+    // E1.22 — a `use:` forwarded onto a component no longer opts the fragment out. Same reasoning as E1.21 (the
+    // action never ran on the server, so re-running it on the adopted root is the create path exactly), and the
+    // same condition: the action must survive to the client, i.e. `derive` rebuilds a `ctx.<name>` one.
+    for (const u of uses) {
+      if (/^ctx\./.test(rewrite(u.name, sc).code) && !gen.derived.has(u.name)) {
+        gen.cannotAdopt(`a \`use:${u.name}\` action on <${node.tag}>`);
+      }
+    }
     if (resumableChild && !adopt) props.push(`'$wid': ${q(cid)}`);
 
     // Slots: group children by a static `slot="name"` (default otherwise); strip the attr.
@@ -1021,7 +1028,28 @@ function compileFragment(
       const tail: string[] = [evObj || 'undefined', slots.length ? slotsObj : 'undefined', propsObj];
       while (tail.length && tail[tail.length - 1] === 'undefined') tail.pop();
       const tailArgs: string = tail.length ? `, ${tail.join(', ')}` : '';
-      stmts.push(`${gen.Ha('adoptComponent')}(${anchorVar}, ${q(cid)}, ${gen.Comp(node.tag)}, _st, (_a) => ${adoptMount}${tailArgs});`);
+      const call: string = `${gen.Ha('adoptComponent')}(${anchorVar}, ${q(cid)}, ${gen.Comp(node.tag)}, _st, (_a) => ${adoptMount}${tailArgs})`;
+      if (uses.length === 0) {
+        stmts.push(`${call};`);
+        return;
+      }
+      // E1.22 — forward each `use:` onto the root that is actually on the page. adoptComponent returns it
+      // whichever branch produced it (adopted, or rebuilt by the fallback), and `componentRoot` resolves a
+      // fragment the same way the create path does.
+      const anVar: string = gen.fn('_cn');
+      const arVar: string = gen.fn('_cr');
+      stmts.push(`const ${anVar} = ${call};`);
+      stmts.push(`if (${anVar}) {`);
+      stmts.push(`  const ${arVar} = ${gen.H('componentRoot')}(${anVar}, ${q(node.tag)});`);
+      for (const u of uses) {
+        const action: string = rewrite(u.name, sc).code;
+        stmts.push(
+          u.expr !== undefined
+            ? `  ${gen.H('applyAction')}(${arVar}, ${action}, () => (${rewrite(u.expr, sc).code}));`
+            : `  ${gen.H('applyAction')}(${arVar}, ${action});`
+        );
+      }
+      stmts.push(`}`);
       return;
     }
 

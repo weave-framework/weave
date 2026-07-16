@@ -643,6 +643,64 @@ test('E1.2c-6: adopt resumes a static CHILD component in place — child setup n
   app.dispose();
 });
 
+/* ──────────── E1.22: a `use:` forwarded onto a component ──────────── */
+
+test('E1.22: a `use:` on a COMPONENT runs ONCE, on the ADOPTED root — not on a duplicate', async () => {
+  // `<Button use:ripple>` is 20 sites on the docs. The danger is not that the action fails to run — it is that
+  // the old emit would have CREATED a second copy of the child, so the page would carry a duplicate and the
+  // action would land on the wrong node. Assert the DOM, not just the call.
+  const childCode: string = compileTemplate('<b>{{ n() }}</b>', { mode: 'function', scope: ['n'], resumable: true }).code;
+  const childRender = new Function('rt', '_c', childCode.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;'))(rt, {}) as
+    ((ctx: unknown, slots?: unknown) => Node) & { adopt?: AdoptFn };
+  let childSetups: number = 0;
+  const Child = dom.defineComponent(childRender as never, () => { childSetups++; return { n: signal(3) }; }) as
+    dom.Component & { adopt?: AdoptFn };
+  Child.adopt = childRender.adopt;
+
+  // A bare (out-of-scope) action is a MODULE reference — the real shape (`import { ripple } from …`), and the
+  // one E1.21/E1.22 allow, since the client has it without any snapshot. Expose it the way the module would.
+  const applied: Element[] = [];
+  (globalThis as unknown as { mark: (el: Element) => void }).mark = (el: Element): void => {
+    applied.push(el);
+    el.setAttribute('data-acted', '1');
+  };
+
+  const parentCode: string = compileTemplate('<div><Child use:mark /></div>', {
+    mode: 'function', scope: [], resumable: true,
+  }).code;
+  const parentRender = new Function('rt', '_c', parentCode.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;'))(rt, { Child }) as
+    ((ctx: unknown, slots?: unknown) => Element) & { adopt?: AdoptFn };
+  assert.equal(typeof parentRender.adopt, 'function', 'a `use:` on a component no longer refuses adopt');
+
+  // ── server ── the action does NOT run here: `onMount` is inert on the server, which is exactly why adopt may
+  // re-run it. (This render is in a real browser, so drain the mount queue before asserting.)
+  const box: HTMLElement = host();
+  const states = collectStates(() => { box.appendChild(serverRender(() => parentRender({}, {})) as Node); });
+  states[ROOT_ID] = {};
+  const wire = snapshot(states);
+  const serverHtml: string = (box.firstElementChild as HTMLElement).outerHTML;
+  // `applyAction` defers to onMount (a microtask), so drain it before discarding what this browser-side stand-in
+  // for the server did. On a REAL server none of it runs at all — that is the whole premise of E1.21/E1.22.
+  await Promise.resolve();
+  applied.length = 0;
+
+  // ── client ──
+  const client: HTMLElement = host();
+  client.innerHTML = serverHtml;
+  const div: HTMLElement = client.querySelector('div')!;
+  const app = resume(div, { snapshot: wire, adopt: parentRender.adopt });
+  assert.equal(childSetups, 1, 'the child ADOPTED — its setup did not re-run');
+  await Promise.resolve();
+
+  assert.equal(div.querySelectorAll('b').length, 1, 'exactly ONE child on the page — no duplicate was mounted');
+  assert.equal(applied.length, 1, `the action ran exactly once; got ${applied.length}`);
+  assert.is(applied[0], div.querySelector('b')!, 'and on the ADOPTED root that is actually on the page');
+  assert.equal(div.querySelector('b')!.getAttribute('data-acted'), '1', 'its effect is on the live node');
+  (app.states.c0 as { n: Signal<number> }).n.set(9);
+  assert.equal(div.querySelector('b')!.textContent, '9', 'the adopted child is still reactive');
+  app.dispose();
+});
+
 /* ──────────── E1.20: props reach a resumed CHILD's handlers ──────────── */
 
 test('E1.20: a resumed CHILD click reads its `props` — live from the parent`s resumed ctx, setup never re-runs', () => {

@@ -190,6 +190,10 @@ export function collectInstances(adopt: () => void): ResumedInstance[] {
  * resumable (`Comp.adopt` present) and its ctx was snapshotted (`states[id]`), re-attach its bindings against
  * that ctx WITHOUT re-running its `setup`, and thread `states` down for its own nested children. Otherwise
  * fall back: clear the server subtree and re-mount fresh via `mount` (a plain CSR island for that child).
+ *
+ * Returns the child's root node — the ADOPTED one, or whatever the fallback built — so the caller can finish
+ * wiring it. E1.22 needs this for a `use:` forwarded onto a component: the action must land on the root that is
+ * actually on the page, whichever branch produced it.
  */
 export function adoptComponent(
   start: Comment,
@@ -200,7 +204,7 @@ export function adoptComponent(
   events?: Record<string, EventListener>,
   slots?: Record<string, () => Node>,
   props?: Record<string, unknown>,
-): void {
+): Node | null {
   const end: Comment = blockEndOf(start);
   const ctx: unknown = states && states[id];
   const root: ChildNode | null = start.nextSibling as ChildNode | null;
@@ -209,10 +213,10 @@ export function adoptComponent(
   // node and there is nothing to insert. If it declines, it built fresh — fall through and swap that in.
   if (Comp && Comp.adoptsSelf && root && root !== end) {
     const taken: Node | null = mount({ root, states: (states ?? {}) as Record<string, unknown>, register: registerAdopted });
-    if (taken === root) return;
+    if (taken === root) return root;
     clearBlock(start, end);
     if (taken) end.parentNode!.insertBefore(taken, end);
-    return;
+    return taken;
   }
   if (Comp && Comp.adopt && ctx !== undefined && root && root !== end) {
     // Rebuild the child's computeds onto its resumed ctx BEFORE adopting — its bindings call them (E1.6).
@@ -233,7 +237,7 @@ export function adoptComponent(
     if (instanceCollector && Comp.handlers && root instanceof Element) {
       instanceCollector.push({ root, handlers: Comp.handlers, ctx: ctx as Record<string, unknown>, props });
     }
-    return;
+    return root;
   }
   // fallback — child not resumable (no adopt / no snapshot): clear its server DOM and re-mount (CSR island)
   clearBlock(start, end);
@@ -242,6 +246,7 @@ export function adoptComponent(
     const list: ChildNode[] = node instanceof DocumentFragment ? ([...node.childNodes] as ChildNode[]) : [node as ChildNode];
     for (const n of list) end.parentNode!.insertBefore(n, end);
   }
+  return node;
 }
 
 /**
