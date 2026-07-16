@@ -317,3 +317,19 @@ test('E1.19: an arrow whose body starts on the NEXT LINE keeps its body — the 
   assert.ok(!/=>\s*$/.test(hs.get('isSelected')!.source), `must not end at the arrow; got: ${hs.get('isSelected')?.source}`);
   assert.ok(/opt\.value \? true : false\s*$/.test(hs.get('isSelected')!.source), `whole body; got: ${hs.get('isSelected')?.source}`);
 });
+
+test('E1.18: an OPTIONAL parameter (`e?: Event`) is still its own param, not an unresolved ref', () => {
+  // The real docs demos: `const save = (e?: Event): void => …`. The `?` clung to the name, so neither the
+  // param list nor the free-id scan recognised `e` — the handler was blamed for reading its own argument.
+  const script: string = setup(
+    '  const n = signal(0);\n' +
+      '  const save = (e?: Event, extra?: string): void => {\n' +
+      '    e?.preventDefault();\n' +
+      '    n.set(extra ? 1 : 2);\n' +
+      '  };\n' +
+      '  return { n, save };'
+  );
+  const h = extractSetupHandlers(script).get('save')!;
+  assert.deepEqual(h.params.slice().sort(), ['e', 'extra'], `optional params read cleanly; got ${JSON.stringify(h.params)}`);
+  assert.deepEqual(unresolvedRefs(h.source, new Set(['n']), h.params, 'save'), [], 'and nothing is blamed');
+});

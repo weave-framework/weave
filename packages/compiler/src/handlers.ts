@@ -745,11 +745,15 @@ function readIdent(src: string, i: number): string {
   return src.slice(i, j);
 }
 
-/** Split a `( … )` parameter list into simple names (a destructured/defaulted param yields its head token). */
+/**
+ * Split a `( … )` parameter list into simple names (a destructured/defaulted param yields its head token).
+ * `?` ends a name too: an OPTIONAL param (`e?: Event`) otherwise yielded `e?`, which failed the identifier
+ * test and was dropped — so the handler got blamed for reading its own argument (`save`, `submit` on the docs).
+ */
 function paramNames(list: string): string[] {
   const out: string[] = [];
   for (const raw of splitTopLevel(list)) {
-    const name: string = raw.trim().split(/[\s=:]/)[0].replace(/[{}[\]().]/g, '');
+    const name: string = raw.trim().split(/[\s=:?]/)[0].replace(/[{}[\]().]/g, '');
     if (/^[A-Za-z_$][\w$]*$/.test(name)) out.push(name);
   }
   return out;
