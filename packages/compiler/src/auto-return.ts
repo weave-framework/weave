@@ -78,7 +78,7 @@ export function injectAutoReturn(script: string, names: string[]): AutoReturnRes
  * (`setup = () => ({ … })`, an implicit return) and any return-type annotation
  * also yield null — both already return, so skipping them is correct.
  */
-function locateSetupBodyOpen(src: string): number | null {
+export function locateSetupBodyOpen(src: string): number | null {
   const fn: RegExpExecArray | null = SETUP_FN.exec(src);
   if (fn) {
     let i: number = skipWs(src, fn.index + fn[0].length);
@@ -261,7 +261,7 @@ function findClose(src: string, open: number): number {
  * `i` unchanged. `prevTok` disambiguates `/` (regex vs division); omit it where a
  * regex can't occur.
  */
-function skipOpaque(src: string, i: number, prevTok: string = ''): number {
+export function skipOpaque(src: string, i: number, prevTok: string = ''): number {
   const c: string = src[i];
   const d: string = src[i + 1];
   if (c === '/' && d === '/') {
@@ -362,19 +362,19 @@ function scanRegex(src: string, start: number): number {
 
 /* ──────────── small helpers ──────────── */
 
-function skipWs(src: string, i: number): number {
+export function skipWs(src: string, i: number): number {
   while (i < src.length && WS.test(src[i])) i++;
   return i;
 }
 
-function startsWithWord(src: string, i: number, word: string): boolean {
+export function startsWithWord(src: string, i: number, word: string): boolean {
   if (src.slice(i, i + word.length) !== word) return false;
   const after: string = src[i + word.length];
   return after === undefined || !ID_CHAR.test(after);
 }
 
 /** Offset of the delimiter matching the `open` char at `i` (e.g. `(`→`)`), or -1. Skips opaque regions. */
-function matchDelimited(src: string, i: number, open: string, close: string): number {
+export function matchDelimited(src: string, i: number, open: string, close: string): number {
   let depth: number = 0;
   const n: number = src.length;
   while (i < n) {
