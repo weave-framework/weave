@@ -605,13 +605,12 @@ function compileFragment(
       }
       if (!adopt) {
         // Adoptability after a block. A block's rendered node count is runtime-variable, so NOTHING after it is
-        // reachable by an absolute child index — only through the post-block cursor. What the cursor reaches: a
-        // reactive interp (E1.2c-4), a block-free element's subtree (E1.2c-5), and a block or component via its
-        // own `[` anchor (E1.15). A nested-block element, or anything else needing indexed access, does not.
-        // (`@let`/`@snippet` returned above; every other non-block type — text/comment/interp — the cursor reaches.)
-        if (sawBlock && node.type === 'element' && !isBlockNode(node) && hasBlockDeep(node)) {
-          gen.cannotAdopt(`\`${describe(node)}\` (it contains a control-flow block) placed after another block`);
-        }
+        // reachable by an absolute child index — only through the post-block cursor. E1.23: everything a level
+        // can hold is now reachable — a reactive interp inline (E1.2c-4), an element's subtree rebased onto a
+        // cursor var (E1.2c-5), and a block or component via its own `[` anchor (E1.15). An element that holds
+        // its OWN block is fine too: once it is found via the cursor, the block inside it sits at a fixed index
+        // at ITS level, and that level runs this same tracker. (`@let`/`@snippet` returned above; text/comment
+        // need no navigation.) So no refusal belongs here any more — only the KIND check below.
         if (isBlockNode(node)) {
           // Only the KIND decides: a block island-replays (@if/@switch/@for) and a component nested-resumes, and
           // E1.15 gave both a cursor, so a 2nd one per level is fine. A slot/w:element/@defer/@await/@key/@render

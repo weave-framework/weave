@@ -788,15 +788,19 @@ test('E1.14: a non-adoptable template REPORTS its cause (the whole subtree would
 });
 
 test('E1.14: the cause names the NODE as authored, not an AST type', () => {
-  // "an `element` node" is useless in a 200-line template; `<aside>` is actionable — naming the tag is exactly
-  // how the real docs blocker was located. (This test originally used `<Foo /><Link>x</Link>`, which WAS the
-  // blocker; E1.15 made that shape adoptable, so the message quality is now pinned on a real refusal: an
-  // element whose subtree holds its own block cannot rebase onto the post-block cursor.)
+  // "an `element` node" is useless in a 200-line template; naming the tag is exactly how the real docs blocker
+  // was located. The EXAMPLE keeps moving as the gates fall — it was `<Foo /><Link>` (E1.15 fixed it), then an
+  // element holding a block after a block (E1.23 fixed it). Now: a `use:` action that is a setup local, which
+  // nothing can rebuild on a resumed client. The message must still name the tag it sits on.
   const { warnings } = compileComponent(
-    { script: 'export function setup(){ return {}; }', template: '<div>@if (x) { <i>a</i> }<aside>@if (y) { <b>c</b> }</aside></div>' },
+    {
+      script: 'export function setup(){ const tip = () => {}; return { tip }; }',
+      template: '<div><Widget use:tip /></div>',
+    },
     { filename: 'na2', resumable: true }
   );
-  assert.ok(warnings && warnings.some((w) => /`<aside>`/.test(w)), `must name <aside>; got ${JSON.stringify(warnings)}`);
+  assert.ok(warnings && warnings.some((w) => /<Widget>/.test(w) && /use:tip/.test(w)),
+    `must name the action AND the tag it is on; got ${JSON.stringify(warnings)}`);
 });
 
 test('E1.15: a component or block placed after another one is adoptable; a `use:` at any position is not', () => {

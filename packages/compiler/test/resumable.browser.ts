@@ -348,18 +348,19 @@ test('E1.2c-2: an adoptable @if emits an adopt fn (adoptIsland + ifBlock); non-a
   assert.ok(adoptBody.includes('blockEndOf(') && adoptBody.includes('clearBlock('), 'the adopt render clears the server island in place');
   assert.ok(adoptBody.includes('ifBlock('), 'then re-runs the normal ifBlock against the cleared island');
 
-  // an element with a NESTED BLOCK after a block → its subtree isn't fixed-structure → no adopt fn (a
-  // BLOCK-FREE element after a block IS adoptable via the E1.2c-5 cursor; a nested-block one is not yet)
+  // An element with a NESTED BLOCK after a block adopts since E1.23: it is found via the E1.2c-5 cursor, and
+  // the block INSIDE it sits at a fixed index at its own level. (This asserted the opposite until then.)
   const afterEl = compileTemplate('<div>@if (show()) { <p>x</p> }<section>@if (more()) { <i>y</i> }</section></div>', {
     mode: 'module', scope: ['show', 'more'], resumable: true,
   });
-  assert.ok(!afterEl.code.includes('render.adopt'), 'an element with a nested block after a block still blocks adopt (E1.2c-5 is flat subtrees)');
+  assert.ok(afterEl.code.includes('render.adopt'), 'an element with a nested block after a block adopts (E1.23)');
 
-  // a use:-component is not adopt-staged yet → no adopt fn
+  // A `use:` whose action is a SETUP binding cannot be rebuilt on a resume (a function never crosses the
+  // snapshot) → still CSR fallback. An out-of-scope action is a module ref, which E1.21/E1.22 adopt.
   const useComp = compileTemplate('<div><Widget use:tip /></div>', {
     mode: 'module', scope: ['tip'], resumable: true,
   });
-  assert.ok(!useComp.code.includes('render.adopt'), 'a use:-component stays CSR fallback (its action wiring is later)');
+  assert.ok(!useComp.code.includes('render.adopt'), 'a ctx `use:` action stays CSR fallback — nothing rebuilds it');
 });
 
 test('E1.2c-2: adopt replays an @if island — statics adopt in place, the block re-renders REACTIVELY', () => {
@@ -640,6 +641,51 @@ test('E1.2c-6: adopt resumes a static CHILD component in place — child setup n
   assert.equal(div.querySelector('b')!.textContent, 'x', 'child <b> adopted with its server value');
   (app.states.c0 as { label: Signal<string> }).label.set('LBL');
   assert.equal(div.querySelector('b')!.textContent, 'LBL', 'the resumed CHILD component is reactive in place — nested resume works');
+  app.dispose();
+});
+
+/* ──────────── E1.23: an element with its own block, after a block ──────────── */
+
+test('E1.23: an element containing a block, placed AFTER a block, adopts — both blocks stay reactive', () => {
+  // The one post-block refusal E1.15 deliberately kept, and the biggest compile-side one left on the docs (30).
+  // Its subtree already rebases onto the post-block cursor (E1.2c-5), and inside the element the inner block's
+  // `[` marker sits at a fixed index — nothing variable precedes it at THAT level. So the refusal is the same
+  // kind of over-caution E1.15 turned out to be. Prove it with a round-trip, not by reading the code.
+  const render = compileResumable(
+    '<div>@if (a()) { <i>A{{ n() }}</i> }<p>tail@if (b()) { <b>B{{ n() }}</b> }</p></div>',
+    ['a', 'b', 'n'],
+  );
+  const adopt = (render as { adopt?: AdoptFn }).adopt;
+  assert.equal(typeof adopt, 'function', 'an element with a nested block, after a block, is adoptable');
+
+  // ── server ──
+  const a: Signal<boolean> = signal(true);
+  const b: Signal<boolean> = signal(true);
+  const n: Signal<number> = signal(1);
+  const serverNode = serverRender(() => render({ a, b, n })) as HTMLElement;
+  const wire = snapshot({ a, b, n });
+  assert.equal(serverNode.querySelector('i')!.textContent, 'A1', 'server rendered the first block');
+  assert.equal(serverNode.querySelector('p b')!.textContent, 'B1', 'and the one nested in the trailing <p>');
+
+  // ── client ──
+  const container: HTMLElement = host();
+  container.innerHTML = serverNode.outerHTML;
+  const div: HTMLElement = container.querySelector('div')!;
+  const p: HTMLElement = div.querySelector('p')!;
+  const app = resume(div, { snapshot: wire, adopt });
+
+  assert.is(div.querySelector('p'), p, 'the trailing <p> itself was ADOPTED, not re-created');
+  assert.ok(/tail/.test(p.textContent!), 'its static text is intact');
+  assert.equal(div.querySelectorAll('i').length, 1, 'the first block replayed once — no duplicate');
+  assert.equal(div.querySelectorAll('p b').length, 1, 'and so did the nested one');
+
+  // both blocks live, against the resumed signals
+  (app.ctx.n as Signal<number>).set(7);
+  assert.equal(div.querySelector('i')!.textContent, 'A7', 'the first block is reactive');
+  assert.equal(div.querySelector('p b')!.textContent, 'B7', 'the block nested after it is reactive too');
+  (app.ctx.b as Signal<boolean>).set(false);
+  assert.equal(div.querySelectorAll('p b').length, 0, 'the nested block still swaps out');
+  assert.ok(/tail/.test(p.textContent!), 'without disturbing the element around it');
   app.dispose();
 });
 
