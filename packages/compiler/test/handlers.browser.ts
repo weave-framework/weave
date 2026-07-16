@@ -366,3 +366,22 @@ test('E1.29: a binding annotated with a FUNCTION TYPE is still extracted — its
   assert.equal(f.computeds.get('narrow')?.source, 'breakpointSignal(bp)', 'the initializer, not the annotation');
   assert.equal(f.computeds.get('pick')?.source, 'fmt(bp)', 'and with parameters in the function type too');
 });
+
+test('E1.30: a reassigned VALUE is still extracted (a reassigned FUNCTION is not)', () => {
+  // `let dragging = false; … dragging = true` — a transient flag the real <Slider> keeps in setup's closure.
+  // The drop exists because inlining a FUNCTION whose definition was replaced would use a stale body; a value
+  // has no body, only an initial value, and it never crossed the wire anyway (it is a local), so rebuilding it
+  // from its initializer is exactly what derive does for every other local.
+  const f = extractSetupBindings(
+    setup(
+      '  let dragging = false;\n' +
+        '  let mut = () => 1;\n' +
+        '  mut = () => 2;\n' +
+        '  const start = () => { dragging = true; };\n' +
+        '  return { start };'
+    )
+  );
+  assert.equal(f.computeds.get('dragging')?.source, 'false', 'the reassigned VALUE keeps its initializer');
+  assert.ok(!f.handlers.has('mut'), 'a reassigned FUNCTION is still dropped — its body is not stable');
+  assert.ok(f.handlers.has('start'), 'and the handler that mutates the flag is untouched');
+});

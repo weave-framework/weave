@@ -644,6 +644,49 @@ test('E1.2c-6: adopt resumes a static CHILD component in place — child setup n
   app.dispose();
 });
 
+/* ──────────── E1.30: a reassigned setup local ──────────── */
+
+test('E1.30: a MUTABLE setup local survives resume — one handler writes it, another reads it', () => {
+  // `let dragging = false` is how <Slider> keeps a transient flag in setup's closure. It never crossed the wire
+  // (setup does not return it), so the extraction dropping it left `onPointerdown`/`onPointermove`/`onPointerup`
+  // all dead. Rebuilt onto ctx, the two handlers must share ONE cell, exactly as the closure gave them.
+  const { code } = compileTemplate('<b on:pointerdown={{ down }} on:pointermove={{ move }}>{{ n() }}</b>', {
+    mode: 'function',
+    scope: ['n', 'down', 'move'],
+    resumable: true,
+    resumableDerived: new Map([['dragging', 'false']]),
+    resumableHandlers: new Map([
+      ['down', '() => { ctx.dragging = true; }'],
+      ['move', '() => { if (ctx.dragging) ctx.n.set(ctx.n() + 1); }'],
+    ]),
+  });
+  const render = new Function('rt', '_c', code.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;'))(rt, {}) as
+    ((ctx: unknown, slots?: unknown) => Element) & {
+      adopt?: AdoptFn;
+      derive?: (c: Record<string, unknown>, p?: Record<string, unknown>) => unknown;
+      handlers?: (c: Record<string, unknown>, p?: Record<string, unknown>) => Record<string, ResumeHandler>;
+    };
+
+  const n: Signal<number> = signal(0);
+  const serverNode = serverRender(() => render({ n, down: () => {}, move: () => {} })) as HTMLElement;
+  const wire = snapshot({ n });
+
+  const container: HTMLElement = host();
+  container.innerHTML = serverNode.outerHTML;
+  const b: HTMLElement = container.querySelector('b')!;
+  const app = resume(b, { snapshot: wire, adopt: render.adopt, derive: render.derive, handlers: render.handlers });
+  assert.equal(app.ctx.dragging, false, 'the mutable local was rebuilt at its initial value');
+
+  b.dispatchEvent(new PointerEvent('pointermove', { bubbles: true }));
+  assert.equal(b.textContent, '0', 'moving without a press does nothing — the flag is honoured');
+
+  b.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+  b.dispatchEvent(new PointerEvent('pointermove', { bubbles: true }));
+  b.dispatchEvent(new PointerEvent('pointermove', { bubbles: true }));
+  assert.equal(b.textContent, '2', 'after the press, both moves land — the two handlers SHARE the one cell');
+  app.dispose();
+});
+
 /* ──────────── E1.25: derive sees props ──────────── */
 
 test('E1.25: a binding initialised FROM props is rebuilt on resume and is live', () => {

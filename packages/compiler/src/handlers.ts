@@ -378,12 +378,14 @@ export function extractSetupBindings(script: string): SetupBindings {
     i = skipWord(script, i);
   }
 
-  // A binding reassigned anywhere in the body is not a stable definition — drop it rather than inline a stale body.
+  // A FUNCTION reassigned anywhere in the body is not a stable definition — inlining it would use a stale body,
+  // so drop it. E1.30: a VALUE is different. It has no body, only an initial value, and it is a setup local that
+  // never crossed the wire — so rebuilding it from its initializer is exactly what derive does for every other
+  // local (`let dragging = false`, a transient flag <Slider> keeps in setup's closure; nobody is mid-drag at
+  // resume). A reassigned value that setup RETURNS is unaffected either way: it crosses the wire with its final
+  // value and derive's `undefined` guard leaves it alone.
   for (const name of [...out.keys()]) {
     if (isReassigned(script, open, close, name)) out.delete(name);
-  }
-  for (const name of [...computeds.keys()]) {
-    if (isReassigned(script, open, close, name)) computeds.delete(name);
   }
   return empty;
 }
