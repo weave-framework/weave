@@ -753,13 +753,27 @@ test('E1.14: a non-adoptable template REPORTS its cause (the whole subtree would
 });
 
 test('E1.14: the cause names the NODE as authored, not an AST type', () => {
-  // "an `element` node" is useless in a 200-line template; `<Link>` is actionable (this is exactly how the
-  // real docs blocker was finally located).
+  // "an `element` node" is useless in a 200-line template; `<aside>` is actionable — naming the tag is exactly
+  // how the real docs blocker was located. (This test originally used `<Foo /><Link>x</Link>`, which WAS the
+  // blocker; E1.15 made that shape adoptable, so the message quality is now pinned on a real refusal: an
+  // element whose subtree holds its own block cannot rebase onto the post-block cursor.)
   const { warnings } = compileComponent(
-    { script: 'export function setup(){ return {}; }', template: '<div><Foo /><Link>x</Link></div>' },
+    { script: 'export function setup(){ return {}; }', template: '<div>@if (x) { <i>a</i> }<aside>@if (y) { <b>c</b> }</aside></div>' },
     { filename: 'na2', resumable: true }
   );
-  assert.ok(warnings && warnings.some((w) => /`<Link>`/.test(w)), `must name <Link>; got ${JSON.stringify(warnings)}`);
+  assert.ok(warnings && warnings.some((w) => /`<aside>`/.test(w)), `must name <aside>; got ${JSON.stringify(warnings)}`);
+});
+
+test('E1.15: a component or block placed after another one is adoptable; a slot at any position is not', () => {
+  // The gate refused EVERY second block/component per level. Only the kind decides now — pinned cheaply here so
+  // the round-trip test in resumable.browser.ts is not the sole guard.
+  const adoptable = (template: string): boolean =>
+    /function adopt\(/.test(compileTemplate(template, { mode: 'module', resumable: true }).code);
+  assert.ok(adoptable('<div><Foo /><Bar /></div>'), 'two sibling components');
+  assert.ok(adoptable('<div><Foo />@if (x) { <b>a</b> }</div>'), 'a block after a component');
+  assert.ok(adoptable('<div>@if (x) { <b>a</b> }<Foo /></div>'), 'a component after a block');
+  assert.ok(adoptable('<div>@if (x) { <b>a</b> }@for (i of xs) { <i>{{ i }}</i> }</div>'), 'two sibling blocks');
+  assert.ok(!adoptable('<div><Foo /><slot /></div>'), 'a <slot> has no adopt path at all — still refused');
 });
 
 test('E1.14: an adoptable component reports nothing', () => {

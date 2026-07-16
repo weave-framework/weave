@@ -641,6 +641,60 @@ test('E1.2c-6: adopt resumes a static CHILD component in place — child setup n
   app.dispose();
 });
 
+/* ──────────── E1.15: sibling components after a block ──────────── */
+
+/** Compile `<el>{{ label() }}</el>` as a real resumable component, counting its setup runs. */
+function labelComponent(el: string, start: string, count: { n: number }): dom.Component & { adopt?: AdoptFn } {
+  const code: string = compileTemplate(`<${el}>{{ label() }}</${el}>`, { mode: 'function', scope: ['label'], resumable: true }).code;
+  const render = new Function('rt', '_c', code.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;'))(rt, {}) as ((ctx: unknown, slots?: unknown) => Node) & { adopt?: AdoptFn };
+  const C = dom.defineComponent(
+    render as never,
+    () => { count.n++; return { label: signal(start) }; }
+  ) as dom.Component & { adopt?: AdoptFn };
+  C.adopt = render.adopt; // component.ts attaches render.adopt in the resumable target
+  return C;
+}
+
+test('E1.15: two SIBLING components both adopt in place — neither setup re-runs, both stay reactive', () => {
+  // `<Foo /><Bar />` is the single most common template shape there is; every E1.2c-6/E1.8 test used exactly
+  // ONE component, so the post-block gate refused the second one (and thus every real app) unnoticed.
+  const a: { n: number } = { n: 0 };
+  const b: { n: number } = { n: 0 };
+  const Foo = labelComponent('b', 'A', a);
+  const Bar = labelComponent('i', 'B', b);
+
+  const parentCode: string = compileTemplate('<div><Foo /><Bar /></div>', { mode: 'function', scope: [], resumable: true }).code;
+  const parentRender = new Function('rt', '_c', parentCode.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;'))(rt, { Foo, Bar }) as ((ctx: unknown, slots?: unknown) => Element) & { adopt?: AdoptFn };
+  assert.equal(typeof parentRender.adopt, 'function', 'two sibling components are adoptable (the gate used to refuse the 2nd)');
+
+  // ── server ── both children self-register; snapshot { $root, c0, c1 }
+  const box: HTMLElement = host();
+  const states = collectStates(() => { box.appendChild(parentRender({}, {})); });
+  assert.ok(states.c0, 'the FIRST child self-registered its ctx (c0)');
+  assert.ok(states.c1, 'the SECOND child self-registered its ctx (c1)');
+  assert.equal(a.n, 1, 'first child setup ran once on the server');
+  assert.equal(b.n, 1, 'second child setup ran once on the server');
+  states[ROOT_ID] = {};
+  const wire = snapshot(states);
+  const serverHtml: string = (box.firstElementChild as HTMLElement).outerHTML;
+
+  // ── client ── fresh parse + resume
+  const client: HTMLElement = host();
+  client.innerHTML = serverHtml;
+  const div: HTMLElement = client.querySelector('div')!;
+  const app = resume(div, { snapshot: wire, adopt: parentRender.adopt });
+  assert.equal(a.n, 1, 'RESUME did not re-run the FIRST child setup');
+  assert.equal(b.n, 1, 'RESUME did not re-run the SECOND child setup — it adopted, it did not re-render');
+
+  assert.equal(div.querySelector('b')!.textContent, 'A', 'first child adopted with its server value');
+  assert.equal(div.querySelector('i')!.textContent, 'B', 'second child adopted with its server value');
+  (app.states.c0 as { label: Signal<string> }).label.set('A2');
+  (app.states.c1 as { label: Signal<string> }).label.set('B2');
+  assert.equal(div.querySelector('b')!.textContent, 'A2', 'first child reactive in place');
+  assert.equal(div.querySelector('i')!.textContent, 'B2', 'SECOND child reactive in place — the post-block cursor reached it');
+  app.dispose();
+});
+
 test('E1.2b-2: adopt re-binds the SERVER text node in place — signal update flows, node identity kept, no re-render', () => {
   const render = compileResumable('<button on:click={{() => count.set((c) => c + 1)}}>Count: {{ count() }}</button>', ['count']);
   const adopt = (render as { adopt?: AdoptFn }).adopt;

@@ -583,19 +583,19 @@ function compileFragment(
         continue;
       }
       if (!adopt) {
-        // Adoptability after a block (post-block cursor): a reactive interp, static text, or a BLOCK-FREE
-        // element adopts; a nested-block element, or anything else needing indexed access, does not yet.
-        if (sawBlock) {
-          if (node.type === 'element' && !isBlockNode(node)) {
-            if (hasBlockDeep(node)) gen.cannotAdopt(`\`${describe(node)}\` (it contains a control-flow block) placed after another block`);
-          } else if (node.type !== 'interp' && node.type !== 'text' && node.type !== 'comment') {
-            gen.cannotAdopt(`\`${describe(node)}\` placed after a control-flow block`);
-          }
+        // Adoptability after a block. A block's rendered node count is runtime-variable, so NOTHING after it is
+        // reachable by an absolute child index — only through the post-block cursor. What the cursor reaches: a
+        // reactive interp (E1.2c-4), a block-free element's subtree (E1.2c-5), and a block or component via its
+        // own `[` anchor (E1.15). A nested-block element, or anything else needing indexed access, does not.
+        // (`@let`/`@snippet` returned above; every other non-block type — text/comment/interp — the cursor reaches.)
+        if (sawBlock && node.type === 'element' && !isBlockNode(node) && hasBlockDeep(node)) {
+          gen.cannotAdopt(`\`${describe(node)}\` (it contains a control-flow block) placed after another block`);
         }
         if (isBlockNode(node)) {
-          // adoptable at a static position if it island-replays (@if/@switch/@for) OR is a resumable child
-          // component; a 2nd block/component per level, or a slot/w:element/@defer/@await/@key, opts out.
-          if (sawBlock || !(isAdoptableBlock(node) || isComponentNode(node))) gen.cannotAdopt(`a \`${node.type}\` node after a control-flow block`);
+          // Only the KIND decides: a block island-replays (@if/@switch/@for) and a component nested-resumes, and
+          // E1.15 gave both a cursor, so a 2nd one per level is fine. A slot/w:element/@defer/@await/@key/@render
+          // has no adopt path at all, at any position.
+          if (!(isAdoptableBlock(node) || isComponentNode(node))) gen.cannotAdopt(`\`${describe(node)}\` cannot be adopted in place`);
           sawBlock = true;
         }
       }
@@ -606,7 +606,14 @@ function compileFragment(
         if (node.type === 'interp') {
           curInterpBase = pbBase;
           curInterpOff = pbOff;
-        } else if (node.type === 'element' && !isBlockNode(node) && hasDynamicDeep(node)) {
+        } else if (
+          (node.type === 'element' && !isBlockNode(node) && hasDynamicDeep(node))
+          // E1.15 — a component or island block AFTER another one. Its `[` start marker sits at
+          // `after(prevEnd, off + 1)` exactly like a post-block element, so the same cursor var works: overriding
+          // its OWN path makes emitComponent/emitBlockReplay's `nodeExpr(path)` yield the cursor instead of an
+          // (unknowable) absolute child index. The decl runs before any stmt, i.e. on the intact server DOM.
+          || isComponentNode(node) || isAdoptableBlock(node)
+        ) {
           const pv: string = gen.fn('_p');
           nodeDecls.push(`const ${pv} = ${gen.Ha('after')}(${pbBase}, ${pbOff + 1});`);
           nodeOverride.set([...basePath, dom].join(','), { baseVar: pv, prefixLen: basePath.length + 1 });
