@@ -246,3 +246,41 @@ test('E1.18: a PARAMETER type annotation is not a ref, but a default value still
     'the param TYPES are gone; only `pick` — read by a default VALUE — is a genuine ref',
   );
 });
+
+test('E1.18: COMMENT prose and an `as` type assertion are not refs', () => {
+  // `freeIdentifiers` skips strings and template literals but NOT comments, so every word of a doc comment was
+  // read as a ctx reference: a real <Radio> handler blamed `Sync`, `the`, `navigates`, `already`… That is how a
+  // warning list reaches 30 names and becomes worthless.
+  const script: string = setup(
+    '  const step = signal(1);\n' +
+      '  const onKeydown = (e: KeyboardEvent): void => {\n' +
+      '    // Sync the current tab so it navigates from the already focused segment.\n' +
+      '    /* Arrow moves relative to the selected one. */\n' +
+      '    const el = e.target as HTMLInputElement;\n' +
+      '    step.set(el.value.length);\n' +
+      '  };\n' +
+      '  return { step, onKeydown };'
+  );
+  const h = extractSetupHandlers(script).get('onKeydown')!;
+  assert.deepEqual(
+    unresolvedRefs(h.source, new Set(['step']), h.params, 'onKeydown'),
+    [],
+    'comment words and the asserted type are gone — nothing here is a real ref',
+  );
+  assert.ok(isInlinable(h, new Set(['step']), 'onKeydown'), 'and the handler inlines');
+});
+
+test('E1.18: a ref mentioned ONLY in a comment is not resurrected, but real code after `as` still counts', () => {
+  const script: string = setup(
+    '  const step = signal(1);\n' +
+      '  const go = (): void => {\n' +
+      '    // mentions missingInComment which does not exist\n' +
+      '    const v = step() as number;\n' +
+      '    realMissing.set(v);\n' +
+      '  };\n' +
+      '  return { step, go };'
+  );
+  const h = extractSetupHandlers(script).get('go')!;
+  assert.deepEqual(unresolvedRefs(h.source, new Set(['step']), h.params, 'go'), ['realMissing'],
+    'only the genuine one, from real code');
+});

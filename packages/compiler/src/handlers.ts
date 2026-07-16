@@ -457,10 +457,20 @@ function stripDeclTypes(src: string): string {
   let i: number = 0;
   const n: number = src.length;
   while (i < n) {
-    const op: number = skipOpaque(src, i); // strings / template literals / comments — never annotations
+    const op: number = skipOpaque(src, i);
     if (op > i) {
-      out += src.slice(i, op);
+      // A COMMENT contributes no identifiers — `freeIdentifiers` skips strings and template literals but not
+      // comments, so every prose word was read as a ctx ref (a real <Radio> handler blamed `Sync`, `the`,
+      // `navigates`, …). Blank it; keep strings/template literals, whose `${…}` IS code.
+      out += /^\/[/*]/.test(src.slice(i, i + 2)) ? ' ' : src.slice(i, op);
       i = op;
+      continue;
+    }
+    // `x as T` — a type assertion. Only after a value (an identifier or a closing bracket), so a variable
+    // named `as` or an `import * as ns` is untouched.
+    if (startsWithWord(src, i, 'as') && isTokenStart(src, i) && /[\w$)\]]/.test(lastNonWs(out))) {
+      out += ' ';
+      i = skipTypeRef(src, skipWs(src, i + 2));
       continue;
     }
     // `const x: T = …` / `let x: T` — after a declared name, a `:` is always the annotation.
@@ -504,6 +514,37 @@ function stripDeclTypes(src: string): string {
     i++;
   }
   return out;
+}
+
+/** The last non-whitespace char of `s` ('' if none) — used to tell `x as T` from a bare `as`. */
+function lastNonWs(s: string): string {
+  for (let i = s.length - 1; i >= 0; i--) if (!/\s/.test(s[i])) return s[i];
+  return '';
+}
+
+/**
+ * Past a TYPE REFERENCE at `i` — `Foo`, `a.b.C`, `Foo<Bar>`, `Foo[]`, `A | B`. Stops at the first thing a type
+ * cannot contain, so real code after the assertion (`(x as T).y`, `x as T; f()`) is left for the scanner.
+ */
+function skipTypeRef(src: string, i: number): number {
+  const n: number = src.length;
+  for (;;) {
+    while (i < n && (ID_CHAR.test(src[i]) || src[i] === '.')) i++;
+    let k: number = i;
+    if (src[k] === '<') {
+      const close: number = skipTypeArgs(src, k);
+      if (close < 0) return i;
+      k = close;
+    }
+    while (src[k] === '[' && src[skipWs(src, k + 1)] === ']') k = skipWs(src, k + 1) + 1;
+    i = k;
+    const j: number = skipWs(src, i);
+    if ((src[j] === '|' || src[j] === '&') && src[j + 1] !== '|' && src[j + 1] !== '&') {
+      i = skipWs(src, j + 1); // a union / intersection continues the type
+      continue;
+    }
+    return i;
+  }
 }
 
 /** Is the `)` at `close` the end of an ARROW's parameter list (possibly through a `: ReturnType`)? */

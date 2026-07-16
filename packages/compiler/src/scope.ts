@@ -268,6 +268,8 @@ const NON_CTX: Set<string> = new Set([
   // Declaration keywords + loop/flow words: a block-bodied expression (`computed(() => { const x = …; })`)
   // contains them, and reading them as component data produced nonsense like "reads `const`" (dogfound).
   'const', 'let', 'var', 'for', 'while', 'do', 'break', 'continue', 'try', 'catch', 'finally', 'throw',
+  // `default` (a `switch` arm) is reserved, so it can never be a data name — it was reported as one.
+  'default', 'async', 'extends', 'static', 'debugger',
   // built-in objects / functions
   'Math', 'JSON', 'Object', 'Array', 'String', 'Number', 'Boolean', 'Date',
   'RegExp', 'Map', 'Set', 'WeakMap', 'WeakSet', 'Symbol', 'Promise', 'BigInt',
