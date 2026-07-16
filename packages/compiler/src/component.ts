@@ -105,7 +105,9 @@ function resumableSetup(script: string, scope: string[]): {
   const reasons: Map<string, string> = new Map();
   const warnings: string[] = [];
   const found: SetupBindings = extractSetupBindings(script);
-  if (found.handlers.size === 0 && found.computeds.size === 0) return { handlers, computeds, locals, reasons, warnings };
+  // NO early return on an empty `found`. A setup that only `return`s an object literal declares no `const` at
+  // all — the real `<Button>`'s shape — yet its returned MODULE names still need deriving (see below). Bailing
+  // here meant such a component got no `derive` whatsoever, so a `use:ripple` had no action on the client.
 
   // The ctx names available on the resumed client = the template scope PLUS any signal/data that setup RETURNS
   // but the template never references (mutated only by a handler, shown only via a computed) — it's serialized

@@ -126,6 +126,8 @@ class Gen {
    * variant is emitted alongside `render`; when false, a resumed page falls back to CSR (unchanged).
    */
   adoptable: boolean = true;
+  /** E1.21 — the names `derive(ctx)` rebuilds, so a `use:` action can tell whether it resolves on a resume. */
+  derived: ReadonlySet<string> = new Set<string>();
   private tplN: number = 0;
   private fnN: number = 0;
   private refN: number = 0;
@@ -203,6 +205,7 @@ export function compileTemplateAst(ast: TemplateNode[], options: CompileOptions 
   const mode: 'module' | 'function' = options.mode ?? 'module';
   const runtimeImport: string = options.runtimeImport ?? '@weave-framework/runtime/dom';
   const gen: Gen = new Gen(mode, options.scopeAttr, options.hostAttr, options.resumable ?? false);
+  gen.derived = new Set(options.resumableDerived?.keys() ?? []);
 
   // E1.2c-6: a resumable component's render self-registers its ctx for the snapshot when the parent tagged
   // this instance with a `$wid` prop (a static-position child) — so the client resumes it without re-running
@@ -873,7 +876,14 @@ function compileFragment(
         sink.push(`${gen.H('setRef')}(${rewrite(attr.expr, sc).code}, ${n});`);
         break;
       case 'use': {
+        // E1.21 — adoptable when the action will EXIST on a resumed client. `use:` never ran on the server at
+        // all (`onMount` is inert there), so re-running it against the adopted node is exactly what the create
+        // path does, with nothing to double-apply. But an action is a function: it cannot cross the snapshot, so
+        // a `ctx.<name>` action resolves only if `derive` rebuilds it (a module import, typically). A plain
+        // setup-local action would leave `applyAction` calling `undefined` — refuse the fragment instead.
+        if (/^ctx\./.test(rewrite(attr.name, sc).code) && !gen.derived.has(attr.name)) {
           gen.cannotAdopt(`a \`use:${attr.name}\` action`);
+        }
         // `use:action={arg}` → applyAction(el, action, () => (arg)). The action is the `name`
         // identifier (rewritten against ctx); the arg is passed as a getter, so a reactive
         // action's `update(arg)` re-runs when it changes (see applyAction / ActionResult).

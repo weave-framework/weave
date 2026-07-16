@@ -802,14 +802,16 @@ test('E1.14: the cause names the NODE as authored, not an AST type', () => {
 test('E1.15: a component or block placed after another one is adoptable; a `use:` at any position is not', () => {
   // The gate refused EVERY second block/component per level. Only the kind decides now — pinned cheaply here so
   // the round-trip test in resumable.browser.ts is not the sole guard.
-  const adoptable = (template: string): boolean =>
-    /function adopt\(/.test(compileTemplate(template, { mode: 'module', resumable: true }).code);
+  const adoptable = (template: string, scope: string[] = []): boolean =>
+    /function adopt\(/.test(compileTemplate(template, { mode: 'module', scope, resumable: true }).code);
   assert.ok(adoptable('<div><Foo /><Bar /></div>'), 'two sibling components');
   assert.ok(adoptable('<div><Foo />@if (x) { <b>a</b> }</div>'), 'a block after a component');
   assert.ok(adoptable('<div>@if (x) { <b>a</b> }<Foo /></div>'), 'a component after a block');
   assert.ok(adoptable('<div>@if (x) { <b>a</b> }@for (i of xs) { <i>{{ i }}</i> }</div>'), 'two sibling blocks');
   assert.ok(adoptable('<div><Foo /><slot /></div>'), 'a <slot> after a component (it island-replays since E1.17)');
-  assert.ok(!adoptable('<div><Foo /><b use:tip>x</b></div>'), 'a `use:` action has no adopt path at all — still refused');
+  // A `use:` whose action is a SETUP binding cannot be rebuilt on a resume (a function never crosses the
+  // snapshot), so it still refuses — at any position. Out of scope it is a module ref, which E1.21 adopts.
+  assert.ok(!adoptable('<div><Foo /><b use:tip>x</b></div>', ['tip']), 'a ctx `use:` action is still refused');
 });
 
 test('E1.14: an adoptable component reports nothing', () => {
@@ -858,4 +860,47 @@ test('E1.20: the child adopt emit hands the child its OWN props', () => {
   const adoptPart: string = code.split('function adopt(')[1] ?? '';
   assert.ok(/adoptComponent\([^;]*get tone\(\)/.test(adoptPart),
     `the props the parent passes must reach adoptComponent; got:\n${adoptPart.slice(0, 400)}`);
+});
+
+/* ──────────── E1.21 — `use:` actions adopt ──────────── */
+
+test('E1.21: a component with NO const declarations still derives its returned module-scope names', () => {
+  // The real `<Button>`: setup returns an object literal only, so `extractSetupBindings` finds nothing and
+  // resumableSetup early-returned — skipping the pass that derives a RETURNED module import as itself. So
+  // `ripple` never reached the resumed ctx, and nothing else in that component did either.
+  const { code } = compileComponent(
+    {
+      script: 'import { ripple } from "./ripple";\nexport function setup(props){ return { ripple, label: props.label }; }',
+      template: '<button use:ripple>x</button>',
+    },
+    { filename: 'u1', resumable: true }
+  );
+  assert.ok(/function derive\(ctx\)/.test(code), 'a derive is emitted');
+  assert.ok(/ctx\.ripple = ripple/.test(code), '`ripple` is derived as ITSELF — it is a module import, already on the client');
+});
+
+test('E1.21: a `use:` action adopts when it resolves; it still opts out when it cannot', () => {
+  // `use:` never ran on the server at all — `onMount` is inert there — so re-running it against the ADOPTED
+  // node is exactly what the create path does, with nothing to double-apply.
+  const ok = compileComponent(
+    {
+      script: 'import { ripple } from "./ripple";\nexport function setup(){ return { ripple }; }',
+      template: '<button use:ripple>x</button>',
+    },
+    { filename: 'u2', resumable: true }
+  );
+  assert.ok(/function adopt\(/.test(ok.code), 'a resolvable action no longer refuses adopt');
+  assert.ok(!ok.warnings?.some((w) => /use:/.test(w)), `and says nothing; got ${JSON.stringify(ok.warnings)}`);
+
+  // An action that is a plain setup local cannot be rebuilt (a function never crosses the snapshot), so
+  // `ctx.tip` would be undefined and `applyAction` would throw — refuse, as before.
+  const bad = compileComponent(
+    {
+      script: 'export function setup(){ const tip = () => {}; return { tip }; }',
+      template: '<button use:tip>x</button>',
+    },
+    { filename: 'u3', resumable: true }
+  );
+  assert.ok(!/function adopt\(/.test(bad.code), 'an unrebuildable action still opts the fragment out');
+  assert.ok(bad.warnings?.some((w) => /use:tip/.test(w)), `and names itself; got ${JSON.stringify(bad.warnings)}`);
 });
