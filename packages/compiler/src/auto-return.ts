@@ -78,7 +78,7 @@ export function injectAutoReturn(script: string, names: string[]): AutoReturnRes
  * (`setup = () => ({ … })`, an implicit return) and any return-type annotation
  * also yield null — both already return, so skipping them is correct.
  */
-export function locateSetupBodyOpen(src: string): number | null {
+function locateSetupBodyOpen(src: string): number | null {
   const fn: RegExpExecArray | null = SETUP_FN.exec(src);
   if (fn) {
     let i: number = skipWs(src, fn.index + fn[0].length);

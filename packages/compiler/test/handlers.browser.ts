@@ -98,3 +98,34 @@ test('a param shadowing a ctx name is a local, not ctx (the rewrite agrees)', ()
 test('self-reference (recursion) does not block inlining', () => {
   assert.ok(isInlinable(handler('function () { tick(); }', []), new Set(['count']), 'tick'), 'own name is not a ctx miss');
 });
+
+/* ──────────── setup-body location (the form real components actually use) ──────────── */
+
+test('finds handlers through a RETURN-TYPE ANNOTATION — the idiomatic TS setup (regression: live-verify caught this)', () => {
+  // `auto-return`'s locator bails on an annotation (it has no return to inject). Handler extraction must not:
+  // this is how nearly every real component is written, and bailing silently skipped ALL inlining.
+  const h = extractSetupHandlers(
+    'import { signal, type Signal } from "@weave-framework/runtime";\n' +
+      'export function setup(): { count: Signal<number>; inc: () => void; reset: () => void } {\n' +
+      '  const count = signal(3);\n' +
+      '  const inc = () => count.set((n) => n + 1);\n' +
+      '  const reset = () => count.set(0);\n' +
+      '  return { count, inc, reset };\n}\n'
+  );
+  assert.equal(h.get('inc')!.source, '() => count.set((n) => n + 1)', 'inc found past the object-type annotation');
+  assert.equal(h.get('reset')!.source, '() => count.set(0)', 'reset too');
+});
+
+test('finds handlers past a NAMED-type annotation and a generic one', () => {
+  const named = extractSetupHandlers('type C = { inc: () => void };\nexport function setup(): C {\n  const inc = () => count.set(1);\n  return { inc };\n}');
+  assert.ok(named.has('inc'), 'named return type');
+  const generic = extractSetupHandlers('export function setup(): Ctx<{ a: 1 }> {\n  const inc = () => count.set(1);\n  return { inc };\n}');
+  assert.ok(generic.has('inc'), 'generic return type containing braces');
+});
+
+test('finds handlers in an arrow setup, annotated or not', () => {
+  const plain = extractSetupHandlers('export const setup = () => {\n  const inc = () => count.set(1);\n  return { inc };\n};');
+  assert.ok(plain.has('inc'), 'arrow setup');
+  const annotated = extractSetupHandlers('export const setup = (props): { inc: () => void } => {\n  const inc = () => count.set(1);\n  return { inc };\n};');
+  assert.ok(annotated.has('inc'), 'annotated arrow setup');
+});

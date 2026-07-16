@@ -19,7 +19,118 @@
  */
 
 import { freeIdentifiers } from './scope.js';
-import { locateSetupBodyOpen, matchDelimited, skipOpaque, skipWs, startsWithWord } from './auto-return.js';
+import { matchDelimited, skipOpaque, skipWs, startsWithWord } from './auto-return.js';
+
+const SETUP_FN: RegExp = /export\s+(?:async\s+)?function\s+setup\b/;
+const SETUP_VAR: RegExp = /export\s+(?:const|let|var)\s+setup\s*=/;
+
+/**
+ * Offset of `setup`'s body-opening `{`, or null when it can't be located with confidence.
+ *
+ * Deliberately NOT `auto-return.ts`'s locator: that one bails on a return-TYPE annotation (correctly — an
+ * annotated setup already returns explicitly, so it has no `return` to inject). Handler extraction must see
+ * through the annotation, because `export function setup(): { count: Signal<number> } { … }` is the idiomatic
+ * TS form — bailing there would silently skip inlining for most real components.
+ *
+ * The annotation is walked type-aware: an object type's `{ … }` is matched whole (its `;`/`=>` are type
+ * syntax, not code), `<>`/`()`/`[]` nest, and a `{ … }` followed by another `{` means the first was the type
+ * and the second is the body. Anything ambiguous returns null → no inlining (fail-safe), never a guess.
+ */
+function locateSetupBody(src: string): number | null {
+  const fn: RegExpExecArray | null = SETUP_FN.exec(src);
+  const v: RegExpExecArray | null = fn ? null : SETUP_VAR.exec(src);
+  if (!fn && !v) return null;
+
+  let i: number;
+  if (fn) {
+    i = skipWs(src, fn.index + fn[0].length);
+  } else {
+    i = skipWs(src, v!.index + v![0].length);
+    if (startsWithWord(src, i, 'async')) i = skipWs(src, i + 5);
+    if (startsWithWord(src, i, 'function')) i = skipWs(src, i + 8);
+    else {
+      // An arrow: `setup = (props): T => { … }` / `setup = () => { … }`. A concise body (`=> ({ … })`)
+      // has no statements to scan, so it yields null.
+      if (src[i] !== '(') return null;
+      const rp: number = matchDelimited(src, i, '(', ')');
+      if (rp < 0) return null;
+      const arrow: number = findArrowAfterType(src, rp + 1);
+      if (arrow < 0) return null;
+      const b: number = skipWs(src, arrow + 2);
+      return src[b] === '{' ? b : null;
+    }
+  }
+  if (src[i] !== '(') return null;
+  const rp: number = matchDelimited(src, i, '(', ')');
+  if (rp < 0) return null;
+  return bodyAfterReturnType(src, rp + 1);
+}
+
+/** From just past `)`, find the body `{` — skipping an optional `: Type` return annotation. */
+function bodyAfterReturnType(src: string, from: number): number | null {
+  let i: number = skipWs(src, from);
+  if (src[i] === '{') return i; // no annotation
+  if (src[i] !== ':') return null;
+  i++;
+  let depth: number = 0;
+  const n: number = src.length;
+  while (i < n) {
+    const op: number = skipOpaque(src, i);
+    if (op > i) {
+      i = op;
+      continue;
+    }
+    const c: string = src[i];
+    // `=>` is one token — its `>` is not a closing angle bracket (a fn-type annotation contains arrows).
+    if (c === '=' && src[i + 1] === '>') {
+      i += 2;
+      continue;
+    }
+    if (c === '<' || c === '(' || c === '[') depth++;
+    else if (c === '>' || c === ')' || c === ']') depth--;
+    else if (depth === 0 && c === '{') {
+      const close: number = matchDelimited(src, i, '{', '}');
+      if (close < 0) return null;
+      const next: number = skipWs(src, close + 1);
+      const nc: string = src[next] ?? '';
+      if (nc === '|' || nc === '&') {
+        i = next + 1; // a union/intersection of object types — that `{ … }` was still the type
+        continue;
+      }
+      if (nc === '{') return next; // `{type} {body}`
+      return i; // this brace IS the body (the annotation was a named type)
+    } else if (depth === 0 && (c === ';' || c === '=')) return null; // ran past the signature — bail
+    i++;
+  }
+  return null;
+}
+
+/** From just past an arrow's `)`, skip an optional `: Type` and return the `=>` offset (-1 if none). */
+function findArrowAfterType(src: string, from: number): number {
+  let i: number = skipWs(src, from);
+  let depth: number = 0;
+  const n: number = src.length;
+  while (i < n) {
+    const op: number = skipOpaque(src, i);
+    if (op > i) {
+      i = op;
+      continue;
+    }
+    const c: string = src[i];
+    // An `=>` must be consumed as ONE token: its `>` is not a closing angle bracket. A type-level arrow
+    // (`{ inc: () => void }`) sits at depth > 0; the arrow we want is the one at depth 0.
+    if (c === '=' && src[i + 1] === '>') {
+      if (depth === 0) return i;
+      i += 2;
+      continue;
+    }
+    if (c === '<' || c === '(' || c === '[' || c === '{') depth++;
+    else if (c === '>' || c === ')' || c === ']' || c === '}') depth--;
+    else if (depth === 0 && c === ';') return -1;
+    i++;
+  }
+  return -1;
+}
 
 const ID_START: RegExp = /[A-Za-z_$]/;
 const ID_CHAR: RegExp = /[A-Za-z0-9_$]/;
@@ -43,7 +154,7 @@ export interface SetupHandler {
  */
 export function extractSetupHandlers(script: string): Map<string, SetupHandler> {
   const out: Map<string, SetupHandler> = new Map();
-  const open: number | null = locateSetupBodyOpen(script);
+  const open: number | null = locateSetupBody(script);
   if (open === null) return out;
   const close: number = matchDelimited(script, open, '{', '}');
   if (close < 0) return out;
