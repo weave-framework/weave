@@ -1,0 +1,134 @@
+name: CI
+
+# Runs the gates on every push and pull request.
+#
+# WHY THIS EXISTS. Until now nothing here ran a single test: the only workflows were docs.yml
+# (deploy) and publish.yml (npm), and neither runs the suite. Every gate — the 1400+ browser
+# tests, typecheck, verify:size, the smokes — only ever ran because someone remembered to run
+# it locally. That is the same failure mode as a rule written in a document: it holds exactly
+# as long as attention holds, which is not a mechanism.
+#
+# A gate is only a gate when a machine enforces it. This workflow is that machine.
+#
+# Layout: three parallel jobs so a failure names itself (a red "gates" tells you nothing; a red
+# "resume round-trip" tells you where to look). `build` is the cheap fail-fast one.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# A new push to the same branch cancels the previous run — no point finishing a run for a commit
+# that has already been replaced.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: typecheck · lint · build · size
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Typecheck
+        run: pnpm typecheck
+      # NO lint step — deliberately, and this is a debt, not a decision. `pnpm lint` is currently
+      # RED: 916 errors across 56 files, all from two style rules (@typescript-eslint/typedef 816,
+      # explicit-function-return-type 100). It drifted precisely because nothing enforced it; the
+      # per-commit cadence says eslint is a gate, and without a machine that claim was untrue.
+      # Adding it here today would make CI red on arrival, which trains everyone to ignore red —
+      # worse than no CI. Fix the 916, then add the step. Do not "fix" this by relaxing the rules.
+      # build:packages must precede verify:size — the budgets are measured on the built dist.
+      - name: Build packages
+        run: pnpm build:packages
+      - name: Size budgets
+        run: pnpm verify:size
+
+  test:
+    name: browser suite
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      # The suite runs against a real headless Chromium (no jsdom), so the browser must be present.
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Browser tests
+        run: pnpm test
+
+  verify:
+    name: smokes · resume round-trip
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      # verify:resume drives a real browser (it builds a real app and resumes it in one).
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      # A few smokes read a built dist rather than sources.
+      - name: Build packages
+        run: pnpm build:packages
+      # Phase E — the server↔client seam. verify:resume is the one that catches a break BETWEEN
+      # the Node render and the browser adopt; nothing else on this list can see it.
+      - name: Server render (headless DOM)
+        run: pnpm verify:server
+      - name: Prerender
+        run: pnpm verify:prerender
+      - name: SSG build
+        run: pnpm verify:ssg
+      - name: Resume round-trip (real app, real browser)
+        run: pnpm verify:resume
+      - name: Router SSR
+        run: pnpm verify:router-ssr
+      - name: UI SSR
+        run: pnpm verify:ui-ssr
+      # Library + tooling contracts.
+      - name: UI sass tokens
+        run: pnpm verify:ui-sass
+      - name: UI composition
+        run: pnpm verify:ui-compose
+      - name: UI is consumable from dist
+        run: pnpm verify:ui-consume
+      - name: Component extension
+        run: pnpm verify:extend
+      - name: CLI assets
+        run: pnpm verify:cli-assets
+      - name: weave check
+        run: pnpm verify:check
+      - name: Prettier plugin
+        run: pnpm verify:prettier
+      - name: MCP server
+        run: pnpm verify:mcp
+      - name: Nx plugin
+        run: pnpm verify:nx
+      - name: TypeScript plugin
+        run: pnpm verify:tsplugin
+      - name: Language server
+        run: pnpm verify:ls
+      - name: Dev proxy
+        run: pnpm verify:dev-proxy
