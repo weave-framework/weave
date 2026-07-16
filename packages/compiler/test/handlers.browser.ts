@@ -455,3 +455,77 @@ test('E1.34: an inline return handler is inlinable when its body resolves', () =
   const f = extractSetupBindings(setup('  const count = signal(0);\n  return { count, inc: () => count.set(1) };'));
   assert.ok(isInlinable(f.handlers.get('inc')!, new Set(['count']), 'inc'), 'resolves against the resumed ctx');
 });
+
+test('E1.35: a function DECLARATION with a return type is read — the annotation is not a wall', () => {
+  // `function openPanel(): void { … }` — <Autocomplete>, <DateRangePicker>, <Menu>. readFunctionDecl required
+  // the body brace RIGHT after `)` and bailed on the annotation ("fail-safe skip"), so the helper vanished and
+  // every handler calling it was refused. Skipping a return type is the same thing E1.5-3 already had to do for
+  // `setup` itself.
+  const f = extractSetupBindings(
+    setup(
+      '  const open = signal(false);\n' +
+        '  function openPanel(): void { open.set(true); }\n' +
+        '  function label(n: number): string { return `#${n}`; }\n' +
+        '  function plain() { open.set(false); }\n' +
+        '  const onClick = () => openPanel();\n' +
+        '  return { open, onClick };'
+    )
+  );
+  assert.equal(f.handlers.get('openPanel')?.source, 'function () { open.set(true); }', 'a bare `(): void` body');
+  assert.deepEqual(f.handlers.get('label')?.params, ['n'], 'params + a named return type');
+  assert.ok(f.handlers.has('plain'), 'an unannotated declaration still works');
+  // (whether `openPanel` then RESOLVES for a caller is resumableSetup's settled set, not the extractor's — the
+  //  component-level test in component.browser.ts covers that end of it)
+  assert.ok(f.handlers.has('onClick'), 'and the handler that calls it is extracted alongside');
+});
+
+test('E1.36: a GENERIC setup is located — a default type param may contain braces', () => {
+  // `export function setup<T = { value: string; label: string }>(props: P<T>): C {` — the real <Autocomplete>,
+  // <Select>, <Menu>. The locator did not expect type PARAMETERS, and the braces inside the default swallowed
+  // the body, so NOTHING was extracted from those components at all: every handler in them was dead.
+  const h = extractSetupHandlers(
+    'import { signal } from "@weave-framework/runtime";\n' +
+      'export function setup<T = { value: string; label: string }>(props: Props<T>): Ctx {\n' +
+      '  const open = signal(false);\n' +
+      '  function openPanel(): void { open.set(true); }\n' +
+      '  const onClick = () => openPanel();\n' +
+      '  return { open, onClick };\n}\n'
+  );
+  assert.ok(h.has('openPanel'), 'the helper is found past the type parameters');
+  assert.ok(h.has('onClick'), 'and the handler');
+
+  // a simple generic, and a constrained one
+  const simple = extractSetupHandlers('export function setup<T>(props: P<T>) {\n  const a = () => 1;\n  return { a };\n}');
+  assert.ok(simple.has('a'), 'a bare type parameter');
+  const bound = extractSetupHandlers('export function setup<T extends { id: string }>(props: P<T>) {\n  const a = () => 1;\n  return { a };\n}');
+  assert.ok(bound.has('a'), 'a constrained one whose bound has braces');
+});
+
+test('E1.37: a wrapped TERNARY (and other leading operators) continue the initializer', () => {
+  // The real <Table>: `const rows = isDataSource(p) \n ? p.connect() \n : signal(p ?? [])`. E1.19 taught declEnd
+  // that a TRAILING operator continues a line; a LEADING one does too, and `:` was not in the list — so the
+  // initializer was cut after the `?` branch and emitted `? props.dataSource.connect();`, failing the BUILD.
+  const f = extractSetupBindings(
+    setup(
+      '  const rows = isDataSource(props.src)\n' +
+        '    ? props.src.connect()\n' +
+        '    : signal(props.src ?? []);\n' +
+        '  const sum = base\n' +
+        '    + extra;\n' +
+        '  const name = first\n' +
+        '    || fallback;\n' +
+        '  return { rows };'
+    )
+  );
+  assert.ok(/: signal\(props\.src \?\? \[\]\)$/.test(f.computeds.get('rows')!.source),
+    `the whole ternary; got: ${JSON.stringify(f.computeds.get('rows')?.source)}`);
+  assert.ok(/\+ extra$/.test(f.computeds.get('sum')!.source), `a wrapped +; got: ${JSON.stringify(f.computeds.get('sum')?.source)}`);
+  assert.ok(/\|\| fallback$/.test(f.computeds.get('name')!.source), `a wrapped ||; got: ${JSON.stringify(f.computeds.get('name')?.source)}`);
+});
+
+test('E1.37: a genuinely finished statement still ends at the newline', () => {
+  const f = extractSetupBindings(setup('  const a = 1;\n  const b = 2\n  const c = 3\n  return { a, b, c };'));
+  assert.equal(f.computeds.get('a')?.source, '1', 'a semicolon ends it');
+  assert.equal(f.computeds.get('b')?.source, '2', 'and so does a newline after a complete expression');
+  assert.equal(f.computeds.get('c')?.source, '3', 'even the last one before a return');
+});

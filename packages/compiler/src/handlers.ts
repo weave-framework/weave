@@ -51,6 +51,7 @@ function locateSetupBody(src: string): number | null {
     else {
       // An arrow: `setup = (props): T => { … }` / `setup = () => { … }`. A concise body (`=> ({ … })`)
       // has no statements to scan, so it yields null.
+      i = skipTypeParams(src, i);
       if (src[i] !== '(') return null;
       const rp: number = matchDelimited(src, i, '(', ')');
       if (rp < 0) return null;
@@ -60,10 +61,23 @@ function locateSetupBody(src: string): number | null {
       return src[b] === '{' ? b : null;
     }
   }
+  i = skipTypeParams(src, i);
   if (src[i] !== '(') return null;
   const rp: number = matchDelimited(src, i, '(', ')');
   if (rp < 0) return null;
   return bodyAfterReturnType(src, rp + 1);
+}
+
+/**
+ * Past a generic's TYPE PARAMETERS — `setup<T = { value: string; label: string }>(props)`, the real
+ * <Autocomplete> / <Select> / <Menu>. The locator expected `(` right after the name, so the braces inside a
+ * default swallowed the body and NOTHING was extracted from those components: every handler in them was dead.
+ * Unchanged when there are none, so a plain `setup(` costs nothing.
+ */
+function skipTypeParams(src: string, i: number): number {
+  if (src[i] !== '<') return i;
+  const gt: number = skipTypeArgs(src, i);
+  return gt < 0 ? i : skipWs(src, gt);
 }
 
 /** From just past `)`, find the body `{` — skipping an optional `: Type` return annotation. */
@@ -906,8 +920,12 @@ function readFunctionDecl(src: string, i: number): { name: string; handler: Setu
   const rp: number = matchDelimited(src, k, '(', ')');
   if (rp < 0) return null;
   const params: string[] = paramNames(src.slice(k + 1, rp));
-  const bodyOpen: number = skipWs(src, rp + 1);
-  if (src[bodyOpen] !== '{') return null; // a return-type annotation → fail-safe skip
+  // E1.35 — skip a RETURN TYPE. `function openPanel(): void { … }` (<Autocomplete>, <DateRangePicker>, <Menu>)
+  // used to bail here, so the helper vanished and every handler calling it was refused. Skipping an annotation
+  // is the same thing E1.5-3 already had to do for `setup` itself.
+  let bodyOpen: number = skipWs(src, rp + 1);
+  if (src[bodyOpen] === ':') bodyOpen = skipWs(src, endOfAnnotation(src, bodyOpen + 1, ['{', ';']));
+  if (src[bodyOpen] !== '{') return null; // still not a body → fail-safe skip
   const bodyClose: number = matchDelimited(src, bodyOpen, '{', '}');
   if (bodyClose < 0) return null;
   // Emit WITHOUT the name: the factory needs a value expression, and dropping the name also keeps the
@@ -1018,9 +1036,13 @@ function declEnd(src: string, i: number): number {
         i++;
         continue;
       }
+      // E1.37 — a LEADING operator continues the line too, exactly as a trailing one does. `:` was missing, so
+      // the real <Table>'s wrapped ternary (`isDataSource(p)\n ? p.connect()\n : signal(…)`) was cut after the
+      // `?` branch and emitted `? props.dataSource.connect();` — a BUILD failure. This matches real ASI: none of
+      // these can begin a statement.
       const next: number = skipWs(src, i);
       const nc: string = src[next] ?? '';
-      if (nc !== '.' && nc !== '?' && nc !== ')' && nc !== ']') return i;
+      if (!/[.?):\],&|+\-*/%^<>=]/.test(nc)) return i;
     }
     i++;
   }

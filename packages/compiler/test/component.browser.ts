@@ -1050,3 +1050,23 @@ test('E1.33: a bare CALL ARGUMENT is not an object shorthand', () => {
   const obj = compileComponent({ template: '<b on:click={{ () => send({ listener, extra: 1 }) }}>x</b>' });
   assert.ok(/\{ listener: ctx\.listener, extra: 1 \}/.test(obj.code), `the shorthand still expands; got:\n${obj.code}`);
 });
+
+test('E1.35: a handler calling a `function` declaration with a return type inlines', () => {
+  // The extractor end is pinned in handlers.browser.ts; this is the whole chain, as <Autocomplete> writes it.
+  const { code } = compileComponent(
+    {
+      script:
+        'import { signal } from "@weave-framework/runtime";\n' +
+        'export function setup(){\n  const open = signal(false);\n' +
+        '  function openPanel(): void { open.set(true); }\n' +
+        '  const onFieldClick = (): void => openPanel();\n' +
+        '  return { open, onFieldClick }; }',
+      template: '<button on:click={{ onFieldClick }}>{{ open() }}</button>',
+    },
+    { filename: 'fd1', resumable: true }
+  );
+  const factory: string = code.match(/function handlers\(ctx, props\)[\s\S]*?\n\}/)?.[0] ?? '';
+  assert.ok(/const openPanel = function \(\) \{ ctx\.open\.set\(true\); \}/.test(factory),
+    `the declaration is rebuilt as a factory local; got:\n${factory}`);
+  assert.ok(/"w0":\s*\(\): void => openPanel\(\)/.test(factory), 'and the site calls it');
+});
