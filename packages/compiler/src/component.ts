@@ -19,6 +19,8 @@ import type { TemplateNode } from './ast.js';
 import { applyPatches, type PatchOp } from './patch.js';
 import { inferCtxNames } from './infer.js';
 import { injectAutoReturn } from './auto-return.js';
+import { extractSetupHandlers, isInlinable, type SetupHandler } from './handlers.js';
+import { rewrite, ctxScope } from './scope.js';
 import { scopeCss, scopeAttr, hostAttr, hashCss } from './css.js';
 
 export interface ComponentSource {
@@ -71,6 +73,30 @@ const HAS_EXTEND_PROPS: RegExp = /export\s+(?:async\s+)?function\s+extendProps\b
 /** Optional `export const propDefaults = { … }` — static prop defaults layered under props. */
 const HAS_PROP_DEFAULTS: RegExp = /export\s+(?:const|let|var)\s+propDefaults\b/;
 
+/**
+ * E1.5 — named-handler resume. Build the `name → inlined body` map the codegen substitutes into the
+ * `handlers(ctx)` factory, so `on:click={{ inc }}` resumes exactly like an inline handler.
+ *
+ * A handler is inlined ONLY when every free identifier in its body still exists on the resumed client. That
+ * set is the template's ctx names MINUS every function-valued binding: `registerState` drops functions from
+ * the snapshot (they can't serialize), so a body that calls another handler or reads a computed would throw a
+ * ReferenceError on the first click. Refusing leaves the site as `ctx.<name>` — today's inert-but-safe
+ * behaviour — rather than trading a dead button for a crash. Recursion is fine (the factory binds the name).
+ */
+function inlineSetupHandlers(script: string, scope: string[]): ReadonlyMap<string, string> {
+  const out: Map<string, string> = new Map();
+  const found: Map<string, SetupHandler> = extractSetupHandlers(script);
+  if (found.size === 0) return out;
+  const resolvable: Set<string> = new Set(scope.filter((name) => !found.has(name)));
+  const sc = ctxScope(scope);
+  for (const [name, handler] of found) {
+    if (!resolvable.has(name) && !scope.includes(name)) continue; // the template never references it
+    if (!isInlinable(handler, resolvable, name)) continue;
+    out.set(name, rewrite(handler.source, sc).code);
+  }
+  return out;
+}
+
 /** Compile a `{ script, template, styles }` triple into a component module + scoped CSS. */
 export function compileComponent(src: ComponentSource, opts: ComponentOptions = {}): CompiledComponent {
   const hash: string = opts.hash ?? hashCss(opts.filename ?? src.template);
@@ -82,7 +108,10 @@ export function compileComponent(src: ComponentSource, opts: ComponentOptions = 
   const scope: string[] = inferCtxNames(ast);
   // Stamp the `:host` root marker only when the styles actually use `:host` (else zero cost).
   const host: string | undefined = src.styles && /:host\b/.test(src.styles) ? hostAttr(hash) : undefined;
-  const compiled: CompileResult = compileTemplateAst(ast, { mode: 'module', scope, scopeAttr: attr, hostAttr: host, resumable: opts.resumable });
+  // E1.5 — resumable only: inline each named handler's `setup` body so `on:click={{ inc }}` resumes.
+  const resumableHandlers: ReadonlyMap<string, string> | undefined =
+    opts.resumable && src.script ? inlineSetupHandlers(src.script, scope) : undefined;
+  const compiled: CompileResult = compileTemplateAst(ast, { mode: 'module', scope, scopeAttr: attr, hostAttr: host, resumable: opts.resumable, resumableHandlers });
   // Demote the template module's default export to a local `render` we can wire up:
   //  - eager:     `export default function render …`  → `function render …`
   //  - resumable: `render` is already a `function render` declaration; a trailing `export default render;`

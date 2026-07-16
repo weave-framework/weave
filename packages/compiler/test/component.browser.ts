@@ -348,6 +348,45 @@ test('compileComponent resumable: attaches render.adopt to the component (nested
   assert.ok(code.includes('from "@weave-framework/runtime/adopt"') && code.includes('from "@weave-framework/runtime/graph"'), 'imports the resumable entries');
 });
 
+/* ──────────── E1.5 — named-handler resume (compile-time inlining) ──────────── */
+
+const counter = (body: string): string =>
+  'import { signal } from "@weave-framework/runtime";\nexport function setup(){ const count = signal(0);\n' + body + '\nreturn { count, inc }; }';
+
+test('E1.5: a NAMED handler is inlined into the factory — `{{ inc }}` resumes like an inline handler', () => {
+  const { code } = compileComponent(
+    { script: counter('const inc = () => count.set((n) => n + 1);'), template: '<button on:click={{ inc }}>{{ count() }}</button>' },
+    { filename: 'ctr', resumable: true }
+  );
+  // The factory must carry inc's BODY (closing over the resumed ctx.count), not a ref to the dropped function.
+  assert.ok(/"w0":\s*\(\)\s*=>\s*ctx\.count\.set\(\(n\)\s*=>\s*n \+ 1\)/.test(code), `factory inlines inc's body; got:\n${code}`);
+  assert.ok(!/"w0":\s*ctx\.inc\b/.test(code), 'no bare ctx.inc — it is undefined on the client (a function cannot serialize)');
+});
+
+test('E1.5 fail-safe: a handler touching a non-ctx setup local is NOT inlined (falls back, never a ReferenceError)', () => {
+  const { code } = compileComponent(
+    { script: counter('const step = 2;\nconst inc = () => count.set((n) => n + step);'), template: '<button on:click={{ inc }}>{{ count() }}</button>' },
+    { filename: 'ctr2', resumable: true }
+  );
+  assert.ok(/"w0":\s*ctx\.inc\b/.test(code), '`step` never reaches the client → keep ctx.inc rather than inline a broken body');
+  assert.ok(!/n \+ step/.test(code.split('function handlers')[1] ?? ''), 'the unsafe body is not inlined');
+});
+
+test('E1.5: an INLINE handler is untouched (already resumable) and eager never inlines', () => {
+  const inline = compileComponent(
+    { script: counter('const inc = () => count.set((n) => n + 1);'), template: '<button on:click={{ () => count.set((n) => n + 2) }}>{{ count() }}</button>' },
+    { filename: 'ctr3', resumable: true }
+  );
+  assert.ok(/"w0":\s*\(\)\s*=>\s*ctx\.count\.set\(\(n\)\s*=>\s*n \+ 2\)/.test(inline.code), 'the inline body is emitted as written');
+  // Eager: no factory at all, and the listener still references the named binding directly.
+  const eager = compileComponent(
+    { script: counter('const inc = () => count.set((n) => n + 1);'), template: '<button on:click={{ inc }}>{{ count() }}</button>' },
+    { filename: 'ctr4' }
+  );
+  assert.ok(!eager.code.includes('function handlers'), 'eager emits no handlers factory');
+  assert.ok(/listen\([^,]+,\s*"click",\s*ctx\.inc\)/.test(eager.code), 'eager still wires ctx.inc directly (byte-for-byte)');
+});
+
 test('compileComponent resumable: an eager build is unchanged (no adopt, direct default export)', () => {
   const { code } = compileComponent({ template: '<b>{{ label() }}</b>', script: 'export function setup(){ return {}; }' });
   assert.ok(code.includes('export default defineComponent('), 'eager keeps the direct default export');

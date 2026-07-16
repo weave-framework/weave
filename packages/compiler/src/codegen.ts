@@ -34,6 +34,14 @@ export interface CompileOptions {
    * unchanged, and the resume entry is never imported (0 bytes for a plain SPA).
    */
   resumable?: boolean;
+  /**
+   * Phase E (E1.5) — named-handler resume. `name → inlined body`: for a handler site written as a bare
+   * binding (`on:click={{ inc }}`), the emitted `handlers(ctx)` factory uses this body in place of
+   * `ctx.inc`, which would be undefined on the client (a function can't cross the snapshot). The caller
+   * ({@link compileComponent}) extracts each body from `setup` and rewrites it against ctx, so the result
+   * is identical to writing the handler inline. Only entries proven safe are present.
+   */
+  resumableHandlers?: ReadonlyMap<string, string>;
 }
 
 export interface CompileResult {
@@ -166,8 +174,18 @@ export function compileTemplateAst(ast: TemplateNode[], options: CompileOptions 
   // E1.1 — the resumable target also emits a `handlers(ctx)` factory (root-fragment event sites → handler
   // over the resumed ctx), so `resume()` wires real handlers with no hand-authoring. It rides on `render`
   // as `render.handlers` (function mode) and is a named export (module mode). Empty unless sites exist.
+  //
+  // E1.5 — a site written as a bare binding (`on:click={{ inc }}`) compiles to `ctx.inc`, which is undefined
+  // on the client: a function can't cross the snapshot (registerState drops it). When the caller supplied the
+  // handler's inlined body, substitute it — the factory then closes over the resumed signals exactly as an
+  // inline handler does. Any site whose code isn't a bare `ctx.<name>` (already inline) is untouched.
+  const inlined: ReadonlyMap<string, string> | undefined = options.resumableHandlers;
+  const siteCode = (code: string): string => {
+    const bare: RegExpExecArray | null = inlined ? /^ctx\.([A-Za-z_$][\w$]*)$/.exec(code) : null;
+    return (bare && inlined!.get(bare[1])) ?? code;
+  };
   const handlersFn: string = gen.resumableSites.length
-    ? `function handlers(ctx) {\n  return { ${gen.resumableSites.map((s) => `${q(s.ref)}: ${s.code}`).join(', ')} };\n}`
+    ? `function handlers(ctx) {\n  return { ${gen.resumableSites.map((s) => `${q(s.ref)}: ${siteCode(s.code)}`).join(', ')} };\n}`
     : '';
 
   // E1.2b-2 — the resumable target ALSO emits an `adopt(_r, ctx, slots)` variant of the render for the

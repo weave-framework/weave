@@ -683,3 +683,66 @@ test('resumableHandler returns instance-unique ids and registers into the active
   handlers.get(el2.getAttribute('data-won-click')!)!(new Event('click'), el2);
   assert.deepEqual(seen, ['b'], 'the second element’s id resolves to the second handler');
 });
+
+/* ──────────── E1.5 — named-handler resume (compile-time inlining) ──────────── */
+
+/**
+ * The payoff test. `on:click={{ inc }}` compiles its site to `ctx.inc`, but `inc` is a FUNCTION — `registerState`
+ * drops it from the snapshot (it cannot serialize), so on the client `ctx.inc` is undefined and the button is
+ * dead. E1.5 has `compileComponent` extract inc's body from `setup` and rewrite it against ctx; the factory then
+ * closes over the resumed `ctx.count` exactly like an inline handler. Here we drive the emitted code with the
+ * body compileComponent produces, and snapshot WITHOUT `inc` — precisely what the SSG pipeline does.
+ */
+function compileNamed(handlers?: Map<string, string>): ((ctx: unknown, slots?: unknown) => Element) & {
+  adopt?: AdoptFn;
+  handlers?: (c: Record<string, unknown>) => Record<string, ResumeHandler>;
+} {
+  const { code } = compileTemplate('<button on:click={{ inc }}>{{ count() }}</button>', {
+    mode: 'function',
+    scope: ['count', 'inc'],
+    resumable: true,
+    resumableHandlers: handlers,
+  });
+  const body: string = code.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;');
+  return new Function('rt', '_c', body)(rt, {});
+}
+
+test('E1.5: a NAMED handler RESUMES — its inlined body clicks against the resumed ctx, with `inc` absent from the snapshot', () => {
+  // exactly what compileComponent emits for `const inc = () => count.set((n) => n + 1)`
+  const render = compileNamed(new Map([['inc', '() => ctx.count.set((n) => n + 1)']]));
+
+  // ── server ── render with the real setup ctx (count + inc), then snapshot ONLY what serializes (no `inc`)
+  const serverCount: Signal<number> = signal(3);
+  const node = render({ count: serverCount, inc: () => serverCount.set((n) => n + 1) }) as HTMLButtonElement;
+  const wire = snapshot({ count: serverCount }); // registerState drops the function — this is the real payload
+  const serverHtml: string = node.outerHTML;
+
+  // ── client ── fresh parse (dead DOM), resume, click
+  const container: HTMLElement = host();
+  container.innerHTML = serverHtml;
+  const btn: HTMLButtonElement = container.querySelector('button')!;
+  assert.equal(btn.textContent, '3', 'the server value is in the DOM');
+  const app = resume(btn, { snapshot: wire, handlers: render.handlers, adopt: render.adopt });
+  assert.equal(app.ctx.inc, undefined, 'the handler function did NOT cross the wire — only its inlined body did');
+
+  btn.click();
+  assert.equal((app.ctx.count as Signal<number>)(), 4, 'the resumed NAMED handler ran against the resumed signal');
+  assert.equal(btn.textContent, '4', 'and the adopted text node updated in place — no re-render');
+  app.dispose();
+});
+
+test('E1.5 DoD: WITHOUT the inlining the same named handler is dead (proves the fix is what makes it work)', () => {
+  const render = compileNamed(); // no resumableHandlers → the factory emits a bare `ctx.inc`
+  const serverCount: Signal<number> = signal(3);
+  const node = render({ count: serverCount, inc: () => serverCount.set((n) => n + 1) }) as HTMLButtonElement;
+  const wire = snapshot({ count: serverCount });
+
+  const container: HTMLElement = host();
+  container.innerHTML = node.outerHTML;
+  const btn: HTMLButtonElement = container.querySelector('button')!;
+  const app = resume(btn, { snapshot: wire, handlers: render.handlers, adopt: render.adopt });
+  btn.click();
+  assert.equal((app.ctx.count as Signal<number>)(), 3, 'ctx.inc is undefined → the click does nothing (today’s gap)');
+  assert.equal(btn.textContent, '3', 'the DOM never changed');
+  app.dispose();
+});
