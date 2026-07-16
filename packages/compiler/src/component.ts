@@ -145,10 +145,34 @@ function resumableSetup(script: string, scope: string[]): {
     }
   }
 
-  // Computeds first, in declaration order: each may read the signals plus any earlier computed. `derive`
-  // emits them in this same order, so the assignment order matches the dependency order.
+  // E1.27 — setup was ONE scope, so resolvability must be settled across BOTH sets at once, before either is
+  // emitted. A value binding is very often initialised by calling a helper (`signal(autoMode() ? … : …)`), and
+  // a helper very often reads a value binding — checking computeds against a set that lacked the helpers meant
+  // the real <Sidenav>'s `openState` was refused, which cascaded into every handler that touched it. Assume all
+  // and withdraw what cannot resolve, to a fixed point (helpers may also be mutually recursive).
+  const fnNames: Set<string> = new Set(found.handlers.keys());
+  const settled: Set<string> = new Set([...resolvable, ...fnNames, ...found.computeds.keys()]);
+  for (let changed = true; changed; ) {
+    changed = false;
+    const check = (name: string, source: string, params: readonly string[]): void => {
+      if (!settled.has(name)) return;
+      if (unresolvedRefs(source, union(settled, imports), params, name).length === 0) return;
+      settled.delete(name);
+      changed = true;
+    };
+    for (const [name, fn] of found.handlers) check(name, fn.source, fn.params);
+    for (const [name, v] of found.computeds) check(name, v.source, []);
+  }
+  // The rewrite scope follows from the settled sets: a value binding becomes `ctx.<name>` (derive puts it
+  // there), a FUNCTION stays a bare name (it is re-declared as a local of derive and of the factory alike).
+  for (const name of found.computeds.keys()) if (settled.has(name)) sc.set(name, { kind: 'ctx' });
+
+  // Computeds in declaration order: `derive` emits them in the same order, so assignment order matches
+  // dependency order.
   for (const [name, derivable] of found.computeds) {
-    const missing: string[] = unresolvedRefs(derivable.source, union(resolvable, imports), [], name);
+    const missing: string[] = settled.has(name)
+      ? []
+      : unresolvedRefs(derivable.source, union(settled, imports), [], name);
     if (missing.length) {
       reasons.set(name, blame(missing));
       // A computed the template CALLS and we cannot rebuild makes resume THROW — the whole page dies, so
@@ -162,43 +186,27 @@ function resumableSetup(script: string, scope: string[]): {
       continue;
     }
     computeds.set(name, rewrite(derivable.source, sc).code);
-    resolvable.add(name); // now live in the resumed ctx → a later computed / a handler may use it
-    sc.set(name, { kind: 'ctx' }); // …and its refs must rewrite to `ctx.<name>` even if the template never reads it
   }
 
-  // E1.19 — setup's own FUNCTIONS, re-declared as locals of the `handlers(ctx)` factory. A function is dropped
-  // from the snapshot and `derive` never rebuilds one, so a handler calling a helper used to be refused — the
-  // commonest real cause left on the docs site (`setOpened`, `openPanel`, `rovingIndex`). But a helper need not
-  // cross the wire: the factory can re-declare it over the resumed ctx exactly as it inlines a handler body,
-  // and it is built once per instance, so the locals are shared by every site just as setup's closure was.
-  // They stay OUT of `sc`: a reference must rewrite to the bare factory local, not to `ctx.<name>`.
-  // Fixed point, because helpers may be mutually recursive — declaration order alone would refuse one.
-  const emittable: Set<string> = new Set(resolvable);
-  // E1.20 — `props` resolves inside the factory: it is its second parameter, fed by the parent's adopt emit
-  // (a root gets `{}`, which is what `mountComponent` gives it too). It stays OUT of `sc`, so a reference
-  // rewrites to the bare parameter rather than `ctx.props`.
-  emittable.add('props');
-  for (const name of found.handlers.keys()) emittable.add(name); // assume all, then withdraw what cannot resolve
-  for (let changed = true; changed; ) {
-    changed = false;
-    for (const [name, fn] of found.handlers) {
-      if (!emittable.has(name)) continue;
-      if (unresolvedRefs(fn.source, union(emittable, imports), fn.params, name).length === 0) continue;
-      emittable.delete(name);
-      changed = true;
-    }
-  }
-  // Declaration order: setup ran in it, so a helper's own dependencies are already bound by the time it is
-  // called. (A `const` TDZ only bites on a call during the factory body, which never happens — all sites are
-  // arrows invoked later.)
+  // E1.19 — setup's own FUNCTIONS, re-declared as locals. A function is dropped from the snapshot and nothing
+  // rebuilds one, so a handler calling a helper used to be refused — the commonest real cause on the docs site
+  // (`setOpened`, `openPanel`, `rovingIndex`). But a helper need not cross the wire: it can be re-declared over
+  // the resumed ctx exactly as a handler body is inlined. E1.27 — the SAME locals go into `derive` AND the
+  // factory, because setup was one scope: derive's initializers call them, and so do the handlers. Each gets
+  // its own copy, which is sound for a helper (a pure closure over ctx/props) and is why a helper holding
+  // MUTABLE state of its own would diverge — that is the documented edge, not the common case.
+  // Declaration order: setup ran in it, so a helper's dependencies are bound by the time it is CALLED. (A
+  // `const` TDZ only bites on a call during the enclosing body, which never happens — these are all arrows.)
   for (const [name, fn] of found.handlers) {
-    if (emittable.has(name)) locals.set(name, rewrite(fn.source, sc).code);
+    if (settled.has(name)) locals.set(name, rewrite(fn.source, sc).code);
   }
 
-  // Handlers last — so a handler may read a derived computed (`() => count.set(doubled())`) AND call a helper.
+  // Handlers last — so a handler may read a derived binding (`() => count.set(doubled())`) AND call a helper.
   for (const [name, handler] of found.handlers) {
     if (!scope.includes(name)) continue; // the template never references it
-    const missing: string[] = unresolvedRefs(handler.source, union(emittable, imports), handler.params, name);
+    const missing: string[] = settled.has(name)
+      ? []
+      : unresolvedRefs(handler.source, union(settled, imports), handler.params, name);
     if (missing.length) {
       reasons.set(name, blame(missing));
       continue; // the warning is raised by the caller, which knows whether it is actually a handler SITE

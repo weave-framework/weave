@@ -491,6 +491,18 @@ function stripDeclTypes(src: string): string {
       i = j;
       continue;
     }
+    // A call's TYPE ARGUMENTS — `signal<Element | null>(null)`. `Element` is a type, erased at runtime, but the
+    // scanner would read it as a value: this is why the old asDerivedInit dropped type args, and why widening it
+    // (E1.28) brought every element-ref drop straight back. Only when `<` follows an identifier immediately and
+    // its match is followed by `(`, so a comparison (`a < b`) is untouched.
+    if (src[i] === '<' && i > 0 && ID_CHAR.test(src[i - 1])) {
+      const gt: number = skipTypeArgs(src, i);
+      if (gt > i && src[skipWs(src, gt)] === '(') {
+        out += ' ';
+        i = gt;
+        continue;
+      }
+    }
     // An arrow's PARAMETER list — `(e: KeyboardEvent, n: number = 2) =>`. Only strip when the `)` is followed
     // by `=>` (optionally through a return type), so a plain CALL's parens are never touched.
     if (src[i] === '(') {
@@ -678,21 +690,41 @@ function declaredLocals(src: string): Set<string> {
 function asDerivedInit(init: string): SetupDerived | null {
   const src: string = init.trim();
   if (!src) return null;
-  if (/^(-?\d+(\.\d+)?|true|false|null|'[^'\\]*'|"[^"\\]*")$/.test(src)) return { source: src };
-  if (!ID_START.test(src[0])) return null;
-  let i: number = 1;
-  while (i < src.length && ID_CHAR.test(src[i])) i++;
-  const callee: string = src.slice(0, i);
-  let j: number = skipWs(src, i);
-  if (src[j] === '<') {
-    const gt: number = skipTypeArgs(src, j);
-    if (gt < 0) return null;
-    j = skipWs(src, gt);
+  // E1.28 — ANY bounded initializer. This was once narrowed to "a call or a literal" as a reaction to a LEXICAL
+  // bug (a type-arg scan that emitted `ctx.input = signal<;` and failed the build), not to the expression shape
+  // — and the narrowing cost far more than it bought: the real <Sidenav>'s
+  // `const bp = props.breakpoint ?? Breakpoints.Narrow` is neither, so the whole chain behind it
+  // (`narrow` → `effectiveMode` → `opened` → `setOpened` → every handler) died at the first link. E1.18's
+  // annotation handling covers the lexical hazard properly now, and `declEnd` (E1.19) bounds the initializer.
+  //
+  // Rebuilding is never a wrong ANSWER, only possibly a stale one: `derive`'s `if (ctx.x === undefined)` guard
+  // means it runs only for a value that could NOT cross the wire, where the alternative is dropping the whole
+  // instance to CSR. A `new Cart()` is no different in kind from the `createRouter([…])` this always accepted.
+  //
+  // The source is emitted VERBATIM, types and all — it lands in a TS module, so esbuild erases them.
+  if (!balanced(src)) return null; // the scanner is not confident → fall back rather than emit something broken
+  return { source: src };
+}
+
+/** Are all bracket pairs closed and no stray closer present? A cheap "the scan bounded this correctly" check. */
+function balanced(src: string): boolean {
+  const stack: string[] = [];
+  const pairs: Record<string, string> = { ')': '(', ']': '[', '}': '{' };
+  let i: number = 0;
+  while (i < src.length) {
+    const op: number = skipOpaque(src, i);
+    if (op > i) {
+      i = op;
+      continue;
+    }
+    const c: string = src[i];
+    if (c === '(' || c === '[' || c === '{') stack.push(c);
+    else if (c === ')' || c === ']' || c === '}') {
+      if (stack.pop() !== pairs[c]) return false;
+    }
+    i++;
   }
-  if (src[j] !== '(') return null;
-  const rp: number = matchDelimited(src, j, '(', ')');
-  if (rp !== src.length - 1) return null; // the whole initializer must BE the call (not `f(…).x`)
-  return { source: `${callee}(${src.slice(j + 1, rp)})` };
+  return stack.length === 0;
 }
 
 /** Past a `<…>` type-argument list starting at `i`; -1 if unbalanced. `=>` is one token, not a closing `>`. */
@@ -811,9 +843,11 @@ function readVarDecl(src: string, i: number, kwLen: number): { name: string; ini
   const name: string = readIdent(src, k);
   if (!name) return null; // destructuring (`const { a } = …`) → not a simple binding
   k = skipWs(src, k + name.length);
-  // A type annotation (`const inc: () => void = …`) — skip to the `=` at depth 0.
+  // A type annotation (`const inc: () => void = …`) — skip to the ASSIGNMENT. E1.29: not simply the first
+  // top-level `=`, because a FUNCTION-TYPE annotation contains one — `const narrow: () => boolean = f(bp)` bailed
+  // on the arrow's `=` and the binding vanished from the extraction, taking everything behind it with it.
   if (src[k] === ':') {
-    const eq: number = findTopLevel(src, k, '=');
+    const eq: number = assignAfterType(src, k + 1);
     if (eq < 0) return null;
     k = eq;
   }
@@ -822,6 +856,35 @@ function readVarDecl(src: string, i: number, kwLen: number): { name: string; ini
   const end: number = declEnd(src, start);
   if (end < 0) return null;
   return { name, init: src.slice(start, end).trim(), end };
+}
+
+/**
+ * Offset of a declaration's ASSIGNMENT `=` at or after `i`, scanning past a type annotation. `=>` (a function
+ * type) and `==`/`>=`/`<=`/`!=` are not it; a `;` or an unbalanced closer means there is none.
+ */
+function assignAfterType(src: string, i: number): number {
+  let depth: number = 0;
+  while (i < src.length) {
+    const op: number = skipOpaque(src, i);
+    if (op > i) {
+      i = op;
+      continue;
+    }
+    const c: string = src[i];
+    if (c === '(' || c === '[' || c === '{' || c === '<') depth++;
+    else if (c === ')' || c === ']' || c === '}' || c === '>') {
+      if (depth === 0) return -1;
+      depth--;
+    } else if (depth === 0 && c === '=') {
+      if (src[i + 1] === '>' || src[i + 1] === '=') {
+        i += 2; // `=>` inside a function type, or `==` — neither is the assignment
+        continue;
+      }
+      return i;
+    } else if (depth === 0 && c === ';') return -1;
+    i++;
+  }
+  return -1;
 }
 
 /** Offset of the first top-level `ch` at or after `i` (stops at a statement end). -1 if none. */

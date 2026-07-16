@@ -252,8 +252,11 @@ export function compileTemplateAst(ast: TemplateNode[], options: CompileOptions 
   // often initialised FROM them (`signal(props.defaultOpened ?? false)`). Giving them to one and not the other
   // made the asymmetry cascade — such a binding was undrivable, so any helper reading it could not be emitted,
   // so every handler calling that helper was refused.
+  // E1.27 — the SAME setup helpers the factory declares, because setup was one scope: an initializer very often
+  // calls one (`signal(autoMode() ? … : …)`). Declared first; they are arrows, so nothing runs until called.
+  const setupLocals: string = [...(options.resumableLocals ?? [])].map(([n, code]) => `  const ${n} = ${code};\n`).join('');
   const deriveFn: string = gen.resumable && options.resumableDerived?.size
-    ? `function derive(ctx, props) {\n${[...options.resumableDerived]
+    ? `function derive(ctx, props) {\n${setupLocals}${[...options.resumableDerived]
         .map(([name, code]) => `  if (ctx.${name} === undefined) ctx.${name} = ${code};`)
         .join('\n')}\n  return ctx;\n}`
     : '';

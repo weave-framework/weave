@@ -619,13 +619,15 @@ test('E1.6: a computed touching a non-ctx local is NOT derived (fail-safe), and 
     {
       script:
         'import { signal, computed } from "@weave-framework/runtime";\n' +
-        'export function setup() {\n  const count = signal(1);\n  const factorOf = () => 3;\n' +
-        '  const scaled = computed(() => count() * factorOf());\n  return { count, scaled };\n}',
+        // (a setup HELPER stood here until E1.27 made derive carry the same locals as the factory; a `new`
+        //  expression is not a shape derive can rebuild, so `rate` genuinely never reaches the client)
+        'export function setup() {\n  const count = signal(1);\n  const rate = new Rate();\n' +
+        '  const scaled = computed(() => count() * rate.factor);\n  return { count, scaled };\n}',
       template: '<p>{{ scaled() }}</p>',
     },
     { filename: 'unsafe', resumable: true }
   );
-  assert.ok(!/ctx\.scaled = /.test(unsafe.code), '`factor` never reaches the client → no derive rather than a broken one');
+  assert.ok(!/ctx\.scaled = /.test(unsafe.code), '`rate` never reaches the client → no derive rather than a broken one');
 
   const eager = compileComponent(
     {
@@ -662,13 +664,14 @@ test('warns when a computed cannot be rebuilt — the resume-throws case', () =>
     {
       script:
         'import { signal, computed } from "@weave-framework/runtime";\n' +
-        'export function setup(){ const count = signal(0); const factorOf = () => 3;\n' +
-        '  const scaled = computed(() => count() * factorOf());\n  return { count, scaled }; }',
+        // (a setup helper until E1.27 made that resolvable; `new Rate()` is not a shape derive can rebuild)
+        'export function setup(){ const count = signal(0); const rate = new Rate();\n' +
+        '  const scaled = computed(() => count() * rate.factor);\n  return { count, scaled }; }',
       template: '<p>{{ scaled() }}</p>',
     },
     { filename: 'w2', resumable: true }
   );
-  assert.ok(warnings && warnings.some((w) => /computed `scaled`/.test(w) && /Resuming this page will fail/.test(w) && /`factorOf`/.test(w)), `expected a computed warning; got ${JSON.stringify(warnings)}`);
+  assert.ok(warnings && warnings.some((w) => /computed `scaled`/.test(w) && /Resuming this page will fail/.test(w) && /`rate`/.test(w)), `expected a computed warning; got ${JSON.stringify(warnings)}`);
 });
 
 test('warns when a handler definition cannot be READ from setup (not a plain const/fn)', () => {
@@ -961,4 +964,75 @@ test('E1.26: an arrow param used inside a TEMPLATE LITERAL is a param, not ctx',
   const { code } = compileComponent({ template: '<b>{{ items().map((_, i) => `#${i}`).join("") }}</b>' });
   assert.ok(!/ctx\.i\b/.test(code), `the param must not be scope-prefixed; got:\n${code}`);
   assert.ok(/ctx\.items\(\)\.map\(\(_, i\) => `#\$\{i\}`\)/.test(code), `and the ctx call still is; got:\n${code}`);
+});
+
+test('E1.27: a binding initialised by calling a setup HELPER derives — one scope, as setup had', () => {
+  // The real <Sidenav>: `const openState = signal(autoMode() ? … : props.defaultOpened ?? true)`. `derive` and
+  // the handlers factory were two SEPARATE scopes, but setup was one — so a helper emitted into the factory was
+  // invisible to derive, the binding could not be rebuilt, and every handler touching it was refused. Both must
+  // carry the same locals, in declaration order, exactly as setup's closure held them.
+  const { code } = compileComponent(
+    {
+      script:
+        'import { signal } from "@weave-framework/runtime";\n' +
+        'export function setup(props){\n' +
+        '  const auto = () => props.mode === undefined;\n' +
+        '  const open = signal(auto() ? 1 : 2);\n' +
+        '  const read = () => open();\n' +
+        '  const bump = () => open.set(read() + 1);\n' +
+        '  return { open, bump }; }',
+      template: '<button on:click={{ bump }}>{{ open() }}</button>',
+    },
+    { filename: 'sc1', resumable: true }
+  );
+  const derive: string = code.match(/function derive\(ctx, props\)[\s\S]*?\n\}/)?.[0] ?? '';
+  assert.ok(/const auto = \(\) => props\.mode === undefined/.test(derive), `derive declares the helper it needs; got:\n${derive}`);
+  assert.ok(/ctx\.open === undefined\) ctx\.open = signal\(auto\(\) \? 1 : 2\)/.test(derive), `and uses it; got:\n${derive}`);
+
+  const factory: string = code.match(/function handlers\(ctx, props\)[\s\S]*?\n\}/)?.[0] ?? '';
+  assert.ok(/const read = \(\) => ctx\.open\(\)/.test(factory), `the factory carries the same helpers; got:\n${factory}`);
+  assert.ok(/"w0":\s*\(\) => ctx\.open\.set\(read\(\) \+ 1\)/.test(factory), 'and the site resolves through them');
+});
+
+test('E1.28: a binding whose initializer is an EXPRESSION derives — the chain no longer dies at the first link', () => {
+  // The real <Sidenav>: `const bp = props.breakpoint ?? Breakpoints.Narrow` is neither a call nor a literal, so
+  // `asDerivedInit` refused it — and that killed the whole chain behind it (`narrow` → `effectiveMode` →
+  // `opened` → `setOpened` → every handler). The narrowing was a reaction to a LEXICAL bug (a type-arg scan
+  // that emitted `signal<;`), not to the expression shape; E1.18's annotation handling covers that properly now.
+  const { code } = compileComponent(
+    {
+      script:
+        'import { signal, breakpointSignal, Breakpoints } from "./lib";\n' +
+        'export function setup(props){\n' +
+        '  const bp = props.breakpoint ?? Breakpoints.Narrow;\n' +
+        '  const narrow = breakpointSignal(bp);\n' +
+        '  const mode = () => (narrow() ? "over" : "side");\n' +
+        '  const open = signal(mode() === "over");\n' +
+        '  const toggle = () => open.set(mode() === "side");\n' +
+        '  return { open, toggle }; }',
+      template: '<button on:click={{ toggle }}>{{ open() }}</button>',
+    },
+    { filename: 'ch1', resumable: true }
+  );
+  const derive: string = code.match(/function derive\(ctx, props\)[\s\S]*?\n\}/)?.[0] ?? '';
+  assert.ok(/ctx\.bp === undefined\) ctx\.bp = props\.breakpoint \?\? Breakpoints\.Narrow/.test(derive),
+    `the expression initializer derives; got:\n${derive}`);
+  assert.ok(/ctx\.narrow = breakpointSignal\(ctx\.bp\)/.test(derive), `and the link after it; got:\n${derive}`);
+  assert.ok(!/"w0":\s*ctx\.toggle\b/.test(code), 'so the handler at the end of the chain inlines rather than falling back');
+});
+
+test('E1.28 fail-safe: an initializer the scanner cannot bound is still refused', () => {
+  // Widening must not become guessing: a destructured binding has no single name to assign, and an initializer
+  // the scanner cannot bound confidently must fall back rather than emit something broken.
+  const { code } = compileComponent(
+    {
+      script:
+        'import { signal } from "@weave-framework/runtime";\n' +
+        'export function setup(props){ const { a } = props.pair;\n' +
+        '  const n = signal(0);\n  const inc = () => n.set(a);\n  return { n, inc }; }',
+      template: '<button on:click={{ inc }}>{{ n() }}</button>',
+    },
+    { filename: 'ch2', resumable: true }
+  );
+  assert.ok(/"w0":\s*ctx\.inc\b/.test(code), 'a destructured local is not derivable → the handler falls back safely');
 });

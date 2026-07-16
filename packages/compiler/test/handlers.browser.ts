@@ -333,3 +333,36 @@ test('E1.18: an OPTIONAL parameter (`e?: Event`) is still its own param, not an 
   assert.deepEqual(h.params.slice().sort(), ['e', 'extra'], `optional params read cleanly; got ${JSON.stringify(h.params)}`);
   assert.deepEqual(unresolvedRefs(h.source, new Set(['n']), h.params, 'save'), [], 'and nothing is blamed');
 });
+
+test('E1.28: a call`s TYPE ARGUMENTS are not refs, but a comparison is left alone', () => {
+  // `signal<Element | null>(null)` — `Element` is a type, erased at runtime. The old asDerivedInit dropped type
+  // args, which quietly kept them out of the analysis too; widening it (E1.28) brought every element-ref drop
+  // straight back (226 on the docs) until this was handled where it belongs.
+  assert.deepEqual(
+    unresolvedRefs('signal<Element | null>(null)', new Set(['signal']), [], 'host'),
+    [],
+    'the type argument is gone',
+  );
+  // a real comparison must survive: `a < b` is not a type-arg list (its match is not followed by `(`)
+  assert.deepEqual(
+    unresolvedRefs('go(a < b, c > d)', new Set(['go']), [], 'x').sort(),
+    ['a', 'b', 'c', 'd'],
+    'a comparison is left alone',
+  );
+});
+
+test('E1.29: a binding annotated with a FUNCTION TYPE is still extracted — its `=>` is not the assignment', () => {
+  // The real <Sidenav>: `const narrow: () => boolean = breakpointSignal(bp)`. readVarDecl skipped the
+  // annotation by scanning for the first top-level `=` — which is the ARROW's, so it bailed and the binding
+  // vanished from the extraction entirely, taking `effectiveMode` and everything behind it with it.
+  const f = extractSetupBindings(
+    setup(
+      '  const bp = "sm";\n' +
+        '  const narrow: () => boolean = breakpointSignal(bp);\n' +
+        '  const pick: (a: number) => string = fmt(bp);\n' +
+        '  return { narrow, pick };'
+    )
+  );
+  assert.equal(f.computeds.get('narrow')?.source, 'breakpointSignal(bp)', 'the initializer, not the annotation');
+  assert.equal(f.computeds.get('pick')?.source, 'fmt(bp)', 'and with parameters in the function type too');
+});
