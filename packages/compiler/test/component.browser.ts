@@ -797,7 +797,7 @@ test('E1.14: the cause names the NODE as authored, not an AST type', () => {
   // nothing can rebuild on a resumed client. The message must still name the tag it sits on.
   const { warnings } = compileComponent(
     {
-      script: 'export function setup(){ const tip = () => {}; return { tip }; }',
+      script: 'export function setup(props){ const { tip } = props.helpers; return { tip }; }',
       template: '<div><Widget use:tip /></div>',
     },
     { filename: 'na2', resumable: true }
@@ -899,11 +899,12 @@ test('E1.21: a `use:` action adopts when it resolves; it still opts out when it 
   assert.ok(/function adopt\(/.test(ok.code), 'a resolvable action no longer refuses adopt');
   assert.ok(!ok.warnings?.some((w) => /use:/.test(w)), `and says nothing; got ${JSON.stringify(ok.warnings)}`);
 
-  // An action that is a plain setup local cannot be rebuilt (a function never crosses the snapshot), so
-  // `ctx.tip` would be undefined and `applyAction` would throw — refuse, as before.
+  // An action nothing can rebuild leaves `ctx.tip` undefined and `applyAction` would throw — refuse. (A plain
+  // setup-local action stood here until E1.44 started handing such a local back to ctx; a DESTRUCTURED one is
+  // not extractable at all, so it stays genuinely unreachable.)
   const bad = compileComponent(
     {
-      script: 'export function setup(){ const tip = () => {}; return { tip }; }',
+      script: 'export function setup(props){ const { tip } = props.helpers; return { tip }; }',
       template: '<button use:tip>x</button>',
     },
     { filename: 'u3', resumable: true }
@@ -1116,4 +1117,95 @@ test('E1.40: a DECLARATION inside a handler binds a local — it is not rewritte
     `and every later reference is the LOCAL, not the ctx signal; got:\n${factory}`);
   // the template's own `label` still resolves to ctx — the shadowing is per-expression, not global
   assert.ok(/ctx\.label\(\)/.test(code), 'the template binding is untouched');
+});
+
+test('E1.44: a setup FUNCTION the template calls is put back on ctx, not only declared as a local', () => {
+  // The docs shell: `panels={{ sidebarPanels() }}` compiles to `ctx.sidebarPanels()`, because the template
+  // scope says it is a binding. E1.19/E1.27 rebuild it as a LOCAL of derive and the factory — which the
+  // template cannot see. So `ctx.sidebarPanels` stayed undefined and the whole sidebar rendered empty, silently
+  // (the throw happens inside an effect). derive must also hand the local back to ctx.
+  const { code } = compileComponent(
+    {
+      script:
+        'import { signal } from "@weave-framework/runtime";\n' +
+        'export function setup(){\n  const n = signal(1);\n' +
+        '  const rows = () => [n(), n() + 1];\n' +
+        '  const bump = () => n.set(n() + 1);\n' +
+        '  return { n, rows, bump }; }',
+      template: '<button on:click={{ bump }}>{{ rows().length }}</button>',
+    },
+    { filename: 'tf1', resumable: true }
+  );
+  assert.ok(/ctx\.rows\(\)/.test(code), 'the template reads it through ctx');
+  const derive: string = code.match(/function derive\(ctx, props\)[\s\S]*?\n\}/)?.[0] ?? '';
+  assert.ok(/const rows = \(\) => \[ctx\.n\(\), ctx\.n\(\) \+ 1\]/.test(derive), `rebuilt as a local; got:\n${derive}`);
+  assert.ok(/ctx\.rows === undefined\) ctx\.rows = rows/.test(derive), `and handed BACK to ctx; got:\n${derive}`);
+});
+
+test('E1.44: a helper the template never mentions stays a local only', () => {
+  const { code } = compileComponent(
+    {
+      script:
+        'import { signal } from "@weave-framework/runtime";\n' +
+        'export function setup(){ const n = signal(1);\n' +
+        '  const helper = () => n() * 2;\n' +
+        '  const bump = () => n.set(helper());\n' +
+        '  return { n, bump }; }',
+      template: '<button on:click={{ bump }}>{{ n() }}</button>',
+    },
+    { filename: 'tf2', resumable: true }
+  );
+  const derive: string = code.match(/function derive\(ctx, props\)[\s\S]*?\n\}/)?.[0] ?? '';
+  assert.ok(!/ctx\.helper = /.test(derive), `an internal helper does not need a ctx slot; got:\n${derive}`);
+});
+
+/* ──────────── E1.45 — a setup that registers onMount cannot adopt ──────────── */
+
+test('E1.45: a component whose setup registers `onMount` refuses to adopt, and says why', () => {
+  // THE structural limit of resumability, found by the docs dogfood. `<Expansion>` fills its panel bodies in an
+  // `onMount` (`querySelectorAll('.weave-expansion__content')` + append). onMount is INERT on the server, so the
+  // bodies ship empty; plain `--ssg` hides that because its client CSR-mounts and onMount runs. Resume adopts —
+  // and `setup` never runs, so the onMount is never even registered. The docs sidebar came back with 4 links
+  // instead of 23, and nothing said a word. Such a component must CSR-fall back, which is exactly correct: its
+  // DOM setup is a create-time effect that no snapshot can carry.
+  const { code, warnings } = compileComponent(
+    {
+      script:
+        'import { signal, onMount } from "@weave-framework/runtime";\n' +
+        'export function setup(){ const host = signal(null);\n' +
+        '  onMount(() => { host()?.append(document.createElement("b")); });\n' +
+        '  return { host }; }',
+      template: '<div ref={{ host }}>x</div>',
+    },
+    { filename: 'om1', resumable: true }
+  );
+  assert.ok(!/function adopt\(/.test(code), 'no adopt is emitted — the subtree client-renders instead');
+  assert.ok(warnings?.some((w) => /onMount/.test(w) && /cannot be resumed/.test(w)),
+    `and it names onMount as the cause; got ${JSON.stringify(warnings)}`);
+});
+
+test('E1.45: onMount in a COMMENT or another function does not refuse; an aliased import does', () => {
+  const innocent = compileComponent(
+    {
+      script:
+        'import { signal } from "@weave-framework/runtime";\n' +
+        '// we deliberately avoid onMount here\nexport function setup(){ const n = signal(0);\n' +
+        '  const inc = () => n.set(1);\n  return { n, inc }; }',
+      template: '<button on:click={{ inc }}>{{ n() }}</button>',
+    },
+    { filename: 'om2', resumable: true }
+  );
+  assert.ok(/function adopt\(/.test(innocent.code), 'the word in a comment is not a call');
+  assert.ok(!innocent.warnings?.some((w) => /onMount/.test(w)), 'and nothing is said');
+
+  const aliased = compileComponent(
+    {
+      script:
+        'import { signal, onMount as afterMount } from "@weave-framework/runtime";\n' +
+        'export function setup(){ const n = signal(0);\n  afterMount(() => n.set(1));\n  return { n }; }',
+      template: '<b>{{ n() }}</b>',
+    },
+    { filename: 'om3', resumable: true }
+  );
+  assert.ok(!/function adopt\(/.test(aliased.code), 'an alias is still the same hook');
 });

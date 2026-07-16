@@ -19,7 +19,7 @@ import type { TemplateNode } from './ast.js';
 import { applyPatches, type PatchOp } from './patch.js';
 import { inferCtxNames } from './infer.js';
 import { injectAutoReturn } from './auto-return.js';
-import { extractSetupBindings, extractReturnedNames, extractModuleImports, unresolvedRefs, type SetupBindings } from './handlers.js';
+import { extractSetupBindings, extractReturnedNames, extractModuleImports, unresolvedRefs, setupCallsHook, type SetupBindings } from './handlers.js';
 import { rewrite, ctxScope } from './scope.js';
 import { scopeCss, scopeAttr, hostAttr, hashCss } from './css.js';
 
@@ -222,6 +222,15 @@ function resumableSetup(script: string, scope: string[]): {
     if (settled.has(name)) locals.set(name, rewrite(fn.source, sc).code);
   }
 
+  // E1.44 — a function the TEMPLATE calls must also land on ctx. `panels={{ sidebarPanels() }}` compiles to
+  // `ctx.sidebarPanels()`, because the template scope says it is a binding — but a local of derive/the factory
+  // is invisible to the render, so `ctx.sidebarPanels` stayed undefined and the docs sidebar came back EMPTY,
+  // silently (the throw happens inside an effect). Hand the local back; the `undefined` guard keeps it from
+  // clobbering anything that crossed the wire. A helper the template never mentions needs no ctx slot.
+  for (const name of found.handlers.keys()) {
+    if (settled.has(name) && scope.includes(name)) computeds.set(name, name);
+  }
+
   // Handlers last — so a handler may read a derived binding (`() => count.set(doubled())`) AND call a helper.
   for (const [name, handler] of found.handlers) {
     if (!scope.includes(name)) continue; // the template never references it
@@ -235,6 +244,21 @@ function resumableSetup(script: string, scope: string[]): {
     handlers.set(name, rewrite(handler.source, sc).code);
   }
   return { handlers, computeds, locals, reasons, warnings };
+}
+
+/**
+ * The LOCAL names of the create-time lifecycle hooks this module imported (E1.45). Local, so
+ * `import { onMount as afterMount }` is caught too. `onCleanup`/`onDispose` are NOT here: they only register
+ * teardown, which an adopted component never needed to run in the first place.
+ */
+function hookNames(imports: ReadonlySet<string>, script: string): Set<string> {
+  const out: Set<string> = new Set();
+  for (const local of imports) {
+    // The local name is what appears in the body; find what it was imported AS to know if it is a hook.
+    const m: RegExpExecArray | null = new RegExp(`\\b(onMount)\\s+as\\s+${local}\\b`).exec(script);
+    if (m || local === 'onMount') out.add(local);
+  }
+  return out;
 }
 
 /** The union of two name sets (what a re-derived initializer may reference). */
@@ -267,12 +291,24 @@ export function compileComponent(src: ComponentSource, opts: ComponentOptions = 
   // E1.5/E1.6 — resumable only: inline each named handler's `setup` body (`on:click={{ inc }}`) and re-derive
   // each `computed` over the resumed ctx (`{{ doubled() }}`), neither of which can cross the snapshot.
   const resumed = opts.resumable && src.script ? resumableSetup(src.script, scope) : undefined;
+  // E1.45 — a lifecycle hook registered in `setup` is the structural limit of resumability: resume never runs
+  // `setup`, so the hook is never registered, and the server never ran it either (it is inert there). Whatever
+  // DOM work it does simply never happens. Refuse to adopt and say so — the subtree then client-renders, which
+  // runs the hook and is exactly right. Found by the docs dogfood: `<Expansion>` fills its panel bodies in an
+  // onMount, so the sidebar resumed with 4 links instead of 23, silently.
+  const hook: string | null =
+    opts.resumable && src.script
+      ? setupCallsHook(src.script, hookNames(extractModuleImports(src.script), src.script))
+      : null;
   const compiled: CompileResult = compileTemplateAst(ast, {
     mode: 'module',
     scope,
     scopeAttr: attr,
     hostAttr: host,
     resumable: opts.resumable,
+    // Not `resumable: false` — the component still compiles to the resumable target (its server render must
+    // stamp the markers its PARENT's cursor walks, and its children still register). Only ADOPT is off.
+    cannotAdopt: hook ? `a \`${hook}()\` lifecycle hook in setup()` : undefined,
     resumableHandlers: resumed?.handlers,
     resumableDerived: resumed?.computeds,
     resumableLocals: resumed?.locals,

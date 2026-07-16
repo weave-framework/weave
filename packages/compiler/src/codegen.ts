@@ -57,6 +57,14 @@ export interface CompileOptions {
    * re-declares it over the resumed ctx, once per instance, exactly as setup's closure held it.
    */
   resumableLocals?: ReadonlyMap<string, string>;
+  /**
+   * Phase E (E1.45) — a reason the CALLER already knows this fragment cannot be adopted, even though nothing in
+   * the template says so. `compileComponent` uses it for a lifecycle hook registered in `setup`: resume never
+   * runs setup, so the hook is never registered and its DOM work never happens. The component still compiles to
+   * the resumable target (its server render must stamp the markers its parent's cursor walks) — only adopt is
+   * off, and the reason rides out on {@link CompileResult.notAdoptable} like any other.
+   */
+  cannotAdopt?: string;
 }
 
 export interface CompileResult {
@@ -206,6 +214,7 @@ export function compileTemplateAst(ast: TemplateNode[], options: CompileOptions 
   const runtimeImport: string = options.runtimeImport ?? '@weave-framework/runtime/dom';
   const gen: Gen = new Gen(mode, options.scopeAttr, options.hostAttr, options.resumable ?? false);
   gen.derived = new Set(options.resumableDerived?.keys() ?? []);
+  if (options.cannotAdopt) gen.cannotAdopt(options.cannotAdopt); // E1.45 — a reason from outside the template
 
   // E1.2c-6: a resumable component's render self-registers its ctx for the snapshot when the parent tagged
   // this instance with a `$wid` prop (a static-position child) — so the client resumes it without re-running

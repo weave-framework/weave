@@ -1,5 +1,5 @@
 import { test, assert } from '../../../tools/harness.js';
-import { extractSetupHandlers, extractSetupBindings, extractModuleImports, isInlinable, isDerivable, unresolvedRefs, type SetupHandler } from '@weave-framework/compiler';
+import { extractSetupHandlers, extractSetupBindings, extractModuleImports, isInlinable, isDerivable, unresolvedRefs, setupCallsHook, type SetupHandler } from '@weave-framework/compiler';
 
 /**
  * E1.5 — named-handler resume. `extractSetupHandlers` pulls each top-level `setup` binding that is a function
@@ -597,4 +597,22 @@ test('E1.43: a FUNCTION-TYPE annotation and a function-type `as` cast are fully 
     ['missing'],
     'and the call after it is still a ref',
   );
+});
+
+test('E1.45: a doc COMMENT before the hook does not disguise it as a property access', () => {
+  // The real <Expansion>: its onMount is preceded by a comment ending in a full stop. Reading the last
+  // non-space character out of the RAW text found that `.` and called the hook a property access, so it went
+  // unseen and the component adopted when it must not.
+  const script: string =
+    'import { onMount, signal } from "@weave-framework/runtime";\n' +
+    'export function setup() {\n  const host = signal(null);\n' +
+    '  // Bodies are appended once the regions are in the DOM (deferred to onMount, like Form Field.).\n' +
+    '  onMount(() => { host()?.append("x"); });\n' +
+    '  return { host };\n}\n';
+  assert.equal(setupCallsHook(script, new Set(['onMount'])), 'onMount', 'found past the comment');
+
+  // a genuine property access is still not this module's hook
+  const method: string =
+    'export function setup(props) {\n  props.lifecycle.onMount(() => {});\n  return {};\n}\n';
+  assert.equal(setupCallsHook(method, new Set(['onMount'])), null, '`x.onMount()` belongs to someone else');
 });

@@ -18,6 +18,7 @@ export { injectAutoReturn, type AutoReturnResult } from './auto-return.js';
 export {
   extractSetupHandlers,
   extractSetupBindings,
+  setupCallsHook,
   extractReturnedNames,
   extractModuleImports,
   unresolvedRefs,

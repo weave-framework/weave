@@ -322,6 +322,48 @@ export function extractSetupHandlers(script: string): Map<string, SetupHandler> 
  * computed(() => …)`). Same fail-safe contract — an unlocatable body, a reassigned/destructured/computed
  * binding, or a nested helper yields nothing rather than a guess.
  */
+/**
+ * Does `setup` CALL one of `names` (an `onMount`-style hook)? The local names matter, not the export names, so
+ * an aliased import (`onMount as afterMount`) is caught — the caller resolves those from the import list.
+ *
+ * A hook registered in `setup` is THE structural limit of resumability: resume never runs `setup`, so the hook
+ * is never even registered, and the server never ran it either (it is inert there). Any DOM work it does simply
+ * does not happen. `<Expansion>` fills its panel bodies this way, and the docs sidebar came back with 4 links
+ * instead of 23 — silently. Such a component must fall back to client rendering, which is exactly right: a
+ * create-time effect is not something a snapshot can carry.
+ */
+export function setupCallsHook(script: string, names: ReadonlySet<string>): string | null {
+  const open: number | null = locateSetupBody(script);
+  if (open === null) return null;
+  const close: number = matchDelimited(script, open, '{', '}');
+  if (close < 0) return null;
+  let i: number = open + 1;
+  // The last SIGNIFICANT character — tracked, not read back out of the raw text, because a comment sits between
+  // often enough and prose ends in a full stop: the doc comment above `<Expansion>`'s onMount ends with `.`, so
+  // reading backwards called it a property access and the hook went unseen.
+  let prev: string = '';
+  while (i < close) {
+    const op: number = skipOpaque(script, i); // strings + COMMENTS — the word in prose is not a call
+    if (op > i) {
+      if (!/^\/[/*]/.test(script.slice(i, i + 2))) prev = script[op - 1]; // a string is significant; a comment is not
+      i = op;
+      continue;
+    }
+    if (ID_START.test(script[i]) && isTokenStart(script, i)) {
+      const j: number = skipWord(script, i);
+      const name: string = script.slice(i, j);
+      // A CALL, and not a property access (`this.onMount(…)` is someone else's).
+      if (names.has(name) && script[skipWs(script, j)] === '(' && prev !== '.') return name;
+      prev = script[j - 1];
+      i = j;
+      continue;
+    }
+    if (!/\s/.test(script[i])) prev = script[i];
+    i++;
+  }
+  return null;
+}
+
 export function extractSetupBindings(script: string): SetupBindings {
   const out: Map<string, SetupHandler> = new Map();
   const computeds: Map<string, SetupDerived> = new Map();
