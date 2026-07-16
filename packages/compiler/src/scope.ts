@@ -61,7 +61,7 @@ export interface RewriteResult {
  * Alongside `code`, returns `segments` — the verbatim src↔gen character runs — so
  * editor tooling can map a position in the generated module back to the template.
  */
-export function rewrite(expr: string, scope: Scope, ctxRef: string = 'ctx'): RewriteResult {
+export function rewrite(expr: string, scope: Scope, ctxRef: string = 'ctx', outerParams?: ReadonlySet<string>): RewriteResult {
   let out: string = '';
   let reactive: boolean = false;
   let i: number = 0;
@@ -73,6 +73,9 @@ export function rewrite(expr: string, scope: Scope, ctxRef: string = 'ctx'): Rew
   // same-named ctx binding exists. Same basis as `freeIdentifiers`, so inference
   // and rewriting agree on what is a parameter.
   const params: Set<string> = arrowParams(expr);
+  // Each `${…}` is rewritten by a RECURSIVE call, which used to start with an empty param set — so an
+  // enclosing arrow's params were forgotten inside it and `items().map((_, i) => `#${i}`)` emitted `ctx.i`.
+  if (outerParams) for (const p of outerParams) params.add(p);
 
   const segments: RewriteSegment[] = [];
   // The current verbatim run, contiguous in both source and generated text.
@@ -148,7 +151,7 @@ export function rewrite(expr: string, scope: Scope, ctxRef: string = 'ctx'): Rew
             }
             k++;
           }
-          const sub: RewriteResult = rewrite(expr.slice(exprStart, k), scope, ctxRef);
+          const sub: RewriteResult = rewrite(expr.slice(exprStart, k), scope, ctxRef, params);
           if (sub.reactive) reactive = true;
           // Splice the rewritten interpolation in WITH its segments (offset into this expr/out), so
           // source coverage + the verbatim invariant hold through `${ … }` for editor tooling.
@@ -327,9 +330,13 @@ function arrowParams(expr: string): Set<string> {
  * that is not a property access, not a JS global/keyword, and not an arrow
  * parameter. The basis for auto-scope (see {@link inferCtxNames}).
  */
-export function freeIdentifiers(expr: string): string[] {
+export function freeIdentifiers(expr: string, outerParams?: ReadonlySet<string>): string[] {
   const out: Set<string> = new Set<string>();
   const params: Set<string> = arrowParams(expr);
+  // A `${…}` is walked by a RECURSIVE call, which used to start with an empty param set — so an enclosing
+  // arrow's params were forgotten inside it: `items.map((_, i) => `#${i}`)` inferred `i` as component data and
+  // compiled it to `ctx.i`. Carry them in.
+  if (outerParams) for (const p of outerParams) params.add(p);
   let i: number = 0;
   const n: number = expr.length;
   while (i < n) {
@@ -368,7 +375,7 @@ export function freeIdentifiers(expr: string): string[] {
             }
             k++;
           }
-          for (const id of freeIdentifiers(expr.slice(start, k))) out.add(id);
+          for (const id of freeIdentifiers(expr.slice(start, k), params)) out.add(id);
           continue;
         }
         k++;

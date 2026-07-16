@@ -946,3 +946,19 @@ test('E1.25: `derive` takes props too — a binding initialised from props is re
   assert.ok(/ctx\.open = signal\(props\.defaultOpened \?\? false\)/.test(code),
     `the props-initialised binding is derived, props left bare; got:\n${code.slice(code.indexOf('function derive'), code.indexOf('function derive') + 200)}`);
 });
+
+test('E1.26: an arrow param used inside a TEMPLATE LITERAL is a param, not ctx', () => {
+  // `freeIdentifiers` recurses into each `${…}` with a FRESH call, so the enclosing arrow's params were lost:
+  // `items.map((_, i) => `#${i}`)` inferred `i` as component data and compiled it to `ctx.i`. The real docs demo
+  // `Array.from({ length: 30 }, (_, i) => `<p>line ${i + 1}</p>`)` was refused for "reading `i`".
+  assert.deepEqual(
+    inferCtxNames(parseTemplate('<b>{{ items().map((_, i) => `#${i}: ${label()}`).join("") }}</b>')),
+    ['items', 'label'],
+    '`i` is the arrow`s own param even though it is read inside a template literal',
+  );
+  // and the emit agrees — this is what would have produced `ctx.i`
+  // (a word boundary: `ctx.items` contains the substring `ctx.i`)
+  const { code } = compileComponent({ template: '<b>{{ items().map((_, i) => `#${i}`).join("") }}</b>' });
+  assert.ok(!/ctx\.i\b/.test(code), `the param must not be scope-prefixed; got:\n${code}`);
+  assert.ok(/ctx\.items\(\)\.map\(\(_, i\) => `#\$\{i\}`\)/.test(code), `and the ctx call still is; got:\n${code}`);
+});
