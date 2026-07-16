@@ -117,6 +117,37 @@ interface AdoptableComponent {
   derive?: (ctx: Record<string, unknown>) => unknown;
   /** E1.8 — the child's own `handlers(ctx)` factory, so its internal `on:` events resume against ITS ctx. */
   handlers?: (ctx: Record<string, unknown>) => Record<string, unknown>;
+  /**
+   * E1.12 — this component adopts through its OWN render rather than from a snapshot ctx. Set by a
+   * hand-written component whose state is not `setup` bindings but live PROPS (`<RouterView>`: its router,
+   * and the route match derived from it). Such a component is handed the server root via the `$adopt` prop and
+   * returns that same node when it takes it; a compiled component never sets this.
+   */
+  adoptsSelf?: boolean;
+}
+
+/** What a self-adopting component receives as its `$adopt` prop (E1.12). */
+export interface AdoptTarget {
+  /** The component's server-rendered root — reuse it instead of building a fresh one. */
+  root: Node;
+  /** The resume state map, so the component can look up whatever it renders (a route view's ctx). */
+  states: Record<string, unknown>;
+  /**
+   * Register a component the self-adopter resumed ITSELF (a routed view), so its own `on:` handlers resolve
+   * against its ctx — the same ancestry-scoped dispatch {@link adoptComponent} gives compiled children (E1.8).
+   * Passed as a callback because the collector is module-private here, and the router package must not import
+   * this entry (invariant I3).
+   */
+  register: (root: Element, handlers: (ctx: Record<string, unknown>) => Record<string, unknown>, ctx: Record<string, unknown>) => void;
+}
+
+/** Register an instance a self-adopting component resumed on its own (E1.12). No-op outside a session. */
+function registerAdopted(
+  root: Element,
+  handlers: (ctx: Record<string, unknown>) => Record<string, unknown>,
+  ctx: Record<string, unknown>,
+): void {
+  if (instanceCollector && root instanceof Element) instanceCollector.push({ root, handlers, ctx });
 }
 
 /**
@@ -163,11 +194,21 @@ export function adoptComponent(
   id: string,
   Comp: AdoptableComponent,
   states: Record<string, unknown> | undefined,
-  mount: () => Node | null,
+  mount: (adopt?: AdoptTarget) => Node | null,
 ): void {
   const end: Comment = blockEndOf(start);
   const ctx: unknown = states && states[id];
   const root: ChildNode | null = start.nextSibling as ChildNode | null;
+  // E1.12 — a self-adopting component (`<RouterView>`) resumes through its own render, because what it needs
+  // is live PROPS, which only `mount` carries. Hand it the server root: if it takes it, it returns that very
+  // node and there is nothing to insert. If it declines, it built fresh — fall through and swap that in.
+  if (Comp && Comp.adoptsSelf && root && root !== end) {
+    const taken: Node | null = mount({ root, states: (states ?? {}) as Record<string, unknown>, register: registerAdopted });
+    if (taken === root) return;
+    clearBlock(start, end);
+    if (taken) end.parentNode!.insertBefore(taken, end);
+    return;
+  }
   if (Comp && Comp.adopt && ctx !== undefined && root && root !== end) {
     // Rebuild the child's computeds onto its resumed ctx BEFORE adopting — its bindings call them (E1.6).
     if (Comp.derive) Comp.derive(ctx as Record<string, unknown>);

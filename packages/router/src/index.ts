@@ -674,6 +674,27 @@ interface OutletCtx {
 const OutletContext: Context<OutletCtx | null> = createContext<OutletCtx | null>(null);
 
 /**
+ * What `adoptComponent` hands a self-adopting component as its `$adopt` prop (Phase E, E1.12).
+ *
+ * Declared here rather than imported from `@weave-framework/runtime/adopt` ON PURPOSE: a type-only import would
+ * be erased, but keeping this package free of any runtime/adopt reference makes it structurally impossible to
+ * pull the resume entry into a plain SPA bundle (invariant I3 — 0 bytes for apps that don't resume). The shape
+ * is tiny and pinned by the SSG smoke.
+ */
+interface AdoptTarget {
+  /** The outlet's server-rendered host — reuse it instead of building a fresh one. */
+  root: Node;
+  /** The resume state map — where a routed view's captured ctx lives, keyed `$route:<depth>`. */
+  states: Record<string, unknown>;
+  /** Register the view we resume ourselves, so ITS `on:` handlers resolve against ITS ctx (E1.8 dispatch). */
+  register: (
+    root: Element,
+    handlers: (ctx: Record<string, unknown>) => Record<string, unknown>,
+    ctx: Record<string, unknown>,
+  ) => void;
+}
+
+/**
  * Inject the router from context — the canonical way a routed component reaches its
  * router (`const r = useRouter(); r.navigate('/x'); r.params()`). Must be called within
  * a `<RouterView>` subtree; the module-level `navigate()`/`currentPath()` sugar covers
@@ -791,10 +812,25 @@ export const RouterView: Component = (props = {}) => {
   // scope exists (a directly-invoked RouterView in a test has none — and won't nest).
   if (router && getOwner()) provide(OutletContext, { router, depth: depth + 1 });
 
-  const host: HTMLDivElement = document.createElement('div');
-  host.style.display = 'contents';
-  const anchorNode: Comment = document.createComment('router');
-  host.appendChild(anchorNode);
+  // Phase E (E1.12) — resume. `$adopt` is handed in by `adoptComponent` when this outlet is being resumed from
+  // a server render: reuse the server's host + anchor instead of building them, and let the first branch
+  // ADOPT the already-rendered view (below) rather than re-render it. A transition would have to play an
+  // intro over DOM that is already painted, so an outlet with one declines and re-renders instead. Arriving as
+  // a PROP is what keeps this package free of the resume entries (invariant I3 — 0 bytes for a plain SPA).
+  const adoptTarget: AdoptTarget | undefined = (props as { $adopt?: AdoptTarget }).$adopt;
+  const adopting: boolean = !!adoptTarget && !txFn;
+
+  let host: HTMLDivElement;
+  let anchorNode: Comment;
+  if (adopting) {
+    host = adoptTarget!.root as HTMLDivElement;
+    anchorNode = host.lastChild as Comment; // the server serialized our `<!--router-->` last
+  } else {
+    host = document.createElement('div');
+    host.style.display = 'contents';
+    anchorNode = document.createComment('router');
+    host.appendChild(anchorNode);
+  }
 
   // Only the top outlet syncs the URL on a guard/redirect (redirects bubble to the
   // chain root regardless of depth). Owned by this outlet's scope; converges after
@@ -806,6 +842,40 @@ export const RouterView: Component = (props = {}) => {
     });
   }
 
+  /**
+   * ADOPT the view the server already rendered into `host` (E1.12), or null if we can't.
+   *
+   * The nodes between `host.firstChild` and our anchor ARE the server's view. Re-bind them against the view's
+   * resumed ctx (registered under `$route:<depth>` by the `$wid` the create path passes below), then hand them
+   * back in a fragment: `ifBlock` re-inserts them exactly where they already are, and now TRACKS them, so a
+   * later navigation disposes + removes them like any branch it rendered itself.
+   */
+  const adoptView = (view: Component): Node | null => {
+    const nodes: ChildNode[] = [];
+    for (let n: ChildNode | null = host.firstChild; n && n !== anchorNode; n = n.nextSibling) nodes.push(n);
+    const viewRoot: ChildNode | undefined = nodes.find((n) => n.nodeType === 1);
+    const vctx: unknown = adoptTarget!.states[routeStateId(depth)];
+    const v: Component & {
+      adopt?: (r: Node, c: Record<string, unknown>, s: Record<string, unknown>, st: Record<string, unknown>) => unknown;
+      derive?: (c: Record<string, unknown>) => unknown;
+      handlers?: (c: Record<string, unknown>) => Record<string, unknown>;
+    } = view;
+    if (!v.adopt || vctx === undefined || !viewRoot) {
+      // Not resumable (or nothing captured) → drop the server DOM and let the caller render fresh.
+      for (const n of nodes) n.remove();
+      return null;
+    }
+    if (v.derive) v.derive(vctx as Record<string, unknown>);
+    v.adopt(viewRoot, vctx as Record<string, unknown>, {}, adoptTarget!.states);
+    // We resumed this view ourselves, so adoptComponent never saw it — register it, or its own `on:` handlers
+    // would never resolve (the delegated dispatch picks the table of the NEAREST registered instance).
+    if (v.handlers) adoptTarget!.register(viewRoot as Element, v.handlers, vctx as Record<string, unknown>);
+    const frag: DocumentFragment = document.createDocumentFragment();
+    frag.append(...nodes);
+    return frag;
+  };
+
+  let adoptFirst: boolean = adopting; // only the initially-matched view adopts; everything after renders
   const thunks: Map<Component, () => Node> = new Map<Component, () => Node>();
   ifBlock(anchorNode, () => {
     const m: Match | null = router?.matched(depth) ?? null;
@@ -814,7 +884,17 @@ export const RouterView: Component = (props = {}) => {
     if (!thunk) {
       const view: Component = m.view;
       const loaderMatch: Match = m; // loader fn is stable per route; params are read live
+      // Adopt applies to this thunk's FIRST call only. Keeping ONE thunk per view (rather than a separate
+      // adopt thunk) preserves the reference stability ifBlock dedupes on — so a param-only change still
+      // updates in place — while a navigate-away-and-back re-renders this view fresh.
+      let adoptOnce: boolean = adoptFirst;
+      adoptFirst = false;
       thunk = () => {
+        if (adoptOnce) {
+          adoptOnce = false;
+          const adopted: Node | null = adoptView(view);
+          if (adopted) return adopted; // resumed in place — the view's setup never re-ran
+        }
         // Run this route's loader (if any) and expose it via context so a descendant's
         // useLoaderData() resolves it. Provided in the branch's own owner scope, so it
         // disposes with the view on swap/unmount.
@@ -825,7 +905,11 @@ export const RouterView: Component = (props = {}) => {
           get params() {
             return router!.params(depth);
           },
-        });
+          // Phase E: tag the view so a resumable build registers its ctx under a SERVER↔CLIENT-stable id.
+          // The path picks the same match on both sides, so depth identifies it. Inert in an eager build
+          // (nothing reads `$wid`) and on the client (registerState no-ops outside a collect session).
+          $wid: routeStateId(depth),
+        } as Record<string, unknown>);
         if (!txFn) return node;
         // Wrap in a real element so the intro plays even when the view's own root is
         // `display:contents` (lazy host) or a fragment (multi-root template).
@@ -841,6 +925,14 @@ export const RouterView: Component = (props = {}) => {
 
   return host;
 };
+
+/** The snapshot id a routed view's ctx is registered under — stable across server + client (E1.12). */
+function routeStateId(depth: number): string {
+  return `$route:${depth}`;
+}
+
+// This outlet resumes through its own render (it needs its live `router` prop), not from a snapshot ctx.
+(RouterView as Component & { adoptsSelf?: boolean }).adoptsSelf = true;
 
 /**
  * Client-side anchor: navigates instead of reloading (plain clicks only — lets

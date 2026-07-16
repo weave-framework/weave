@@ -197,6 +197,60 @@ try {
   rmSync(rout, { recursive: true, force: true });
 }
 
+/* ── Part 3b — E1.12: a ROUTED page resumes (the router is re-derived; the view adopts in place) ── */
+
+const rrapp = mkdtempSync(join(here, '.smoke-ssg-rr-'));
+const rrout = mkdtempSync(join(here, '.smoke-ssg-rrout-'));
+try {
+  writeFileSync(
+    join(rrapp, 'home.ts'),
+    `import { signal, type Signal } from '@weave-framework/runtime';
+` +
+      `export const template = '<section><b id="n">{{ n() }}</b><button on:click={{ bump }}>+1</button></section>';
+` +
+      `export function setup(): { n: Signal<number>; bump: () => void } {
+` +
+      `  const n = signal(7);
+  const bump = () => n.set((v) => v + 1);
+  return { n, bump };
+}
+`
+  );
+  writeFileSync(join(rrapp, 'app.ts'),
+    `import { createRouter, route, RouterView } from '@weave-framework/router';
+` +
+      `import Home from './home';
+` +
+      `export const template = '<main><RouterView router={{ router }} /></main>';
+` +
+      `export function setup() {
+  const router = createRouter([ route('/', { component: Home }) ]);
+  return { router };
+}
+`
+  );
+
+  const rootComponent = join(rrapp, 'app.ts');
+  await buildSsg({
+    virtualEntry: { code: generateEntry(rootComponent, '#app', rrapp, [], { resume: true }), resolveDir: rrapp },
+    serverEntry: { code: generateServerEntry(rootComponent, rrapp, { routed: true, resumable: true }), resolveDir: rrapp },
+    mount: '#app', routes: ['/'], outDir: rrout, minify: false, styleLang: 'css', resume: true,
+  });
+
+  const doc = readFileSync(join(rrout, 'index.html'), 'utf8');
+  const json = (doc.match(/id="__weave_snapshot__">([^<]*)/) || [])[1].replace(/\u003c/g, '<');
+  const state = deserialize(JSON.parse(json));
+  // The router made the root unserializable BEFORE E1.11 (the build actually failed). Now it is re-derived
+  // client-side, so the root IS captured — and E1.12 captures the routed view's ctx under $route:0.
+  ok(state && '$root' in state, 'routed resume: the root is resumable (the router is re-derived, not serialized)');
+  ok(state && '$route:0' in state, "routed resume: the VIEW's ctx is captured under $route:0 (RouterView tags it with $wid)");
+  ok(state && typeof state['$route:0'].n === 'function' && state['$route:0'].n() === 7, "routed resume: the view's signal round-trips @ 7");
+  ok(!/data-won-click/.test(doc) === false, 'routed resume: the view keeps its resumable event marker in the server HTML');
+} finally {
+  rmSync(rrapp, { recursive: true, force: true });
+  rmSync(rrout, { recursive: true, force: true });
+}
+
 /* ── Part 4 — staticRoutePaths derives the prerender list from a pages dir (skips :param + *) ── */
 
 const pages = mkdtempSync(join(here, '.smoke-ssg-pages-'));

@@ -945,7 +945,13 @@ function compileFragment(
       const endVar: string = gen.fn('_e');
       nodeDecls.push(`const ${endVar} = ${gen.Ha('blockEndOf')}(${anchorVar});`);
       blockEndVar = endVar;
-      stmts.push(`${gen.Ha('adoptComponent')}(${anchorVar}, ${q(cid)}, ${gen.Comp(node.tag)}, _st, () => ${mountExpr});`);
+      // The mount thunk takes the adopt target and passes it through as `$adopt` (E1.12). A COMPILED child
+      // ignores it — it resumes from `states[cid]` instead. A hand-written one (`<RouterView>`) needs live
+      // PROPS to adopt (its router), and props only exist inside this thunk — so this is the channel that
+      // reaches it, without the router package importing the resume entries (invariant I3).
+      const adoptProps: string = [...props, `'$adopt': _a`].join(', ');
+      const adoptMount: string = `${gen.Comp(node.tag)}({ ${adoptProps} }, ${slotsObj})`;
+      stmts.push(`${gen.Ha('adoptComponent')}(${anchorVar}, ${q(cid)}, ${gen.Comp(node.tag)}, _st, (_a) => ${adoptMount});`);
       return;
     }
 
