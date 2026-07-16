@@ -25,7 +25,7 @@ export interface StyleAsset {
 }
 
 // A `url(...)` reference: optional quote, then the ref (up to the closing quote/paren).
-const URL_RE = /url\(\s*(['"]?)([^'")]+)\1\s*\)/g;
+const URL_RE: RegExp = /url\(\s*(['"]?)([^'")]+)\1\s*\)/g;
 
 /** A url() ref the pipeline must leave alone — absolute, protocol, data:, or a bare fragment. */
 function isExternalRef(ref: string): boolean {
@@ -42,7 +42,7 @@ function isExternalRef(ref: string): boolean {
  * (deduped by absolute path), so repeated refs share one emitted asset.
  */
 export function rewriteStyleAssets(css: string, baseDir: string): { css: string; assets: StyleAsset[] } {
-  const byAbs = new Map<string, string>(); // absPath → servedPath (dedupe)
+  const byAbs: Map<string, string> = new Map<string, string>(); // absPath → servedPath (dedupe)
   const assets: StyleAsset[] = [];
   const out: string = css.replace(URL_RE, (whole: string, _q: string, ref: string): string => {
     const raw: string = ref.trim();

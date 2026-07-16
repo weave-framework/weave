@@ -14,7 +14,7 @@ import {
   type ProjectConfiguration,
   type Tree,
 } from '@nx/devkit';
-import { componentFiles } from '../component/files.js';
+import { componentFiles, type GenFile } from '../component/files.js';
 
 export interface LibraryGeneratorSchema {
   name: string;
@@ -23,7 +23,7 @@ export interface LibraryGeneratorSchema {
 }
 
 /** Version range for the generated lib's `@weave-framework/*` deps — mirrors the create-weave template. */
-const WEAVE_DEP_RANGE = '^1.0.0';
+const WEAVE_DEP_RANGE: "^1.0.0" = '^1.0.0';
 
 /** Compute the workspace-relative project root for a library (default under `libs/`). */
 export function libRoot(name: string, directory?: string): string {
@@ -40,10 +40,10 @@ export async function libraryGenerator(
   const src: string = joinPathFragments(root, 'src');
   const style: 'css' | 'scss' | 'none' = schema.style ?? 'css';
 
-  const files = componentFiles(joinPathFragments(src, 'lib', fileName), fileName, style);
+  const files: GenFile[] = componentFiles(joinPathFragments(src, 'lib', fileName), fileName, style);
   // Write everything except the Weave `.html` template now; the template is written after
   // formatFiles so Prettier can't mangle its `{{ }}` bindings.
-  const htmlFiles = files.filter((f) => f.path.endsWith('.html'));
+  const htmlFiles: GenFile[] = files.filter((f) => f.path.endsWith('.html'));
   for (const file of files) {
     if (file.path.endsWith('.html')) continue;
     tree.write(file.path, file.content);

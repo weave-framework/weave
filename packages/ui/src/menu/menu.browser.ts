@@ -1,5 +1,5 @@
 import { test, assert } from '../../../../tools/harness.js';
-import { signal, effect } from '@weave-framework/runtime';
+import { signal, effect, type Signal } from '@weave-framework/runtime';
 import { overlayContainer, type ConnectedPosition } from '@weave-framework/ui/cdk';
 import { menu, type MenuItem, type MenuOptions, type MenuRowContext } from '@weave-framework/ui/menu';
 import { buildPositions } from './menu-core.js';
@@ -310,7 +310,7 @@ test('menu: `selected` marks the matching row role=menuitemradio + aria-checked 
 });
 
 test('menu: a `selected` getter is re-read on every open, so the check follows the value', () => {
-  let current = 'edit';
+  let current: string = 'edit';
   const { trigger, cleanup } = mount({ selected: () => current });
   const checkedLabel = (): string | undefined =>
     items().find((r) => r.getAttribute('aria-checked') === 'true')
@@ -563,8 +563,8 @@ test('menu: itemTemplate takes precedence over optionContent (FW-10)', () => {
 });
 
 test('menu: itemTemplate bindings are torn down on close — no leak (FW-10)', () => {
-  const ext = signal(0);
-  let runs = 0;
+  const ext: Signal<number> = signal(0);
+  let runs: number = 0;
   const trigger: HTMLButtonElement = document.createElement('button');
   document.body.appendChild(trigger);
   const cleanup: () => void = menu<Lang>(trigger, {

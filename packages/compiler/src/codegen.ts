@@ -519,7 +519,7 @@ function compileFragment(
   // post-block element rebases its subtree onto a cursor var (E1.2c-5) instead of the fragment root.
   const adoptIndicesFrom = (path: number[], start: number): number[] => {
     const out: number[] = [];
-    for (let level = start; level < path.length; level++) {
+    for (let level: number = start; level < path.length; level++) {
       const parentKey: string = path.slice(0, level).join(',');
       const idx: number = path[level];
       const dyns: number[] | undefined = dynText.get(parentKey);
@@ -532,10 +532,10 @@ function compileFragment(
 
   // Post-block subtree rebasing (E1.2c-5): pathKey → the cursor var holding that node (an element reached via
   // `after(blockEnd, off)`) + its path length, so deeper nodeExpr calls navigate `child(<var>, …suffix)`.
-  const nodeOverride: Map<string, { baseVar: string; prefixLen: number }> = new Map();
-  const findOverride = (path: number[]): { baseVar: string; prefixLen: number } | null => {
-    for (let len = path.length; len >= 1; len--) {
-      const e = nodeOverride.get(path.slice(0, len).join(','));
+  const nodeOverride: Map<string, NodeOverride> = new Map();
+  const findOverride = (path: number[]): NodeOverride | null => {
+    for (let len: number = path.length; len >= 1; len--) {
+      const e: NodeOverride | undefined = nodeOverride.get(path.slice(0, len).join(','));
       if (e) return e;
     }
     return null;
@@ -561,7 +561,7 @@ function compileFragment(
     let v: string | undefined = nodeVars.get(key);
     if (!v) {
       // Post-block subtree (E1.2c-5): a prefix of `path` is a cursor var → navigate relative to it.
-      const ov = adopt ? findOverride(path) : null;
+      const ov: NodeOverride | null = adopt ? findOverride(path) : null;
       if (ov) {
         if (path.length === ov.prefixLen) {
           nodeVars.set(key, ov.baseVar);
@@ -1304,6 +1304,16 @@ function compileFragment(
   ];
   gen.fragmentDepth--;
   return `function ${name}(${param}) {\n${body.map((l) => '  ' + l).join('\n')}\n}`;
+}
+
+/**
+ * E1.2c-5 — where a post-block subtree's adopt cursor lives: the var holding a node reached via
+ * `after(blockEnd, off)`, plus the path length it covers, so deeper nodes navigate `child(<baseVar>, …suffix)`
+ * instead of an absolute child index (which a runtime-variable block makes meaningless).
+ */
+interface NodeOverride {
+  baseVar: string;
+  prefixLen: number;
 }
 
 /* ──────────── helpers ──────────── */

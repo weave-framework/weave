@@ -105,7 +105,7 @@ export function adoptIsland(start: Comment): Comment {
  */
 export function after(node: Node, n: number): Node {
   let x: Node = node;
-  for (let i = 0; i < n; i++) x = x.nextSibling!;
+  for (let i: number = 0; i < n; i++) x = x.nextSibling!;
   return x;
 }
 

@@ -1,10 +1,22 @@
 import { test, assert } from '../../../tools/harness.js';
-import { signal, computed, effect, root, type Signal } from '@weave-framework/runtime';
+import { signal, computed, effect, root, type Signal, type Computed } from '@weave-framework/runtime';
 import * as dom from '@weave-framework/runtime/dom';
-import { resumeEvents, collectResumable, resumableHandler, handlerAttr, type ResumeHandler } from '@weave-framework/runtime/resume';
+import { resumeEvents, collectResumable, resumableHandler, handlerAttr, type ResumeHandler, type ResumeControl } from '@weave-framework/runtime/resume';
+import type { Wire } from '@weave-framework/runtime/serialize';
 import { bindTextResumable, adoptText, blockStart, adoptIsland, blockEndOf, clearBlock, after, adoptComponent } from '@weave-framework/runtime/adopt';
-import { snapshot, resume, resumePage, SNAPSHOT_ID, collectStates, registerState, ROOT_ID, type AdoptFn } from '@weave-framework/runtime/graph';
-import { compileTemplate, compileComponent } from '@weave-framework/compiler';
+import { snapshot, resume, resumePage, SNAPSHOT_ID, collectStates, registerState, ROOT_ID, type AdoptFn, type ResumeApp } from '@weave-framework/runtime/graph';
+import { compileTemplate, compileComponent, type CompileResult } from '@weave-framework/compiler';
+
+/**
+ * A compiled render fn plus the resume extras the compiler attaches to it (`render.adopt` / `.derive` /
+ * `.handlers`). Written out longhand at 17 call sites before this had a name; each site spelled a slightly
+ * different subset of the same shape, which is exactly how a "style" rule ends up unsatisfiable.
+ */
+type ResumableRender<T extends Node = Element> = ((ctx: unknown, slots?: unknown) => T) & {
+  adopt?: AdoptFn;
+  derive?: (c: Record<string, unknown>, p?: Record<string, unknown>) => unknown;
+  handlers?: (c: Record<string, unknown>, p?: Record<string, unknown>) => Record<string, ResumeHandler>;
+};
 
 /**
  * E0.2b — the compiler's `resumable` target. DOM event handlers compile to `resumableHandler(...)` refs
@@ -96,7 +108,7 @@ test('each event site gets a distinct stable ref (w0, w1, …)', () => {
 
 test('resumable render isolates reactive text with a $ marker (adopt-ready)', () => {
   const x: Signal<string> = signal('world');
-  const render = compileResumable('<p>Hello, {{ x() }}!</p>', ['x']);
+  const render: (ctx: unknown, slots?: unknown) => Element = compileResumable('<p>Hello, {{ x() }}!</p>', ['x']);
   const p: HTMLElement = render({ x }) as HTMLElement;
   assert.equal(p.textContent, 'Hello, world!', 'renders the value inline');
   const marker: ChildNode | undefined = [...p.childNodes].find((n) => n.nodeType === 8 && (n as Comment).data === '$');
@@ -111,7 +123,7 @@ test('resumable render isolates reactive text with a $ marker (adopt-ready)', ()
 test('resumable: a resumed click invokes the right handler (no eager listener)', () => {
   const count: Signal<number> = signal(0);
   const inc = (): number => count.set((c) => c + 1);
-  const render = compileResumable('<button on:click={{inc}}>x</button>', ['count', 'inc']);
+  const render: (ctx: unknown, slots?: unknown) => Element = compileResumable('<button on:click={{inc}}>x</button>', ['count', 'inc']);
 
   const { node, handlers } = collectResumable(() => render({ count, inc }));
   const btn: HTMLButtonElement = node as HTMLButtonElement;
@@ -123,7 +135,7 @@ test('resumable: a resumed click invokes the right handler (no eager listener)',
   btn.click();
   assert.equal(count(), 0, 'a bare click does nothing before resume (handler was not wired eagerly)');
 
-  const ctl = resumeEvents(container, { resolve: (id) => handlers.get(id) });
+  const ctl: ResumeControl = resumeEvents(container, { resolve: (id) => handlers.get(id) });
   btn.click();
   btn.click();
   assert.equal(count(), 2, 'after resume, the delegated dispatch invokes the handler');
@@ -133,11 +145,11 @@ test('resumable: a resumed click invokes the right handler (no eager listener)',
 test('resumable: preventDefault modifier still applies through the handler body', () => {
   let ran: boolean = false;
   const onSubmit = (): boolean => (ran = true);
-  const render = compileResumable('<button on:click|preventDefault={{onSubmit}}>go</button>', ['onSubmit']);
+  const render: (ctx: unknown, slots?: unknown) => Element = compileResumable('<button on:click|preventDefault={{onSubmit}}>go</button>', ['onSubmit']);
   const { node, handlers } = collectResumable(() => render({ onSubmit }));
   const container: HTMLElement = host();
   container.appendChild(node);
-  const ctl = resumeEvents(container, { resolve: (id) => handlers.get(id) });
+  const ctl: ResumeControl = resumeEvents(container, { resolve: (id) => handlers.get(id) });
   const ev: MouseEvent = new MouseEvent('click', { cancelable: true, bubbles: true });
   node.dispatchEvent(ev);
   assert.ok(ran, 'handler ran via resume');
@@ -148,7 +160,7 @@ test('resumable: preventDefault modifier still applies through the handler body'
 test('resumable: each @for row registers its OWN handler (instance-unique refs)', () => {
   const items: Signal<number[]> = signal([10, 20, 30]);
   const picked: Signal<number> = signal(0);
-  const render = compileResumable(
+  const render: (ctx: unknown, slots?: unknown) => Element = compileResumable(
     '<ul>@for (n of items(); track n) { <li><button on:click={{() => picked.set(n)}}>{{ n }}</button></li> }</ul>',
     ['items', 'picked']
   );
@@ -163,7 +175,7 @@ test('resumable: each @for row registers its OWN handler (instance-unique refs)'
   assert.equal(new Set(ids).size, 3, 'each row got a distinct data-won-click id');
   assert.equal(handlers.size, 3, 'three handlers registered');
 
-  const ctl = resumeEvents(container, { resolve: (id) => handlers.get(id) });
+  const ctl: ResumeControl = resumeEvents(container, { resolve: (id) => handlers.get(id) });
   buttons[1].click();
   assert.equal(picked(), 20, 'clicking the second row invoked THAT row’s handler, not a shared one');
   buttons[2].click();
@@ -199,19 +211,19 @@ test('E1.1: a block-local (@for row) handler is NOT hoisted into the root factor
 test('E1.1: resume() drives the EMITTED factory end-to-end — no hand-authored handlers', () => {
   // an INLINE handler that touches a signal (which IS in the snapshot); a named setup fn would need a
   // lazily-imported chunk (deferred), but a signal-touching handler resumes from the graph alone.
-  const render = compileResumable('<button on:click={{() => count.set((c) => c + 1)}}>x</button>', ['count']);
+  const render: (ctx: unknown, slots?: unknown) => Element = compileResumable('<button on:click={{() => count.set((c) => c + 1)}}>x</button>', ['count']);
   assert.equal(typeof (render as { handlers?: unknown }).handlers, 'function', 'render carries the emitted factory');
 
   // ── server ── render (stamps the marker) + snapshot the reactive state
   const count: Signal<number> = signal(3);
-  const node = serverRender(() => render({ count })) as HTMLButtonElement;
+  const node: HTMLButtonElement = serverRender(() => render({ count })) as HTMLButtonElement;
   const container: HTMLElement = host();
   container.appendChild(node);
   assert.ok(node.getAttribute(handlerAttr('click'))!.startsWith('w0#'), 'server HTML carries the marker');
-  const wire = snapshot({ count });
+  const wire: Wire = snapshot({ count });
 
   // ── client ── resume with the EMITTED factory (render.handlers), never hand-authored
-  const app = resume(container, { snapshot: wire, handlers: (render as { handlers: (c: Record<string, unknown>) => Record<string, ResumeHandler> }).handlers });
+  const app: ResumeApp = resume(container, { snapshot: wire, handlers: (render as { handlers: (c: Record<string, unknown>) => Record<string, ResumeHandler> }).handlers });
   assert.equal((app.ctx.count as Signal<number>)(), 3, 'resumed signal carries the server value');
 
   const out: HTMLSpanElement = document.createElement('span');
@@ -226,7 +238,7 @@ test('E1.1: resume() drives the EMITTED factory end-to-end — no hand-authored 
 
 test('E1.2: resumePage reads the embedded snapshot <script> and resumes (SSG client entry)', () => {
   // server: render the resumable component + embed the state snapshot exactly as renderPage would
-  const render = compileResumable('<button on:click={{() => count.set((c) => c + 1)}}>x</button>', ['count']);
+  const render: (ctx: unknown, slots?: unknown) => Element = compileResumable('<button on:click={{() => count.set((c) => c + 1)}}>x</button>', ['count']);
   const count: Signal<number> = signal(10);
   const container: HTMLElement = host();
   container.appendChild(serverRender(() => render({ count })) as Node);
@@ -237,7 +249,7 @@ test('E1.2: resumePage reads the embedded snapshot <script> and resumes (SSG cli
   document.body.appendChild(script);
 
   // client: resumePage finds the snapshot by id, deserializes, and wires the emitted factory — no hand-authoring
-  const app = resumePage({
+  const app: ResumeApp | null = resumePage({
     root: container,
     handlers: (render as { handlers: (c: Record<string, unknown>) => Record<string, ResumeHandler> }).handlers,
   });
@@ -283,14 +295,14 @@ test('E1.2b-2: a flat resumable module emits + exports an adopt(_r,…) fn — a
 
 test('E1.2b-2: adopt indices compound — each preceding dynamic text shifts a sibling by 2, across nesting', () => {
   // <p>{{a}}{{b}}</p>: a at pristine 0 → server 2 (own marker+text); b at pristine 1 → server 5 (a's 2 + own 2).
-  const flat = compileTemplate('<p>{{ a() }}{{ b() }}</p>', { mode: 'module', scope: ['a', 'b'], resumable: true });
+  const flat: CompileResult = compileTemplate('<p>{{ a() }}{{ b() }}</p>', { mode: 'module', scope: ['a', 'b'], resumable: true });
   const flatAdopt: string = flat.code.slice(flat.code.indexOf('function adopt(_r'));
   assert.ok(/child\(_r, 2\)/.test(flatAdopt), 'first dynamic text → server index 2 (its own marker+text)');
   assert.ok(/child\(_r, 5\)/.test(flatAdopt), 'second dynamic text → server index 5 (preceding 2 + its own 2)');
 
   // <div>{{a}}<p>{{b}}</p></div>: a → server 2; the <p> is shifted to server 3 by a's marker+text, and b
   // inside <p> is at server 2 — so b's node is child(_r, 3, 2). Proves the shift applies per-level.
-  const nested = compileTemplate('<div>{{ a() }}<p>{{ b() }}</p></div>', { mode: 'module', scope: ['a', 'b'], resumable: true });
+  const nested: CompileResult = compileTemplate('<div>{{ a() }}<p>{{ b() }}</p></div>', { mode: 'module', scope: ['a', 'b'], resumable: true });
   const nestedAdopt: string = nested.code.slice(nested.code.indexOf('function adopt(_r'));
   assert.ok(/child\(_r, 2\)/.test(nestedAdopt), 'the div-level dynamic text is at server index 2');
   assert.ok(/child\(_r, 3, 2\)/.test(nestedAdopt), 'the <p> shifted to 3 by the preceding text; its inner text at 2');
@@ -310,13 +322,13 @@ test('E1.2b-2: a resumable fragment with a not-yet-adoptable construct emits NO 
 
 test('E1.2c: the resumable render brackets a block with [ … ] markers (adopt-ready), block stays reactive', () => {
   const show: Signal<boolean> = signal(true);
-  const render = compileResumable('<div>@if (show()) { <i>hi</i> }</div>', ['show']);
+  const render: (ctx: unknown, slots?: unknown) => Element = compileResumable('<div>@if (show()) { <i>hi</i> }</div>', ['show']);
   const div: HTMLElement = render({ show }) as HTMLElement;
   const i: HTMLElement = div.querySelector('i')!;
   assert.equal((i.previousSibling as Comment).data, '[', 'a [ boundary marker sits right before the branch content');
   assert.equal((i.nextSibling as Comment).data, ']', 'the block end anchor carries the ] data (right after the content)');
   // eager stays byte-for-byte — a plain <!----> anchor, no [ marker
-  const eager = compileTemplate('<div>@if (show()) { <i>hi</i> }</div>', { mode: 'module', scope: ['show'] });
+  const eager: CompileResult = compileTemplate('<div>@if (show()) { <i>hi</i> }</div>', { mode: 'module', scope: ['show'] });
   assert.ok(!eager.code.includes('blockStart') && !eager.code.includes(']'), 'eager target keeps a plain anchor, no brackets');
   // the block is still live — toggling removes the branch (brackets are inert to the reactive machinery)
   show.set(false);
@@ -340,7 +352,7 @@ test('E1.2c: the resumable module emits blockStart + a ] anchor; imports it from
 
 test('E1.2c-2: an adoptable @if emits an adopt fn (adoptIsland + ifBlock); non-adoptable positions do not', () => {
   // @if as the last indexed thing at its level → adoptable (island-replay)
-  const ok = compileTemplate('<div><h1>{{ t() }}</h1>@if (show()) { <p>{{ b() }}</p> }</div>', {
+  const ok: CompileResult = compileTemplate('<div><h1>{{ t() }}</h1>@if (show()) { <p>{{ b() }}</p> }</div>', {
     mode: 'module', scope: ['t', 'show', 'b'], resumable: true,
   });
   assert.ok(ok.code.includes('render.adopt'), 'an adoptably-positioned @if emits an adopt fn');
@@ -350,31 +362,31 @@ test('E1.2c-2: an adoptable @if emits an adopt fn (adoptIsland + ifBlock); non-a
 
   // An element with a NESTED BLOCK after a block adopts since E1.23: it is found via the E1.2c-5 cursor, and
   // the block INSIDE it sits at a fixed index at its own level. (This asserted the opposite until then.)
-  const afterEl = compileTemplate('<div>@if (show()) { <p>x</p> }<section>@if (more()) { <i>y</i> }</section></div>', {
+  const afterEl: CompileResult = compileTemplate('<div>@if (show()) { <p>x</p> }<section>@if (more()) { <i>y</i> }</section></div>', {
     mode: 'module', scope: ['show', 'more'], resumable: true,
   });
   assert.ok(afterEl.code.includes('render.adopt'), 'an element with a nested block after a block adopts (E1.23)');
 
   // A `use:` whose action is a SETUP binding cannot be rebuilt on a resume (a function never crosses the
   // snapshot) → still CSR fallback. An out-of-scope action is a module ref, which E1.21/E1.22 adopt.
-  const useComp = compileTemplate('<div><Widget use:tip /></div>', {
+  const useComp: CompileResult = compileTemplate('<div><Widget use:tip /></div>', {
     mode: 'module', scope: ['tip'], resumable: true,
   });
   assert.ok(!useComp.code.includes('render.adopt'), 'a ctx `use:` action stays CSR fallback — nothing rebuilds it');
 });
 
 test('E1.2c-2: adopt replays an @if island — statics adopt in place, the block re-renders REACTIVELY', () => {
-  const render = compileResumable('<div><h1>{{ title() }}</h1>@if (show()) { <p>{{ body() }}</p> }</div>', ['title', 'show', 'body']);
-  const adopt = (render as { adopt?: AdoptFn }).adopt;
-  const handlers = (render as { handlers?: (c: Record<string, unknown>) => Record<string, ResumeHandler> }).handlers;
+  const render: (ctx: unknown, slots?: unknown) => Element = compileResumable('<div><h1>{{ title() }}</h1>@if (show()) { <p>{{ body() }}</p> }</div>', ['title', 'show', 'body']);
+  const adopt: AdoptFn | undefined = (render as { adopt?: AdoptFn }).adopt;
+  const handlers: ((c: Record<string, unknown>) => Record<string, ResumeHandler>) | undefined = (render as { handlers?: (c: Record<string, unknown>) => Record<string, ResumeHandler> }).handlers;
   assert.equal(typeof adopt, 'function', 'the @if fragment carries an adopt fn');
 
   // ── server ── render (resumable: markers + [ … ] brackets) with the branch shown, then snapshot
   const title: Signal<string> = signal('Hi');
   const show: Signal<boolean> = signal(true);
   const body: Signal<string> = signal('shown');
-  const serverNode = render({ title, show, body }) as HTMLElement;
-  const wire = snapshot({ title, show, body });
+  const serverNode: HTMLElement = render({ title, show, body }) as HTMLElement;
+  const wire: Wire = snapshot({ title, show, body });
   const serverHtml: string = serverNode.outerHTML;
   assert.ok(serverHtml.includes('shown') && serverHtml.includes('<!--[-->'), 'server rendered the live branch inside [ … ]');
 
@@ -382,7 +394,7 @@ test('E1.2c-2: adopt replays an @if island — statics adopt in place, the block
   const container: HTMLElement = host();
   container.innerHTML = serverHtml;
   const div: HTMLElement = container.querySelector('div')!;
-  const app = resume(div, {
+  const app: ResumeApp = resume(div, {
     snapshot: wire,
     handlers: handlers as (c: Record<string, unknown>) => Record<string, ResumeHandler>,
     adopt,
@@ -407,18 +419,18 @@ test('E1.2c-2: adopt replays an @if island — statics adopt in place, the block
 /* ──────────── E1.2c-3: @for island-replay adopt ──────────── */
 
 test('E1.2c-3: adopt replays a @for island — the heading adopts in place, the list re-renders REACTIVELY', () => {
-  const render = compileResumable(
+  const render: (ctx: unknown, slots?: unknown) => Element = compileResumable(
     '<div><h2>{{ title() }}</h2><ul>@for (n of items(); track n) { <li>{{ n }}</li> }</ul></div>',
     ['title', 'items']
   );
-  const adopt = (render as { adopt?: AdoptFn }).adopt;
+  const adopt: AdoptFn | undefined = (render as { adopt?: AdoptFn }).adopt;
   assert.equal(typeof adopt, 'function', 'a fragment whose last indexed thing is a @for emits an adopt fn');
 
   // ── server ── render the list + snapshot
   const title: Signal<string> = signal('Nums');
   const items: Signal<number[]> = signal([1, 2, 3]);
-  const serverNode = render({ title, items }) as HTMLElement;
-  const wire = snapshot({ title, items });
+  const serverNode: HTMLElement = render({ title, items }) as HTMLElement;
+  const wire: Wire = snapshot({ title, items });
   const serverHtml: string = serverNode.outerHTML;
   assert.ok(/<li[^>]*>1<\/li>/.test(serverHtml.replace(/<!--[^>]*-->/g, '')), 'server rendered the rows');
 
@@ -426,7 +438,7 @@ test('E1.2c-3: adopt replays a @for island — the heading adopts in place, the 
   const container: HTMLElement = host();
   container.innerHTML = serverHtml;
   const div: HTMLElement = container.querySelector('div')!;
-  const app = resume(div, { snapshot: wire, adopt });
+  const app: ResumeApp = resume(div, { snapshot: wire, adopt });
 
   // heading adopted in place + reactive
   assert.equal(div.querySelector('h2')!.textContent, 'Nums', 'the <h2> text is present after adopt');
@@ -456,19 +468,19 @@ test('E1.2c-4: a reactive interp AFTER a block adopts via the cursor — emit sh
 });
 
 test('E1.2c-4: adopt resumes a block PLUS a trailing interp — the tail after the block updates in place', () => {
-  const render = compileResumable(
+  const render: (ctx: unknown, slots?: unknown) => Element = compileResumable(
     '<div><h4>{{ head() }}</h4>@if (show()) { <p>body</p> }{{ tail() }}</div>',
     ['head', 'show', 'tail']
   );
-  const adopt = (render as { adopt?: AdoptFn }).adopt;
+  const adopt: AdoptFn | undefined = (render as { adopt?: AdoptFn }).adopt;
   assert.equal(typeof adopt, 'function', 'the fragment (pre-block text + block + post-block interp) is adoptable');
 
   // ── server ──
   const head: Signal<string> = signal('H');
   const show: Signal<boolean> = signal(true);
   const tail: Signal<string> = signal('T');
-  const serverNode = render({ head, show, tail }) as HTMLElement;
-  const wire = snapshot({ head, show, tail });
+  const serverNode: HTMLElement = render({ head, show, tail }) as HTMLElement;
+  const wire: Wire = snapshot({ head, show, tail });
   const serverHtml: string = serverNode.outerHTML;
   assert.ok(serverHtml.includes('body') && serverHtml.replace(/<!--[^>]*-->/g, '').includes('T'), 'server rendered branch + tail');
 
@@ -481,7 +493,7 @@ test('E1.2c-4: adopt resumes a block PLUS a trailing interp — the tail after t
   const tailNode: Text = tailAnchor.previousSibling as Text;
   assert.equal(tailNode.data, 'T', 'the post-block tail text was found via the cursor (server value)');
 
-  const app = resume(div, { snapshot: wire, adopt });
+  const app: ResumeApp = resume(div, { snapshot: wire, adopt });
   assert.equal(div.querySelector('h4')!.textContent, 'H', 'pre-block <h4> adopted');
 
   // the tail (reached by after(], 3)) is reactive in place — the SAME node, re-bound
@@ -512,11 +524,11 @@ test('E1.2c-5: an element with dynamics AFTER a block adopts — its subtree reb
 });
 
 test('E1.2c-5: adopt resumes a block PLUS a trailing element subtree — the element text is reactive in place', () => {
-  const render = compileResumable(
+  const render: (ctx: unknown, slots?: unknown) => Element = compileResumable(
     '<div><h5>{{ head() }}</h5>@if (show()) { <p>body</p> }<footer>© {{ year() }} <b>{{ org() }}</b></footer></div>',
     ['head', 'show', 'year', 'org']
   );
-  const adopt = (render as { adopt?: AdoptFn }).adopt;
+  const adopt: AdoptFn | undefined = (render as { adopt?: AdoptFn }).adopt;
   assert.equal(typeof adopt, 'function', 'the fragment (block + trailing element subtree) is adoptable');
 
   // ── server ──
@@ -524,8 +536,8 @@ test('E1.2c-5: adopt resumes a block PLUS a trailing element subtree — the ele
   const show: Signal<boolean> = signal(true);
   const year: Signal<number> = signal(2026);
   const org: Signal<string> = signal('Weave');
-  const serverNode = render({ head, show, year, org }) as HTMLElement;
-  const wire = snapshot({ head, show, year, org });
+  const serverNode: HTMLElement = render({ head, show, year, org }) as HTMLElement;
+  const wire: Wire = snapshot({ head, show, year, org });
 
   // ── client ──
   const container: HTMLElement = host();
@@ -533,7 +545,7 @@ test('E1.2c-5: adopt resumes a block PLUS a trailing element subtree — the ele
   const div: HTMLElement = container.querySelector('div')!;
   const footer: HTMLElement = div.querySelector('footer')!;
   const bold: HTMLElement = footer.querySelector('b')!;
-  const app = resume(div, { snapshot: wire, adopt });
+  const app: ResumeApp = resume(div, { snapshot: wire, adopt });
 
   assert.ok(footer.textContent!.includes('2026') && footer.textContent!.includes('Weave'), 'the post-block <footer> subtree is present');
 
@@ -555,13 +567,13 @@ test('E1.2c-5: adopt resumes a block PLUS a trailing element subtree — the ele
 /* ──────────── E1.2c-6a: multi-root fragments ──────────── */
 
 test('E1.2c-6a: a multi-root fragment is adoptable (was single-root only); a `use:` fragment still is not', () => {
-  const multi = compileTemplate('<span>{{ a() }}</span><b>{{ c() }}</b>', {
+  const multi: CompileResult = compileTemplate('<span>{{ a() }}</span><b>{{ c() }}</b>', {
     mode: 'module', scope: ['a', 'c'], resumable: true,
   });
   assert.ok(multi.code.includes('render.adopt'), 'two element roots now emit an adopt fn');
 
   // (`<slot>` stood here until E1.17; it island-replays now, so the opt-out is pinned on a real one)
-  const used = compileTemplate('<div><b use:tooltip>x</b></div>', { mode: 'module', scope: ['tooltip'], resumable: true });
+  const used: CompileResult = compileTemplate('<div><b use:tooltip>x</b></div>', { mode: 'module', scope: ['tooltip'], resumable: true });
   assert.ok(!used.code.includes('render.adopt'), 'a `use:` action opts out (not adopt-navigable yet)');
 });
 
@@ -569,26 +581,26 @@ test('E1.46: adopt PUBLISHES which node it navigates off — container for a mul
   // The bug this pins: both shapes navigate by `child(_r, i)`, so the emit looks identical and a caller has
   // to GUESS what `_r` is. The docs shell (two component roots) was handed `firstElementChild` — the toolbar —
   // so `adopt` walked the toolbar's insides and threw off its end, and the whole page stayed inert server HTML.
-  const multi = compileTemplate('<span>{{ a() }}</span><b>{{ c() }}</b>', { mode: 'module', scope: ['a', 'c'], resumable: true });
+  const multi: CompileResult = compileTemplate('<span>{{ a() }}</span><b>{{ c() }}</b>', { mode: 'module', scope: ['a', 'c'], resumable: true });
   assert.ok(multi.code.includes('adopt.container = true;'), 'a multi-root fragment declares it adopts off the CONTAINER');
 
-  const single = compileTemplate('<div>{{ a() }}</div>', { mode: 'module', scope: ['a'], resumable: true });
+  const single: CompileResult = compileTemplate('<div>{{ a() }}</div>', { mode: 'module', scope: ['a'], resumable: true });
   assert.ok(single.code.includes('render.adopt'), 'the single-root control still emits an adopt fn');
   assert.ok(!single.code.includes('adopt.container'), 'a single root element adopts off ITSELF — no container flag');
 
   // a bare text root has no root element either — same container contract as two elements
-  const text = compileTemplate('{{ a() }}<b>{{ c() }}</b>', { mode: 'module', scope: ['a', 'c'], resumable: true });
+  const text: CompileResult = compileTemplate('{{ a() }}<b>{{ c() }}</b>', { mode: 'module', scope: ['a', 'c'], resumable: true });
   assert.ok(text.code.includes('adopt.container = true;'), 'a text-root fragment adopts off the container too');
 
   // the flag must survive onto the callable render, which is what the client entry actually reads
-  const render = compileResumable('<span>{{ a() }}</span><b>{{ c() }}</b>', ['a', 'c']);
+  const render: (ctx: unknown, slots?: unknown) => Element = compileResumable('<span>{{ a() }}</span><b>{{ c() }}</b>', ['a', 'c']);
   assert.equal((render as { adopt?: { container?: boolean } }).adopt!.container, true, 'render.adopt.container is set at runtime, not just in the source text');
 });
 
 test('E1.2c-6a: adopt resumes a MULTI-ROOT fragment in place against the mount container', () => {
   // two sibling roots + a bare text-interp root — the top level is the mount container, not one element
-  const render = compileResumable('<span>{{ a() }}</span> <b>{{ c() }}</b>', ['a', 'c']);
-  const adopt = (render as { adopt?: AdoptFn }).adopt;
+  const render: (ctx: unknown, slots?: unknown) => Element = compileResumable('<span>{{ a() }}</span> <b>{{ c() }}</b>', ['a', 'c']);
+  const adopt: AdoptFn | undefined = (render as { adopt?: AdoptFn }).adopt;
   assert.equal(typeof adopt, 'function', 'the multi-root fragment carries an adopt fn');
 
   // ── server ── render the fragment into a container, snapshot
@@ -596,14 +608,14 @@ test('E1.2c-6a: adopt resumes a MULTI-ROOT fragment in place against the mount c
   const c: Signal<number> = signal(1);
   const mount: HTMLElement = host();
   mount.appendChild(render({ a, c })); // a DocumentFragment of [<span>, ' ', <b>]
-  const wire = snapshot({ a, c });
+  const wire: Wire = snapshot({ a, c });
   const serverHtml: string = mount.innerHTML;
   assert.ok(serverHtml.includes('A') && serverHtml.includes('<b'), 'server rendered both roots');
 
   // ── client ── fresh parse into a container; resume against the CONTAINER (it holds the roots)
   const container: HTMLElement = host();
   container.innerHTML = serverHtml;
-  const app = resume(container, { snapshot: wire, adopt });
+  const app: ResumeApp = resume(container, { snapshot: wire, adopt });
 
   const span: HTMLElement = container.querySelector('span')!;
   const bold: HTMLElement = container.querySelector('b')!;
@@ -622,9 +634,9 @@ test('E1.2c-6a: adopt resumes a MULTI-ROOT fragment in place against the mount c
 test('E1.2c-6: adopt resumes a static CHILD component in place — child setup never re-runs, both reactive', () => {
   // compile the child (resumable) and wrap it as a real component (as the loader/component.ts would)
   const childCode: string = compileTemplate('<b>{{ label() }}</b>', { mode: 'function', scope: ['label'], resumable: true }).code;
-  const childRender = new Function('rt', '_c', childCode.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;'))(rt, {}) as ((ctx: unknown, slots?: unknown) => Node) & { adopt?: AdoptFn };
+  const childRender: ((ctx: unknown, slots?: unknown) => Node) & { adopt?: AdoptFn; } = new Function('rt', '_c', childCode.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;'))(rt, {}) as ResumableRender<Node>;
   let childSetups: number = 0;
-  const Child = dom.defineComponent(
+  const Child: dom.Component & { adopt?: AdoptFn; } = dom.defineComponent(
     childRender as never,
     (props: Record<string, unknown>) => { childSetups++; return { label: signal((props.start as string) ?? 'x') }; }
   ) as dom.Component & { adopt?: AdoptFn };
@@ -632,24 +644,24 @@ test('E1.2c-6: adopt resumes a static CHILD component in place — child setup n
 
   // compile the parent, referencing Child via _c
   const parentCode: string = compileTemplate('<div><h1>{{ title() }}</h1><Child /></div>', { mode: 'function', scope: ['title'], resumable: true }).code;
-  const parentRender = new Function('rt', '_c', parentCode.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;'))(rt, { Child }) as ((ctx: unknown, slots?: unknown) => Element) & { adopt?: AdoptFn };
+  const parentRender: ((ctx: unknown, slots?: unknown) => Element) & { adopt?: AdoptFn; } = new Function('rt', '_c', parentCode.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;'))(rt, { Child }) as ResumableRender;
   assert.equal(typeof parentRender.adopt, 'function', 'the parent (with a static child component) is adoptable');
 
   // ── server ── render + collect the child ctx; snapshot the whole { $root, c0 } map
   const title: Signal<string> = signal('T');
   const box: HTMLElement = host();
-  const states = collectStates(() => { box.appendChild(parentRender({ title }, {})); });
+  const states: Record<string, unknown> = collectStates(() => { box.appendChild(parentRender({ title }, {})); });
   assert.ok(states.c0, 'the static child self-registered its ctx under c0 (via the $wid preamble)');
   assert.equal(childSetups, 1, 'child setup ran once on the server');
   states[ROOT_ID] = { title };
-  const wire = snapshot(states);
+  const wire: Wire = snapshot(states);
   const serverHtml: string = (box.firstElementChild as HTMLElement).outerHTML;
 
   // ── client ── fresh parse + resume
   const client: HTMLElement = host();
   client.innerHTML = serverHtml;
   const div: HTMLElement = client.querySelector('div')!;
-  const app = resume(div, { snapshot: wire, adopt: parentRender.adopt });
+  const app: ResumeApp = resume(div, { snapshot: wire, adopt: parentRender.adopt });
   assert.equal(childSetups, 1, 'RESUME did NOT re-run the child setup — resumed, not re-rendered');
 
   // parent text adopted + reactive
@@ -680,21 +692,16 @@ test('E1.30: a MUTABLE setup local survives resume — one handler writes it, an
       ['move', '() => { if (ctx.dragging) ctx.n.set(ctx.n() + 1); }'],
     ]),
   });
-  const render = new Function('rt', '_c', code.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;'))(rt, {}) as
-    ((ctx: unknown, slots?: unknown) => Element) & {
-      adopt?: AdoptFn;
-      derive?: (c: Record<string, unknown>, p?: Record<string, unknown>) => unknown;
-      handlers?: (c: Record<string, unknown>, p?: Record<string, unknown>) => Record<string, ResumeHandler>;
-    };
+  const render: ResumableRender<Element> = new Function('rt', '_c', code.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;'))(rt, {}) as ResumableRender;
 
   const n: Signal<number> = signal(0);
-  const serverNode = serverRender(() => render({ n, down: () => {}, move: () => {} })) as HTMLElement;
-  const wire = snapshot({ n });
+  const serverNode: HTMLElement = serverRender(() => render({ n, down: () => {}, move: () => {} })) as HTMLElement;
+  const wire: Wire = snapshot({ n });
 
   const container: HTMLElement = host();
   container.innerHTML = serverNode.outerHTML;
   const b: HTMLElement = container.querySelector('b')!;
-  const app = resume(b, { snapshot: wire, adopt: render.adopt, derive: render.derive, handlers: render.handlers });
+  const app: ResumeApp = resume(b, { snapshot: wire, adopt: render.adopt, derive: render.derive, handlers: render.handlers });
   assert.equal(app.ctx.dragging, false, 'the mutable local was rebuilt at its initial value');
 
   b.dispatchEvent(new PointerEvent('pointermove', { bubbles: true }));
@@ -720,17 +727,12 @@ test('E1.25: a binding initialised FROM props is rebuilt on resume and is live',
     resumableDerived: new Map([['open', 'rt.signal(props.start ?? "shut")']]),
     resumableHandlers: new Map([['tog', '() => ctx.open.set("toggled")']]),
   });
-  const render = new Function('rt', '_c', code.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;'))(rt, {}) as
-    ((ctx: unknown, slots?: unknown) => Element) & {
-      adopt?: AdoptFn;
-      derive?: (c: Record<string, unknown>, p?: Record<string, unknown>) => unknown;
-      handlers?: (c: Record<string, unknown>, p?: Record<string, unknown>) => Record<string, ResumeHandler>;
-    };
+  const render: ResumableRender<Element> = new Function('rt', '_c', code.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;'))(rt, {}) as ResumableRender;
 
   // ── server ── `open` is a setup local, never returned → nothing about it crosses the wire
   const serverOpen: Signal<string> = signal('wide');
-  const serverNode = serverRender(() => render({ open: serverOpen, tog: () => {} })) as HTMLElement;
-  const wire = snapshot({});
+  const serverNode: HTMLElement = serverRender(() => render({ open: serverOpen, tog: () => {} })) as HTMLElement;
+  const wire: Wire = snapshot({});
   assert.equal(serverNode.textContent, 'wide', 'the server rendered it');
 
   // ── client ── derive rebuilds it FROM PROPS; without them it could not be rebuilt at all
@@ -738,7 +740,7 @@ test('E1.25: a binding initialised FROM props is rebuilt on resume and is live',
   container.innerHTML = serverNode.outerHTML;
   const b: HTMLElement = container.querySelector('b')!;
   const props: Record<string, unknown> = { start: 'wide' };
-  const app = resume(b, {
+  const app: ResumeApp = resume(b, {
     snapshot: wire,
     adopt: render.adopt,
     derive: (c) => render.derive!(c, props),
@@ -765,25 +767,25 @@ test('E1.24: a `@snippet` after a block does not block adopt — it consumes no 
 });
 
 test('E1.24: `@key` and `@render` island-replay on adopt — the statics around them stay put', () => {
-  const render = compileResumable(
+  const render: (ctx: unknown, slots?: unknown) => Element = compileResumable(
     '<div><h1>{{ t() }}</h1>@key (k()) { <i>K{{ n() }}</i> }</div>',
     ['t', 'k', 'n'],
   );
-  const adopt = (render as { adopt?: AdoptFn }).adopt;
+  const adopt: AdoptFn | undefined = (render as { adopt?: AdoptFn }).adopt;
   assert.equal(typeof adopt, 'function', 'an @key block is adoptable (it replays like @if)');
 
   const t: Signal<string> = signal('T');
   const k: Signal<number> = signal(1);
   const n: Signal<number> = signal(5);
-  const serverNode = serverRender(() => render({ t, k, n })) as HTMLElement;
-  const wire = snapshot({ t, k, n });
+  const serverNode: HTMLElement = serverRender(() => render({ t, k, n })) as HTMLElement;
+  const wire: Wire = snapshot({ t, k, n });
   assert.equal(serverNode.querySelector('i')!.textContent, 'K5', 'server rendered the keyed block');
 
   const container: HTMLElement = host();
   container.innerHTML = serverNode.outerHTML;
   const div: HTMLElement = container.querySelector('div')!;
   const h1: HTMLElement = div.querySelector('h1')!;
-  const app = resume(div, { snapshot: wire, adopt });
+  const app: ResumeApp = resume(div, { snapshot: wire, adopt });
 
   assert.is(div.querySelector('h1'), h1, 'the heading before it was ADOPTED, not re-created');
   assert.equal(h1.textContent, 'T', 'with its server value');
@@ -805,19 +807,19 @@ test('E1.23: an element containing a block, placed AFTER a block, adopts — bot
   // Its subtree already rebases onto the post-block cursor (E1.2c-5), and inside the element the inner block's
   // `[` marker sits at a fixed index — nothing variable precedes it at THAT level. So the refusal is the same
   // kind of over-caution E1.15 turned out to be. Prove it with a round-trip, not by reading the code.
-  const render = compileResumable(
+  const render: (ctx: unknown, slots?: unknown) => Element = compileResumable(
     '<div>@if (a()) { <i>A{{ n() }}</i> }<p>tail@if (b()) { <b>B{{ n() }}</b> }</p></div>',
     ['a', 'b', 'n'],
   );
-  const adopt = (render as { adopt?: AdoptFn }).adopt;
+  const adopt: AdoptFn | undefined = (render as { adopt?: AdoptFn }).adopt;
   assert.equal(typeof adopt, 'function', 'an element with a nested block, after a block, is adoptable');
 
   // ── server ──
   const a: Signal<boolean> = signal(true);
   const b: Signal<boolean> = signal(true);
   const n: Signal<number> = signal(1);
-  const serverNode = serverRender(() => render({ a, b, n })) as HTMLElement;
-  const wire = snapshot({ a, b, n });
+  const serverNode: HTMLElement = serverRender(() => render({ a, b, n })) as HTMLElement;
+  const wire: Wire = snapshot({ a, b, n });
   assert.equal(serverNode.querySelector('i')!.textContent, 'A1', 'server rendered the first block');
   assert.equal(serverNode.querySelector('p b')!.textContent, 'B1', 'and the one nested in the trailing <p>');
 
@@ -826,7 +828,7 @@ test('E1.23: an element containing a block, placed AFTER a block, adopts — bot
   container.innerHTML = serverNode.outerHTML;
   const div: HTMLElement = container.querySelector('div')!;
   const p: HTMLElement = div.querySelector('p')!;
-  const app = resume(div, { snapshot: wire, adopt });
+  const app: ResumeApp = resume(div, { snapshot: wire, adopt });
 
   assert.is(div.querySelector('p'), p, 'the trailing <p> itself was ADOPTED, not re-created');
   assert.ok(/tail/.test(p.textContent!), 'its static text is intact');
@@ -850,10 +852,9 @@ test('E1.22: a `use:` on a COMPONENT runs ONCE, on the ADOPTED root — not on a
   // the old emit would have CREATED a second copy of the child, so the page would carry a duplicate and the
   // action would land on the wrong node. Assert the DOM, not just the call.
   const childCode: string = compileTemplate('<b>{{ n() }}</b>', { mode: 'function', scope: ['n'], resumable: true }).code;
-  const childRender = new Function('rt', '_c', childCode.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;'))(rt, {}) as
-    ((ctx: unknown, slots?: unknown) => Node) & { adopt?: AdoptFn };
+  const childRender: ((ctx: unknown, slots?: unknown) => Node) & { adopt?: AdoptFn; } = new Function('rt', '_c', childCode.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;'))(rt, {}) as ResumableRender<Node>;
   let childSetups: number = 0;
-  const Child = dom.defineComponent(childRender as never, () => { childSetups++; return { n: signal(3) }; }) as
+  const Child: dom.Component & { adopt?: AdoptFn; } = dom.defineComponent(childRender as never, () => { childSetups++; return { n: signal(3) }; }) as
     dom.Component & { adopt?: AdoptFn };
   Child.adopt = childRender.adopt;
 
@@ -868,16 +869,15 @@ test('E1.22: a `use:` on a COMPONENT runs ONCE, on the ADOPTED root — not on a
   const parentCode: string = compileTemplate('<div><Child use:mark /></div>', {
     mode: 'function', scope: [], resumable: true,
   }).code;
-  const parentRender = new Function('rt', '_c', parentCode.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;'))(rt, { Child }) as
-    ((ctx: unknown, slots?: unknown) => Element) & { adopt?: AdoptFn };
+  const parentRender: ((ctx: unknown, slots?: unknown) => Element) & { adopt?: AdoptFn; } = new Function('rt', '_c', parentCode.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;'))(rt, { Child }) as ResumableRender;
   assert.equal(typeof parentRender.adopt, 'function', 'a `use:` on a component no longer refuses adopt');
 
   // ── server ── the action does NOT run here: `onMount` is inert on the server, which is exactly why adopt may
   // re-run it. (This render is in a real browser, so drain the mount queue before asserting.)
   const box: HTMLElement = host();
-  const states = collectStates(() => { box.appendChild(serverRender(() => parentRender({}, {})) as Node); });
+  const states: Record<string, unknown> = collectStates(() => { box.appendChild(serverRender(() => parentRender({}, {})) as Node); });
   states[ROOT_ID] = {};
-  const wire = snapshot(states);
+  const wire: Wire = snapshot(states);
   const serverHtml: string = (box.firstElementChild as HTMLElement).outerHTML;
   // `applyAction` defers to onMount (a microtask), so drain it before discarding what this browser-side stand-in
   // for the server did. On a REAL server none of it runs at all — that is the whole premise of E1.21/E1.22.
@@ -888,7 +888,7 @@ test('E1.22: a `use:` on a COMPONENT runs ONCE, on the ADOPTED root — not on a
   const client: HTMLElement = host();
   client.innerHTML = serverHtml;
   const div: HTMLElement = client.querySelector('div')!;
-  const app = resume(div, { snapshot: wire, adopt: parentRender.adopt });
+  const app: ResumeApp = resume(div, { snapshot: wire, adopt: parentRender.adopt });
   assert.equal(childSetups, 1, 'the child ADOPTED — its setup did not re-run');
   await Promise.resolve();
 
@@ -913,10 +913,9 @@ test('E1.20: a resumed CHILD click reads its `props` — live from the parent`s 
     resumable: true,
     resumableHandlers: new Map([['bump', '() => ctx.n.set((v) => v + props.step)']]),
   }).code;
-  const childRender = new Function('rt', '_c', childCode.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;'))(rt, {}) as
-    ((ctx: unknown, slots?: unknown) => Node) & { adopt?: AdoptFn; handlers?: (c: Record<string, unknown>, p?: Record<string, unknown>) => Record<string, ResumeHandler> };
+  const childRender: ResumableRender<Node> = new Function('rt', '_c', childCode.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;'))(rt, {}) as ResumableRender<Node>;
   let childSetups: number = 0;
-  const Child = dom.defineComponent(childRender as never, () => { childSetups++; return { n: signal(1), bump: () => {} }; }) as
+  const Child: dom.Component & { adopt?: AdoptFn; handlers?: unknown; } = dom.defineComponent(childRender as never, () => { childSetups++; return { n: signal(1), bump: () => {} }; }) as
     dom.Component & { adopt?: AdoptFn; handlers?: unknown };
   Child.adopt = childRender.adopt;
   Child.handlers = childRender.handlers;
@@ -924,24 +923,23 @@ test('E1.20: a resumed CHILD click reads its `props` — live from the parent`s 
   const parentCode: string = compileTemplate('<div><Child step={{ step() }} /></div>', {
     mode: 'function', scope: ['step'], resumable: true,
   }).code;
-  const parentRender = new Function('rt', '_c', parentCode.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;'))(rt, { Child }) as
-    ((ctx: unknown, slots?: unknown) => Element) & { adopt?: AdoptFn };
+  const parentRender: ((ctx: unknown, slots?: unknown) => Element) & { adopt?: AdoptFn; } = new Function('rt', '_c', parentCode.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;'))(rt, { Child }) as ResumableRender;
 
   // ── server ──
   const step: Signal<number> = signal(10);
   const box: HTMLElement = host();
   // BOTH sessions, as `renderPage` runs them: collectStates captures each instance's ctx, collectResumable
   // makes the `on:` sites stamp their `data-won-*` markers. Without the latter there is nothing to click.
-  const states = collectStates(() => { box.appendChild(serverRender(() => parentRender({ step }, {})) as Node); });
+  const states: Record<string, unknown> = collectStates(() => { box.appendChild(serverRender(() => parentRender({ step }, {})) as Node); });
   states[ROOT_ID] = { step };
-  const wire = snapshot(states);
+  const wire: Wire = snapshot(states);
   const serverHtml: string = (box.firstElementChild as HTMLElement).outerHTML;
 
   // ── client ──
   const client: HTMLElement = host();
   client.innerHTML = serverHtml;
   const div: HTMLElement = client.querySelector('div')!;
-  const app = resume(div, { snapshot: wire, adopt: parentRender.adopt });
+  const app: ResumeApp = resume(div, { snapshot: wire, adopt: parentRender.adopt });
   assert.equal(childSetups, 1, 'the child adopted — its setup did not re-run');
 
   const b: HTMLElement = div.querySelector('b')!;
@@ -966,17 +964,16 @@ test('E1.19: a resumed click runs through a setup HELPER rebuilt as a factory lo
     resumableHandlers: new Map([['inc', '() => bump(2)']]),          // the site body calls the helper…
     resumableLocals: new Map([['bump', '(by) => ctx.count.set((n) => n + by)']]), // …which the factory declares
   });
-  const render = new Function('rt', '_c', code.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;'))(rt, {}) as
-    ((ctx: unknown, slots?: unknown) => Element) & { adopt?: AdoptFn; handlers?: (c: Record<string, unknown>) => Record<string, ResumeHandler> };
+  const render: ResumableRender<Element> = new Function('rt', '_c', code.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;'))(rt, {}) as ResumableRender;
 
   const serverCount: Signal<number> = signal(5);
-  const serverNode = serverRender(() => render({ count: serverCount, inc: () => {} })) as HTMLButtonElement;
-  const wire = snapshot({ count: serverCount }); // `inc` and `bump` are functions — neither crosses the wire
+  const serverNode: HTMLButtonElement = serverRender(() => render({ count: serverCount, inc: () => {} })) as HTMLButtonElement;
+  const wire: Wire = snapshot({ count: serverCount }); // `inc` and `bump` are functions — neither crosses the wire
 
   const container: HTMLElement = host();
   container.innerHTML = serverNode.outerHTML;
   const btn: HTMLButtonElement = container.querySelector('button')!;
-  const app = resume(btn, { snapshot: wire, adopt: render.adopt, handlers: render.handlers });
+  const app: ResumeApp = resume(btn, { snapshot: wire, adopt: render.adopt, handlers: render.handlers });
 
   btn.click();
   assert.equal((app.ctx.count as Signal<number>)(), 7, 'the click ran the helper (5 + 2) — the factory local resolved');
@@ -995,12 +992,11 @@ test('E1.17: a <slot> component adopts — its own state resumes, setup never re
   const childCode: string = compileTemplate('<div class="c"><b>{{ n() }}</b><slot></slot></div>', {
     mode: 'function', scope: ['n'], resumable: true,
   }).code;
-  const childRender = new Function('rt', '_c', childCode.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;'))(rt, {}) as
-    ((ctx: unknown, slots?: unknown) => Node) & { adopt?: AdoptFn };
+  const childRender: ((ctx: unknown, slots?: unknown) => Node) & { adopt?: AdoptFn; } = new Function('rt', '_c', childCode.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;'))(rt, {}) as ResumableRender<Node>;
   assert.equal(typeof childRender.adopt, 'function', 'a template containing a <slot> is adoptable');
 
   let childSetups: number = 0;
-  const Child = dom.defineComponent(
+  const Child: dom.Component & { adopt?: AdoptFn; } = dom.defineComponent(
     childRender as never,
     () => { childSetups++; return { n: signal(4) }; }
   ) as dom.Component & { adopt?: AdoptFn };
@@ -1009,16 +1005,15 @@ test('E1.17: a <slot> component adopts — its own state resumes, setup never re
   const parentCode: string = compileTemplate('<section><Child><i>{{ label() }}</i></Child></section>', {
     mode: 'function', scope: ['label'], resumable: true,
   }).code;
-  const parentRender = new Function('rt', '_c', parentCode.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;'))(rt, { Child }) as
-    ((ctx: unknown, slots?: unknown) => Element) & { adopt?: AdoptFn };
+  const parentRender: ((ctx: unknown, slots?: unknown) => Element) & { adopt?: AdoptFn; } = new Function('rt', '_c', parentCode.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;'))(rt, { Child }) as ResumableRender;
 
   // ── server ──
   const label: Signal<string> = signal('projected');
   const box: HTMLElement = host();
-  const states = collectStates(() => { box.appendChild(parentRender({ label }, {})); });
+  const states: Record<string, unknown> = collectStates(() => { box.appendChild(parentRender({ label }, {})); });
   assert.ok(states.c0, 'the slotted child self-registered its ctx');
   states[ROOT_ID] = { label };
-  const wire = snapshot(states);
+  const wire: Wire = snapshot(states);
   const serverHtml: string = (box.firstElementChild as HTMLElement).outerHTML;
   assert.ok(/projected/.test(serverHtml), 'the server rendered the projected slot content');
 
@@ -1026,7 +1021,7 @@ test('E1.17: a <slot> component adopts — its own state resumes, setup never re
   const client: HTMLElement = host();
   client.innerHTML = serverHtml;
   const section: HTMLElement = client.querySelector('section')!;
-  const app = resume(section, { snapshot: wire, adopt: parentRender.adopt });
+  const app: ResumeApp = resume(section, { snapshot: wire, adopt: parentRender.adopt });
   assert.equal(childSetups, 1, 'the child ADOPTED — its setup did not re-run despite holding a slot');
 
   assert.equal(section.querySelector('.c b')!.textContent, '4', "the child's own binding adopted at its server value");
@@ -1053,26 +1048,25 @@ test('E1.16: a `ref` capture adopts — the ref re-binds to the ADOPTED server n
     resumable: true,
     resumableDerived: new Map([['host', 'rt.signal(null)']]), // as compileComponent emits for `const host = signal(null)`
   });
-  const render = new Function('rt', '_c', code.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;'))(rt, {}) as
-    ((ctx: unknown, slots?: unknown) => Element) & { adopt?: AdoptFn; derive?: (c: Record<string, unknown>) => unknown };
+  const render: ResumableRender<Element> = new Function('rt', '_c', code.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;'))(rt, {}) as ResumableRender;
   assert.equal(typeof render.adopt, 'function', 'a template with a `ref` is adoptable — the adopt walk HAS the node');
 
   // ── server ── the ref captures the SERVER node; only `count` crosses the wire
   const serverCount: Signal<number> = signal(7);
   const serverHost: Signal<Element | null> = signal<Element | null>(null);
-  const serverNode = serverRender(() => render({ count: serverCount, host: serverHost })) as HTMLElement;
+  const serverNode: HTMLElement = serverRender(() => render({ count: serverCount, host: serverHost })) as HTMLElement;
   assert.equal((serverHost() as Element)?.tagName, 'P', 'the server render captured its own <p> into the ref');
   const serverHtml: string = serverNode.outerHTML;
-  const wire = snapshot({ count: serverCount });
+  const wire: Wire = snapshot({ count: serverCount });
 
   // ── client ── fresh parse; `host` is absent from the snapshot, so derive rebuilds it as an empty signal
   const container: HTMLElement = host();
   container.innerHTML = serverHtml;
   const div: HTMLElement = container.querySelector('div')!;
   const clientP: HTMLElement = div.querySelector('p')!;
-  const app = resume(div, { snapshot: wire, adopt: render.adopt, derive: render.derive });
+  const app: ResumeApp = resume(div, { snapshot: wire, adopt: render.adopt, derive: render.derive });
 
-  const bound = (app.ctx.host as Signal<Element | null>)();
+  const bound: Element | null = (app.ctx.host as Signal<Element | null>)();
   assert.ok(bound, 'the ref is populated after resume (it was rebuilt, then bound by the adopt walk)');
   assert.is(bound as Element, clientP, 'the ref points at the ADOPTED server <p> — the very node on the page');
   assert.ok(bound !== (serverHost() as Element), 'and not at the stale server-render node');
@@ -1084,8 +1078,8 @@ test('E1.16: a `ref` capture adopts — the ref re-binds to the ADOPTED server n
 /** Compile `<el>{{ label() }}</el>` as a real resumable component, counting its setup runs. */
 function labelComponent(el: string, start: string, count: { n: number }): dom.Component & { adopt?: AdoptFn } {
   const code: string = compileTemplate(`<${el}>{{ label() }}</${el}>`, { mode: 'function', scope: ['label'], resumable: true }).code;
-  const render = new Function('rt', '_c', code.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;'))(rt, {}) as ((ctx: unknown, slots?: unknown) => Node) & { adopt?: AdoptFn };
-  const C = dom.defineComponent(
+  const render: ((ctx: unknown, slots?: unknown) => Node) & { adopt?: AdoptFn; } = new Function('rt', '_c', code.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;'))(rt, {}) as ResumableRender<Node>;
+  const C: dom.Component & { adopt?: AdoptFn; } = dom.defineComponent(
     render as never,
     () => { count.n++; return { label: signal(start) }; }
   ) as dom.Component & { adopt?: AdoptFn };
@@ -1098,29 +1092,29 @@ test('E1.15: two SIBLING components both adopt in place — neither setup re-run
   // ONE component, so the post-block gate refused the second one (and thus every real app) unnoticed.
   const a: { n: number } = { n: 0 };
   const b: { n: number } = { n: 0 };
-  const Foo = labelComponent('b', 'A', a);
-  const Bar = labelComponent('i', 'B', b);
+  const Foo: dom.Component & { adopt?: AdoptFn; } = labelComponent('b', 'A', a);
+  const Bar: dom.Component & { adopt?: AdoptFn; } = labelComponent('i', 'B', b);
 
   const parentCode: string = compileTemplate('<div><Foo /><Bar /></div>', { mode: 'function', scope: [], resumable: true }).code;
-  const parentRender = new Function('rt', '_c', parentCode.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;'))(rt, { Foo, Bar }) as ((ctx: unknown, slots?: unknown) => Element) & { adopt?: AdoptFn };
+  const parentRender: ((ctx: unknown, slots?: unknown) => Element) & { adopt?: AdoptFn; } = new Function('rt', '_c', parentCode.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;'))(rt, { Foo, Bar }) as ResumableRender;
   assert.equal(typeof parentRender.adopt, 'function', 'two sibling components are adoptable (the gate used to refuse the 2nd)');
 
   // ── server ── both children self-register; snapshot { $root, c0, c1 }
   const box: HTMLElement = host();
-  const states = collectStates(() => { box.appendChild(parentRender({}, {})); });
+  const states: Record<string, unknown> = collectStates(() => { box.appendChild(parentRender({}, {})); });
   assert.ok(states.c0, 'the FIRST child self-registered its ctx (c0)');
   assert.ok(states.c1, 'the SECOND child self-registered its ctx (c1)');
   assert.equal(a.n, 1, 'first child setup ran once on the server');
   assert.equal(b.n, 1, 'second child setup ran once on the server');
   states[ROOT_ID] = {};
-  const wire = snapshot(states);
+  const wire: Wire = snapshot(states);
   const serverHtml: string = (box.firstElementChild as HTMLElement).outerHTML;
 
   // ── client ── fresh parse + resume
   const client: HTMLElement = host();
   client.innerHTML = serverHtml;
   const div: HTMLElement = client.querySelector('div')!;
-  const app = resume(div, { snapshot: wire, adopt: parentRender.adopt });
+  const app: ResumeApp = resume(div, { snapshot: wire, adopt: parentRender.adopt });
   assert.equal(a.n, 1, 'RESUME did not re-run the FIRST child setup');
   assert.equal(b.n, 1, 'RESUME did not re-run the SECOND child setup — it adopted, it did not re-render');
 
@@ -1134,15 +1128,15 @@ test('E1.15: two SIBLING components both adopt in place — neither setup re-run
 });
 
 test('E1.2b-2: adopt re-binds the SERVER text node in place — signal update flows, node identity kept, no re-render', () => {
-  const render = compileResumable('<button on:click={{() => count.set((c) => c + 1)}}>Count: {{ count() }}</button>', ['count']);
-  const adopt = (render as { adopt?: AdoptFn }).adopt;
-  const handlers = (render as { handlers?: (c: Record<string, unknown>) => Record<string, ResumeHandler> }).handlers;
+  const render: (ctx: unknown, slots?: unknown) => Element = compileResumable('<button on:click={{() => count.set((c) => c + 1)}}>Count: {{ count() }}</button>', ['count']);
+  const adopt: AdoptFn | undefined = (render as { adopt?: AdoptFn }).adopt;
+  const handlers: ((c: Record<string, unknown>) => Record<string, ResumeHandler>) | undefined = (render as { handlers?: (c: Record<string, unknown>) => Record<string, ResumeHandler> }).handlers;
   assert.equal(typeof adopt, 'function', 'the resumable render carries an adopt fn');
 
   // ── server ── render the resumable target (stamps the data-won marker + isolates the dynamic text) + snapshot
   const serverCount: Signal<number> = signal(7);
-  const serverNode = serverRender(() => render({ count: serverCount })) as HTMLButtonElement;
-  const wire = snapshot({ count: serverCount });
+  const serverNode: HTMLButtonElement = serverRender(() => render({ count: serverCount })) as HTMLButtonElement;
+  const wire: Wire = snapshot({ count: serverCount });
   const serverHtml: string = serverNode.outerHTML; // exactly what renderPage would serialize
 
   // ── client ── a FRESH parse of the server HTML: dead DOM, no live bindings carried over from the render above
@@ -1155,7 +1149,7 @@ test('E1.2b-2: adopt re-binds the SERVER text node in place — signal update fl
 
   // resume with the EMITTED adopt + handlers — no hand-authoring, no setup (ctx comes from the snapshot). The
   // resume root IS the component's single root element (what render returns / adopt navigates from as `_r`).
-  const app = resume(btn, {
+  const app: ResumeApp = resume(btn, {
     snapshot: wire,
     handlers: handlers as (c: Record<string, unknown>) => Record<string, ResumeHandler>,
     adopt,
@@ -1195,10 +1189,7 @@ test('resumableHandler returns instance-unique ids and registers into the active
  * closes over the resumed `ctx.count` exactly like an inline handler. Here we drive the emitted code with the
  * body compileComponent produces, and snapshot WITHOUT `inc` — precisely what the SSG pipeline does.
  */
-function compileNamed(handlers?: Map<string, string>): ((ctx: unknown, slots?: unknown) => Element) & {
-  adopt?: AdoptFn;
-  handlers?: (c: Record<string, unknown>) => Record<string, ResumeHandler>;
-} {
+function compileNamed(handlers?: Map<string, string>): ResumableRender {
   const { code } = compileTemplate('<button on:click={{ inc }}>{{ count() }}</button>', {
     mode: 'function',
     scope: ['count', 'inc'],
@@ -1211,12 +1202,12 @@ function compileNamed(handlers?: Map<string, string>): ((ctx: unknown, slots?: u
 
 test('E1.5: a NAMED handler RESUMES — its inlined body clicks against the resumed ctx, with `inc` absent from the snapshot', () => {
   // exactly what compileComponent emits for `const inc = () => count.set((n) => n + 1)`
-  const render = compileNamed(new Map([['inc', '() => ctx.count.set((n) => n + 1)']]));
+  const render: ResumableRender<Element> = compileNamed(new Map([['inc', '() => ctx.count.set((n) => n + 1)']]));
 
   // ── server ── render with the real setup ctx (count + inc), then snapshot ONLY what serializes (no `inc`)
   const serverCount: Signal<number> = signal(3);
-  const node = serverRender(() => render({ count: serverCount, inc: () => serverCount.set((n) => n + 1) })) as HTMLButtonElement;
-  const wire = snapshot({ count: serverCount }); // registerState drops the function — this is the real payload
+  const node: HTMLButtonElement = serverRender(() => render({ count: serverCount, inc: () => serverCount.set((n) => n + 1) })) as HTMLButtonElement;
+  const wire: Wire = snapshot({ count: serverCount }); // registerState drops the function — this is the real payload
   const serverHtml: string = node.outerHTML;
 
   // ── client ── fresh parse (dead DOM), resume, click
@@ -1224,7 +1215,7 @@ test('E1.5: a NAMED handler RESUMES — its inlined body clicks against the resu
   container.innerHTML = serverHtml;
   const btn: HTMLButtonElement = container.querySelector('button')!;
   assert.equal(btn.textContent, '3', 'the server value is in the DOM');
-  const app = resume(btn, { snapshot: wire, handlers: render.handlers, adopt: render.adopt });
+  const app: ResumeApp = resume(btn, { snapshot: wire, handlers: render.handlers, adopt: render.adopt });
   assert.equal(app.ctx.inc, undefined, 'the handler function did NOT cross the wire — only its inlined body did');
 
   btn.click();
@@ -1234,15 +1225,15 @@ test('E1.5: a NAMED handler RESUMES — its inlined body clicks against the resu
 });
 
 test('E1.5 DoD: WITHOUT the inlining the same named handler is dead (proves the fix is what makes it work)', () => {
-  const render = compileNamed(); // no resumableHandlers → the factory emits a bare `ctx.inc`
+  const render: ResumableRender<Element> = compileNamed(); // no resumableHandlers → the factory emits a bare `ctx.inc`
   const serverCount: Signal<number> = signal(3);
-  const node = serverRender(() => render({ count: serverCount, inc: () => serverCount.set((n) => n + 1) })) as HTMLButtonElement;
-  const wire = snapshot({ count: serverCount });
+  const node: HTMLButtonElement = serverRender(() => render({ count: serverCount, inc: () => serverCount.set((n) => n + 1) })) as HTMLButtonElement;
+  const wire: Wire = snapshot({ count: serverCount });
 
   const container: HTMLElement = host();
   container.innerHTML = node.outerHTML;
   const btn: HTMLButtonElement = container.querySelector('button')!;
-  const app = resume(btn, { snapshot: wire, handlers: render.handlers, adopt: render.adopt });
+  const app: ResumeApp = resume(btn, { snapshot: wire, handlers: render.handlers, adopt: render.adopt });
   btn.click();
   assert.equal((app.ctx.count as Signal<number>)(), 3, 'ctx.inc is undefined → the click does nothing (today’s gap)');
   assert.equal(btn.textContent, '3', 'the DOM never changed');
@@ -1257,10 +1248,7 @@ test('E1.5 DoD: WITHOUT the inlining the same named handler is dead (proves the 
  * (adopt never finished, no events armed, page inert). `derive(ctx)` rebuilds it over the resumed signals
  * before adopt runs.
  */
-function compileComputed(computeds?: Map<string, string>): ((ctx: unknown, slots?: unknown) => Element) & {
-  adopt?: AdoptFn;
-  derive?: (ctx: Record<string, unknown>) => unknown;
-} {
+function compileComputed(computeds?: Map<string, string>): ResumableRender {
   const { code } = compileTemplate('<p>{{ doubled() }}</p>', {
     mode: 'function',
     scope: ['doubled'],
@@ -1274,15 +1262,15 @@ function compileComputed(computeds?: Map<string, string>): ((ctx: unknown, slots
 test('E1.6: a computed is REBUILT on resume — the page adopts and stays reactive through the derived value', () => {
   // what compileComponent emits: the FULL initializer, ctx-rewritten (its callee is the module's own import;
   // function mode reaches it via `rt`).
-  const render = compileComputed(new Map([['doubled', 'rt.computed(() => ctx.count() * 2)']]));
+  const render: ResumableRender<Element> = compileComputed(new Map([['doubled', 'rt.computed(() => ctx.count() * 2)']]));
   assert.equal(typeof render.derive, 'function', 'the render carries a derive');
 
   // ── server ── the real setup ctx; the snapshot carries ONLY the signal (registerState drops the computed)
   const count: Signal<number> = signal(3);
-  const doubled = computed(() => count() * 2);
-  const node = render({ doubled }) as HTMLElement;
+  const doubled: Computed<number> = computed(() => count() * 2);
+  const node: HTMLElement = render({ doubled }) as HTMLElement;
   const serverHtml: string = node.outerHTML;
-  const wire = snapshot({ count });
+  const wire: Wire = snapshot({ count });
 
   // ── client ── fresh parse + resume
   const container: HTMLElement = host();
@@ -1290,7 +1278,7 @@ test('E1.6: a computed is REBUILT on resume — the page adopts and stays reacti
   const p: HTMLElement = container.querySelector('p')!;
   assert.equal(p.textContent, '6', 'the server rendered the computed value');
 
-  const app = resume(p, { snapshot: wire, adopt: render.adopt, derive: render.derive });
+  const app: ResumeApp = resume(p, { snapshot: wire, adopt: render.adopt, derive: render.derive });
   assert.equal(p.textContent, '6', 'resumed in place — the derived computed matches the server value');
   assert.equal(typeof app.ctx.doubled, 'function', 'the computed was rebuilt onto the resumed ctx');
 
@@ -1301,9 +1289,9 @@ test('E1.6: a computed is REBUILT on resume — the page adopts and stays reacti
 });
 
 test('E1.6 DoD: WITHOUT derive the same page THROWS on resume (this was killing the whole page, not one button)', () => {
-  const render = compileComputed(); // no resumableComputeds → no derive emitted
+  const render: ResumableRender<Element> = compileComputed(); // no resumableComputeds → no derive emitted
   const count: Signal<number> = signal(3);
-  const doubled = computed(() => count() * 2);
+  const doubled: Computed<number> = computed(() => count() * 2);
   const container: HTMLElement = host();
   container.innerHTML = (render({ doubled }) as HTMLElement).outerHTML;
   const p: HTMLElement = container.querySelector('p')!;
@@ -1321,37 +1309,37 @@ test('E1.6 DoD: WITHOUT derive the same page THROWS on resume (this was killing 
 
 test('E1.8: a static <Child> with its OWN on:click resumes — the click runs the child handler over the child ctx', () => {
   // child: its own button + handler + reactive text
-  const childCode = compileTemplate('<button on:click={{ () => count.set((c) => c + 1) }}>{{ count() }}</button>', {
+  const childCode: string = compileTemplate('<button on:click={{ () => count.set((c) => c + 1) }}>{{ count() }}</button>', {
     mode: 'function', scope: ['count'], resumable: true,
   }).code;
-  const childRender = new Function('rt', '_c', childCode.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;'))(rt, {}) as ((ctx: unknown) => Node) & { adopt?: AdoptFn; handlers?: (c: Record<string, unknown>) => Record<string, ResumeHandler> };
-  let childSetups = 0;
-  const Child = dom.defineComponent(childRender as never, () => { childSetups++; return { count: signal(0) }; }) as dom.Component & { adopt?: AdoptFn; handlers?: unknown };
+  const childRender: ResumableRender<Node> = new Function('rt', '_c', childCode.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;'))(rt, {}) as ResumableRender<Node>;
+  let childSetups: number = 0;
+  const Child: dom.Component & { adopt?: AdoptFn; handlers?: unknown; } = dom.defineComponent(childRender as never, () => { childSetups++; return { count: signal(0) }; }) as dom.Component & { adopt?: AdoptFn; handlers?: unknown };
   Child.adopt = childRender.adopt;
   (Child as { handlers?: unknown }).handlers = childRender.handlers; // component.ts attaches this in the resumable target
 
   // parent: a static child, no events of its own
-  const parentCode = compileTemplate('<div><h1>{{ title() }}</h1><Child /></div>', { mode: 'function', scope: ['title'], resumable: true }).code;
-  const parentRender = new Function('rt', '_c', parentCode.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;'))(rt, { Child }) as ((ctx: unknown, slots?: unknown) => Element) & { adopt?: AdoptFn };
+  const parentCode: string = compileTemplate('<div><h1>{{ title() }}</h1><Child /></div>', { mode: 'function', scope: ['title'], resumable: true }).code;
+  const parentRender: ((ctx: unknown, slots?: unknown) => Element) & { adopt?: AdoptFn; } = new Function('rt', '_c', parentCode.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;'))(rt, { Child }) as ResumableRender;
 
   // ── server ── render + collect the child ctx under c0, snapshot { $root, c0 }
-  const title = signal('T');
-  const box = host();
-  const states = collectStates(() => { box.appendChild(serverRender(() => parentRender({ title }, {}))); });
+  const title: Signal<string> = signal('T');
+  const box: HTMLElement = host();
+  const states: Record<string, unknown> = collectStates(() => { box.appendChild(serverRender(() => parentRender({ title }, {}))); });
   assert.ok(states.c0, 'the child self-registered under c0');
   assert.equal(childSetups, 1, 'child setup ran once on the server');
   states[ROOT_ID] = { title };
-  const wire = snapshot(states);
-  const serverHtml = (box.firstElementChild as HTMLElement).outerHTML;
+  const wire: Wire = snapshot(states);
+  const serverHtml: string = (box.firstElementChild as HTMLElement).outerHTML;
 
   // ── client ── fresh parse + resume (parent has no handlers of its own)
-  const client = host();
+  const client: HTMLElement = host();
   client.innerHTML = serverHtml;
-  const div = client.querySelector('div')!;
-  const btn = div.querySelector('button')!;
+  const div: HTMLDivElement = client.querySelector('div')!;
+  const btn: HTMLButtonElement = div.querySelector('button')!;
   assert.equal(btn.textContent, '0', 'the child rendered its server value');
 
-  const app = resume(div, { snapshot: wire, adopt: parentRender.adopt });
+  const app: ResumeApp = resume(div, { snapshot: wire, adopt: parentRender.adopt });
   assert.equal(childSetups, 1, 'resume did NOT re-run the child setup');
 
   btn.click(); // the CHILD's own handler — must resolve against the child ctx, not the (handler-less) root
@@ -1395,14 +1383,13 @@ test('E1.47: the rebuilt effect is LIVE on a resumed page — it re-subscribes, 
     resumableDerived: new Map([['shown', 'rt.computed(() => ctx.mirror())']]),
     resumableEffects: ['rt.effect(() => ctx.mirror.set(ctx.src()))'],
   });
-  const render = new Function('rt', '_c', code.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;'))(rt, {}) as
-    ((ctx: unknown) => Element) & { adopt?: AdoptFn; derive?: (c: Record<string, unknown>) => unknown };
+  const render: ResumableRender<Element> = new Function('rt', '_c', code.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;'))(rt, {}) as ResumableRender;
 
   // ── server ── setup ran for real: src → effect → mirror → shown
   const src: Signal<string> = signal('one');
   const mirror: Signal<string> = signal('');
   root(() => { effect(() => mirror.set(src())); });
-  const shown = computed(() => mirror());
+  const shown: Computed<string> = computed(() => mirror());
   const serverHtml: string = (render({ shown }) as HTMLElement).outerHTML;
   assert.ok(serverHtml.includes('one'), 'the server ran the effect and rendered through it');
 
@@ -1410,7 +1397,7 @@ test('E1.47: the rebuilt effect is LIVE on a resumed page — it re-subscribes, 
   const container: HTMLElement = host();
   container.innerHTML = serverHtml;
   const p: HTMLElement = container.querySelector('p')!;
-  const app = resume(p, { snapshot: snapshot({ src, mirror }), adopt: render.adopt, derive: render.derive });
+  const app: ResumeApp = resume(p, { snapshot: snapshot({ src, mirror }), adopt: render.adopt, derive: render.derive });
   assert.equal(p.textContent, 'one', 'resumed in place at the server value');
 
   // the proof: pushing the SOURCE must flow through the rebuilt effect into mirror → shown → the adopted DOM
@@ -1428,17 +1415,16 @@ test('E1.47 DoD: WITHOUT the rebuilt effect the same resumed page goes stale (th
     resumableDerived: new Map([['shown', 'rt.computed(() => ctx.mirror())']]),
     // resumableEffects omitted — exactly what the compiler emitted before E1.47
   });
-  const render = new Function('rt', '_c', code.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;'))(rt, {}) as
-    ((ctx: unknown) => Element) & { adopt?: AdoptFn; derive?: (c: Record<string, unknown>) => unknown };
+  const render: ResumableRender<Element> = new Function('rt', '_c', code.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;'))(rt, {}) as ResumableRender;
 
   const src: Signal<string> = signal('one');
   const mirror: Signal<string> = signal('');
   root(() => { effect(() => mirror.set(src())); });
-  const shown = computed(() => mirror());
+  const shown: Computed<string> = computed(() => mirror());
   const container: HTMLElement = host();
   container.innerHTML = (render({ shown }) as HTMLElement).outerHTML;
   const p: HTMLElement = container.querySelector('p')!;
-  const app = resume(p, { snapshot: snapshot({ src, mirror }), adopt: render.adopt, derive: render.derive });
+  const app: ResumeApp = resume(p, { snapshot: snapshot({ src, mirror }), adopt: render.adopt, derive: render.derive });
 
   assert.equal(p.textContent, 'one', 'it still adopts and still LOOKS right — which is why this was invisible');
   (app.ctx.src as Signal<string>).set('two');

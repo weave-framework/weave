@@ -1,5 +1,5 @@
 import { test, assert } from '../../../tools/harness.js';
-import { extractSetupHandlers, extractSetupBindings, extractModuleImports, isInlinable, isDerivable, unresolvedRefs, setupCallsHook, type SetupHandler } from '@weave-framework/compiler';
+import { extractSetupHandlers, extractSetupBindings, extractModuleImports, isInlinable, isDerivable, unresolvedRefs, setupCallsHook, type SetupHandler, type SetupBindings } from '@weave-framework/compiler';
 
 /**
  * E1.5 — named-handler resume. `extractSetupHandlers` pulls each top-level `setup` binding that is a function
@@ -24,13 +24,13 @@ test('extracts a top-level const arrow handler', () => {
 });
 
 test('extracts an arrow with params + a block body', () => {
-  const h = extractSetupHandlers(setup('  const pick = (e, i) => { sel.set(i); e.preventDefault(); };\n  return { pick };'));
+  const h: Map<string, SetupHandler> = extractSetupHandlers(setup('  const pick = (e, i) => { sel.set(i); e.preventDefault(); };\n  return { pick };'));
   assert.equal(h.get('pick')!.source, '(e, i) => { sel.set(i); e.preventDefault(); }', 'block body captured whole');
   assert.deepEqual(h.get('pick')!.params, ['e', 'i'], 'params recorded');
 });
 
 test('extracts a single bare-param arrow + a function declaration + async forms', () => {
-  const h = extractSetupHandlers(
+  const h: Map<string, SetupHandler> = extractSetupHandlers(
     setup(
       '  const one = e => open.set(!open());\n' +
         '  function two(a) { count.set(a); }\n' +
@@ -47,7 +47,7 @@ test('extracts a single bare-param arrow + a function declaration + async forms'
 });
 
 test('skips what it cannot bound confidently — nested, reassigned, destructured, non-function', () => {
-  const h = extractSetupHandlers(
+  const h: Map<string, SetupHandler> = extractSetupHandlers(
     setup(
       '  const count = signal(0);\n' +
         '  const outer = () => { const nested = () => 1; return nested(); };\n' +
@@ -75,7 +75,7 @@ test('fail-safe: an unlocatable setup body yields no handlers (no guessing)', ()
 const handler = (source: string, params: string[] = []): SetupHandler => ({ source, params });
 
 test('inlinable when every free identifier is a ctx binding, a global, or its own param', () => {
-  const ctx = new Set(['count', 'open']);
+  const ctx: Set<string> = new Set(['count', 'open']);
   assert.ok(isInlinable(handler('() => count.set((n) => n + 1)'), ctx), 'ctx signal + a nested arrow param');
   assert.ok(isInlinable(handler('() => open.set((v) => !v)'), ctx), 'toggle');
   assert.ok(isInlinable(handler('(e) => { e.preventDefault(); count.set(0); }', ['e']), ctx), 'own param + ctx');
@@ -84,7 +84,7 @@ test('inlinable when every free identifier is a ctx binding, a global, or its ow
 });
 
 test('NOT inlinable when it touches a setup local that never reaches the client', () => {
-  const ctx = new Set(['count']);
+  const ctx: Set<string> = new Set(['count']);
   assert.ok(!isInlinable(handler('() => count.set((n) => n + step)'), ctx), 'a non-ctx local (`step`) → refuse');
   assert.ok(!isInlinable(handler('() => helper()'), ctx), 'a call to another setup fn → refuse');
   assert.ok(!isInlinable(handler('() => other.set(1)'), ctx), 'a signal that setup did not return → refuse');
@@ -104,7 +104,7 @@ test('self-reference (recursion) does not block inlining', () => {
 test('finds handlers through a RETURN-TYPE ANNOTATION — the idiomatic TS setup (regression: live-verify caught this)', () => {
   // `auto-return`'s locator bails on an annotation (it has no return to inject). Handler extraction must not:
   // this is how nearly every real component is written, and bailing silently skipped ALL inlining.
-  const h = extractSetupHandlers(
+  const h: Map<string, SetupHandler> = extractSetupHandlers(
     'import { signal, type Signal } from "@weave-framework/runtime";\n' +
       'export function setup(): { count: Signal<number>; inc: () => void; reset: () => void } {\n' +
       '  const count = signal(3);\n' +
@@ -117,23 +117,23 @@ test('finds handlers through a RETURN-TYPE ANNOTATION — the idiomatic TS setup
 });
 
 test('finds handlers past a NAMED-type annotation and a generic one', () => {
-  const named = extractSetupHandlers('type C = { inc: () => void };\nexport function setup(): C {\n  const inc = () => count.set(1);\n  return { inc };\n}');
+  const named: Map<string, SetupHandler> = extractSetupHandlers('type C = { inc: () => void };\nexport function setup(): C {\n  const inc = () => count.set(1);\n  return { inc };\n}');
   assert.ok(named.has('inc'), 'named return type');
-  const generic = extractSetupHandlers('export function setup(): Ctx<{ a: 1 }> {\n  const inc = () => count.set(1);\n  return { inc };\n}');
+  const generic: Map<string, SetupHandler> = extractSetupHandlers('export function setup(): Ctx<{ a: 1 }> {\n  const inc = () => count.set(1);\n  return { inc };\n}');
   assert.ok(generic.has('inc'), 'generic return type containing braces');
 });
 
 test('finds handlers in an arrow setup, annotated or not', () => {
-  const plain = extractSetupHandlers('export const setup = () => {\n  const inc = () => count.set(1);\n  return { inc };\n};');
+  const plain: Map<string, SetupHandler> = extractSetupHandlers('export const setup = () => {\n  const inc = () => count.set(1);\n  return { inc };\n};');
   assert.ok(plain.has('inc'), 'arrow setup');
-  const annotated = extractSetupHandlers('export const setup = (props): { inc: () => void } => {\n  const inc = () => count.set(1);\n  return { inc };\n};');
+  const annotated: Map<string, SetupHandler> = extractSetupHandlers('export const setup = (props): { inc: () => void } => {\n  const inc = () => count.set(1);\n  return { inc };\n};');
   assert.ok(annotated.has('inc'), 'annotated arrow setup');
 });
 
 /* ──────────── E1.6 — computeds re-derived on resume ──────────── */
 
 test('extracts every non-function binding in source order (= dependency order), keeping the FULL initializer', () => {
-  const b = extractSetupBindings(
+  const b: SetupBindings = extractSetupBindings(
     setup('  const count = signal(1);\n  const doubled = computed(() => count() * 2);\n  const quad = computed(() => doubled() * 2);\n  const inc = () => count.set(1);\n  return { count, doubled, quad, inc };')
   );
   // Every non-function binding is a derive CANDIDATE. The `if (ctx.x === undefined)` guard is what decides at
@@ -144,9 +144,9 @@ test('extracts every non-function binding in source order (= dependency order), 
 });
 
 test('a binding is derivable only when its initializer resolves on the client', () => {
-  const c = (src: string) => ({ source: src });
+  const c: (src: string) => { source: string } = (src: string) => ({ source: src });
   // `computed` / `createRouter` resolve because the emitted derive sits in the module that imports them.
-  const mod = new Set(['count', 'computed']);
+  const mod: Set<string> = new Set(['count', 'computed']);
   assert.ok(isDerivable(c('computed(() => count() * 2)'), mod), 'ctx signal + the imported callee');
   assert.ok(!isDerivable(c('computed(() => count() * factor)'), mod), 'an unresolvable name (`factor`) → refuse');
   assert.ok(isDerivable(c('computed(() => doubled() + 1)'), new Set(['doubled', 'computed'])), 'reads an EARLIER derived binding');
@@ -157,7 +157,7 @@ test('a binding is derivable only when its initializer resolves on the client', 
 });
 
 test('module imports are collected — they are what a re-derived initializer may reference', () => {
-  const imports = extractModuleImports(
+  const imports: Set<string> = extractModuleImports(
     'import { createRouter, route as r } from "@weave-framework/router";\n' +
       'import Home from "./home";\n' +
       'import * as util from "./util";\n' +
@@ -187,7 +187,7 @@ test('E1.18: a handler`s own block-body locals and TYPE annotations are not unre
       '  };\n' +
       '  return { input, onNativeChange };'
   );
-  const h = extractSetupHandlers(script).get('onNativeChange')!;
+  const h: SetupHandler = extractSetupHandlers(script).get('onNativeChange')!;
   assert.ok(h, 'the handler was extracted');
   assert.deepEqual(
     unresolvedRefs(h.source, new Set(['input']), h.params, 'onNativeChange').sort(),
@@ -207,7 +207,7 @@ test('E1.18: a REAL unresolved ref still reports, and reports only itself', () =
       '  };\n' +
       '  return { input, onChange };'
   );
-  const h = extractSetupHandlers(script).get('onChange')!;
+  const h: SetupHandler = extractSetupHandlers(script).get('onChange')!;
   assert.deepEqual(
     unresolvedRefs(h.source, new Set(['input']), h.params, 'onChange'),
     ['missing'],
@@ -224,7 +224,7 @@ test('E1.18: a local declared in the handler does not mask a same-named ctx bind
       '  const b = (): void => { missing.set(count()); };\n' +
       '  return { count, a, b };'
   );
-  const hs = extractSetupHandlers(script);
+  const hs: Map<string, SetupHandler> = extractSetupHandlers(script);
   assert.deepEqual(unresolvedRefs(hs.get('a')!.source, new Set(['count']), [], 'a'), [], 'a: tmp is its own local');
   assert.deepEqual(unresolvedRefs(hs.get('b')!.source, new Set(['count']), [], 'b'), ['missing'], 'b: unaffected by a`s local');
 });
@@ -239,7 +239,7 @@ test('E1.18: a PARAMETER type annotation is not a ref, but a default value still
       '  };\n' +
       '  return { step, onKeydown };'
   );
-  const h = extractSetupHandlers(script).get('onKeydown')!;
+  const h: SetupHandler = extractSetupHandlers(script).get('onKeydown')!;
   assert.deepEqual(
     unresolvedRefs(h.source, new Set(['step']), h.params, 'onKeydown'),
     ['pick'],
@@ -261,7 +261,7 @@ test('E1.18: COMMENT prose and an `as` type assertion are not refs', () => {
       '  };\n' +
       '  return { step, onKeydown };'
   );
-  const h = extractSetupHandlers(script).get('onKeydown')!;
+  const h: SetupHandler = extractSetupHandlers(script).get('onKeydown')!;
   assert.deepEqual(
     unresolvedRefs(h.source, new Set(['step']), h.params, 'onKeydown'),
     [],
@@ -280,7 +280,7 @@ test('E1.18: a ref mentioned ONLY in a comment is not resurrected, but real code
       '  };\n' +
       '  return { step, go };'
   );
-  const h = extractSetupHandlers(script).get('go')!;
+  const h: SetupHandler = extractSetupHandlers(script).get('go')!;
   assert.deepEqual(unresolvedRefs(h.source, new Set(['step']), h.params, 'go'), ['realMissing'],
     'only the genuine one, from real code');
 });
@@ -290,7 +290,7 @@ test('E1.19: an arrow with a return type AND an expression body extracts its who
   // ending in `=>`, i.e. NO BODY. It was invisible while such helpers were never emitted; E1.19 emits them, so
   // the real <ButtonToggle> compiled to `const isSelected = (opt: ButtonToggleOption): boolean =>;` and the
   // BUILD failed with `Unexpected ";"`. A block body was fine, which is why 1374 tests never saw it.
-  const hs = extractSetupHandlers(
+  const hs: Map<string, SetupHandler> = extractSetupHandlers(
     setup(
       '  const sel = signal("a");\n' +
         '  const isSelected = (opt: { value: string }): boolean => opt.value === sel();\n' +
@@ -306,7 +306,7 @@ test('E1.19: an arrow with a return type AND an expression body extracts its who
 test('E1.19: an arrow whose body starts on the NEXT LINE keeps its body — the real <ButtonToggle> shape', () => {
   // This is what actually broke the build: the body sits on the line AFTER `=>`, which is how prettier wraps a
   // long ternary. Same-line bodies extracted fine, so nothing caught it.
-  const hs = extractSetupHandlers(
+  const hs: Map<string, SetupHandler> = extractSetupHandlers(
     setup(
       '  const sel = signal("a");\n' +
         '  const isSelected = (opt: { value: string }): boolean =>\n' +
@@ -329,7 +329,7 @@ test('E1.18: an OPTIONAL parameter (`e?: Event`) is still its own param, not an 
       '  };\n' +
       '  return { n, save };'
   );
-  const h = extractSetupHandlers(script).get('save')!;
+  const h: SetupHandler = extractSetupHandlers(script).get('save')!;
   assert.deepEqual(h.params.slice().sort(), ['e', 'extra'], `optional params read cleanly; got ${JSON.stringify(h.params)}`);
   assert.deepEqual(unresolvedRefs(h.source, new Set(['n']), h.params, 'save'), [], 'and nothing is blamed');
 });
@@ -355,7 +355,7 @@ test('E1.29: a binding annotated with a FUNCTION TYPE is still extracted — its
   // The real <Sidenav>: `const narrow: () => boolean = breakpointSignal(bp)`. readVarDecl skipped the
   // annotation by scanning for the first top-level `=` — which is the ARROW's, so it bailed and the binding
   // vanished from the extraction entirely, taking `effectiveMode` and everything behind it with it.
-  const f = extractSetupBindings(
+  const f: SetupBindings = extractSetupBindings(
     setup(
       '  const bp = "sm";\n' +
         '  const narrow: () => boolean = breakpointSignal(bp);\n' +
@@ -372,7 +372,7 @@ test('E1.30: a reassigned VALUE is still extracted (a reassigned FUNCTION is not
   // The drop exists because inlining a FUNCTION whose definition was replaced would use a stale body; a value
   // has no body, only an initial value, and it never crossed the wire anyway (it is a local), so rebuilding it
   // from its initializer is exactly what derive does for every other local.
-  const f = extractSetupBindings(
+  const f: SetupBindings = extractSetupBindings(
     setup(
       '  let dragging = false;\n' +
         '  let mut = () => 1;\n' +
@@ -399,7 +399,7 @@ test('E1.31: an arrow`s RETURN type is not a ref, with or without parameters', (
       '  const at = (x: number): number => (rect()?.width ?? 0) + x;\n' +
       '  return { host };'
   );
-  const hs = extractSetupHandlers(script);
+  const hs: Map<string, SetupHandler> = extractSetupHandlers(script);
   assert.deepEqual(unresolvedRefs(hs.get('rect')!.source, new Set(['host']), hs.get('rect')!.params, 'rect'), [],
     'a bare `()` with a return type');
   assert.deepEqual(unresolvedRefs(hs.get('at')!.source, new Set(['rect']), hs.get('at')!.params, 'at'), [],
@@ -410,7 +410,7 @@ test('E1.32: a declaration with NO initializer is still a binding — it is simp
   // `let timer: ReturnType<typeof setTimeout> | undefined;` — the docs' <CodeBlock>. readVarDecl requires an
   // `=`, so it was not extracted at all and every handler touching `timer` was refused. An uninitialized `let`
   // IS its value: undefined. Rebuilding it that way is exactly what setup's closure started with.
-  const f = extractSetupBindings(
+  const f: SetupBindings = extractSetupBindings(
     setup(
       '  let timer: ReturnType<typeof setTimeout> | undefined;\n' +
         '  let plain;\n' +
@@ -432,7 +432,7 @@ test('E1.34: a handler defined INLINE in setup`s return object is extracted', ()
   // `return { count, inc: () => count.set(n => n + 1) }` — the shape most of the docs demos and much of
   // @weave-framework/ui use. The extractor only read `const`/`function` declarations, so every one of these was
   // "its definition could not be read from setup()" and fell back to a dead `ctx.inc`.
-  const f = extractSetupBindings(
+  const f: SetupBindings = extractSetupBindings(
     setup(
       '  const count = signal(2);\n' +
         '  return {\n' +
@@ -452,7 +452,7 @@ test('E1.34: a handler defined INLINE in setup`s return object is extracted', ()
 });
 
 test('E1.34: an inline return handler is inlinable when its body resolves', () => {
-  const f = extractSetupBindings(setup('  const count = signal(0);\n  return { count, inc: () => count.set(1) };'));
+  const f: SetupBindings = extractSetupBindings(setup('  const count = signal(0);\n  return { count, inc: () => count.set(1) };'));
   assert.ok(isInlinable(f.handlers.get('inc')!, new Set(['count']), 'inc'), 'resolves against the resumed ctx');
 });
 
@@ -461,7 +461,7 @@ test('E1.35: a function DECLARATION with a return type is read — the annotatio
   // the body brace RIGHT after `)` and bailed on the annotation ("fail-safe skip"), so the helper vanished and
   // every handler calling it was refused. Skipping a return type is the same thing E1.5-3 already had to do for
   // `setup` itself.
-  const f = extractSetupBindings(
+  const f: SetupBindings = extractSetupBindings(
     setup(
       '  const open = signal(false);\n' +
         '  function openPanel(): void { open.set(true); }\n' +
@@ -483,7 +483,7 @@ test('E1.36: a GENERIC setup is located — a default type param may contain bra
   // `export function setup<T = { value: string; label: string }>(props: P<T>): C {` — the real <Autocomplete>,
   // <Select>, <Menu>. The locator did not expect type PARAMETERS, and the braces inside the default swallowed
   // the body, so NOTHING was extracted from those components at all: every handler in them was dead.
-  const h = extractSetupHandlers(
+  const h: Map<string, SetupHandler> = extractSetupHandlers(
     'import { signal } from "@weave-framework/runtime";\n' +
       'export function setup<T = { value: string; label: string }>(props: Props<T>): Ctx {\n' +
       '  const open = signal(false);\n' +
@@ -495,9 +495,9 @@ test('E1.36: a GENERIC setup is located — a default type param may contain bra
   assert.ok(h.has('onClick'), 'and the handler');
 
   // a simple generic, and a constrained one
-  const simple = extractSetupHandlers('export function setup<T>(props: P<T>) {\n  const a = () => 1;\n  return { a };\n}');
+  const simple: Map<string, SetupHandler> = extractSetupHandlers('export function setup<T>(props: P<T>) {\n  const a = () => 1;\n  return { a };\n}');
   assert.ok(simple.has('a'), 'a bare type parameter');
-  const bound = extractSetupHandlers('export function setup<T extends { id: string }>(props: P<T>) {\n  const a = () => 1;\n  return { a };\n}');
+  const bound: Map<string, SetupHandler> = extractSetupHandlers('export function setup<T extends { id: string }>(props: P<T>) {\n  const a = () => 1;\n  return { a };\n}');
   assert.ok(bound.has('a'), 'a constrained one whose bound has braces');
 });
 
@@ -505,7 +505,7 @@ test('E1.37: a wrapped TERNARY (and other leading operators) continue the initia
   // The real <Table>: `const rows = isDataSource(p) \n ? p.connect() \n : signal(p ?? [])`. E1.19 taught declEnd
   // that a TRAILING operator continues a line; a LEADING one does too, and `:` was not in the list — so the
   // initializer was cut after the `?` branch and emitted `? props.dataSource.connect();`, failing the BUILD.
-  const f = extractSetupBindings(
+  const f: SetupBindings = extractSetupBindings(
     setup(
       '  const rows = isDataSource(props.src)\n' +
         '    ? props.src.connect()\n' +
@@ -524,7 +524,7 @@ test('E1.37: a wrapped TERNARY (and other leading operators) continue the initia
 });
 
 test('E1.37: a genuinely finished statement still ends at the newline', () => {
-  const f = extractSetupBindings(setup('  const a = 1;\n  const b = 2\n  const c = 3\n  return { a, b, c };'));
+  const f: SetupBindings = extractSetupBindings(setup('  const a = 1;\n  const b = 2\n  const c = 3\n  return { a, b, c };'));
   assert.equal(f.computeds.get('a')?.source, '1', 'a semicolon ends it');
   assert.equal(f.computeds.get('b')?.source, '2', 'and so does a newline after a complete expression');
   assert.equal(f.computeds.get('c')?.source, '3', 'even the last one before a return');
@@ -569,7 +569,7 @@ test('E1.42: a comma inside TYPE ARGUMENTS does not end the initializer', () => 
   // stops at a top-level `,`, and it did not track `<…>`, so the initializer came back as `new Map<string`.
   // It never reached the emit only because that fragment was then blamed for reading `string` and refused —
   // i.e. the truncation was hiding behind a false diagnostic.
-  const f = extractSetupBindings(
+  const f: SetupBindings = extractSetupBindings(
     setup(
       '  const optionEls: Map<string, HTMLElement> = new Map<string, HTMLElement>();\n' +
         '  const pair = fn<A, B>(1, 2);\n' +

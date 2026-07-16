@@ -694,7 +694,7 @@ function stripDeclTypes(src: string): string {
 
 /** The last non-whitespace char of `s` ('' if none) — used to tell `x as T` from a bare `as`. */
 function lastNonWs(s: string): string {
-  for (let i = s.length - 1; i >= 0; i--) if (!/\s/.test(s[i])) return s[i];
+  for (let i: number = s.length - 1; i >= 0; i--) if (!/\s/.test(s[i])) return s[i];
   return '';
 }
 
@@ -759,7 +759,7 @@ function stripParamTypes(params: string): string {
   for (const part of splitTop(params)) {
     let depth: number = 0;
     let cut: number = -1;
-    for (let i = 0; i < part.length; i++) {
+    for (let i: number = 0; i < part.length; i++) {
       const op: number = skipOpaque(part, i);
       if (op > i) {
         i = op - 1;

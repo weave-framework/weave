@@ -31,51 +31,51 @@ test('serialize: BigInt', () => {
 });
 
 test('serialize: Date + RegExp', () => {
-  const d = new Date('2026-07-14T21:19:07.000Z');
-  const out = rt(d) as Date;
+  const d: Date = new Date('2026-07-14T21:19:07.000Z');
+  const out: Date = rt(d) as Date;
   assert.ok(out instanceof Date && out.getTime() === d.getTime(), 'Date value + type');
-  const re = /ab+c/gi;
-  const reOut = rt(re) as RegExp;
+  const re: RegExp = /ab+c/gi;
+  const reOut: RegExp = rt(re) as RegExp;
   assert.ok(reOut instanceof RegExp && reOut.source === 'ab+c' && reOut.flags === 'gi', 'RegExp source + flags');
 });
 
 test('serialize: Map + Set', () => {
-  const m = new Map<unknown, unknown>([['a', 1], [2, 'b']]);
-  const mOut = rt(m) as Map<unknown, unknown>;
+  const m: Map<unknown, unknown> = new Map<unknown, unknown>([['a', 1], [2, 'b']]);
+  const mOut: Map<unknown, unknown> = rt(m) as Map<unknown, unknown>;
   assert.ok(mOut instanceof Map && mOut.get('a') === 1 && mOut.get(2) === 'b', 'Map entries + type');
-  const s = new Set([1, 2, 3]);
-  const sOut = rt(s) as Set<number>;
+  const s: Set<number> = new Set([1, 2, 3]);
+  const sOut: Set<number> = rt(s) as Set<number>;
   assert.ok(sOut instanceof Set && sOut.has(1) && sOut.has(3) && sOut.size === 3, 'Set members + type');
 });
 
 test('serialize: typed arrays (numeric + bigint)', () => {
-  const u8 = new Uint8Array([1, 2, 255]);
-  const u8Out = rt(u8) as Uint8Array;
+  const u8: Uint8Array<ArrayBuffer> = new Uint8Array([1, 2, 255]);
+  const u8Out: Uint8Array<ArrayBufferLike> = rt(u8) as Uint8Array;
   assert.ok(u8Out instanceof Uint8Array && u8Out.length === 3 && u8Out[2] === 255, 'Uint8Array');
-  const f64 = new Float64Array([1.5, -2.25]);
-  const f64Out = rt(f64) as Float64Array;
+  const f64: Float64Array<ArrayBuffer> = new Float64Array([1.5, -2.25]);
+  const f64Out: Float64Array<ArrayBufferLike> = rt(f64) as Float64Array;
   assert.ok(f64Out instanceof Float64Array && f64Out[0] === 1.5 && f64Out[1] === -2.25, 'Float64Array');
-  const big = new BigInt64Array([1n, -5n]);
-  const bigOut = rt(big) as BigInt64Array;
+  const big: BigInt64Array<ArrayBuffer> = new BigInt64Array([1n, -5n]);
+  const bigOut: BigInt64Array<ArrayBufferLike> = rt(big) as BigInt64Array;
   assert.ok(bigOut instanceof BigInt64Array && bigOut[0] === 1n && bigOut[1] === -5n, 'BigInt64Array');
 });
 
 /* ── structure ── */
 test('serialize: nested objects + arrays', () => {
-  const v = { a: 1, b: [2, { c: 'three', d: [true, null] }], e: { f: new Date(0) } };
+  const v: Record<string, unknown> = { a: 1, b: [2, { c: 'three', d: [true, null] }], e: { f: new Date(0) } };
   assert.deepEqual(rt(v), v);
   assert.deepEqual(rtJSON(v), v, 'also survives a JSON transport');
 });
 
 /* ── structural sharing ── */
 test('serialize: a value referenced twice is shared (identity preserved)', () => {
-  const shared = { id: 7 };
-  const v = { x: shared, y: shared };
-  const out = rt(v) as { x: object; y: object };
+  const shared: { id: number } = { id: 7 };
+  const v: { x: object; y: object } = { x: shared, y: shared };
+  const out: { x: object; y: object } = rt(v) as { x: object; y: object };
   assert.is(out.x, out.y, 'both fields decode to the SAME object, not two copies');
   const wire: Wire = serialize(v);
   // shared object encoded once → its node appears a single time
-  const objNodes = wire.n.filter((n) => n[0] === 'obj').length;
+  const objNodes: number = wire.n.filter((n) => n[0] === 'obj').length;
   assert.equal(objNodes, 2, 'only the root + the one shared object are encoded (not duplicated)');
 });
 
@@ -83,7 +83,7 @@ test('serialize: a value referenced twice is shared (identity preserved)', () =>
 test('serialize: a self-referential cycle round-trips', () => {
   const v: Record<string, unknown> = { name: 'root' };
   v.self = v;
-  const out = rt(v) as Record<string, unknown>;
+  const out: Record<string, unknown> = rt(v) as Record<string, unknown>;
   assert.equal(out.name, 'root');
   assert.is(out.self, out, 'the cycle points back to the same decoded object');
 });
@@ -93,7 +93,7 @@ test('serialize: a two-node cycle (a↔b) round-trips', () => {
   const b: Record<string, unknown> = { tag: 'b' };
   a.b = b;
   b.a = a;
-  const out = rt(a) as Record<string, unknown>;
+  const out: Record<string, unknown> = rt(a) as Record<string, unknown>;
   assert.equal((out.b as Record<string, unknown>).tag, 'b');
   assert.is((out.b as Record<string, unknown>).a, out, 'b.a points back to a');
 });
@@ -113,18 +113,18 @@ registerSerializableType({
 });
 
 test('serialize: custom class via a registered SerializableType', () => {
-  const p = new Point(3, 4);
-  const out = rt(p) as Point;
+  const p: Point = new Point(3, 4);
+  const out: Point = rt(p) as Point;
   assert.ok(out instanceof Point, 'decoded back to a Point instance (behaviour restored)');
   assert.equal(out.sum, 7, 'the class method works on the decoded instance');
   // nested + shared inside a larger structure
-  const container = rt({ points: [p, new Point(1, 1)] }) as { points: Point[] };
+  const container: { points: Point[] } = rt({ points: [p, new Point(1, 1)] }) as { points: Point[] };
   assert.ok(container.points[0] instanceof Point && container.points[0].sum === 7, 'nested custom instance');
 });
 
 /* ── the non-serializable guard ── */
 test('serialize: a function throws SerializeError (not silent corruption)', () => {
-  let threw = false;
+  let threw: boolean = false;
   try {
     serialize({ fn: () => 1 });
   } catch (e) {
@@ -134,7 +134,7 @@ test('serialize: a function throws SerializeError (not silent corruption)', () =
 });
 
 test('serialize: a symbol throws SerializeError', () => {
-  let threw = false;
+  let threw: boolean = false;
   try {
     serialize(Symbol('x'));
   } catch (e) {
@@ -145,9 +145,9 @@ test('serialize: a symbol throws SerializeError', () => {
 
 test('serialize: an unregistered class instance throws SerializeError', () => {
   class Unknown {
-    v = 1;
+    v: number = 1;
   }
-  let threw = false;
+  let threw: boolean = false;
   try {
     serialize(new Unknown());
   } catch (e) {

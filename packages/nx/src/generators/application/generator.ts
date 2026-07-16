@@ -22,7 +22,7 @@ export interface ApplicationGeneratorSchema {
 }
 
 /** Version range for the generated app's `@weave-framework/*` deps — mirrors the create-weave template. */
-const WEAVE_DEP_RANGE = '^1.0.0';
+const WEAVE_DEP_RANGE: "^1.0.0" = '^1.0.0';
 
 /** Compute the workspace-relative project root for an app (default under `apps/`). */
 export function appRoot(name: string, directory?: string): string {

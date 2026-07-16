@@ -373,7 +373,7 @@ export function weave(state: WeaveState, options: WeaveOptions = {}): Plugin {
    * esbuild warnings framed at the component file, so a silent runtime defect is visible at build time.
    */
   const emit = (code: string, css: string, resolveDir: string, warnings?: string[], file?: string): OnLoadResult => {
-    const warn = warnings?.length
+    const warn: Pick<OnLoadResult, 'warnings'> = warnings?.length
       ? { warnings: warnings.map((text) => ({ text, location: file ? { file } : undefined })) }
       : {};
     if (dev) return { contents: code + cssInjector(css), loader: 'ts' as const, resolveDir, ...warn };

@@ -189,7 +189,7 @@ export function withSetupConstRedirect<T extends ServicePlugin>(services: T[], t
     ...svc,
     create(context: never): ServiceInstance {
       const instance: ServiceInstance = svc.create(context) as ServiceInstance;
-      const orig = instance.provideDefinition?.bind(instance);
+      const orig: ((document: unknown, position: unknown, token: unknown) => unknown) | undefined = instance.provideDefinition?.bind(instance);
       if (!orig) return instance;
       instance.provideDefinition = async (document: unknown, position: unknown, token: unknown): Promise<unknown> => {
         const res: unknown = await orig(document, position, token);

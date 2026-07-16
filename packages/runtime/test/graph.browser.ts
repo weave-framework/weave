@@ -1,8 +1,8 @@
 import { test, assert } from '../../../tools/harness.js';
 import { signal, effect, type Signal } from '@weave-framework/runtime';
-import { serialize, deserialize, SerializeError } from '@weave-framework/runtime/serialize';
+import { serialize, deserialize, SerializeError, type Wire } from '@weave-framework/runtime/serialize';
 import { handlerAttr } from '@weave-framework/runtime/resume';
-import { snapshot, resume, collectStates, registerState, finalizeStates, ROOT_ID, type DroppedState } from '@weave-framework/runtime/graph';
+import { snapshot, resume, collectStates, registerState, finalizeStates, ROOT_ID, type DroppedState, type ResumeApp } from '@weave-framework/runtime/graph';
 
 /**
  * E0.3 — the resume entry (`@weave-framework/runtime/graph`). Rebuild a component's reactive state from a
@@ -25,7 +25,7 @@ function host(): HTMLElement {
 
 test('graph: a signal round-trips as a fresh LIVE signal carrying the server value', () => {
   const s: Signal<{ n: number; when: Date }> = signal({ n: 1, when: new Date(0) });
-  const ctx = deserialize(snapshot({ s })) as { s: Signal<{ n: number; when: Date }> };
+  const ctx: { s: Signal<{ n: number; when: Date }> } = deserialize(snapshot({ s })) as { s: Signal<{ n: number; when: Date }> };
 
   assert.ok(isLiveSignal(ctx.s), 'decoded back to a live signal (callable with .set/.peek)');
   assert.ok(ctx.s !== s, 'a FRESH signal, not the same instance');
@@ -59,7 +59,7 @@ test('collectStates: gathers each registered component ctx into one map, keyed b
   registerState('c9', { x: signal(1) }); // outside a session → dropped, no throw
   const a: Signal<number> = signal(1);
   const b: Signal<string> = signal('b');
-  const states = collectStates(() => {
+  const states: Record<string, unknown> = collectStates(() => {
     registerState('c0', { a });
     registerState('c1', { b });
   });
@@ -67,22 +67,22 @@ test('collectStates: gathers each registered component ctx into one map, keyed b
   assert.is((states.c0 as { a: Signal<number> }).a, a, 'the ctx is stored by reference');
   // the session is restored after collectStates returns → a later registerState is again a no-op
   registerState('c2', { late: signal(9) });
-  const empty = collectStates(() => {});
+  const empty: Record<string, unknown> = collectStates(() => {});
   assert.deepEqual(Object.keys(empty), [], 'the collector reset — a post-session registerState leaked nothing');
 });
 
 test('registerState: drops raw handler functions (not state) but keeps signals — so the ctx serializes', () => {
   const count: Signal<number> = signal(2);
   const inc = (): void => count.set((n) => n + 1);
-  const states = collectStates(() => {
+  const states: Record<string, unknown> = collectStates(() => {
     registerState('c0', { count, inc, label: 'hi' });
   });
-  const c0 = states.c0 as Record<string, unknown>;
+  const c0: Record<string, unknown> = states.c0 as Record<string, unknown>;
   assert.is(c0.count, count, 'the writable signal is kept (it IS state)');
   assert.equal(c0.label, 'hi', 'plain data is kept');
   assert.ok(!('inc' in c0), 'the handler function was dropped (re-derived on the client, and unserializable)');
   // proof the captured ctx now crosses the wire (a raw function would have thrown in serialize)
-  const back = deserialize(snapshot(states)) as Record<string, Record<string, unknown>>;
+  const back: Record<string, Record<string, unknown>> = deserialize(snapshot(states)) as Record<string, Record<string, unknown>>;
   assert.ok(typeof back.c0.count === 'function' && (back.c0.count as Signal<number>)() === 2, 'the filtered ctx round-trips (count @ 2)');
 });
 
@@ -94,7 +94,7 @@ test('E1.16: finalizeStates keeps an instance whose DERIVED binding turned unser
   const host: Signal<unknown> = signal(null);
   const count: Signal<number> = signal(5);
   const dropped: DroppedState[] = [];
-  const states = collectStates(() => {
+  const states: Record<string, unknown> = collectStates(() => {
     registerState('c0', { count, host }, ['host']); // `host` is derived → derive() rebuilds it client-side
   }, dropped);
   assert.ok(states.c0, 'registerState kept the instance (host was still null, hence serializable)');
@@ -105,7 +105,7 @@ test('E1.16: finalizeStates keeps an instance whose DERIVED binding turned unser
   assert.ok(states.c0, 'the instance SURVIVES — a derived key going unserializable is not a hole');
   assert.ok(!('host' in (states.c0 as Record<string, unknown>)), 'the offending derived key is dropped from the snapshot');
   assert.equal(dropped.length, 0, 'and it is not reported as a failure — this is the designed path, not degradation');
-  const back = deserialize(snapshot(states)) as Record<string, Record<string, unknown>>;
+  const back: Record<string, Record<string, unknown>> = deserialize(snapshot(states)) as Record<string, Record<string, unknown>>;
   assert.equal((back.c0.count as Signal<number>)(), 5, 'the rest of the ctx still crosses the wire');
 });
 
@@ -114,7 +114,7 @@ test('E1.16: finalizeStates still drops the whole instance when a NON-derived bi
   // `undefined` — half a ctx is worse than none (E1.9).
   const stash: Signal<unknown> = signal(null);
   const dropped: DroppedState[] = [];
-  const states = collectStates(() => { registerState('c0', { stash }, ['other']); }, dropped);
+  const states: Record<string, unknown> = collectStates(() => { registerState('c0', { stash }, ['other']); }, dropped);
   stash.set(document.createElement('p'));
   finalizeStates(states, dropped);
   assert.ok(!states.c0, 'the instance is dropped (the client CSR-mounts it instead)');
@@ -124,20 +124,20 @@ test('E1.16: finalizeStates still drops the whole instance when a NON-derived bi
 test('collectStates: the whole map snapshots + resumes, sharing a signal across components by structural sharing', () => {
   // a signal SHARED by two component instances (e.g. a store) must deserialize to ONE instance, not two
   const shared: Signal<number> = signal(10);
-  const states = collectStates(() => {
+  const states: Record<string, unknown> = collectStates(() => {
     registerState('c0', { own: signal('a'), shared });
     registerState('c1', { own: signal('b'), shared });
   });
   states[ROOT_ID] = { title: signal('root') };
 
-  const back = deserialize(snapshot(states)) as Record<string, Record<string, Signal<unknown>>>;
+  const back: Record<string, Record<string, Signal<unknown>>> = deserialize(snapshot(states)) as Record<string, Record<string, Signal<unknown>>>;
   assert.deepEqual(Object.keys(back).sort(), ['c0', 'c1', ROOT_ID].sort(), 'root + both instances round-trip');
   assert.ok(isLiveSignal(back.c0.own) && isLiveSignal(back[ROOT_ID].title), 'each ctx rebuilt with live signals');
   assert.is(back.c0.shared, back.c1.shared, 'the shared signal deserialized to ONE instance (structural sharing held)');
   assert.ok(back.c0.own !== back.c1.own, 'the per-instance signals stayed distinct');
 
   // the shared, resumed signal is reactive and drives both consumers
-  let seen = 0;
+  let seen: number = 0;
   effect(() => { (back.c1.shared as Signal<number>)(); seen++; });
   (back.c0.shared as Signal<number>).set(11);
   assert.equal(seen, 2, 'writing the shared signal via one instance re-runs an effect reading it via the other');
@@ -154,13 +154,13 @@ test('resume: rebuilds the graph + wires a lazy handler WITHOUT calling setup (r
   };
   const serverCtx: { count: Signal<number> } = setup();
   assert.equal(setupCalls, 1, 'server ran setup once');
-  const wire = snapshot({ count: serverCtx.count });
+  const wire: Wire = snapshot({ count: serverCtx.count });
   const html: string = `<button ${handlerAttr('click')}="w0#0">inc</button>`;
 
   // ── client ── parse server HTML, resume; setup must NEVER be called here
   const root: HTMLElement = host();
   root.innerHTML = html;
-  const app = resume(root, {
+  const app: ResumeApp = resume(root, {
     snapshot: wire,
     handlers: (c) => ({ w0: () => asSig<number>(c.count).set((n) => n + 1) }),
   });
@@ -189,7 +189,7 @@ test('resume: an exact id wins over the site prefix, and a bare id resolves', ()
     `<button id="a" ${handlerAttr('click')}="w0#0">a</button>` +
     `<button id="b" ${handlerAttr('click')}="bare">b</button>`;
   const hits: string[] = [];
-  const app = resume(root, {
+  const app: ResumeApp = resume(root, {
     snapshot: snapshot({}),
     handlers: () => ({
       'w0#0': () => hits.push('exact'), // exact instance id present → must win over the 'w0' site

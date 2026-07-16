@@ -3,6 +3,7 @@ import { signal, computed, effect, root, onDispose, type Signal, type Computed }
 import * as dom from '@weave-framework/runtime/dom';
 import {
   compileTemplate, compileComponent, parseSfc, inferCtxNames, parseTemplate, extractSources, injectAutoReturn,
+  type CompiledComponent,
 } from '@weave-framework/compiler';
 
 const rt: typeof dom & {
@@ -416,13 +417,13 @@ test('E1.11: a handler reading a plain setup local IS inlined — `derive` rebui
 });
 
 test('E1.5: an INLINE handler is untouched (already resumable) and eager never inlines', () => {
-  const inline = compileComponent(
+  const inline: CompiledComponent = compileComponent(
     { script: counter('const inc = () => count.set((n) => n + 1);'), template: '<button on:click={{ () => count.set((n) => n + 2) }}>{{ count() }}</button>' },
     { filename: 'ctr3', resumable: true }
   );
   assert.ok(/"w0":\s*\(\)\s*=>\s*ctx\.count\.set\(\(n\)\s*=>\s*n \+ 2\)/.test(inline.code), 'the inline body is emitted as written');
   // Eager: no factory at all, and the listener still references the named binding directly.
-  const eager = compileComponent(
+  const eager: CompiledComponent = compileComponent(
     { script: counter('const inc = () => count.set((n) => n + 1);'), template: '<button on:click={{ inc }}>{{ count() }}</button>' },
     { filename: 'ctr4' }
   );
@@ -537,7 +538,7 @@ test('an auto-exposed (return-injected) setup mounts and updates for real', () =
     'export function setup(){ const count = rt.signal(0); const inc = () => count.set((n) => n + 1); }',
     ['count', 'inc']
   ).code;
-  const setup = new Function('rt', injected.replace('export function', 'function') + '\nreturn setup;')(rt) as () => unknown;
+  const setup: () => unknown = new Function('rt', injected.replace('export function', 'function') + '\nreturn setup;')(rt) as () => unknown;
   const render: (ctx: unknown, slots?: unknown) => Node = compileRender('<button on:click={{inc}}>{{ count() }}</button>', ['count', 'inc']);
   const C: dom.Component = dom.defineComponent(render as never, setup as never);
   const h: HTMLElement = host();
@@ -615,7 +616,7 @@ test('E1.6: computeds compile to a derive(ctx) — the resumed page rebuilds wha
 });
 
 test('E1.6: a computed touching a non-ctx local is NOT derived (fail-safe), and eager emits no derive', () => {
-  const unsafe = compileComponent(
+  const unsafe: CompiledComponent = compileComponent(
     {
       script:
         'import { signal, computed } from "@weave-framework/runtime";\n' +
@@ -629,7 +630,7 @@ test('E1.6: a computed touching a non-ctx local is NOT derived (fail-safe), and 
   );
   assert.ok(!/ctx\.scaled = /.test(unsafe.code), '`rate` never reaches the client → no derive rather than a broken one');
 
-  const eager = compileComponent(
+  const eager: CompiledComponent = compileComponent(
     {
       script:
         'import { signal, computed } from "@weave-framework/runtime";\n' +
@@ -690,7 +691,7 @@ test('warns when a handler definition cannot be READ from setup (not a plain con
 });
 
 test('NO warnings for safe handlers/computeds, and NEVER for an eager build', () => {
-  const safe = compileComponent(
+  const safe: CompiledComponent = compileComponent(
     {
       script:
         'import { signal, computed } from "@weave-framework/runtime";\n' +
@@ -701,7 +702,7 @@ test('NO warnings for safe handlers/computeds, and NEVER for an eager build', ()
   );
   assert.ok(!safe.warnings, 'a fully-resumable component warns about nothing');
 
-  const eager = compileComponent(
+  const eager: CompiledComponent = compileComponent(
     {
       script:
         'import { signal } from "@weave-framework/runtime";\n' +
@@ -889,7 +890,7 @@ test('E1.21: a component with NO const declarations still derives its returned m
 test('E1.21: a `use:` action adopts when it resolves; it still opts out when it cannot', () => {
   // `use:` never ran on the server at all — `onMount` is inert there — so re-running it against the ADOPTED
   // node is exactly what the create path does, with nothing to double-apply.
-  const ok = compileComponent(
+  const ok: CompiledComponent = compileComponent(
     {
       script: 'import { ripple } from "./ripple";\nexport function setup(){ return { ripple }; }',
       template: '<button use:ripple>x</button>',
@@ -902,7 +903,7 @@ test('E1.21: a `use:` action adopts when it resolves; it still opts out when it 
   // An action nothing can rebuild leaves `ctx.tip` undefined and `applyAction` would throw — refuse. (A plain
   // setup-local action stood here until E1.44 started handing such a local back to ctx; a DESTRUCTURED one is
   // not extractable at all, so it stays genuinely unreachable.)
-  const bad = compileComponent(
+  const bad: CompiledComponent = compileComponent(
     {
       script: 'export function setup(props){ const { tip } = props.helpers; return { tip }; }',
       template: '<button use:tip>x</button>',
@@ -1043,12 +1044,12 @@ test('E1.33: a bare CALL ARGUMENT is not an object shorthand', () => {
   // But a `,` is ambiguous: `f(a, b)` looks identical. The real <Menubar> emitted
   // `removeEventListener("keydown", arrowListener: ctx.arrowListener, true)` and the BUILD failed. Only the
   // nearest unclosed bracket can tell them apart.
-  const call = compileComponent({ template: '<b on:click={{ () => off("keydown", listener, true) }}>x</b>' });
+  const call: CompiledComponent = compileComponent({ template: '<b on:click={{ () => off("keydown", listener, true) }}>x</b>' });
   assert.ok(/off\("keydown", ctx\.listener, true\)/.test(call.code), `a call argument stays an argument; got:\n${call.code}`);
   assert.ok(!/listener:/.test(call.code), 'it is not expanded into a key');
 
   // and a real object shorthand still expands — a bare `{ ctx.x }` would be a syntax error
-  const obj = compileComponent({ template: '<b on:click={{ () => send({ listener, extra: 1 }) }}>x</b>' });
+  const obj: CompiledComponent = compileComponent({ template: '<b on:click={{ () => send({ listener, extra: 1 }) }}>x</b>' });
   assert.ok(/\{ listener: ctx\.listener, extra: 1 \}/.test(obj.code), `the shorthand still expands; got:\n${obj.code}`);
 });
 
@@ -1185,7 +1186,7 @@ test('E1.45: a component whose setup registers `onMount` refuses to adopt, and s
 });
 
 test('E1.45: onMount in a COMMENT or another function does not refuse; an aliased import does', () => {
-  const innocent = compileComponent(
+  const innocent: CompiledComponent = compileComponent(
     {
       script:
         'import { signal } from "@weave-framework/runtime";\n' +
@@ -1198,7 +1199,7 @@ test('E1.45: onMount in a COMMENT or another function does not refuse; an aliase
   assert.ok(/function adopt\(/.test(innocent.code), 'the word in a comment is not a call');
   assert.ok(!innocent.warnings?.some((w) => /onMount/.test(w)), 'and nothing is said');
 
-  const aliased = compileComponent(
+  const aliased: CompiledComponent = compileComponent(
     {
       script:
         'import { signal, onMount as afterMount } from "@weave-framework/runtime";\n' +

@@ -336,7 +336,7 @@ export function resume(root: Element, options: ResumeOptions): ResumeApp {
   const resolve = (id: string, el: Element): ResumeHandler | undefined => {
     let node: Element | null = el;
     while (node) {
-      const get = tables.get(node);
+      const get: (() => Record<string, ResumeHandler>) | undefined = tables.get(node);
       if (get) {
         const table: Record<string, ResumeHandler> = get();
         const h: ResumeHandler | undefined = table[id] ?? table[siteOf(id)];

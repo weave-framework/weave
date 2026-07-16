@@ -5,7 +5,7 @@
  * synchronous string/doc assembly.
  */
 import { parseTemplate, parseSfcLoc } from '@weave-framework/compiler';
-import type { TemplateNode, Attr } from '@weave-framework/compiler';
+import type { TemplateNode, Attr, ComponentSourceLoc } from '@weave-framework/compiler';
 import { format } from 'prettier';
 import type { Options, ParserOptions } from 'prettier';
 import type { SfcBlock, WeaveRoot } from './ast.js';
@@ -25,7 +25,7 @@ export async function parseWeave(text: string, options: ParserOptions): Promise<
     return { type: 'weave-root', variant: 'template', nodes, raw: text };
   }
 
-  const loc = parseSfcLoc(text);
+  const loc: ComponentSourceLoc = parseSfcLoc(text);
   const nodes: TemplateNode[] = parseTemplate(loc.template, { comments: true });
   await formatNodes(nodes, options);
 

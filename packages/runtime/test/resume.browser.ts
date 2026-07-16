@@ -5,7 +5,7 @@ const tick = (): Promise<void> => new Promise<void>((r) => queueMicrotask(r));
 
 /** Build a detached root, run the callback to populate it, append to the document, return it. */
 function mount(build: (root: HTMLElement) => void): HTMLElement {
-  const root = document.createElement('div');
+  const root: HTMLDivElement = document.createElement('div');
   build(root);
   document.body.appendChild(root);
   return root;
@@ -18,8 +18,8 @@ test('resume: handlerAttr convention', () => {
 
 test('resume: a click on a referenced element resolves + invokes the handler (event + element)', () => {
   let seen: { ref: string; ev: Event; el: Element } | null = null;
-  const root = mount((r) => {
-    const btn = document.createElement('button');
+  const root: HTMLElement = mount((r) => {
+    const btn: HTMLButtonElement = document.createElement('button');
     btn.setAttribute('data-won-click', 'h1');
     btn.id = 'b';
     r.appendChild(btn);
@@ -27,7 +27,7 @@ test('resume: a click on a referenced element resolves + invokes the handler (ev
   const ctl: ResumeControl = resumeEvents(root, {
     resolve: (ref) => ((ev, el) => (seen = { ref, ev, el })) as ResumeHandler,
   });
-  const btn = root.querySelector('#b') as HTMLButtonElement;
+  const btn: HTMLButtonElement = root.querySelector('#b') as HTMLButtonElement;
   btn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
   assert.ok(seen, 'handler fired');
   assert.equal(seen!.ref, 'h1', 'resolver got the ref');
@@ -38,16 +38,16 @@ test('resume: a click on a referenced element resolves + invokes the handler (ev
 });
 
 test('resume: delegation — a click on a child dispatches the ancestor handler', () => {
-  let fired = 0;
-  const root = mount((r) => {
-    const btn = document.createElement('button');
+  let fired: number = 0;
+  const root: HTMLElement = mount((r) => {
+    const btn: HTMLButtonElement = document.createElement('button');
     btn.setAttribute('data-won-click', 'h1');
-    const span = document.createElement('span');
+    const span: HTMLSpanElement = document.createElement('span');
     span.id = 'inner';
     btn.appendChild(span);
     r.appendChild(btn);
   });
-  const ctl = resumeEvents(root, { resolve: () => (() => fired++) as ResumeHandler });
+  const ctl: ResumeControl = resumeEvents(root, { resolve: () => (() => fired++) as ResumeHandler });
   (root.querySelector('#inner') as HTMLElement).dispatchEvent(new MouseEvent('click', { bubbles: true }));
   assert.equal(fired, 1, 'a click on the inner span dispatched the button’s handler');
   ctl.dispose();
@@ -56,16 +56,16 @@ test('resume: delegation — a click on a child dispatches the ancestor handler'
 
 test('resume: nearest ancestor wins (nested handlers)', () => {
   const hits: string[] = [];
-  const root = mount((r) => {
-    const outer = document.createElement('div');
+  const root: HTMLElement = mount((r) => {
+    const outer: HTMLDivElement = document.createElement('div');
     outer.setAttribute('data-won-click', 'outer');
-    const inner = document.createElement('button');
+    const inner: HTMLButtonElement = document.createElement('button');
     inner.setAttribute('data-won-click', 'inner');
     inner.id = 'i';
     outer.appendChild(inner);
     r.appendChild(outer);
   });
-  const ctl = resumeEvents(root, { resolve: (ref) => (() => hits.push(ref)) as ResumeHandler });
+  const ctl: ResumeControl = resumeEvents(root, { resolve: (ref) => (() => hits.push(ref)) as ResumeHandler });
   (root.querySelector('#i') as HTMLElement).dispatchEvent(new MouseEvent('click', { bubbles: true }));
   assert.deepEqual(hits, ['inner'], 'only the nearest (inner) handler ran, not the outer');
   ctl.dispose();
@@ -73,14 +73,14 @@ test('resume: nearest ancestor wins (nested handlers)', () => {
 });
 
 test('resume: lazy — the resolver is NOT called until an event fires', () => {
-  let resolves = 0;
-  const root = mount((r) => {
-    const btn = document.createElement('button');
+  let resolves: number = 0;
+  const root: HTMLElement = mount((r) => {
+    const btn: HTMLButtonElement = document.createElement('button');
     btn.setAttribute('data-won-click', 'h1');
     btn.id = 'b';
     r.appendChild(btn);
   });
-  const ctl = resumeEvents(root, {
+  const ctl: ResumeControl = resumeEvents(root, {
     resolve: () => {
       resolves++;
       return (() => {}) as ResumeHandler;
@@ -95,15 +95,15 @@ test('resume: lazy — the resolver is NOT called until an event fires', () => {
 
 test('resume: multiple event types are each delegated', () => {
   const hits: string[] = [];
-  const root = mount((r) => {
-    const input = document.createElement('input');
+  const root: HTMLElement = mount((r) => {
+    const input: HTMLInputElement = document.createElement('input');
     input.setAttribute('data-won-input', 'oninput');
     input.setAttribute('data-won-focus', 'onfocus');
     input.id = 'in';
     r.appendChild(input);
   });
-  const ctl = resumeEvents(root, { resolve: (ref) => (() => hits.push(ref)) as ResumeHandler });
-  const input = root.querySelector('#in') as HTMLInputElement;
+  const ctl: ResumeControl = resumeEvents(root, { resolve: (ref) => (() => hits.push(ref)) as ResumeHandler });
+  const input: HTMLInputElement = root.querySelector('#in') as HTMLInputElement;
   input.dispatchEvent(new Event('input', { bubbles: true }));
   input.dispatchEvent(new Event('focus', { bubbles: true }));
   assert.deepEqual(hits.sort(), ['onfocus', 'oninput'], 'both event types dispatched');
@@ -112,14 +112,14 @@ test('resume: multiple event types are each delegated', () => {
 });
 
 test('resume: an async resolver (lazy import) is awaited before invoking', async () => {
-  let fired = 0;
-  const root = mount((r) => {
-    const btn = document.createElement('button');
+  let fired: number = 0;
+  const root: HTMLElement = mount((r) => {
+    const btn: HTMLButtonElement = document.createElement('button');
     btn.setAttribute('data-won-click', 'h1');
     btn.id = 'b';
     r.appendChild(btn);
   });
-  const ctl = resumeEvents(root, {
+  const ctl: ResumeControl = resumeEvents(root, {
     resolve: () => Promise.resolve((() => fired++) as ResumeHandler),
   });
   (root.querySelector('#b') as HTMLElement).dispatchEvent(new MouseEvent('click', { bubbles: true }));
@@ -131,15 +131,15 @@ test('resume: an async resolver (lazy import) is awaited before invoking', async
 });
 
 test('resume: dispose() stops dispatching', () => {
-  let fired = 0;
-  const root = mount((r) => {
-    const btn = document.createElement('button');
+  let fired: number = 0;
+  const root: HTMLElement = mount((r) => {
+    const btn: HTMLButtonElement = document.createElement('button');
     btn.setAttribute('data-won-click', 'h1');
     btn.id = 'b';
     r.appendChild(btn);
   });
-  const ctl = resumeEvents(root, { resolve: () => (() => fired++) as ResumeHandler });
-  const btn = root.querySelector('#b') as HTMLElement;
+  const ctl: ResumeControl = resumeEvents(root, { resolve: () => (() => fired++) as ResumeHandler });
+  const btn: HTMLElement = root.querySelector('#b') as HTMLElement;
   btn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
   ctl.dispose();
   btn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
@@ -148,14 +148,14 @@ test('resume: dispose() stops dispatching', () => {
 });
 
 test('resume: extraEvents delegates a type not present at scan time', () => {
-  let fired = 0;
-  const root = mount(() => {});
-  const ctl = resumeEvents(root, {
+  let fired: number = 0;
+  const root: HTMLElement = mount(() => {});
+  const ctl: ResumeControl = resumeEvents(root, {
     resolve: () => (() => fired++) as ResumeHandler,
     extraEvents: ['click'],
   });
   // add a referenced element AFTER resume
-  const btn = document.createElement('button');
+  const btn: HTMLButtonElement = document.createElement('button');
   btn.setAttribute('data-won-click', 'late');
   root.appendChild(btn);
   btn.dispatchEvent(new MouseEvent('click', { bubbles: true }));

@@ -18,7 +18,7 @@
 import { signal, effect, onDispose, type Signal } from '@weave-framework/runtime';
 import { createOverlay, connectedPosition, type OverlayRef } from '../cdk/index.js';
 import { buildPositions, type MenuPosition } from '../shared/positions.js';
-import { activeIcons } from '../icon/icons.js';
+import { activeIcons, type IconRegistry } from '../icon/icons.js';
 
 /** A time of day, 24-hour internally. */
 export interface TimeValue {
@@ -121,7 +121,7 @@ export function setup(props: TimepickerProps): TimepickerContext {
 
   // Spinner arrows are lucide chevrons from the active icon registry (resolved once, with the
   // component's context in scope) — the same source `<Icon>` uses, not hand-drawn glyphs.
-  const icons = activeIcons();
+  const icons: IconRegistry = activeIcons();
   const chevronUp: string = icons.resolve('chevron-up') ?? '';
   const chevronDown: string = icons.resolve('chevron-down') ?? '';
 

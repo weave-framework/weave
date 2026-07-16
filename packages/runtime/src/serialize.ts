@@ -80,7 +80,9 @@ export function registerSerializableType(type: SerializableType): void {
   globalTypes.push(type);
 }
 
-const TYPED_ARRAYS: Record<string, new (length: number) => { [i: number]: unknown; length: number }> = {
+type TypedArrayCtor = new (length: number) => { [i: number]: unknown; length: number };
+
+const TYPED_ARRAYS: Record<string, TypedArrayCtor> = {
   Int8Array,
   Uint8Array,
   Uint8ClampedArray,
@@ -108,7 +110,7 @@ const isPlainObject = (value: object): boolean => {
 export function serialize(value: unknown, options?: SerializeOptions): Wire {
   const types: SerializableType[] = options?.types ? [...options.types, ...globalTypes] : globalTypes;
   const nodes: WireNode[] = [];
-  const seen = new Map<unknown, number>();
+  const seen: Map<unknown, number> = new Map<unknown, number>();
 
   // Reference types (+ strings) are shared; primitives are cheap and never cause cycles, so they get a
   // fresh node each time (simpler, and sharing them buys little). Functions are shareable too: a
@@ -164,7 +166,7 @@ export function serialize(value: unknown, options?: SerializeOptions): Wire {
     if (ta) {
       const arr: ArrayLike<number | bigint> = obj as ArrayLike<number | bigint>;
       const out: (number | string)[] = [];
-      for (let i = 0; i < arr.length; i++) {
+      for (let i: number = 0; i < arr.length; i++) {
         const el: number | bigint = arr[i];
         out.push(typeof el === 'bigint' ? el.toString() : el);
       }
@@ -186,7 +188,7 @@ export function serialize(value: unknown, options?: SerializeOptions): Wire {
 export function deserialize(wire: Wire, options?: SerializeOptions): unknown {
   if (!wire || wire.v !== 1 || !Array.isArray(wire.n)) throw new SerializeError('Not a valid Wire (version 1) object.');
   const types: SerializableType[] = options?.types ? [...options.types, ...globalTypes] : globalTypes;
-  const byTag = new Map<string, SerializableType>();
+  const byTag: Map<string, SerializableType<unknown>> = new Map<string, SerializableType>();
   for (const type of types) if (!byTag.has(type.tag)) byTag.set(type.tag, type);
 
   const nodes: WireNode[] = wire.n;
@@ -243,14 +245,14 @@ export function deserialize(wire: Wire, options?: SerializeOptions): unknown {
         return obj;
       }
       case 'map': {
-        const m = new Map<unknown, unknown>();
+        const m: Map<unknown, unknown> = new Map<unknown, unknown>();
         built[i] = m;
         done[i] = true;
         for (const [kr, vr] of node[1] as [number, number][]) m.set(resolve(kr), resolve(vr));
         return m;
       }
       case 'set': {
-        const s = new Set<unknown>();
+        const s: Set<unknown> = new Set<unknown>();
         built[i] = s;
         done[i] = true;
         for (const r of node[1] as number[]) s.add(resolve(r));
@@ -258,14 +260,14 @@ export function deserialize(wire: Wire, options?: SerializeOptions): unknown {
       }
       case 'ta': {
         const ctorName: string = node[1] as string;
-        const Ctor = TYPED_ARRAYS[ctorName];
+        const Ctor: TypedArrayCtor | undefined = TYPED_ARRAYS[ctorName];
         if (!Ctor) throw new SerializeError(`Unknown typed array in wire: ${ctorName}.`);
         const values: (number | string)[] = node[2] as (number | string)[];
         const isBig: boolean = ctorName.startsWith('Big');
-        const out = new Ctor(values.length) as unknown as { [k: number]: unknown };
+        const out: { [k: number]: unknown } = new Ctor(values.length) as unknown as { [k: number]: unknown };
         built[i] = out;
         done[i] = true;
-        for (let k = 0; k < values.length; k++) out[k] = isBig ? BigInt(values[k] as string) : (values[k] as number);
+        for (let k: number = 0; k < values.length; k++) out[k] = isBig ? BigInt(values[k] as string) : (values[k] as number);
         return out;
       }
       case 'cls': {

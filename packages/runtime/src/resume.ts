@@ -43,7 +43,7 @@ export interface ResumeControl {
   dispose: () => void;
 }
 
-const PREFIX = 'data-won-';
+const PREFIX: "data-won-" = 'data-won-';
 
 /** The attribute an element carries to reference a resumable handler for `event` (shared with the compiler). */
 export function handlerAttr(event: string): string {
@@ -52,17 +52,17 @@ export function handlerAttr(event: string): string {
 
 /** Collect the distinct event types referenced by `data-won-<event>` attributes under `root` (inclusive). */
 function discoverEventTypes(root: Element): Set<string> {
-  const types = new Set<string>();
+  const types: Set<string> = new Set<string>();
   const scan = (el: Element): void => {
     const attrs: NamedNodeMap = el.attributes;
-    for (let i = 0; i < attrs.length; i++) {
+    for (let i: number = 0; i < attrs.length; i++) {
       const name: string = attrs[i].name;
       if (name.startsWith(PREFIX)) types.add(name.slice(PREFIX.length));
     }
   };
   scan(root);
   const all: NodeListOf<Element> = root.querySelectorAll('*');
-  for (let i = 0; i < all.length; i++) scan(all[i]);
+  for (let i: number = 0; i < all.length; i++) scan(all[i]);
   return types;
 }
 
@@ -72,7 +72,7 @@ function discoverEventTypes(root: Element): Set<string> {
  * that resolves to a Promise is awaited before the invoke (the event is still passed through).
  */
 export function resumeEvents(root: Element, options: ResumeOptions): ResumeControl {
-  const types = discoverEventTypes(root);
+  const types: Set<string> = discoverEventTypes(root);
   if (options.extraEvents) for (const t of options.extraEvents) types.add(t);
 
   const attrFor = (type: string): string => PREFIX + type;
@@ -104,7 +104,7 @@ export function resumeEvents(root: Element, options: ResumeOptions): ResumeContr
 
   const listeners: Array<[string, (event: Event) => void]> = [];
   for (const type of types) {
-    const fn = dispatch(type);
+    const fn: (event: Event) => void = dispatch(type);
     root.addEventListener(type, fn);
     listeners.push([type, fn]);
   }

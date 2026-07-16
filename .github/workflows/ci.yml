@@ -26,9 +26,7 @@ concurrency:
 
 jobs:
   build:
-    # NOT "typecheck · lint · build · size" — there is no lint step (see below). A job name that
-    # claims a gate it does not run is the same lie as a document that claims one.
-    name: typecheck · build · size
+    name: typecheck · lint · build · size
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -43,12 +41,13 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Typecheck
         run: pnpm typecheck
-      # NO lint step — deliberately, and this is a debt, not a decision. `pnpm lint` is currently
-      # RED: 916 errors across 56 files, all from two style rules (@typescript-eslint/typedef 816,
-      # explicit-function-return-type 100). It drifted precisely because nothing enforced it; the
-      # per-commit cadence says eslint is a gate, and without a machine that claim was untrue.
-      # Adding it here today would make CI red on arrival, which trains everyone to ignore red —
-      # worse than no CI. Fix the 916, then add the step. Do not "fix" this by relaxing the rules.
+      # Lint was RED at 916 errors when this workflow landed — drifted precisely because nothing
+      # enforced it. It is 0 now and enforced here, so it can never drift again. Of those 916, 568
+      # were phantom (eslint was reading packages/ui/.compiled, a gitignored build artifact — now
+      # ignored), 348 were real and are written. If this step goes red, fix the code: do NOT relax
+      # the rules, and do NOT drop the step. That is how the 916 happened.
+      - name: Lint
+        run: pnpm lint
       # build:packages must precede verify:size — the budgets are measured on the built dist.
       - name: Build packages
         run: pnpm build:packages

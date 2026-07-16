@@ -29,7 +29,7 @@ const escapeAttr = (s: string): string => s.replace(/&/g, '&amp;').replace(/"/g,
 
 /* ──────────────────────────── nodes ──────────────────────────── */
 
-let ELEMENT_NODE = 1, TEXT_NODE = 3, COMMENT_NODE = 8, FRAGMENT_NODE = 11;
+let ELEMENT_NODE: number = 1, TEXT_NODE: number = 3, COMMENT_NODE: number = 8, FRAGMENT_NODE: number = 11;
 
 class SNode {
   nodeType: number = 0;
@@ -162,7 +162,7 @@ interface SStyle {
 
 /** Build an {@link SStyle} — a Proxy so `el.style.color = 'red'` and `.setProperty('--x', …)` both work. */
 function makeStyle(): SStyle {
-  const props = new Map<string, string>();
+  const props: Map<string, string> = new Map<string, string>();
   const api: SStyle = {
     setProperty(name: string, value: unknown): void {
       props.set(name, String(value));
@@ -188,11 +188,11 @@ function makeStyle(): SStyle {
     },
   };
   return new Proxy(api, {
-    get(t, p): unknown {
+    get(t: SStyle, p: string | symbol): unknown {
       if (typeof p === 'string' && !(p in t)) return props.get(dashify(p)) ?? '';
       return Reflect.get(t, p);
     },
-    set(t, p, value): boolean {
+    set(t: SStyle, p: string | symbol, value: unknown): boolean {
       if (p === 'cssText') t.cssText = String(value);
       else if (typeof p === 'string') props.set(dashify(p), String(value));
       return true;
@@ -256,8 +256,8 @@ class SElement extends SNode {
     };
     return {
       contains: (name) => read().has(name),
-      add: (name) => { const s = read(); s.add(name); write(s); },
-      remove: (name) => { const s = read(); s.delete(name); write(s); },
+      add: (name) => { const s: Set<string> = read(); s.add(name); write(s); },
+      remove: (name) => { const s: Set<string> = read(); s.delete(name); write(s); },
       toggle: (name, force) => {
         const s: Set<string> = read();
         const on: boolean = force === undefined ? !s.has(name) : force;
@@ -307,7 +307,7 @@ class SElement extends SNode {
   }
 
   protected _shallow(): SNode {
-    const copy = new SElement(this.tagName, this.namespaceURI);
+    const copy: SElement = new SElement(this.tagName, this.namespaceURI);
     copy.attrs = new Map(this.attrs);
     copy.style.cssText = this.style.toCss();
     return copy;
@@ -332,7 +332,7 @@ class STemplate extends SElement {
     for (const n of parseHtml(html, null)) this.content.appendChild(n);
   }
   protected _shallow(): SNode {
-    const copy = new STemplate();
+    const copy: STemplate = new STemplate();
     for (const c of this.content.childNodes) copy.content.appendChild(c.cloneNode(true));
     return copy;
   }
@@ -340,7 +340,7 @@ class STemplate extends SElement {
 
 /* ──────────────────────────── parser (compiler-emitted HTML) ──────────────────────────── */
 
-const SVG_NS = 'http://www.w3.org/2000/svg';
+const SVG_NS: "http://www.w3.org/2000/svg" = 'http://www.w3.org/2000/svg';
 
 /**
  * Parse a compiler-emitted HTML string into nodes. The input is well-formed (codegen output), so this is a
@@ -356,7 +356,7 @@ function parseHtml(html: string, ns: string | null): SNode[] {
     if (parent) parent.appendChild(n);
     else roots.push(n);
   };
-  let i = 0;
+  let i: number = 0;
   const len: number = html.length;
   while (i < len) {
     if (html[i] === '<') {
@@ -370,7 +370,7 @@ function parseHtml(html: string, ns: string | null): SNode[] {
       if (html[i + 1] === '/') {
         const end: number = html.indexOf('>', i);
         const name: string = html.slice(i + 2, end).trim().toLowerCase();
-        for (let k = stack.length - 1; k >= 0; k--) {
+        for (let k: number = stack.length - 1; k >= 0; k--) {
           if (stack[k].tagName === name) {
             stack.length = k;
             break;
@@ -386,7 +386,7 @@ function parseHtml(html: string, ns: string | null): SNode[] {
       const sp: number = inner.search(/\s/);
       const tag: string = (sp === -1 ? inner : inner.slice(0, sp)).toLowerCase();
       const elNs: string | null = tag === 'svg' ? SVG_NS : ns;
-      const el = new SElement(tag, elNs);
+      const el: SElement = new SElement(tag, elNs);
       if (sp !== -1) for (const [an, av] of parseAttrs(inner.slice(sp + 1))) el.setAttribute(an, av);
       add(el);
       if (!selfClose && !VOID_TAGS.has(tag)) stack.push(el);
@@ -405,7 +405,7 @@ function parseHtml(html: string, ns: string | null): SNode[] {
 
 function parseAttrs(s: string): [string, string][] {
   const out: [string, string][] = [];
-  const re = /([^\s=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s]+)))?/g;
+  const re: RegExp = /([^\s=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s]+)))?/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(s))) {
     if (!m[1]) break;
@@ -433,7 +433,7 @@ export function serializeNode(node: SNode): string {
     case FRAGMENT_NODE:
       return node.childNodes.map(serializeNode).join('');
     case ELEMENT_NODE: {
-      const el = node as SElement;
+      const el: SElement = node as SElement;
       const tag: string = el.tagName;
       const attrs: string = el
         .attrList()
@@ -451,7 +451,7 @@ export function serializeNode(node: SNode): string {
 
 /** The minimal `document` surface `runtime/dom` reaches for. */
 function makeDocument(): Record<string, unknown> {
-  const body = new SElement('body');
+  const body: SElement = new SElement('body');
   return {
     createElement: (tag: string): SElement => (tag === 'template' ? new STemplate() : new SElement(tag)),
     createElementNS: (nsUri: string, tag: string): SElement => new SElement(tag, nsUri),

@@ -4,8 +4,8 @@ import { bindTextResumable, adoptText, DYN_TEXT, blockStart, blockEndOf, clearBl
 import { ifBlock } from '@weave-framework/runtime/dom';
 
 /** Node types (avoid the Node global under the test bundler). */
-const TEXT = 3;
-const COMMENT = 8;
+const TEXT: 3 = 3;
+const COMMENT: 8 = 8;
 
 test('bindTextResumable: inserts a marker-isolated text node before the anchor + updates it', () => {
   const p: HTMLParagraphElement = document.createElement('p');
@@ -13,7 +13,7 @@ test('bindTextResumable: inserts a marker-isolated text node before the anchor +
   const anchor: Comment = document.createComment('');
   p.append(anchor);
 
-  const x = signal('world');
+  const x: Signal<string> = signal('world');
   root(() => bindTextResumable(anchor, () => x()));
 
   // "Hello, ", <!--$-->, "world", <!---->
@@ -38,7 +38,7 @@ test('adoptText: re-binds the EXISTING server text node in place (no new node), 
   const serverText: Text = anchor.previousSibling as Text;
   assert.equal(serverText.data, 'world', 'the server rendered the dynamic value isolated by its marker');
 
-  const x = signal('world');
+  const x: Signal<string> = signal('world');
   root(() => adoptText(anchor, () => x()));
 
   assert.is(anchor.previousSibling, serverText, 'adopted the SAME text node — no re-creation');
@@ -56,7 +56,7 @@ test('adoptText: isolated interp (no adjacent static text) adopts the lone text 
   const anchor: Comment = h1.lastChild as Comment;
   const serverText: Text = anchor.previousSibling as Text;
 
-  const t = signal('Title');
+  const t: Signal<string> = signal('Title');
   root(() => adoptText(anchor, () => t()));
   assert.is(anchor.previousSibling, serverText, 'adopted the existing text node');
   t.set('Renamed');
@@ -67,7 +67,7 @@ test('adoptText: missing server text (mismatch) falls back to creating one rathe
   const span: HTMLElement = document.createElement('span');
   const anchor: Comment = document.createComment('');
   span.append(anchor); // no text before it
-  const v = signal('x');
+  const v: Signal<string> = signal('x');
   root(() => adoptText(anchor, () => v()));
   const t: Node | null = anchor.previousSibling;
   assert.ok(t && t.nodeType === TEXT, 'created a text node when none existed');

@@ -11,7 +11,7 @@ import {
   type ProjectConfiguration,
   type Tree,
 } from '@nx/devkit';
-import { componentFiles } from './files.js';
+import { componentFiles, type GenFile } from './files.js';
 
 export interface ComponentGeneratorSchema {
   name: string;
@@ -27,10 +27,10 @@ export async function componentGenerator(tree: Tree, schema: ComponentGeneratorS
   const dir: string = joinPathFragments(sourceRoot, schema.directory ?? '', fileName);
   const style: 'css' | 'scss' | 'none' = schema.style ?? 'css';
 
-  const files = componentFiles(dir, fileName, style);
+  const files: GenFile[] = componentFiles(dir, fileName, style);
   // Write the Weave `.html` template after formatFiles so Prettier can't mangle its
   // `{{ }}` bindings (e.g. `on:click={{ inc }}` → `on:click="{{" inc }}`).
-  const htmlFiles = files.filter((f) => f.path.endsWith('.html'));
+  const htmlFiles: GenFile[] = files.filter((f) => f.path.endsWith('.html'));
   for (const file of files) {
     if (file.path.endsWith('.html')) continue;
     tree.write(file.path, file.content);

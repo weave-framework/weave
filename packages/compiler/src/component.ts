@@ -20,7 +20,7 @@ import { applyPatches, type PatchOp } from './patch.js';
 import { inferCtxNames } from './infer.js';
 import { injectAutoReturn } from './auto-return.js';
 import { extractSetupBindings, extractReturnedNames, extractModuleImports, unresolvedRefs, setupCallsHook, type SetupBindings } from './handlers.js';
-import { rewrite, ctxScope } from './scope.js';
+import { rewrite, ctxScope, type Scope } from './scope.js';
 import { scopeCss, scopeAttr, hostAttr, hashCss } from './css.js';
 
 export interface ComponentSource {
@@ -90,7 +90,8 @@ const HAS_PROP_DEFAULTS: RegExp = /export\s+(?:const|let|var)\s+propDefaults\b/;
  * ReferenceError on the first click. Refusing leaves the site as `ctx.<name>` — today's inert-but-safe
  * behaviour — rather than trading a dead button for a crash. Recursion is fine (the factory binds the name).
  */
-function resumableSetup(script: string, scope: string[]): {
+/** What {@link resumableSetup} reconstructs from a component's `setup` source for the resumable target. */
+interface ResumableSetup {
   handlers: ReadonlyMap<string, string>;
   computeds: ReadonlyMap<string, string>;
   /** E1.19 — setup's own helper functions, re-declared inside the `handlers(ctx)` factory. */
@@ -103,7 +104,9 @@ function resumableSetup(script: string, scope: string[]): {
    *  the whole component cannot adopt; the caller turns the first into the refusal reason. */
   effectRefusals: string[];
   warnings: string[];
-} {
+}
+
+function resumableSetup(script: string, scope: string[]): ResumableSetup {
   const handlers: Map<string, string> = new Map();
   const computeds: Map<string, string> = new Map();
   const locals: Map<string, string> = new Map();
@@ -125,7 +128,7 @@ function resumableSetup(script: string, scope: string[]): {
   const returned: Set<string> | null = extractReturnedNames(script);
   const ctxNames: Set<string> = new Set(scope);
   if (returned) for (const n of returned) if (!found.handlers.has(n) && !found.computeds.has(n)) ctxNames.add(n);
-  const sc = ctxScope(ctxNames);
+  const sc: Scope = ctxScope(ctxNames);
 
   // A re-derived initializer is emitted into THIS module, so it may also reference the module's own imports
   // (`createRouter`, `computed`, `Home`) — they resolve on the client without crossing the wire.
@@ -166,7 +169,7 @@ function resumableSetup(script: string, scope: string[]): {
   // useless (openPanel is right there in setup) and misleading (it is not the problem). One cause wearing the
   // name of whatever touched it last is what made the docs list look like a dozen problems instead of one.
   const because: Map<string, string[]> = new Map();
-  for (let changed = true; changed; ) {
+  for (let changed: boolean = true; changed; ) {
     changed = false;
     const check = (name: string, source: string, params: readonly string[]): void => {
       if (!settled.has(name)) return;
@@ -333,7 +336,7 @@ export function compileComponent(src: ComponentSource, opts: ComponentOptions = 
   const host: string | undefined = src.styles && /:host\b/.test(src.styles) ? hostAttr(hash) : undefined;
   // E1.5/E1.6 — resumable only: inline each named handler's `setup` body (`on:click={{ inc }}`) and re-derive
   // each `computed` over the resumed ctx (`{{ doubled() }}`), neither of which can cross the snapshot.
-  const resumed = opts.resumable && src.script ? resumableSetup(src.script, scope) : undefined;
+  const resumed: ResumableSetup | undefined = opts.resumable && src.script ? resumableSetup(src.script, scope) : undefined;
   // E1.45 — a lifecycle hook registered in `setup` is the structural limit of resumability: resume never runs
   // `setup`, so the hook is never registered, and the server never ran it either (it is inert there). Whatever
   // DOM work it does simply never happens. Refuse to adopt and say so — the subtree then client-renders, which

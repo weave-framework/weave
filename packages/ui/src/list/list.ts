@@ -163,7 +163,7 @@ export function setup<T = unknown>(props: ListProps<T>): ListContext<T> {
   // FRESH object for the same `value` when the data is edited (reload), so a new version means the
   // row's data changed — folding object identity into the string `rowKey` (which keyBlock compares
   // by value) so an edited row's template body rebuilds, not just on a selected/disabled flip.
-  let rowVersion = 0;
+  let rowVersion: number = 0;
   const rowVersions: WeakMap<object, number> = new WeakMap<object, number>();
   const versionOf = (item: ListItem<T>): number => {
     let v: number | undefined = rowVersions.get(item as object);
