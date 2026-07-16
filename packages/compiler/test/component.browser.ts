@@ -1036,3 +1036,17 @@ test('E1.28 fail-safe: an initializer the scanner cannot bound is still refused'
   );
   assert.ok(/"w0":\s*ctx\.inc\b/.test(code), 'a destructured local is not derivable → the handler falls back safely');
 });
+
+test('E1.33: a bare CALL ARGUMENT is not an object shorthand', () => {
+  // `rewrite` expands `{ name }` to `{ name: <value> }`, detecting a shorthand as "between `{`|`,` and `,`|`}`".
+  // But a `,` is ambiguous: `f(a, b)` looks identical. The real <Menubar> emitted
+  // `removeEventListener("keydown", arrowListener: ctx.arrowListener, true)` and the BUILD failed. Only the
+  // nearest unclosed bracket can tell them apart.
+  const call = compileComponent({ template: '<b on:click={{ () => off("keydown", listener, true) }}>x</b>' });
+  assert.ok(/off\("keydown", ctx\.listener, true\)/.test(call.code), `a call argument stays an argument; got:\n${call.code}`);
+  assert.ok(!/listener:/.test(call.code), 'it is not expanded into a key');
+
+  // and a real object shorthand still expands — a bare `{ ctx.x }` would be a syntax error
+  const obj = compileComponent({ template: '<b on:click={{ () => send({ listener, extra: 1 }) }}>x</b>' });
+  assert.ok(/\{ listener: ctx\.listener, extra: 1 \}/.test(obj.code), `the shorthand still expands; got:\n${obj.code}`);
+});

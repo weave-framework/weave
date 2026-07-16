@@ -405,3 +405,25 @@ test('E1.31: an arrow`s RETURN type is not a ref, with or without parameters', (
   assert.deepEqual(unresolvedRefs(hs.get('at')!.source, new Set(['rect']), hs.get('at')!.params, 'at'), [],
     'and one with parameters');
 });
+
+test('E1.32: a declaration with NO initializer is still a binding — it is simply undefined', () => {
+  // `let timer: ReturnType<typeof setTimeout> | undefined;` — the docs' <CodeBlock>. readVarDecl requires an
+  // `=`, so it was not extracted at all and every handler touching `timer` was refused. An uninitialized `let`
+  // IS its value: undefined. Rebuilding it that way is exactly what setup's closure started with.
+  const f = extractSetupBindings(
+    setup(
+      '  let timer: ReturnType<typeof setTimeout> | undefined;\n' +
+        '  let plain;\n' +
+        '  const n = signal(0);\n' +
+        '  const go = () => { timer = setTimeout(() => n.set(1), 10); };\n' +
+        '  return { n, go };'
+    )
+  );
+  assert.equal(f.computeds.get('timer')?.source, 'undefined', 'an annotated declaration with no initializer');
+  assert.equal(f.computeds.get('plain')?.source, 'undefined', 'and a bare one');
+  assert.deepEqual(
+    unresolvedRefs(f.handlers.get('go')!.source, new Set(['n', 'timer']), [], 'go'),
+    [],
+    'so the handler that assigns it resolves',
+  );
+});

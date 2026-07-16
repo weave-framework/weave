@@ -76,6 +76,10 @@ export function rewrite(expr: string, scope: Scope, ctxRef: string = 'ctx', oute
   // Each `${…}` is rewritten by a RECURSIVE call, which used to start with an empty param set — so an
   // enclosing arrow's params were forgotten inside it and `items().map((_, i) => `#${i}`)` emitted `ctx.i`.
   if (outerParams) for (const p of outerParams) params.add(p);
+  // The chain of unclosed brackets at the cursor. A `,` alone cannot tell `{ a, b }` from `f(a, b)` — only the
+  // nearest opener can, and mistaking the second for the first emitted `f("k", a: ctx.a, b)`, which fails the
+  // BUILD (the real <Menubar>'s `removeEventListener("keydown", arrowListener, true)`).
+  const brackets: string[] = [];
 
   const segments: RewriteSegment[] = [];
   // The current verbatim run, contiguous in both source and generated text.
@@ -192,7 +196,7 @@ export function rewrite(expr: string, scope: Scope, ctxRef: string = 'ctx', oute
       if (binding && !isProperty && !isObjectKey && !params.has(name)) {
         // `{ name }` object shorthand must expand to `{ name: <value> }` — a bare `{ ctx.name }` /
         // `{ accessor() }` is a syntax error. Detect a shorthand key: between `{`|`,` and `,`|`}`.
-        if (binding.kind !== 'local') {
+        if (binding.kind !== 'local' && brackets[brackets.length - 1] === '{') {
           if ((prev === '{' || prev === ',') && (next === ',' || next === '}')) insert(`${name}: `);
         }
         if (binding.kind === 'ctx') {
@@ -211,6 +215,9 @@ export function rewrite(expr: string, scope: Scope, ctxRef: string = 'ctx', oute
       continue;
     }
 
+    // Track the enclosing bracket so a shorthand can be told from a call argument (see `inObject` below).
+    if (c === '{' || c === '[' || c === '(') brackets.push(c);
+    else if (c === '}' || c === ']' || c === ')') brackets.pop();
     copy(i, c);
     i++;
   }

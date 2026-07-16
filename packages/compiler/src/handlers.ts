@@ -854,9 +854,16 @@ function readVarDecl(src: string, i: number, kwLen: number): { name: string; ini
   // on the arrow's `=` and the binding vanished from the extraction, taking everything behind it with it.
   if (src[k] === ':') {
     const eq: number = assignAfterType(src, k + 1);
-    if (eq < 0) return null;
+    // E1.32 — no `=` at all: an ANNOTATED declaration with no initializer (`let timer: Timeout | undefined;`).
+    // It is not "unreadable" — its value IS undefined, which is exactly what setup's closure started with, so
+    // rebuild it as that. Without this it was not extracted, and every handler assigning it was refused.
+    if (eq < 0) {
+      const semi: number = findTopLevel(src, k, ';');
+      return semi < 0 ? null : { name, init: 'undefined', end: semi };
+    }
     k = eq;
   }
+  if (src[k] === ';') return { name, init: 'undefined', end: k }; // a bare `let x;`
   if (src[k] !== '=' || src[k + 1] === '=' || src[k + 1] === '>') return null;
   const start: number = skipWs(src, k + 1);
   const end: number = declEnd(src, start);
