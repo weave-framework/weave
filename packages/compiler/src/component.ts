@@ -19,7 +19,7 @@ import type { TemplateNode } from './ast.js';
 import { applyPatches, type PatchOp } from './patch.js';
 import { inferCtxNames } from './infer.js';
 import { injectAutoReturn } from './auto-return.js';
-import { extractSetupBindings, extractReturnedNames, unresolvedRefs, COMPUTED_CALLEE, type SetupBindings } from './handlers.js';
+import { extractSetupBindings, extractReturnedNames, extractModuleImports, unresolvedRefs, type SetupBindings } from './handlers.js';
 import { rewrite, ctxScope } from './scope.js';
 import { scopeCss, scopeAttr, hostAttr, hashCss } from './css.js';
 
@@ -113,6 +113,10 @@ function resumableSetup(script: string, scope: string[]): {
   if (returned) for (const n of returned) if (!found.handlers.has(n) && !found.computeds.has(n)) ctxNames.add(n);
   const sc = ctxScope(ctxNames);
 
+  // A re-derived initializer is emitted into THIS module, so it may also reference the module's own imports
+  // (`createRouter`, `computed`, `Home`) — they resolve on the client without crossing the wire.
+  const imports: Set<string> = extractModuleImports(script);
+
   // What an inlined body may reference: the bindings that survive to the client. Signals + plain data do
   // (the snapshot carries them); handlers and computeds do NOT — `registerState` drops every function. A
   // computed comes BACK via `derive`, so once we prove one derivable it becomes resolvable for the rest.
@@ -120,8 +124,8 @@ function resumableSetup(script: string, scope: string[]): {
 
   // Computeds first, in declaration order: each may read the signals plus any earlier computed. `derive`
   // emits them in this same order, so the assignment order matches the dependency order.
-  for (const [name, computed] of found.computeds) {
-    const missing: string[] = unresolvedRefs(computed.source, resolvable, [], name, COMPUTED_CALLEE);
+  for (const [name, derivable] of found.computeds) {
+    const missing: string[] = unresolvedRefs(derivable.source, union(resolvable, imports), [], name);
     if (missing.length) {
       reasons.set(name, blame(missing));
       // A computed the template CALLS and we cannot rebuild makes resume THROW — the whole page dies, so
@@ -134,7 +138,7 @@ function resumableSetup(script: string, scope: string[]): {
       }
       continue;
     }
-    computeds.set(name, rewrite(computed.args, sc).code);
+    computeds.set(name, rewrite(derivable.source, sc).code);
     resolvable.add(name); // now live in the resumed ctx → a later computed / a handler may use it
     sc.set(name, { kind: 'ctx' }); // …and its refs must rewrite to `ctx.<name>` even if the template never reads it
   }
@@ -142,7 +146,7 @@ function resumableSetup(script: string, scope: string[]): {
   // Handlers second — so a handler that reads a derived computed (`() => count.set(doubled())`) inlines too.
   for (const [name, handler] of found.handlers) {
     if (!scope.includes(name)) continue; // the template never references it
-    const missing: string[] = unresolvedRefs(handler.source, resolvable, handler.params, name);
+    const missing: string[] = unresolvedRefs(handler.source, union(resolvable, imports), handler.params, name);
     if (missing.length) {
       reasons.set(name, blame(missing));
       continue; // the warning is raised by the caller, which knows whether it is actually a handler SITE
@@ -150,6 +154,13 @@ function resumableSetup(script: string, scope: string[]): {
     handlers.set(name, rewrite(handler.source, sc).code);
   }
   return { handlers, computeds, reasons, warnings };
+}
+
+/** The union of two name sets (what a re-derived initializer may reference). */
+function union(a: ReadonlySet<string>, b: ReadonlySet<string>): Set<string> {
+  const out: Set<string> = new Set(a);
+  for (const n of b) out.add(n);
+  return out;
 }
 
 /** `['step']` → "`step`, which setup() does not return"; two or more → a list. */
@@ -182,7 +193,7 @@ export function compileComponent(src: ComponentSource, opts: ComponentOptions = 
     hostAttr: host,
     resumable: opts.resumable,
     resumableHandlers: resumed?.handlers,
-    resumableComputeds: resumed?.computeds,
+    resumableDerived: resumed?.computeds,
   });
   // Demote the template module's default export to a local `render` we can wire up:
   //  - eager:     `export default function render …`  → `function render …`

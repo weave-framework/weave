@@ -19,11 +19,12 @@ export {
   extractSetupHandlers,
   extractSetupBindings,
   extractReturnedNames,
+  extractModuleImports,
   unresolvedRefs,
   isInlinable,
   isDerivable,
   type SetupHandler,
-  type SetupComputed,
+  type SetupDerived,
   type SetupBindings,
 } from './handlers.js';
 export {

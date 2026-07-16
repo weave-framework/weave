@@ -773,14 +773,16 @@ function compileComputed(computeds?: Map<string, string>): ((ctx: unknown, slots
     mode: 'function',
     scope: ['doubled'],
     resumable: true,
-    resumableComputeds: computeds,
+    resumableDerived: computeds,
   });
   const body: string = code.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;');
   return new Function('rt', '_c', body)(rt, {});
 }
 
 test('E1.6: a computed is REBUILT on resume — the page adopts and stays reactive through the derived value', () => {
-  const render = compileComputed(new Map([['doubled', '() => ctx.count() * 2']]));
+  // what compileComponent emits: the FULL initializer, ctx-rewritten (its callee is the module's own import;
+  // function mode reaches it via `rt`).
+  const render = compileComputed(new Map([['doubled', 'rt.computed(() => ctx.count() * 2)']]));
   assert.equal(typeof render.derive, 'function', 'the render carries a derive');
 
   // ── server ── the real setup ctx; the snapshot carries ONLY the signal (registerState drops the computed)

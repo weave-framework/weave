@@ -1,5 +1,5 @@
 import { test, assert } from '../../../tools/harness.js';
-import { extractSetupHandlers, extractSetupBindings, isInlinable, isDerivable, type SetupHandler } from '@weave-framework/compiler';
+import { extractSetupHandlers, extractSetupBindings, extractModuleImports, isInlinable, isDerivable, type SetupHandler } from '@weave-framework/compiler';
 
 /**
  * E1.5 — named-handler resume. `extractSetupHandlers` pulls each top-level `setup` binding that is a function
@@ -132,23 +132,40 @@ test('finds handlers in an arrow setup, annotated or not', () => {
 
 /* ──────────── E1.6 — computeds re-derived on resume ──────────── */
 
-test('extracts computed() declarations, in source order, keeping only the args', () => {
+test('extracts every non-function binding in source order (= dependency order), keeping the FULL initializer', () => {
   const b = extractSetupBindings(
     setup('  const count = signal(1);\n  const doubled = computed(() => count() * 2);\n  const quad = computed(() => doubled() * 2);\n  const inc = () => count.set(1);\n  return { count, doubled, quad, inc };')
   );
-  assert.deepEqual([...b.computeds.keys()], ['doubled', 'quad'], 'both computeds, in DECLARATION order (= dependency order)');
-  assert.equal(b.computeds.get('doubled')!.args, '() => count() * 2', 'args only — the callee is re-attached by the emit');
-  assert.ok(b.handlers.has('inc') && !b.handlers.has('doubled'), 'a computed is not a handler');
+  // Every non-function binding is a derive CANDIDATE. The `if (ctx.x === undefined)` guard is what decides at
+  // RUNTIME whether it is actually rebuilt — so `count`, a signal that crossed the wire, is never clobbered.
+  assert.deepEqual([...b.computeds.keys()], ['count', 'doubled', 'quad'], 'declaration order, which is dependency order');
+  assert.equal(b.computeds.get('doubled')!.source, 'computed(() => count() * 2)', 'the FULL initializer — its callee is a module import');
+  assert.ok(b.handlers.has('inc') && !b.computeds.has('inc'), 'a function is a handler, not a derived binding');
 });
 
-test('a computed is only derivable when its body resolves on the client', () => {
-  const c = (args: string) => ({ source: `computed(${args})`, args });
-  assert.ok(isDerivable(c('() => count() * 2'), new Set(['count'])), 'reads a snapshotted signal');
-  assert.ok(!isDerivable(c('() => count() * factor'), new Set(['count'])), 'a non-ctx setup local → refuse');
-  assert.ok(isDerivable(c('() => doubled() + 1'), new Set(['doubled'])), 'reads an EARLIER computed (already derived)');
+test('a binding is derivable only when its initializer resolves on the client', () => {
+  const c = (src: string) => ({ source: src });
+  // `computed` / `createRouter` resolve because the emitted derive sits in the module that imports them.
+  const mod = new Set(['count', 'computed']);
+  assert.ok(isDerivable(c('computed(() => count() * 2)'), mod), 'ctx signal + the imported callee');
+  assert.ok(!isDerivable(c('computed(() => count() * factor)'), mod), 'an unresolvable name (`factor`) → refuse');
+  assert.ok(isDerivable(c('computed(() => doubled() + 1)'), new Set(['doubled', 'computed'])), 'reads an EARLIER derived binding');
+  assert.ok(!isDerivable(c('computed(() => count() * 2)'), new Set(['count'])), 'the callee itself must resolve too');
+  // the E1.11 case: built purely from module imports, so it needs nothing from the wire
+  assert.ok(isDerivable(c('createRouter([route("/", { component: Home })])'), new Set(['createRouter', 'route', 'Home'])),
+    'a router built from module imports is reconstructible');
 });
 
-test('fail-safe: only a plain `computed(…)` initializer is recognised', () => {
-  const b = extractSetupBindings(setup('  const a = computed(() => 1).valueOf;\n  const c = memo(() => 1);\n  return { a, c };'));
-  assert.equal(b.computeds.size, 0, 'a member access on the call / an unknown factory → not recognised (no wrong derive)');
+test('module imports are collected — they are what a re-derived initializer may reference', () => {
+  const imports = extractModuleImports(
+    'import { createRouter, route as r } from "@weave-framework/router";\n' +
+      'import Home from "./home";\n' +
+      'import * as util from "./util";\n' +
+      'import "./side-effect.css";\n'
+  );
+  assert.ok(imports.has('createRouter'), 'named');
+  assert.ok(imports.has('r') && !imports.has('route'), 'aliased → the LOCAL name is what resolves in the module');
+  assert.ok(imports.has('Home'), 'default');
+  assert.ok(imports.has('util'), 'namespace');
+  assert.equal(imports.size, 4, 'a side-effect-only import contributes nothing');
 });

@@ -103,7 +103,7 @@ export function collectStates(fn: () => void, dropped?: DroppedState[]): Record<
  * bindings would resume against `undefined`). A missing `states[id]` is the client's signal to CSR-mount that
  * component instead — its `setup` re-runs and all still works. Previously this FAILED THE BUILD.
  */
-export function registerState(id: string, ctx: unknown): void {
+export function registerState(id: string, ctx: unknown, derived?: readonly string[]): void {
   if (!collector) return;
   const src: Record<string, unknown> = ctx as Record<string, unknown>;
   const clean: Record<string, unknown> = {};
@@ -114,8 +114,13 @@ export function registerState(id: string, ctx: unknown): void {
     try {
       serialize(v);
     } catch (e) {
+      // `derived` are the keys the compiled `derive(ctx)` rebuilds from module scope (E1.11) — a `router`,
+      // a store. Leaving one out is not a hole: derive fills it client-side, so the instance still resumes.
+      // Anything else unserializable IS a hole (the render would bind against `undefined`), so the whole
+      // instance is dropped and the client CSR-mounts it instead (E1.9).
+      if (derived?.includes(key)) continue;
       if (droppedSink) droppedSink.push({ id, key, reason: (e as Error).message });
-      return; // all-or-nothing: this instance is not resumable
+      return;
     }
     clean[key] = v;
   }

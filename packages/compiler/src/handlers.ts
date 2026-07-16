@@ -144,35 +144,65 @@ export interface SetupHandler {
 }
 
 /**
- * A `setup` binding declared as `computed(…)` (E1.6), extracted so the client can RE-DERIVE it.
+ * A non-function `setup` binding the client can RE-DERIVE — rebuild by re-running its initializer over the
+ * resumed ctx (E1.6 computeds, E1.11 anything else built from module scope).
  *
- * A computed is a bare getter with no writable surface, so the signal codec doesn't claim it and
- * `registerState` drops it — but unlike a handler, the template CALLS it (`{{ doubled() }}`), so a resumed
- * `ctx.doubled` of `undefined` throws and takes the whole page's resume down with it. The compiler therefore
- * emits a `derive(ctx)` that rebuilds each computed over the resumed ctx before adopt runs.
+ * Two kinds of value never survive the snapshot: a `computed` (a bare getter — the codec can't claim it, yet
+ * the template CALLS it, so a resumed `undefined` throws and kills the page), and a value that simply cannot
+ * be serialized (a `router`, a store with methods). Both are reconstructible when their initializer only
+ * references things the client already has: module imports, globals, and ctx bindings that DID survive. The
+ * emitted `derive(ctx)` re-runs the initializer — guarded by `if (ctx.x === undefined)`, so a binding that
+ * DID cross the wire (a signal carrying the server's value) is never clobbered by a fresh one.
  */
-export interface SetupComputed {
-  /** The full `computed(…)` call source — what the free-identifier check reads. */
+export interface SetupDerived {
+  /** The full initializer source, emitted verbatim after a ctx rewrite (its callee is a module import). */
   source: string;
-  /**
-   * Just the ARGUMENTS, i.e. the text inside `computed( … )`. The emit re-attaches the callee itself via the
-   * codegen's core-import reference (`computed` in module mode, `rt.computed` in function mode), so the user's
-   * bare `computed` name is never emitted — it would be undefined in a `new Function` body.
-   */
-  args: string;
 }
 
 /** Every extractable top-level `setup` binding, split by shape. */
 export interface SetupBindings {
   /** `const inc = () => …` — event handlers (E1.5). */
   handlers: Map<string, SetupHandler>;
-  /** `const doubled = computed(() => …)` — re-derived on resume (E1.6). Insertion order = source order,
-   *  which is also dependency order (a computed can only read one declared before it). */
-  computeds: Map<string, SetupComputed>;
+  /** Non-function bindings, re-derived on resume (E1.6/E1.11). Insertion order = source order, which is also
+   *  dependency order — an initializer can only read a binding declared before it. */
+  computeds: Map<string, SetupDerived>;
 }
 
 /** The callee of a re-derivable binding — excluded from the free-identifier check (the emit imports it). */
 export const COMPUTED_CALLEE: string = 'computed';
+
+/**
+ * Names the component MODULE imports (`import { createRouter, route } from '…'`, `import Home from './home'`).
+ *
+ * A `derive` emitted into that same module can reference them directly, so a binding built purely from imports
+ * — `const router = createRouter([route('/', { component: Home })])` — is reconstructible client-side even
+ * though the value itself could never cross the wire. Default/namespace/named/aliased forms are all collected;
+ * `import 'x'` (side-effect only) contributes nothing.
+ */
+export function extractModuleImports(script: string): Set<string> {
+  const out: Set<string> = new Set();
+  const re: RegExp = /import\s+([^;'"]*?)\s*from\s*['"][^'"]+['"]/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(script)) !== null) {
+    const clause: string = m[1];
+    // `Default, { a, b as c }` / `* as ns` / `{ x }`
+    const braces: RegExpMatchArray | null = clause.match(/\{([^}]*)\}/);
+    if (braces) {
+      for (const raw of braces[1].split(',')) {
+        const part: string = raw.trim();
+        if (!part) continue;
+        const alias: string = part.includes(' as ') ? part.split(/\s+as\s+/)[1] : part;
+        const name: string = alias.trim().replace(/^type\s+/, '');
+        if (/^[A-Za-z_$][\w$]*$/.test(name)) out.add(name);
+      }
+    }
+    const head: string = clause.replace(/\{[^}]*\}/, '').replace(/,/g, ' ').trim();
+    const ns: RegExpMatchArray | null = head.match(/\*\s+as\s+([A-Za-z_$][\w$]*)/);
+    if (ns) out.add(ns[1]);
+    else if (/^[A-Za-z_$][\w$]*$/.test(head)) out.add(head); // default import
+  }
+  return out;
+}
 
 /**
  * The ctx keys `setup` explicitly returns (`return { count, inc, doubled: d }` → `count`, `inc`, `doubled`),
@@ -248,7 +278,7 @@ export function extractSetupHandlers(script: string): Map<string, SetupHandler> 
  */
 export function extractSetupBindings(script: string): SetupBindings {
   const out: Map<string, SetupHandler> = new Map();
-  const computeds: Map<string, SetupComputed> = new Map();
+  const computeds: Map<string, SetupDerived> = new Map();
   const empty: SetupBindings = { handlers: out, computeds };
   const open: number | null = locateSetupBody(script);
   if (open === null) return empty;
@@ -305,10 +335,7 @@ export function extractSetupBindings(script: string): SetupBindings {
       if (parsed) {
         const handler: SetupHandler | null = asFunctionExpr(parsed.init);
         if (handler) out.set(parsed.name, handler);
-        else {
-          const c: SetupComputed | null = asComputedCall(parsed.init);
-          if (c) computeds.set(parsed.name, c);
-        }
+        else if (parsed.init) computeds.set(parsed.name, { source: parsed.init });
         i = parsed.end;
         continue;
       }
@@ -326,25 +353,18 @@ export function extractSetupBindings(script: string): SetupBindings {
   return empty;
 }
 
-/** `computed( … )` at `init` → its source + args. Null for anything else (an aliased import is not
- *  recognised — fail-safe: no derive, rather than a wrong one). */
-function asComputedCall(init: string): SetupComputed | null {
-  const src: string = init.trim();
-  if (!startsWithWord(src, 0, COMPUTED_CALLEE)) return null;
-  const p: number = skipWs(src, COMPUTED_CALLEE.length);
-  if (src[p] !== '(') return null;
-  const rp: number = matchDelimited(src, p, '(', ')');
-  if (rp !== src.length - 1) return null; // the whole initializer must BE the call (not `computed(…).x`)
-  return { source: src, args: src.slice(p + 1, rp) };
-}
-
 /**
- * Can `computed`'s body be re-derived over the resumed ctx? Same rule as {@link isInlinable}, minus the
- * callee itself (`computed` is imported by the emitted `derive`, not read from ctx) and its own name.
- * `resolvable` must include the computeds declared BEFORE this one — a computed may read an earlier one.
+ * Can this binding be rebuilt over the resumed ctx? Every free identifier of its initializer must be
+ * something the client has: a surviving ctx binding, an earlier-derived one, a MODULE IMPORT (the emitted
+ * `derive` lives in that same module, so `createRouter`/`computed`/`Home` all resolve), or a JS global.
+ * The caller therefore passes `resolvable` already unioned with {@link extractModuleImports}.
  */
-export function isDerivable(computed: SetupComputed, resolvable: ReadonlySet<string>, name?: string): boolean {
-  return unresolvedRefs(computed.source, resolvable, [], name, COMPUTED_CALLEE).length === 0;
+export function isDerivable(
+  derived: SetupDerived,
+  resolvable: ReadonlySet<string>,
+  name?: string,
+): boolean {
+  return unresolvedRefs(derived.source, resolvable, [], name).length === 0;
 }
 
 /**

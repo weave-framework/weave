@@ -363,13 +363,24 @@ test('E1.5: a NAMED handler is inlined into the factory — `{{ inc }}` resumes 
   assert.ok(!/"w0":\s*ctx\.inc\b/.test(code), 'no bare ctx.inc — it is undefined on the client (a function cannot serialize)');
 });
 
-test('E1.5 fail-safe: a handler touching a non-ctx setup local is NOT inlined (falls back, never a ReferenceError)', () => {
+test('E1.5 fail-safe: a handler calling ANOTHER setup function is NOT inlined (falls back, never a ReferenceError)', () => {
+  // A plain local (`const step = 2`) is re-derivable since E1.11, so it no longer blocks inlining. A FUNCTION
+  // is different: it is dropped from the snapshot and `derive` never rebuilds functions — so a handler calling
+  // one cannot resolve, and must fall back rather than emit a body that throws on the first click.
   const { code } = compileComponent(
-    { script: counter('const step = 2;\nconst inc = () => count.set((n) => n + step);'), template: '<button on:click={{ inc }}>{{ count() }}</button>' },
+    { script: counter('const helper = () => count.set(0);\nconst inc = () => helper();'), template: '<button on:click={{ inc }}>{{ count() }}</button>' },
     { filename: 'ctr2', resumable: true }
   );
-  assert.ok(/"w0":\s*ctx\.inc\b/.test(code), '`step` never reaches the client → keep ctx.inc rather than inline a broken body');
-  assert.ok(!/n \+ step/.test(code.split('function handlers')[1] ?? ''), 'the unsafe body is not inlined');
+  assert.ok(/"w0":\s*ctx\.inc\b/.test(code), '`helper` never reaches the client → keep ctx.inc rather than inline a broken body');
+});
+
+test('E1.11: a handler reading a plain setup local IS inlined — `derive` rebuilds the local', () => {
+  const { code } = compileComponent(
+    { script: counter('const step = 2;\nconst inc = () => count.set((n) => n + step);'), template: '<button on:click={{ inc }}>{{ count() }}</button>' },
+    { filename: 'ctr2b', resumable: true }
+  );
+  assert.ok(/if \(ctx\.step === undefined\) ctx\.step = 2;/.test(code), '`step` never crossed the wire → derive rebuilds it');
+  assert.ok(/"w0":\s*\(\)\s*=>\s*ctx\.count\.set\(\(n\)\s*=>\s*n \+ ctx\.step\)/.test(code), 'so the handler inlines against it');
 });
 
 test('E1.5: an INLINE handler is untouched (already resumable) and eager never inlines', () => {
@@ -576,8 +587,8 @@ test('E1.6: a computed touching a non-ctx local is NOT derived (fail-safe), and 
     {
       script:
         'import { signal, computed } from "@weave-framework/runtime";\n' +
-        'export function setup() {\n  const count = signal(1);\n  const factor = 3;\n' +
-        '  const scaled = computed(() => count() * factor);\n  return { count, scaled };\n}',
+        'export function setup() {\n  const count = signal(1);\n  const factorOf = () => 3;\n' +
+        '  const scaled = computed(() => count() * factorOf());\n  return { count, scaled };\n}',
       template: '<p>{{ scaled() }}</p>',
     },
     { filename: 'unsafe', resumable: true }
@@ -603,7 +614,7 @@ test('warns when a NAMED handler cannot be inlined (dead after resume), naming t
     {
       script:
         'import { signal } from "@weave-framework/runtime";\n' +
-        'export function setup(){ const count = signal(0); const step = 2;\n' +
+        'export function setup(){ const count = signal(0); const helper = () => count.set(0);\n' +
         '  const inc = () => count.set((n) => n + step);\n  return { count, inc }; }',
       template: '<button on:click={{ inc }}>{{ count() }}</button>',
     },
@@ -619,13 +630,13 @@ test('warns when a computed cannot be rebuilt — the resume-throws case', () =>
     {
       script:
         'import { signal, computed } from "@weave-framework/runtime";\n' +
-        'export function setup(){ const count = signal(0); const factor = 3;\n' +
-        '  const scaled = computed(() => count() * factor);\n  return { count, scaled }; }',
+        'export function setup(){ const count = signal(0); const factorOf = () => 3;\n' +
+        '  const scaled = computed(() => count() * factorOf());\n  return { count, scaled }; }',
       template: '<p>{{ scaled() }}</p>',
     },
     { filename: 'w2', resumable: true }
   );
-  assert.ok(warnings && warnings.some((w) => /computed `scaled`/.test(w) && /Resuming this page will fail/.test(w) && /`factor`/.test(w)), `expected a computed warning; got ${JSON.stringify(warnings)}`);
+  assert.ok(warnings && warnings.some((w) => /computed `scaled`/.test(w) && /Resuming this page will fail/.test(w) && /`factorOf`/.test(w)), `expected a computed warning; got ${JSON.stringify(warnings)}`);
 });
 
 test('warns when a handler definition cannot be READ from setup (not a plain const/fn)', () => {
@@ -659,7 +670,7 @@ test('NO warnings for safe handlers/computeds, and NEVER for an eager build', ()
     {
       script:
         'import { signal } from "@weave-framework/runtime";\n' +
-        'export function setup(){ const count = signal(0); const step = 2;\n  const inc = () => count.set((n) => n + step);\n  return { count, inc }; }',
+        'export function setup(){ const count = signal(0); const helper = () => count.set(0);\n  const inc = () => count.set((n) => n + step);\n  return { count, inc }; }',
       template: '<button on:click={{ inc }}>{{ count() }}</button>',
     },
     { filename: 'eagerw' } // NOT resumable → resume can't happen → nothing to warn about

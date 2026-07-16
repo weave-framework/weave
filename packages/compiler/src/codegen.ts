@@ -43,12 +43,13 @@ export interface CompileOptions {
    */
   resumableHandlers?: ReadonlyMap<string, string>;
   /**
-   * Phase E (E1.6) — `name → rewritten computed(…) call`, in declaration order. A `computed` is dropped from
-   * the snapshot (it has no writable surface to serialize), but the template CALLS it, so a resumed
-   * `ctx.doubled` of `undefined` throws and kills the whole resume. These become a `derive(ctx)` the client
-   * runs after deserialize and BEFORE adopt, rebuilding each computed over the resumed signals.
+   * Phase E (E1.6/E1.11) — `name → rewritten initializer`, in declaration order. Bindings that cannot cross
+   * the snapshot but CAN be rebuilt from module scope: a `computed` (no writable surface, yet the template
+   * calls it — a resumed `undefined` throws and kills the page) and a value like `createRouter([…])`. These
+   * become a `derive(ctx)` the client runs after deserialize and BEFORE adopt. Each assignment is guarded by
+   * `if (ctx.x === undefined)`, so a binding that DID survive (a signal with the server's value) is kept.
    */
-  resumableComputeds?: ReadonlyMap<string, string>;
+  resumableDerived?: ReadonlyMap<string, string>;
 }
 
 export interface CompileResult {
@@ -178,7 +179,7 @@ export function compileTemplateAst(ast: TemplateNode[], options: CompileOptions 
   // itself has props on its prototype (not serializable, and reconnected by the parent), and `$wid` is a prop
   // too, so both are naturally excluded. Reactive props / computeds inside a resumed child are a known gap.
   const renderPreamble: string = gen.resumable
-    ? `if (ctx.$wid !== undefined) ${gen.Hg('registerState')}(ctx.$wid, { ...ctx });`
+    ? `if (ctx.$wid !== undefined) ${gen.Hg('registerState')}(ctx.$wid, { ...ctx }, ${JSON.stringify([...(options.resumableDerived?.keys() ?? [])])});`
     : '';
   // isHost: the render fragment's top-level elements are the component's roots → `:host`.
   const render: string = compileFragment(gen, ast, ctxScope(options.scope ?? []), 'render', 'ctx, slots', true, 'create', renderPreamble);
@@ -211,11 +212,13 @@ export function compileTemplateAst(ast: TemplateNode[], options: CompileOptions 
 
   // E1.6 — rebuild each `computed` over the resumed ctx. Emitted in declaration order, so a computed that
   // reads an earlier one sees it already assigned. The client runs this after deserialize, before adopt.
-  // The callee comes from the codegen's core-import reference (`computed` / `rt.computed`), never the user's
-  // bare name — a `new Function` body has no `computed` in scope.
-  const deriveFn: string = gen.resumable && options.resumableComputeds?.size
-    ? `function derive(ctx) {\n${[...options.resumableComputeds]
-        .map(([name, args]) => `  ctx.${name} = ${gen.Hc('computed')}(${args});`)
+  // Each initializer is emitted verbatim (already ctx-rewritten): its callee is one of the component module's
+  // OWN imports (`computed`, `createRouter`, …), which this `derive` sits alongside. The `undefined` guard is
+  // what makes it safe to emit for every re-derivable binding — one that DID cross the wire is already on ctx
+  // (a signal carrying the server's value) and must not be replaced by a fresh, state-less copy.
+  const deriveFn: string = gen.resumable && options.resumableDerived?.size
+    ? `function derive(ctx) {\n${[...options.resumableDerived]
+        .map(([name, code]) => `  if (ctx.${name} === undefined) ctx.${name} = ${code};`)
         .join('\n')}\n  return ctx;\n}`
     : '';
 

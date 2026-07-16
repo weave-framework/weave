@@ -1,6 +1,7 @@
 import { test, assert } from '../../../tools/harness.js';
-import { signal, root } from '@weave-framework/runtime';
+import { signal, root, type Signal } from '@weave-framework/runtime';
 import { bindTextResumable, adoptText, DYN_TEXT, blockStart, blockEndOf, clearBlock } from '@weave-framework/runtime/adopt';
+import { ifBlock } from '@weave-framework/runtime/dom';
 
 /** Node types (avoid the Node global under the test bundler). */
 const TEXT = 3;
@@ -120,4 +121,48 @@ test('clearBlock: empties the region between the boundary markers, leaving marke
   assert.is(start.nextSibling, end, 'all nodes strictly between [ and ] are gone (island cleared for replay)');
   assert.ok(!p.querySelector('b') && !p.querySelector('i'), 'nested content removed too');
   assert.ok(p.querySelector('span'), 'content AFTER the block is untouched');
+});
+
+/* ──────────── E1.10 — adopt-first blocks (the basis for resuming a router outlet) ──────────── */
+
+/**
+ * A control-flow block can ADOPT its server-rendered content instead of replaying it (clear + re-render),
+ * WITHOUT a second block implementation: `ifBlock`'s first evaluation clears nothing (it owns no nodes yet)
+ * and then `placeBefore`s whatever the thunk returns. So a thunk that hands back the EXISTING server nodes in
+ * a fragment re-inserts them exactly where they already are — node identity survives, and `ifBlock` now tracks
+ * them, so a later swap disposes + removes them normally. This is what lets `<RouterView>` resume its view in
+ * place while staying reactive to navigation. Pinning it here: the trick relies on ifBlock's ordering, so a
+ * change to that must fail loudly rather than silently duplicate or leak the server DOM.
+ */
+test('E1.10: a first thunk returning the EXISTING nodes adopts them in place; a later swap still replaces them', () => {
+  const box: HTMLDivElement = document.createElement('div');
+  document.body.appendChild(box);
+  box.innerHTML = '<span id="srv">SERVER</span><!--b-->'; // server content, then the block anchor
+  const anchor: Comment = box.lastChild as Comment;
+  const serverSpan: HTMLElement = box.querySelector('#srv') as HTMLElement;
+
+  const which: Signal<string> = signal('adopt');
+  const adoptThunk = (): Node => {
+    const nodes: ChildNode[] = [];
+    for (let n: ChildNode | null = box.firstChild; n && n !== anchor; n = n.nextSibling) nodes.push(n);
+    const frag: DocumentFragment = document.createDocumentFragment();
+    frag.append(...nodes); // detach…
+    return frag; // …ifBlock places them back before the anchor: same spot, now tracked
+  };
+  const freshThunk = (): Node => {
+    const el: HTMLElement = document.createElement('b');
+    el.id = 'fresh';
+    return el;
+  };
+
+  root(() => {
+    ifBlock(anchor, () => (which() === 'adopt' ? adoptThunk : freshThunk));
+  });
+
+  assert.equal(box.querySelector('#srv'), serverSpan, 'the SERVER node itself was adopted — not re-created');
+  assert.equal(box.innerHTML, '<span id="srv">SERVER</span><!--b-->', 'and it sits exactly where it was');
+
+  which.set('fresh');
+  assert.ok(!box.querySelector('#srv'), 'a swap removes the adopted nodes — ifBlock tracked them');
+  assert.ok(box.querySelector('#fresh'), 'and renders the new branch');
 });
