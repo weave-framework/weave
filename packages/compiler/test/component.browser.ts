@@ -718,7 +718,8 @@ test('E1.13: `<Button on:click={{ fn }}>` re-attaches on adopt — a component e
   // ADOPT: defineComponent's forwarding never runs, so adoptComponent re-attaches it — with the INLINED body,
   // since `ctx.toggle` is undefined on a resumed client (the docs theme button was dead on exactly this).
   const adoptPart: string = code.split('function adopt(')[1] ?? '';
-  assert.ok(/adoptComponent\([^;]*\{ onClick: \(\) => ctx\.theme\.set\("dark"\) \}\)/.test(adoptPart),
+  // (not anchored on the closing paren — E1.17 appends the child's slots after the events arg)
+  assert.ok(/adoptComponent\([^;]*\{ onClick: \(\) => ctx\.theme\.set\("dark"\) \}/.test(adoptPart),
     `adopt hands the inlined handler to adoptComponent; got:\n${adoptPart.slice(0, 400)}`);
 });
 
@@ -764,7 +765,7 @@ test('E1.14: the cause names the NODE as authored, not an AST type', () => {
   assert.ok(warnings && warnings.some((w) => /`<aside>`/.test(w)), `must name <aside>; got ${JSON.stringify(warnings)}`);
 });
 
-test('E1.15: a component or block placed after another one is adoptable; a slot at any position is not', () => {
+test('E1.15: a component or block placed after another one is adoptable; a `use:` at any position is not', () => {
   // The gate refused EVERY second block/component per level. Only the kind decides now — pinned cheaply here so
   // the round-trip test in resumable.browser.ts is not the sole guard.
   const adoptable = (template: string): boolean =>
@@ -773,7 +774,8 @@ test('E1.15: a component or block placed after another one is adoptable; a slot 
   assert.ok(adoptable('<div><Foo />@if (x) { <b>a</b> }</div>'), 'a block after a component');
   assert.ok(adoptable('<div>@if (x) { <b>a</b> }<Foo /></div>'), 'a component after a block');
   assert.ok(adoptable('<div>@if (x) { <b>a</b> }@for (i of xs) { <i>{{ i }}</i> }</div>'), 'two sibling blocks');
-  assert.ok(!adoptable('<div><Foo /><slot /></div>'), 'a <slot> has no adopt path at all — still refused');
+  assert.ok(adoptable('<div><Foo /><slot /></div>'), 'a <slot> after a component (it island-replays since E1.17)');
+  assert.ok(!adoptable('<div><Foo /><b use:tip>x</b></div>'), 'a `use:` action has no adopt path at all — still refused');
 });
 
 test('E1.14: an adoptable component reports nothing', () => {

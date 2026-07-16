@@ -196,6 +196,7 @@ export function adoptComponent(
   states: Record<string, unknown> | undefined,
   mount: (adopt?: AdoptTarget) => Node | null,
   events?: Record<string, EventListener>,
+  slots?: Record<string, () => Node>,
 ): void {
   const end: Comment = blockEndOf(start);
   const ctx: unknown = states && states[id];
@@ -213,7 +214,9 @@ export function adoptComponent(
   if (Comp && Comp.adopt && ctx !== undefined && root && root !== end) {
     // Rebuild the child's computeds onto its resumed ctx BEFORE adopting — its bindings call them (E1.6).
     if (Comp.derive) Comp.derive(ctx as Record<string, unknown>);
-    Comp.adopt(root, ctx as Record<string, unknown>, {}, states as Record<string, unknown>);
+    // E1.17 — the child's `<slot>`s island-replay through the PARENT's slot fns, so they must reach the adopt
+    // walk. Passing `{}` here is what forced every container component to fall back to CSR.
+    Comp.adopt(root, ctx as Record<string, unknown>, slots ?? {}, states as Record<string, unknown>);
     // E1.13 — re-attach the PARENT's component-level `on:` handlers. On the create path `defineComponent`
     // forwards them onto the child's root; adopt never runs that path, so without this they silently vanish.
     // Mirror its rule: a key the child itself consumed (a same-named binding in its ctx) is the child's own.

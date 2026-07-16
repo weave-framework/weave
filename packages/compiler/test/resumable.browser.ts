@@ -296,13 +296,14 @@ test('E1.2b-2: adopt indices compound — each preceding dynamic text shifts a s
   assert.ok(/child\(_r, 3, 2\)/.test(nestedAdopt), 'the <p> shifted to 3 by the preceding text; its inner text at 2');
 });
 
-test('E1.2b-2: a resumable fragment with a not-yet-adoptable construct (a <slot>) emits NO adopt fn — falls back to CSR', () => {
-  const { code } = compileTemplate('<div><slot /></div>', {
+test('E1.2b-2: a resumable fragment with a not-yet-adoptable construct emits NO adopt fn — falls back to CSR', () => {
+  // (this pinned `<slot>` until E1.17 made it island-replay; a `use:` action is still genuinely un-navigable)
+  const { code } = compileTemplate('<div><b use:tooltip>x</b></div>', {
     mode: 'module',
-    scope: [],
+    scope: ['tooltip'],
     resumable: true,
   });
-  assert.ok(!code.includes('render.adopt'), 'a <slot> is not adopt-navigable yet (falls back to CSR)');
+  assert.ok(!code.includes('render.adopt'), 'a `use:` action is not adopt-navigable yet (falls back to CSR)');
 });
 
 /* ──────────── E1.2c: block-boundary markers (cursor-walk foundation) ──────────── */
@@ -552,14 +553,15 @@ test('E1.2c-5: adopt resumes a block PLUS a trailing element subtree — the ele
 
 /* ──────────── E1.2c-6a: multi-root fragments ──────────── */
 
-test('E1.2c-6a: a multi-root fragment is adoptable (was single-root only); a <slot> fragment still is not', () => {
+test('E1.2c-6a: a multi-root fragment is adoptable (was single-root only); a `use:` fragment still is not', () => {
   const multi = compileTemplate('<span>{{ a() }}</span><b>{{ c() }}</b>', {
     mode: 'module', scope: ['a', 'c'], resumable: true,
   });
   assert.ok(multi.code.includes('render.adopt'), 'two element roots now emit an adopt fn');
 
-  const slotted = compileTemplate('<div><slot /></div>', { mode: 'module', scope: [], resumable: true });
-  assert.ok(!slotted.code.includes('render.adopt'), 'a <slot> opts out (not adopt-navigable yet)');
+  // (`<slot>` stood here until E1.17; it island-replays now, so the opt-out is pinned on a real one)
+  const used = compileTemplate('<div><b use:tooltip>x</b></div>', { mode: 'module', scope: ['tooltip'], resumable: true });
+  assert.ok(!used.code.includes('render.adopt'), 'a `use:` action opts out (not adopt-navigable yet)');
 });
 
 test('E1.2c-6a: adopt resumes a MULTI-ROOT fragment in place against the mount container', () => {
@@ -638,6 +640,60 @@ test('E1.2c-6: adopt resumes a static CHILD component in place — child setup n
   assert.equal(div.querySelector('b')!.textContent, 'x', 'child <b> adopted with its server value');
   (app.states.c0 as { label: Signal<string> }).label.set('LBL');
   assert.equal(div.querySelector('b')!.textContent, 'LBL', 'the resumed CHILD component is reactive in place — nested resume works');
+  app.dispose();
+});
+
+/* ──────────── E1.17: <slot> ──────────── */
+
+test('E1.17: a <slot> component adopts — its own state resumes, setup never re-runs, and the projected content renders', () => {
+  // Every container component (`<Toolbar>`, `<Card>`, `<Sidenav>`…) has a slot, so `<slot>` refused adopt meant
+  // each one fell back to CSR and lost its own state. The slot CONTENT belongs to the parent and is rendered by
+  // the parent's slot fn, so it island-replays like an `@if` — but the component around it now adopts.
+  const childCode: string = compileTemplate('<div class="c"><b>{{ n() }}</b><slot></slot></div>', {
+    mode: 'function', scope: ['n'], resumable: true,
+  }).code;
+  const childRender = new Function('rt', '_c', childCode.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;'))(rt, {}) as
+    ((ctx: unknown, slots?: unknown) => Node) & { adopt?: AdoptFn };
+  assert.equal(typeof childRender.adopt, 'function', 'a template containing a <slot> is adoptable');
+
+  let childSetups: number = 0;
+  const Child = dom.defineComponent(
+    childRender as never,
+    () => { childSetups++; return { n: signal(4) }; }
+  ) as dom.Component & { adopt?: AdoptFn };
+  Child.adopt = childRender.adopt;
+
+  const parentCode: string = compileTemplate('<section><Child><i>{{ label() }}</i></Child></section>', {
+    mode: 'function', scope: ['label'], resumable: true,
+  }).code;
+  const parentRender = new Function('rt', '_c', parentCode.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;'))(rt, { Child }) as
+    ((ctx: unknown, slots?: unknown) => Element) & { adopt?: AdoptFn };
+
+  // ── server ──
+  const label: Signal<string> = signal('projected');
+  const box: HTMLElement = host();
+  const states = collectStates(() => { box.appendChild(parentRender({ label }, {})); });
+  assert.ok(states.c0, 'the slotted child self-registered its ctx');
+  states[ROOT_ID] = { label };
+  const wire = snapshot(states);
+  const serverHtml: string = (box.firstElementChild as HTMLElement).outerHTML;
+  assert.ok(/projected/.test(serverHtml), 'the server rendered the projected slot content');
+
+  // ── client ──
+  const client: HTMLElement = host();
+  client.innerHTML = serverHtml;
+  const section: HTMLElement = client.querySelector('section')!;
+  const app = resume(section, { snapshot: wire, adopt: parentRender.adopt });
+  assert.equal(childSetups, 1, 'the child ADOPTED — its setup did not re-run despite holding a slot');
+
+  assert.equal(section.querySelector('.c b')!.textContent, '4', "the child's own binding adopted at its server value");
+  assert.equal(section.querySelector('.c i')!.textContent, 'projected', 'the projected content is on the page exactly once');
+  assert.equal(section.querySelectorAll('.c i').length, 1, 'and was not duplicated by the replay');
+
+  (app.states.c0 as { n: Signal<number> }).n.set(9);
+  assert.equal(section.querySelector('.c b')!.textContent, '9', "the child's resumed state is live in place");
+  (app.ctx.label as Signal<string>).set('re-projected');
+  assert.equal(section.querySelector('.c i')!.textContent, 're-projected', "the slot content is live against the PARENT's resumed ctx");
   app.dispose();
 });
 

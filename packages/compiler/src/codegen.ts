@@ -322,8 +322,13 @@ const SVG_TAGS: Set<string> = new Set<string>([
 /** `on:<phase>` names that are transition lifecycle hooks, not DOM events. */
 const TRANSITION_PHASES: Set<string> = new Set<string>(['enterstart', 'enterend', 'leavestart', 'leaveend']);
 
-/** A block the adopt walk can island-replay: clear its server DOM + re-run its helper. @if/@switch (E1.2c-2), @for (E1.2c-3). */
+/**
+ * A block the adopt walk can island-replay: clear its server DOM + re-run its helper. @if/@switch (E1.2c-2),
+ * @for (E1.2c-3), `<slot>` (E1.17 — its content is the PARENT's, rendered by the parent's slot fn, so it
+ * replays exactly like a block while the component around it adopts).
+ */
 function isAdoptableBlock(node: TemplateNode): boolean {
+  if (node.type === 'element') return (node as ElementNode).tag === 'slot';
   return node.type === 'if' || node.type === 'switch' || node.type === 'for';
 }
 
@@ -987,8 +992,11 @@ function compileFragment(
       const evObj: string = eventProps.length
         ? `{ ${eventProps.map((e) => `${propKey(e.key)}: ${inlineHandler(gen, e.code)}`).join(', ')} }`
         : '';
-      const evArg: string = evObj ? `, ${evObj}` : '';
-      stmts.push(`${gen.Ha('adoptComponent')}(${anchorVar}, ${q(cid)}, ${gen.Comp(node.tag)}, _st, (_a) => ${adoptMount}${evArg});`);
+      // E1.17 — the child's slots must reach its adopt walk (its `<slot>`s replay through these very fns).
+      // `events` sits between, so it is filled in with `undefined` when there are none.
+      const evArg: string = evObj || slots.length ? `, ${evObj || 'undefined'}` : '';
+      const slotArg: string = slots.length ? `, ${slotsObj}` : '';
+      stmts.push(`${gen.Ha('adoptComponent')}(${anchorVar}, ${q(cid)}, ${gen.Comp(node.tag)}, _st, (_a) => ${adoptMount}${evArg}${slotArg});`);
       return;
     }
 
@@ -1016,9 +1024,7 @@ function compileFragment(
   }
 
   function emitSlot(node: ElementNode, path: number[], sc: Scope): void {
-    gen.cannotAdopt('a `<slot>`');
     blockAnchor(path);
-    const anchorVar: string = nodeExpr(path);
     const nameAttr: Attr | undefined = node.attrs.find((a) => a.type === 'static' && a.name === 'name');
     const name: string = nameAttr ? (nameAttr as StaticAttr).value : 'default';
 
@@ -1028,9 +1034,12 @@ function compileFragment(
       childDecls.push(compileFragment(gen, node.children, sc, fbFn));
       fallback = `${fbFn}()`;
     }
-    stmts.push(
-      `{ const _sf = slots[${q(name)}]; ${gen.H('mountChild')}(${anchorVar}, _sf ? _sf() : ${fallback}); }`
-    );
+    // E1.17 — island-replay on adopt. The projected nodes are the PARENT's: it owns their content and their
+    // reactivity, and its own resumed ctx already drives the slot fn — so clearing the server copy and
+    // re-running `_sf()` yields identical, live content, while the component AROUND the slot adopts in place
+    // (previously the whole component fell back to CSR and lost its own state). Slot fns reach the adopt walk
+    // because the parent hands them to `adoptComponent`.
+    emitBlockReplay(path, (a) => `{ const _sf = slots[${q(name)}]; ${gen.H('mountChild')}(${a}, _sf ? _sf() : ${fallback}); }`);
   }
 
   function emitIf(node: IfNode, path: number[], sc: Scope): void {
