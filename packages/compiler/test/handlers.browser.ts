@@ -547,3 +547,37 @@ test('E1.39: a `function` expression`s parameter types are stripped too, not jus
     'a ternary inside a condition is not mistaken for an annotation',
   );
 });
+
+test('E1.41: a DESTRUCTURED declaration binds its names — array, object, rename, rest, defaults', () => {
+  // `for (const [v, el] of optionEls)` — the real <Select>'s `syncSelected`, blamed for reading `v` and `el`.
+  // A superset would be unsafe here (a missed ref means inlining a body that throws), so each shape is exact.
+  const check = (body: string, ctx: string[] = []): string[] =>
+    unresolvedRefs(`() => { ${body} }`, new Set(ctx), [], 'h');
+
+  assert.deepEqual(check('for (const [v, el] of pairs) { use(v, el); }', ['pairs', 'use']), [], 'an array pattern');
+  assert.deepEqual(check('const { a, b } = src; use(a, b);', ['src', 'use']), [], 'an object pattern');
+  assert.deepEqual(check('const { a: x, ...rest } = src; use(x, rest);', ['src', 'use']), [], 'rename + rest');
+  assert.deepEqual(check('const [first = 1] = src; use(first);', ['src', 'use']), [], 'a default');
+  // a default VALUE is real code and must still report
+  assert.deepEqual(check('const [first = missing] = src; use(first);', ['src', 'use']), ['missing'], 'a default value is a ref');
+  // and an object pattern's KEY is not a binding — the renamed name is
+  assert.deepEqual(check('const { a: x } = src; use(a);', ['src', 'use']), ['a'], 'the key is not bound; `a` is unresolved');
+});
+
+test('E1.42: a comma inside TYPE ARGUMENTS does not end the initializer', () => {
+  // `const optionEls: Map<string, HTMLElement> = new Map<string, HTMLElement>()` — the real <Select>. declEnd
+  // stops at a top-level `,`, and it did not track `<…>`, so the initializer came back as `new Map<string`.
+  // It never reached the emit only because that fragment was then blamed for reading `string` and refused —
+  // i.e. the truncation was hiding behind a false diagnostic.
+  const f = extractSetupBindings(
+    setup(
+      '  const optionEls: Map<string, HTMLElement> = new Map<string, HTMLElement>();\n' +
+        '  const pair = fn<A, B>(1, 2);\n' +
+        '  return { optionEls };'
+    )
+  );
+  assert.equal(f.computeds.get('optionEls')?.source, 'new Map<string, HTMLElement>()', 'the whole initializer');
+  assert.equal(f.computeds.get('pair')?.source, 'fn<A, B>(1, 2)', 'and a call with type arguments');
+  assert.deepEqual(unresolvedRefs(f.computeds.get('optionEls')!.source, new Set(), [], 'optionEls'), [],
+    'with no type names left to blame');
+});

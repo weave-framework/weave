@@ -763,13 +763,52 @@ function declaredLocals(src: string): Set<string> {
     const kw: string | null = startsWithWord(src, i, 'const') ? 'const' : startsWithWord(src, i, 'let') ? 'let' : startsWithWord(src, i, 'var') ? 'var' : null;
     if (kw && isTokenStart(src, i)) {
       let j: number = skipWs(src, i + kw.length);
+      // E1.41 — a DESTRUCTURED declaration binds names too: `for (const [v, el] of pairs)` is the real
+      // <Select>'s `syncSelected`, which was blamed for reading its own `v` and `el`.
+      if (src[j] === '[' || src[j] === '{') {
+        const close: number = matchDelimited(src, j, src[j], src[j] === '[' ? ']' : '}');
+        if (close > j) {
+          for (const nm of patternNames(src.slice(j + 1, close), src[j] === '{')) out.add(nm);
+          i = close + 1;
+          continue;
+        }
+      }
       const s: number = j;
       while (j < n && ID_CHAR.test(src[j])) j++;
-      if (j > s) out.add(src.slice(s, j)); // a destructuring pattern declares no bare name here → skipped
+      if (j > s) out.add(src.slice(s, j));
       i = j;
       continue;
     }
     i++;
+  }
+  return out;
+}
+
+/**
+ * The names a destructuring pattern BINDS. `{ a, b: x, ...r }` binds `a`, `x`, `r` — never the KEY `b`, which
+ * names a property, not a local. `[a, b = 1]` binds `a` and `b`; the default `1` is real code and stays a
+ * reference for the caller to resolve. Exact rather than a superset: a missed name would be reported as
+ * unresolved (noise), but a WRONGLY bound one would inline a body that throws.
+ */
+function patternNames(body: string, isObject: boolean): string[] {
+  const out: string[] = [];
+  for (const raw of splitTop(body)) {
+    let p: string = raw.trim();
+    if (p.startsWith('...')) p = p.slice(3).trim(); // a rest binds its own name
+    if (!p) continue;
+    const eq: number = findTopLevel(p, 0, '=');
+    if (eq >= 0) p = p.slice(0, eq).trim(); // a default VALUE is code, not a binding
+    if (isObject) {
+      const colon: number = findTopLevel(p, 0, ':');
+      if (colon >= 0) p = p.slice(colon + 1).trim(); // `key: local` — the LOCAL is bound
+    }
+    if (p[0] === '[' || p[0] === '{') {
+      const close: number = matchDelimited(p, 0, p[0], p[0] === '[' ? ']' : '}');
+      if (close > 0) out.push(...patternNames(p.slice(1, close), p[0] === '{')); // nested
+      continue;
+    }
+    const name: string = readIdent(p, 0);
+    if (name && name.length === p.length) out.push(name);
   }
   return out;
 }
@@ -1032,6 +1071,16 @@ function declEnd(src: string, i: number): number {
       continue;
     }
     const c: string = src[i];
+    // E1.42 — TYPE ARGUMENTS hold commas: `new Map<string, HTMLElement>()` came back as `new Map<string`,
+    // because a top-level `,` ends the initializer and `<…>` was not tracked. Skip the list wholesale, only
+    // where `<` follows an identifier, so a comparison is untouched.
+    if (c === '<' && i > 0 && ID_CHAR.test(src[i - 1])) {
+      const gt: number = skipTypeArgs(src, i);
+      if (gt > i) {
+        i = gt;
+        continue;
+      }
+    }
     if (c === '(' || c === '[' || c === '{') depth++;
     else if (c === ')' || c === ']' || c === '}') {
       if (depth === 0) return i; // ran into the enclosing body's `}` — the initializer ends here
