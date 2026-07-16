@@ -23,8 +23,12 @@
 export type ResumeHandler = (event: Event, element: Element) => void;
 
 export interface ResumeOptions {
-  /** Map a handler reference (from the `data-won-*` attribute) to a handler — sync or lazy (Promise). */
-  resolve: (ref: string) => ResumeHandler | Promise<ResumeHandler> | undefined;
+  /**
+   * Map a handler reference (from the `data-won-*` attribute) to a handler — sync or lazy (Promise). `element`
+   * is the node that carried the reference; a multi-component resume (E1.8) uses it to resolve the ref against
+   * the handler table of the NEAREST enclosing component instance (site prefixes collide across components).
+   */
+  resolve: (ref: string, element: Element) => ResumeHandler | Promise<ResumeHandler> | undefined;
   /**
    * Also listen for these event types even if no element currently carries a `data-won-<type>` (useful
    * when nodes are added after resume). By default only the types found under `root` at call time are
@@ -82,7 +86,7 @@ export function resumeEvents(root: Element, options: ResumeOptions): ResumeContr
         const ref: string | null = node.getAttribute(attr);
         const el: Element = node;
         if (ref != null) {
-          const resolved: ResumeHandler | Promise<ResumeHandler> | undefined = options.resolve(ref);
+          const resolved: ResumeHandler | Promise<ResumeHandler> | undefined = options.resolve(ref, el);
           if (resolved) {
             if (typeof (resolved as Promise<ResumeHandler>).then === 'function') {
               (resolved as Promise<ResumeHandler>).then((h) => h(event, el));

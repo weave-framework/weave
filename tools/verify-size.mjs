@@ -39,14 +39,17 @@ const BUDGETS = [
   // Grown across E1.2c (block adopt lands incrementally): E1.2a marker text-bind → E1.2c-1 block-boundary
   // cursor (blockStart/blockEndOf/clearBlock) → E1.2c-2 adoptIsland (@if/@switch island-replay). Budget
   // 1536 → 2560 → 3072 → 3584 (deliberate, forward-looking so each adopt slice doesn't trip a micro-bump;
-  // E1.2c-6 added adoptComponent for nested component resume). The SPA core (20.9 KB) is untouched; this
-  // entry never ships to a plain client SPA. Baseline 3.1 KB after E1.2c-6.
-  { label: 'runtime/adopt (E1.2a/c DOM adopt)', files: ['packages/runtime/dist/adopt.js'], budget: 3_584 },
+  // E1.2c-6 added adoptComponent for nested component resume) → 4096 (E1.8 collectInstances: an adopted child
+  // registers its root + handler factory so its OWN events resume). The SPA core (20.9 KB) is untouched; this
+  // entry never ships to a plain client SPA.
+  { label: 'runtime/adopt (E1.2a/c DOM adopt)', files: ['packages/runtime/dist/adopt.js'], budget: 4_096 },
   // runtime/graph (E0.3/E1.2): resume entry — signal codec + snapshot/resume + resumePage (SSG client entry).
   // Budget raised 2048 → 2560 (E1.2 resumePage + SNAPSHOT_ID) → 3072 (E1.2c-6 per-instance state collection:
-  // collectStates / registerState / ROOT_ID) → 3584 (E1.2c-6 resume states-map handling + ResumeApp.states).
-  // Resumable-only, 0 for a plain SPA (I3; SPA core 20.9 KB flat). Still a lean resume entry.
-  { label: 'runtime/graph (E0.3/E1.2 resume)', files: ['packages/runtime/dist/graph.js'], budget: 3_584 },
+  // collectStates / registerState / ROOT_ID) → 3584 (E1.2c-6 resume states-map handling + ResumeApp.states)
+  // → 4096 (E1.6 derive/DeriveFn — computeds rebuilt on resume; E1.8 ancestry-scoped event resolution, so a
+  // child component's own handlers resolve against ITS ctx). Resumable-only, 0 for a plain SPA (I3; SPA core
+  // 20.9 KB flat). Deliberate: E1.5–E1.8 turned resume from "flat text only" into real components.
+  { label: 'runtime/graph (E0.3/E1.2 resume)', files: ['packages/runtime/dist/graph.js'], budget: 4_096 },
   // runtime/server (E0.4): headless render — the in-house server DOM + parser + serializer + renderToString.
   // Server-only, its own line — 0 bytes for a client SPA (I3). Baseline 5.8 KB; budget raised 7168 → 7680
   // (E1.3d SSG document-<title> capture) → 8192 (E1.4 the islands capture: `renderPage({ resumable })` wraps

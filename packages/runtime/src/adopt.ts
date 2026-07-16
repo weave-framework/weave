@@ -115,6 +115,40 @@ interface AdoptableComponent {
   adopt?: (root: Node, ctx: Record<string, unknown>, slots: Record<string, unknown>, states: Record<string, unknown>) => unknown;
   /** E1.6 — rebuilds the child's own `computed`s onto its resumed ctx (they cannot cross the snapshot). */
   derive?: (ctx: Record<string, unknown>) => unknown;
+  /** E1.8 — the child's own `handlers(ctx)` factory, so its internal `on:` events resume against ITS ctx. */
+  handlers?: (ctx: Record<string, unknown>) => Record<string, unknown>;
+}
+
+/**
+ * A resumed component instance's event ownership (E1.8): its server-rendered ROOT element plus the factory
+ * that builds its handler table over ITS resumed ctx. The delegated dispatch resolves a `data-won-*` ref
+ * against the NEAREST enclosing instance — so a `<Child>`'s own `on:click` runs the child's handler over the
+ * child's signals, not the root's (whose handler-site prefixes `w0`,`w1`,… collide with the child's).
+ */
+export interface ResumedInstance {
+  root: Element;
+  handlers: (ctx: Record<string, unknown>) => Record<string, unknown>;
+  ctx: Record<string, unknown>;
+}
+
+// A collection session active during `resume`'s adopt walk: each adopted resumable child pushes its instance
+// so the caller can build ancestry-scoped event resolution. Null outside a session (a plain SPA never adopts).
+let instanceCollector: ResumedInstance[] | null = null;
+
+/**
+ * Run `adopt` while gathering every resumable child component instance {@link adoptComponent} adopts, then
+ * return them (the root instance is added by the caller). Nestable/reentrant-safe.
+ */
+export function collectInstances(adopt: () => void): ResumedInstance[] {
+  const prev: ResumedInstance[] | null = instanceCollector;
+  const out: ResumedInstance[] = [];
+  instanceCollector = out;
+  try {
+    adopt();
+    return out;
+  } finally {
+    instanceCollector = prev;
+  }
 }
 
 /**
@@ -138,6 +172,10 @@ export function adoptComponent(
     // Rebuild the child's computeds onto its resumed ctx BEFORE adopting — its bindings call them (E1.6).
     if (Comp.derive) Comp.derive(ctx as Record<string, unknown>);
     Comp.adopt(root, ctx as Record<string, unknown>, {}, states as Record<string, unknown>);
+    // E1.8 — register the child so its OWN events resolve against its ctx (root is an Element here).
+    if (instanceCollector && Comp.handlers && root instanceof Element) {
+      instanceCollector.push({ root, handlers: Comp.handlers, ctx: ctx as Record<string, unknown> });
+    }
     return;
   }
   // fallback — child not resumable (no adopt / no snapshot): clear its server DOM and re-mount (CSR island)

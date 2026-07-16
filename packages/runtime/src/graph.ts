@@ -1,31 +1,26 @@
 /**
- * `@weave-framework/runtime/graph` — the Phase E (E0.3) resume entry.
+ * `@weave-framework/runtime/graph` — the Phase E resume entry.
  *
- * The client-side counterpart to a server render: rebuild a component's reactive state from a serialized
- * snapshot and wire its event handlers LAZILY, WITHOUT re-running `setup` (RFC 0009 §3). This is what makes
- * Weave *resumable* rather than *hydrated* — the server already ran the app logic and rendered the DOM; the
- * client adopts that DOM, deserializes the signal graph (E0.1), and only resolves + invokes a handler when
- * the user actually interacts (the delegated dispatch of E0.2a). `setup` is never called on the client — a
- * conformance test spies on it and asserts zero calls.
+ * The client-side counterpart to a server render: rebuild the reactive state from a serialized snapshot, adopt
+ * the server DOM in place, and wire handlers LAZILY — WITHOUT re-running `setup` (RFC 0009 §3). That is what
+ * makes Weave *resumable* rather than *hydrated*: the server already ran the app logic and rendered the DOM.
+ * A conformance test spies on `setup` and asserts zero calls.
  *
- * Its own entry (own size budget); 0 bytes for a plain client SPA (invariant I3). Importing this module
- * registers a `signal` (de)serializer, so a reactive-state record round-trips through `serialize`/`deserialize`.
+ *   const wire = snapshot({ count });                                  // server / build
+ *   const { ctx } = resume(root, { snapshot: wire, adopt: render.adopt, handlers: render.handlers });
  *
- *   // server / build:
- *   const wire = snapshot({ count });
- *   // client:
- *   const { ctx } = resume(root, { snapshot: wire, handlers: (c) => ({ w0: () => c.count.set((n) => n + 1) }) });
+ * Its own entry (own size budget); 0 bytes for a plain client SPA (invariant I3). Importing it registers a
+ * `signal` (de)serializer, so reactive state round-trips through `serialize`/`deserialize`.
  *
- * Scope: the graph rebuild + lazy-handler contract (E0.3) plus DOM-binding *adoption* (E1.2b-2) — pass the
- * compiled render's `adopt` fn as `options.adopt` and resume re-attaches its reactive bindings to the server
- * DOM in place (no re-render, no `setup`). Adopt is emitted for flat single-root components today; blocks
- * (`@if`/`@for`/components) need the marker cursor walk (E1.2c) and fall back to CSR. Per-instance captured
- * closure state (each `@for` row's own handler data) needs serialized lexical scope — a later slice; a
- * component-level handler that closes over `ctx` resumes today.
+ * What crosses the wire is only what can: signals + plain data. Functions are dropped by {@link registerState}
+ * and rebuilt client-side instead — handlers by the compiled `handlers(ctx)` factory (E1.5 inlines a named
+ * `setup` handler's body into it), computeds by `derive(ctx)` (E1.6). Known gaps: a `@for` row's per-instance
+ * closure state, and router-block adopt.
  */
 import { signal, root as reactiveRoot, type Signal } from './reactive.js';
 import { serialize, deserialize, registerSerializableType, type Wire } from './serialize.js';
 import { resumeEvents, type ResumeHandler, type ResumeControl } from './resume.js';
+import { collectInstances, type ResumedInstance } from './adopt.js';
 
 /** Duck-typed signal check — a callable carrying the writable-signal surface (avoids branding the hot core). */
 function isSignal(v: unknown): v is Signal<unknown> {
@@ -221,17 +216,45 @@ export function resume(root: Element, options: ResumeOptions): ResumeApp {
   // Adopt the server DOM's reactive bindings in place FIRST (E1.2b-2), inside a reactive root so the
   // re-attached effects are owned + disposable — no re-render, `setup` never runs. Then arm delegated events.
   let disposeAdopt: () => void = () => {};
+  let instances: ResumedInstance[] = [];
   if (options.adopt || options.derive) reactiveRoot((dispose) => {
-    // Rebuild the computeds BEFORE adopt (E1.6): the render's bindings call them, and a computed created
-    // here is owned by this root, so it disposes with the rest.
-    if (options.derive) options.derive(ctx);
-    if (options.adopt) options.adopt(root, ctx, {}, states);
+    // Collect each adopted child component instance (E1.8) so its OWN events resolve against ITS ctx.
+    instances = collectInstances(() => {
+      // Rebuild the computeds BEFORE adopt (E1.6): the render's bindings call them, and a computed created
+      // here is owned by this root, so it disposes with the rest.
+      if (options.derive) options.derive(ctx);
+      if (options.adopt) options.adopt(root, ctx, {}, states);
+    });
     disposeAdopt = dispose;
   });
-  const table: Record<string, ResumeHandler> = options.handlers ? options.handlers(ctx) : {};
-  const ctl: ResumeControl = resumeEvents(root, {
-    resolve: (id) => table[id] ?? table[siteOf(id)],
-    extraEvents: options.extraEvents,
-  });
+
+  // Event resolution is ANCESTRY-SCOPED (E1.8). Each component instance owns its DOM subtree; a `data-won-*`
+  // ref (`w0#n`) resolves by prefix (`w0`) within the NEAREST enclosing instance's handler table — the root,
+  // or any adopted child. This disambiguates the per-component site prefixes, which collide across components.
+  // Tables are built lazily (only on first event) + cached; a child's ctx already carries its derived computeds.
+  const tables: Map<Element, () => Record<string, ResumeHandler>> = new Map();
+  const addInstance = (el: Element, factory: (c: Record<string, unknown>) => Record<string, unknown>, c: Record<string, unknown>): void => {
+    let built: Record<string, ResumeHandler> | undefined;
+    tables.set(el, () => (built ??= factory(c) as Record<string, ResumeHandler>));
+  };
+  if (options.handlers) addInstance(root, options.handlers, ctx);
+  for (const inst of instances) addInstance(inst.root, inst.handlers, inst.ctx);
+
+  const resolve = (id: string, el: Element): ResumeHandler | undefined => {
+    let node: Element | null = el;
+    while (node) {
+      const get = tables.get(node);
+      if (get) {
+        const table: Record<string, ResumeHandler> = get();
+        const h: ResumeHandler | undefined = table[id] ?? table[siteOf(id)];
+        if (h) return h; // else keep walking out — a forwarded handler may belong to an ancestor instance
+      }
+      if (node === root) break;
+      node = node.parentElement;
+    }
+    return undefined;
+  };
+
+  const ctl: ResumeControl = resumeEvents(root, { resolve, extraEvents: options.extraEvents });
   return { ctx, states, dispose: () => { ctl.dispose(); disposeAdopt(); } };
 }

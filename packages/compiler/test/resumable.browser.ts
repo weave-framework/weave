@@ -812,3 +812,48 @@ test('E1.6 DoD: WITHOUT derive the same page THROWS on resume (this was killing 
   }
   assert.ok(/doubled is not a function/.test(threw), `resume throws without the rebuild (got: ${threw || 'no error'})`);
 });
+
+/* ──────────── E1.8 — a CHILD component's own events resume ──────────── */
+
+test('E1.8: a static <Child> with its OWN on:click resumes — the click runs the child handler over the child ctx', () => {
+  // child: its own button + handler + reactive text
+  const childCode = compileTemplate('<button on:click={{ () => count.set((c) => c + 1) }}>{{ count() }}</button>', {
+    mode: 'function', scope: ['count'], resumable: true,
+  }).code;
+  const childRender = new Function('rt', '_c', childCode.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;'))(rt, {}) as ((ctx: unknown) => Node) & { adopt?: AdoptFn; handlers?: (c: Record<string, unknown>) => Record<string, ResumeHandler> };
+  let childSetups = 0;
+  const Child = dom.defineComponent(childRender as never, () => { childSetups++; return { count: signal(0) }; }) as dom.Component & { adopt?: AdoptFn; handlers?: unknown };
+  Child.adopt = childRender.adopt;
+  (Child as { handlers?: unknown }).handlers = childRender.handlers; // component.ts attaches this in the resumable target
+
+  // parent: a static child, no events of its own
+  const parentCode = compileTemplate('<div><h1>{{ title() }}</h1><Child /></div>', { mode: 'function', scope: ['title'], resumable: true }).code;
+  const parentRender = new Function('rt', '_c', parentCode.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;'))(rt, { Child }) as ((ctx: unknown, slots?: unknown) => Element) & { adopt?: AdoptFn };
+
+  // ── server ── render + collect the child ctx under c0, snapshot { $root, c0 }
+  const title = signal('T');
+  const box = host();
+  const states = collectStates(() => { box.appendChild(parentRender({ title }, {})); });
+  assert.ok(states.c0, 'the child self-registered under c0');
+  assert.equal(childSetups, 1, 'child setup ran once on the server');
+  states[ROOT_ID] = { title };
+  const wire = snapshot(states);
+  const serverHtml = (box.firstElementChild as HTMLElement).outerHTML;
+
+  // ── client ── fresh parse + resume (parent has no handlers of its own)
+  const client = host();
+  client.innerHTML = serverHtml;
+  const div = client.querySelector('div')!;
+  const btn = div.querySelector('button')!;
+  assert.equal(btn.textContent, '0', 'the child rendered its server value');
+
+  const app = resume(div, { snapshot: wire, adopt: parentRender.adopt });
+  assert.equal(childSetups, 1, 'resume did NOT re-run the child setup');
+
+  btn.click(); // the CHILD's own handler — must resolve against the child ctx, not the (handler-less) root
+  assert.equal((app.states.c0 as { count: Signal<number> }).count(), 1, 'the child handler ran against the child signal');
+  assert.equal(btn.textContent, '1', 'the child text adopted in place updated');
+  btn.click();
+  assert.equal(btn.textContent, '2', 'and it stays live');
+  app.dispose();
+});
