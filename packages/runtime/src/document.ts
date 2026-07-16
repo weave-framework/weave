@@ -15,6 +15,12 @@ export interface PageArtifact {
   snapshotScript: string;
   /** The `document.title` the render set (if any) — used as the page `<title>` unless overridden. */
   title?: string;
+  /**
+   * E1.9 — non-fatal diagnostics from a `resumable` render: component instances the server could not make
+   * resumable (a binding that can't be serialized), which the client will CSR-mount instead. The build logs
+   * these per route, so a silent downgrade to client rendering is visible.
+   */
+  warnings?: string[];
 }
 
 /** Options for {@link renderDocument}. */

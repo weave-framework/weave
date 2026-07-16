@@ -146,10 +146,16 @@ let fallbackN: number = 0;
  * `preventDefault`/`stopPropagation`/`self` still apply, since they live in the handler body).
  */
 export function resumableHandler(node: Element, event: string, siteRef: string, handler: ResumeHandler): string {
-  const n: number = activeSink ? activeSink.n++ : fallbackN++;
-  const id: string = `${siteRef}#${n}`;
+  // No session ⇒ a LIVE CLIENT render of a resumable build (E1.9): a CSR fallback, a route swap, a `@for` row
+  // added after resume. Nothing to bridge to, so wire a real listener. The marker is deliberately NOT stamped
+  // — it means "awaiting resume", and would make the delegated dispatch fire this handler a second time.
+  if (!activeSink) {
+    node.addEventListener(event, (e: Event) => handler(e, node));
+    return `${siteRef}#live`;
+  }
+  const id: string = `${siteRef}#${activeSink.n++}`;
   node.setAttribute(PREFIX + event, id);
-  if (activeSink) activeSink.map.set(id, handler);
+  activeSink.map.set(id, handler);
   return id;
 }
 

@@ -62,15 +62,30 @@ export const ROOT_ID: string = '$root';
  */
 let collector: Record<string, unknown> | null = null;
 
-export function collectStates(fn: () => void): Record<string, unknown> {
+/** A component instance the server render could NOT make resumable, and why (E1.9). */
+export interface DroppedState {
+  /** The instance id (`$root`, `c0`, …) that will be absent from the snapshot. */
+  id: string;
+  /** The setup binding that cannot cross the wire (`router`, a store with methods, a class instance). */
+  key: string;
+  /** The codec's reason. */
+  reason: string;
+}
+
+let droppedSink: DroppedState[] | null = null;
+
+export function collectStates(fn: () => void, dropped?: DroppedState[]): Record<string, unknown> {
   const prev: Record<string, unknown> | null = collector;
+  const prevDropped: DroppedState[] | null = droppedSink;
   const states: Record<string, unknown> = {};
   collector = states;
+  droppedSink = dropped ?? null;
   try {
     fn();
     return states;
   } finally {
     collector = prev;
+    droppedSink = prevDropped;
   }
 }
 
@@ -79,12 +94,14 @@ export function collectStates(fn: () => void): Record<string, unknown> {
  * OWN render preamble when the parent tagged it with a `$wid` prop (static-position child). No-op outside a
  * {@link collectStates} session (so it costs nothing on the client / in a plain SPA — no runtime/dom change).
  *
- * Only SERIALIZABLE state is captured: writable signals + plain data. A raw handler function (`inc: () => …`)
- * is NOT state — the client re-derives it from the render's `handlers` factory over the resumed ctx — and
- * `serialize` would throw on it, so it is dropped here. Signals are callable too, but the signal codec claims
- * them (isSignal), so they are kept. (A `computed` is a bare getter with no writable surface, so it is dropped
- * with the handlers — a template that binds a computed on a resumed component is a known gap: expose a writable
- * signal instead. Nested functions deeper than the top level are left to `serialize`'s guard.)
+ * Only SERIALIZABLE state is captured: signals + plain data. A top-level function is NOT state — a handler is
+ * rebuilt by the compiled `handlers(ctx)` factory (E1.5), a `computed` by `derive` (E1.6) — so both are
+ * dropped. Signals are callable too, but the codec claims them ({@link isSignal}), so they are kept.
+ *
+ * E1.9 — a binding that cannot cross the wire at all (a `router`, a store with methods, a class instance)
+ * makes the whole instance non-resumable and it is dropped: half a ctx is worse than none (the render's
+ * bindings would resume against `undefined`). A missing `states[id]` is the client's signal to CSR-mount that
+ * component instead — its `setup` re-runs and all still works. Previously this FAILED THE BUILD.
  */
 export function registerState(id: string, ctx: unknown): void {
   if (!collector) return;
@@ -92,7 +109,14 @@ export function registerState(id: string, ctx: unknown): void {
   const clean: Record<string, unknown> = {};
   for (const key of Object.keys(src)) {
     const v: unknown = src[key];
-    if (typeof v === 'function' && !isSignal(v)) continue; // a handler/computed — re-derived, not state
+    if (typeof v === 'function' && !isSignal(v)) continue; // a handler/computed — rebuilt, not state
+    // Probe this binding on its own so a failure can NAME it. The throwaway encode costs build time only.
+    try {
+      serialize(v);
+    } catch (e) {
+      if (droppedSink) droppedSink.push({ id, key, reason: (e as Error).message });
+      return; // all-or-nothing: this instance is not resumable
+    }
     clean[key] = v;
   }
   collector[id] = clean;
@@ -179,6 +203,12 @@ export interface ResumePageOptions {
   derive?: DeriveFn;
   /** Where to read the snapshot `<script>` from (default: the global `document`). */
   document?: Document;
+  /**
+   * E1.9 — CSR fallback for a root the server could not make resumable (a binding that can't cross the wire;
+   * see {@link registerState}). Called INSTEAD of resuming, and must render the app itself (clear the server
+   * DOM + `mountComponent`). Without it, such a page throws rather than degrading.
+   */
+  fallback?: () => void;
 }
 
 /**
@@ -186,11 +216,20 @@ export interface ResumePageOptions {
  * `renderPage` emitted) and {@link resume} `root` against it — lazy handlers, no `setup`. Throws loudly if
  * the snapshot script is missing. Returns the {@link ResumeApp}.
  */
-export function resumePage(options: ResumePageOptions): ResumeApp {
+export function resumePage(options: ResumePageOptions): ResumeApp | null {
   const doc: Document = options.document ?? (globalThis as { document?: Document }).document!;
   const el: HTMLElement | null = doc.getElementById(SNAPSHOT_ID);
   if (!el) throw new Error(`resumePage: no snapshot <script id="${SNAPSHOT_ID}"> found in the document.`);
   const wire: Wire = JSON.parse(el.textContent || 'null') as Wire;
+  // E1.9 — the root is resumable iff the server registered it. A map WITHOUT `$root` means it had a binding
+  // that couldn't cross the wire, so resuming would run the render's bindings against nothing: CSR instead.
+  if (options.fallback) {
+    const decoded: unknown = deserialize(wire);
+    if (decoded == null || typeof decoded !== 'object' || !(ROOT_ID in (decoded as Record<string, unknown>))) {
+      options.fallback();
+      return null;
+    }
+  }
   return resume(options.root, {
     snapshot: wire,
     handlers: options.handlers,

@@ -85,9 +85,13 @@ ok(routedResumable.includes('setServerLocation') && routedResumable.includes('re
 
 const resumeClient = generateEntry(join(rootDir, 'App.ts'), '#app', rootDir, [], { resume: true });
 ok(resumeClient.includes('import { resumePage } from "@weave-framework/runtime/graph"'), 'resume client entry: imports resumePage');
-ok(!resumeClient.includes('mountComponent'), 'resume client entry does NOT CSR-remount (adopts instead)');
-ok(resumeClient.includes('_m.firstElementChild') && /resumePage\(\{ root: _r, adopt: Root\.adopt, handlers: Root\.handlers, derive: Root\.derive \}\)/.test(resumeClient),
+ok(resumeClient.includes('_m.firstElementChild') && /resumePage\(\{ root: _r, adopt: Root\.adopt, handlers: Root\.handlers, derive: Root\.derive, fallback: _csr \}\)/.test(resumeClient),
   'resume client entry: resumePage adopts the mount target\'s first child with Root.adopt + .handlers + .derive');
+// E1.9 — the entry ALSO carries a CSR fallback, for a root the server could not make resumable (e.g. a
+// `router` binding that cannot be serialized). Without it such a page would throw instead of degrading.
+ok(/_csr = \(\) => \{ if \(_m\) \{ _m\.textContent = ""; mountComponent\(Root, _m\); \} \};/.test(resumeClient),
+  'resume client entry: carries a CSR fallback (clear + mountComponent) for a non-resumable root');
+ok(resumeClient.includes('else _csr();'), 'resume client entry: no prerendered DOM at all → CSR');
 
 /* ── Part 2 — end-to-end `buildSsg` into a temp dir with a real component ── */
 
@@ -267,9 +271,10 @@ try {
   ok(state && typeof state.$root.count === 'function' && state.$root.count() === 3, 'islands: $root.count round-trips as a live signal @ 3');
   ok(state && !('inc' in state.$root), 'islands: the handler `inc` was dropped from the captured state (re-derived on the client)');
 
-  // (c) the client bundle is the RESUME entry (adopts) — not a CSR remount
+  // (c) the client bundle is the RESUME entry (adopts). It also bundles mountComponent for the E1.9 CSR
+  // fallback, so presence of `resumePage` — not absence of mountComponent — is what proves the resume entry.
   const mainJs = readFileSync(join(iout, 'main.js'), 'utf8');
-  ok(mainJs.includes('resumePage') && !/\bmountComponent\(/.test(mainJs), 'islands: client bundle resumes (resumePage), no CSR mountComponent');
+  ok(mainJs.includes('resumePage'), 'islands: client bundle resumes (resumePage) rather than plain CSR-mounting');
 } finally {
   rmSync(iapp, { recursive: true, force: true });
   rmSync(iout, { recursive: true, force: true });

@@ -33,8 +33,11 @@ const BUDGETS = [
   // Phase E entries — opt-in, NOT part of the SPA core (0 bytes for apps that don't import them).
   // runtime/serialize (E0.1): the wire-format codec, used by SSR-resume + local-first. Baseline 3.1 KB.
   { label: 'runtime/serialize (E0.1 codec)', files: ['packages/runtime/dist/serialize.js'], budget: 4_096 },
-  // runtime/resume (E0.2a/b): resumable event dispatch + handler registration. Baseline 2.4 KB.
-  { label: 'runtime/resume (E0.2a/b dispatch)', files: ['packages/runtime/dist/resume.js'], budget: 2_560 },
+  // runtime/resume (E0.2a/b): resumable event dispatch + handler registration. Baseline 2.4 KB; budget
+  // 2560 → 3072 (E1.9: with no collecting session a resumable render is a LIVE client render, so it wires a
+  // real listener and skips the marker — that is what makes a resumable bundle work under CSR at all: a
+  // fallback root, a route swap, a `@for` row added after resume). Resume-only, 0 for a plain SPA (I3).
+  { label: 'runtime/resume (E0.2a/b dispatch)', files: ['packages/runtime/dist/resume.js'], budget: 3_072 },
   // runtime/adopt (E1.2a/c): DOM-adoption primitives. Server+client, own line — 0 bytes for a plain SPA (I3).
   // Grown across E1.2c (block adopt lands incrementally): E1.2a marker text-bind → E1.2c-1 block-boundary
   // cursor (blockStart/blockEndOf/clearBlock) → E1.2c-2 adoptIsland (@if/@switch island-replay). Budget
@@ -48,8 +51,11 @@ const BUDGETS = [
   // collectStates / registerState / ROOT_ID) → 3584 (E1.2c-6 resume states-map handling + ResumeApp.states)
   // → 4096 (E1.6 derive/DeriveFn — computeds rebuilt on resume; E1.8 ancestry-scoped event resolution, so a
   // child component's own handlers resolve against ITS ctx). Resumable-only, 0 for a plain SPA (I3; SPA core
-  // 20.9 KB flat). Deliberate: E1.5–E1.8 turned resume from "flat text only" into real components.
-  { label: 'runtime/graph (E0.3/E1.2 resume)', files: ['packages/runtime/dist/graph.js'], budget: 4_096 },
+  // 20.9 KB flat) → 4608 (E1.9 graceful degradation: registerState probes each binding and drops an instance
+  // that cannot be serialized — a router/store/class instance — instead of FAILING THE BUILD; plus the
+  // resumePage CSR `fallback` and the DroppedState diagnostics the build reports).
+  // Deliberate: E1.5–E1.9 turned resume from "flat text only" into real components.
+  { label: 'runtime/graph (E0.3/E1.2 resume)', files: ['packages/runtime/dist/graph.js'], budget: 4_608 },
   // runtime/server (E0.4): headless render — the in-house server DOM + parser + serializer + renderToString.
   // Server-only, its own line — 0 bytes for a client SPA (I3). Baseline 5.8 KB; budget raised 7168 → 7680
   // (E1.3d SSG document-<title> capture) → 8192 (E1.4 the islands capture: `renderPage({ resumable })` wraps
@@ -58,7 +64,9 @@ const BUDGETS = [
   {
     label: 'runtime/server (E0.4 headless)',
     files: ['packages/runtime/dist/server.js', 'packages/runtime/dist/server-dom.js', 'packages/runtime/dist/document.js'],
-    budget: 8_192,
+    // 8192 → 8704 (E1.9: renderPage declares the server render via collectResumable + maps dropped instances
+    // to build warnings). Server-only — never ships to a browser.
+    budget: 8_704,
   },
 ];
 

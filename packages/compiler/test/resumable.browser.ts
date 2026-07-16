@@ -45,6 +45,16 @@ function host(): HTMLElement {
   return el;
 }
 
+/**
+ * Render the way the SERVER does — inside a collecting session, exactly as `renderPage` runs it. That is what
+ * makes each `on:` site stamp its `data-won-*` marker for the client to resume; the same render WITHOUT a
+ * session is a live client render and wires real listeners instead (a CSR fallback, a route swap, a late
+ * `@for` row). The captured handler map is discarded here — the client rebuilds handlers from the factory.
+ */
+function serverRender<T>(fn: () => T): T {
+  return collectResumable(fn).node;
+}
+
 /* ──────────── emit shape ──────────── */
 
 test('resumable module emits a handler ref + imports from runtime/resume, not listen', () => {
@@ -194,7 +204,7 @@ test('E1.1: resume() drives the EMITTED factory end-to-end — no hand-authored 
 
   // ── server ── render (stamps the marker) + snapshot the reactive state
   const count: Signal<number> = signal(3);
-  const node = render({ count }) as HTMLButtonElement;
+  const node = serverRender(() => render({ count })) as HTMLButtonElement;
   const container: HTMLElement = host();
   container.appendChild(node);
   assert.ok(node.getAttribute(handlerAttr('click'))!.startsWith('w0#'), 'server HTML carries the marker');
@@ -219,7 +229,7 @@ test('E1.2: resumePage reads the embedded snapshot <script> and resumes (SSG cli
   const render = compileResumable('<button on:click={{() => count.set((c) => c + 1)}}>x</button>', ['count']);
   const count: Signal<number> = signal(10);
   const container: HTMLElement = host();
-  container.appendChild(render({ count }));
+  container.appendChild(serverRender(() => render({ count })) as Node);
   const script: HTMLScriptElement = document.createElement('script');
   script.type = 'application/weave';
   script.id = SNAPSHOT_ID;
@@ -639,7 +649,7 @@ test('E1.2b-2: adopt re-binds the SERVER text node in place — signal update fl
 
   // ── server ── render the resumable target (stamps the data-won marker + isolates the dynamic text) + snapshot
   const serverCount: Signal<number> = signal(7);
-  const serverNode = render({ count: serverCount }) as HTMLButtonElement;
+  const serverNode = serverRender(() => render({ count: serverCount })) as HTMLButtonElement;
   const wire = snapshot({ count: serverCount });
   const serverHtml: string = serverNode.outerHTML; // exactly what renderPage would serialize
 
@@ -713,7 +723,7 @@ test('E1.5: a NAMED handler RESUMES — its inlined body clicks against the resu
 
   // ── server ── render with the real setup ctx (count + inc), then snapshot ONLY what serializes (no `inc`)
   const serverCount: Signal<number> = signal(3);
-  const node = render({ count: serverCount, inc: () => serverCount.set((n) => n + 1) }) as HTMLButtonElement;
+  const node = serverRender(() => render({ count: serverCount, inc: () => serverCount.set((n) => n + 1) })) as HTMLButtonElement;
   const wire = snapshot({ count: serverCount }); // registerState drops the function — this is the real payload
   const serverHtml: string = node.outerHTML;
 
@@ -734,7 +744,7 @@ test('E1.5: a NAMED handler RESUMES — its inlined body clicks against the resu
 test('E1.5 DoD: WITHOUT the inlining the same named handler is dead (proves the fix is what makes it work)', () => {
   const render = compileNamed(); // no resumableHandlers → the factory emits a bare `ctx.inc`
   const serverCount: Signal<number> = signal(3);
-  const node = render({ count: serverCount, inc: () => serverCount.set((n) => n + 1) }) as HTMLButtonElement;
+  const node = serverRender(() => render({ count: serverCount, inc: () => serverCount.set((n) => n + 1) })) as HTMLButtonElement;
   const wire = snapshot({ count: serverCount });
 
   const container: HTMLElement = host();
@@ -833,7 +843,7 @@ test('E1.8: a static <Child> with its OWN on:click resumes — the click runs th
   // ── server ── render + collect the child ctx under c0, snapshot { $root, c0 }
   const title = signal('T');
   const box = host();
-  const states = collectStates(() => { box.appendChild(parentRender({ title }, {})); });
+  const states = collectStates(() => { box.appendChild(serverRender(() => parentRender({ title }, {}))); });
   assert.ok(states.c0, 'the child self-registered under c0');
   assert.equal(childSetups, 1, 'child setup ran once on the server');
   states[ROOT_ID] = { title };

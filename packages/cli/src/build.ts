@@ -199,6 +199,8 @@ export async function buildSsg(config: SsgBuildConfig): Promise<void> {
       routes: config.routes ?? ['/'],
       render: async (route: string): Promise<PageArtifact> => {
         const artifact: PageArtifact = await server.render(route);
+        // E1.9 — surface any component the render could not make resumable (it will be client-rendered).
+        for (const w of artifact.warnings ?? []) console.warn(`▲ weave build --ssg ${route}: ${w}`);
         // Wrap the server HTML in the #id mount target so the client CSR mounts over it; keep the captured
         // title so `renderDocument` fills each page's <title>.
         return {

@@ -29,13 +29,13 @@ const entry = `
   import { renderToString, renderComponent, renderPage, renderDocument } from '@weave-framework/runtime/server';
   import * as dom from '@weave-framework/runtime/dom';
   import { signal, computed, effect, root } from '@weave-framework/runtime';
-  import { resumableHandler } from '@weave-framework/runtime/resume';
+  import { resumableHandler, collectResumable } from '@weave-framework/runtime/resume';
   import { deserialize } from '@weave-framework/runtime/serialize';
   import { SNAPSHOT_ID, ROOT_ID, collectStates, registerState } from '@weave-framework/runtime/graph';
   import { bindTextResumable, adoptText, blockStart, adoptIsland, blockEndOf, clearBlock, after, adoptComponent } from '@weave-framework/runtime/adopt';
   import { compileTemplate } from '@weave-framework/compiler';
   export const rt = { ...dom, signal, computed, effect, root, resumableHandler, bindTextResumable, adoptText, blockStart, adoptIsland, blockEndOf, clearBlock, after, adoptComponent, registerState };
-  export { renderToString, renderComponent, renderPage, renderDocument, compileTemplate, signal, dom, deserialize, SNAPSHOT_ID, ROOT_ID };
+  export { renderToString, renderComponent, renderPage, renderDocument, compileTemplate, signal, dom, deserialize, SNAPSHOT_ID, ROOT_ID, collectResumable };
 `;
 
 const cacheDir = join(repo, 'node_modules', '.weave');
@@ -49,7 +49,7 @@ await esbuild({
   target: 'node18',
   outfile: out,
 });
-const { rt, renderToString, renderComponent, renderPage, renderDocument, compileTemplate, signal, deserialize, SNAPSHOT_ID, ROOT_ID } = await import(pathToFileURL(out).href);
+const { rt, renderToString, renderComponent, renderPage, renderDocument, compileTemplate, signal, deserialize, SNAPSHOT_ID, ROOT_ID, collectResumable } = await import(pathToFileURL(out).href);
 
 /** Compile a template (function mode) and return the bare render fn (with `.adopt`/`.handlers` attached). */
 function compileRender(html, scope, opts = {}, children = {}) {
@@ -118,9 +118,17 @@ console.log('verify:server — headless render to string\n');
 // 4) the SSR half of resume: the `resumable` target stamps a data-won marker into the server HTML
 {
   const inc = () => {};
-  const node = render('<button on:click={{inc}}>go</button>', { inc }, ['inc'], { resumable: true });
+  // Inside a collecting session — i.e. how renderPage runs it. That is what marks this as THE server render,
+  // so each `on:` site stamps its marker for the client to resume instead of wiring a live listener.
+  const node = collectResumable(() => render('<button on:click={{inc}}>go</button>', { inc }, ['inc'], { resumable: true })).node;
   const html = renderToString(node);
   ok(/<button data-won-click="w0#\d+">go<\/button>/.test(html), `resumable marker present in server HTML (got: ${html})`);
+
+  // …and WITHOUT a session the same render is a live client render: a real listener, and NO marker (which
+  // would otherwise make a delegated dispatcher fire the handler a second time). E1.9.
+  let ran = 0;
+  const live = render('<button on:click={{go}}>go</button>', { go: () => ran++ }, ['go'], { resumable: true });
+  ok(!/data-won-click/.test(renderToString(live)), 'no session → no resume marker (a live render owns its listener)');
 }
 
 // 5) full component via renderComponent (defineComponent mount path → string)

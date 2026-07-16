@@ -18,7 +18,8 @@
  */
 import { installServerDom, serializeNode, type SNode } from './server-dom.js';
 import { createOwner, runInOwner, disposeOwner, type Owner } from './reactive.js';
-import { snapshot, collectStates, ROOT_ID, SNAPSHOT_ID } from './graph.js';
+import { snapshot, collectStates, ROOT_ID, SNAPSHOT_ID, type DroppedState } from './graph.js';
+import { collectResumable } from './resume.js';
 import { scriptSafe, type PageArtifact } from './document.js';
 import type { Component } from './dom.js';
 
@@ -69,13 +70,32 @@ export function renderPage(
     ? { ...options.props, $wid: ROOT_ID }
     : options.props;
   let html: string = '';
+  const dropped: DroppedState[] = [];
   const states: Record<string, unknown> = collectStates(() => {
-    html = renderComponent(component, props);
-  });
+    // A collecting session marks this as THE server render: each `on:` site stamps its `data-won-*` marker for
+    // the client to resume, instead of wiring a live listener (which is what a client-side render of the same
+    // resumable build does). The captured id→handler map is discarded — the client rebuilds handlers from the
+    // compiled `handlers(ctx)` factory over the resumed ctx.
+    html = collectResumable(() => renderComponent(component, props)).node;
+  }, dropped);
   const wire: unknown = options.resumable ? snapshot(states) : snapshot(options.state ?? {});
   const json: string = scriptSafe(JSON.stringify(wire));
   const title: string | undefined = doc?.title || undefined;
-  return { html, snapshotScript: `<script type="application/weave" id="${SNAPSHOT_ID}">${json}</script>`, title };
+  // E1.9 — say which components fell back to client rendering, and why. A silent downgrade is exactly the
+  // kind of defect the resume warnings exist to surface.
+  const warnings: string[] = dropped.map(
+    (d) =>
+      `${d.id === ROOT_ID ? 'the root component' : `component instance \`${d.id}\``} is not resumable — ` +
+      `binding \`${d.key}\` cannot be serialized (${d.reason}) — it will be client-rendered instead ` +
+      `(its setup re-runs). Keep non-serializable values (a router, a store with methods, a class instance) ` +
+      `out of what setup() returns, or accept client rendering for this component.`
+  );
+  return {
+    html,
+    snapshotScript: `<script type="application/weave" id="${SNAPSHOT_ID}">${json}</script>`,
+    title,
+    ...(warnings.length ? { warnings } : {}),
+  };
 }
 
 // The document-assembly layer is DOM-free — re-exported here for convenience, defined in `./document`.

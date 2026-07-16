@@ -121,7 +121,7 @@ export function generateEntry(
   elements.forEach((ce, i) => lines.push(`import __ce${i} from ${spec(ce.file)};`));
   lines.push(
     options.resume
-      ? 'import { resumePage } from "@weave-framework/runtime/graph";\nimport { defineCustomElement } from "@weave-framework/runtime/dom";'
+      ? 'import { resumePage } from "@weave-framework/runtime/graph";\nimport { mountComponent, defineCustomElement } from "@weave-framework/runtime/dom";'
       : 'import { mountComponent, defineCustomElement } from "@weave-framework/runtime/dom";'
   );
   // Register custom elements BEFORE bringing the root online, so a tag is defined at first render.
@@ -130,9 +130,15 @@ export function generateEntry(
   );
   if (options.resume) {
     // Adopt the SSG-rendered DOM in place: the component root is the mount target's first element child.
+    // `fallback` (E1.9) covers a root the server could not make resumable (a non-serializable binding such as
+    // a router): clear the server DOM and mount fresh, so the page still works — just client-rendered.
     lines.push(`const _m = document.querySelector(${JSON.stringify(mount)});`);
     lines.push(`const _r = _m && _m.firstElementChild;`);
-    lines.push(`if (_r) resumePage({ root: _r, adopt: Root.adopt, handlers: Root.handlers, derive: Root.derive });`);
+    lines.push(`const _csr = () => { if (_m) { _m.textContent = ""; mountComponent(Root, _m); } };`);
+    lines.push(
+      `if (_r) resumePage({ root: _r, adopt: Root.adopt, handlers: Root.handlers, derive: Root.derive, fallback: _csr });\n` +
+        `else _csr();`
+    );
   } else {
     lines.push(`mountComponent(Root, ${JSON.stringify(mount)});`);
   }
