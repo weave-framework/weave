@@ -152,17 +152,37 @@ function resumableSetup(script: string, scope: string[]): {
   // and withdraw what cannot resolve, to a fixed point (helpers may also be mutually recursive).
   const fnNames: Set<string> = new Set(found.handlers.keys());
   const settled: Set<string> = new Set([...resolvable, ...fnNames, ...found.computeds.keys()]);
+  // E1.38 — why each withdrawal happened, so the blame can be TRANSITIVE. `onFieldClick` reads `openPanel`,
+  // which reads `box`, which nothing rebuilds: saying "reads `openPanel`, which setup() does not return" is both
+  // useless (openPanel is right there in setup) and misleading (it is not the problem). One cause wearing the
+  // name of whatever touched it last is what made the docs list look like a dozen problems instead of one.
+  const because: Map<string, string[]> = new Map();
   for (let changed = true; changed; ) {
     changed = false;
     const check = (name: string, source: string, params: readonly string[]): void => {
       if (!settled.has(name)) return;
-      if (unresolvedRefs(source, union(settled, imports), params, name).length === 0) return;
+      const missing: string[] = unresolvedRefs(source, union(settled, imports), params, name);
+      if (missing.length === 0) return;
       settled.delete(name);
+      because.set(name, missing);
       changed = true;
     };
     for (const [name, fn] of found.handlers) check(name, fn.source, fn.params);
     for (const [name, v] of found.computeds) check(name, v.source, []);
   }
+  /** Follow a refusal to the names nothing can rebuild, keeping the chain that leads there. */
+  const rootCause = (missing: readonly string[], seen: Set<string> = new Set()): string[] => {
+    const out: string[] = [];
+    for (const m of missing) {
+      if (seen.has(m)) continue;
+      seen.add(m);
+      const via: string[] | undefined = because.get(m);
+      // A withdrawn binding is a LINK, not the cause — keep it (the author needs the path) and follow it down.
+      if (via) out.push(m, ...rootCause(via, seen));
+      else out.push(m);
+    }
+    return out;
+  };
   // The rewrite scope follows from the settled sets: a value binding becomes `ctx.<name>` (derive puts it
   // there), a FUNCTION stays a bare name (it is re-declared as a local of derive and of the factory alike).
   for (const name of found.computeds.keys()) if (settled.has(name)) sc.set(name, { kind: 'ctx' });
@@ -174,13 +194,14 @@ function resumableSetup(script: string, scope: string[]): {
       ? []
       : unresolvedRefs(derivable.source, union(settled, imports), [], name);
     if (missing.length) {
-      reasons.set(name, blame(missing));
+      const chain: string[] = rootCause(missing);
+      reasons.set(name, blame(chain));
       // A computed the template CALLS and we cannot rebuild makes resume THROW — the whole page dies, so
       // this is worth saying loudly even though we can't tell here whether the template reads it.
       if (scope.includes(name)) {
         warnings.push(
-          `computed \`${name}\` cannot be rebuilt on resume — it reads ${blame(missing)}. ` +
-            `Resuming this page will fail (\`ctx.${name} is not a function\`). Return ${listOf(missing)} from setup(), or inline the expression.`
+          `computed \`${name}\` cannot be rebuilt on resume — it reads ${blame(chain)}. ` +
+            `Resuming this page will fail (\`ctx.${name} is not a function\`). Return ${listOf(chain)} from setup(), or inline the expression.`
         );
       }
       continue;
@@ -208,7 +229,7 @@ function resumableSetup(script: string, scope: string[]): {
       ? []
       : unresolvedRefs(handler.source, union(settled, imports), handler.params, name);
     if (missing.length) {
-      reasons.set(name, blame(missing));
+      reasons.set(name, blame(rootCause(missing)));
       continue; // the warning is raised by the caller, which knows whether it is actually a handler SITE
     }
     handlers.set(name, rewrite(handler.source, sc).code);

@@ -529,3 +529,21 @@ test('E1.37: a genuinely finished statement still ends at the newline', () => {
   assert.equal(f.computeds.get('b')?.source, '2', 'and so does a newline after a complete expression');
   assert.equal(f.computeds.get('c')?.source, '3', 'even the last one before a return');
 });
+
+test('E1.39: a `function` expression`s parameter types are stripped too, not just an arrow`s', () => {
+  // `function closePanel(returnFocus: boolean): void { … }` — the real <Select>. The param strip only fired when
+  // the `)` was followed by `=>`, so a function BODY (`{`) left every param type in, and `closePanel` was blamed
+  // for reading `boolean`. Transitive blame (E1.38) is what surfaced it: the site said `closePanel`, the root
+  // said `boolean`.
+  assert.deepEqual(
+    unresolvedRefs('function (returnFocus: boolean, n: Count): void { open.set(returnFocus); }', new Set(['open']), ['returnFocus', 'n'], 'closePanel'),
+    [],
+    'the param types are gone',
+  );
+  // an `if (…) { }` is NOT a param list — its condition must survive untouched
+  assert.deepEqual(
+    unresolvedRefs('function () { if (a ? b : c) { open.set(d); } }', new Set(['open']), [], 'x').sort(),
+    ['a', 'b', 'c', 'd'],
+    'a ternary inside a condition is not mistaken for an annotation',
+  );
+});

@@ -1070,3 +1070,50 @@ test('E1.35: a handler calling a `function` declaration with a return type inlin
     `the declaration is rebuilt as a factory local; got:\n${factory}`);
   assert.ok(/"w0":\s*\(\): void => openPanel\(\)/.test(factory), 'and the site calls it');
 });
+
+test('E1.38: the blame is TRANSITIVE — it names the root cause, not the middle of the chain', () => {
+  // `onFieldClick` reads `openPanel`, which reads `box`, which nothing can rebuild. The warning said
+  // "reads `openPanel`, which setup() does not return" — which is both useless (openPanel is RIGHT THERE in
+  // setup) and misleading (openPanel is not the problem). One cause wearing the name of whatever touched it
+  // last is exactly what made the docs list look like a dozen problems instead of one.
+  const { warnings } = compileComponent(
+    {
+      script:
+        'import { signal } from "@weave-framework/runtime";\n' +
+        'export function setup(){\n  const open = signal(false);\n' +
+        '  const box = new Panel();\n' +
+        '  function openPanel(): void { box.show(); open.set(true); }\n' +
+        '  const onFieldClick = (): void => openPanel();\n' +
+        '  return { open, onFieldClick }; }',
+      template: '<button on:click={{ onFieldClick }}>{{ open() }}</button>',
+    },
+    { filename: 'tb1', resumable: true }
+  );
+  const w: string = warnings?.find((x) => /onFieldClick/.test(x)) ?? '';
+  assert.ok(/`box`/.test(w), `must name the ROOT cause; got: ${w}`);
+  assert.ok(/openPanel/.test(w), `and the chain that leads to it, so the author can find it; got: ${w}`);
+});
+
+test('E1.40: a DECLARATION inside a handler binds a local — it is not rewritten to ctx', () => {
+  // The real <Autocomplete> emitted `const ctx.label: HTMLElement = document.createElement("span")` and the
+  // BUILD failed: `label` is a ctx binding AND a block-local inside a helper. scope.ts called this a known,
+  // rare edge ("over-rewriting is the only risk"); once helpers are emitted it is neither rare nor benign.
+  const { code } = compileComponent(
+    {
+      script:
+        'import { signal } from "@weave-framework/runtime";\n' +
+        'export function setup(){\n  const label = signal("a");\n' +
+        '  const build = () => { const label = document.createElement("span"); label.textContent = "x"; return label; };\n' +
+        '  const go = () => build();\n' +
+        '  return { label, go }; }',
+      template: '<button on:click={{ go }}>{{ label() }}</button>',
+    },
+    { filename: 'sh1', resumable: true }
+  );
+  assert.ok(!/const ctx\.label/.test(code), `a declaration name must stay bare; got:\n${code}`);
+  const factory: string = code.match(/function handlers\(ctx, props\)[\s\S]*?\n\}/)?.[0] ?? '';
+  assert.ok(/const label = document\.createElement\("span"\); label\.textContent = "x"; return label;/.test(factory),
+    `and every later reference is the LOCAL, not the ctx signal; got:\n${factory}`);
+  // the template's own `label` still resolves to ctx — the shadowing is per-expression, not global
+  assert.ok(/ctx\.label\(\)/.test(code), 'the template binding is untouched');
+});

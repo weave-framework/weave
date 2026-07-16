@@ -193,6 +193,17 @@ export function rewrite(expr: string, scope: Scope, ctxRef: string = 'ctx', oute
       const next: string = firstNonSpaceFrom(expr, j);
       const isObjectKey: boolean = (prev === '{' || prev === ',') && next === ':';
 
+      // A DECLARATION binds a LOCAL for the rest of this expression. `const label = …` inside a helper emitted
+      // `const ctx.label = …` and failed the BUILD when `label` was also a ctx name — and every later `label` in
+      // that body means the local, not the signal. Adding it to `params` shadows it from here on, which is what
+      // a linear scan can honour (a reference BEFORE its own declaration is a TDZ error anyway).
+      if (declaresLocal(expr, i)) {
+        params.add(name);
+        copy(i, name);
+        i = j;
+        continue;
+      }
+
       if (binding && !isProperty && !isObjectKey && !params.has(name)) {
         // `{ name }` object shorthand must expand to `{ name: <value> }` — a bare `{ ctx.name }` /
         // `{ accessor() }` is a syntax error. Detect a shorthand key: between `{`|`,` and `,`|`}`.
@@ -240,6 +251,18 @@ export function childScope(parent: Scope, locals: Record<string, string>): Scope
     scope.set(name, { kind: 'call', accessor });
   }
   return scope;
+}
+
+/** Is the identifier at `i` the NAME of a `const`/`let`/`var` declaration (so it binds a local, not a ref)? */
+function declaresLocal(expr: string, i: number): boolean {
+  let k: number = i - 1;
+  while (k >= 0 && /[ \t]/.test(expr[k])) k--;
+  if (k < 0) return false;
+  const end: number = k + 1;
+  while (k >= 0 && ID_CHAR.test(expr[k])) k--;
+  const word: string = expr.slice(k + 1, end);
+  if (word !== 'const' && word !== 'let' && word !== 'var') return false;
+  return k < 0 || !ID_CHAR.test(expr[k]); // a whole word, not the tail of `myconst`
 }
 
 function lastNonSpace(s: string): string {

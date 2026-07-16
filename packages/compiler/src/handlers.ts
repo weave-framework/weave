@@ -576,7 +576,7 @@ function stripDeclTypes(src: string): string {
     // by `=>` (optionally through a return type), so a plain CALL's parens are never touched.
     if (src[i] === '(') {
       const close: number = matchDelimited(src, i, '(', ')');
-      if (close > i && isArrowParams(src, close)) {
+      if (close > i && (isArrowParams(src, close) || isFunctionParams(src, i))) {
         out += `(${stripParamTypes(src.slice(i + 1, close))}) `;
         i = close + 1;
         // …and its RETURN type, here: consuming the `)` above is what stopped the `)`-then-`:` branch below from
@@ -630,6 +630,16 @@ function skipTypeRef(src: string, i: number): number {
     }
     return i;
   }
+}
+
+/**
+ * Is the `(` at `open` a FUNCTION's parameter list? Decided by what precedes it, not what follows: a `{` after
+ * the `)` would also match `if (…) { }`, whose condition may hold a ternary that must not be read as an
+ * annotation. `function closePanel(returnFocus: boolean): void {…}` (the real <Select>) was left untouched
+ * while only arrows were handled, so it was blamed for reading `boolean`.
+ */
+function isFunctionParams(src: string, open: number): boolean {
+  return /\bfunction(\s+[A-Za-z_$][\w$]*)?\s*$/.test(src.slice(0, open));
 }
 
 /** Is the `)` at `close` the end of an ARROW's parameter list (possibly through a `: ReturnType`)? */
