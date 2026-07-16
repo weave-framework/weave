@@ -387,7 +387,60 @@ export function extractSetupBindings(script: string): SetupBindings {
   for (const name of [...out.keys()]) {
     if (isReassigned(script, open, close, name)) out.delete(name);
   }
+
+  // E1.34 — handlers defined INLINE in setup's `return { … }`, the shape most of the docs demos and much of
+  // @weave-framework/ui use (`return { count, inc: () => count.set(n => n + 1) }`). Only declarations were read,
+  // so every one of these reported "its definition could not be read from setup()" and fell back to a dead
+  // `ctx.inc`. An object property cannot be reassigned, so the filter above does not apply to them. Functions
+  // ONLY: a value returned inline already crosses the wire, so there is nothing to rebuild.
+  for (const [name, value] of returnEntries(script)) {
+    if (out.has(name) || computeds.has(name)) continue; // a real declaration wins
+    const h: SetupHandler | null = asFunctionExpr(value);
+    if (h) out.set(name, h);
+  }
   return empty;
+}
+
+/**
+ * `name: <value>` entries of setup's `return { … }` object. A shorthand (`count,`) is a REFERENCE, not a
+ * definition, so it is skipped — as is a spread or a computed key, which name nothing statically.
+ */
+function returnEntries(script: string): Map<string, string> {
+  const out: Map<string, string> = new Map();
+  const open: number | null = locateSetupBody(script);
+  if (open === null) return out;
+  const close: number = matchDelimited(script, open, '{', '}');
+  if (close < 0) return out;
+
+  let i: number = open + 1;
+  let depth: number = 0;
+  while (i < close) {
+    const op: number = skipOpaque(script, i);
+    if (op > i) {
+      i = op;
+      continue;
+    }
+    const c: string = script[i];
+    if (c === '(' || c === '[' || c === '{') { depth++; i++; continue; }
+    if (c === ')' || c === ']' || c === '}') { depth--; i++; continue; }
+    if (depth === 0 && ID_START.test(c) && isTokenStart(script, i) && startsWithWord(script, i, 'return')) {
+      const b: number = skipWs(script, i + 6);
+      if (script[b] !== '{') return out; // `return x` / `return;` — not a plain object literal
+      const rb: number = matchDelimited(script, b, '{', '}');
+      if (rb < 0) return out;
+      for (const part of splitTop(script.slice(b + 1, rb))) {
+        const p: string = part.trim();
+        const name: string = readIdent(p, 0);
+        if (!name) continue; // a spread, a computed key, or a quoted one
+        const k: number = skipWs(p, name.length);
+        if (p[k] !== ':') continue; // a shorthand — a reference to a binding read elsewhere
+        out.set(name, p.slice(k + 1).trim());
+      }
+      return out;
+    }
+    i = ID_START.test(c) && isTokenStart(script, i) ? skipWord(script, i) : i + 1;
+  }
+  return out;
 }
 
 /**
@@ -607,24 +660,44 @@ function stripParamTypes(params: string): string {
   return out.join(',');
 }
 
-/** Split a parameter list on top-level commas. */
+/**
+ * Split on top-level commas — a parameter list, or setup's `return { … }` entries.
+ *
+ * `<`/`>` are NOT counted as a pair: `>` also ends an ARROW, so counting it sent the depth negative and every
+ * later comma stopped looking top-level — a return object came back as one giant entry. Type arguments are
+ * skipped wholesale instead (only where `<` follows an identifier), which keeps a comma inside `Map<K, V>` from
+ * splitting while leaving a comparison alone.
+ */
 function splitTop(src: string): string[] {
   const out: string[] = [];
   let depth: number = 0;
   let start: number = 0;
-  for (let i = 0; i < src.length; i++) {
+  let i: number = 0;
+  while (i < src.length) {
     const op: number = skipOpaque(src, i);
     if (op > i) {
-      i = op - 1;
+      i = op;
       continue;
     }
     const c: string = src[i];
-    if (c === '(' || c === '[' || c === '{' || c === '<') depth++;
-    else if (c === ')' || c === ']' || c === '}' || c === '>') depth--;
+    if (c === '=' && src[i + 1] === '>') {
+      i += 2; // an arrow, not a closing bracket
+      continue;
+    }
+    if (c === '<' && i > 0 && ID_CHAR.test(src[i - 1])) {
+      const gt: number = skipTypeArgs(src, i);
+      if (gt > i) {
+        i = gt;
+        continue;
+      }
+    }
+    if (c === '(' || c === '[' || c === '{') depth++;
+    else if (c === ')' || c === ']' || c === '}') depth--;
     else if (c === ',' && depth === 0) {
       out.push(src.slice(start, i));
       start = i + 1;
     }
+    i++;
   }
   out.push(src.slice(start));
   return out;

@@ -427,3 +427,31 @@ test('E1.32: a declaration with NO initializer is still a binding — it is simp
     'so the handler that assigns it resolves',
   );
 });
+
+test('E1.34: a handler defined INLINE in setup`s return object is extracted', () => {
+  // `return { count, inc: () => count.set(n => n + 1) }` — the shape most of the docs demos and much of
+  // @weave-framework/ui use. The extractor only read `const`/`function` declarations, so every one of these was
+  // "its definition could not be read from setup()" and fell back to a dead `ctx.inc`.
+  const f = extractSetupBindings(
+    setup(
+      '  const count = signal(2);\n' +
+        '  return {\n' +
+        '    count,\n' +
+        '    inc: (): void => count.set((n) => n + 1),\n' +
+        '    reset: () => { count.set(0); },\n' +
+        '    label: (n: number): string => `#${n}`,\n' +
+        '    plain: 42,\n' +
+        '  };'
+    )
+  );
+  assert.equal(f.handlers.get('inc')?.source, '(): void => count.set((n) => n + 1)', 'an annotated arrow value');
+  assert.equal(f.handlers.get('reset')?.source, '() => { count.set(0); }', 'a block-bodied one');
+  assert.deepEqual(f.handlers.get('label')?.params, ['n'], 'params are read');
+  assert.ok(!f.handlers.has('plain'), 'a non-function value is not a handler');
+  assert.ok(!f.handlers.has('count'), 'and a shorthand is a reference, not a definition');
+});
+
+test('E1.34: an inline return handler is inlinable when its body resolves', () => {
+  const f = extractSetupBindings(setup('  const count = signal(0);\n  return { count, inc: () => count.set(1) };'));
+  assert.ok(isInlinable(f.handlers.get('inc')!, new Set(['count']), 'inc'), 'resolves against the resumed ctx');
+});
