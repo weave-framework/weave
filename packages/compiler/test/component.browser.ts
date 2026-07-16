@@ -393,13 +393,17 @@ test('E1.19: mutually recursive helpers both resolve (a single declaration-order
 });
 
 test('E1.19 fail-safe: a handler reading something genuinely unreachable still falls back to ctx.<name>', () => {
-  // `props` is the parent's live object — it cannot cross the wire and nothing rebuilds it, so the site must
-  // stay inert-but-safe rather than emit a body that throws on the first click.
+  // (`props` stood here until E1.20 made it the factory's parameter.) A `new` expression is not a shape derive
+  // rebuilds, and a class instance cannot cross the wire — so nothing can produce `cart` on the client and the
+  // site must stay inert-but-safe rather than inline a body that throws on the first click.
   const { code } = compileComponent(
-    { script: counter('const inc = () => count.set(props.start);'), template: '<button on:click={{ inc }}>{{ count() }}</button>' },
+    {
+      script: counter('const cart = new Cart();\nconst inc = () => count.set(cart.total);'),
+      template: '<button on:click={{ inc }}>{{ count() }}</button>',
+    },
     { filename: 'ctr2d', resumable: true }
   );
-  assert.ok(/"w0":\s*ctx\.inc\b/.test(code), 'keep ctx.inc rather than inline a body that reads an absent `props`');
+  assert.ok(/"w0":\s*ctx\.inc\b/.test(code), 'keep ctx.inc rather than inline a body that reads an unrebuildable `cart`');
 });
 
 test('E1.11: a handler reading a plain setup local IS inlined — `derive` rebuilds the local', () => {
@@ -757,9 +761,10 @@ test('E1.13: a component `on:` whose handler cannot be inlined is REPORTED (it w
       script:
         'import { signal } from "@weave-framework/runtime";\n' +
         'import Button from "./button";\n' +
-        // (this used a setup-local helper until E1.19 made those factory locals; `props` is still unreachable)
-        'export function setup(props){ const theme = signal("light");\n' +
-        '  const toggle = () => theme.set(props.next);\n  return { theme, toggle }; }',
+        // (a setup-local helper until E1.19 made those factory locals, then `props` until E1.20 wired it in;
+        //  a `new` expression is not a shape derive can rebuild, so it is genuinely unreachable)
+        'export function setup(){ const theme = signal("light"); const store = new Store();\n' +
+        '  const toggle = () => theme.set(store.next);\n  return { theme, toggle }; }',
       template: '<div><Button on:click={{ toggle }}>x</Button></div>',
     },
     { filename: 'cev2', resumable: true }
@@ -813,4 +818,44 @@ test('E1.14: an adoptable component reports nothing', () => {
     { filename: 'ok2', resumable: true }
   );
   assert.ok(!warnings, `a fully adoptable component is silent; got ${JSON.stringify(warnings)}`);
+});
+
+/* ──────────── E1.20 — `props` reaches the resumed handlers factory ──────────── */
+
+test('E1.20: a handler reading `props` inlines — the factory takes props as a parameter', () => {
+  // `props` was the LAST root cause: a helper like `setOpened` reads it, so the helper could not be emitted, so
+  // every handler calling the helper was refused and blamed the HELPER. One cause wearing many names.
+  const { code } = compileComponent(
+    { script: counter('const inc = () => count.set(props.start);'), template: '<button on:click={{ inc }}>{{ count() }}</button>' },
+    { filename: 'p1', resumable: true }
+  );
+  assert.ok(/function handlers\(ctx, props\)/.test(code), 'the factory takes props');
+  assert.ok(/"w0":\s*\(\) => ctx\.count\.set\(props\.start\)/.test(code), '`props` stays bare — it is the factory parameter, not ctx');
+  assert.ok(!/"w0":\s*ctx\.inc\b/.test(code), 'no longer falls back');
+});
+
+test('E1.20: a HELPER reading `props` is emitted, so the handler calling it inlines too (the real cascade)', () => {
+  const { code } = compileComponent(
+    {
+      script: counter('const setOpened = (v) => count.set(props.base + v);\nconst inc = () => setOpened(1);'),
+      template: '<button on:click={{ inc }}>{{ count() }}</button>',
+    },
+    { filename: 'p2', resumable: true }
+  );
+  const factory: string = code.split('function handlers(')[1]?.split('\n}')[0] ?? '';
+  assert.ok(/const setOpened = \(v\) => ctx\.count\.set\(props\.base \+ v\)/.test(factory), `helper emitted; got:\n${factory}`);
+  assert.ok(/"w0":\s*\(\) => setOpened\(1\)/.test(factory), 'and the handler resolves through it');
+});
+
+test('E1.20: the child adopt emit hands the child its OWN props', () => {
+  const { code } = compileComponent(
+    {
+      script: 'import { signal } from "@weave-framework/runtime";\nimport Child from "./child";\nexport function setup(){ const n = signal(1); return { n }; }',
+      template: '<div><Child tone={{ n() }} /></div>',
+    },
+    { filename: 'p3', resumable: true }
+  );
+  const adoptPart: string = code.split('function adopt(')[1] ?? '';
+  assert.ok(/adoptComponent\([^;]*get tone\(\)/.test(adoptPart),
+    `the props the parent passes must reach adoptComponent; got:\n${adoptPart.slice(0, 400)}`);
 });

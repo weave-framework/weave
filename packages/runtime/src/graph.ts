@@ -74,11 +74,7 @@ export interface DroppedState {
 
 let droppedSink: DroppedState[] | null = null;
 
-/**
- * Per-instance derived-key lists, keyed by the states map so they live exactly as long as it (E1.11/E1.16).
- * {@link registerState} learns them from the compiled component; {@link finalizeStates} needs them too, and it
- * runs after the session has closed — hence a map rather than session state.
- */
+/** Per-instance derived keys, keyed by the states map: {@link finalizeStates} runs after the session closed. */
 const derivedKeys: WeakMap<object, Record<string, readonly string[]>> = new WeakMap();
 
 export function collectStates(fn: () => void, dropped?: DroppedState[]): Record<string, unknown> {
@@ -148,10 +144,9 @@ export function registerState(id: string, ctx: unknown, derived?: readonly strin
  * without it the build dies on `snapshot()` with no clue which component was at fault (dogfound on the docs
  * site). A dropped instance simply CSR-mounts on the client, and the caller reports it.
  *
- * E1.16 — a DERIVED key that turns unserializable is NOT a drop: `derive(ctx)` rebuilds it client-side, so only
- * the key leaves the snapshot and the instance still resumes. This is the normal life of an element `ref` —
- * `signal(null)` when the component registered (serializable, hence kept), a DOM node once `setRef` ran. The
- * exemption stays narrow: nothing rebuilds a plain binding, so that still drops the whole ctx (E1.9).
+ * E1.16 — a DERIVED key that turns unserializable is NOT a drop: `derive` rebuilds it, so only the key leaves
+ * the snapshot. That is an element `ref`'s normal life — `signal(null)` at register time, a DOM node once
+ * `setRef` ran. Narrow on purpose: nothing rebuilds a plain binding, so that still drops the ctx (E1.9).
  */
 export function finalizeStates(states: Record<string, unknown>, dropped?: DroppedState[]): void {
   const derived: Record<string, readonly string[]> = derivedKeys.get(states) ?? {};
@@ -324,12 +319,19 @@ export function resume(root: Element, options: ResumeOptions): ResumeApp {
   // or any adopted child. This disambiguates the per-component site prefixes, which collide across components.
   // Tables are built lazily (only on first event) + cached; a child's ctx already carries its derived computeds.
   const tables: Map<Element, () => Record<string, ResumeHandler>> = new Map();
-  const addInstance = (el: Element, factory: (c: Record<string, unknown>) => Record<string, unknown>, c: Record<string, unknown>): void => {
+  // E1.20 — a factory also takes the instance's `props`. A root has none, and `{}` is right, not a guess:
+  // `mountComponent` passes a root no props either.
+  const addInstance = (
+    el: Element,
+    factory: (c: Record<string, unknown>, p?: Record<string, unknown>) => Record<string, unknown>,
+    c: Record<string, unknown>,
+    p?: Record<string, unknown>,
+  ): void => {
     let built: Record<string, ResumeHandler> | undefined;
-    tables.set(el, () => (built ??= factory(c) as Record<string, ResumeHandler>));
+    tables.set(el, () => (built ??= factory(c, p ?? {}) as Record<string, ResumeHandler>));
   };
   if (options.handlers) addInstance(root, options.handlers, ctx);
-  for (const inst of instances) addInstance(inst.root, inst.handlers, inst.ctx);
+  for (const inst of instances) addInstance(inst.root, inst.handlers, inst.ctx, inst.props);
 
   const resolve = (id: string, el: Element): ResumeHandler | undefined => {
     let node: Element | null = el;

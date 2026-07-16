@@ -168,6 +168,10 @@ function resumableSetup(script: string, scope: string[]): {
   // They stay OUT of `sc`: a reference must rewrite to the bare factory local, not to `ctx.<name>`.
   // Fixed point, because helpers may be mutually recursive — declaration order alone would refuse one.
   const emittable: Set<string> = new Set(resolvable);
+  // E1.20 — `props` resolves inside the factory: it is its second parameter, fed by the parent's adopt emit
+  // (a root gets `{}`, which is what `mountComponent` gives it too). It stays OUT of `sc`, so a reference
+  // rewrites to the bare parameter rather than `ctx.props`.
+  emittable.add('props');
   for (const name of found.handlers.keys()) emittable.add(name); // assume all, then withdraw what cannot resolve
   for (let changed = true; changed; ) {
     changed = false;

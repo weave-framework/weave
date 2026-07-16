@@ -231,8 +231,12 @@ export function compileTemplateAst(ast: TemplateNode[], options: CompileOptions 
   // (E1.13, handled during the walk) and a DOM site report through ONE list.
   // E1.19 — setup's helper functions, re-declared ahead of the site map so an inlined body can call them.
   const factoryLocals: string = [...(options.resumableLocals ?? [])].map(([n, code]) => `  const ${n} = ${code};\n`).join('');
+  // E1.20 — the factory takes `props` too. A handler reading `props` was the LAST root cause: it made a helper
+  // like `setOpened` unemittable, so every handler CALLING that helper was refused and blamed the helper. The
+  // parent's adopt walk already builds the child's props (getters over the parent's resumed ctx) and hands them
+  // to `adoptComponent`; a root has none, so it gets `{}` — which is exactly right, `mountComponent` passes none.
   const handlersFn: string = gen.resumableSites.length
-    ? `function handlers(ctx) {\n${factoryLocals}  return { ${gen.resumableSites.map((s) => `${q(s.ref)}: ${inlineHandler(gen, s.code)}`).join(', ')} };\n}`
+    ? `function handlers(ctx, props) {\n${factoryLocals}  return { ${gen.resumableSites.map((s) => `${q(s.ref)}: ${inlineHandler(gen, s.code)}`).join(', ')} };\n}`
     : '';
 
   // E1.6 — rebuild each `computed` over the resumed ctx. Emitted in declaration order, so a computed that
@@ -1002,10 +1006,12 @@ function compileFragment(
         ? `{ ${eventProps.map((e) => `${propKey(e.key)}: ${inlineHandler(gen, e.code)}`).join(', ')} }`
         : '';
       // E1.17 — the child's slots must reach its adopt walk (its `<slot>`s replay through these very fns).
-      // `events` sits between, so it is filled in with `undefined` when there are none.
-      const evArg: string = evObj || slots.length ? `, ${evObj || 'undefined'}` : '';
-      const slotArg: string = slots.length ? `, ${slotsObj}` : '';
-      stmts.push(`${gen.Ha('adoptComponent')}(${anchorVar}, ${q(cid)}, ${gen.Comp(node.tag)}, _st, (_a) => ${adoptMount}${evArg}${slotArg});`);
+      // E1.20 — and its own props, so ITS handlers factory can resolve `props`. Trailing args are positional,
+      // so an earlier one that is absent is filled in with `undefined`.
+      const tail: string[] = [evObj || 'undefined', slots.length ? slotsObj : 'undefined', propsObj];
+      while (tail.length && tail[tail.length - 1] === 'undefined') tail.pop();
+      const tailArgs: string = tail.length ? `, ${tail.join(', ')}` : '';
+      stmts.push(`${gen.Ha('adoptComponent')}(${anchorVar}, ${q(cid)}, ${gen.Comp(node.tag)}, _st, (_a) => ${adoptMount}${tailArgs});`);
       return;
     }
 

@@ -179,7 +179,7 @@ test('E1.1: resumable module emits a handlers(ctx) factory, attaches + exports i
     scope: ['count', 'inc'],
     resumable: true,
   });
-  assert.ok(code.includes('function handlers(ctx)'), 'emits a handlers factory');
+  assert.ok(code.includes('function handlers(ctx, props)'), 'emits a handlers factory (props is its E1.20 second parameter)');
   assert.ok(code.includes('render.handlers = handlers'), 'attaches the factory to render');
   assert.ok(code.includes('export { handlers }'), 'names it as an export');
   assert.ok(code.includes('export default render'), 'default export stays render');
@@ -191,7 +191,7 @@ test('E1.1: a block-local (@for row) handler is NOT hoisted into the root factor
     { mode: 'module', scope: ['root', 'items', 'pick'], resumable: true }
   );
   // exactly ONE entry in the factory (the root button); the row handler stays in-render only
-  const body: string = code.slice(code.indexOf('function handlers(ctx)'));
+  const body: string = code.slice(code.indexOf('function handlers(ctx, props)'));
   const entries: number = (body.slice(0, body.indexOf('}')).match(/"w\d+":/g) ?? []).length;
   assert.equal(entries, 1, 'only the root-fragment handler is in the factory (row handler excluded)');
 });
@@ -640,6 +640,59 @@ test('E1.2c-6: adopt resumes a static CHILD component in place — child setup n
   assert.equal(div.querySelector('b')!.textContent, 'x', 'child <b> adopted with its server value');
   (app.states.c0 as { label: Signal<string> }).label.set('LBL');
   assert.equal(div.querySelector('b')!.textContent, 'LBL', 'the resumed CHILD component is reactive in place — nested resume works');
+  app.dispose();
+});
+
+/* ──────────── E1.20: props reach a resumed CHILD's handlers ──────────── */
+
+test('E1.20: a resumed CHILD click reads its `props` — live from the parent`s resumed ctx, setup never re-runs', () => {
+  // The last root cause, end to end: the child's handler reads `props.step`, which only exists because the
+  // PARENT's adopt walk built the props object and handed it to adoptComponent. And it must be LIVE — the prop
+  // is a getter over the parent's resumed signal, so changing the parent must change what the child's click does.
+  const childCode: string = compileTemplate('<b on:click={{ bump }}>{{ n() }}</b>', {
+    mode: 'function',
+    scope: ['n', 'bump'],
+    resumable: true,
+    resumableHandlers: new Map([['bump', '() => ctx.n.set((v) => v + props.step)']]),
+  }).code;
+  const childRender = new Function('rt', '_c', childCode.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;'))(rt, {}) as
+    ((ctx: unknown, slots?: unknown) => Node) & { adopt?: AdoptFn; handlers?: (c: Record<string, unknown>, p?: Record<string, unknown>) => Record<string, ResumeHandler> };
+  let childSetups: number = 0;
+  const Child = dom.defineComponent(childRender as never, () => { childSetups++; return { n: signal(1), bump: () => {} }; }) as
+    dom.Component & { adopt?: AdoptFn; handlers?: unknown };
+  Child.adopt = childRender.adopt;
+  Child.handlers = childRender.handlers;
+
+  const parentCode: string = compileTemplate('<div><Child step={{ step() }} /></div>', {
+    mode: 'function', scope: ['step'], resumable: true,
+  }).code;
+  const parentRender = new Function('rt', '_c', parentCode.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;'))(rt, { Child }) as
+    ((ctx: unknown, slots?: unknown) => Element) & { adopt?: AdoptFn };
+
+  // ── server ──
+  const step: Signal<number> = signal(10);
+  const box: HTMLElement = host();
+  // BOTH sessions, as `renderPage` runs them: collectStates captures each instance's ctx, collectResumable
+  // makes the `on:` sites stamp their `data-won-*` markers. Without the latter there is nothing to click.
+  const states = collectStates(() => { box.appendChild(serverRender(() => parentRender({ step }, {})) as Node); });
+  states[ROOT_ID] = { step };
+  const wire = snapshot(states);
+  const serverHtml: string = (box.firstElementChild as HTMLElement).outerHTML;
+
+  // ── client ──
+  const client: HTMLElement = host();
+  client.innerHTML = serverHtml;
+  const div: HTMLElement = client.querySelector('div')!;
+  const app = resume(div, { snapshot: wire, adopt: parentRender.adopt });
+  assert.equal(childSetups, 1, 'the child adopted — its setup did not re-run');
+
+  const b: HTMLElement = div.querySelector('b')!;
+  b.click();
+  assert.equal(b.textContent, '11', 'the click read `props.step` (1 + 10) — props reached the resumed factory');
+
+  (app.ctx.step as Signal<number>).set(100);
+  b.click();
+  assert.equal(b.textContent, '111', 'and the prop is LIVE: it is a getter over the parent`s resumed signal');
   app.dispose();
 });
 

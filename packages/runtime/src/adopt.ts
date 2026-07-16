@@ -158,8 +158,10 @@ function registerAdopted(
  */
 export interface ResumedInstance {
   root: Element;
-  handlers: (ctx: Record<string, unknown>) => Record<string, unknown>;
+  handlers: (ctx: Record<string, unknown>, props?: Record<string, unknown>) => Record<string, unknown>;
   ctx: Record<string, unknown>;
+  /** E1.20 — the props its parent passes it, so a handler reading `props` resolves against the live object. */
+  props?: Record<string, unknown>;
 }
 
 // A collection session active during `resume`'s adopt walk: each adopted resumable child pushes its instance
@@ -197,6 +199,7 @@ export function adoptComponent(
   mount: (adopt?: AdoptTarget) => Node | null,
   events?: Record<string, EventListener>,
   slots?: Record<string, () => Node>,
+  props?: Record<string, unknown>,
 ): void {
   const end: Comment = blockEndOf(start);
   const ctx: unknown = states && states[id];
@@ -228,7 +231,7 @@ export function adoptComponent(
     }
     // E1.8 — register the child so its OWN events resolve against its ctx (root is an Element here).
     if (instanceCollector && Comp.handlers && root instanceof Element) {
-      instanceCollector.push({ root, handlers: Comp.handlers, ctx: ctx as Record<string, unknown> });
+      instanceCollector.push({ root, handlers: Comp.handlers, ctx: ctx as Record<string, unknown>, props });
     }
     return;
   }
