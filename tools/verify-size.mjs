@@ -44,8 +44,9 @@ const BUDGETS = [
   // 1536 → 2560 → 3072 → 3584 (deliberate, forward-looking so each adopt slice doesn't trip a micro-bump;
   // E1.2c-6 added adoptComponent for nested component resume) → 4096 (E1.8 collectInstances: an adopted child
   // registers its root + handler factory so its OWN events resume). The SPA core (20.9 KB) is untouched; this
-  // entry never ships to a plain client SPA.
-  { label: 'runtime/adopt (E1.2a/c DOM adopt)', files: ['packages/runtime/dist/adopt.js'], budget: 4_096 },
+  // entry never ships to a plain client SPA. → 4608 (E1.12 self-adopting components + E1.13 re-attaching a
+  // parent's component-level `on:` handlers, which defineComponent only forwards on the CREATE path).
+  { label: 'runtime/adopt (E1.2a/c DOM adopt)', files: ['packages/runtime/dist/adopt.js'], budget: 4_608 },
   // runtime/graph (E0.3/E1.2): resume entry — signal codec + snapshot/resume + resumePage (SSG client entry).
   // Budget raised 2048 → 2560 (E1.2 resumePage + SNAPSHOT_ID) → 3072 (E1.2c-6 per-instance state collection:
   // collectStates / registerState / ROOT_ID) → 3584 (E1.2c-6 resume states-map handling + ResumeApp.states)

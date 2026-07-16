@@ -698,3 +698,42 @@ test('E1.5: a handler using a RETURNED signal the template never reads still inl
   assert.ok(/ctx\.scaled = computed\(\(\) => ctx\.count\(\) \* 2\)/.test(code), 'scaled derives against ctx.count');
   assert.ok(!warnings, `no warning — everything resolves; got ${JSON.stringify(warnings)}`);
 });
+
+/* ──────────── E1.13 — a component-level `on:` resumes ──────────── */
+
+test('E1.13: `<Button on:click={{ fn }}>` re-attaches on adopt — a component event is not a DOM resume site', () => {
+  const { code } = compileComponent(
+    {
+      script:
+        'import { signal } from "@weave-framework/runtime";\n' +
+        'import Button from "./button";\n' +
+        'export function setup(){ const theme = signal("light");\n' +
+        '  const toggle = () => theme.set("dark");\n  return { theme, toggle }; }',
+      template: '<div><Button on:click={{ toggle }}>x</Button></div>',
+    },
+    { filename: 'cev', resumable: true }
+  );
+  // CREATE: unchanged — the handler rides as an onClick prop that defineComponent forwards to the child root.
+  assert.ok(/onClick:\s*ctx\.toggle/.test(code), 'create still forwards the handler as a prop');
+  // ADOPT: defineComponent's forwarding never runs, so adoptComponent re-attaches it — with the INLINED body,
+  // since `ctx.toggle` is undefined on a resumed client (the docs theme button was dead on exactly this).
+  const adoptPart: string = code.split('function adopt(')[1] ?? '';
+  assert.ok(/adoptComponent\([^;]*\{ onClick: \(\) => ctx\.theme\.set\("dark"\) \}\)/.test(adoptPart),
+    `adopt hands the inlined handler to adoptComponent; got:\n${adoptPart.slice(0, 400)}`);
+});
+
+test('E1.13: a component `on:` whose handler cannot be inlined is REPORTED (it would be silently dead)', () => {
+  const { warnings } = compileComponent(
+    {
+      script:
+        'import { signal } from "@weave-framework/runtime";\n' +
+        'import Button from "./button";\n' +
+        'export function setup(){ const theme = signal("light"); const helper = () => theme.set("dark");\n' +
+        '  const toggle = () => helper();\n  return { theme, toggle }; }',
+      template: '<div><Button on:click={{ toggle }}>x</Button></div>',
+    },
+    { filename: 'cev2', resumable: true }
+  );
+  assert.ok(warnings && warnings.some((w) => /handler `toggle`/.test(w) && /will not work after resume/.test(w)),
+    `a dead component-event handler must warn; got ${JSON.stringify(warnings)}`);
+});

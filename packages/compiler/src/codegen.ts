@@ -72,6 +72,10 @@ export interface CompileResult {
 class Gen {
   used: Set<string> = new Set<string>(); // @weave-framework/runtime/dom helpers
   usedCore: Set<string> = new Set<string>(); // @weave-framework/runtime primitives (computed, …)
+  /** E1.5 — `name → inlined setup body`; a bare `ctx.<name>` handler ref substitutes through it. */
+  inlined?: ReadonlyMap<string, string>;
+  /** E1.7 — handler names still emitted as a bare `ctx.<name>`, i.e. DEAD after resume. */
+  deadHandlers: string[] = [];
   usedResume: Set<string> = new Set<string>(); // @weave-framework/runtime/resume helpers (resumable target)
   usedAdopt: Set<string> = new Set<string>(); // @weave-framework/runtime/adopt helpers (resumable target)
   usedGraph: Set<string> = new Set<string>(); // @weave-framework/runtime/graph helpers (resumable target)
@@ -178,6 +182,7 @@ export function compileTemplateAst(ast: TemplateNode[], options: CompileOptions 
   // Register a PLAIN copy of the component's OWN bindings (`{...ctx}` — the signals setup returned): the ctx
   // itself has props on its prototype (not serializable, and reconnected by the parent), and `$wid` is a prop
   // too, so both are naturally excluded. Reactive props / computeds inside a resumed child are a known gap.
+  gen.inlined = options.resumableHandlers;
   const renderPreamble: string = gen.resumable
     ? `if (ctx.$wid !== undefined) ${gen.Hg('registerState')}(ctx.$wid, { ...ctx }, ${JSON.stringify([...(options.resumableDerived?.keys() ?? [])])});`
     : '';
@@ -193,21 +198,11 @@ export function compileTemplateAst(ast: TemplateNode[], options: CompileOptions 
   // on the client: a function can't cross the snapshot (registerState drops it). When the caller supplied the
   // handler's inlined body, substitute it — the factory then closes over the resumed signals exactly as an
   // inline handler does. Any site whose code isn't a bare `ctx.<name>` (already inline) is untouched.
-  const inlined: ReadonlyMap<string, string> | undefined = options.resumableHandlers;
-  // Sites left as a bare `ctx.<name>` are the ones that will be DEAD after resume — whatever the cause
-  // (not extractable, not inlinable, reassigned). Reported so the caller can warn about the real defect
-  // rather than guessing from the extraction alone.
-  const deadHandlers: string[] = [];
-  const siteCode = (code: string): string => {
-    const bare: RegExpExecArray | null = /^ctx\.([A-Za-z_$][\w$]*)$/.exec(code);
-    if (!bare) return code; // already an inline expression — resumes as written
-    const body: string | undefined = inlined?.get(bare[1]);
-    if (body) return body;
-    if (!deadHandlers.includes(bare[1])) deadHandlers.push(bare[1]);
-    return code;
-  };
+  // Sites left as a bare `ctx.<name>` are the ones that will be DEAD after resume — whatever the cause (not
+  // extractable, not inlinable, reassigned). `inlineHandler` records them on `gen` so a component-level `on:`
+  // (E1.13, handled during the walk) and a DOM site report through ONE list.
   const handlersFn: string = gen.resumableSites.length
-    ? `function handlers(ctx) {\n  return { ${gen.resumableSites.map((s) => `${q(s.ref)}: ${siteCode(s.code)}`).join(', ')} };\n}`
+    ? `function handlers(ctx) {\n  return { ${gen.resumableSites.map((s) => `${q(s.ref)}: ${inlineHandler(gen, s.code)}`).join(', ')} };\n}`
     : '';
 
   // E1.6 — rebuild each `computed` over the resumed ctx. Emitted in declaration order, so a computed that
@@ -239,7 +234,7 @@ export function compileTemplateAst(ast: TemplateNode[], options: CompileOptions 
     if (deriveFn) parts.push(deriveFn, 'render.derive = derive;');
     if (adoptFn) parts.push(adoptFn, 'render.adopt = adopt;');
     parts.push('return render(ctx, {});'); // tail unchanged → the function-mode `render` strip still applies
-    return { code: parts.join('\n'), components, deadHandlers };
+    return { code: parts.join('\n'), components, deadHandlers: gen.deadHandlers };
   }
 
   const domImport: string = `import { ${[...gen.used].sort().join(', ')} } from ${JSON.stringify(runtimeImport)};`;
@@ -274,11 +269,11 @@ export function compileTemplateAst(ast: TemplateNode[], options: CompileOptions 
       ...(adoptFn ? [adoptFn, 'render.adopt = adopt;', 'export { adopt };'] : []),
       'export default render;',
     ].join('\n');
-    return { code, components, deadHandlers };
+    return { code, components, deadHandlers: gen.deadHandlers };
   }
 
   const code: string = [imports, ...gen.templates, `export default ${render}`].join('\n');
-  return { code, components, deadHandlers };
+  return { code, components, deadHandlers: gen.deadHandlers };
 }
 
 /**
@@ -866,6 +861,7 @@ function compileFragment(
     // an `attr`, consumed inside the child) must not be auto-forwarded (double-invoked) too.
     const props: string[] = [];
     const eventKeys: string[] = [];
+    const eventProps: Array<{ key: string; code: string }> = []; // E1.13 — re-attached on the adopt path
     const uses: UseAttr[] = []; // `use:` actions forwarded to the mounted component's root element
     for (const attr of node.attrs) {
       switch (attr.type) {
@@ -880,8 +876,10 @@ function compileFragment(
           break;
         case 'event': {
           const k: string = onProp(attr.name);
-          props.push(`${propKey(k)}: ${rewrite(attr.expr, sc).code}`);
+          const handlerCode: string = rewrite(attr.expr, sc).code;
+          props.push(`${propKey(k)}: ${handlerCode}`);
           eventKeys.push(k);
+          eventProps.push({ key: k, code: handlerCode });
           break;
         }
         case 'bind':
@@ -951,7 +949,16 @@ function compileFragment(
       // reaches it, without the router package importing the resume entries (invariant I3).
       const adoptProps: string = [...props, `'$adopt': _a`].join(', ');
       const adoptMount: string = `${gen.Comp(node.tag)}({ ${adoptProps} }, ${slotsObj})`;
-      stmts.push(`${gen.Ha('adoptComponent')}(${anchorVar}, ${q(cid)}, ${gen.Comp(node.tag)}, _st, (_a) => ${adoptMount});`);
+      // E1.13 — a component-level `on:` (`<Button on:click={{ toggleTheme }}>`) is NOT a DOM resume site: it
+      // compiles to a forwarded `onClick` PROP that `defineComponent` attaches to the child's root while
+      // CREATING it. Adopt never runs that path, so the listener would simply be missing (silently — the docs
+      // dogfood found the theme button dead). Hand the handlers to `adoptComponent` and it re-attaches them to
+      // the adopted root. Inlined, because `ctx.<name>` is undefined on a resumed client.
+      const evObj: string = eventProps.length
+        ? `{ ${eventProps.map((e) => `${propKey(e.key)}: ${inlineHandler(gen, e.code)}`).join(', ')} }`
+        : '';
+      const evArg: string = evObj ? `, ${evObj}` : '';
+      stmts.push(`${gen.Ha('adoptComponent')}(${anchorVar}, ${q(cid)}, ${gen.Comp(node.tag)}, _st, (_a) => ${adoptMount}${evArg});`);
       return;
     }
 
@@ -1198,6 +1205,20 @@ function q(s: string): string {
 /** Object-literal key: bare when a valid identifier, quoted otherwise. */
 function propKey(name: string): string {
   return /^[A-Za-z_$][\w$]*$/.test(name) ? name : JSON.stringify(name);
+}
+
+/**
+ * Substitute a bare `ctx.<name>` handler reference with the inlined body of that `setup` handler (E1.5).
+ * `ctx.<name>` is `undefined` on a resumed client — functions never cross the snapshot — so a site left as-is
+ * is DEAD; record it (E1.7) so the caller can warn. An already-inline expression is returned untouched.
+ */
+function inlineHandler(gen: Gen, code: string): string {
+  const bare: RegExpExecArray | null = /^ctx\.([A-Za-z_$][\w$]*)$/.exec(code);
+  if (!bare) return code;
+  const body: string | undefined = gen.inlined?.get(bare[1]);
+  if (body) return body;
+  if (!gen.deadHandlers.includes(bare[1])) gen.deadHandlers.push(bare[1]);
+  return code;
 }
 
 /** `on:select` → `onSelect` (the prop the child receives). */

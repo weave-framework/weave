@@ -195,6 +195,7 @@ export function adoptComponent(
   Comp: AdoptableComponent,
   states: Record<string, unknown> | undefined,
   mount: (adopt?: AdoptTarget) => Node | null,
+  events?: Record<string, EventListener>,
 ): void {
   const end: Comment = blockEndOf(start);
   const ctx: unknown = states && states[id];
@@ -213,6 +214,15 @@ export function adoptComponent(
     // Rebuild the child's computeds onto its resumed ctx BEFORE adopting — its bindings call them (E1.6).
     if (Comp.derive) Comp.derive(ctx as Record<string, unknown>);
     Comp.adopt(root, ctx as Record<string, unknown>, {}, states as Record<string, unknown>);
+    // E1.13 — re-attach the PARENT's component-level `on:` handlers. On the create path `defineComponent`
+    // forwards them onto the child's root; adopt never runs that path, so without this they silently vanish.
+    // Mirror its rule: a key the child itself consumed (a same-named binding in its ctx) is the child's own.
+    if (events && root instanceof Element) {
+      for (const key of Object.keys(events)) {
+        if (ctx && key in (ctx as Record<string, unknown>)) continue;
+        root.addEventListener(key.slice(2).toLowerCase(), events[key]);
+      }
+    }
     // E1.8 — register the child so its OWN events resolve against its ctx (root is an Element here).
     if (instanceCollector && Comp.handlers && root instanceof Element) {
       instanceCollector.push({ root, handlers: Comp.handlers, ctx: ctx as Record<string, unknown> });
