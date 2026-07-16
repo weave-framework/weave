@@ -22,6 +22,7 @@
     "verify:server": "node packages/runtime/test/server.smoke.mjs",
     "verify:prerender": "node packages/cli/test/prerender.smoke.mjs",
     "verify:ssg": "node packages/cli/test/ssg.smoke.mjs",
+    "verify:resume": "node tools/verify-resume.mjs",
     "verify:router-ssr": "node packages/router/test/ssr.smoke.mjs",
     "verify:ui-ssr": "node packages/ui/test/ssr.smoke.mjs",
     "verify:dev-proxy": "node tools/verify-dev-proxy.mjs",
