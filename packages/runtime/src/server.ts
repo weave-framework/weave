@@ -18,7 +18,7 @@
  */
 import { installServerDom, serializeNode, type SNode } from './server-dom.js';
 import { createOwner, runInOwner, disposeOwner, type Owner } from './reactive.js';
-import { snapshot, collectStates, ROOT_ID, SNAPSHOT_ID, type DroppedState } from './graph.js';
+import { snapshot, collectStates, finalizeStates, ROOT_ID, SNAPSHOT_ID, type DroppedState } from './graph.js';
 import { collectResumable } from './resume.js';
 import { scriptSafe, type PageArtifact } from './document.js';
 import type { Component } from './dom.js';
@@ -78,6 +78,9 @@ export function renderPage(
     // compiled `handlers(ctx)` factory over the resumed ctx.
     html = collectResumable(() => renderComponent(component, props)).node;
   }, dropped);
+  // A signal can be reassigned AFTER its component registered — re-check before encoding, or the build dies
+  // inside `snapshot()` with no clue which component was at fault (E1.9).
+  if (options.resumable) finalizeStates(states, dropped);
   const wire: unknown = options.resumable ? snapshot(states) : snapshot(options.state ?? {});
   const json: string = scriptSafe(JSON.stringify(wire));
   const title: string | undefined = doc?.title || undefined;

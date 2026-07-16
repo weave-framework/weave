@@ -54,8 +54,10 @@ const BUDGETS = [
   // 20.9 KB flat) → 4608 (E1.9 graceful degradation: registerState probes each binding and drops an instance
   // that cannot be serialized — a router/store/class instance — instead of FAILING THE BUILD; plus the
   // resumePage CSR `fallback` and the DroppedState diagnostics the build reports).
-  // Deliberate: E1.5–E1.9 turned resume from "flat text only" into real components.
-  { label: 'runtime/graph (E0.3/E1.2 resume)', files: ['packages/runtime/dist/graph.js'], budget: 4_608 },
+  // → 5120 (E1.9b `finalizeStates`: re-probe every instance AFTER the render, since a signal can be reassigned
+  // between registerState and the snapshot — without it the docs build died inside `snapshot()` naming nothing).
+  // Deliberate: E1.5–E1.12 turned resume from "flat text only" into real components + routed pages.
+  { label: 'runtime/graph (E0.3/E1.2 resume)', files: ['packages/runtime/dist/graph.js'], budget: 5_120 },
   // runtime/server (E0.4): headless render — the in-house server DOM + parser + serializer + renderToString.
   // Server-only, its own line — 0 bytes for a client SPA (I3). Baseline 5.8 KB; budget raised 7168 → 7680
   // (E1.3d SSG document-<title> capture) → 8192 (E1.4 the islands capture: `renderPage({ resumable })` wraps

@@ -122,6 +122,20 @@ function resumableSetup(script: string, scope: string[]): {
   // computed comes BACK via `derive`, so once we prove one derivable it becomes resolvable for the rest.
   const resolvable: Set<string> = new Set(ctxNames);
 
+  // A RETURNED name that setup never declared but that resolves at module scope — `import { router } from
+  // './router'; … return { router }`, a module-level singleton handed straight out (the docs shell's shape,
+  // and the reason its root was still dropped). The client has it already, so derive it as ITSELF: no rewrite,
+  // it is a module reference, not a ctx one. Same for an imported helper function (dropped from the snapshot
+  // like any function, then rebuilt here). First, so a computed or handler below may read it.
+  if (returned) {
+    for (const n of returned) {
+      if (found.handlers.has(n) || found.computeds.has(n) || !imports.has(n)) continue;
+      computeds.set(n, n);
+      resolvable.add(n);
+      sc.set(n, { kind: 'ctx' });
+    }
+  }
+
   // Computeds first, in declaration order: each may read the signals plus any earlier computed. `derive`
   // emits them in this same order, so the assignment order matches the dependency order.
   for (const [name, derivable] of found.computeds) {

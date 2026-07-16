@@ -128,6 +128,31 @@ export function registerState(id: string, ctx: unknown, derived?: readonly strin
 }
 
 /**
+ * Re-check every collected instance once the render is OVER, dropping any that can no longer serialize (E1.9).
+ *
+ * {@link registerState} probes a binding the moment the component registers it — but the render continues after
+ * that, and a signal can be REASSIGNED before the snapshot is taken (a later effect storing a class instance,
+ * say). The value the snapshot actually encodes is the one at the END, so the decisive check belongs here;
+ * without it the build dies on `snapshot()` with no clue which component was at fault (dogfound on the docs
+ * site). A dropped instance simply CSR-mounts on the client, and the caller reports it.
+ */
+export function finalizeStates(states: Record<string, unknown>, dropped?: DroppedState[]): void {
+  for (const id of Object.keys(states)) {
+    const ctx: Record<string, unknown> = states[id] as Record<string, unknown>;
+    if (ctx == null || typeof ctx !== 'object') continue;
+    for (const key of Object.keys(ctx)) {
+      try {
+        serialize(ctx[key]);
+      } catch (e) {
+        if (dropped) dropped.push({ id, key, reason: (e as Error).message });
+        delete states[id];
+        break;
+      }
+    }
+  }
+}
+
+/**
  * A factory binding handler site-refs to handlers over the RESUMED ctx. In the full pipeline the compiler
  * emits this (extracted from the resumable render); E0.3 hand-authors it, which is what pins the contract.
  */

@@ -172,15 +172,47 @@ export interface SetupBindings {
 export const COMPUTED_CALLEE: string = 'computed';
 
 /**
- * Names the component MODULE imports (`import { createRouter, route } from '…'`, `import Home from './home'`).
+ * Names that resolve at MODULE scope — imports plus the module's own top-level declarations.
  *
- * A `derive` emitted into that same module can reference them directly, so a binding built purely from imports
- * — `const router = createRouter([route('/', { component: Home })])` — is reconstructible client-side even
- * though the value itself could never cross the wire. Default/namespace/named/aliased forms are all collected;
- * `import 'x'` (side-effect only) contributes nothing.
+ * A `derive` emitted into that module can reference any of them, so a binding built from them — `const router =
+ * createRouter([route('/', { component: Home })])`, or a computed reading a module-level `const DEFAULTS` — is
+ * reconstructible client-side even when the value itself could never cross the wire. Import forms
+ * (default/named/aliased/namespace) and top-level `const`/`let`/`var`/`function`/`class` are collected;
+ * `import 'x'` (side-effect only) contributes nothing. A `setup`-local shadowing one of these is handled by the
+ * caller (it passes its own resolvable set first) — over-collecting here would only ever ACCEPT a binding, and
+ * the dogfood showed the real risk is the opposite: rejecting good code because a module const looked unknown.
  */
 export function extractModuleImports(script: string): Set<string> {
   const out: Set<string> = new Set();
+  // Top-level declarations — DEPTH-AWARE, not a `^const` regex: a `setup` body's own `const` can sit at
+  // column 0 (nothing forces indentation), and counting it as module scope would wrongly accept a handler
+  // that calls a setup-local helper. Only depth 0 is the module.
+  const KW: string[] = ['const', 'let', 'var', 'function', 'class'];
+  let i: number = 0;
+  let depth: number = 0;
+  while (i < script.length) {
+    const op: number = skipOpaque(script, i);
+    if (op > i) {
+      i = op;
+      continue;
+    }
+    const c: string = script[i];
+    if (c === '(' || c === '[' || c === '{') { depth++; i++; continue; }
+    if (c === ')' || c === ']' || c === '}') { depth--; i++; continue; }
+    if (depth === 0 && ID_START.test(c) && isTokenStart(script, i)) {
+      for (const kw of KW) {
+        if (!startsWithWord(script, i, kw)) continue;
+        let k: number = skipWs(script, i + kw.length);
+        if (script[k] === '*') k = skipWs(script, k + 1); // function*
+        const name: string = readIdent(script, k);
+        if (name) out.add(name);
+        break;
+      }
+      i = skipWord(script, i);
+      continue;
+    }
+    i++;
+  }
   const re: RegExp = /import\s+([^;'"]*?)\s*from\s*['"][^'"]+['"]/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(script)) !== null) {
@@ -335,7 +367,10 @@ export function extractSetupBindings(script: string): SetupBindings {
       if (parsed) {
         const handler: SetupHandler | null = asFunctionExpr(parsed.init);
         if (handler) out.set(parsed.name, handler);
-        else if (parsed.init) computeds.set(parsed.name, { source: parsed.init });
+        else {
+          const d: SetupDerived | null = asDerivedInit(parsed.init);
+          if (d) computeds.set(parsed.name, d);
+        }
         i = parsed.end;
         continue;
       }
@@ -405,6 +440,70 @@ export function unresolvedRefs(
 }
 
 /* ──────────── internals ──────────── */
+
+/**
+ * A `setup` initializer we can rebuild client-side, or null.
+ *
+ * Deliberately NARROW — only two shapes, because everything else is a guess:
+ *  - a CALL: `computed(…)` · `createRouter([…])` · `signal<T>(null)`. TYPE ARGUMENTS ARE DROPPED: they are
+ *    erased at runtime anyway, and keeping them would (a) feed type NAMES to the free-identifier check, which
+ *    reads them as values and rejects the binding (`computed<Element|null>(…)` "reads `Element`"), and
+ *    (b) leave `<`/`,` in the emit for a scanner that cannot tell a generic from a comparison.
+ *  - a simple LITERAL: `2`, `'x'`, `true` — deterministic, so rebuilding is exact.
+ *
+ * Anything else (`new Cart()`, `a.b()`, a ternary, an object literal) is NOT derived: the instance then just
+ * falls back to CSR if its value can't serialize (E1.9), which is honest rather than a wrong rebuild.
+ * Both bugs above were found by the docs dogfood — every real component is typed, and no unit test was.
+ */
+function asDerivedInit(init: string): SetupDerived | null {
+  const src: string = init.trim();
+  if (!src) return null;
+  if (/^(-?\d+(\.\d+)?|true|false|null|'[^'\\]*'|"[^"\\]*")$/.test(src)) return { source: src };
+  if (!ID_START.test(src[0])) return null;
+  let i: number = 1;
+  while (i < src.length && ID_CHAR.test(src[i])) i++;
+  const callee: string = src.slice(0, i);
+  let j: number = skipWs(src, i);
+  if (src[j] === '<') {
+    const gt: number = skipTypeArgs(src, j);
+    if (gt < 0) return null;
+    j = skipWs(src, gt);
+  }
+  if (src[j] !== '(') return null;
+  const rp: number = matchDelimited(src, j, '(', ')');
+  if (rp !== src.length - 1) return null; // the whole initializer must BE the call (not `f(…).x`)
+  return { source: `${callee}(${src.slice(j + 1, rp)})` };
+}
+
+/** Past a `<…>` type-argument list starting at `i`; -1 if unbalanced. `=>` is one token, not a closing `>`. */
+function skipTypeArgs(src: string, i: number): number {
+  let depth: number = 0;
+  const n: number = src.length;
+  while (i < n) {
+    const op: number = skipOpaque(src, i);
+    if (op > i) {
+      i = op;
+      continue;
+    }
+    const c: string = src[i];
+    if (c === '=' && src[i + 1] === '>') {
+      i += 2; // a function type inside the args (`signal<() => void>`)
+      continue;
+    }
+    if (c === '<') depth++;
+    else if (c === '>') {
+      depth--;
+      if (depth === 0) return i + 1;
+    } else if (c === '(' || c === '[' || c === '{') {
+      const close: number = matchDelimited(src, i, c, c === '(' ? ')' : c === '[' ? ']' : '}');
+      if (close < 0) return -1;
+      i = close + 1;
+      continue;
+    } else if (c === ';') return -1;
+    i++;
+  }
+  return -1;
+}
 
 /** Is `i` the start of a token (not the middle of an identifier)? */
 function isTokenStart(src: string, i: number): boolean {
