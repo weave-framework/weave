@@ -614,6 +614,15 @@ function lastNonWs(s: string): string {
 function skipTypeRef(src: string, i: number): number {
   const n: number = src.length;
   for (;;) {
+    // A FUNCTION type — `(node: N) => number`. Jump the parameter list, then the arrow, then its RETURN type.
+    if (src[i] === '(') {
+      const close: number = matchDelimited(src, i, '(', ')');
+      if (close < 0) return i;
+      const k: number = skipWs(src, close + 1);
+      if (!src.startsWith('=>', k)) return close + 1; // a parenthesised type, not a function one
+      i = skipWs(src, k + 2);
+      continue;
+    }
     while (i < n && (ID_CHAR.test(src[i]) || src[i] === '.')) i++;
     let k: number = i;
     if (src[k] === '<') {
@@ -734,6 +743,12 @@ function endOfAnnotation(src: string, i: number, stops: readonly string[]): numb
     const op: number = skipOpaque(src, i);
     if (op > i) {
       i = op;
+      continue;
+    }
+    // A FUNCTION TYPE has its own `=>`, and `=` is a stop — `const f: (node: N) => number = …` ended at the
+    // arrow, so `number` was left behind as a "reference". Only stop at `=>` if a caller asked for it.
+    if (src.startsWith('=>', i) && !stops.includes('=>')) {
+      i += 2;
       continue;
     }
     for (const s of stops) if (src.startsWith(s, i)) return i;

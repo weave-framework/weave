@@ -581,3 +581,20 @@ test('E1.42: a comma inside TYPE ARGUMENTS does not end the initializer', () => 
   assert.deepEqual(unresolvedRefs(f.computeds.get('optionEls')!.source, new Set(), [], 'optionEls'), [],
     'with no type names left to blame');
 });
+
+test('E1.43: a FUNCTION-TYPE annotation and a function-type `as` cast are fully skipped', () => {
+  // The real <Tree>: `const getLevel: (node: N) => number = props.getLevel as (node: N) => number;`. Two
+  // separate holes, both leaking `number`: endOfAnnotation stopped at the `=` of the annotation's OWN `=>`
+  // (the E1.29 class, in the other scanner), and skipTypeRef could not read a function type after `as`.
+  assert.deepEqual(
+    unresolvedRefs('() => { const f: (node: N) => number = props.get as (node: N) => number; use(f); }', new Set(['props', 'use']), [], 'h'),
+    [],
+    'neither the annotation nor the cast leaves a type name',
+  );
+  // real code after the cast still counts
+  assert.deepEqual(
+    unresolvedRefs('() => { const f = props.get as (n: N) => number; missing(f); }', new Set(['props']), [], 'h'),
+    ['missing'],
+    'and the call after it is still a ref',
+  );
+});
