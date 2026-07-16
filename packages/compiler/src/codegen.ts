@@ -60,6 +60,12 @@ export interface CompileResult {
    * the loader resolves each to a real `import` (function mode injects them via `_c` instead).
    */
   components: string[];
+  /**
+   * Phase E (E1.5) — resumable target only: names of `on:` handler sites that stayed a bare `ctx.<name>`,
+   * i.e. the handlers that will be DEAD after resume (the function itself never crosses the snapshot).
+   * Empty when every site is inline or was inlined. {@link compileComponent} turns these into build warnings.
+   */
+  deadHandlers?: string[];
 }
 
 class Gen {
@@ -187,9 +193,17 @@ export function compileTemplateAst(ast: TemplateNode[], options: CompileOptions 
   // handler's inlined body, substitute it — the factory then closes over the resumed signals exactly as an
   // inline handler does. Any site whose code isn't a bare `ctx.<name>` (already inline) is untouched.
   const inlined: ReadonlyMap<string, string> | undefined = options.resumableHandlers;
+  // Sites left as a bare `ctx.<name>` are the ones that will be DEAD after resume — whatever the cause
+  // (not extractable, not inlinable, reassigned). Reported so the caller can warn about the real defect
+  // rather than guessing from the extraction alone.
+  const deadHandlers: string[] = [];
   const siteCode = (code: string): string => {
-    const bare: RegExpExecArray | null = inlined ? /^ctx\.([A-Za-z_$][\w$]*)$/.exec(code) : null;
-    return (bare && inlined!.get(bare[1])) ?? code;
+    const bare: RegExpExecArray | null = /^ctx\.([A-Za-z_$][\w$]*)$/.exec(code);
+    if (!bare) return code; // already an inline expression — resumes as written
+    const body: string | undefined = inlined?.get(bare[1]);
+    if (body) return body;
+    if (!deadHandlers.includes(bare[1])) deadHandlers.push(bare[1]);
+    return code;
   };
   const handlersFn: string = gen.resumableSites.length
     ? `function handlers(ctx) {\n  return { ${gen.resumableSites.map((s) => `${q(s.ref)}: ${siteCode(s.code)}`).join(', ')} };\n}`
@@ -222,7 +236,7 @@ export function compileTemplateAst(ast: TemplateNode[], options: CompileOptions 
     if (deriveFn) parts.push(deriveFn, 'render.derive = derive;');
     if (adoptFn) parts.push(adoptFn, 'render.adopt = adopt;');
     parts.push('return render(ctx, {});'); // tail unchanged → the function-mode `render` strip still applies
-    return { code: parts.join('\n'), components };
+    return { code: parts.join('\n'), components, deadHandlers };
   }
 
   const domImport: string = `import { ${[...gen.used].sort().join(', ')} } from ${JSON.stringify(runtimeImport)};`;
@@ -257,11 +271,11 @@ export function compileTemplateAst(ast: TemplateNode[], options: CompileOptions 
       ...(adoptFn ? [adoptFn, 'render.adopt = adopt;', 'export { adopt };'] : []),
       'export default render;',
     ].join('\n');
-    return { code, components };
+    return { code, components, deadHandlers };
   }
 
   const code: string = [imports, ...gen.templates, `export default ${render}`].join('\n');
-  return { code, components };
+  return { code, components, deadHandlers };
 }
 
 /**

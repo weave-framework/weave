@@ -19,7 +19,7 @@ import type { TemplateNode } from './ast.js';
 import { applyPatches, type PatchOp } from './patch.js';
 import { inferCtxNames } from './infer.js';
 import { injectAutoReturn } from './auto-return.js';
-import { extractSetupBindings, isInlinable, isDerivable, type SetupBindings } from './handlers.js';
+import { extractSetupBindings, extractReturnedNames, unresolvedRefs, COMPUTED_CALLEE, type SetupBindings } from './handlers.js';
 import { rewrite, ctxScope } from './scope.js';
 import { scopeCss, scopeAttr, hostAttr, hashCss } from './css.js';
 
@@ -63,6 +63,13 @@ export interface CompiledComponent {
    * the component's own script already imports that name (see the plugin).
    */
   components: string[];
+  /**
+   * Phase E (E1.5/E1.6) — non-fatal build diagnostics, raised ONLY for a `resumable` build. Each names a
+   * handler or computed that will not survive resume and says why, so a silent runtime defect (a dead button,
+   * or a resume that throws) becomes a message at build time. The loader surfaces these as esbuild warnings.
+   * Empty for an eager build.
+   */
+  warnings?: string[];
 }
 
 const HAS_SETUP: RegExp = /export\s+(?:async\s+)?function\s+setup\b|export\s+(?:const|let|var)\s+setup\b/;
@@ -86,35 +93,72 @@ const HAS_PROP_DEFAULTS: RegExp = /export\s+(?:const|let|var)\s+propDefaults\b/;
 function resumableSetup(script: string, scope: string[]): {
   handlers: ReadonlyMap<string, string>;
   computeds: ReadonlyMap<string, string>;
+  /** Why a binding was refused, keyed by name — the caller turns these into build warnings. */
+  reasons: Map<string, string>;
+  warnings: string[];
 } {
   const handlers: Map<string, string> = new Map();
   const computeds: Map<string, string> = new Map();
+  const reasons: Map<string, string> = new Map();
+  const warnings: string[] = [];
   const found: SetupBindings = extractSetupBindings(script);
-  if (found.handlers.size === 0 && found.computeds.size === 0) return { handlers, computeds };
-  const sc = ctxScope(scope);
+  if (found.handlers.size === 0 && found.computeds.size === 0) return { handlers, computeds, reasons, warnings };
+
+  // The ctx names available on the resumed client = the template scope PLUS any signal/data that setup RETURNS
+  // but the template never references (mutated only by a handler, shown only via a computed) — it's serialized
+  // regardless, so it resolves. Without it, such a handler is wrongly refused and any warning blames a name
+  // that is actually fine. A function (handler/computed) doesn't survive, so it's not added here.
+  const returned: Set<string> | null = extractReturnedNames(script);
+  const ctxNames: Set<string> = new Set(scope);
+  if (returned) for (const n of returned) if (!found.handlers.has(n) && !found.computeds.has(n)) ctxNames.add(n);
+  const sc = ctxScope(ctxNames);
 
   // What an inlined body may reference: the bindings that survive to the client. Signals + plain data do
   // (the snapshot carries them); handlers and computeds do NOT — `registerState` drops every function. A
   // computed comes BACK via `derive`, so once we prove one derivable it becomes resolvable for the rest.
-  const resolvable: Set<string> = new Set(
-    scope.filter((name) => !found.handlers.has(name) && !found.computeds.has(name))
-  );
+  const resolvable: Set<string> = new Set(ctxNames);
 
   // Computeds first, in declaration order: each may read the signals plus any earlier computed. `derive`
   // emits them in this same order, so the assignment order matches the dependency order.
   for (const [name, computed] of found.computeds) {
-    if (!isDerivable(computed, resolvable, name)) continue;
+    const missing: string[] = unresolvedRefs(computed.source, resolvable, [], name, COMPUTED_CALLEE);
+    if (missing.length) {
+      reasons.set(name, blame(missing));
+      // A computed the template CALLS and we cannot rebuild makes resume THROW — the whole page dies, so
+      // this is worth saying loudly even though we can't tell here whether the template reads it.
+      if (scope.includes(name)) {
+        warnings.push(
+          `computed \`${name}\` cannot be rebuilt on resume — it reads ${blame(missing)}. ` +
+            `Resuming this page will fail (\`ctx.${name} is not a function\`). Return ${listOf(missing)} from setup(), or inline the expression.`
+        );
+      }
+      continue;
+    }
     computeds.set(name, rewrite(computed.args, sc).code);
     resolvable.add(name); // now live in the resumed ctx → a later computed / a handler may use it
+    sc.set(name, { kind: 'ctx' }); // …and its refs must rewrite to `ctx.<name>` even if the template never reads it
   }
 
   // Handlers second — so a handler that reads a derived computed (`() => count.set(doubled())`) inlines too.
   for (const [name, handler] of found.handlers) {
     if (!scope.includes(name)) continue; // the template never references it
-    if (!isInlinable(handler, resolvable, name)) continue;
+    const missing: string[] = unresolvedRefs(handler.source, resolvable, handler.params, name);
+    if (missing.length) {
+      reasons.set(name, blame(missing));
+      continue; // the warning is raised by the caller, which knows whether it is actually a handler SITE
+    }
     handlers.set(name, rewrite(handler.source, sc).code);
   }
-  return { handlers, computeds };
+  return { handlers, computeds, reasons, warnings };
+}
+
+/** `['step']` → "`step`, which setup() does not return"; two or more → a list. */
+function blame(missing: string[]): string {
+  return `${listOf(missing)}, which setup() does not return`;
+}
+
+function listOf(names: string[]): string {
+  return names.map((n) => `\`${n}\``).join(', ');
 }
 
 /** Compile a `{ script, template, styles }` triple into a component module + scoped CSS. */
@@ -195,7 +239,21 @@ export function compileComponent(src: ComponentSource, opts: ComponentOptions = 
     .filter(Boolean)
     .join('\n\n');
 
-  return { code, css, hash, components: compiled.components };
+  // E1.5/E1.6 — a resumable build reports what will NOT survive resume. A dead handler site is ground truth
+  // from the codegen (whatever the cause); the reason comes from the extraction when it knows one.
+  const warnings: string[] = resumed ? [...resumed.warnings] : [];
+  for (const name of compiled.deadHandlers ?? []) {
+    const why: string | undefined = resumed?.reasons.get(name);
+    warnings.push(
+      `handler \`${name}\` will not work after resume — ` +
+        (why
+          ? `it reads ${why}. Return it from setup(), or inline the handler in the template.`
+          : `its definition could not be read from setup() (only a plain \`const ${name} = () => …\` / \`function ${name}() {}\` is understood). ` +
+            `Inline the handler in the template to make it resumable.`)
+    );
+  }
+
+  return { code, css, hash, components: compiled.components, ...(warnings.length ? { warnings } : {}) };
 }
 
 /**

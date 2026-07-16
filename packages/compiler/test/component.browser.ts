@@ -595,3 +595,95 @@ test('E1.6: a computed touching a non-ctx local is NOT derived (fail-safe), and 
   );
   assert.ok(!eager.code.includes('function derive'), 'eager emits no derive (byte-for-byte)');
 });
+
+/* ──────────── E1.5/E1.6 — build warnings for what won't survive resume ──────────── */
+
+test('warns when a NAMED handler cannot be inlined (dead after resume), naming the culprit', () => {
+  const { warnings } = compileComponent(
+    {
+      script:
+        'import { signal } from "@weave-framework/runtime";\n' +
+        'export function setup(){ const count = signal(0); const step = 2;\n' +
+        '  const inc = () => count.set((n) => n + step);\n  return { count, inc }; }',
+      template: '<button on:click={{ inc }}>{{ count() }}</button>',
+    },
+    { filename: 'w1', resumable: true }
+  );
+  assert.ok(warnings && warnings.length === 1, 'one warning');
+  assert.ok(/handler `inc`/.test(warnings![0]) && /will not work after resume/.test(warnings![0]), 'names the handler + effect');
+  assert.ok(/`step`/.test(warnings![0]) && /setup\(\) does not return/.test(warnings![0]), 'names WHY (reads `step`)');
+});
+
+test('warns when a computed cannot be rebuilt — the resume-throws case', () => {
+  const { warnings } = compileComponent(
+    {
+      script:
+        'import { signal, computed } from "@weave-framework/runtime";\n' +
+        'export function setup(){ const count = signal(0); const factor = 3;\n' +
+        '  const scaled = computed(() => count() * factor);\n  return { count, scaled }; }',
+      template: '<p>{{ scaled() }}</p>',
+    },
+    { filename: 'w2', resumable: true }
+  );
+  assert.ok(warnings && warnings.some((w) => /computed `scaled`/.test(w) && /Resuming this page will fail/.test(w) && /`factor`/.test(w)), `expected a computed warning; got ${JSON.stringify(warnings)}`);
+});
+
+test('warns when a handler definition cannot be READ from setup (not a plain const/fn)', () => {
+  const { warnings } = compileComponent(
+    {
+      // `inc` comes from a helper call — the extractor can't read a body → dead, but we still say so.
+      script:
+        'import { signal } from "@weave-framework/runtime";\n' +
+        'import { makeInc } from "./x";\n' +
+        'export function setup(){ const count = signal(0); const inc = makeInc(count);\n  return { count, inc }; }',
+      template: '<button on:click={{ inc }}>{{ count() }}</button>',
+    },
+    { filename: 'w3', resumable: true }
+  );
+  assert.ok(warnings && warnings.some((w) => /handler `inc`/.test(w) && /could not be read from setup/.test(w)), `expected an unreadable-handler warning; got ${JSON.stringify(warnings)}`);
+});
+
+test('NO warnings for safe handlers/computeds, and NEVER for an eager build', () => {
+  const safe = compileComponent(
+    {
+      script:
+        'import { signal, computed } from "@weave-framework/runtime";\n' +
+        'export function setup(){ const count = signal(0);\n  const doubled = computed(() => count() * 2);\n  const inc = () => count.set((n) => n + 1);\n  return { count, doubled, inc }; }',
+      template: '<button on:click={{ inc }}>{{ count() }} {{ doubled() }}</button>',
+    },
+    { filename: 'ok', resumable: true }
+  );
+  assert.ok(!safe.warnings, 'a fully-resumable component warns about nothing');
+
+  const eager = compileComponent(
+    {
+      script:
+        'import { signal } from "@weave-framework/runtime";\n' +
+        'export function setup(){ const count = signal(0); const step = 2;\n  const inc = () => count.set((n) => n + step);\n  return { count, inc }; }',
+      template: '<button on:click={{ inc }}>{{ count() }}</button>',
+    },
+    { filename: 'eagerw' } // NOT resumable → resume can't happen → nothing to warn about
+  );
+  assert.ok(!eager.warnings, 'eager builds never emit resume warnings');
+});
+
+test('E1.5: a handler using a RETURNED signal the template never reads still inlines (not wrongly refused)', () => {
+  // `count` is returned + serialized, but the template only shows `scaled()` and the button — so `count`
+  // is not in the template scope. The handler must still inline (regression: it was refused + mis-warned).
+  const { code, warnings } = compileComponent(
+    {
+      script:
+        'import { signal, computed, type Signal } from "@weave-framework/runtime";\n' +
+        'export function setup(): { scaled: () => number; bump: () => void } {\n' +
+        '  const count = signal(0);\n' +
+        '  const scaled = computed(() => count() * 2);\n' +
+        '  const bump = () => count.set((n) => n + 1);\n' +
+        '  return { count, scaled, bump };\n}',
+      template: '<button on:click={{ bump }}>{{ scaled() }}</button>',
+    },
+    { filename: 'ret', resumable: true }
+  );
+  assert.ok(/"w0":\s*\(\)\s*=>\s*ctx\.count\.set\(\(n\)\s*=>\s*n \+ 1\)/.test(code), `bump inlines against ctx.count; got:\n${code}`);
+  assert.ok(/ctx\.scaled = computed\(\(\) => ctx\.count\(\) \* 2\)/.test(code), 'scaled derives against ctx.count');
+  assert.ok(!warnings, `no warning — everything resolves; got ${JSON.stringify(warnings)}`);
+});

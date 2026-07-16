@@ -367,11 +367,18 @@ export function weave(state: WeaveState, options: WeaveOptions = {}): Plugin {
   const dev: boolean = options.dev ?? false;
   const resumable: boolean = options.resumable ?? false;
 
-  /** Emit a compiled component: collect its CSS (build) or inject it (dev). */
-  const emit = (code: string, css: string, resolveDir: string): OnLoadResult => {
-    if (dev) return { contents: code + cssInjector(css), loader: 'ts' as const, resolveDir };
+  /**
+   * Emit a compiled component: collect its CSS (build) or inject it (dev). A resumable build may also carry
+   * non-fatal diagnostics (E1.5/E1.6 — a handler or computed that won't survive resume); surface them as real
+   * esbuild warnings framed at the component file, so a silent runtime defect is visible at build time.
+   */
+  const emit = (code: string, css: string, resolveDir: string, warnings?: string[], file?: string): OnLoadResult => {
+    const warn = warnings?.length
+      ? { warnings: warnings.map((text) => ({ text, location: file ? { file } : undefined })) }
+      : {};
+    if (dev) return { contents: code + cssInjector(css), loader: 'ts' as const, resolveDir, ...warn };
     if (css) state.css.push(css);
-    return { contents: code, loader: 'ts' as const, resolveDir };
+    return { contents: code, loader: 'ts' as const, resolveDir, ...warn };
   };
 
   return {
@@ -388,9 +395,9 @@ export function weave(state: WeaveState, options: WeaveOptions = {}): Plugin {
           ? await compileStyleSource(src.styles, styleLang, dirname(args.path))
           : undefined;
         try {
-          const { code, css, components } = compileComponent({ ...src, styles }, { filename: args.path, resumable });
+          const { code, css, components, warnings } = compileComponent({ ...src, styles }, { filename: args.path, resumable });
           const wired: string = injectChildImports(code, components, dirname(args.path), src.script, args.path);
-          return emit(wired, css, dirname(args.path));
+          return emit(wired, css, dirname(args.path), warnings, args.path);
         } catch (e) {
           if (e instanceof ParseError) return parseErrorResult(e, args.path, src.template);
           throw e;
@@ -438,7 +445,7 @@ export function weave(state: WeaveState, options: WeaveOptions = {}): Plugin {
             // Base-template child tags resolve relative to the BASE dir; inserted tags the extension
             // itself imports are skipped by injectChildImports (explicit import wins).
             const wired: string = injectChildImports(compiled.code, compiled.components, base.dir, decl.script, args.path);
-            return { ...emit(wired, compiled.css, dir), watchFiles: [base.file] };
+            return { ...emit(wired, compiled.css, dir, compiled.warnings, args.path), watchFiles: [base.file] };
           } catch (e) {
             if (e instanceof ParseError) return { ...parseErrorResult(e, base.file, base.template), watchFiles: [base.file] };
             throw e;
@@ -462,7 +469,7 @@ export function weave(state: WeaveState, options: WeaveOptions = {}): Plugin {
         );
 
         try {
-          const { code, css, components } = compileComponent(
+          const { code, css, components, warnings } = compileComponent(
             { script: decl.script, template: template.text, styles: styles.css },
             { filename: args.path, resumable }
           );
@@ -470,7 +477,7 @@ export function weave(state: WeaveState, options: WeaveOptions = {}): Plugin {
           // Tell esbuild this module also depends on its template + style files, so a
           // template-only or style-only edit (which leaves the .ts untouched) still
           // triggers a watch-mode rebuild + live-reload.
-          return { ...emit(wired, css, dir), watchFiles: [...template.files, ...styles.files] };
+          return { ...emit(wired, css, dir, warnings, args.path), watchFiles: [...template.files, ...styles.files] };
         } catch (e) {
           // A malformed template → a framed `file:line:col` esbuild error at the .html/template,
           // not a raw parser stack trace. Point at the template file (sibling/declared), else the .ts.

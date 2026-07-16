@@ -18,6 +18,8 @@ export { injectAutoReturn, type AutoReturnResult } from './auto-return.js';
 export {
   extractSetupHandlers,
   extractSetupBindings,
+  extractReturnedNames,
+  unresolvedRefs,
   isInlinable,
   isDerivable,
   type SetupHandler,

@@ -175,6 +175,59 @@ export interface SetupBindings {
 export const COMPUTED_CALLEE: string = 'computed';
 
 /**
+ * The ctx keys `setup` explicitly returns (`return { count, inc, doubled: d }` → `count`, `inc`, `doubled`),
+ * or null when it can't be read: no top-level `return`, a non-object-literal return, or a spread (`...base`,
+ * an extension component) whose full key set isn't statically known. Null means "fall back to template scope".
+ *
+ * Why it matters: a signal RETURNED but not referenced in the template (mutated only by a handler, shown only
+ * via a computed) is still serialized and thus resolvable on the client — but it isn't in the template-inferred
+ * scope. Without this, such a handler is wrongly refused (and any warning blames a name that is actually fine).
+ */
+export function extractReturnedNames(script: string): Set<string> | null {
+  const open: number | null = locateSetupBody(script);
+  if (open === null) return null;
+  const close: number = matchDelimited(script, open, '{', '}');
+  if (close < 0) return null;
+
+  let i: number = open + 1;
+  let depth: number = 0;
+  while (i < close) {
+    const op: number = skipOpaque(script, i);
+    if (op > i) {
+      i = op;
+      continue;
+    }
+    const c: string = script[i];
+    if (c === '(' || c === '[' || c === '{') { depth++; i++; continue; }
+    if (c === ')' || c === ']' || c === '}') { depth--; i++; continue; }
+    if (depth === 0 && ID_START.test(c) && isTokenStart(script, i) && startsWithWord(script, i, 'return')) {
+      const b: number = skipWs(script, i + 6);
+      if (script[b] !== '{') return null; // `return x` / `return;` — not a plain object literal
+      const rb: number = matchDelimited(script, b, '{', '}');
+      if (rb < 0) return null;
+      return objectKeys(script.slice(b + 1, rb));
+    }
+    i = ID_START.test(c) && isTokenStart(script, i) ? skipWord(script, i) : i + 1;
+  }
+  return null; // no explicit return → auto-return synthesizes `{ …templateScope }`, so scope is the truth
+}
+
+/** Keys of an object-literal body (`a, b: x, [k]: y, ...s`). Null if a spread or computed key makes it unknown. */
+function objectKeys(body: string): Set<string> | null {
+  const out: Set<string> = new Set();
+  for (const raw of splitTopLevel(body)) {
+    const entry: string = raw.trim();
+    if (!entry) continue;
+    if (entry.startsWith('...')) return null; // a spread — the full key set isn't statically known
+    if (entry.startsWith('[')) return null; // a computed key — unknown
+    const key: string = entry.split(':')[0].trim();
+    if (/^[A-Za-z_$][\w$]*$/.test(key)) out.add(key);
+    else return null; // anything unexpected → be conservative
+  }
+  return out;
+}
+
+/**
  * Extract every top-level `setup` binding whose initializer is a function, keyed by name:
  * `const inc = (…) => …` · `const inc = function (…) { … }` · `function inc(…) { … }` (incl. `async`).
  *
@@ -291,11 +344,7 @@ function asComputedCall(init: string): SetupComputed | null {
  * `resolvable` must include the computeds declared BEFORE this one — a computed may read an earlier one.
  */
 export function isDerivable(computed: SetupComputed, resolvable: ReadonlySet<string>, name?: string): boolean {
-  for (const id of freeIdentifiers(computed.source)) {
-    if (id === COMPUTED_CALLEE || id === name) continue;
-    if (!resolvable.has(id)) return false;
-  }
-  return true;
+  return unresolvedRefs(computed.source, resolvable, [], name, COMPUTED_CALLEE).length === 0;
 }
 
 /**
@@ -308,12 +357,31 @@ export function isDerivable(computed: SetupComputed, resolvable: ReadonlySet<str
  * inlining it would throw a ReferenceError on the first click. Refuse instead.
  */
 export function isInlinable(handler: SetupHandler, ctxNames: ReadonlySet<string>, name?: string): boolean {
-  for (const id of freeIdentifiers(handler.source)) {
-    if (id === name) continue; // self-reference (recursion) — the factory binds it, not ctx
-    if (handler.params.includes(id)) continue; // its own parameter (a local)
-    if (!ctxNames.has(id)) return false; // a setup local that never reaches the client
+  return unresolvedRefs(handler.source, ctxNames, handler.params, name).length === 0;
+}
+
+/**
+ * The free identifiers in `source` that would NOT resolve on the resumed client — i.e. exactly why
+ * {@link isInlinable} / {@link isDerivable} refused. Each is a `setup` local that never crosses the snapshot
+ * (a plain local, a helper fn, another handler, a non-derivable computed). Empty ⇒ safe to emit.
+ *
+ * The caller turns these into a build warning naming the culprit, so a silently-dead handler becomes a
+ * message the author can act on.
+ */
+export function unresolvedRefs(
+  source: string,
+  ctxNames: ReadonlySet<string>,
+  params: readonly string[] = [],
+  name?: string,
+  ignore?: string,
+): string[] {
+  const out: string[] = [];
+  for (const id of freeIdentifiers(source)) {
+    if (id === name || id === ignore) continue; // self-reference, or the emitted callee (`computed`)
+    if (params.includes(id)) continue; // its own parameter (a local)
+    if (!ctxNames.has(id) && !out.includes(id)) out.push(id);
   }
-  return true;
+  return out;
 }
 
 /* ──────────── internals ──────────── */
