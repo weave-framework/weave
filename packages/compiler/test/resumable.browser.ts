@@ -644,6 +644,51 @@ test('E1.2c-6: adopt resumes a static CHILD component in place — child setup n
   app.dispose();
 });
 
+/* ──────────── E1.25: derive sees props ──────────── */
+
+test('E1.25: a binding initialised FROM props is rebuilt on resume and is live', () => {
+  // The real `<Sidenav>` shape: `const openState = signal(props.defaultOpened ?? false)`. Such a binding is not
+  // returned, so it never crosses the wire; derive must rebuild it — and it cannot without props.
+  // (a string, not a boolean: `false` renders as empty text by design — it would make the assertion say nothing)
+  const { code } = compileTemplate('<b on:click={{ tog }}>{{ open() }}</b>', {
+    mode: 'function',
+    scope: ['open', 'tog'],
+    resumable: true,
+    resumableDerived: new Map([['open', 'rt.signal(props.start ?? "shut")']]),
+    resumableHandlers: new Map([['tog', '() => ctx.open.set("toggled")']]),
+  });
+  const render = new Function('rt', '_c', code.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;'))(rt, {}) as
+    ((ctx: unknown, slots?: unknown) => Element) & {
+      adopt?: AdoptFn;
+      derive?: (c: Record<string, unknown>, p?: Record<string, unknown>) => unknown;
+      handlers?: (c: Record<string, unknown>, p?: Record<string, unknown>) => Record<string, ResumeHandler>;
+    };
+
+  // ── server ── `open` is a setup local, never returned → nothing about it crosses the wire
+  const serverOpen: Signal<string> = signal('wide');
+  const serverNode = serverRender(() => render({ open: serverOpen, tog: () => {} })) as HTMLElement;
+  const wire = snapshot({});
+  assert.equal(serverNode.textContent, 'wide', 'the server rendered it');
+
+  // ── client ── derive rebuilds it FROM PROPS; without them it could not be rebuilt at all
+  const container: HTMLElement = host();
+  container.innerHTML = serverNode.outerHTML;
+  const b: HTMLElement = container.querySelector('b')!;
+  const props: Record<string, unknown> = { start: 'wide' };
+  const app = resume(b, {
+    snapshot: wire,
+    adopt: render.adopt,
+    derive: (c) => render.derive!(c, props),
+    handlers: (c) => render.handlers!(c, props),
+  });
+  assert.equal((app.ctx.open as Signal<string>)(), 'wide', '`open` was rebuilt onto the resumed ctx FROM props.start');
+  assert.equal(b.textContent, 'wide', 'and the adopted text still shows the server value');
+
+  b.click();
+  assert.equal(b.textContent, 'toggled', `the rebuilt binding is live in the adopted node; got ${JSON.stringify(b.textContent)}`);
+  app.dispose();
+});
+
 /* ──────────── E1.24: @key, @render, @snippet ──────────── */
 
 test('E1.24: a `@snippet` after a block does not block adopt — it consumes no DOM position at all', () => {

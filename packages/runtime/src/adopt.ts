@@ -114,7 +114,7 @@ interface AdoptableComponent {
   (props?: Record<string, unknown>, slots?: Record<string, () => Node>): Node;
   adopt?: (root: Node, ctx: Record<string, unknown>, slots: Record<string, unknown>, states: Record<string, unknown>) => unknown;
   /** E1.6 — rebuilds the child's own `computed`s onto its resumed ctx (they cannot cross the snapshot). */
-  derive?: (ctx: Record<string, unknown>) => unknown;
+  derive?: (ctx: Record<string, unknown>, props?: Record<string, unknown>) => unknown;
   /** E1.8 — the child's own `handlers(ctx)` factory, so its internal `on:` events resume against ITS ctx. */
   handlers?: (ctx: Record<string, unknown>) => Record<string, unknown>;
   /**
@@ -220,7 +220,7 @@ export function adoptComponent(
   }
   if (Comp && Comp.adopt && ctx !== undefined && root && root !== end) {
     // Rebuild the child's computeds onto its resumed ctx BEFORE adopting — its bindings call them (E1.6).
-    if (Comp.derive) Comp.derive(ctx as Record<string, unknown>);
+    if (Comp.derive) Comp.derive(ctx as Record<string, unknown>, props ?? {}); // E1.25 — props initialise bindings too
     // E1.17 — the child's `<slot>`s island-replay through the PARENT's slot fns, so they must reach the adopt
     // walk. Passing `{}` here is what forced every container component to fall back to CSR.
     Comp.adopt(root, ctx as Record<string, unknown>, slots ?? {}, states as Record<string, unknown>);

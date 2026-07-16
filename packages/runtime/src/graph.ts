@@ -194,7 +194,7 @@ export type AdoptFn = (
  * page's resume with it. The compiler emits this from the `computed(…)` declarations in `setup`, rewritten
  * against ctx, and it re-assigns each onto the resumed ctx in declaration order.
  */
-export type DeriveFn = (ctx: Record<string, unknown>) => unknown;
+export type DeriveFn = (ctx: Record<string, unknown>, props?: Record<string, unknown>) => unknown;
 
 export interface ResumeOptions {
   /** The serialized reactive state from the server ({@link snapshot}). */

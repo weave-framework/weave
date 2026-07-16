@@ -248,8 +248,12 @@ export function compileTemplateAst(ast: TemplateNode[], options: CompileOptions 
   // OWN imports (`computed`, `createRouter`, …), which this `derive` sits alongside. The `undefined` guard is
   // what makes it safe to emit for every re-derivable binding — one that DID cross the wire is already on ctx
   // (a signal carrying the server's value) and must not be replaced by a fresh, state-less copy.
+  // E1.25 — `derive` takes `props` for the same reason the handlers factory does (E1.20): a binding is very
+  // often initialised FROM them (`signal(props.defaultOpened ?? false)`). Giving them to one and not the other
+  // made the asymmetry cascade — such a binding was undrivable, so any helper reading it could not be emitted,
+  // so every handler calling that helper was refused.
   const deriveFn: string = gen.resumable && options.resumableDerived?.size
-    ? `function derive(ctx) {\n${[...options.resumableDerived]
+    ? `function derive(ctx, props) {\n${[...options.resumableDerived]
         .map(([name, code]) => `  if (ctx.${name} === undefined) ctx.${name} = ${code};`)
         .join('\n')}\n  return ctx;\n}`
     : '';

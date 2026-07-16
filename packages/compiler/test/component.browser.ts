@@ -608,7 +608,7 @@ test('E1.6: computeds compile to a derive(ctx) — the resumed page rebuilds wha
     },
     { filename: 'dbl', resumable: true }
   );
-  assert.ok(/function derive\(ctx\)/.test(code), 'a derive(ctx) is emitted');
+  assert.ok(/function derive\(ctx, props\)/.test(code), 'a derive is emitted (props is its E1.25 second parameter)');
   assert.ok(/ctx\.doubled = computed\(\(\) => ctx\.count\(\) \* 2\)/.test(code), `the computed is rebuilt over the resumed ctx; got:\n${code}`);
   assert.ok(code.includes('_wc.derive = render.derive'), 'the component carries .derive for resumePage / adoptComponent');
   assert.ok(/from "@weave-framework\/runtime"/.test(code) && /\bcomputed\b/.test(code), 'computed is imported for the derive');
@@ -879,7 +879,7 @@ test('E1.21: a component with NO const declarations still derives its returned m
     },
     { filename: 'u1', resumable: true }
   );
-  assert.ok(/function derive\(ctx\)/.test(code), 'a derive is emitted');
+  assert.ok(/function derive\(ctx, props\)/.test(code), 'a derive is emitted');
   assert.ok(/ctx\.ripple = ripple/.test(code), '`ripple` is derived as ITSELF — it is a module import, already on the client');
 });
 
@@ -926,4 +926,23 @@ test('E1.22: a `use:` on a COMPONENT adopts — the action lands on the ADOPTED 
     `adopt resumes the child and captures the returned root; got:\n${adoptPart.slice(0, 500)}`);
   assert.ok(/applyAction\(/.test(adoptPart), 'and forwards the action onto it');
   assert.ok(!/mountChild\(/.test(adoptPart), 'without ALSO mounting a fresh copy — that was the duplicate');
+});
+
+test('E1.25: `derive` takes props too — a binding initialised from props is rebuildable', () => {
+  // E1.20 gave `props` to the handlers factory but not to `derive`, and the asymmetry cascaded: the real
+  // <Sidenav>'s `const openState = signal(props.defaultOpened ?? false)` was not derivable, so `controlled`
+  // and `setOpened` could not be emitted, so every handler calling them was refused.
+  const { code } = compileComponent(
+    {
+      script:
+        'import { signal } from "@weave-framework/runtime";\n' +
+        'export function setup(props){ const open = signal(props.defaultOpened ?? false);\n' +
+        '  const toggle = () => open.set(!open());\n  return { open, toggle }; }',
+      template: '<button on:click={{ toggle }}>{{ open() }}</button>',
+    },
+    { filename: 'd1', resumable: true }
+  );
+  assert.ok(/function derive\(ctx, props\)/.test(code), 'derive takes props');
+  assert.ok(/ctx\.open = signal\(props\.defaultOpened \?\? false\)/.test(code),
+    `the props-initialised binding is derived, props left bare; got:\n${code.slice(code.indexOf('function derive'), code.indexOf('function derive') + 200)}`);
 });

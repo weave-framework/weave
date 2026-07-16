@@ -125,7 +125,11 @@ function resumableSetup(script: string, scope: string[]): {
   // What an inlined body may reference: the bindings that survive to the client. Signals + plain data do
   // (the snapshot carries them); handlers and computeds do NOT — `registerState` drops every function. A
   // computed comes BACK via `derive`, so once we prove one derivable it becomes resolvable for the rest.
+  // E1.25 — `props` resolves inside `derive` too: it is its second parameter, fed by the same adopt walk that
+  // feeds the handlers factory (E1.20). A binding initialised from props (`signal(props.defaultOpened ?? false)`)
+  // is otherwise underivable, and that cascades into every helper and handler that touches it.
   const resolvable: Set<string> = new Set(ctxNames);
+  resolvable.add('props');
 
   // A RETURNED name that setup never declared but that resolves at module scope — `import { router } from
   // './router'; … return { router }`, a module-level singleton handed straight out (the docs shell's shape,
