@@ -565,6 +565,26 @@ test('E1.2c-6a: a multi-root fragment is adoptable (was single-root only); a `us
   assert.ok(!used.code.includes('render.adopt'), 'a `use:` action opts out (not adopt-navigable yet)');
 });
 
+test('E1.46: adopt PUBLISHES which node it navigates off — container for a multi-root, the element itself for one root', () => {
+  // The bug this pins: both shapes navigate by `child(_r, i)`, so the emit looks identical and a caller has
+  // to GUESS what `_r` is. The docs shell (two component roots) was handed `firstElementChild` — the toolbar —
+  // so `adopt` walked the toolbar's insides and threw off its end, and the whole page stayed inert server HTML.
+  const multi = compileTemplate('<span>{{ a() }}</span><b>{{ c() }}</b>', { mode: 'module', scope: ['a', 'c'], resumable: true });
+  assert.ok(multi.code.includes('adopt.container = true;'), 'a multi-root fragment declares it adopts off the CONTAINER');
+
+  const single = compileTemplate('<div>{{ a() }}</div>', { mode: 'module', scope: ['a'], resumable: true });
+  assert.ok(single.code.includes('render.adopt'), 'the single-root control still emits an adopt fn');
+  assert.ok(!single.code.includes('adopt.container'), 'a single root element adopts off ITSELF — no container flag');
+
+  // a bare text root has no root element either — same container contract as two elements
+  const text = compileTemplate('{{ a() }}<b>{{ c() }}</b>', { mode: 'module', scope: ['a', 'c'], resumable: true });
+  assert.ok(text.code.includes('adopt.container = true;'), 'a text-root fragment adopts off the container too');
+
+  // the flag must survive onto the callable render, which is what the client entry actually reads
+  const render = compileResumable('<span>{{ a() }}</span><b>{{ c() }}</b>', ['a', 'c']);
+  assert.equal((render as { adopt?: { container?: boolean } }).adopt!.container, true, 'render.adopt.container is set at runtime, not just in the source text');
+});
+
 test('E1.2c-6a: adopt resumes a MULTI-ROOT fragment in place against the mount container', () => {
   // two sibling roots + a bare text-interp root — the top level is the mount container, not one element
   const render = compileResumable('<span>{{ a() }}</span> <b>{{ c() }}</b>', ['a', 'c']);

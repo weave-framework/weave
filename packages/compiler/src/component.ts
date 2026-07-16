@@ -294,8 +294,9 @@ export function compileComponent(src: ComponentSource, opts: ComponentOptions = 
   // E1.45 — a lifecycle hook registered in `setup` is the structural limit of resumability: resume never runs
   // `setup`, so the hook is never registered, and the server never ran it either (it is inert there). Whatever
   // DOM work it does simply never happens. Refuse to adopt and say so — the subtree then client-renders, which
-  // runs the hook and is exactly right. Found by the docs dogfood: `<Expansion>` fills its panel bodies in an
-  // onMount, so the sidebar resumed with 4 links instead of 23, silently.
+  // runs the hook and is exactly right. (`<Expansion>` fills its panel bodies in an onMount, so it needs this.)
+  // The limit is real, but it was NOT what emptied the docs sidebar — that was E1.46: the client entry handed
+  // `adopt` the wrong root, so resume threw on its first step and no component on the page ever adopted at all.
   const hook: string | null =
     opts.resumable && src.script
       ? setupCallsHook(src.script, hookNames(extractModuleImports(src.script), src.script))

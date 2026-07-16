@@ -104,10 +104,11 @@ function importSpec(rootDir: string, file: string): string {
  *  - **mount** (default) — `mountComponent(Root, selector)`: a fresh CSR render into the mount target.
  *  - **resume** (E1.4, `resume: true`) — the islands client. Instead of re-rendering, ADOPT the server DOM the
  *    SSG shell already placed inside the mount target: `resumePage({ root, adopt: Root.adopt, handlers:
- *    Root.handlers })`, where `root` is the mount target's first element child (the server-rendered component
- *    root the SSG shell wrapped in `<div id>`). `setup` never re-runs; static content ships 0 JS. Requires a
- *    `resumable`-compiled bundle (so `Root.adopt`/`Root.handlers` exist). A missing server root (nothing
- *    prerendered) is a no-op rather than a crash.
+ *    Root.handlers })`. `root` is the mount target's first element child for a single-root component, or the
+ *    mount target ITSELF for a multi-root one — `Root.adopt.container` says which (E1.46). `setup` never
+ *    re-runs; static content ships 0 JS. Requires a `resumable`-compiled bundle (so `Root.adopt`/`Root.handlers`
+ *    exist); a root that emitted no `adopt` client-renders instead. A missing server root (nothing prerendered)
+ *    is a no-op rather than a crash.
  */
 export function generateEntry(
   rootComponent: string,
@@ -129,14 +130,20 @@ export function generateEntry(
     lines.push(`defineCustomElement(${JSON.stringify(ce.tag)}, __ce${i}, { props: ${JSON.stringify(ce.props)} });`)
   );
   if (options.resume) {
-    // Adopt the SSG-rendered DOM in place: the component root is the mount target's first element child.
+    // Adopt the SSG-rendered DOM in place. WHICH node to hand `adopt` is the component's own contract, not a
+    // guess (E1.46): a single-root component IS the mount target's first element child, but a MULTI-ROOT one has
+    // no such element — its roots are the mount target's children, so `adopt` navigates off the target itself.
+    // The compiler publishes that as `Root.adopt.container`. Guessing `firstElementChild` for a multi-root root
+    // walked into the first root's insides and threw off the end of it, leaving the page inert server HTML.
     // `fallback` (E1.9) covers a root the server could not make resumable (a non-serializable binding such as
     // a router): clear the server DOM and mount fresh, so the page still works — just client-rendered.
+    // No `Root.adopt` at all (the whole root opted out — e.g. a lifecycle hook in setup) means there is nothing
+    // to resume INTO: CSR outright, rather than arm handlers over DOM no one ever adopts.
     lines.push(`const _m = document.querySelector(${JSON.stringify(mount)});`);
-    lines.push(`const _r = _m && _m.firstElementChild;`);
+    lines.push(`const _r = _m && (Root.adopt && Root.adopt.container ? _m : _m.firstElementChild);`);
     lines.push(`const _csr = () => { if (_m) { _m.textContent = ""; mountComponent(Root, _m); } };`);
     lines.push(
-      `if (_r) resumePage({ root: _r, adopt: Root.adopt, handlers: Root.handlers, derive: Root.derive, fallback: _csr });\n` +
+      `if (_r && Root.adopt) resumePage({ root: _r, adopt: Root.adopt, handlers: Root.handlers, derive: Root.derive, fallback: _csr });\n` +
         `else _csr();`
     );
   } else {

@@ -134,6 +134,14 @@ class Gen {
    * variant is emitted alongside `render`; when false, a resumed page falls back to CSR (unchanged).
    */
   adoptable: boolean = true;
+  /**
+   * E1.46 — whether `adopt`'s `_r` must be the mount CONTAINER rather than a root element. A single root
+   * element IS `_r` (its bindings sit under it); a multi-root / text-root fragment has no such element, so its
+   * top-level nodes are the container's children and `_r` is the container itself. Both navigate by
+   * `child(_r, i)`, which is exactly why the difference is invisible in the emit — the CALLER has to be told.
+   * Rides out as `adopt.container = true` so the client entry can hand `resumePage` the right node.
+   */
+  rootIsFragment: boolean = false;
   /** E1.21 — the names `derive(ctx)` rebuilds, so a `use:` action can tell whether it resolves on a resume. */
   derived: ReadonlySet<string> = new Set<string>();
   private tplN: number = 0;
@@ -285,7 +293,7 @@ export function compileTemplateAst(ast: TemplateNode[], options: CompileOptions 
     const parts: string[] = [...gen.templates, render];
     if (handlersFn) parts.push(handlersFn, 'render.handlers = handlers;');
     if (deriveFn) parts.push(deriveFn, 'render.derive = derive;');
-    if (adoptFn) parts.push(adoptFn, 'render.adopt = adopt;');
+    if (adoptFn) parts.push(adoptFn, 'render.adopt = adopt;', ...adoptRootDecl(gen));
     parts.push('return render(ctx, {});'); // tail unchanged → the function-mode `render` strip still applies
     return { code: parts.join('\n'), components, deadHandlers: gen.deadHandlers };
   }
@@ -319,7 +327,7 @@ export function compileTemplateAst(ast: TemplateNode[], options: CompileOptions 
       render,
       ...(handlersFn ? [handlersFn, 'render.handlers = handlers;', 'export { handlers };'] : []),
       ...(deriveFn ? [deriveFn, 'render.derive = derive;', 'export { derive };'] : []),
-      ...(adoptFn ? [adoptFn, 'render.adopt = adopt;', 'export { adopt };'] : []),
+      ...(adoptFn ? [adoptFn, 'render.adopt = adopt;', ...adoptRootDecl(gen), 'export { adopt };'] : []),
       'export default render;',
     ].join('\n');
     return { code, components, deadHandlers: gen.deadHandlers, notAdoptable: gen.notAdoptable };
@@ -472,6 +480,10 @@ function compileFragment(
   // reconciler can still move/remove it as one unit.
   const sole: ElementNode | null = top.length === 1 && top[0].type === 'element' ? (top[0] as ElementNode) : null;
   const singleRoot: boolean = !!sole && !/^[A-Z]/.test(sole.tag) && sole.tag !== 'slot';
+  // E1.46 — record the ROOT render's shape (depth 1) so the emit can publish it. `adopt` navigates a
+  // multi-root fragment off the mount CONTAINER, and a caller that guesses `firstElementChild` instead
+  // walks into the first root's insides and runs off the end of it.
+  if (gen.fragmentDepth === 1) gen.rootIsFragment = !singleRoot;
   // Adopt navigation keys off `_r`: for a single root element `_r` IS that element (children under it); for a
   // multi-root / text-root fragment (E1.2c-6a) `_r` is the mount CONTAINER and the top-level nodes are its
   // children — either way `child(_r, i)` reaches them, so both adopt. A component/slot at the root still opts
@@ -1284,6 +1296,15 @@ function compileFragment(
 }
 
 /* ──────────── helpers ──────────── */
+
+/**
+ * E1.46 — publish `adopt`'s root contract when (and only when) it is the non-obvious one. A multi-root /
+ * text-root fragment adopts off the mount CONTAINER; a single root element adopts off itself. Emitted onto
+ * the adopt fn so it rides through `_wc.adopt = render.adopt` to the client entry with no extra plumbing.
+ */
+function adoptRootDecl(gen: Gen): string[] {
+  return gen.rootIsFragment ? ['adopt.container = true;'] : [];
+}
 
 function wrapHandler(attr: EventAttr, scope: Scope): string {
   const expr: string = rewrite(attr.expr, scope).code;

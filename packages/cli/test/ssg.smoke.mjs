@@ -85,8 +85,19 @@ ok(routedResumable.includes('setServerLocation') && routedResumable.includes('re
 
 const resumeClient = generateEntry(join(rootDir, 'App.ts'), '#app', rootDir, [], { resume: true });
 ok(resumeClient.includes('import { resumePage } from "@weave-framework/runtime/graph"'), 'resume client entry: imports resumePage');
-ok(resumeClient.includes('_m.firstElementChild') && /resumePage\(\{ root: _r, adopt: Root\.adopt, handlers: Root\.handlers, derive: Root\.derive, fallback: _csr \}\)/.test(resumeClient),
-  'resume client entry: resumePage adopts the mount target\'s first child with Root.adopt + .handlers + .derive');
+ok(/resumePage\(\{ root: _r, adopt: Root\.adopt, handlers: Root\.handlers, derive: Root\.derive, fallback: _csr \}\)/.test(resumeClient),
+  'resume client entry: resumePage adopts with Root.adopt + .handlers + .derive');
+// E1.46 — WHICH node `adopt` navigates off is the component's contract, not the entry's guess. A single-root
+// component is the mount target's first element child; a MULTI-ROOT one has no root element, so its roots are
+// the mount target's own children and `adopt` walks the target. This line used to hard-code `firstElementChild`
+// — which handed the docs shell (two component roots) its TOOLBAR, so adopt walked the toolbar's insides, ran
+// off the end (`nextSibling` of null) and threw, leaving every docs page inert server HTML with resume ON.
+ok(resumeClient.includes('Root.adopt && Root.adopt.container ? _m : _m.firstElementChild'),
+  'resume client entry: picks the mount CONTAINER for a multi-root root, its first element child otherwise');
+// A root that emitted no `adopt` at all (the whole component opted out — e.g. a lifecycle hook in setup) has
+// nothing to resume into; resuming anyway armed handlers over DOM nobody adopted, i.e. a silently dead page.
+ok(resumeClient.includes('if (_r && Root.adopt) resumePage('),
+  'resume client entry: a root with no adopt fn client-renders instead of half-resuming');
 // E1.9 — the entry ALSO carries a CSR fallback, for a root the server could not make resumable (e.g. a
 // `router` binding that cannot be serialized). Without it such a page would throw instead of degrading.
 ok(/_csr = \(\) => \{ if \(_m\) \{ _m\.textContent = ""; mountComponent\(Root, _m\); \} \};/.test(resumeClient),
