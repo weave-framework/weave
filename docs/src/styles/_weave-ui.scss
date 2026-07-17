@@ -61,6 +61,9 @@
 /* Off, this toggle's track is `color.field` — which on this site IS the demo backdrop, so it
    measured 1.00:1: not faint, gone, leaving the ink knob as a stray black square. */
 @include weave.slide-toggle-overrides((border: var(--field-line)));
+/* The slider's inactive track was `color.field` too — the backdrop colour — so you could not
+   see how long the slider was, only the accent fill up to the thumb. Give it the visible line. */
+@include weave.slider-overrides((track: var(--field-line)));
 @include weave.checkbox-overrides((border: var(--field-line)));
 @include weave.radio-overrides((border: var(--field-line)));
 @include weave.chips-overrides((border: var(--field-line)));
