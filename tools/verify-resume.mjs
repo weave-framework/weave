@@ -30,6 +30,7 @@ import { build as esbuild } from 'esbuild';
 import { chromium } from 'playwright';
 import { createServer } from 'node:http';
 import { mkdirSync, mkdtempSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs';
+import { gzipSync } from 'node:zlib';
 import { dirname, join, extname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -156,6 +157,31 @@ export function setup(): { slug: Signal<string> } {
   // (No check that the bundle literally contains `adopt.container = true`. It was here for one run and it was
   // both wrong — esbuild renames the local to `adopt3` — and against the point: the emitted TEXT is not the
   // behaviour. Whether the contract reached the entry is proven below, by the second root actually adopting.)
+
+  /* ── what the page actually COSTS ── */
+
+  // The E1 exit criterion asks for a per-PAGE budget, and nothing measured one. Every budget in verify:size is
+  // a runtime ENTRY weighed in isolation (reactive, dom, adopt, graph…), which answers "how big is the library"
+  // — not "what does a resumed page ship", the number a reader of the page actually pays. They diverge: a page
+  // carries the entry code the bundler kept, the compiled components, AND the state snapshot inlined in the HTML.
+  //
+  // MEASURED, not assumed: this is the whole JS the page links plus its snapshot. It is the SAME main.js for
+  // every route — buildSsg splits only on an explicit `@defer` import, so there is no per-route or per-island
+  // chunking today. E1.2's other half ("static subtrees ship zero JS") is therefore NOT built: resume avoids
+  // re-RENDERING, it does not yet avoid SHIPPING. This budget pins the cost that exists so it cannot grow in
+  // silence, and it is the number that must FALL when island chunking lands.
+  const pageJs = [...doc.matchAll(/<script[^>]+src="\/([^"]+\.js)"/g)].map((m) => m[1]);
+  const jsBytes = pageJs.reduce((n, f) => n + gzipSync(readFileSync(join(outDir, f))).length, 0);
+  const snapBytes = gzipSync(Buffer.from((/id="__weave_snapshot__"[^>]*>([\s\S]*?)<\/script>/.exec(doc) ?? ['', ''])[1])).length;
+  // 8.75 KB gz against a measured 7.6 — ~15% headroom, the same margin verify:size runs (SPA core sits at
+  // 20.9/22.0). A budget with 2× headroom catches nothing; this one has to bite before the number doubles.
+  // Raise it only with a reason written down, exactly as verify:size demands.
+  const PAGE_BUDGET = 8_960;
+  ok(
+    jsBytes + snapBytes <= PAGE_BUDGET,
+    `a resumed page ships ${(jsBytes / 1024).toFixed(1)} KB gz JS + ${snapBytes} B snapshot ` +
+      `(budget ${(PAGE_BUDGET / 1024).toFixed(0)} KB) — files: ${pageJs.join(', ')}`
+  );
 
   /* ── serve the emitted files exactly as a static host would ── */
 
