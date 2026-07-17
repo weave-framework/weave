@@ -45,6 +45,10 @@
    contradicting the very chrome sitting above it. */
 @include weave.card-overrides((background: var(--raised)));
 @include weave.toolbar-overrides((background: var(--raised)));
+/* Every floating panel — a select/autocomplete dropdown, a menu, a dialog, a tooltip — is a
+   raised plane too, and shares one `overlay.surface` token. Bound to `--surface` (the recessed
+   #f1f3f6) a dropdown was the same grey as the page behind it; it should read as lifted. */
+@include weave.overlay-overrides((surface: var(--raised)));
 
 /* A field is a place you AIM at. On this site every demo sits on the soft dotted backdrop,
    and an underline with no fill left nothing to aim at: the line was the only drawn part and
