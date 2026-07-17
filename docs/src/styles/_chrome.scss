@@ -161,6 +161,56 @@ $topbar-h: var(--weave-toolbar-height, 52px);
     var(--bg-soft);
 }
 
+/* Several components are transparent shells by design: tabs, stepper, menubar, list, paginator and
+   tree paint no container of their own — they inherit the app surface a consumer sits them on. On
+   this site's dotted demo backdrop that leaves them floating with nothing to anchor them, and as
+   flex items of the demo stage (a flex row) they shrink to their content width instead of filling
+   it. In the demo stage ONLY — never forced on consumers — give them a full-width raised panel so
+   each reads as one discrete, finished box. Table + GridList already carry a raised surface (set
+   via *-overrides in _weave-ui.scss); they just need to fill the width. */
+.demo {
+  .weave-tabs,
+  .weave-stepper,
+  .weave-menubar,
+  .weave-list,
+  .weave-paginator,
+  .weave-tree,
+  .weave-expansion,
+  .weave-table,
+  .weave-grid-list {
+    width: 100%;
+  }
+
+  .weave-tabs,
+  .weave-stepper,
+  .weave-menubar,
+  .weave-list,
+  .weave-paginator,
+  .weave-tree {
+    background: var(--raised);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+
+  // Expansion already draws its own bordered, rounded frame — it only needed the raised fill.
+  .weave-expansion {
+    background: var(--raised);
+  }
+
+  // Bare rows (no inner chrome) would sit flush against the new box edge — give them breathing room.
+  .weave-menubar,
+  .weave-paginator {
+    padding: 6px 10px;
+  }
+
+  // Column shells whose panel has zero horizontal padding (tabs__panel / stepper body are `y 0`) —
+  // inset the box so the content and the tab underline don't touch the border.
+  .weave-tabs,
+  .weave-stepper {
+    padding: 2px 14px;
+  }
+}
+
 // <CodeBlock> copy control — a ghost <Button class="copy"> pinned to the corner.
 .code-block .copy.weave-button {
   position: absolute;

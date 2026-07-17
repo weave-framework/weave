@@ -88,3 +88,8 @@
    backdrop — so the sidenav drawer sank into the section just like Card and Toolbar did. It is a
    raised plane too: give it the white --raised so it reads as lifted off the dotted backdrop. */
 @include weave.sidenav-overrides((drawer-background: var(--raised)));
+/* A data Table reads as a surface, and GridList's tiles are surfaces — both bound to this site's
+   recessed --surface (~1.05 on the dotted demo backdrop), so they sank into it exactly as Card
+   did. Give them the white --raised, the same treatment every other lifted plane gets here. */
+@include weave.table-overrides((surface: var(--raised)));
+@include weave.grid-list-overrides((tile-background: var(--raised)));
