@@ -66,6 +66,10 @@
    `--field-line` at full strength (3.24:1) read too loud for an inactive rail, so mix it 60%
    into the backdrop (~1.9:1) — clearly there, subordinate to the accent fill. */
 @include weave.slider-overrides((track: color-mix(in srgb, var(--field-line) 60%, transparent)));
+/* The progress-bar's empty track is `color.field` too — the backdrop colour — so an unfilled
+   rail was invisible and a low-percentage bar looked like a stray accent stub floating in space.
+   Give it the same softened line the slider rail uses, so the full length of the bar is visible. */
+@include weave.progress-bar-overrides((track: color-mix(in srgb, var(--field-line) 60%, transparent)));
 @include weave.checkbox-overrides((border: var(--field-line)));
 @include weave.radio-overrides((border: var(--field-line)));
 @include weave.chips-overrides((border: var(--field-line)));
