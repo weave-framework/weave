@@ -138,12 +138,16 @@ the client with `setup` never called on the client.
 
 1. **Handler-chunk granularity** — one chunk per handler (max laziness, more requests) vs per-component
    vs per-route. Likely per-route default, per-component opt-in.
-   **STILL OPEN — and now measured, not theoretical (2026-07-17).** Nothing chunks: every route links the
-   same `main.js` (buildSsg splits only on an explicit `@defer` import). So E1.2's *"static subtrees ship
-   zero JS"* is unbuilt — **resume avoids re-RENDERING, it does not yet avoid SHIPPING**. The cost that
-   exists is pinned by `verify:resume`'s per-page budget (a 3-component resumed page = 7.6 KB gz + a 135 B
-   snapshot); that number is what must FALL when this question is answered. Until then RFC 0001 is not
-   Implemented.
+   **PER-ROUTE: ANSWERED + SHIPPED (2026-07-17).** The RFC's own default was right. `--ssg` had been
+   generating the routes manifest with static imports for BOTH bundles — a real constraint (the synchronous
+   headless render cannot await a lazy chunk) applied to the wrong side — so every route linked one `main.js`
+   holding the whole app. The CLI now emits both manifests and aliases the eager one into the SERVER bundle
+   only; the client keeps `lazy()` and esbuild splits per page. Measured on the real docs: a reader of one page
+   went **350.8 KB gz → 9.1 KB + ~0.5 KB** for their own route (~36×). Gated by `verify:resume` through the
+   real CLI, with both halves DoD-proven (drop the split → 0 chunks; drop the alias → pages prerender empty).
+   **PER-COMPONENT: still open.** An interactive component inside a route still rides its route's chunk, so a
+   mostly-static page pays for its one island. That is the remaining half of *"static subtrees ship zero JS"*.
+
 2. **Snapshot placement** — inline `<script type="application/weave">` vs a separate fetch. Inline for
    SSG; revisit for streaming in E1.
    **RESOLVED as specified**: inline, `id="__weave_snapshot__"`, read by `resumePage`. 135 B gz on the
