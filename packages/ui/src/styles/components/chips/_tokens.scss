@@ -17,12 +17,13 @@ $tokens: (
     chip-gap: 6px,
     add-gap: 4px,
     remove-size: 16px,
+    remove-icon: 12px, // the lucide `x` inside the 16px remove button
+    add-icon: 14px, // the lucide `plus` beside the add label
     remove-nudge: -4px,
     duration: ref.ref('motion.fast'),
   ),
   typography: (
     font-size: 12px,
     line-height: 1.4,
-    remove-font-size: 14px,
   ),
 );

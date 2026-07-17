@@ -10,6 +10,8 @@ import {
 } from '@weave-framework/runtime';
 import * as dom from '@weave-framework/runtime/dom';
 import { compileTemplate } from '@weave-framework/compiler';
+import * as IconMod from '@weave-framework/ui/icon';
+import { toComponent } from '../internal/compose.js';
 import { setup, template, type ChipsProps, type ChipsContext, type ChipsControl } from '@weave-framework/ui/chips';
 
 const rt: typeof dom & { signal: typeof signal; effect: typeof effect } = { ...dom, signal, effect };
@@ -29,7 +31,7 @@ function mount(props: ChipsProps): { group: HTMLElement; chips: () => HTMLElemen
       r: unknown,
       k: unknown
     ) => HTMLElement;
-    return fn(ctx, rt, {});
+    return fn(ctx, rt, { Icon: toComponent(IconMod as never) });
   });
   document.body.appendChild(group);
   return {
@@ -56,7 +58,11 @@ test('renders a group of chips with labels and remove buttons', () => {
   assert.equal(group.getAttribute('role'), 'group');
   assert.equal(chips().length, 3);
   assert.deepEqual(chips().map((c) => c.querySelector('.weave-chips__label')?.textContent), ['red', 'green', 'blue']);
-  assert.equal(removes().length, 3, 'each chip has a × button');
+  assert.equal(removes().length, 3, 'each chip has a remove button');
+  assert.ok(
+    removes().every((r) => r.querySelector('.weave-icon, svg')),
+    'each remove button draws a lucide `x` icon, not a glyph',
+  );
   dispose();
 });
 
@@ -158,7 +164,8 @@ test('onAdd renders a dashed "+ Add" chip that fires on click', () => {
   const { group, dispose } = mount({ value: ['a'], onAdd: () => (added += 1), addLabel: 'Tag' });
   const add: HTMLButtonElement | null = group.querySelector('.weave-chips__chip--add');
   assert.ok(add, 'the add chip is rendered');
-  assert.equal(add!.textContent, '+ Tag');
+  assert.equal(add!.textContent, 'Tag', 'label text only — the "+" is a lucide plus icon, not a glyph');
+  assert.ok(add!.querySelector('.weave-icon, svg'), 'the add chip carries a lucide plus icon');
   add!.click();
   assert.equal(added, 1);
   dispose();

@@ -44,8 +44,7 @@
     border-radius: 50%;
     background: transparent;
     color: var(--weave-chips-remove);
-    font-size: var(--weave-chips-remove-font-size);
-    line-height: 1;
+    --weave-icon-size: var(--weave-chips-remove-icon); // sizes the lucide `x` (was a font glyph)
     cursor: pointer;
     transition:
       color var(--weave-chips-duration) ease,
@@ -62,11 +61,12 @@
     opacity: 0.5;
   }
 
-  /* The dashed "+ Add" chip — a real button. */
+  /* The dashed add chip — a real button: lucide `plus` + the add label. */
   .weave-chips__chip--add {
     gap: var(--weave-chips-add-gap);
     border-style: dashed;
     color: var(--weave-chips-add-text);
+    --weave-icon-size: var(--weave-chips-add-icon); // sizes the lucide `plus` (was a '+' glyph)
     cursor: pointer;
     font-family: inherit;
     transition: background var(--weave-chips-duration) ease;

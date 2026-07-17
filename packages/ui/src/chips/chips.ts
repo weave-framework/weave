@@ -57,13 +57,13 @@ export const template: string =
   '<span class="weave-chips__label">{{ chip }}</span>' +
   '@if (removable()) {' +
   '<button type="button" class="weave-chips__remove" aria-label={{ removeLabelFor(chip) }} tabindex="-1"' +
-  ' disabled={{ isDisabled() }} on:click={{ () => removeChip(chip) }}>×</button>' +
+  ' disabled={{ isDisabled() }} on:click={{ () => removeChip(chip) }}><Icon name={{ \'x\' }} /></button>' +
   '}' +
   '</span>' +
   '}' +
   '@if (showAdd()) {' +
   '<button type="button" class="weave-chips__chip weave-chips__chip--add" disabled={{ isDisabled() }}' +
-  ' on:click={{ add }}>{{ addText() }}</button>' +
+  ' on:click={{ add }}><Icon name={{ \'plus\' }} />{{ addText() }}</button>' +
   '}' +
   '</div>';
 
@@ -163,6 +163,7 @@ export function setup(props: ChipsProps): ChipsContext {
     add: (): void => {
       if (!isDisabled()) props.onAdd?.();
     },
-    addText: (): string => `+ ${props.addLabel ?? 'Add'}`,
+    // No '+' prefix: a lucide `plus` Icon draws it now (UI-icons rule — never a glyph).
+    addText: (): string => props.addLabel ?? 'Add',
   };
 }
