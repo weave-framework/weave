@@ -17,6 +17,22 @@
 import { signal, effect, batch, onCleanup, watch } from '@weave-framework/runtime';
 import type { Signal } from '@weave-framework/runtime';
 
+/**
+ * E1.3 — hand an in-flight fetch to a headless SERVER render, so it settles before serializing and the client
+ * resumes with data already present rather than refetching what the server just fetched.
+ *
+ * Read through a global rather than imported from `@weave-framework/runtime/server`: this package is used by
+ * ordinary client apps, and importing that entry would pull the entire headless render into their bundle
+ * (invariant I3 — resume/server code is 0 bytes for a plain SPA). `runtime/server` publishes the sink when a
+ * render is in progress; in a browser it is simply never there, so this costs one `undefined` compare.
+ */
+function trackServerAsync(p: Promise<unknown>): void {
+  const sink: Promise<unknown>[] | undefined = (globalThis as Record<string, unknown>).__weaveAsync as
+    | Promise<unknown>[]
+    | undefined;
+  if (sink) sink.push(p);
+}
+
 /* ──────────────────────────── resource ──────────────────────────── */
 
 /** Extra info handed to a fetcher: an abort signal + whether this is a manual refetch. */
@@ -106,7 +122,7 @@ export function resource(
     });
 
     // Defer the fetcher to a microtask so it never tracks signals in this effect.
-    Promise.resolve()
+    const inFlight: Promise<void> = Promise.resolve()
       .then(() => fetcher(value, { signal: controller.signal, refetching }))
       .then(
         (result) => {
@@ -125,6 +141,11 @@ export function resource(
           });
         }
       );
+    // E1.3 — during a headless SERVER render, hand the in-flight fetch to the render so it waits before
+    // serializing; the client then resumes with the data already present instead of asking for it again.
+    // A global, not an import: importing `runtime/server` here would drag the whole headless render into
+    // every client bundle that fetches (invariant I3). Undefined in a browser → one compare, nothing else.
+    trackServerAsync(inFlight);
   }
 
   effect(() => {

@@ -26,6 +26,41 @@ import type { Component } from './dom.js';
 // Install on import, so a component module imported afterward parses its `template(...)` strings headlessly.
 installServerDom();
 
+/**
+ * E1.3 — the async seam. The render is synchronous but data is not: `resource()` defers its fetcher to a
+ * microtask, so a headless render finished before any fetch resolved and an SSG page shipped empty + `loading`,
+ * with the client refetching exactly what the build had just fetched.
+ *
+ * A GLOBAL, not an exported function: `@weave-framework/data` must not import this entry, or every fetching
+ * client SPA would bundle the headless render (I3). Same shape as {@link installServerDom} — the server
+ * installs, the library looks (`data`'s `trackServerAsync`). Absent in a browser → one `undefined` compare.
+ */
+const ASYNC_SINK: string = '__weaveAsync';
+
+/**
+ * Run `render`, then drain what the sink collected — repeatedly, since settling one fetch can start another
+ * (a resource whose `source` reads another's data). Rejections are absorbed: a failed fetch lands in `error()`
+ * and renders as such, which is the app's business, not a build failure. Bounded, so a self-retriggering
+ * resource cannot hang the build forever.
+ */
+async function settleAsync<T>(render: () => T): Promise<T> {
+  const g: Record<string, unknown> = globalThis as Record<string, unknown>;
+  const prev: unknown = g[ASYNC_SINK];
+  const sink: Promise<unknown>[] = [];
+  g[ASYNC_SINK] = sink;
+  try {
+    const out: T = render();
+    for (let round: number = 0; sink.length && round < 20; round++) {
+      await Promise.allSettled(sink.splice(0));
+      await Promise.resolve(); // let the .then() that writes the signal run before checking for more
+    }
+    return out;
+  } finally {
+    if (prev === undefined) delete g[ASYNC_SINK];
+    else g[ASYNC_SINK] = prev;
+  }
+}
+
 /** Serialize an already-built node tree (element / text / comment / fragment) to an HTML string. */
 export function renderToString(node: unknown): string {
   return serializeNode(node as SNode);
@@ -56,10 +91,10 @@ export function renderComponent(component: Component, props?: Record<string, unk
  *  - **explicit** (E1.2, default) — snapshot the caller's `state` record (byte-for-byte prior behaviour;
  *    `collectStates` is inert for an eager render, which never calls `registerState`).
  */
-export function renderPage(
+export async function renderPage(
   component: Component,
   options: { props?: Record<string, unknown>; state?: Record<string, unknown>; resumable?: boolean } = {}
-): PageArtifact {
+): Promise<PageArtifact> {
   // Reset the shared title so a prior route's value never leaks; the render may set `document.title`
   // (e.g. a route-title effect), which we capture below for the page's <title>.
   const doc: { title?: string } | undefined = (globalThis as { document?: { title?: string } }).document;
@@ -69,15 +104,24 @@ export function renderPage(
   const props: Record<string, unknown> | undefined = options.resumable
     ? { ...options.props, $wid: ROOT_ID }
     : options.props;
-  let html: string = '';
   const dropped: DroppedState[] = [];
-  const states: Record<string, unknown> = collectStates(() => {
-    // A collecting session marks this as THE server render: each `on:` site stamps its `data-won-*` marker for
-    // the client to resume, instead of wiring a live listener (which is what a client-side render of the same
-    // resumable build does). The captured id→handler map is discarded — the client rebuilds handlers from the
-    // compiled `handlers(ctx)` factory over the resumed ctx.
-    html = collectResumable(() => renderComponent(component, props)).node;
-  }, dropped);
+  // E1.3 — build the node, SETTLE, then serialize (it was one synchronous `renderComponent` call, which is why
+  // a page with a `resource()` prerendered empty). The owner must OUTLIVE the wait: disposing it early — as
+  // `renderComponent` does in its `finally` — kills the bindings that write the fetched value into the node.
+  const owner: Owner = createOwner(null);
+  let node: unknown;
+  const states: Record<string, unknown> = await settleAsync(() =>
+    collectStates(() => {
+      // A collecting session marks this as THE server render: each `on:` site stamps its `data-won-*` marker for
+      // the client to resume, instead of wiring a live listener (which is what a client-side render of the same
+      // resumable build does). The captured id→handler map is discarded — the client rebuilds handlers from the
+      // compiled `handlers(ctx)` factory over the resumed ctx.
+      node = collectResumable(() => runInOwner(owner, () => component(props ?? {}, {}))).node;
+    }, dropped)
+  );
+  // Settled: every tracked fetch has resolved and its effect has written through into `node`.
+  const html: string = serializeNode(node as SNode);
+  disposeOwner(owner);
   // A signal can be reassigned AFTER its component registered — re-check before encoding, or the build dies
   // inside `snapshot()` with no clue which component was at fault (E1.9).
   if (options.resumable) finalizeStates(states, dropped);

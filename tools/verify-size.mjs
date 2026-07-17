@@ -64,12 +64,18 @@ const BUDGETS = [
   // (E1.3d SSG document-<title> capture) → 8192 (E1.4 the islands capture: `renderPage({ resumable })` wraps
   // the render in `collectStates` + tags the root `$root` + snapshots the per-instance state map, pulling in
   // collectStates/ROOT_ID). Deliberate — the SPA core (20.9 KB) is untouched; this line never ships to a browser.
+  // → 9728 (E1.3 async render): `renderPage` is now async and settles every tracked fetch BEFORE serializing,
+  // so a page with a `resource()` prerenders WITH its data instead of shipping `loading: true` and making the
+  // client refetch what the build just fetched. Costs the async/await transform + the drain loop + splitting
+  // build-node/serialize apart so the owner outlives the wait (8.1 → 8.9 KB). Trimmed the prose first — that
+  // was 0.3 KB of it, since dist is unminified. Same rationale as every bump on this line: server-only.
   {
     label: 'runtime/server (E0.4 headless)',
     files: ['packages/runtime/dist/server.js', 'packages/runtime/dist/server-dom.js', 'packages/runtime/dist/document.js'],
     // 8192 → 8704 (E1.9: renderPage declares the server render via collectResumable + maps dropped instances
-    // to build warnings). Server-only — never ships to a browser.
-    budget: 8_704,
+    // to build warnings) → 9472 (E1.3 async render; see the note above — measured 8.9, ~6% headroom, the
+    // margin this file runs). Server-only — never ships to a browser.
+    budget: 9_472,
   },
 ];
 

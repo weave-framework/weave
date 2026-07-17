@@ -34,8 +34,9 @@ const entry = `
   import { SNAPSHOT_ID, ROOT_ID, collectStates, registerState } from '@weave-framework/runtime/graph';
   import { bindTextResumable, adoptText, blockStart, adoptIsland, blockEndOf, clearBlock, after, adoptComponent } from '@weave-framework/runtime/adopt';
   import { compileTemplate } from '@weave-framework/compiler';
+  import { resource } from '@weave-framework/data';
   export const rt = { ...dom, signal, computed, effect, root, resumableHandler, bindTextResumable, adoptText, blockStart, adoptIsland, blockEndOf, clearBlock, after, adoptComponent, registerState };
-  export { renderToString, renderComponent, renderPage, renderDocument, compileTemplate, signal, dom, deserialize, SNAPSHOT_ID, ROOT_ID, collectResumable };
+  export { renderToString, renderComponent, renderPage, renderDocument, compileTemplate, signal, dom, deserialize, SNAPSHOT_ID, ROOT_ID, collectResumable, resource };
 `;
 
 const cacheDir = join(repo, 'node_modules', '.weave');
@@ -49,7 +50,7 @@ await esbuild({
   target: 'node18',
   outfile: out,
 });
-const { rt, renderToString, renderComponent, renderPage, renderDocument, compileTemplate, signal, deserialize, SNAPSHOT_ID, ROOT_ID, collectResumable } = await import(pathToFileURL(out).href);
+const { rt, renderToString, renderComponent, renderPage, renderDocument, compileTemplate, signal, deserialize, SNAPSHOT_ID, ROOT_ID, collectResumable, resource } = await import(pathToFileURL(out).href);
 
 /** Compile a template (function mode) and return the bare render fn (with `.adopt`/`.handlers` attached). */
 function compileRender(html, scope, opts = {}, children = {}) {
@@ -146,7 +147,7 @@ console.log('verify:server — headless render to string\n');
   const App = rt.defineComponent(renderFn, (props) => ({ title: props.title }));
 
   const count = signal(41);
-  const artifact = renderPage(App, { props: { title: 'Docs' }, state: { count } });
+  const artifact = await renderPage(App, { props: { title: 'Docs' }, state: { count } });
   ok(artifact.html.includes('<h1>Docs'), 'renderPage renders the component HTML');
   ok(artifact.snapshotScript.includes(`id="${SNAPSHOT_ID}"`) && artifact.snapshotScript.includes('application/weave'), 'emits the snapshot <script>');
 
@@ -165,7 +166,7 @@ console.log('verify:server — headless render to string\n');
   const { code } = compileTemplate('<h1>{{ t }}</h1>', { mode: 'function', scope: ['t'] });
   const renderFn = new Function('rt', '_c', code.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;'))(rt, {});
   const Titled = rt.defineComponent(renderFn, () => { document.title = 'Signals — Weave'; return { t: 'Signals' }; });
-  const artifact = renderPage(Titled, {});
+  const artifact = await renderPage(Titled, {});
   ok(artifact.title === 'Signals — Weave', 'renderPage captures document.title set during render');
 
   const doc = renderDocument(artifact, { entry: '/app.js' }); // no explicit title → the captured one
@@ -174,7 +175,7 @@ console.log('verify:server — headless render to string\n');
 
   // a later render with no title resets — the prior route's title must not leak
   const Plain = rt.defineComponent(renderFn, () => ({ t: 'x' }));
-  ok(renderPage(Plain, {}).title === undefined, 'title is reset between renders (no leak)');
+  ok((await renderPage(Plain, {})).title === undefined, 'title is reset between renders (no leak)');
 }
 
 // 8) E1.4 — the ISLANDS path: a resumable-compiled component renders headlessly (markers + block boundaries
@@ -192,7 +193,7 @@ console.log('verify:server — headless render to string\n');
   const Parent = rt.defineComponent(parentRender, (props) => ({ title: signal(props.title ?? 'T') }));
   Parent.adopt = parentRender.adopt;
 
-  const art = renderPage(Parent, { props: { title: 'Home' }, resumable: true });
+  const art = await renderPage(Parent, { props: { title: 'Home' }, resumable: true });
 
   // (a) resumable-CREATE render runs under the headless DOM + serializes: real HTML with the marker + child
   ok(art.html.includes('<h1>') && art.html.includes('Home') && art.html.includes('<b>') && art.html.includes('x'),
@@ -213,7 +214,7 @@ console.log('verify:server — headless render to string\n');
   const eagerRender = compileRender('<p>{{ t }}</p>', ['t']);
   const Eager = rt.defineComponent(eagerRender, (props) => ({ t: props.t }));
   const n = signal(5);
-  const art = renderPage(Eager, { props: { t: 'hi' }, state: { n } });
+  const art = await renderPage(Eager, { props: { t: 'hi' }, state: { n } });
   const json = art.snapshotScript.replace(/^[^>]*>/, '').replace(/<\/script>$/, '').replace(/\\u003c/g, '<');
   const state = deserialize(JSON.parse(json));
   ok(!(ROOT_ID in state) && typeof state.n === 'function' && state.n() === 5,
@@ -221,6 +222,44 @@ console.log('verify:server — headless render to string\n');
 }
 
 console.log('');
+// 10) E1.3 — a page that FETCHES prerenders WITH its data, and the snapshot carries it.
+//     The render is synchronous but `resource()` defers its fetcher to a microtask, so the HTML used to be
+//     written before any data existed: an SSG page shipped `loading: true` and empty, and the client then
+//     refetched exactly what the build had just fetched. `renderPage` now settles every tracked fetch before
+//     serializing — that is what "the client resumes with data already present" means.
+{
+  const { code } = compileTemplate('<p>{{ label() }}</p>', { mode: 'function', scope: ['label'], resumable: true });
+  const renderFn = new Function('rt', '_c', code.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;'))(rt, {});
+  const Fetching = rt.defineComponent(renderFn, () => {
+    const r = resource(async () => {
+      await new Promise((res) => setTimeout(res, 5)); // real async, not a resolved promise
+      return 'FETCHED_ON_SERVER';
+    });
+    return { label: () => r.data() ?? 'PENDING', got: signal('') , res: r };
+  });
+  const art = await renderPage(Fetching, {});
+  ok(art.html.includes('FETCHED_ON_SERVER'), `the prerendered HTML carries the FETCHED value (got: ${art.html})`);
+  ok(!art.html.includes('PENDING'), 'and not the pending placeholder');
+}
+
+// 11) E1.3 DoD — the same page, rendered WITHOUT settling, is the bug: HTML written before the fetch lands.
+//     Proves the wait is what does the work, rather than the fetch happening to be fast.
+{
+  const { code } = compileTemplate('<p>{{ label() }}</p>', { mode: 'function', scope: ['label'], resumable: true });
+  const renderFn = new Function('rt', '_c', code.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;'))(rt, {});
+  const Fetching = rt.defineComponent(renderFn, () => {
+    const r = resource(async () => {
+      await new Promise((res) => setTimeout(res, 5));
+      return 'FETCHED_ON_SERVER';
+    });
+    return { label: () => r.data() ?? 'PENDING' };
+  });
+  // renderComponent is the OLD synchronous path — build + serialize in one go, no settle.
+  const html = renderComponent(Fetching, {});
+  ok(html.includes('PENDING') && !html.includes('FETCHED_ON_SERVER'),
+    `without settling, the same page prerenders EMPTY — this was every SSG page with data (got: ${html})`);
+}
+
 if (failures) {
   console.error(`✖ ${failures} server-render check(s) failed.`);
   process.exit(1);
