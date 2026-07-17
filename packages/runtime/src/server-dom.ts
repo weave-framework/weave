@@ -477,6 +477,9 @@ export function installServerDom(): boolean {
   if (installed) return true;
   const g: Record<string, unknown> = globalThis as unknown as Record<string, unknown>;
   if (typeof g.document !== 'undefined') return false; // real DOM present — never clobber it (I2)
+  // A mount hook has no DOM to run against here, and E1.3's settling gives the microtask queue a turn it never
+  // used to get — so make the documented "onMount is inert on the server" true by construction, not by luck.
+  g.__weaveHeadless = true;
   g.document = makeDocument();
   g.Node = SNode;
   g.Element = SElement;

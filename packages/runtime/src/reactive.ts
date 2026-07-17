@@ -352,6 +352,9 @@ export function onDispose(fn: () => void): void {
  * before the microtask fires. No-op cleanup tie-in outside an owner scope.
  */
 export function onMount(fn: () => void | (() => void)): void {
+  // Inert under the headless render (`installServerDom` sets the flag) — a mount hook has no DOM there. Via a
+  // global, not an import: a server-only concern must not cost the SPA core an export + an edge (I3).
+  if ((globalThis as Record<string, unknown>).__weaveHeadless) return;
   const owner: Owner | null = currentOwner;
   queueMicrotask(() => {
     if (owner && owner._disposed) return;

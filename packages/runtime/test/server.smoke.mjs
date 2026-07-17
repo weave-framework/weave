@@ -28,14 +28,14 @@ const eq = (actual, expected, msg) => ok(actual === expected, `${msg}${actual ==
 const entry = `
   import { renderToString, renderComponent, renderPage, renderDocument } from '@weave-framework/runtime/server';
   import * as dom from '@weave-framework/runtime/dom';
-  import { signal, computed, effect, root } from '@weave-framework/runtime';
+  import { signal, computed, effect, root, onMount } from '@weave-framework/runtime';
   import { resumableHandler, collectResumable } from '@weave-framework/runtime/resume';
   import { deserialize } from '@weave-framework/runtime/serialize';
   import { SNAPSHOT_ID, ROOT_ID, collectStates, registerState } from '@weave-framework/runtime/graph';
   import { bindTextResumable, adoptText, blockStart, adoptIsland, blockEndOf, clearBlock, after, adoptComponent } from '@weave-framework/runtime/adopt';
   import { compileTemplate } from '@weave-framework/compiler';
   import { resource } from '@weave-framework/data';
-  export const rt = { ...dom, signal, computed, effect, root, resumableHandler, bindTextResumable, adoptText, blockStart, adoptIsland, blockEndOf, clearBlock, after, adoptComponent, registerState };
+  export const rt = { ...dom, signal, computed, effect, root, onMount, resumableHandler, bindTextResumable, adoptText, blockStart, adoptIsland, blockEndOf, clearBlock, after, adoptComponent, registerState };
   export { renderToString, renderComponent, renderPage, renderDocument, compileTemplate, signal, dom, deserialize, SNAPSHOT_ID, ROOT_ID, collectResumable, resource };
 `;
 
@@ -258,6 +258,25 @@ console.log('');
   const html = renderComponent(Fetching, {});
   ok(html.includes('PENDING') && !html.includes('FETCHED_ON_SERVER'),
     `without settling, the same page prerenders EMPTY — this was every SSG page with data (got: ${html})`);
+}
+
+// 12) onMount is INERT under the headless render — enforced, not lucky.
+//     It was inert only because the render was fully synchronous. E1.3 made it await data, which handed the
+//     microtask queue a turn: every onMount fired against the DOM shim and the first `getComputedStyle` took
+//     the whole docs build down. This pins the invariant runtime/server's header has always claimed, and that
+//     E1.45's refusal depends on (it refuses to ADOPT a component with a mount hook precisely because the
+//     server never runs it — if the server DID run it, that refusal would be wrong).
+{
+  const { code } = compileTemplate('<p>{{ t }}</p>', { mode: 'function', scope: ['t'] });
+  const renderFn = new Function('rt', '_c', code.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;'))(rt, {});
+  let mounted = false;
+  const Hooked = rt.defineComponent(renderFn, () => {
+    rt.onMount(() => { mounted = true; });
+    return { t: 'x' };
+  });
+  const art = await renderPage(Hooked, {}); // awaits — the microtask queue DOES get a turn here
+  ok(art.html.includes('x'), 'the component still rendered');
+  ok(mounted === false, 'onMount did NOT run on the server, even though the render awaited');
 }
 
 if (failures) {
