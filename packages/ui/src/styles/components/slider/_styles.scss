@@ -1,6 +1,4 @@
 // slider — styles() mixin (class rules). Forwarded by ./_index.scss.
-@use '../../helpers' as helpers;
-
 @mixin styles() {
   .weave-slider {
     position: relative;
@@ -62,8 +60,11 @@
     outline: none;
   }
 
+  // A thin accent ring on the thumb, not the shared 2px one: at 2px + offset the box was
+  // taller and wider than the thumb it marked and read as covering the slider.
   .weave-slider:focus-visible .weave-slider__thumb {
-    @include helpers.focus-ring;
+    outline: var(--weave-slider-focus-width) solid var(--weave-slider-focus);
+    outline-offset: var(--weave-slider-focus-offset);
   }
 
   // Invalid — the fill + cap redden (state via the --invalid modifier from the control).

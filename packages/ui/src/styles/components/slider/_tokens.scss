@@ -8,6 +8,10 @@ $tokens: (
     fill: ref.ref('color.accent'),
     thumb: ref.ref('color.ink'),
     cap: ref.ref('color.accent'),
+    // Keyboard focus ring on the thumb. Its own token so it can be softened without touching
+    // the shared focus-ring (which many components use). Accent keeps the ≥3:1 a focus
+    // indicator needs; the thinness (below) is what stops it from dwarfing the 3px thumb.
+    focus: ref.ref('color.accent'),
     error: ref.ref('color.error'),
   ),
   size: (
@@ -17,6 +21,8 @@ $tokens: (
     thumb-height: 18px,
     cap-nudge: 1px, // shift the accent cap 1px toward the fill side (visual centring on the 3px bar)
     cap-size: 6px,
+    focus-width: 1px, // the shared ring is 2px, which boxed in the whole thumb; 1px here
+    focus-offset: 1px,
     duration: ref.ref('motion.fast'),
   ),
 );
