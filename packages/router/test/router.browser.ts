@@ -11,7 +11,6 @@ import {
   beforeEach,
   RouterView,
   Link,
-  prefetch,
   useRouter,
   route,
   useLoaderData,

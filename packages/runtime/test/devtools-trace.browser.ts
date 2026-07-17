@@ -15,7 +15,6 @@ import {
   type Owner,
   type Signal,
   type Computed,
-  type DevSnapshot,
   type DevTrigger,
 } from '@weave-framework/runtime';
 

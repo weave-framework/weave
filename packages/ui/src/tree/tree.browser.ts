@@ -42,7 +42,7 @@ const FLAT: FlatRow[] = [
 type Ctx<N> = TreeContext<N>;
 type MakeRender<N> = (ctx: Ctx<N>, rt: unknown, c: unknown) => (ctx: Ctx<N>, slots: Record<string, () => Node>) => HTMLElement;
 
-interface Mounted<N> {
+interface Mounted {
   host: HTMLElement;
   owner: Owner;
   dispose: () => void;
@@ -50,7 +50,7 @@ interface Mounted<N> {
 
 const SCOPE: string[] = inferCtxNames(parseTemplate(template));
 
-async function mount<N>(props: TreeProps<N>): Promise<Mounted<N>> {
+async function mount<N>(props: TreeProps<N>): Promise<Mounted> {
   const owner: Owner = createOwner();
   const host: HTMLElement = runInOwner(owner, () => {
     const ctx: Ctx<N> = setup<N>(props);
@@ -70,12 +70,12 @@ async function mount<N>(props: TreeProps<N>): Promise<Mounted<N>> {
   };
 }
 
-const nodes = (m: Mounted<unknown>): HTMLElement[] =>
+const nodes = (m: Mounted): HTMLElement[] =>
   Array.from(m.host.querySelectorAll<HTMLElement>('.weave-tree__node'));
-const labels = (m: Mounted<unknown>): string[] => nodes(m).map((n) => n.textContent ?? '');
-const byName = (m: Mounted<unknown>, name: string): HTMLElement =>
+const labels = (m: Mounted): string[] => nodes(m).map((n) => n.textContent ?? '');
+const byName = (m: Mounted, name: string): HTMLElement =>
   nodes(m).find((n) => (n.textContent ?? '') === name) as HTMLElement;
-const press = (m: Mounted<unknown>, key: string): void => {
+const press = (m: Mounted, key: string): void => {
   // m.host IS the role=tree root (the template's single root element).
   m.host.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
 };
@@ -84,7 +84,7 @@ const NESTED: TreeProps<FileNode> = { nodes: TREE, label: (n) => n.name };
 
 /* ── structure + nested model ── */
 test('tree: role=tree of role=treeitem; only visible (collapsed) roots render', async () => {
-  const m: Mounted<FileNode> = await mount<FileNode>({ ...NESTED });
+  const m: Mounted = await mount<FileNode>({ ...NESTED });
   assert.equal(m.host.getAttribute('role'), 'tree', 'the root is a role=tree container');
   assert.equal(nodes(m).length, 2, 'two roots, children hidden');
   assert.deepEqual(labels(m), ['src', 'README.md']);
@@ -96,7 +96,7 @@ test('tree: role=tree of role=treeitem; only visible (collapsed) roots render', 
 });
 
 test('tree: aria-level / -setsize / -posinset reflect the hierarchy', async () => {
-  const m: Mounted<FileNode> = await mount<FileNode>({ ...NESTED, defaultExpanded: [TREE[0]] });
+  const m: Mounted = await mount<FileNode>({ ...NESTED, defaultExpanded: [TREE[0]] });
   const src: HTMLElement = byName(m, 'src');
   assert.equal(src.getAttribute('aria-level'), '1');
   assert.equal(src.getAttribute('aria-setsize'), '2');
@@ -110,7 +110,7 @@ test('tree: aria-level / -setsize / -posinset reflect the hierarchy', async () =
 /* ── expand / collapse ── */
 test('tree: clicking the disclosure toggle reveals + hides children', async () => {
   const expandedSets: string[][] = [];
-  const m: Mounted<FileNode> = await mount<FileNode>({ ...NESTED, onExpandedChange: (e) => expandedSets.push(e.map((n) => n.id)) });
+  const m: Mounted = await mount<FileNode>({ ...NESTED, onExpandedChange: (e) => expandedSets.push(e.map((n) => n.id)) });
   const toggle: HTMLElement = byName(m, 'src').querySelector('.weave-tree__toggle') as HTMLElement;
   toggle.click();
   assert.deepEqual(labels(m), ['src', 'index.ts', 'ui', 'README.md'], 'children shown under src');
@@ -123,7 +123,7 @@ test('tree: clicking the disclosure toggle reveals + hides children', async () =
 });
 
 test('tree: a non-selectable folder toggles on row click (whole node)', async () => {
-  const m: Mounted<FileNode> = await mount<FileNode>({ ...NESTED });
+  const m: Mounted = await mount<FileNode>({ ...NESTED });
   byName(m, 'src').click(); // no selection → row click expands
   assert.deepEqual(labels(m), ['src', 'index.ts', 'ui', 'README.md']);
   m.dispose();
@@ -132,7 +132,7 @@ test('tree: a non-selectable folder toggles on row click (whole node)', async ()
 test('tree: controlled expanded — the prop is the source of truth; toggles emit without self-mutating', async () => {
   const expanded: ReturnType<typeof signal<FileNode[]>> = signal<FileNode[]>([]);
   const emitted: string[][] = [];
-  const m: Mounted<FileNode> = await mount<FileNode>({
+  const m: Mounted = await mount<FileNode>({
     nodes: TREE,
     label: (n) => n.name,
     get expanded(): FileNode[] {
@@ -152,7 +152,7 @@ test('tree: controlled expanded — the prop is the source of truth; toggles emi
 /* ── flat model ── */
 test('tree: flat model (getLevel) flattens + hides descendants of collapsed nodes', async () => {
   const flat: TreeProps<FlatRow> = { nodes: FLAT, getLevel: (n) => n.depth, label: (n) => n.name };
-  const m: Mounted<FlatRow> = await mount<FlatRow>({ ...flat, defaultExpanded: [FLAT[0]] }); // src open, ui closed
+  const m: Mounted = await mount<FlatRow>({ ...flat, defaultExpanded: [FLAT[0]] }); // src open, ui closed
   assert.deepEqual(labels(m), ['src', 'index.ts', 'ui', 'README.md'], 'ui collapsed hides button.ts');
   assert.equal(byName(m, 'ui').getAttribute('aria-expanded'), 'false');
   assert.equal(byName(m, 'button.ts') as unknown, undefined, 'button.ts hidden under collapsed ui');
@@ -164,7 +164,7 @@ test('tree: flat model (getLevel) flattens + hides descendants of collapsed node
 /* ── selection ── */
 test('tree: selectable single — clicking a node selects it (aria-selected), replaces prior', async () => {
   const changes: string[][] = [];
-  const m: Mounted<FileNode> = await mount<FileNode>({
+  const m: Mounted = await mount<FileNode>({
     ...NESTED,
     defaultExpanded: [TREE[0]],
     selectable: true,
@@ -180,7 +180,7 @@ test('tree: selectable single — clicking a node selects it (aria-selected), re
 });
 
 test('tree: selectable multiple accumulates + toggles off', async () => {
-  const m: Mounted<FileNode> = await mount<FileNode>({ ...NESTED, defaultExpanded: [TREE[0]], selectable: true, selectionMode: 'multiple' });
+  const m: Mounted = await mount<FileNode>({ ...NESTED, defaultExpanded: [TREE[0]], selectable: true, selectionMode: 'multiple' });
   byName(m, 'index.ts').click();
   byName(m, 'README.md').click();
   assert.equal(byName(m, 'index.ts').getAttribute('aria-selected'), 'true');
@@ -191,7 +191,7 @@ test('tree: selectable multiple accumulates + toggles off', async () => {
 });
 
 test('tree: a selectable folder click selects but does NOT expand (chevron / keys do)', async () => {
-  const m: Mounted<FileNode> = await mount<FileNode>({ ...NESTED, selectable: true });
+  const m: Mounted = await mount<FileNode>({ ...NESTED, selectable: true });
   byName(m, 'src').click();
   assert.equal(byName(m, 'src').getAttribute('aria-selected'), 'true');
   assert.deepEqual(labels(m), ['src', 'README.md'], 'not expanded by the row click');
@@ -202,7 +202,7 @@ test('tree: a selectable folder click selects but does NOT expand (chevron / key
 
 /* ── keyboard (WAI-ARIA tree) ── */
 test('tree: ArrowRight expands a collapsed folder, then steps into the first child', async () => {
-  const m: Mounted<FileNode> = await mount<FileNode>({ ...NESTED });
+  const m: Mounted = await mount<FileNode>({ ...NESTED });
   press(m, 'ArrowRight'); // active defaults to src → expand
   assert.equal(byName(m, 'src').getAttribute('aria-expanded'), 'true');
   press(m, 'ArrowRight'); // already expanded → move to first child
@@ -211,7 +211,7 @@ test('tree: ArrowRight expands a collapsed folder, then steps into the first chi
 });
 
 test('tree: ArrowLeft collapses an expanded folder, then moves to the parent', async () => {
-  const m: Mounted<FileNode> = await mount<FileNode>({ ...NESTED, defaultExpanded: [TREE[0]] });
+  const m: Mounted = await mount<FileNode>({ ...NESTED, defaultExpanded: [TREE[0]] });
   press(m, 'ArrowDown'); // src → index.ts
   assert.equal(document.activeElement, byName(m, 'index.ts'));
   press(m, 'ArrowLeft'); // leaf → move to parent
@@ -224,7 +224,7 @@ test('tree: ArrowLeft collapses an expanded folder, then moves to the parent', a
 test('tree: RTL flips expand/collapse — ArrowLeft expands + steps in, ArrowRight collapses + steps out', async () => {
   setDirection('rtl');
   try {
-    const m: Mounted<FileNode> = await mount<FileNode>({ ...NESTED });
+    const m: Mounted = await mount<FileNode>({ ...NESTED });
     press(m, 'ArrowLeft'); // active defaults to src → expand (into-key is ArrowLeft in RTL)
     assert.equal(byName(m, 'src').getAttribute('aria-expanded'), 'true', 'ArrowLeft expands in RTL');
     press(m, 'ArrowLeft'); // already expanded → step into first child
@@ -240,7 +240,7 @@ test('tree: RTL flips expand/collapse — ArrowLeft expands + steps in, ArrowRig
 });
 
 test('tree: Up/Down rove focus; a single tab stop (roving tabindex)', async () => {
-  const m: Mounted<FileNode> = await mount<FileNode>({ ...NESTED, defaultExpanded: [TREE[0]] });
+  const m: Mounted = await mount<FileNode>({ ...NESTED, defaultExpanded: [TREE[0]] });
   assert.equal(nodes(m).filter((n) => n.getAttribute('tabindex') === '0').length, 1, 'exactly one tabbable node');
   assert.equal(byName(m, 'src').getAttribute('tabindex'), '0', 'first node tabbable initially');
   press(m, 'ArrowDown');
@@ -251,7 +251,7 @@ test('tree: Up/Down rove focus; a single tab stop (roving tabindex)', async () =
 });
 
 test('tree: Enter/Space activates the focused node (selects when selectable)', async () => {
-  const m: Mounted<FileNode> = await mount<FileNode>({ ...NESTED, defaultExpanded: [TREE[0]], selectable: true });
+  const m: Mounted = await mount<FileNode>({ ...NESTED, defaultExpanded: [TREE[0]], selectable: true });
   press(m, 'ArrowDown'); // → index.ts
   press(m, 'Enter');
   assert.equal(byName(m, 'index.ts').getAttribute('aria-selected'), 'true');
@@ -264,7 +264,7 @@ const dragPointer = (target: EventTarget, type: string, clientY: number): void =
 };
 
 test('tree: reorderable renders a per-node drag handle + a --reorderable class', async () => {
-  const m: Mounted<FileNode> = await mount<FileNode>({ ...NESTED, reorderable: true });
+  const m: Mounted = await mount<FileNode>({ ...NESTED, reorderable: true });
   assert.ok(m.host.classList.contains('weave-tree--reorderable'));
   assert.ok(nodes(m).every((n) => n.querySelector('.weave-tree__drag-handle')), 'each node has a handle');
   m.dispose();
@@ -272,7 +272,7 @@ test('tree: reorderable renders a per-node drag handle + a --reorderable class',
 
 test('tree: dragging a node handle past a sibling emits onReorder (visible order)', async () => {
   const drops: Array<{ previousIndex: number; currentIndex: number }> = [];
-  const m: Mounted<FileNode> = await mount<FileNode>({
+  const m: Mounted = await mount<FileNode>({
     ...NESTED,
     defaultExpanded: [TREE[0]],
     reorderable: true,
@@ -290,7 +290,7 @@ test('tree: dragging a node handle past a sibling emits onReorder (visible order
 });
 
 test('tree: Space/Enter still selects when reorderable (dropList keyboard is off)', async () => {
-  const m: Mounted<FileNode> = await mount<FileNode>({ ...NESTED, defaultExpanded: [TREE[0]], reorderable: true, selectable: true });
+  const m: Mounted = await mount<FileNode>({ ...NESTED, defaultExpanded: [TREE[0]], reorderable: true, selectable: true });
   press(m, 'ArrowDown'); // focus → node 1 (index.ts)
   press(m, 'Enter');
   assert.equal(nodes(m)[1].getAttribute('aria-selected'), 'true', 'Enter selects; no keyboard-drag hijack');
@@ -299,7 +299,7 @@ test('tree: Space/Enter still selects when reorderable (dropList keyboard is off
 
 /* ── content render fn ── */
 test('tree: a node render fn mounts arbitrary content', async () => {
-  const m: Mounted<FileNode> = await mount<FileNode>({
+  const m: Mounted = await mount<FileNode>({
     nodes: TREE,
     node: (n: FileNode): Node => {
       const b: HTMLElement = document.createElement('strong');

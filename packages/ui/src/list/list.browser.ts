@@ -421,7 +421,7 @@ test('rowTemplate: a click on an interactive child (a Button inside the row) doe
 
 test('non-selectable + rowTemplate: rows render the template and stay inert (FW-14)', async () => {
   let calls: number = 0;
-  const { list, rows, dispose } = mount({ items: ROLE_ROWS, selectable: false, rowTemplate: roleRow, onChange: () => (calls += 1) } as ListProps);
+  const { rows, dispose } = mount({ items: ROLE_ROWS, selectable: false, rowTemplate: roleRow, onChange: () => (calls += 1) } as ListProps);
   await tick();
   assert.ok(rows.every((r) => r.getAttribute('role') === 'listitem'), 'plain list rows under a template');
   assert.ok(rows.every((r) => r.querySelector('.list-item-main')), 'template body rendered in every row');

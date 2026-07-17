@@ -133,7 +133,6 @@ interface HandlerSink {
   n: number;
 }
 let activeSink: HandlerSink | null = null;
-let fallbackN: number = 0;
 
 /**
  * Stamp a resumable handler reference onto `node` and register its handler.

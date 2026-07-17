@@ -78,7 +78,7 @@ function mountEB(
 }
 
 test('ErrorBoundary renders the protected content when nothing throws', () => {
-  const el: HTMLElement = mountEB((e) => span('fallback'), () => span('content'));
+  const el: HTMLElement = mountEB((_e) => span('fallback'), () => span('content'));
   assert.ok(el.textContent?.includes('content'));
   assert.ok(!el.textContent?.includes('fallback'));
 });

@@ -243,7 +243,7 @@ test('select: control binding drives the displayed value two-way', () => {
 
 test('select: clearable × clears the selection without opening the panel', () => {
   const control: Ctl = makeControl('us');
-  const { root, field, dispose } = mount({ options: OPTS, control, clearable: true });
+  const { root, dispose } = mount({ options: OPTS, control, clearable: true });
   const clear: HTMLElement = root.querySelector('.weave-select__clear') as HTMLElement;
   assert.ok(clear, 'clear shown when a value is set');
   clear.dispatchEvent(new MouseEvent('click', { bubbles: true }));

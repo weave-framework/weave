@@ -16,7 +16,7 @@
  * `onSelect(item)`. Free text is allowed. The text value binds like Input (`value`/`onInput`
  * OR a `control` Field<string>). Zero-dep.
  */
-import { signal, effect, onMount, onDispose, type Signal } from '@weave-framework/runtime';
+import { signal, effect, onDispose, type Signal } from '@weave-framework/runtime';
 import { createOverlay, connectedPosition, listKeyManager, type OverlayRef, type ListKeyManager } from '../cdk/index.js';
 import { optValue, optLabel, optDescription, type OptionAccessors } from '../shared/options.js';
 import { buildPositions, type MenuPosition } from '../shared/positions.js';

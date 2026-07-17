@@ -341,11 +341,11 @@ export function extractSetupHandlers(script: string): Map<string, SetupHandler> 
  * Does `setup` CALL one of `names` (an `onMount`-style hook)? The local names matter, not the export names, so
  * an aliased import (`onMount as afterMount`) is caught — the caller resolves those from the import list.
  *
- * A hook registered in `setup` is THE structural limit of resumability: resume never runs `setup`, so the hook
- * is never even registered, and the server never ran it either (it is inert there). Any DOM work it does simply
- * does not happen. `<Expansion>` fills its panel bodies this way, and the docs sidebar came back with 4 links
- * instead of 23 — silently. Such a component must fall back to client rendering, which is exactly right: a
- * create-time effect is not something a snapshot can carry.
+ * E1.45 used this to REFUSE adoption, calling a mount hook "THE structural limit of resumability". That was
+ * wrong and E1.49 retracted it: `derive` runs on resume and re-creates the hook, exactly as it re-creates a bare
+ * `effect` (E1.47). Refusing also bought nothing — the client-rendered fallback re-runs `setup` and fires the
+ * hook anyway, plus a full re-render. `component.ts`'s `hookNames` now feeds the rebuild set instead; nothing
+ * refuses on this basis. Kept as a public predicate (the question is still meaningful), NOT as a limit.
  */
 export function setupCallsHook(script: string, names: ReadonlySet<string>): string | null {
   const open: number | null = locateSetupBody(script);

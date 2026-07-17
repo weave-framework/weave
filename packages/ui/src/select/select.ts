@@ -77,6 +77,12 @@ export const template: string =
   '</div>' +
   '</div>';
 
+/**
+ * `T` is decorative — every member below is a display string or a handler, so `SelectContext<A>` and
+ * `SelectContext<B>` are the same type. It stays because the 1.0 API is frozen and every call site writes
+ * `SelectContext<Opt>`; dropping it is a breaking change for a cosmetic gain. Deliberate, not overlooked.
+ */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export interface SelectContext<T> {
   root: Signal<HTMLElement | null>;
   trigger: Signal<HTMLElement | null>;

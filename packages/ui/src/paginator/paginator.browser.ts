@@ -5,7 +5,6 @@ import {
   createOwner,
   runInOwner,
   disposeOwner,
-  type Signal,
   type Owner,
 } from '@weave-framework/runtime';
 import * as dom from '@weave-framework/runtime/dom';

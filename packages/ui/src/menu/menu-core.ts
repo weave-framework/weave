@@ -23,7 +23,7 @@ import {
   emitSelection,
   type OptionAccessors,
 } from '../shared/options.js';
-import { buildPositions, type MenuPosition } from '../shared/positions.js';
+import { type MenuPosition } from '../shared/positions.js';
 
 export type { OptionAccessors } from '../shared/options.js';
 export { buildPositions, type MenuPosition } from '../shared/positions.js';

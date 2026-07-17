@@ -49,6 +49,24 @@ test('setText is static (one-shot, no reactivity)', () => {
   assert.equal(root.textContent, 'hello', 'static text does not react');
 });
 
+// `setAttr` takes an already-evaluated value, so a "does not react" assertion here would be theatre: the
+// caller reads the signal before setAttr is entered, and no implementation could subscribe. What IS worth
+// pinning is that the static door applies the same boolean/null contract as the reactive one (`applyAttr`).
+test('setAttr applies the boolean/null attribute contract', () => {
+  const tpl: HTMLTemplateElement = template('<input>');
+  const root: HTMLInputElement = clone(tpl) as HTMLInputElement;
+  setAttr(root, 'class', 'a');
+  setAttr(root, 'disabled', true);
+  setAttr(root, 'placeholder', null);
+  setAttr(root, 'readonly', false);
+  setAttr(root, 'size', 4);
+  assert.equal(root.getAttribute('class'), 'a');
+  assert.equal(root.getAttribute('disabled'), '', 'true → present and empty');
+  assert.equal(root.hasAttribute('placeholder'), false, 'null → absent');
+  assert.equal(root.hasAttribute('readonly'), false, 'false → absent');
+  assert.equal(root.getAttribute('size'), '4', 'non-string → stringified');
+});
+
 test('bindAttr toggles boolean and sets value attributes', () => {
   const tpl: HTMLTemplateElement = template('<input>');
   const root: HTMLInputElement = clone(tpl) as HTMLInputElement;

@@ -13,13 +13,13 @@
  * passes directly.
  */
 
-import { compileTemplate, compileTemplateAst, type CompileResult } from './codegen.js';
+import { compileTemplateAst, type CompileResult } from './codegen.js';
 import { parseTemplate } from './parser.js';
 import type { TemplateNode } from './ast.js';
 import { applyPatches, type PatchOp } from './patch.js';
 import { inferCtxNames } from './infer.js';
 import { injectAutoReturn } from './auto-return.js';
-import { extractSetupBindings, extractReturnedNames, extractModuleImports, unresolvedRefs, setupCallsHook, type SetupBindings } from './handlers.js';
+import { extractSetupBindings, extractReturnedNames, extractModuleImports, unresolvedRefs, type SetupBindings } from './handlers.js';
 import { rewrite, ctxScope, type Scope } from './scope.js';
 import { scopeCss, scopeAttr, hostAttr, hashCss } from './css.js';
 
@@ -294,7 +294,8 @@ function resumableSetup(script: string, scope: string[]): ResumableSetup {
 /**
  * The LOCAL names of the runtime's `effect` in this module (E1.47) — `import { effect as watch }` included, on
  * the same reasoning as {@link hookNames}. Only `effect`: a `computed` is a BINDING (derive already rebuilds it
- * by name), and `onMount`/`onDispose` are hooks, which E1.45 governs.
+ * by name), and `onMount` is a hook — {@link hookNames} finds those, and since E1.49 both feed the same rebuild
+ * set. They stay separate functions because only the hook set may ever need create-time-only treatment.
  */
 function effectNames(imports: ReadonlySet<string>, script: string): Set<string> {
   const out: Set<string> = new Set();

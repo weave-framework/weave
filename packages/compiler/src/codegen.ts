@@ -422,31 +422,6 @@ function hasDynamicDeep(node: TemplateNode): boolean {
 }
 
 /**
- * Whether a node's subtree contains a control-flow block or a component/slot — the constructs that insert a
- * runtime-variable node count. A post-block ELEMENT is adopt-navigable (E1.2c-5) only when this is false: its
- * subtree has fixed structure, so once the element node is found via the cursor its descendants index normally.
- */
-function hasBlockDeep(node: TemplateNode): boolean {
-  switch (node.type) {
-    case 'if':
-    case 'for':
-    case 'switch':
-    case 'defer':
-    case 'await':
-    case 'key':
-    case 'render':
-      return true;
-    case 'element': {
-      const el: ElementNode = node as ElementNode;
-      if (/^[A-Z]/.test(el.tag) || el.tag === 'slot' || el.tag === 'w:element') return true;
-      return el.children.some(hasBlockDeep);
-    }
-    default:
-      return false; // text / comment / interp / let / snippet
-  }
-}
-
-/**
  * PascalCase child-component tag → kebab-case module basename (`SlideToggle` → `slide-toggle`).
  * Used by the loader to resolve a `<Foo>` tag to its sibling component module by convention.
  */

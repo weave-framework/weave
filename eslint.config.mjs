@@ -54,6 +54,11 @@ export default tseslint.config(
           allowHigherOrderFunctions: true,
         },
       ],
+      // E1.49 removed the last caller of `setupCallsHook` and left the import behind. Nothing noticed:
+      // typecheck ignores it, and the two rules above only ask about ANNOTATIONS. A dead import is how a
+      // retracted idea keeps looking alive in the source. Enabling this cost 0 errors — the debt was never
+      // owed, the question was simply never asked.
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
     },
   }
 );

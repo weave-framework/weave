@@ -1,5 +1,5 @@
 import { test, assert } from '../../../../tools/harness.js';
-import { signal, effect, createOwner, runInOwner, disposeOwner, type Signal, type Owner } from '@weave-framework/runtime';
+import { signal, effect, createOwner, runInOwner, disposeOwner, type Owner } from '@weave-framework/runtime';
 import * as dom from '@weave-framework/runtime/dom';
 import { compileTemplate, inferCtxNames, parseTemplate } from '@weave-framework/compiler';
 import { setup, template, type TimepickerProps, type TimepickerContext, type TimepickerControl, type TimeValue } from '@weave-framework/ui/timepicker';
