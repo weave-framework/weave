@@ -15,7 +15,8 @@
     @include helpers.field-underline(
       var(--weave-datepicker-border),
       var(--weave-datepicker-focus),
-      var(--weave-datepicker-border-width)
+      var(--weave-datepicker-border-width),
+      var(--weave-datepicker-background)
     );
     display: flex;
     align-items: center;

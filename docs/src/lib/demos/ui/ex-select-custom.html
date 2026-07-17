@@ -1,4 +1,4 @@
-<div style="max-width:320px; display:flex; flex-direction:column; gap:14px;">
+<div style="width:100%; max-width:320px; display:flex; flex-direction:column; gap:14px;">
   <Select
     options={{ countries }}
     optionValue={{ optCode }}
@@ -10,5 +10,5 @@
     label={{ 'Country' }}
     placeholder={{ 'Pick a country' }}
   />
-  <span style="color:var(--muted)">Object: {{ picked() ? picked().name + ' (' + picked().region + ')' : 'none' }}</span>
+  <span class="demo-note">Object: {{ picked() ? picked().name + ' (' + picked().region + ')' : 'none' }}</span>
 </div>

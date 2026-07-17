@@ -131,6 +131,19 @@ $topbar-h: var(--weave-toolbar-height, 52px);
    which carry the component's own style scope — so a component-scoped rule can't reach
    them. Global here, alongside the rest of the chrome. */
 
+// A demo's own caption — "You typed: …", "Picked: …". An ASIDE about the control above it, so
+// it takes the HINT's size (11px), not the control's (13px): at 13px it weighed exactly as
+// much as the field's own text and stopped reading as secondary at all. Global, not in
+// demo/demo.scss, because the notes are rendered by the demo components — their scope, not
+// the frame's. Replaces 123 copies of `<span style="color:var(--muted)">`.
+.demo-note {
+  font-size: 11px;
+  // Tight on purpose. Half-leading is invisible space that stacks on top of the flex gap:
+  // at 1.5 it added 3.3px above the text, so a 6px gap arrived at the eye as 9.3px.
+  line-height: 1.25;
+  color: var(--muted);
+}
+
 // <Demo> frame — the live-example stage is a <Card class="demo"> with a dotted backdrop.
 .demo.weave-card {
   position: relative;

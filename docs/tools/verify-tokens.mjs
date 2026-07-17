@@ -9,6 +9,13 @@
 // A fallback does NOT excuse an undefined var: `var(--bg-subtle, transparent)` is just
 // `transparent` written the long way round. If the name is undefined the fallback always
 // wins, which is never what the author meant. So an undefined name fails here either way.
+//
+// Pass 2 checks the OTHER direction, and it is the one prose gets wrong. /ui/theming — the
+// page that teaches the token system — offered `--weave-button-fill` and
+// `--weave-input-underline` as its worked examples. Neither has ever existed (they are
+// `--weave-button-background` and `--weave-input-border`). A reader following that page
+// would set a variable nothing reads and watch nothing happen. So every `--weave-*` name
+// the docs NAME, prose included, is checked against the vars the library actually emits.
 
 import { readFileSync } from 'node:fs';
 import { readdir } from 'node:fs/promises';
@@ -65,6 +72,48 @@ for (const f of files.filter((f) => /\.(scss|css|html|ts)$/.test(f))) {
 
 // 3. Report every used-but-undefined name.
 const broken = [...used.entries()].filter(([name]) => !defined.has(name));
+
+/* ── Pass 2: every `--weave-*` name the docs mention must be one the library emits. ──
+   Ground truth is the built stylesheet, not a list I keep in step by hand. */
+const CSS = join(ROOT, 'dist', 'app.css');
+let weaveBroken = [];
+try {
+  const built = readFileSync(CSS, 'utf8');
+  const real = new Set([...built.matchAll(/(--weave-[a-z0-9-]+)\s*:/gi)].map((m) => m[1]));
+  if (real.size < 50) throw new Error(`only ${real.size} --weave-* vars in dist/app.css — stale or partial build`);
+
+  const mentioned = new Map();
+  for (const f of (await walk(SRC)).filter((f) => /\.(scss|css|html|ts|md)$/.test(f) && !f.endsWith('.gen.ts'))) {
+    const src = readFileSync(f, 'utf8');
+    // A file may legitimately name tokens that do not exist HERE: /ui/theming documents
+    // `weave.define('rating', …)`, which mints `--weave-rating-*` in the READER'S app. So a
+    // prefix registered by a define() in the same file is its own authority. Anything else
+    // claiming to be a built-in has to actually be one.
+    const local = new Set([...src.matchAll(/define\(\s*['"]([a-z0-9-]+)['"]/gi)].map((m) => m[1]));
+    src.split(/\r?\n/).forEach((line, i) => {
+      for (const m of line.matchAll(/(--weave-([a-z0-9-]+))/gi)) {
+        if ([...local].some((n) => m[2].startsWith(n + '-'))) continue;
+        if (!mentioned.has(m[1])) mentioned.set(m[1], []);
+        mentioned.get(m[1]).push({ file: relative(ROOT, f), line: i + 1 });
+      }
+    });
+  }
+  weaveBroken = [...mentioned.entries()].filter(([n]) => !real.has(n));
+} catch (e) {
+  console.error(`\n✖ cannot verify --weave-* names: ${e.message}`);
+  console.error('  Run `pnpm docs:build` first — this pass reads the built stylesheet as ground truth.\n');
+  process.exit(1);
+}
+
+if (weaveBroken.length) {
+  console.error('\n✖ the docs name --weave-* tokens the library does not emit:\n');
+  for (const [name, sites] of weaveBroken) {
+    console.error(`  ${name}`);
+    for (const s of sites.slice(0, 4)) console.error(`      ${s.file}:${s.line}`);
+    console.error('');
+  }
+  process.exit(1);
+}
 
 if (broken.length) {
   console.error('\n✖ undefined CSS custom properties referenced by the docs:\n');

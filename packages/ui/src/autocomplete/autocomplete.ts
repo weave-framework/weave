@@ -180,7 +180,11 @@ export function setup<T = { value: string; label: string }>(props: AutocompleteP
     listbox.setAttribute('role', 'listbox');
     listbox.id = `weave-autocomplete-${id}-list`;
     overlay = createOverlay({
-      positionStrategy: connectedPosition(el, { positions: buildPositions(props.position, 'bottom-start'), offset: 4 }),
+      positionStrategy: connectedPosition(el, {
+        positions: buildPositions(props.position, 'bottom-start'),
+        offset: 4,
+        matchOriginWidth: true, // the suggestions belong to this field — same edges
+      }),
     });
   }
 

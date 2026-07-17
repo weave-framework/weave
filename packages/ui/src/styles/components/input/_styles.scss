@@ -4,7 +4,7 @@
 @mixin styles() {
   .weave-input {
     // THE shared Weave field underline (single source; Select uses the same helper).
-    @include helpers.field-underline(var(--weave-input-border), var(--weave-input-focus), var(--weave-input-border-width));
+    @include helpers.field-underline(var(--weave-input-border), var(--weave-input-focus), var(--weave-input-border-width), var(--weave-input-background));
     display: inline-flex;
     align-items: center;
     gap: var(--weave-input-gap);

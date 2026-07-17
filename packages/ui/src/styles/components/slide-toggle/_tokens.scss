@@ -5,6 +5,13 @@ $tokens: (
   color: (
     track-off: ref.ref('color.field'),
     track-on: ref.ref('color.accent'),
+    // The OFF track's outline. Transparent by default — nothing changes for anyone who does
+    // not set it. It exists because `track-off` is a TINT: on a surface of the same tint the
+    // track measures 1.00:1 against its background, i.e. it is not faint, it is gone, and the
+    // ink knob is left hanging in space like a stray square. A fill alone cannot be relied on
+    // to draw a control; an outline can. Drawn as an inset shadow, not a border, so it costs
+    // no layout (the knob is positioned off the padding box — a real border would shift it).
+    border: transparent,
     knob-off: ref.ref('color.ink'),
     // On-accent knob: a fixed white (accent is dark in Light + Dim).
     knob-on: #fff,

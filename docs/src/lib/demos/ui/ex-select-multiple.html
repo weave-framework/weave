@@ -1,4 +1,4 @@
-<div style="max-width:320px; display:flex; flex-direction:column; gap:14px;">
+<div style="width:100%; max-width:320px; display:flex; flex-direction:column; gap:14px;">
   <Select multiple={{ true }} options={{ options }} value={{ langs() }} onChange={{ setLangs }} label={{ 'Languages' }} placeholder={{ 'Choose languages' }} />
-  <span style="color:var(--muted)">Selected: {{ langs().join(', ') || 'none' }}</span>
+  <span class="demo-note">Selected: {{ langs().join(', ') || 'none' }}</span>
 </div>

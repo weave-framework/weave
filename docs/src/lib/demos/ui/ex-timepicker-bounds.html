@@ -1,4 +1,4 @@
-<div style="max-width:240px; display:flex; flex-direction:column; gap:10px;">
+<div style="width:100%; max-width:240px; display:flex; flex-direction:column; gap:6px;">
   <Timepicker value={{ time() }} onChange={{ setTime }} min={{ min }} max={{ max }} label={{ 'Office hours' }} />
-  <span style="color:var(--muted)">Selected: {{ fmt(time()) }} (clamped 09:00–17:00)</span>
+  <span class="demo-note">Selected: {{ fmt(time()) }} (clamped 09:00–17:00)</span>
 </div>

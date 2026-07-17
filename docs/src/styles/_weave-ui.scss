@@ -39,12 +39,28 @@
  * --field-line. Done through each component's own documented `<name>-overrides()` mixin —
  * the exact API /ui/theming tells readers to use, so the docs dogfood their own advice.
  */
-@include weave.input-overrides((border: var(--field-line)));
-@include weave.select-overrides((border: var(--field-line)));
+/* Card and Toolbar are raised planes, not recessed panels — see --raised in _tokens.scss.
+   Both measured ~1.05 against the demo backdrop and simply sank into it. This site's OWN
+   top bar is already white (`.topbar`, styled in _chrome.scss), so a grey demo toolbar was
+   contradicting the very chrome sitting above it. */
+@include weave.card-overrides((background: var(--raised)));
+@include weave.toolbar-overrides((background: var(--raised)));
+
+/* A field is a place you AIM at. On this site every demo sits on the soft dotted backdrop,
+   and an underline with no fill left nothing to aim at: the line was the only drawn part and
+   the typing area was simply the page. `color.field` (#f7f8fa) could not help — it IS the
+   backdrop colour, and despite the name no field has ever used it (23 components take it for
+   hover/track tints). So the fields get the raised plane, same as Card and Toolbar. */
+@include weave.input-overrides((border: var(--field-line), background: var(--raised)));
+@include weave.select-overrides((border: var(--field-line), background: var(--raised)));
+@include weave.timepicker-overrides((background: var(--raised)));
+/* Off, this toggle's track is `color.field` — which on this site IS the demo backdrop, so it
+   measured 1.00:1: not faint, gone, leaving the ink knob as a stray black square. */
+@include weave.slide-toggle-overrides((border: var(--field-line)));
 @include weave.checkbox-overrides((border: var(--field-line)));
 @include weave.radio-overrides((border: var(--field-line)));
 @include weave.chips-overrides((border: var(--field-line)));
 @include weave.button-toggle-overrides((border: var(--field-line)));
-@include weave.datepicker-overrides((border: var(--field-line)));
-@include weave.date-range-picker-overrides((border: var(--field-line)));
-@include weave.popover-edit-overrides((border: var(--field-line)));
+@include weave.datepicker-overrides((border: var(--field-line), background: var(--raised)));
+@include weave.date-range-picker-overrides((border: var(--field-line), background: var(--raised)));
+@include weave.popover-edit-overrides((border: var(--field-line), background: var(--raised)));

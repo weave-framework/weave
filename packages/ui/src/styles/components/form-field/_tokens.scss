@@ -8,7 +8,13 @@ $tokens: (
     error: ref.ref('color.error'),
   ),
   size: (
+    // The gap BELOW the control — hint/error. Its own relationship, and a comfortable one.
     gap: 6px,
+    // The gap ABOVE the control — the label. Deliberately not the same number: a label names
+    // the field it sits on and should touch it, while a hint is an aside that follows it. One
+    // shared `gap` could not say that. (It also read looser than it measured: the label's
+    // line-height left 3px of half-leading under the text, so a 6px gap arrived as 9px.)
+    label-gap: 1px,
     label-size: 10px,
     message-size: 11px,
   ),

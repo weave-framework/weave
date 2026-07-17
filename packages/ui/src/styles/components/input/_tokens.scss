@@ -3,6 +3,9 @@
 
 $tokens: (
   color: (
+    // Transparent by default — the Weave field is an underline, not a box. Set it when the
+    // field sits on a tinted surface, where a line alone leaves nothing to aim at.
+    background: transparent,
     border: ref.ref('color.line'),
     focus: ref.ref('color.accent'),
     error: ref.ref('color.error'),

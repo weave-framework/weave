@@ -52,24 +52,27 @@
   }
 
   /* Marked — text with a 2px accent underline mark (no fill). */
+  /* Marked — tonal: the same rounded rect as the rest of the family, carrying accent
+     quietly. (Was text + a 2px accent underline, which read as a tab among buttons.) */
   .weave-button--marked {
-    background: transparent;
-    color: var(--weave-button-background);
-    box-shadow: inset 0 calc(-1 * var(--weave-button-mark-width)) 0 var(--weave-button-accent);
+    background: var(--weave-button-marked-background);
+    color: var(--weave-button-accent);
   }
 
   .weave-button--marked:hover {
+    background: var(--weave-button-marked-hover);
     opacity: 1;
   }
 
-  /* Ghost — text only; sub → ink on hover. */
+  /* Ghost — chromeless; sub → ink text, over the same faint wash the icon button uses.
+     Text-only hover was too weak to register as feedback. */
   .weave-button--ghost {
     background: transparent;
     color: var(--weave-button-ghost-text);
   }
 
   .weave-button--ghost:hover {
-    background: transparent;
+    background: var(--weave-button-ghost-hover);
     color: var(--weave-button-ghost-text-hover);
     opacity: 1;
   }

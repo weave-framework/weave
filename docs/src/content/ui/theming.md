@@ -33,7 +33,7 @@ There are two tiers, both plain CSS custom properties:
 | Tier | Shape | Example |
 | --- | --- | --- |
 | **Global** | `--weave-<group>-<key>` | `--weave-color-accent`, `--weave-shape-radius` |
-| **Component** | `--weave-<name>-<key>` | `--weave-button-fill`, `--weave-input-underline` |
+| **Component** | `--weave-<name>-<key>` | `--weave-button-background`, `--weave-input-border` |
 
 The global groups are **`color`**, **`text`** (typography), **`shape`** (radii, borders), and **`motion`**
 (durations). Component tokens mostly *reference* the globals (so changing one accent recolours everything), with a

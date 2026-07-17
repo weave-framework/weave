@@ -1,4 +1,4 @@
-<div style="max-width:280px; margin-top:120px; display:flex; flex-direction:column; gap:10px;">
+<div style="max-width:280px; margin-top:120px; display:flex; flex-direction:column; gap:6px;">
   <Autocomplete options={{ options }} onSelect={{ onSelect }} position={{ 'top-start' }} class={{ 'my-autocomplete' }} label={{ 'Framework' }} placeholder={{ 'Opens upward…' }} />
-  <span style="color:var(--muted)">Chosen: {{ chosen() || '—' }}</span>
+  <span class="demo-note">Chosen: {{ chosen() || '—' }}</span>
 </div>

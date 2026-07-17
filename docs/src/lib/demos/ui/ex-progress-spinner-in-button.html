@@ -2,6 +2,6 @@
   <Button on:click={{ save }} disabled={{ loading() }}>Save</Button>
   @if (loading()) {
     <ProgressSpinner small={{ true }} label={{ 'Saving' }} />
-    <span style="color:var(--weave-color-muted, #6b7280);">Saving…</span>
+    <span style="color:var(--weave-color-sub);">Saving…</span>
   }
 </div>

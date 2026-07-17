@@ -1,4 +1,4 @@
-<div style="max-width:280px; display:flex; flex-direction:column; gap:10px;">
+<div style="width:100%; max-width:280px; display:flex; flex-direction:column; gap:6px;">
   <Autocomplete options={{ options }} filter={{ filter }} onSelect={{ onSelect }} label={{ 'Country' }} placeholder={{ 'Name or code…' }} />
-  <span style="color:var(--muted)">Chosen: {{ chosen() || '—' }}</span>
+  <span class="demo-note">Chosen: {{ chosen() || '—' }}</span>
 </div>

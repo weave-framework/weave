@@ -1,4 +1,4 @@
-<div style="max-width:280px; display:flex; flex-direction:column; gap:10px;">
+<div style="width:100%; max-width:280px; display:flex; flex-direction:column; gap:6px;">
   <Datepicker value={{ date() }} onChange={{ setDate }} min={{ min }} max={{ max }} label={{ 'This month only' }} placeholder={{ 'Pick a day' }} />
-  <span style="color:var(--muted)">Selected: {{ fmt(date()) }}</span>
+  <span class="demo-note">Selected: {{ fmt(date()) }}</span>
 </div>

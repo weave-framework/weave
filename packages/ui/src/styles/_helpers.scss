@@ -46,10 +46,15 @@
 // THE Weave field look — a hairline bottom border that swaps to accent on focus (no box,
 // no layout shift). The single source of the underline shared by Input + Select (and thus
 // Autocomplete, which composes Input) — include it, don't re-write it per component.
-@mixin field-underline($border, $focus, $width: 1.5px) {
+// $background defaults to `transparent` — the look every caller had when this was hard-coded
+// here, so nothing changes for anyone who does not pass it. It became a parameter because a
+// bare underline over a TINTED surface leaves no field to see: the line is the only drawn
+// part, and the area you are meant to type into is just… the page. There was no way to give
+// a field a fill short of overriding the component's CSS from outside.
+@mixin field-underline($border, $focus, $width: 1.5px, $background: transparent) {
   border: 0;
   border-bottom: #{$width} solid #{$border};
-  background: transparent;
+  background: #{$background};
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 
   &:focus,

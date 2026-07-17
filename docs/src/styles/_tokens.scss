@@ -8,6 +8,12 @@
   --bg: #ffffff;
   --bg-soft: #f7f8fa;
   --surface: #f1f3f6;
+  /* A raised plane. `--surface` is a RECESSED panel here (#f1f3f6, darker than --bg-soft) —
+     which is right for the chrome it dresses, but a Card is the opposite gesture: it sits ON
+     the section, so it has to be lighter than it. Bound to --surface it was #f1f3f6 on a
+     #f7f8fa backdrop and simply sank into it. (Dark never had this problem — there the
+     surface scale already runs the right way.) */
+  --raised: #ffffff;
   --code-bg: #f6f8fa;
 
   --fg: #1a1f29;
@@ -47,6 +53,7 @@
   --bg: #0f1115;
   --bg-soft: #14171d;
   --surface: #181c23;
+  --raised: #1e242e; /* lifts off --bg-soft (#14171d) — dark's scale already ran this way. */
   --code-bg: #0c0e12;
 
   --fg: #e7ebf0;

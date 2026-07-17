@@ -230,7 +230,11 @@ export function setup<T = { value: string; label: string }>(props: SelectProps<T
     overlay = createOverlay({
       hasBackdrop: true,
       backdropClass: 'weave-overlay-backdrop--transparent',
-      positionStrategy: connectedPosition(t, { positions: buildPositions(props.position, 'bottom-start'), offset: 4 }),
+      positionStrategy: connectedPosition(t, {
+        positions: buildPositions(props.position, 'bottom-start'),
+        offset: 4,
+        matchOriginWidth: true, // the listbox is this trigger's panel — it lines up with it
+      }),
     });
     overlay.onBackdropClick(() => closePanel(false));
     overlay.attach(listbox);

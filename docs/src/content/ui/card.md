@@ -42,7 +42,7 @@ and content. Use whichever you need:
   <p class="weave-card__body">Your projects moved forward this week.</p>
   <p class="weave-card__meta">Updated 2 hours ago</p>
   <div class="weave-card__actions">
-    <Button variant={{ 'marked' }}>Open</Button>
+    <Button>Open</Button>
     <Button variant={{ 'ghost' }}>Dismiss</Button>
   </div>
 </Card>

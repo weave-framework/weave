@@ -13,8 +13,8 @@ import Button from '@weave-framework/ui/button';
 
 ## Variants
 
-The `variant` prop picks the look: `primary` (default, ink fill), `outline`, `marked` (accent underline),
-`ghost` (text only), and `icon` (34px square — pass a `label` for the accessible name).
+The `variant` prop picks the look: `primary` (default, ink fill), `outline`, `marked` (soft accent tint),
+`ghost` (no chrome until you hover it), and `icon` (34px square — pass a `label` for the accessible name).
 
 :::demo ex-button-variants
 

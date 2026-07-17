@@ -1,7 +1,7 @@
-<div style="display:flex; flex-direction:column; gap:10px;">
+<div style="display:flex; flex-direction:column; gap:6px;">
   <div style="display:flex; gap:8px; align-items:center;">
     <Button on:click={{ toggle }}>{{ open() ? 'Close' : 'Open' }} menu</Button>
-    <span style="color:var(--muted)">opened = {{ open() }}</span>
+    <span class="demo-note">opened = {{ open() }}</span>
   </div>
   <div style="height:200px; border:1px solid var(--border); border-radius:6px; overflow:hidden;">
     <Sidenav mode={{ 'over' }} opened={{ open() }} onOpenedChange={{ setOpen }}>

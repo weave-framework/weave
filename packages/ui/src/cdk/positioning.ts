@@ -59,6 +59,16 @@ export interface ConnectedPositionOptions {
   viewportMargin?: number;
   /** Reposition on scroll/resize while attached. Default true. */
   autoUpdate?: boolean;
+  /**
+   * Grow the overlay to at least the origin's width. Default false.
+   *
+   * For a dropdown whose panel BELONGS to its trigger — a select's listbox — the two reading
+   * as one control depends on them sharing an edge. Without this the panel takes its own
+   * `min-width` (a fixed 180px), so it is wider than a short trigger and narrower than a long
+   * one, and never simply lines up. A menu or a tooltip wants nothing to do with this: their
+   * width is their own business.
+   */
+  matchOriginWidth?: boolean;
 }
 
 export interface ConnectedPositionStrategy extends PositionStrategy {
@@ -155,6 +165,10 @@ export function connectedPosition(
 
   function apply(el: HTMLElement): void {
     currentEl = el;
+    // Before anything is measured: this widens `el`, and every number below reads its size.
+    if (options.matchOriginWidth) {
+      el.style.minWidth = `${Math.round(origin.getBoundingClientRect().width)}px`;
+    }
     const rtl: boolean = activeDirection() === 'rtl';
     const vw: number = isBrowser ? window.innerWidth : 0;
     const vh: number = isBrowser ? window.innerHeight : 0;

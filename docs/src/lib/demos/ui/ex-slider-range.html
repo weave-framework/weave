@@ -1,4 +1,4 @@
-<div style="max-width:320px; display:flex; flex-direction:column; gap:14px;">
+<div style="width:100%; max-width:320px; display:flex; flex-direction:column; gap:14px;">
   <Slider min={{ 16 }} max={{ 28 }} value={{ temp() }} onChange={{ setTemp }} label={{ 'Temperature' }} />
-  <span style="color:var(--muted)">Value: {{ temp() }} °C (range 16–28)</span>
+  <span class="demo-note">Value: {{ temp() }} °C (range 16–28)</span>
 </div>

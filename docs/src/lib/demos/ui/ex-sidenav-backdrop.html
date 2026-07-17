@@ -1,4 +1,4 @@
-<div style="display:flex; flex-direction:column; gap:10px;">
+<div style="display:flex; flex-direction:column; gap:6px;">
   <Button on:click={{ toggle }}>{{ open() ? 'Close' : 'Open' }} drawer</Button>
   <div style="height:200px; border:1px solid var(--border); border-radius:6px; overflow:hidden;">
     <Sidenav mode={{ 'push' }} backdrop={{ true }} opened={{ open() }} onOpenedChange={{ setOpen }}>

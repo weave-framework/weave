@@ -6,6 +6,12 @@
     align-items: center;
     gap: var(--weave-toolbar-gap);
     box-sizing: border-box;
+    /* A toolbar spans its container — that is what a bar IS, and `__spacer` (flex: 1 1 auto)
+       depends on it to push `__end` to the far edge. Without this the rule held only by luck
+       of context: block parent → full width, flex/grid/inline parent → shrink-to-fit, and the
+       spacer silently expands nothing, leaving every action bunched at the left. A no-op in a
+       block parent; the fix everywhere else. */
+    width: 100%;
     height: var(--weave-toolbar-height);
     padding: 0 var(--weave-toolbar-padding-x);
     background: var(--weave-toolbar-background);

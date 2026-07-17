@@ -12,7 +12,8 @@
     @include helpers.field-underline(
       var(--weave-timepicker-border),
       var(--weave-timepicker-focus),
-      var(--weave-timepicker-border-width)
+      var(--weave-timepicker-border-width),
+      var(--weave-timepicker-background)
     );
     display: flex;
     align-items: center;

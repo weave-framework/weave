@@ -1,4 +1,4 @@
-<div style="max-width:280px; display:flex; flex-direction:column; gap:10px;">
+<div style="width:100%; max-width:280px; display:flex; flex-direction:column; gap:6px;">
   <Autocomplete options={{ options }} value={{ text() }} onInput={{ setText }} onSelect={{ onSelect }} label={{ 'City' }} placeholder={{ 'Type a city…' }} />
-  <span style="color:var(--muted)">Text: {{ text() || '(empty)' }}</span>
+  <span class="demo-note">Text: {{ text() || '(empty)' }}</span>
 </div>

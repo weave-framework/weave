@@ -1,4 +1,4 @@
-<div style="display:flex; flex-direction:column; gap:10px;">
+<div style="display:flex; flex-direction:column; gap:6px;">
   <Paginator length={{ 240 }} pageSize={{ size() }} pageIndex={{ page() }} onPage={{ onPage }} />
-  <span style="color:var(--muted)">Showing {{ from() }}–{{ to() }} of 240 · page {{ page() + 1 }}</span>
+  <span class="demo-note">Showing {{ from() }}–{{ to() }} of 240 · page {{ page() + 1 }}</span>
 </div>

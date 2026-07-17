@@ -6,13 +6,20 @@
 @use '../../helpers' as helpers;
 
 @mixin styles() {
+  /* Fills its container, exactly as `.weave-input` does — a select is a field, and a field
+     takes the width it is given. `display: block` alone got that right only in a BLOCK
+     parent; drop one into a flex or grid container and it shrank to its longest option,
+     while the Input beside it spanned the row. Two fields, same job, different widths, for
+     no reason the author could see. */
   .weave-select {
     display: block;
+    width: 100%;
+    box-sizing: border-box;
   }
 
   .weave-select__field {
     // THE shared Weave field underline (same helper as Input — one source, one look).
-    @include helpers.field-underline(var(--weave-select-border), var(--weave-select-focus), var(--weave-select-border-width));
+    @include helpers.field-underline(var(--weave-select-border), var(--weave-select-focus), var(--weave-select-border-width), var(--weave-select-background));
     display: flex;
     align-items: center;
     gap: var(--weave-select-gap);

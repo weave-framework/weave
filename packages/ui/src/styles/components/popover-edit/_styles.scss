@@ -16,7 +16,8 @@
     @include helpers.field-underline(
       var(--weave-popover-edit-border),
       var(--weave-popover-edit-focus),
-      var(--weave-popover-edit-border-width)
+      var(--weave-popover-edit-border-width),
+      var(--weave-popover-edit-background)
     );
     display: block;
     width: 100%;

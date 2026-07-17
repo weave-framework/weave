@@ -1,10 +1,12 @@
 // form-field — styles() mixin (class rules). Forwarded by ./_index.scss.
 
 @mixin styles() {
+  /* No container `gap`: the label and the messages have different relationships to the
+     control, so they set their own (label-gap above, gap below). One shared gap could only
+     ever be right for one of them. */
   .weave-form-field {
     display: flex;
     flex-direction: column;
-    gap: var(--weave-form-field-gap);
 
     @content;
   }
@@ -15,6 +17,11 @@
     text-transform: uppercase;
     letter-spacing: var(--weave-form-field-label-tracking);
     color: var(--weave-form-field-label);
+    /* Hug the text. Inherited leading put 3px of invisible space under a 10px uppercase
+       label, which then stacked on the gap — the label floated for a reason nobody could
+       see in the CSS. There are no descenders in uppercase; it costs nothing. */
+    line-height: 1;
+    margin-bottom: var(--weave-form-field-label-gap);
   }
 
   .weave-form-field__control {
@@ -24,11 +31,13 @@
   .weave-form-field__hint {
     font-size: var(--weave-form-field-message-size);
     color: var(--weave-form-field-hint);
+    margin-top: var(--weave-form-field-gap);
   }
 
   .weave-form-field__error {
     font-size: var(--weave-form-field-message-size);
     color: var(--weave-form-field-error);
+    margin-top: var(--weave-form-field-gap);
   }
 
   /* Error state — the label reddens (the control's underline reddens off the

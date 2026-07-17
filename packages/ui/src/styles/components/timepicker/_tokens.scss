@@ -5,6 +5,8 @@
 
 $tokens: (
   color: (
+    // See input's `background`: transparent by default, set it on a tinted surface.
+    background: transparent,
     text: ref.ref('color.ink'),
     placeholder: ref.ref('color.sub'),
     border: ref.ref('color.line'),

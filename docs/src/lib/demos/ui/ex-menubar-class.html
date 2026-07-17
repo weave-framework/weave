@@ -1,4 +1,4 @@
-<div style="display:flex; flex-direction:column; gap:10px;">
+<div style="display:flex; flex-direction:column; gap:6px;">
   <style>
     .app-bar {
       border: 1px solid var(--border);
@@ -8,5 +8,5 @@
     }
   </style>
   <Menubar menus={{ menus }} onSelect={{ onSelect }} label={{ 'App bar' }} class={{ 'app-bar' }} />
-  <span style="color:var(--muted)">Picked: {{ picked() || '—' }}</span>
+  <span class="demo-note">Picked: {{ picked() || '—' }}</span>
 </div>

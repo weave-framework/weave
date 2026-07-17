@@ -1,4 +1,4 @@
-<div style="max-width:300px; display:flex; flex-direction:column; gap:10px;">
+<div style="width:100%; max-width:300px; display:flex; flex-direction:column; gap:6px;">
   <DateRangePicker value={{ range() }} onChange={{ setRange }} min={{ today }} dateFilter={{ isWeekday }} label={{ 'Weekdays from today' }} placeholder={{ 'Pick a range' }} />
-  <span style="color:var(--muted)">Selected: {{ fmt(range()) }}</span>
+  <span class="demo-note">Selected: {{ fmt(range()) }}</span>
 </div>

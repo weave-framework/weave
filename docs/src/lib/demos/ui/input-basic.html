@@ -1,4 +1,4 @@
-<div style="max-width:320px; display:flex; flex-direction:column; gap:10px;">
+<div style="width:100%; max-width:320px; display:flex; flex-direction:column; gap:6px;">
   <Input value={{ q() }} onInput={{ setQ }} placeholder={{ 'Type something…' }} label={{ 'Message' }} />
-  <span style="color:var(--muted)">You typed: {{ q() || '(nothing yet)' }}</span>
+  <span class="demo-note">You typed: {{ q() || '(nothing yet)' }}</span>
 </div>

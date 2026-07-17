@@ -1,5 +1,5 @@
-<div style="max-width:280px; display:flex; flex-direction:column; gap:10px;">
+<div style="width:100%; max-width:280px; display:flex; flex-direction:column; gap:6px;">
   <Timepicker value={{ time() }} onChange={{ setTime }} locale={{ 'en-US' }} label={{ '12-hour (en-US)' }} />
   <Timepicker value={{ time() }} onChange={{ setTime }} use24={{ true }} label={{ 'Forced 24-hour' }} />
-  <span style="color:var(--muted)">Value (24h): {{ fmt(time()) }}</span>
+  <span class="demo-note">Value (24h): {{ fmt(time()) }}</span>
 </div>

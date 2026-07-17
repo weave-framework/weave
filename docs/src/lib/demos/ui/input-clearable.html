@@ -1,4 +1,4 @@
-<div style="max-width:320px; display:flex; flex-direction:column; gap:10px;">
+<div style="width:100%; max-width:320px; display:flex; flex-direction:column; gap:6px;">
   <Input value={{ text() }} onInput={{ setText }} clearable={{ true }} label={{ 'Clearable' }} placeholder={{ 'Type something…' }} />
-  <span style="color:var(--muted)">Value: {{ text() || '(empty)' }}</span>
+  <span class="demo-note">Value: {{ text() || '(empty)' }}</span>
 </div>

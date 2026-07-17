@@ -1,4 +1,4 @@
-<div style="max-width:320px; display:flex; flex-direction:column; gap:14px;">
+<div style="width:100%; max-width:320px; display:flex; flex-direction:column; gap:14px;">
   <Select options={{ options }} value={{ fruit() }} onChange={{ setFruit }} clearable={{ true }} clearLabel={{ 'Clear fruit' }} label={{ 'Fruit' }} placeholder={{ 'Pick a fruit' }} />
-  <span style="color:var(--muted)">Value: {{ fruit() || '(cleared)' }}</span>
+  <span class="demo-note">Value: {{ fruit() || '(cleared)' }}</span>
 </div>

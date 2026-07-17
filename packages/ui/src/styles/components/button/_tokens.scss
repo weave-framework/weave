@@ -9,13 +9,23 @@ $tokens: (
     // Primary text
     border: ref.ref('color.ink'),
     accent: ref.ref('color.accent'),
-    // marked underline
+    // Marked — the family's quiet-but-emphasised slot ("a quiet action that still wants a
+    // hint of emphasis"). It used to be text + a 2px accent underline, which spoke a
+    // different language from every sibling: primary, outline and icon are all a rounded
+    // rect, so an underlined label read as a TAB, not a button. Same shape as the family
+    // now, just tonal — quieter than outline, louder than ghost.
+    marked-background: color-mix(in srgb, ref.ref('color.accent') 12%, transparent),
+    marked-hover: color-mix(in srgb, ref.ref('color.accent') 20%, transparent),
     ghost-text: ref.ref('color.sub'),
     ghost-text-hover: ref.ref('color.ink'),
-    // Adaptive tint (a faint wash of the current text color) so an icon button's
+    // Adaptive tint (a faint wash of the current text color) so a chromeless button's
     // hover reads on ANY background — light surface or ink toolbar. Resolved at the
     // use site, where currentColor = the button's inherited color.
     icon-hover: color-mix(in srgb, currentColor 8%, transparent),
+    // Ghost gets its own, defaulting to the same wash: a ghost that only changed its TEXT
+    // on hover gave almost no feedback — the one variant with no shape to respond with.
+    // Separate from icon-hover so the two can be tuned apart.
+    ghost-hover: color-mix(in srgb, currentColor 8%, transparent),
     disabled-background: ref.ref('color.field'),
     disabled-text: ref.ref('color.sub'),
   ),
@@ -25,7 +35,9 @@ $tokens: (
     padding-y: 9px,
     gap: 8px,
     icon-size: 34px,
-    mark-width: 2px,
+    // `mark-width` lived here while `marked` drew a 2px underline. The underline is gone,
+    // so the token is gone too: a public token that no rule reads is worse than no token —
+    // it invites you to set it and then silently ignores you.
     hover-opacity: 0.85,
     duration: ref.ref('motion.fast'),
   ),

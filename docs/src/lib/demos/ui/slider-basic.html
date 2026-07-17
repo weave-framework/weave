@@ -1,4 +1,4 @@
-<div style="max-width:280px; display:flex; flex-direction:column; gap:12px;">
+<div style="width:100%; max-width:280px; display:flex; flex-direction:column; gap:12px;">
   <Slider min={{ 0 }} max={{ 100 }} step={{ 5 }} value={{ vol() }} onChange={{ setVol }} format={{ fmt }} label={{ 'Volume' }} />
-  <span style="color:var(--muted)">Volume: {{ vol() }}%</span>
+  <span class="demo-note">Volume: {{ vol() }}%</span>
 </div>

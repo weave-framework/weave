@@ -1,5 +1,5 @@
 <div style="display:flex; gap:16px; align-items:center;">
   <ButtonToggle disabled={{ disabled() }} options={{ opts }} value={{ size() }} onChange={{ setSize }} label={{ 'Size' }} />
   <button type="button" on:click={{ toggle }}>{{ label() }}</button>
-  <span style="color:var(--muted)">Selected: {{ size() }}</span>
+  <span class="demo-note">Selected: {{ size() }}</span>
 </div>

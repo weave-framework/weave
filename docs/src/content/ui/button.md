@@ -68,8 +68,8 @@ of the others.
 | --- | --- | --- |
 | `primary` *(default)* | Solid ink fill | The main action on the screen — the one thing you want clicked. |
 | `outline` | Bordered, inverts on hover | A secondary action sitting next to a primary one. |
-| `marked` | Text with a 2px accent underline | A quiet action that still wants a hint of emphasis. |
-| `ghost` | Text only, no chrome | Low-priority actions, toolbars, dense UIs. |
+| `marked` | Soft accent tint, accent label | A quiet action that still wants a hint of emphasis. |
+| `ghost` | No chrome until you hover it | Low-priority actions, toolbars, dense UIs. |
 | `icon` | 34px square, no label text | An icon-only button — **pass a `label` for the accessible name.** |
 
 ```html

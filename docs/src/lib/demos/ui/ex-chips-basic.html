@@ -1,4 +1,4 @@
-<div style="display:flex; flex-direction:column; gap:10px;">
+<div style="display:flex; flex-direction:column; gap:6px;">
   <Chips value={{ tags() }} onChange={{ setTags }} label={{ 'Tags' }} />
-  <span style="color:var(--muted)">Value: [{{ tags().join(', ') || '(empty)' }}]</span>
+  <span class="demo-note">Value: [{{ tags().join(', ') || '(empty)' }}]</span>
 </div>

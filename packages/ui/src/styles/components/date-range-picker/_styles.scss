@@ -14,7 +14,8 @@
     @include helpers.field-underline(
       var(--weave-date-range-picker-border),
       var(--weave-date-range-picker-focus),
-      var(--weave-date-range-picker-border-width)
+      var(--weave-date-range-picker-border-width),
+      var(--weave-date-range-picker-background)
     );
     display: flex;
     align-items: center;

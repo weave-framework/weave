@@ -1,4 +1,4 @@
-<div style="max-width:420px; display:flex; flex-direction:column; gap:10px;">
+<div style="width:100%; max-width:420px; display:flex; flex-direction:column; gap:6px;">
   <Table columns={{ columns }} dataSource={{ rows }} trackBy={{ trackBy }} selectable={{ true }} selectionMode={{ 'single' }} onSelectionChange={{ onSel }} ariaLabel={{ 'Pick one' }} />
-  <span style="color:var(--muted)">Picked: {{ picked() }}</span>
+  <span class="demo-note">Picked: {{ picked() }}</span>
 </div>

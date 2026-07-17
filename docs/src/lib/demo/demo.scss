@@ -23,7 +23,11 @@
      the 16px prose scale of the page around it. So every demo's own caption ("You typed: …")
      rendered a size LARGER than the control it describes, and read as a shouted hint rather
      than an aside. One rule instead of 140 inline styles; components set their own sizes and
-     are unaffected. */
+     are unaffected. (No line-height here: my first pass set 1.5 and the half-leading it added
+     silently reopened the very gap it was meant to close — a 6px gap the eye read as 9.3px.) */
   font-size: 13px;
-  line-height: 1.5;
 }
+
+/* `.demo-note` is NOT here on purpose — it lives in styles/_chrome.scss. This file is the
+   Demo component's SCOPED sheet, and the notes are rendered by the demo components inside it,
+   which carry their own scope attribute. A rule here matches nothing (it silently did). */

@@ -1,5 +1,5 @@
-<div style="max-width:320px; display:flex; flex-direction:column; gap:14px;">
+<div style="width:100%; max-width:320px; display:flex; flex-direction:column; gap:14px;">
   <Select options={{ sizes }} value={{ size() }} onChange={{ setSize }} label={{ 'Size' }} placeholder={{ 'Pick a size' }} />
   <Select options={{ plans }} value={{ plan() }} onChange={{ setPlan }} label={{ 'Plan' }} placeholder={{ 'Pick a plan' }} />
-  <span style="color:var(--muted)">Size: {{ size() }} · Plan: {{ plan() }}</span>
+  <span class="demo-note">Size: {{ size() }} · Plan: {{ plan() }}</span>
 </div>

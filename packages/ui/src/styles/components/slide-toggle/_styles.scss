@@ -30,7 +30,13 @@
     height: var(--weave-slide-toggle-track-height);
     border-radius: var(--weave-slide-toggle-radius);
     background: var(--weave-slide-toggle-track-off);
+    box-shadow: inset 0 0 0 1px var(--weave-slide-toggle-border);
     transition: background var(--weave-slide-toggle-duration) ease;
+  }
+
+  /* On, the accent fill IS the boundary — an outline over it only muddies the colour. */
+  .weave-slide-toggle__input:checked + .weave-slide-toggle__track {
+    box-shadow: none;
   }
 
   /* The knob — slides across when on. */

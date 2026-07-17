@@ -1,6 +1,6 @@
 <div style="display:flex; gap:16px; align-items:center;">
   <Button use:menu={{ { ...langMenu, itemTemplate: langRow } }}>Language ▾</Button>
-  <span style="color:var(--muted)">Locale: {{ locale() }}</span>
+  <span class="demo-note">Locale: {{ locale() }}</span>
 
   @snippet langRow(row) {
     <span

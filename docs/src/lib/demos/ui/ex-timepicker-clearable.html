@@ -1,4 +1,4 @@
-<div style="max-width:240px; display:flex; flex-direction:column; gap:10px;">
+<div style="width:100%; max-width:240px; display:flex; flex-direction:column; gap:6px;">
   <Timepicker value={{ time() }} onChange={{ setTime }} clearable={{ true }} clearLabel={{ 'Clear time' }} label={{ 'Reminder' }} />
-  <span style="color:var(--muted)">Selected: {{ fmt(time()) }}</span>
+  <span class="demo-note">Selected: {{ fmt(time()) }}</span>
 </div>
