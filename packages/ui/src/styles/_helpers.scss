@@ -77,7 +77,7 @@
 }
 
 // THE Weave inline clear (×) button — the small round reset shared by Input + Select.
-@mixin clear-button($color, $hover, $size: 18px) {
+@mixin clear-button($color, $hover, $size: 18px, $icon: 14px) {
   @include field-reset;
   display: inline-flex;
   align-items: center;
@@ -87,6 +87,9 @@
   border-radius: 50%;
   color: #{$color};
   cursor: pointer;
+  // The `×` is a lucide `x` <Icon> now, not a font glyph — size it here so every clear button
+  // (Input, Select, the pickers) matches, instead of each setting a font-size.
+  --weave-icon-size: #{$icon};
 
   &:hover {
     color: #{$hover};

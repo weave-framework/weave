@@ -5,6 +5,7 @@ import { compileTemplate } from '@weave-framework/compiler';
 import { overlayContainer } from '@weave-framework/ui/cdk';
 import { setup, template, type AutocompleteProps, type AutocompleteContext, type AutocompleteControl } from '@weave-framework/ui/autocomplete';
 import * as InputMod from '@weave-framework/ui/input';
+import * as IconMod from '@weave-framework/ui/icon';
 import { toComponent } from '../internal/compose.js';
 
 const rt: typeof dom & { signal: typeof signal; effect: typeof effect } = { ...dom, signal, effect };
@@ -56,7 +57,9 @@ function mount(props: AutocompleteProps<Fruit>): Mounted {
     ) as MakeRender;
     // The field IS the composed Input; a component-root template renders a fragment, so
     // grab its element before appending (append empties the fragment).
-    const node: Node = make(ctx, rt, { Input: toComponent(InputMod as never) })(ctx, {});
+    const node: Node = make(ctx, rt, {
+      Input: toComponent(InputMod as never, { Icon: toComponent(IconMod as never) }),
+    })(ctx, {});
     const el: HTMLElement = ((node as DocumentFragment).firstElementChild ?? node) as HTMLElement;
     document.body.appendChild(node);
     return el;

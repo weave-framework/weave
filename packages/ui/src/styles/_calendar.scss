@@ -36,6 +36,7 @@
     height: var(--weave-#{$name}-nav-size);
     border-radius: 50%;
     color: var(--weave-#{$name}-nav);
+    --weave-icon-size: 16px; // the ‹/› are lucide chevron <Icon>s now, not glyphs
     cursor: pointer;
   }
 
@@ -165,7 +166,10 @@
     margin: 1px auto;
     border-radius: var(--weave-#{$name}-cell-radius);
     color: var(--weave-#{$name}-cell-text);
-    font-size: var(--weave-#{$name}-cell-size);
+    // `cell-font`, NOT `cell-size`: those were two tokens with the same emitted name (one in
+    // `size`, one in `typography`), so the typography 12px clobbered the 30px dimension AND
+    // was the font — every day cell rendered 12×12px, cramped. Separate names now.
+    font-size: var(--weave-#{$name}-cell-font);
     cursor: pointer;
   }
 

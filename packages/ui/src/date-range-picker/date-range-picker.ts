@@ -107,7 +107,7 @@ export const template: string =
   '<span class={{ valueClass() }}>{{ displayText() }}</span>' +
   '<span class="weave-date-range-picker__spacer"></span>' +
   '@if (showClear()) {' +
-  '<button type="button" class="weave-date-range-picker__clear" tabindex="-1" aria-label={{ clearLabel() }} on:click={{ onClearClick }}>×</button>' +
+  '<button type="button" class="weave-date-range-picker__clear" tabindex="-1" aria-label={{ clearLabel() }} on:click={{ onClearClick }}><Icon name={{ \'x\' }} /></button>' +
   '}' +
   '<span class="weave-date-range-picker__icon" aria-hidden="true"><Icon name={{ \'calendar\' }} /></span>' +
   '</div>' +

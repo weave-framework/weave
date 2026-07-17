@@ -112,7 +112,7 @@ export const template: string =
   '@if (!editable()) {<span class={{ valueClass() }}>{{ displayText() }}</span>}' +
   '<span class="weave-datepicker__spacer"></span>' +
   '@if (showClear()) {' +
-  '<button type="button" class="weave-datepicker__clear" tabindex="-1" aria-label={{ clearLabel() }} on:click={{ onClearClick }}>×</button>' +
+  '<button type="button" class="weave-datepicker__clear" tabindex="-1" aria-label={{ clearLabel() }} on:click={{ onClearClick }}><Icon name={{ \'x\' }} /></button>' +
   '}' +
   '@if (editable()) {<button type="button" class="weave-datepicker__icon-button" tabindex="-1" aria-label={{ openCalendarLabel() }} on:click={{ onIconClick }}><span class="weave-datepicker__icon" aria-hidden="true"><Icon name={{ \'calendar\' }} /></span></button>}' +
   '@if (!editable()) {<span class="weave-datepicker__icon" aria-hidden="true"><Icon name={{ \'calendar\' }} /></span>}' +

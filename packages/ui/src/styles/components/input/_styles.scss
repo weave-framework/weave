@@ -101,12 +101,10 @@
     display: none;
   }
 
-  /* Clear × — the shared Weave clear button (same as Select). */
+  /* Clear — the shared Weave clear button (a lucide `x` <Icon>, same as Select). */
   .weave-input__clear {
     @include helpers.clear-button(var(--weave-input-adornment), var(--weave-input-text));
     flex: none;
-    font-size: var(--weave-input-clear-size);
-    line-height: 1;
   }
 
   /* Password reveal (eye) toggle — a plain icon button sharing the adornment tint. */

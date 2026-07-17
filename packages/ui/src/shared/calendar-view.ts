@@ -10,6 +10,8 @@
  * its own SCSS while sharing this one behavior implementation (UI RULE #1 — no duplication).
  */
 import { activeDirection, type DateAdapter } from '../cdk/index.js';
+import { activeIcons } from '../icon/icons.js';
+import { sanitizeSvg } from '../icon/icon.js';
 
 /**
  * Translatable chrome strings for the calendar popover — the accessible names of the nav
@@ -170,12 +172,23 @@ export function createCalendarView(host: CalendarHost): CalendarView {
   content.className = `${p}__content`;
   panel.append(content);
 
-  function navButton(glyph: string, label: string, onClick: () => void): HTMLButtonElement {
+  // A lucide chevron, built imperatively (this renderer is plain DOM, not a Weave template):
+  // resolve the name to a full <svg>, sanitize, drop it into the standard .weave-icon span so
+  // the calendar's `--weave-icon-size` sizes it. Replaces the `‹`/`›` glyphs.
+  function iconSpan(name: string): HTMLElement {
+    const span: HTMLElement = document.createElement('span');
+    span.className = 'weave-icon';
+    span.setAttribute('aria-hidden', 'true');
+    span.innerHTML = sanitizeSvg(activeIcons().resolve(name) ?? '');
+    return span;
+  }
+
+  function navButton(icon: string, label: string, onClick: () => void): HTMLButtonElement {
     const b: HTMLButtonElement = document.createElement('button');
     b.type = 'button';
     b.className = `${p}__nav-button`;
     b.setAttribute('aria-label', label);
-    b.textContent = glyph;
+    b.appendChild(iconSpan(icon));
     b.addEventListener('click', onClick);
     return b;
   }
@@ -220,8 +233,8 @@ export function createCalendarView(host: CalendarHost): CalendarView {
   function renderDayView(): void {
     const header: HTMLElement = document.createElement('div');
     header.className = `${p}__nav`;
-    const prev: HTMLButtonElement = navButton('‹', host.labels().prevMonth, () => shiftMonth(-1));
-    const next: HTMLButtonElement = navButton('›', host.labels().nextMonth, () => shiftMonth(1));
+    const prev: HTMLButtonElement = navButton('chevron-left', host.labels().prevMonth, () => shiftMonth(-1));
+    const next: HTMLButtonElement = navButton('chevron-right', host.labels().nextMonth, () => shiftMonth(1));
     const label: HTMLButtonElement = viewSwitch(
       adapter.format(viewMonth, { month: 'long', year: 'numeric' }),
       host.labels().chooseYear,
@@ -405,8 +418,8 @@ export function createCalendarView(host: CalendarHost): CalendarView {
   function renderYearView(): void {
     const header: HTMLElement = document.createElement('div');
     header.className = `${p}__nav`;
-    const prev: HTMLButtonElement = navButton('‹', host.labels().prevYearRange, () => shiftYearRange(-1));
-    const next: HTMLButtonElement = navButton('›', host.labels().nextYearRange, () => shiftYearRange(1));
+    const prev: HTMLButtonElement = navButton('chevron-left', host.labels().prevYearRange, () => shiftYearRange(-1));
+    const next: HTMLButtonElement = navButton('chevron-right', host.labels().nextYearRange, () => shiftYearRange(1));
     const endYear: number = rangeStart + YEARS_PER_PAGE - 1;
     const range: HTMLElement = document.createElement('span');
     range.className = `${p}__month-label ${p}__range-label`;

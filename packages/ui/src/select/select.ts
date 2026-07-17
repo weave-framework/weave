@@ -70,7 +70,7 @@ export const template: string =
   '<span class={{ valueClass() }}>{{ displayText() }}</span>' +
   '<span class="weave-select__spacer"></span>' +
   '@if (showClear()) {' +
-  '<button type="button" class="weave-select__clear" tabindex="-1" aria-label={{ clearLabel() }} on:click={{ onClearClick }}>×</button>' +
+  '<button type="button" class="weave-select__clear" tabindex="-1" aria-label={{ clearLabel() }} on:click={{ onClearClick }}><Icon name={{ \'x\' }} /></button>' +
   '}' +
   '<span class="weave-select__suffix"><slot name="suffix"></slot></span>' +
   '<span class="weave-select__chevron" aria-hidden="true"><Icon name={{ \'chevron-down\' }} /></span>' +

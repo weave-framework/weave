@@ -109,7 +109,7 @@ export const template: string =
   ' name={{ name() }} aria-label={{ label() }} on:input={{ onNativeInput }} on:blur={{ onBlur }} />' +
   '}' +
   '@if (showClear()) {' +
-  '<button type="button" class="weave-input__clear" aria-label={{ clearLabel() }} on:click={{ clear }}>×</button>' +
+  '<button type="button" class="weave-input__clear" aria-label={{ clearLabel() }} on:click={{ clear }}><Icon name={{ \'x\' }} /></button>' +
   '}' +
   '@if (showReveal()) {' +
   '<button type="button" class="weave-input__reveal" ref={{ revealBtn }} aria-label={{ revealAriaLabel() }}' +

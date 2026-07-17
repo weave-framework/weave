@@ -64,7 +64,7 @@ type PageCell = number | 'ellipsis';
 export const template: string =
   '<nav class={{ rootClass() }} ref={{ host }} aria-label={{ navLabel() }}>' +
   '<Button variant="ghost" class="weave-paginator__nav" label="Previous page"' +
-  ' disabled={{ prevDisabled() }} on:click={{ prev }}>‹</Button>' +
+  ' disabled={{ prevDisabled() }} on:click={{ prev }}><Icon name={{ \'chevron-left\' }} /></Button>' +
   '@for (cell of cells(); track $index) {' +
   '@if (isPage(cell)) {' +
   '<Button variant={{ pageVariant(cell) }} class="weave-paginator__page" label={{ pageLabel(cell) }}' +
@@ -74,7 +74,7 @@ export const template: string =
   '@if (!isPage(cell)) {<span class="weave-paginator__ellipsis" aria-hidden="true">…</span>}' +
   '}' +
   '<Button variant="ghost" class="weave-paginator__nav" label="Next page"' +
-  ' disabled={{ nextDisabled() }} on:click={{ next }}>›</Button>' +
+  ' disabled={{ nextDisabled() }} on:click={{ next }}><Icon name={{ \'chevron-right\' }} /></Button>' +
   '@if (showRange()) {<span class="weave-paginator__range">{{ rangeText() }}</span>}' +
   '@if (showJump()) {' +
   '<span class="weave-paginator__jump">' +

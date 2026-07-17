@@ -48,10 +48,12 @@ function mount(props: PaginatorProps): Mounted {
       k: unknown
     ) => HTMLElement;
     // Page/nav buttons are <Button>, the jump field <Input>, the page-size <Select> — which itself
-    // composes <Icon> (its chevron), so Icon is passed as the Select's own child map.
+    // composes <Icon> (its chevron). The prev/next nav buttons now hold a lucide `<Icon>` chevron
+    // directly, so Icon is also a top-level child here.
     return fn(ctx, rt, {
       Button: toComponent(ButtonMod as never),
       Input: toComponent(InputMod as never),
+      Icon: toComponent(IconMod as never),
       Select: toComponent(SelectMod as never, { Icon: toComponent(IconMod as never) }),
     });
   });

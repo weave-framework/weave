@@ -76,7 +76,7 @@ export const template: string =
   '<span class={{ valueClass() }}>{{ displayText() }}</span>' +
   '<span class="weave-timepicker__spacer"></span>' +
   '@if (showClear()) {' +
-  '<button type="button" class="weave-timepicker__clear" tabindex="-1" aria-label={{ clearLabel() }} on:click={{ onClearClick }}>×</button>' +
+  '<button type="button" class="weave-timepicker__clear" tabindex="-1" aria-label={{ clearLabel() }} on:click={{ onClearClick }}><Icon name={{ \'x\' }} /></button>' +
   '}' +
   '<span class="weave-timepicker__icon" aria-hidden="true"><Icon name={{ \'clock\' }} /></span>' +
   '</div>' +
