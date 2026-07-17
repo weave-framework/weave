@@ -71,13 +71,16 @@
 @include weave.chips-overrides((border: var(--field-line)));
 @include weave.button-toggle-overrides((border: var(--field-line)));
 @include weave.datepicker-overrides((border: var(--field-line), background: var(--raised)));
-/* The in-range band + hover preview were `color.field` (#f7f8fa) — 1.06:1 on the white panel,
-   so a selected range showed only its two accent ends, no span between them. A range band reads
-   as a light wash of the accent, not a neutral grey: tint it. */
+/* The in-range band was `color.field` (#f7f8fa) — 1.06:1 on the white panel, so a selected
+   range showed only its two accent ends, no span between them. Fill the whole span with the
+   SAME accent as the ends (with light text to match), so the range reads as one solid block
+   rather than two dots with a faint gap. The hover preview stays a light tint — it is the
+   TENTATIVE end, and should look different from a committed range. */
 @include weave.date-range-picker-overrides((
   border: var(--field-line),
   background: var(--raised),
-  in-range-background: color-mix(in srgb, var(--accent) 16%, transparent),
-  preview-background: color-mix(in srgb, var(--accent) 9%, transparent),
+  in-range-background: var(--accent),
+  in-range-text: var(--raised),
+  preview-background: color-mix(in srgb, var(--accent) 12%, transparent),
 ));
 @include weave.popover-edit-overrides((border: var(--field-line), background: var(--raised)));

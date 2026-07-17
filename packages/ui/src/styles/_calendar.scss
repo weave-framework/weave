@@ -224,6 +224,12 @@
       isolation: isolate;
     }
 
+    // In-between day text — a token so a filled (strong-colour) band can flip it to a light
+    // colour for contrast; defaults to the normal ink for a light band.
+    .#{$c}__cell--in-range {
+      color: var(--weave-#{$name}-in-range-text);
+    }
+
     // Cap the band inside the endpoints (rounded on the outer side, flush toward the middle).
     .#{$c}__cell--range-start::before {
       inset-inline-start: 50%;

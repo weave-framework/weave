@@ -29,6 +29,9 @@ $tokens: (
     // Range-only: the in-between band (neutral field tint), the hover-preview band, and the
     // dashed ring on the tentative end while picking.
     in-range-background: ref.ref('color.field'),
+    // Text colour of the in-between days. Defaults to the normal day ink (the band is a light
+    // tint) — a consumer that fills the band with a strong colour sets this to a light value.
+    in-range-text: ref.ref('color.ink'),
     preview-background: ref.ref('color.field'),
     preview-edge: ref.ref('color.accent'),
   ),
