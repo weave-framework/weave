@@ -1,6 +1,11 @@
 # RFC 0009: Serializable / Resumable Signal Core (Phase E — E0)
 
-- **Status:** Draft — 2026-07-14
+- **Status:** **Implemented** — 2026-07-17 (Draft 2026-07-14). E0.1–E0.4 shipped; the exit criterion below is
+  now machine-enforced by `pnpm verify:resume`, which builds a real app through the real CLI and resumes it in
+  a real browser, asserting `setup` never re-runs on the client. It was hand-verified before that, which is
+  precisely why E1.46 (a dead resume for every multi-root app) could hide behind a green suite for a week.
+  **Scope note:** this RFC is E0 — the core. Its E1-facing open questions (#1, #3) are unresolved by design
+  and belong to RFC 0001's surface; #1 in particular is a MEASURED gap, not a theory (see below).
 - **Author(s):** Aidas Josas (@aidasjosas)
 - **Discussion:** maintainer decision record; drafted with the AI pair (session ak).
 - **Depends on / supersedes scope of:** [RFC 0001](0001-ssr-hydration.md) — 0001 fixed the *direction*
@@ -133,13 +138,34 @@ the client with `setup` never called on the client.
 
 1. **Handler-chunk granularity** — one chunk per handler (max laziness, more requests) vs per-component
    vs per-route. Likely per-route default, per-component opt-in.
+   **STILL OPEN — and now measured, not theoretical (2026-07-17).** Nothing chunks: every route links the
+   same `main.js` (buildSsg splits only on an explicit `@defer` import). So E1.2's *"static subtrees ship
+   zero JS"* is unbuilt — **resume avoids re-RENDERING, it does not yet avoid SHIPPING**. The cost that
+   exists is pinned by `verify:resume`'s per-page budget (a 3-component resumed page = 7.6 KB gz + a 135 B
+   snapshot); that number is what must FALL when this question is answered. Until then RFC 0001 is not
+   Implemented.
 2. **Snapshot placement** — inline `<script type="application/weave">` vs a separate fetch. Inline for
    SSG; revisit for streaming in E1.
+   **RESOLVED as specified**: inline, `id="__weave_snapshot__"`, read by `resumePage`. 135 B gz on the
+   3-component page above — small enough that a separate fetch would cost a round-trip to save nothing.
 3. **Partial resume / islands boundary** — is an island just a resume root? (Probably yes — defer the
    API to E1.)
+   **Answered in the affirmative, by construction**: `adoptComponent` treats each child as its own resume
+   root (its ctx rides the state map under its own id), and a component that CANNOT adopt degrades to a
+   plain CSR island in place. No separate island API was needed. The chunking half is #1.
 4. **Custom-class registry ergonomics** — global registry vs per-serialize options.
 5. **`effect` on resume** — do effects re-run on resume, or only on first dependency change after resume?
    (Leaning: re-run once to reach a consistent DOM, then normal.)
+   **RESOLVED — the leaning was right, and E1.47 implements exactly it.** `derive` re-creates each of
+   setup's bare `effect(…)`s after the bindings they read, inside the reactive root that owns the resume
+   (so they dispose with it). Creating an effect runs it once, which replays a first pass over the SAME
+   resumed values the server already computed from — then it behaves normally. The justification is that
+   an effect, unlike an `onMount` (which the compiler now refuses to adopt), DID run on the server, so
+   re-creating it is not new work; and `derive` already re-runs every computed initializer on the same
+   reasoning. Found the hard way: nothing rebuilt them, so the docs' per-route `document.title` effect was
+   never re-registered and the title froze at the server's value — silently, since the page still adopted
+   and stayed reactive. An effect that cannot be rebuilt now refuses the whole component (it binds no name,
+   so there is nothing to degrade and no way for an author to see it go missing).
 
 ## Alternatives considered
 

@@ -1,6 +1,15 @@
 # RFC 0001: Server-side rendering & hydration
 
-- **Status:** Accepted (scoped) — 2026-07-04
+- **Status:** Accepted (scoped) — 2026-07-04. **Still Accepted, NOT Implemented — deliberately (2026-07-17).**
+  The render+resume half is built and gated (`weave build --ssg` prerenders every route; the client ADOPTS that
+  DOM — `setup` never re-runs — proven end-to-end in a real browser by `pnpm verify:resume`). What is missing is
+  the PAYLOAD half of E1.2: *"only interactive components ship handler chunks; static subtrees ship zero JS"*.
+  Measured, not assumed — every route links the same `main.js`; buildSsg splits only on an explicit `@defer`
+  import, so no per-route or per-island chunking exists. **Resume avoids re-RENDERING; it does not yet avoid
+  SHIPPING.** The cost that exists is pinned by `verify:resume`'s per-page budget (7.6 KB gz + a 135 B snapshot
+  on a 3-component page) and is the number that must fall before this line reads "Implemented". Design choice
+  open as RFC 0009 question #1. Also unbuilt: E1.3's `@weave-framework/data` → resume payload (`packages/data`
+  has no serialize/resume seam at all), and there is no SSR/SSG page on the docs site.
 - **Author(s):** Aidas Josas (@aidasjosas)
 - **Discussion:** decided directly by the maintainer (no community to gauge yet); this RFC is
   the decision record.
