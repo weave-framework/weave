@@ -1,6 +1,6 @@
 {
   "name": "@weave-framework/runtime",
-  "version": "1.5.28",
+  "version": "1.6.0",
   "description": "Weave reactive core + DOM runtime. Zero dependencies.",
   "type": "module",
   "sideEffects": false,

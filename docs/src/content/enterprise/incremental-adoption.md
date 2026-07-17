@@ -51,7 +51,7 @@ No surprises — here are the edges:
 
 - **Attributes are strings.** Pass rich data (objects, arrays) via the JS property (`el.value = {...}`) rather than an HTML attribute.
 - **Events.** Communicate outward with standard DOM `CustomEvent`s, which every host framework already understands.
-- **No SSR yet.** A Weave custom element renders on the client; if your host server-renders, the widget hydrates in the browser — the same as most third-party widgets. Server-side rendering is on the [roadmap](/enterprise/safe-to-bet-on).
+- **An embedded widget renders on the client.** If your host server-renders its page, the Weave custom element still builds in the browser — the same as most third-party widgets. Weave's [static generation](/learn/static-generation) prerenders *Weave-owned routes* at build time; it does not reach inside a host application's own server render, and request-time SSR is deliberately not built.
 
 ## The path
 

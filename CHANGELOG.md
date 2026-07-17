@@ -1,14 +1,50 @@
 # Weave — changelog
 
-> **Versioning discipline (set 2026-07-02):** every commit bumps the framework **patch**
-> version by 1. So the version = `0.2.0` (last npm release) **+ the number of commits since
-> that release**. All framework packages move in **lockstep** (one version across
-> `@weave-framework/*`); `workspace:*` deps resolve to the concrete version at publish. The
-> VS Code extension (`editor/vscode`) is versioned independently. **This version is exactly
-> what is published to npm** — bump it in the same commit as the change, and record notable
-> releases here. Publishing itself is a separate, explicit step (the `/publish` skill /
-> `pnpm publish:packages`) — pushing code does **not** publish to npm. (The scheme started at
-> `0.2.0`; the line crossed `1.0.0` on 2026-07-05 when the public API was frozen.)
+> **Versioning discipline.** The version is **semver, decided by the change** — see
+> [VERSIONING.md](VERSIONING.md), which is the public promise: PATCH for a compatible fix, MINOR for new
+> compatible surface, MAJOR for a break. All framework packages move in **lockstep** (one version across
+> `@weave-framework/*`); `workspace:*` deps resolve to the concrete version at publish. The VS Code extension
+> (`editor/vscode`) is versioned independently. **This version is exactly what is published to npm.**
+> Publishing is a separate, explicit step (the `/publish` skill / `pnpm publish:packages`) — pushing code does
+> **not** publish to npm.
+>
+> *(Corrected 2026-07-17.* This note used to read "every commit bumps the patch version by 1", a pre-1.0
+> bookkeeping habit from 2026-07-02. It **contradicted VERSIONING.md** the moment the API was frozen on
+> 2026-07-05: a scheme where a bug fix and a new feature both cost +1 patch cannot express semver. Practice had
+> already left it behind — Phase E ran 94 commits without a bump, and then released as one MINOR. The public
+> promise wins; the habit is retired.)*
+
+## 1.6.0 — 2026-07-17
+
+**Phase E — SSG + a resumable signal core.** 94 commits, released as one MINOR: everything below is new,
+opt-in surface with a safe default. The eager SPA path is untouched by design (byte-for-byte), and a SPA-only
+app pays **zero bytes** for any of it.
+
+### Static generation — `weave build --ssg`
+- **`--ssg`** prerenders every route to real HTML at build time and derives the route list automatically (E1.2, E1.3a–d). Per-page `<title>` captured from `document.title` (E1.3d). Per-route chunks: a reader downloads the page they opened (E1.2) — docs page **1555.7 KB → 169.7 KB**, measured in the browser, not on disk.
+- **`resource()` data is awaited before the HTML is written** and travels in the snapshot (E1.3). The build settles tracked async work via a global sink, so `@weave-framework/data` does not pull the headless render into a client bundle.
+- **`lazy()` prerenders**: its `import()` joins the same sink, so a lazily-imported component writes real HTML *and* stays out of other bundles. This made per-component splitting free and retired the eager-routes twin built to work around the old constraint.
+- **Router**: headless location injection (E1.3c-1), per-route SSG via router-SSR (E1.3c-2), `RouterView` adopts its server-rendered view (E1.12).
+
+### Resume — `ssg: { resume: true }`
+- **Wire format + resume entry** (E0.1–E0.3): serialize/deserialize, resumable event dispatch via `data-won-*` markers, graph rebuild with **no `setup()` re-run**. **Headless render to an HTML string** (E0.4) — the DOM seam.
+- **Adopt-mode render** (E1.2a–E1.2c-6): reactive bindings re-attach to server DOM in place; block-boundary markers give a cursor walk; `@if`/`@switch`/`@for` adopt via island-replay; post-block elements and interpolations adopt; multi-root fragments; nested component resume with per-instance state + shared-signal dedup.
+- **`derive(ctx, props)`** rebuilds what cannot serialize: computeds (E1.6), module-scope bindings so a router no longer blocks resume (E1.11), `props` (E1.25), bare `effect()`s (E1.47), and `onMount()` hooks (E1.49).
+- **Coverage for real components**: element `ref`s re-bound from the adopted DOM rather than serialized (E1.16 — refusals 52 → 0, drops 228 → 29); `<slot>` (E1.17); `use:` actions, including forwarded onto a component (E1.21, E1.22); `@key`/`@render`/`@snippet` (E1.24); component-level `on:` handlers (E1.13); named + inline-in-return handlers (E1.5, E1.34); nested-component events with ancestry-scoped resolution (E1.8).
+- **Never silent**: a component that cannot be adopted **names its cause** at build time (E1.14), a handler that won't inline or a computed that can't be rebuilt emits a real esbuild warning under a resume build (E1.7), and a non-serializable binding **degrades to client rendering instead of failing the build** (E1.9).
+
+### Fixes
+- **1.6.0 — fix(cli):** resume adopted off the **wrong root** on every multi-root app (E1.46). The entry hard-coded `_m.firstElementChild`; a multi-root component's roots *are* the mount target's children, so the walk got the first root, threw `nextSibling of null` on step one, and **nothing ever adopted** — silently, because the throw precedes any console listener and the server HTML looks right. Our own documentation site had never resumed, not once. The compiler now publishes the contract (`adopt.container`) instead of the caller guessing; a root that emitted no `adopt` CSRs outright rather than arming handlers over unadopted DOM. Gated by `verify:resume` (a real multi-root app — every prior test app was single-root, which is why the bug could exist).
+- **1.6.0 — fix(compiler):** a bare `effect()` in `setup()` binds no name, so `derive` never rebuilt it — a per-route `document.title` effect froze at the server's value forever (E1.47).
+- **1.6.0 — fix(compiler):** an `onMount()` in `setup()` **resumes** (E1.49). A prior build refused to adopt any component with one, calling it a structural limit; `derive` re-creates the hook exactly as it re-creates an effect, and the refusal was strictly *more* expensive (client-rendering re-runs `setup()` and fires the hook anyway, plus a full re-render). Docs cannot-adopt **34 → 6**. Enabling hooks ran their bodies through the setup scanners for the first time and exposed three real bugs: comments were not skipped (an apostrophe in prose opened a string and swallowed live code), the previous-significant-character was read from raw text, and `returnEntries` dropped a comment-introduced entry and everything after it.
+- **1.6.0 — fix(runtime):** `onMount` is inert during a headless render **by construction** (`__weaveHeadless`), not merely because the render used to be synchronous — E1.3's settling would otherwise have let mount hooks fire at build time.
+- **1.6.0 — fix(compiler):** the setup analysis no longer misreads **regex literals** (`/\/+$/` reported `$` as a variable), comments, TS type annotations, `as` casts, function-type annotations, generics with commas, destructured declarations, optional params, shadowed declarations, or a handler's own locals as ctx references (E1.18–E1.48). Each quietly narrowed what could resume without ever being visible.
+- **1.6.0 — fix(ui):** `<Timepicker>`, `<Select>`, `<Datepicker>` and `<DateRangePicker>` use **lucide icons** instead of hand-drawn Unicode/CSS glyphs.
+
+### Under the hood
+- **1.6.0 — ci:** this repository had **no CI at all** — only a docs deploy and an npm publish, neither of which ran a test. Every gate ran on memory alone. `.github/workflows/ci.yml` now runs build · test · verify on every push (~1.5 min), including **`verify:resume`**: a real app, the real CLI, a real browser, real clicks.
+- **1.6.0 — build(size):** `verify:size` enforces the budgets. SPA core **21.2 KB gz**; resume/adopt/serialize sit on their own lines.
+- **1.6.0 — style:** `pnpm lint` went **916 errors → 0** (the rules were fixed, never relaxed) and is now a CI step; `no-unused-vars` was added after a dead import survived a retraction unnoticed.
 
 ## 1.5.28 — 2026-07-14
 - **1.5.28 — fix(ui):** `<DateRangePicker>` — the **second click now always commits** (FW-17 follow-up). Selecting the first date worked, but the second click frequently did nothing: while the pointer moved toward the end date, every `mouseenter` re-ran a full `calendar.render()` that **rebuilt the entire day grid**, detaching the cell under the cursor mid-click — `mousedown` on the old node, `mouseup` on the replacement → the browser fires no `click`. Two causes fixed: (1) the hover preview + the anchor-set now call a new **`refreshDays()`** on the shared calendar core, which re-decorates the existing day buttons **in place** (reset className → re-derive selected/today/range/preview + focus) instead of recreating them, so each cell keeps its element identity and a real `mousedown+mouseup` always lands; (2) the value-sync `effect` was implicitly **tracking `pendingStart`/`hoverDate`** (read by `decorateDay` during its `render()`), so a hover re-ran it → another rebuild — it now wraps `render()` in `untrack()` and depends only on the external `rawValue()`. `<Datepicker>` shares the core but has no hover path, so it is unchanged (32 tests green). Pinned by a new `date-range-picker.browser.ts` regression test that drives a real `mousedown → mid-click hover → mouseup` and asserts the target cell is never detached + the range commits (fails against the pre-fix rebuild-on-hover). Root cause: my original tests used a synthetic atomic `.click()` which never split mousedown/mouseup, so they missed the real-cursor failure.

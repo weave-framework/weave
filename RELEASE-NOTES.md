@@ -3,6 +3,80 @@
 Human-readable highlights, one section per release — everything notable that landed since
 the previous one. For the granular, per-version log see [CHANGELOG.md](CHANGELOG.md).
 
+## 1.6.0 — 2026-07-17
+
+The big one: **Weave renders to HTML at build time, and the browser resumes it instead of rebuilding it.**
+Everything here is opt-in and additive — a normal `weave build` is byte-for-byte what it was, and no existing
+code changes.
+
+### ✨ Features
+
+- **`weave build --ssg` — static generation.** Every route renders to real HTML at build time: painted on
+  arrival, crawlable, and served as plain files (no server at request time). Routes are derived automatically,
+  each page gets its own `<title>`, and each is its own chunk — a reader downloads the page they opened, not
+  your whole site. On our own documentation site that is **1555.7 KB → 169.7 KB** of transferred payload for a
+  single page, measured in the browser.
+
+- **`ssg: { resume: true }` — resumability.** With `--ssg` alone the browser client-renders over the
+  prerendered HTML; add this and it **adopts** it instead. The build snapshots the reactive graph — every
+  signal's value, per component instance — into an inline `<script type="application/weave">`; the client
+  rebuilds the signals and attaches the *existing* DOM to them. **`setup()` is never called on the client.**
+  The nodes the server wrote are the nodes you keep, down to the same text node. Re-running means paying for
+  the render twice — once to produce the HTML, once to discover what it already says. Resuming pays once.
+
+- **Data prerenders with the page.** A `resource()` that fetches during a build is awaited **before the HTML is
+  written**, and its result travels in the snapshot. No spinner on first paint, and no second request for data
+  the build already has.
+
+- **`lazy()` prerenders too.** A lazily-imported component still renders its real HTML into the page, and still
+  stays out of everyone else's bundle. Lazy means "not in your bundle", not "not in your HTML" — so there is no
+  trade between a complete first paint and a small download.
+
+- **Resume covers what real components actually do:** nested components, `<slot>`, element `ref`s (re-bound
+  from the adopted DOM rather than serialized), `use:` actions, `@if`/`@for`/`@switch`/`@key`/`@render`/
+  `@snippet`, routed views, component-level `on:` handlers, `props`, module-scope bindings, `effect()` and
+  `onMount()` in `setup()`.
+
+- **It tells you what it cannot resume, at build time.** A value that cannot cross the wire (a live socket, a
+  class instance) makes that component client-render — with a warning that names the binding, the file and the
+  cause, never a silent degradation. `weave build --ssg` also warns for a handler that won't inline or a
+  computed that can't be rebuilt.
+
+- **`<Timepicker>`, `<Select>`, `<Datepicker>`, `<DateRangePicker>` use lucide icons** instead of hand-drawn
+  glyphs, matching the rest of the library.
+
+### 🐛 Fixes
+
+- **`--ssg` + `resume` was broken for every multi-root app — including ours.** The client entry handed the
+  adopt walk `firstElementChild`, which is right for a single-root component and wrong for a multi-root one,
+  whose roots *are* the mount target's children. It threw on its first step, silently, and the page stayed
+  inert server HTML. Nothing on our documentation site had ever resumed. The compiler now publishes the
+  contract (`adopt.container`) rather than the caller guessing it, and a root that cannot adopt client-renders
+  outright instead of arming handlers over DOM nobody adopted.
+
+- **A bare `effect()` in `setup()` is re-created on resume.** It binds no name, so nothing rebuilt it: a
+  per-route `document.title` effect stayed frozen at the server's value forever.
+
+- **An `onMount()` in `setup()` resumes.** An earlier build refused to adopt any component that had one; that
+  refusal was wrong (the hook is re-created, exactly as an effect is) and it was also the more expensive
+  answer, since client-rendering re-runs `setup()` and fires the hook anyway.
+
+- **`onMount` is inert during a build by construction** — there is no browser at build time, and it no longer
+  depends on the render happening to be synchronous to stay that way.
+
+- **Regex literals, comments, type annotations, casts, destructuring, generics and shadowed declarations** are
+  no longer misread as variable references by the compiler's setup analysis. Each of these quietly narrowed
+  what could resume.
+
+### 🔬 Under the hood
+
+- **CI.** This repository had none: the test suite, typecheck, lint and size budgets ran only when someone
+  remembered. Three jobs now run on every push, including `verify:resume` — a real app, built by the real CLI,
+  resumed and clicked in a real browser.
+- **Size budgets are enforced** (`verify:size`). The SPA core is 21.2 KB gzipped; resume, adopt and serialize
+  sit on their own budget lines and cost a SPA-only app **zero bytes**.
+- **Zero third-party runtime dependencies**, unchanged.
+
 ## 1.5.28 — 2026-07-14
 
 ### 🐛 Fixes

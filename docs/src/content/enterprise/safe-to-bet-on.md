@@ -28,9 +28,10 @@ ends a lot of meetings early.
 ## Upgrades stay boring — on purpose
 
 Stability isn't a milestone Weave is waiting on — it's a standing priority, and the record backs it up:
-**every release since the first public one has been a patch — over a hundred of them — with no breaking change to
-the code you write.** New capability lands additively, behind its own surface, so routine upgrades stay boring.
-Boring is the goal.
+**every release since the first public one — over a hundred of them — has been a patch or a minor. Never a
+major. Not one breaking change to the code you write.** New capability lands additively, behind its own
+surface: static generation and resume arrived in 1.6.0 as a whole new rendering mode, and existing code did not
+change by a character. That is what a minor is *for*, and why routine upgrades stay boring. Boring is the goal.
 
 We won't pretend a breaking change can *never* happen — one day something may genuinely need to change at its root.
 What we commit to is that when that day comes, it won't blindside you:
@@ -59,10 +60,12 @@ You're not assembling a stack and hoping the parts keep agreeing with each other
 
 ## What we're still building — honestly
 
-We won't oversell the young parts. **Server-side rendering & hydration** and **devtools** are on the roadmap, not
-shipped, and the third-party ecosystem is still small. If your project needs SSR today, that's a real gap to weigh.
-The foundation, though — the reactive core, the first-party stack, the zero-dependency guarantee — is real and
-tested now.
+We won't oversell the young parts. **[Static generation and resume](/learn/static-generation)** shipped in 1.6.0
+and are new: `weave build --ssg` prerenders every route to real HTML, and the browser adopts it rather than
+rebuilding it. That covers SEO and first paint with no server in the request path. **Rendering per request is
+deliberately not built** — if your project needs request-time SSR or streaming today, that is a real gap to
+weigh. The third-party ecosystem is still small. The foundation, though — the reactive core, the first-party
+stack, the zero-dependency guarantee — is real and tested now.
 
 ## The bottom line
 

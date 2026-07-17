@@ -26,9 +26,11 @@ this list is a live intention, not a historical note.
   (`#3`, 1.2.0). Both shipped; see [Extending a component](https://weaveframework.dev/learn/components). Still
   planned: `weave check` type-checking of the markup inside `#3` `patch` ops (today a typo in a patched
   expression surfaces at build/runtime, not in the editor; `#1` extensions are already fully checked).
-- **Server-side rendering — SSG first.** Accepted as a future track ([RFC 0001](rfcs/0001-ssr-hydration.md)):
-  build-time prerendering + client hydration for SEO and first paint, before request-time SSR / streaming. Scheduled
-  after the client-first roadmap matures, so it never comes at the cost of the core.
+- **Splitting below the component.** `weave build --ssg` splits per route, and `lazy()` splits per component —
+  but an interactive component still carries its whole module. Shipping *one handler* and nothing else, so a
+  mostly-static page pays only for the island on it, is sketched in
+  [RFC 0009](rfcs/0009-resumable-signal-core.md) and not built. Zero JS is reachable today, but you draw the
+  line yourself.
 
 ---
 
@@ -36,7 +38,8 @@ this list is a live intention, not a historical note.
 
 Not planned — these are conscious design choices, not omissions:
 
-- **Streaming SSR / RSC** — later phases of the SSR track above, only on real demand (the first cut is static
-  prerendering + hydration).
+- **Request-time SSR, streaming, RSC** — static generation shipped in 1.6.0 and covers SEO and first paint
+  without a server in the request path. Rendering per request is a different set of trade-offs and waits for a
+  real need, not a checklist.
 - **A full animation system** beyond the transition callbacks above — CSS covers the rest.
 - **RxJS interop** — the reactive model is signal-native by design.

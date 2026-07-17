@@ -72,7 +72,7 @@ Installation, your first component, guides, and the complete API reference all l
 
 Weave is *small, fast, signal‑native, and low‑ceremony* — and built to hold up in serious codebases, not just demos. Its sharpest edge is the one large teams worry about most: **zero third‑party runtime dependencies.** No transitive packages, no audit scramble — a supply‑chain attack surface that's effectively nil. Pair that with performance that stays flat as the UI grows, first‑party routing, state, forms, and i18n that share one reactive core, and type‑checking that reaches all the way into your templates, and you get a framework that scales *with* a team, not against it.
 
-We won't oversell the young parts: SSR/hydration and devtools are on the roadmap, and the ecosystem is still growing. But the foundation is real and tested today — and it's aimed squarely at the work real applications demand.
+We won't oversell the young parts: static generation and resume are new, request‑time SSR is deliberately not built, and the ecosystem is still growing. But the foundation is real and tested today — and it's aimed squarely at the work real applications demand.
 
 ## License
 
