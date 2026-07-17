@@ -100,9 +100,16 @@ try {
   }
   weaveBroken = [...mentioned.entries()].filter(([n]) => !real.has(n));
 } catch (e) {
-  console.error(`\n✖ cannot verify --weave-* names: ${e.message}`);
-  console.error('  Run `pnpm docs:build` first — this pass reads the built stylesheet as ground truth.\n');
-  process.exit(1);
+  // No built stylesheet at all → SKIP this pass (don't fail): pass 2 needs dist/app.css as its
+  // ground truth, and a bare `pnpm docs:tokens` before any build should not false-fail. CI runs
+  // `docs:build` first, so it always has one. A build that EXISTS but is stale/partial is a real
+  // problem, so that still fails.
+  if (e.code === 'ENOENT') {
+    console.warn('\n⚠ skipping the --weave-* name check: dist/app.css not built (run `pnpm docs:build` to include it).\n');
+  } else {
+    console.error(`\n✖ cannot verify --weave-* names: ${e.message}\n`);
+    process.exit(1);
+  }
 }
 
 if (weaveBroken.length) {

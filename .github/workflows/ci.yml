@@ -59,8 +59,10 @@ jobs:
       # screenshot. Two more (`--bg-subtle`, `--field`) were broken the same way, plus the docs'
       # own table headers (`--surface-2`), which had no background at all. A typo in a var name
       # is invisible by design; this is the only thing that can see it.
+      # Build the docs first: verify-tokens' second pass reads dist/app.css as the ground
+      # truth for which `--weave-*` names the library actually emits.
       - name: Docs tokens
-        run: pnpm docs:tokens
+        run: pnpm docs:build && pnpm docs:tokens
 
   test:
     name: browser suite
