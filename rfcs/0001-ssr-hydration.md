@@ -19,6 +19,18 @@
   **Honest edges.** "Zero JS" is reachable, not automatic: a static subtree inside an eagerly-imported
   component still ships, and `lazy()` is the author's opt-in. Per-HANDLER chunks (RFC 0009 §2's sketch —
   a chunk per `on:click`) are not built. Request-time SSR + streaming remain out of scope, as decided here.
+
+  **And the one that matters most: I5 (dogfooding) is NOT satisfied.** This RFC names the docs site as the
+  first SSG dogfood, and the DEPLOYED docs do not run `--ssg` at all — `docs:build` is a plain `weave build`,
+  so `weaveframework.dev` is a client-rendered SPA and nothing above reaches a real reader. What holds the
+  claim up instead is `verify:resume`: a real app, through the real CLI, resumed in a real browser, on every
+  push. That is a stronger gate than a site nobody re-checks, but it is not the same as production.
+  Switching the deploy is a separate, unmade decision, and it has one thing that cannot be measured from here:
+  whether Cloudflare maps `/learn/templates` → `/learn/templates/index.html`. If it misses, the
+  `not_found_handling = "single-page-application"` fallback serves the HOME page's HTML — harmless for a SPA,
+  wrong under resume (a foreign snapshot). MEASURE that on a real deploy before turning resume on.
+  (Note the payload win is INDEPENDENT of all this: per-page chunking comes from `lazy()` + splitting, so a
+  plain `weave build` already carries it — measured, /learn/templates 1127.4 → 132.4 KB raw.)
 - **Author(s):** Aidas Josas (@aidasjosas)
 - **Discussion:** decided directly by the maintainer (no community to gauge yet); this RFC is
   the decision record.

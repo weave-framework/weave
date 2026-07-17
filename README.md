@@ -32,11 +32,14 @@ The result feels calm: state that updates exactly where it should, a runtime sma
 
 ---
 
-## 🪡 Woven from the best threads
+## 🪡 Woven from one thread
 
-We love the frameworks that came before. React made components mainstream, Angular brought structure and a real toolchain, Vue made the on‑ramp gentle, Svelte showed how small a runtime can be, Solid proved signals could carry an entire UI. Weave isn't here to dunk on any of them — it's here to take the threads developers reached for again and again, and weave them into one coherent piece of cloth.
+Most of what a front end needs is already well understood: components that compose, a router, forms that
+validate, state that outlives a screen, translations, motion. What is rarely true is that they are all made of
+the *same material*. Weave starts from one primitive — the signal — and refuses to add a second. Everything
+above is woven from that one thread, which is why the pieces fit instead of merely coexisting.
 
-So what does Weave do *a little differently*?
+So what does that get you?
 
 - **Signals all the way down.** Reactivity is one model, and it powers everything — from a single piece of text to the router. There's no second system to learn and no observables to bridge.
 - **Dependencies track themselves.** Things update when — and only when — what they depend on actually changes. Nothing to declare by hand, nothing to cache, nothing to forget.
