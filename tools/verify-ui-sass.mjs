@@ -362,7 +362,7 @@ check('stepper-overrides adds new token (auto-var)', /--weave-stepper-ring:\s*2p
 
 /* ── slider built-in: cascade refs + literals + overrides (U4) ── */
 check('theme emits slider fill referencing accent', /--weave-slider-fill:\s*var\(--weave-color-accent\)/.test(cssTheme));
-check('theme emits slider thumb dims literals (3×18) + 5px cap', /--weave-slider-thumb-width:\s*3px/.test(cssTheme) && /--weave-slider-thumb-height:\s*18px/.test(cssTheme) && /--weave-slider-cap-size:\s*5px/.test(cssTheme));
+check('theme emits slider thumb dims literals (3×18) + 6px cap', /--weave-slider-thumb-width:\s*3px/.test(cssTheme) && /--weave-slider-thumb-height:\s*18px/.test(cssTheme) && /--weave-slider-cap-size:\s*6px/.test(cssTheme));
 const cssSliderOverride = compile(
   `@use '@weave-framework/ui' as weave;\n@include weave.slider-overrides((track-height: 4px, tick: 1px));`,
 );
@@ -505,7 +505,7 @@ check('stepper label truncates so the header never overflows its box', /\.weave-
 check('all-styles emits .weave-slider track + accent fill', /\.weave-slider__track\s*{[\s\S]*?height:\s*var\(--weave-slider-track-height\)[\s\S]*?background:\s*var\(--weave-slider-track\)/.test(cssStyles) && /\.weave-slider__fill\s*{[\s\S]*?background:\s*var\(--weave-slider-fill\)/.test(cssStyles));
 check('slider thumb is a 3×18 ink bar with a 5px accent cap (::after)', /\.weave-slider__thumb\s*{[\s\S]*?width:\s*var\(--weave-slider-thumb-width\)[\s\S]*?height:\s*var\(--weave-slider-thumb-height\)[\s\S]*?background:\s*var\(--weave-slider-thumb\)/.test(cssStyles) && /\.weave-slider__thumb::after\s*{[\s\S]*?background:\s*var\(--weave-slider-cap\)/.test(cssStyles));
 check('slider blocks page scroll during a pointer drag (touch-action:none)', /\.weave-slider\s*{[\s\S]*?touch-action:\s*none/.test(cssStyles));
-check('slider focus shows on the thumb (ring), not a box around the track', /\.weave-slider:focus-visible\s*{[^}]*outline:\s*none/.test(cssStyles) && /\.weave-slider:focus-visible\s+\.weave-slider__thumb\s*{[^}]*outline:\s*2px solid/.test(cssStyles));
+check('slider focus shows on the thumb (ring), not a box around the track', /\.weave-slider:focus-visible\s*{[^}]*outline:\s*none/.test(cssStyles) && /\.weave-slider:focus-visible\s+\.weave-slider__thumb\s*{[^}]*outline:\s*var\(--weave-slider-focus-width\) solid var\(--weave-slider-focus\)/.test(cssStyles));
 check('all-styles emits .weave-paginator page + nav buttons', /\.weave-paginator__page,\s*\.weave-paginator__nav\s*{[\s\S]*?min-width:\s*var\(--weave-paginator-button\)/.test(cssStyles));
 check('paginator page/nav buttons ARE Button (only compact sizing here, no re-created fill)', /\.weave-paginator__page,\s*\.weave-paginator__nav\s*{[^}]*min-width:\s*var\(--weave-paginator-button\)/.test(cssStyles) && !/\.weave-paginator__page\[aria-current=page\]/.test(cssStyles));
 check('paginator emits the ellipsis + tabular-nums range; jump field IS the composed Input (width only)', /\.weave-paginator__ellipsis\s*{/.test(cssStyles) && /\.weave-paginator__range\s*{[\s\S]*?font-variant-numeric:\s*tabular-nums/.test(cssStyles) && /\.weave-paginator__jump-field\s*{[^}]*width:\s*var\(--weave-paginator-jump-width\)/.test(cssStyles) && !/\.weave-paginator__jump-input\s*{/.test(cssStyles));
