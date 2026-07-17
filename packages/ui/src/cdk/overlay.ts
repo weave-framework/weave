@@ -177,13 +177,18 @@ export function createOverlay(config: OverlayConfig = {}): OverlayRef {
     backdropPortal?.detach();
     panelPortal = backdropPortal = null;
     overlayElement.textContent = '';
+    // A detached overlay has nothing to position, so release the strategy's live listeners
+    // (window scroll/resize, the panel ResizeObserver). Reattach re-establishes them in
+    // `apply`. Previously these were only freed on dispose(), which components that
+    // detach-and-drop per open (Select, Autocomplete, the pickers) never call — so every
+    // open leaked a scroll listener and an observer for the life of the page.
+    strategy.dispose?.();
     _attached.set(false);
   }
 
   function dispose(): void {
     if (disposed) return;
     detach();
-    strategy.dispose?.();
     backdropHandlers.clear();
     disposed = true;
   }

@@ -148,6 +148,7 @@ export function connectedPosition(
   const _applied: Signal<ConnectedPosition | null> = signal<ConnectedPosition | null>(null);
   let currentEl: HTMLElement | null = null;
   let listening: boolean = false;
+  let correctionFrame: number = 0;
 
   function place(el: HTMLElement, pos: ConnectedPosition, rtl: boolean, vw: number, vh: number): Placement {
     const rect: DOMRect = origin.getBoundingClientRect();
@@ -202,6 +203,32 @@ export function connectedPosition(
       listening = true;
       window.addEventListener('scroll', reposition, { passive: true, capture: true });
       window.addEventListener('resize', reposition, { passive: true });
+
+      // The panel's own size is the other input to the flip decision, and it is not there
+      // yet: `apply` runs synchronously inside `attach`, and the panel fills its content (a
+      // select's options) AFTER this — so this first pass measured a near-empty box (~10px),
+      // which "fits" below a trigger that the full 106px panel overflows, and it opened
+      // downward and clipped. It self-corrected only on the SECOND open, when the element
+      // already carried layout. A single next-tick re-run is NOT enough: on a cold first open
+      // the fill can take more than one, so that tick still measured the empty box. So re-place
+      // across a few ticks until the panel's height STOPS changing — cheap (a bounded handful
+      // of reads, all before the eye can register a shift) and it also catches content that
+      // grows late. Uses setTimeout, NOT requestAnimationFrame: a background tab (and this
+      // project's headless preview) suspends rAF entirely, which would leave the panel
+      // mispositioned there; setTimeout runs regardless.
+      let lastH: number = -1;
+      let ticksLeft: number = 12;
+      const settle = (): void => {
+        correctionFrame = 0;
+        if (!currentEl || !currentEl.isConnected) return;
+        const h: number = currentEl.offsetHeight;
+        if (h !== lastH) {
+          lastH = h;
+          apply(currentEl); // re-place with the current height (listener setup is guarded off)
+        }
+        if (ticksLeft-- > 0) correctionFrame = setTimeout(settle, 16) as unknown as number;
+      };
+      correctionFrame = setTimeout(settle, 0) as unknown as number;
     }
   }
 
@@ -213,6 +240,8 @@ export function connectedPosition(
     if (listening && isBrowser) {
       window.removeEventListener('scroll', reposition, { capture: true } as EventListenerOptions);
       window.removeEventListener('resize', reposition);
+      if (correctionFrame) clearTimeout(correctionFrame);
+      correctionFrame = 0;
       listening = false;
     }
     currentEl = null;

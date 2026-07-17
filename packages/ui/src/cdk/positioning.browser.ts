@@ -61,6 +61,32 @@ test('positioning: flips to top when the preferred bottom overflows', () => {
   ref.dispose();
 });
 
+test('positioning: re-flips after the panel grows post-attach (the empty-at-open bug)', async () => {
+  // The real-world failure: a Select's panel is EMPTY when `attach` runs (its options fill a
+  // beat later), so `apply` measures a ~10px box that "fits" below a near-bottom trigger and
+  // opens downward — then the panel grows tall and clips off-screen. It only self-corrected on
+  // the SECOND open, when the element already had height. The strategy must re-place once the
+  // panel settles to its real size. Reproduce it precisely: attach small, then grow.
+  // Origin.bottom sits 30px above the viewport edge: enough for the empty 10px panel to fit
+  // below (10 + 8 margin < 30), NOT enough for the full 100px one.
+  const oy: number = VH() - 50; // origin top; height 20 → origin.bottom = VH()-30
+  const strat: ConnectedPositionStrategy = connectedPosition(fixed(100, oy, 50, 20), {
+    positions: ['bottom-start', 'top-start'],
+  });
+  const ref: OverlayRef = createOverlay({ positionStrategy: strat });
+  const content: HTMLElement = sized(80, 10); // empty at open — 10px "fits" below
+  const host: HTMLElement = ref.attach(content); // the element the strategy positions
+  assert.equal(px(host, 'top'), oy + 20, 'opens DOWN at first — the empty panel fits below');
+
+  // The content arrives; the panel is now taller than the room below the trigger.
+  content.style.height = '100px';
+  // Give the settle loop its ticks to notice the growth and re-place (it runs on setTimeout).
+  await new Promise<void>((r) => setTimeout(r, 250));
+
+  assert.equal(px(host, 'top'), oy - 100, 'after it grows, the panel re-flips ABOVE the origin');
+  ref.dispose();
+});
+
 test('positioning: shifts (clamps) into view when a single position overflows the right edge', () => {
   const ox: number = VW() - 20; // origin hugging the right edge
   const ref: OverlayRef = createOverlay({ positionStrategy: connectedPosition(fixed(ox, 100, 50, 20), { positions: ['bottom-start'], viewportMargin: 8 }) });
