@@ -1,5 +1,5 @@
 import { test, assert } from '../../../tools/harness.js';
-import { rewrite, ctxScope, childScope, type Scope, type RewriteSegment } from '@weave-framework/compiler';
+import { rewrite, ctxScope, childScope, unresolvedRefs, type Scope, type RewriteSegment } from '@weave-framework/compiler';
 
 /** Assert the verbatim invariant: each segment quotes identical text on both sides. */
 function assertVerbatim(expr: string, code: string, segments: RewriteSegment[]): void {
@@ -202,4 +202,40 @@ test('rewrite: code output is unchanged vs the pre-segment behavior (regression 
   assert.equal(rewrite('items.length', ctxScope(['items']), '__ctx').code, '__ctx.items.length');
   assert.equal(rewrite('1 + 2', ctxScope([]), '__ctx').code, '1 + 2');
   assert.equal(rewrite('fn(x)', ctxScope(['fn', 'x']), '__ctx').code, '__ctx.fn(__ctx.x)');
+});
+
+/* ──────────── E1.49 — a comment is prose, and it must not steer the scanner ──────────── */
+
+test('E1.49: a comment does not swallow the code after it, and its full stop is not a member access', () => {
+  // Two distinct ways a comment used to corrupt the scan, both found in the real <Sidenav>:
+  //  1. an APOSTROPHE in prose ("the drawer's sibling") opened a STRING, which then ran to the next quote
+  //     and left every identifier in between un-rewritten;
+  //  2. a sentence's FULL STOP was read back as the previous significant character, so the identifier after
+  //     it looked like `.member` and was skipped.
+  // Either one emitted `trapOn = true` bare, and a resumed page threw `trapOn is not defined`.
+  const sc: Scope = ctxScope(['trap', 'trapOn']);
+
+  const apostrophe: string = rewrite("// the backdrop is the drawer's sibling\ntrapOn = true;", sc).code;
+  assert.ok(apostrophe.includes('ctx.trapOn = true'), `an apostrophe in prose does not open a string; got ${apostrophe}`);
+
+  const fullStop: string = rewrite('// clickable (it closes the drawer).\ntrap ??= f();', sc).code;
+  assert.ok(fullStop.includes('ctx.trap ??='), `a sentence's full stop is not a member access; got ${fullStop}`);
+
+  // the comment itself must come through untouched — it is not code
+  assert.ok(fullStop.includes('// clickable (it closes the drawer).'), 'the comment is copied verbatim');
+  assert.ok(!/ctx\.\w+ closes/.test(fullStop), 'and nothing inside it was rewritten');
+
+  // a real `.member` is still a member, and division is still division
+  assert.equal(rewrite('a.trap', ctxScope(['a', 'trap'])).code, 'ctx.a.trap');
+  assert.equal(rewrite('trap / 2', sc).code, 'ctx.trap / 2');
+});
+
+test('E1.49: the ANALYSIS agrees with rewrite about comments', () => {
+  // The two must see the same references, or a component is refused for a name it does not read — or worse,
+  // cleared for one it does. (`unresolvedRefs` runs the same scan `rewrite` does.)
+  const src: string = "// the drawer's own note.\ntrapOn = true;";
+  assert.deepEqual(unresolvedRefs(src, new Set(), [], ''), ['trapOn'],
+    `prose contributes no references; got ${JSON.stringify(unresolvedRefs(src, new Set(), [], ''))}`);
+  assert.deepEqual(unresolvedRefs("// a note.\nknown = 1;", new Set(['known']), [], ''), [],
+    'and a known one still resolves');
 });

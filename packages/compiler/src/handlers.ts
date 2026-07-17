@@ -534,7 +534,11 @@ function returnEntries(script: string): Map<string, string> {
       const rb: number = matchDelimited(script, b, '{', '}');
       if (rb < 0) return out;
       for (const part of splitTop(script.slice(b + 1, rb))) {
-        const p: string = part.trim();
+        // An entry may be introduced by a comment — a doc line above it is ordinary style. Strip those first
+        // or `readIdent` sees `/`, returns nothing, and the entry is silently DROPPED. The real <Sidenav>
+        // annotates `drawerModal` that way: it was never extracted, so it never reached the resumed ctx and a
+        // resumed page threw `drawerModal is not a function`. Every entry after a commented one was lost too.
+        const p: string = stripLeadingComments(part.trim());
         const name: string = readIdent(p, 0);
         if (!name) continue; // a spread, a computed key, or a quoted one
         const k: number = skipWs(p, name.length);
@@ -546,6 +550,27 @@ function returnEntries(script: string): Map<string, string> {
     i = ID_START.test(c) && isTokenStart(script, i) ? skipWord(script, i) : i + 1;
   }
   return out;
+}
+
+/** Drop any run of leading `//` / block comments (and the whitespace around them) from `s`. */
+function stripLeadingComments(s: string): string {
+  let i: number = 0;
+  for (;;) {
+    while (i < s.length && /\s/.test(s[i])) i++;
+    if (s[i] === '/' && s[i + 1] === '/') {
+      const nl: number = s.indexOf('\n', i);
+      if (nl < 0) return '';
+      i = nl + 1;
+      continue;
+    }
+    if (s[i] === '/' && s[i + 1] === '*') {
+      const end: number = s.indexOf('*/', i + 2);
+      if (end < 0) return '';
+      i = end + 2;
+      continue;
+    }
+    return s.slice(i);
+  }
 }
 
 /**

@@ -1160,15 +1160,16 @@ test('E1.44: a helper the template never mentions stays a local only', () => {
   assert.ok(!/ctx\.helper = /.test(derive), `an internal helper does not need a ctx slot; got:\n${derive}`);
 });
 
-/* ──────────── E1.45 — a setup that registers onMount cannot adopt ──────────── */
+/* ──────────── E1.49 — a setup that registers onMount CAN adopt (E1.45's refusal, retracted) ──────────── */
 
-test('E1.45: a component whose setup registers `onMount` refuses to adopt, and says why', () => {
-  // THE structural limit of resumability, found by the docs dogfood. `<Expansion>` fills its panel bodies in an
-  // `onMount` (`querySelectorAll('.weave-expansion__content')` + append). onMount is INERT on the server, so the
-  // bodies ship empty; plain `--ssg` hides that because its client CSR-mounts and onMount runs. Resume adopts —
-  // and `setup` never runs, so the onMount is never even registered. The docs sidebar came back with 4 links
-  // instead of 23, and nothing said a word. Such a component must CSR-fall back, which is exactly correct: its
-  // DOM setup is a create-time effect that no snapshot can carry.
+test('E1.49: a component whose setup registers `onMount` ADOPTS — derive re-creates the hook', () => {
+  // E1.45 refused this, calling a mount hook "THE structural limit of resumability": resume never runs setup,
+  // so the hook never registers, and the server never ran it either — so its DOM work would vanish. The premise
+  // is true. The conclusion was not: `derive` DOES run on resume, and can re-create the hook exactly as it
+  // re-creates a bare effect (E1.47). The work then happens on the client once — the only time it could ever be
+  // right, since the hook is inert on the server by construction.
+  // Refusing was also the MORE expensive answer: client-rendering the subtree re-runs setup and fires the hook
+  // anyway, plus a full re-render. It bought nothing and cost the adopt. On the docs it refused 30 components.
   const { code, warnings } = compileComponent(
     {
       script:
@@ -1180,12 +1181,13 @@ test('E1.45: a component whose setup registers `onMount` refuses to adopt, and s
     },
     { filename: 'om1', resumable: true }
   );
-  assert.ok(!/function adopt\(/.test(code), 'no adopt is emitted — the subtree client-renders instead');
-  assert.ok(warnings?.some((w) => /onMount/.test(w) && /cannot be resumed/.test(w)),
-    `and it names onMount as the cause; got ${JSON.stringify(warnings)}`);
+  assert.ok(/function adopt\(/.test(code), 'it adopts now');
+  assert.ok(/function derive[\s\S]*onMount\(/.test(code), 'and derive re-creates the hook');
+  assert.ok(/function derive[\s\S]*ctx\.host\(\)/.test(code), "rewritten against the resumed ctx, not setup's closure");
+  assert.equal(warnings?.length ?? 0, 0, `nothing to warn about; got ${JSON.stringify(warnings)}`);
 });
 
-test('E1.45: onMount in a COMMENT or another function does not refuse; an aliased import does', () => {
+test('E1.49: an aliased onMount rebuilds too; a hook reading something unrebuildable still refuses', () => {
   const innocent: CompiledComponent = compileComponent(
     {
       script:
@@ -1208,5 +1210,21 @@ test('E1.45: onMount in a COMMENT or another function does not refuse; an aliase
     },
     { filename: 'om3', resumable: true }
   );
-  assert.ok(!/function adopt\(/.test(aliased.code), 'an alias is still the same hook');
+  assert.ok(/function adopt\(/.test(aliased.code), 'an alias is the same hook — and it rebuilds (E1.49)');
+  assert.ok(/function derive[\s\S]*afterMount\(/.test(aliased.code), 'under its local name');
+
+  // The refusal that REMAINS after E1.49: not the hook itself, but a hook whose body reads a name nothing
+  // can reconstruct. There is no binding to degrade — so the whole component client-renders, and says why.
+  const unrebuildable: CompiledComponent = compileComponent(
+    {
+      script:
+        'import { signal, onMount } from "@weave-framework/runtime";\n' +
+        'export function setup(){ const n = signal(0);\n  onMount(() => mysteryBus.send(n()));\n  return { n }; }',
+      template: '<b>{{ n() }}</b>',
+    },
+    { filename: 'om4', resumable: true }
+  );
+  assert.ok(!/function adopt\(/.test(unrebuildable.code), 'a hook that cannot be rebuilt still refuses');
+  assert.ok(unrebuildable.warnings?.some((w) => /onMount/.test(w) && /`mysteryBus`/.test(w)),
+    `and it names what it could not resolve; got ${JSON.stringify(unrebuildable.warnings)}`);
 });

@@ -616,3 +616,24 @@ test('E1.45: a doc COMMENT before the hook does not disguise it as a property ac
     'export function setup(props) {\n  props.lifecycle.onMount(() => {});\n  return {};\n}\n';
   assert.equal(setupCallsHook(method, new Set(['onMount'])), null, '`x.onMount()` belongs to someone else');
 });
+
+test("E1.49: a comment above a return-object entry does not swallow it (nor everything after)", () => {
+  // The real <Sidenav> documents `drawerModal` with a line above it. `returnEntries` read the part, saw `/`,
+  // found no identifier and skipped it — so `drawerModal` never reached the resumed ctx and a resumed page
+  // threw `drawerModal is not a function`. Every entry AFTER a commented one was lost the same way.
+  const script: string = [
+    'export function setup() {',
+    '  return {',
+    '    before: (): number => 1,',
+    '    // Declare modality to AT while the over-mode drawer is open.',
+    "    documented: (): string => 'x',",
+    '    after: (): boolean => true,',
+    '  };',
+    '}',
+  ].join('\n');
+  const found: SetupBindings = extractSetupBindings(script);
+  const names: string[] = [...found.handlers.keys()];
+  assert.ok(names.includes('documented'), `the commented entry is extracted; got ${JSON.stringify(names)}`);
+  assert.ok(names.includes('after'), 'and so is everything after it');
+  assert.ok(names.includes('before'), 'and before it');
+});

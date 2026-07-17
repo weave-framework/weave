@@ -116,7 +116,20 @@ function resumableSetup(script: string, scope: string[]): ResumableSetup {
   const warnings: string[] = [];
   const found: SetupBindings = extractSetupBindings(script);
   // E1.47 — which local names mean the runtime's `effect` (an aliased import included, as for hooks).
-  const effectLocals: ReadonlySet<string> = effectNames(extractModuleImports(script), script);
+  // E1.49 — setup's bare calls that `derive` must re-create: `effect(…)` AND `onMount(…)`.
+  //
+  // E1.45 refused to adopt any component with a mount hook, reasoning that resume never runs setup so the
+  // hook is never registered, and the server never ran it either — so its DOM work would be lost. The first
+  // half is true; the conclusion was not. `derive` DOES run on resume, and it can re-create the hook exactly
+  // as E1.47 re-creates a bare effect. The work then happens on the client, once — which is the ONLY time it
+  // could ever be right, since the hook is inert on the server by construction.
+  //
+  // And refusing was strictly the more expensive answer: it client-rendered the whole subtree, which re-runs
+  // setup and fires the hook anyway, plus a full re-render. The refusal bought nothing and cost the adopt.
+  const rebuildable: ReadonlySet<string> = union(
+    effectNames(extractModuleImports(script), script),
+    hookNames(extractModuleImports(script), script)
+  );
   // NO early return on an empty `found`. A setup that only `return`s an object literal declares no `const` at
   // all — the real `<Button>`'s shape — yet its returned MODULE names still need deriving (see below). Bailing
   // here meant such a component got no `derive` whatsoever, so a `use:ripple` had no action on the client.
@@ -249,14 +262,14 @@ function resumableSetup(script: string, scope: string[]): ResumableSetup {
   // rendered and never tracked another navigation. Unlike an `onMount` (E1.45), an effect DID run on the server,
   // so re-creating it here is not new work — it re-establishes a subscription and re-runs a first pass over the
   // SAME resumed values, exactly as derive already does for every computed initializer.
-  // Emitted after the bindings and helpers above, because an effect reads them.
+  // Emitted after the bindings and helpers above, because an effect (or a mount hook) reads them.
   for (const call of found.calls) {
-    if (!effectLocals.has(call.callee)) continue; // some other bare call — not ours to rebuild
+    if (!rebuildable.has(call.callee)) continue; // some other bare call — not ours to rebuild
     const missing: string[] = unresolvedRefs(call.source, union(settled, imports), [], '');
     if (missing.length) {
-      // Nothing names an effect, so there is no binding to blame and no way to degrade it on its own: the
-      // component cannot be adopted at all. Say so — the subtree then client-renders, which runs setup and
-      // the effect with it.
+      // Neither an effect nor a hook binds a name, so there is no binding to blame and no way to degrade one
+      // on its own: the component cannot be adopted at all. Say so — the subtree then client-renders, which
+      // runs setup and the statement with it.
       effectRefusals.push(blame(rootCause(missing)));
       continue;
     }
@@ -337,16 +350,14 @@ export function compileComponent(src: ComponentSource, opts: ComponentOptions = 
   // E1.5/E1.6 — resumable only: inline each named handler's `setup` body (`on:click={{ inc }}`) and re-derive
   // each `computed` over the resumed ctx (`{{ doubled() }}`), neither of which can cross the snapshot.
   const resumed: ResumableSetup | undefined = opts.resumable && src.script ? resumableSetup(src.script, scope) : undefined;
-  // E1.45 — a lifecycle hook registered in `setup` is the structural limit of resumability: resume never runs
-  // `setup`, so the hook is never registered, and the server never ran it either (it is inert there). Whatever
-  // DOM work it does simply never happens. Refuse to adopt and say so — the subtree then client-renders, which
-  // runs the hook and is exactly right. (`<Expansion>` fills its panel bodies in an onMount, so it needs this.)
-  // The limit is real, but it was NOT what emptied the docs sidebar — that was E1.46: the client entry handed
-  // `adopt` the wrong root, so resume threw on its first step and no component on the page ever adopted at all.
-  const hook: string | null =
-    opts.resumable && src.script
-      ? setupCallsHook(src.script, hookNames(extractModuleImports(src.script), src.script))
-      : null;
+  // E1.49 — a lifecycle hook in `setup` is NOT a limit. E1.45 refused to adopt such a component, reasoning
+  // that resume never runs `setup` so the hook never registers, and the server never ran it either — so its
+  // work would be lost. True premise, wrong conclusion: `derive` runs on resume, and re-creates the hook the
+  // same way it re-creates a bare `effect` (E1.47). The work then happens on the client exactly once, which is
+  // the only time it could ever be right — the hook is inert on the server by construction.
+  // The refusal was also the more expensive answer: client-rendering the subtree re-runs `setup` and fires the
+  // hook anyway, plus a full re-render. It bought nothing and cost the adopt. `<Expansion>` — which fills its
+  // panel bodies in an onMount and was the component that motivated the refusal — now adopts.
   const compiled: CompileResult = compileTemplateAst(ast, {
     mode: 'module',
     scope,
@@ -358,11 +369,11 @@ export function compileComponent(src: ComponentSource, opts: ComponentOptions = 
     // E1.47 — an effect that cannot be rebuilt is a whole-component refusal: it names nothing, so there is no
     // single binding to degrade and no way for the author to see it go missing. A hook (E1.45) wins the report
     // when both apply — it is the harder limit (an onMount can never resume; an effect merely could not here).
-    cannotAdopt: hook
-      ? `a \`${hook}()\` lifecycle hook in setup()`
-      : resumed?.effectRefusals.length
-        ? `an \`effect()\` in setup() that reads ${resumed.effectRefusals[0]}`
-        : undefined,
+    // Only a statement `derive` could not rebuild refuses now — an `effect()`/`onMount()` reading something
+    // nothing can reconstruct. The hook itself is no longer a refusal (E1.49).
+    cannotAdopt: resumed?.effectRefusals.length
+      ? `an \`effect()\`/\`onMount()\` in setup() that reads ${resumed.effectRefusals[0]}`
+      : undefined,
     resumableHandlers: resumed?.handlers,
     resumableDerived: resumed?.computeds,
     resumableLocals: resumed?.locals,

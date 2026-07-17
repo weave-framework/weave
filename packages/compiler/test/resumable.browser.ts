@@ -1449,7 +1449,9 @@ export function setup(props) {
   // `_wc.adopt = render.adopt;`, which is undefined when no adopt fn exists but still matches a loose search.
   assert.ok(!code.includes('render.adopt = adopt;'), 'the component opts out of adopting rather than lose the effect');
   assert.ok(!/function derive[\s\S]*mysteryBus/.test(code), 'and the refused effect is not emitted into derive either');
-  assert.ok(warnings.some((w) => /`effect\(\)` in setup\(\)/.test(w) && /`mysteryBus`/.test(w)),
+  // The message names both shapes now: E1.49 rebuilds `onMount()` through the same path, so an unrebuildable
+  // one refuses for the same reason and deserves the same wording.
+  assert.ok(warnings.some((w) => /`effect\(\)`\/`onMount\(\)` in setup\(\)/.test(w) && /`mysteryBus`/.test(w)),
     'and it says which name it could not resolve');
 });
 

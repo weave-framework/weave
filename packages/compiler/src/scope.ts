@@ -80,6 +80,11 @@ export function rewrite(expr: string, scope: Scope, ctxRef: string = 'ctx', oute
   // nearest opener can, and mistaking the second for the first emitted `f("k", a: ctx.a, b)`, which fails the
   // BUILD (the real <Menubar>'s `removeEventListener("keydown", arrowListener, true)`).
   const brackets: string[] = [];
+  // The last SIGNIFICANT character emitted — tracked, not read back out of `out`. A comment is copied
+  // verbatim, so `lastNonSpace(out)` saw whatever it ENDED with: a sentence's full stop made the next
+  // identifier look like `.member` and left it un-rewritten. That is what emitted the real <Sidenav>'s
+  // `trap ??= …` bare, so a resumed page threw `trapOn is not defined`.
+  let sig: string = '';
 
   const segments: RewriteSegment[] = [];
   // The current verbatim run, contiguous in both source and generated text.
@@ -113,14 +118,39 @@ export function rewrite(expr: string, scope: Scope, ctxRef: string = 'ctx', oute
   while (i < n) {
     const c: string = expr[i];
 
-    if (c === '"' || c === "'") {
-      const end: number = scanString(expr, i);
+    // A COMMENT is prose — copy it and move on. Skipped here for the same reason the analysis skips it
+    // (`stripDeclTypes`), and the asymmetry between the two was a real bug: an apostrophe in a comment
+    // ("the drawer's sibling") opened a STRING to this scanner, which then swallowed real code up to the
+    // next quote and left it unrewritten. The real <Sidenav>'s effect came out with `trapOn = true` still
+    // bare, so a resumed page threw `trapOn is not defined`. Template expressions rarely carry comments,
+    // which is why this survived until setup bodies (E1.47's effects, E1.49's hooks) started coming through.
+    if (c === '/' && (expr[i + 1] === '/' || expr[i + 1] === '*')) {
+      const end: number = scanComment(expr, i);
       copy(i, expr.slice(i, end));
       i = end;
       continue;
     }
 
+    // A REGEX literal is opaque too — its contents are pattern syntax, and a `'` or `"` inside one would
+    // otherwise open a string here exactly as the comment above did.
+    if (c === '/' && startsRegex(expr, i)) {
+      const end: number = scanRegex(expr, i);
+      copy(i, expr.slice(i, end));
+      sig = '/';
+      i = end;
+      continue;
+    }
+
+    if (c === '"' || c === "'") {
+      const end: number = scanString(expr, i);
+      copy(i, expr.slice(i, end));
+      sig = c; // a string is a VALUE; all that matters downstream is that it is not a `.`
+      i = end;
+      continue;
+    }
+
     if (c === '`') {
+      sig = '`';
       // Template literal: copy the literal spans verbatim but rewrite each `${ … }` interpolation,
       // so a ctx/local binding inside `${ }` still resolves instead of being left a bare global.
       copy(i, '`');
@@ -183,7 +213,7 @@ export function rewrite(expr: string, scope: Scope, ctxRef: string = 'ctx', oute
       // A member access (`obj.name`) leaves `name` verbatim — but a spread/rest `...name` also
       // ends in `.`, and there `name` IS a reference that must be scope-rewritten. Distinguish
       // the two: only a lone `.` is a property accessor; `...` is a spread.
-      const isProperty: boolean = lastNonSpace(out) === '.' && !endsWithSpread(out);
+      const isProperty: boolean = sig === '.' && !endsWithSpread(out);
       const binding: Binding | undefined = scope.get(name);
 
       // An explicit object-literal key (`{ key: … }` / `, key: …`) is a property name, not a
@@ -222,6 +252,7 @@ export function rewrite(expr: string, scope: Scope, ctxRef: string = 'ctx', oute
       } else {
         copy(i, name);
       }
+      sig = name[name.length - 1];
       i = j;
       continue;
     }
@@ -230,6 +261,7 @@ export function rewrite(expr: string, scope: Scope, ctxRef: string = 'ctx', oute
     if (c === '{' || c === '[' || c === '(') brackets.push(c);
     else if (c === '}' || c === ']' || c === ')') brackets.pop();
     copy(i, c);
+    if (!/\s/.test(c)) sig = c;
     i++;
   }
   flush();
@@ -318,6 +350,19 @@ const NON_CTX: Set<string> = new Set([
   'alert', 'confirm', 'prompt', 'performance', 'crypto',
   'Event', 'CustomEvent', 'AbortController', 'FormData', 'Blob', 'File',
   'Image', 'Audio', 'getComputedStyle', 'atob', 'btoa',
+  // Observers + DOM types a mount hook reaches for constantly (`new ResizeObserver(…)`, `el instanceof
+  // HTMLElement`). Missing here, they read as component data nothing can rebuild, so the component was
+  // refused for "reading `ResizeObserver`" — a global that is simply there. Found by E1.49: once mount hooks
+  // became re-creatable, their bodies went through this scan for the first time and named the gaps.
+  'ResizeObserver', 'IntersectionObserver', 'MutationObserver', 'PerformanceObserver',
+  'HTMLElement', 'HTMLInputElement', 'HTMLTextAreaElement', 'HTMLButtonElement', 'HTMLAnchorElement',
+  'HTMLImageElement', 'HTMLSelectElement', 'HTMLDivElement', 'HTMLSpanElement', 'HTMLFormElement',
+  'Element', 'Node', 'Text', 'Comment', 'DocumentFragment', 'NodeList', 'DOMRect', 'MediaQueryList',
+  'KeyboardEvent', 'MouseEvent', 'PointerEvent', 'TouchEvent', 'InputEvent', 'FocusEvent', 'WheelEvent',
+  'DragEvent', 'ClipboardEvent', 'SubmitEvent', 'ErrorEvent', 'MessageEvent', 'StorageEvent',
+  // `import(…)` is an operator, not a name. A dynamic import inside a hook/effect body was reported as
+  // "reads `import`", refusing the component over a keyword.
+  'import',
 ]);
 
 /** Collect arrow-function parameter names in `expr` (so they aren't treated as ctx). */
@@ -369,10 +414,21 @@ export function freeIdentifiers(expr: string, outerParams?: ReadonlySet<string>)
   if (outerParams) for (const p of outerParams) params.add(p);
   let i: number = 0;
   const n: number = expr.length;
+  // The last SIGNIFICANT character — tracked, not read back out of the raw text. Reading it back sees whatever
+  // a skipped comment ENDED with: a sentence's full stop made the next identifier look like `.member`, so it
+  // was never collected and whatever it referenced went unseen. (`rewrite` carries the same fix; the two must
+  // agree on what is a reference or the analysis and the emit disagree — which is how a component gets refused
+  // for a name it does not read, or emitted with a name it does.)
+  let sig: string = '';
   while (i < n) {
     const c: string = expr[i];
+    if (c === '/' && (expr[i + 1] === '/' || expr[i + 1] === '*')) {
+      i = scanComment(expr, i); // prose — `sig` deliberately untouched
+      continue;
+    }
     if (c === '"' || c === "'") {
       i = scanString(expr, i);
+      sig = c;
       continue;
     }
     if (c === '`') {
@@ -420,26 +476,28 @@ export function freeIdentifiers(expr: string, outerParams?: ReadonlySet<string>)
     // silence: the binding was dropped from the resumed graph and blamed on a phantom.
     if (c === '/' && startsRegex(expr, i)) {
       i = scanRegex(expr, i);
+      sig = '/';
       continue;
     }
     if (ID_START.test(c)) {
       let j: number = i + 1;
       while (j < n && ID_CHAR.test(expr[j])) j++;
       const name: string = expr.slice(i, j);
-      const before: string = expr.slice(0, i);
-      const prev: string = lastNonSpace(before);
+      const prev: string = sig;
       const next: string = firstNonSpaceFrom(expr, j);
       // A member access (`obj.name`) is a property; a spread/rest (`...name`) also ends in `.` but
       // there `name` is a data reference that must be inferred as ctx (regression: a `use:` config
       // `{ ...opts, … }` failed to pull `opts` into scope, so it stayed a bare global).
-      const isProperty: boolean = prev === '.' && !endsWithSpread(before);
+      const isProperty: boolean = prev === '.' && !endsWithSpread(expr.slice(0, i));
       // An explicit object-literal key (`{ key: … }` / `, key: …`) is a property name, not component
       // data — don't infer it as ctx. Shorthand `{ key }` (next is `,`/`}`) IS a value ref → kept.
       const isObjectKey: boolean = (prev === '{' || prev === ',') && next === ':';
       if (!isProperty && !isObjectKey && !NON_CTX.has(name) && !params.has(name)) out.add(name);
+      sig = name[name.length - 1];
       i = j;
       continue;
     }
+    if (!/\s/.test(c)) sig = c;
     i++;
   }
   return [...out];
@@ -458,6 +516,16 @@ function scanString(s: string, start: number): number {
     i++;
   }
   return s.length;
+}
+
+/** Past the `//` or `/* *\/` comment starting at `i`. A line comment ends at the newline (kept). */
+function scanComment(s: string, start: number): number {
+  if (s[start + 1] === '/') {
+    const nl: number = s.indexOf('\n', start);
+    return nl < 0 ? s.length : nl;
+  }
+  const end: number = s.indexOf('*/', start + 2);
+  return end < 0 ? s.length : end + 2;
 }
 
 /**
