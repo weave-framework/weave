@@ -15,6 +15,10 @@
   --muted: #687180;
 
   --border: #e2e6ec;
+  /* An input's baseline is an affordance, not a divider. Bound to --border it measured
+     1.18:1 against the demo card — WCAG wants 3:1 for a UI component boundary, so the
+     field was, literally, invisible. 3.24:1 vs the demo card, 3.44:1 vs a white page. */
+  --field-line: #828b9a;
   --accent: #1373b0; /* logo blue (light) */
 
   /* Theme-independent brand + fonts — declared on :root so they apply in both themes. */
@@ -50,6 +54,7 @@
   --muted: #8b94a3;
 
   --border: #272d38;
+  --field-line: #646d7d; /* dark was worse: --border measured 1.33:1 here. This is 3.53:1. */
   --accent: #1e8cd2; /* logo blue (dark) */
 
   /* Syntax-highlight token colors (dark). */

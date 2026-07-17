@@ -53,6 +53,14 @@ jobs:
         run: pnpm build:packages
       - name: Size budgets
         run: pnpm verify:size
+      # `--fg-muted` was referenced 129 times across 127 demo files and never once defined. CSS
+      # answers an undefined var by silently inheriting, so every one of those captions rendered
+      # in full body ink at full size — and nothing said a word until a human noticed it in a
+      # screenshot. Two more (`--bg-subtle`, `--field`) were broken the same way, plus the docs'
+      # own table headers (`--surface-2`), which had no background at all. A typo in a var name
+      # is invisible by design; this is the only thing that can see it.
+      - name: Docs tokens
+        run: pnpm docs:tokens
 
   test:
     name: browser suite

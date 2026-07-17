@@ -1,6 +1,6 @@
 <div style="max-width:460px; display:flex; flex-direction:column; gap:8px;">
   <List selectable={{ false }} items={{ items }} rowTemplate={{ roleRow }} label={{ 'Roles' }} />
-  <span style="color:var(--fg-muted)">Last action: {{ lastAction() }}</span>
+  <span style="color:var(--muted)">Last action: {{ lastAction() }}</span>
 
   @snippet roleRow(row) {
     <div style="flex:1; display:flex; flex-direction:column; gap:2px; min-width:0;">
@@ -10,7 +10,7 @@
         <Badge variant={{ 'tag' }}>{{ row.data.users }} users</Badge>
         @if (row.data.system) { <Badge variant={{ 'tag' }}>system</Badge> }
       </div>
-      <span style="color:var(--fg-muted); font-size:13px;">{{ row.data.description }}</span>
+      <span style="color:var(--muted); font-size:13px;">{{ row.data.description }}</span>
     </div>
     <div style="display:flex; gap:4px; flex:none;">
       <Button variant={{ 'icon' }} label={{ 'Edit' }} on:click={{ () => edit(row.data) }}>

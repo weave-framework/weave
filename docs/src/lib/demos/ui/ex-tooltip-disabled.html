@@ -2,7 +2,7 @@
   <button use:tooltip={{ opts() }} style="padding:8px 16px; border:1px solid var(--border); border-radius:6px; cursor:pointer; background:none; color:inherit;">
     Hover me — tooltip is {{ off() ? 'disabled' : 'enabled' }}
   </button>
-  <button type="button" onClick={{ toggle }} style="padding:6px 12px; border:1px solid var(--border); border-radius:6px; cursor:pointer; background:var(--bg-subtle, transparent); color:inherit;">
+  <button type="button" onClick={{ toggle }} style="padding:6px 12px; border:1px solid var(--border); border-radius:6px; cursor:pointer; background:var(--bg-soft, transparent); color:inherit;">
     {{ off() ? 'Enable tooltip' : 'Disable tooltip' }}
   </button>
 </div>

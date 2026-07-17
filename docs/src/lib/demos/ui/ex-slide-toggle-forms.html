@@ -1,5 +1,5 @@
 <div style="display:flex; flex-direction:column; gap:12px;">
   <SlideToggle control={{ consent }} required={{ true }} label={{ 'Enable data sync' }} />
   <span style="color:var(--red)">{{ consentError() }}</span>
-  <span style="color:var(--fg-muted)">Value: {{ consent.value() ? 'true' : 'false' }}</span>
+  <span style="color:var(--muted)">Value: {{ consent.value() ? 'true' : 'false' }}</span>
 </div>

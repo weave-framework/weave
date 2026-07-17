@@ -1,11 +1,11 @@
 <div style="display:flex; gap:16px; align-items:center;">
   <Button use:menu={{ { ...langMenu, itemTemplate: langRow } }}>Language ▾</Button>
-  <span style="color:var(--fg-muted)">Locale: {{ locale() }}</span>
+  <span style="color:var(--muted)">Locale: {{ locale() }}</span>
 
   @snippet langRow(row) {
     <span
       style="display:flex; align-items:center; gap:10px; padding:8px 12px; width:100%;"
-      style:background={{ row.checked ? 'var(--surface-active, rgba(99,102,241,.12))' : 'transparent' }}
+      style:background={{ row.checked ? 'color-mix(in srgb, var(--accent) 12%, transparent)' : 'transparent' }}
       style:font-weight={{ row.checked ? '600' : '400' }}
     >
       <span style="font-size:18px; line-height:1;">{{ row.item.flag }}</span>

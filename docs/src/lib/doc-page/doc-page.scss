@@ -32,10 +32,10 @@
 }
 
 .doc :global(thead th) {
-  background: var(--surface-2);
+  background: var(--bg-soft);
   font-weight: 600;
 }
 
 .doc :global(tbody tr:nth-child(even)) {
-  background: color-mix(in srgb, var(--surface-2) 45%, transparent);
+  background: color-mix(in srgb, var(--bg-soft) 45%, transparent);
 }

@@ -4,9 +4,9 @@
       border: 1px solid var(--border);
       border-radius: 8px;
       padding: 2px 6px;
-      background: var(--bg-subtle);
+      background: var(--bg-soft);
     }
   </style>
   <Menubar menus={{ menus }} onSelect={{ onSelect }} label={{ 'App bar' }} class={{ 'app-bar' }} />
-  <span style="color:var(--fg-muted)">Picked: {{ picked() || '—' }}</span>
+  <span style="color:var(--muted)">Picked: {{ picked() || '—' }}</span>
 </div>

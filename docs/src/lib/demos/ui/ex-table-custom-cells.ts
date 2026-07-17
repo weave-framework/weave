@@ -31,10 +31,12 @@ export function setup(): Setup {
     const span = document.createElement('span');
     const on = row.status === 'active';
     span.textContent = on ? 'Active' : 'Away';
+    // Every name here was undefined, so the hard-coded fallbacks always won — a light-mode
+    // green and two greys baked in, ignoring the theme entirely.
     span.style.cssText =
       `padding:1px 8px;border-radius:999px;font-size:12px;` +
-      `background:${on ? 'var(--accent-soft, #e6f4ea)' : 'var(--surface-2, #eee)'};` +
-      `color:${on ? 'var(--accent, #1a7f37)' : 'var(--fg-muted, #666)'}`;
+      `background:${on ? 'color-mix(in srgb, var(--green) 14%, transparent)' : 'var(--bg-soft)'};` +
+      `color:${on ? 'var(--green)' : 'var(--muted)'}`;
     return span;
   };
   const headerNode = (): Node => {

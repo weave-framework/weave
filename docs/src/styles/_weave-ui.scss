@@ -26,3 +26,25 @@
     ),
   )
 );
+
+/* `color.line` does two jobs, and binding it to --border served only one of them.
+ *
+ * A DIVIDER wants a hairline — it separates without shouting, and --border is exactly right
+ * for it. A CONTROL'S BOUNDARY is an affordance: it is the only drawn part of an underline
+ * field, and it has to say "you can type here". Bound to the same hairline it measured
+ * **1.18:1** against the demo card (1.33:1 in dark). WCAG asks 3:1 for a UI component
+ * boundary. That is why the inputs on this site could not be seen.
+ *
+ * So: dividers, cards, menus and lists keep --border. Everything you actually operate gets
+ * --field-line. Done through each component's own documented `<name>-overrides()` mixin —
+ * the exact API /ui/theming tells readers to use, so the docs dogfood their own advice.
+ */
+@include weave.input-overrides((border: var(--field-line)));
+@include weave.select-overrides((border: var(--field-line)));
+@include weave.checkbox-overrides((border: var(--field-line)));
+@include weave.radio-overrides((border: var(--field-line)));
+@include weave.chips-overrides((border: var(--field-line)));
+@include weave.button-toggle-overrides((border: var(--field-line)));
+@include weave.datepicker-overrides((border: var(--field-line)));
+@include weave.date-range-picker-overrides((border: var(--field-line)));
+@include weave.popover-edit-overrides((border: var(--field-line)));

@@ -1,6 +1,6 @@
 <div style="max-width:460px;">
   <Stepper steps={{ steps }} value={{ idx() }} onChange={{ setIdx }} disabled={{ frozen() }} />
-  <label style="display:inline-flex; gap:8px; margin-top:12px; color:var(--fg-muted);">
+  <label style="display:inline-flex; gap:8px; margin-top:12px; color:var(--muted);">
     <input type="checkbox" checked={{ frozen() }} on:change={{ toggle }} />
     Freeze the whole stepper
   </label>

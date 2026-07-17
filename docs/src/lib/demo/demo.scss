@@ -18,4 +18,12 @@
   align-items: center;
   justify-content: flex-start;
   min-height: 56px;
+
+  /* A demo shows COMPONENTS, which live on the UI library's 13px scale — but it inherited
+     the 16px prose scale of the page around it. So every demo's own caption ("You typed: …")
+     rendered a size LARGER than the control it describes, and read as a shouted hint rather
+     than an aside. One rule instead of 140 inline styles; components set their own sizes and
+     are unaffected. */
+  font-size: 13px;
+  line-height: 1.5;
 }
