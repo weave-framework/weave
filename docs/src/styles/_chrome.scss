@@ -55,9 +55,16 @@ $topbar-h: var(--weave-toolbar-height, 52px);
    drawer can be collapsed/expanded on every screen size (side mode toggles too). ── */
 .weave-sidenav.layout {
   --weave-sidenav-width: #{$sidebar-w};
-  // Match the old transparent sidebar (keep the 1px hairline the component draws).
-  --weave-sidenav-drawer-background: transparent;
   height: calc(100vh - #{$topbar-h});
+}
+
+// The layout drawer is transparent (the chrome paints the sidebar). Target the drawer ELEMENT
+// directly, NOT the --weave-sidenav-drawer-background token: that custom property inherits, and
+// every <Sidenav> demo on a docs page lives INSIDE this layout sidenav — so setting the token
+// here cascaded `transparent` down into their drawers, defeating the raised-white override in
+// _weave-ui.scss. Painting the element keeps the leak from happening. (1px hairline stays.)
+.weave-sidenav.layout > .weave-sidenav__drawer {
+  background: transparent;
 }
 
 .sidebar {

@@ -84,3 +84,7 @@
   preview-background: color-mix(in srgb, var(--accent) 12%, transparent),
 ));
 @include weave.popover-edit-overrides((border: var(--field-line), background: var(--raised)));
+/* The drawer's `color.surface` binds to this site's recessed `--surface`, ~1.05 on the demo
+   backdrop — so the sidenav drawer sank into the section just like Card and Toolbar did. It is a
+   raised plane too: give it the white --raised so it reads as lifted off the dotted backdrop. */
+@include weave.sidenav-overrides((drawer-background: var(--raised)));

@@ -7,6 +7,12 @@
   .weave-sidenav {
     position: relative;
     display: flex;
+    // A layout shell fills the box it is given: the drawer is meant to run the full height of
+    // its container, not stop at the last nav item. In an auto-height parent this resolves to
+    // auto (a no-op); in a sized parent (the common case — an app shell, a fixed panel) it makes
+    // the drawer and content stretch to the full height. Flex `align-items: stretch` (default)
+    // then carries that height onto the drawer and content children.
+    height: 100%;
     overflow: hidden; // clip the off-canvas drawer when closed
   }
 
