@@ -41,9 +41,15 @@ That last point is the difference between resuming and re-running. Re-running me
 
 ## What ships to the reader
 
-Each route is its own chunk. A reader downloads the shared client bundle plus **only the route they opened** — not the other 111 pages of your site. On this documentation site that is the difference between 350 KB and about 10 KB, gzipped, for a single page.
+Each route is its own chunk. A reader downloads the shared client bundle plus **only the route they opened** — not the other 111 pages of your site. Measured in the browser on this documentation site, one page went from **1555.7 KB to 169.7 KB** of transferred payload.
 
-Prerendering and code-splitting pull in opposite directions, and Weave resolves it in the build rather than making you choose: the server render is synchronous and cannot wait on a lazily-imported chunk, so it gets static imports, while the browser gets the lazy ones it can actually split on. You write your routes once and both are generated for you.
+Splitting by route is the floor, not the ceiling: what a chunk *imports* is the number that matters. If one module pulls in every page's content or every demo in your library, every route chunk pulls it in too, and splitting buys you nothing. Reach for `lazy()` at that boundary:
+
+~~~ts
+const Chart = lazy(() => import('./chart.js'));
+~~~
+
+**A `lazy()` component still prerenders.** The build waits for the import, renders the real component, and writes its HTML — then leaves the chunk out of everyone else's bundle. Lazy means "not in your bundle", not "not in your HTML", so there is no trade to make between a complete first paint and a small download.
 
 ## Data
 
@@ -64,8 +70,6 @@ The prerendered HTML contains the posts. The client resumes with them already pr
 
 Some things are not serializable, and some are not reachable from a snapshot at all. When Weave meets one it **says so at build time** and client-renders that component instead — the page still works, it just re-runs that subtree's `setup()`. It never fails silently.
 
-**A lifecycle hook in `setup()`.** `onMount()` registers work for after the DOM lands. Resume never runs `setup()`, and the build never ran the hook either (there is no browser at build time), so the work would simply never happen. Weave refuses to adopt such a component rather than drop its behaviour on the floor.
-
 **A value that cannot cross the wire.** A router, a class instance with methods, a live socket. Return those from `setup()` and that component client-renders. Values Weave can rebuild — signals, plain data, anything it can re-derive from module scope — cross fine.
 
 ~~~ts
@@ -81,14 +85,32 @@ return { router: createRouter(routes) };
 
 Each of these is a warning in your build output, with the component and the reason. Read them: a warning here means a subtree you thought was resumed is quietly being rebuilt.
 
-## Effects
+## Effects and mount hooks
 
-An `effect()` in `setup()` *is* re-created on resume, and runs once against the values that came over the wire. That keeps whatever it drives — a document title, a scroll position — consistent with the page you are looking at, and live from then on.
+Resume never calls `setup()`, so nothing written inside it is re-executed. But Weave does not need to re-execute it — the compiler reads `setup()` at build time and knows how to **re-create** what it registered.
 
-An `onMount()` does not, and cannot: see above.
+An `effect()` in `setup()` is re-created on resume and runs once against the values that came over the wire. That keeps whatever it drives — a document title, a scroll position — consistent with the page you are looking at, and live from then on.
+
+An `onMount()` is re-created too, and fires once the adopted DOM is in place — the same node the server wrote, not a fresh one:
+
+~~~ts
+export function setup() {
+  const box = signal<Element | null>(null);
+  onMount(() => {
+    const ro = new ResizeObserver(() => { /* … */ });
+    ro.observe(box()!);
+    return () => ro.disconnect();
+  });
+  return { box };
+}
+~~~
+
+This resumes. The observer attaches to the prerendered element; `setup()` never runs a second time.
+
+The one thing a hook cannot do is see a *build-time* mount, because there is no browser at build time. Anything your hook does is client-side by definition, which is exactly what it was always for.
 
 ## Where it stands
 
-Per-route splitting, prerendering, resume, nested component resume, and data are all in place and gated by a test that builds a real app with the real CLI and resumes it in a real browser.
+Per-route splitting, per-component splitting via `lazy()`, prerendering, resume, nested component resume, effects, mount hooks, and data are all in place — gated by a test that builds a real app with the real CLI and resumes it in a real browser.
 
-**Per-component splitting is not.** An interactive component still travels in its route's chunk, so a page that is mostly static still pays for the one island on it. Making a static subtree ship literally zero JavaScript is the remaining piece of this work.
+**Zero JavaScript is reachable, not automatic.** A static subtree inside an eagerly-imported component still ships; `lazy()` is how you draw that line, and you draw it. Splitting below the component — shipping one handler and nothing else — is not built.
