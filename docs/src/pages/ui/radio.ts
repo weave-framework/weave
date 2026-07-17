@@ -1,5 +1,5 @@
 import DocPage from '../../lib/doc-page/doc-page';
-import { content } from '../../content/content.gen';
+import { source } from '../../content/ui/radio.gen';
 
 // `<DocPage>` is referenced in radio.html.
 void DocPage;
@@ -10,5 +10,5 @@ interface Setup {
 
 /** UI → Radio Group (route `/ui/radio`). */
 export function setup(): Setup {
-  return { source: content['ui/radio'] ?? '' };
+  return { source };
 }

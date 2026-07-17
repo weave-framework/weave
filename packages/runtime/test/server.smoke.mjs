@@ -279,6 +279,19 @@ console.log('');
   ok(mounted === false, 'onMount did NOT run on the server, even though the render awaited');
 }
 
+// 13) E1.3 — a `lazy()` component PRERENDERS. Its loader is an import(): the render used to finish first, so
+//     a lazy subtree froze at its placeholder and only appeared after the client loaded the chunk. Settling
+//     covers it, which is what lets a page ship its islands as separate chunks AND still prerender them.
+{
+  const { code } = compileTemplate('<p>{{ t }}</p>', { mode: 'function', scope: ['t'] });
+  const inner = new Function('rt', '_c', code.replace(/return render\(ctx, \{\}\);\s*$/, 'return render;'))(rt, {});
+  const Inner = rt.defineComponent(inner, () => ({ t: 'LAZY_RENDERED' }));
+  const Lazy = rt.lazy(() => new Promise((res) => setTimeout(() => res({ default: Inner }), 5)));
+  const host = rt.defineComponent(() => Lazy({}, {}), () => ({}));
+  const art = await renderPage(host, {});
+  ok(art.html.includes('LAZY_RENDERED'), `a lazy() component prerenders its real content (got: ${art.html})`);
+}
+
 if (failures) {
   console.error(`✖ ${failures} server-render check(s) failed.`);
   process.exit(1);

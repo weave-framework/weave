@@ -1,5 +1,5 @@
 import DocPage from '../../../lib/doc-page/doc-page';
-import { content } from '../../../content/content.gen';
+import { source } from '../../../content/examples/components/list.gen';
 
 // `<DocPage>` is referenced in list.html.
 void DocPage;
@@ -11,5 +11,5 @@ interface ListExamplesSetup {
 /** Examples → Components → List (route `/examples/components/list`). Authored in Markdown
  *  (src/content/examples/components/list.md) and rendered by <DocPage>. */
 export function setup(): ListExamplesSetup {
-  return { source: content['examples/components/list'] ?? '' };
+  return { source };
 }

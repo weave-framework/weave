@@ -1,5 +1,5 @@
 import DocPage from '../../lib/doc-page/doc-page';
-import { content } from '../../content/content.gen';
+import { source } from '../../content/ui/popover-edit.gen';
 
 // `<DocPage>` is referenced in popover-edit.html.
 void DocPage;
@@ -10,5 +10,5 @@ interface Setup {
 
 /** UI → Popover Edit (route `/ui/popover-edit`). */
 export function setup(): Setup {
-  return { source: content['ui/popover-edit'] ?? '' };
+  return { source };
 }

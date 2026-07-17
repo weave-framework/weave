@@ -1,5 +1,5 @@
 import DocPage from '../../lib/doc-page/doc-page';
-import { content } from '../../content/content.gen';
+import { source } from '../../content/ui/checkbox.gen';
 
 // `<DocPage>` is referenced in checkbox.html.
 void DocPage;
@@ -10,5 +10,5 @@ interface Setup {
 
 /** UI → Checkbox (route `/ui/checkbox`). */
 export function setup(): Setup {
-  return { source: content['ui/checkbox'] ?? '' };
+  return { source };
 }

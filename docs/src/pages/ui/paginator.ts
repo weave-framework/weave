@@ -1,5 +1,5 @@
 import DocPage from '../../lib/doc-page/doc-page';
-import { content } from '../../content/content.gen';
+import { source } from '../../content/ui/paginator.gen';
 
 // `<DocPage>` is referenced in paginator.html.
 void DocPage;
@@ -10,5 +10,5 @@ interface Setup {
 
 /** UI → Paginator (route `/ui/paginator`). */
 export function setup(): Setup {
-  return { source: content['ui/paginator'] ?? '' };
+  return { source };
 }

@@ -1,5 +1,5 @@
 import DocPage from '../../../lib/doc-page/doc-page';
-import { content } from '../../../content/content.gen';
+import { source } from '../../../content/examples/components/button.gen';
 
 // `<DocPage>` is referenced in button.html.
 void DocPage;
@@ -12,5 +12,5 @@ interface ButtonExamplesSetup {
  *  gallery covering the whole `<Button>` surface. Authored in Markdown
  *  (src/content/examples/components/button.md) and rendered by <DocPage>. */
 export function setup(): ButtonExamplesSetup {
-  return { source: content['examples/components/button'] ?? '' };
+  return { source };
 }

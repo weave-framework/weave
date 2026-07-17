@@ -1,5 +1,5 @@
 import DocPage from '../../../lib/doc-page/doc-page';
-import { content } from '../../../content/content.gen';
+import { source } from '../../../content/examples/components/menubar.gen';
 
 // `<DocPage>` is referenced in menubar.html.
 void DocPage;
@@ -11,5 +11,5 @@ interface MenubarExamplesSetup {
 /** Examples → Components → Menubar (route `/examples/components/menubar`). Authored in Markdown
  *  (src/content/examples/components/menubar.md) and rendered by <DocPage>. */
 export function setup(): MenubarExamplesSetup {
-  return { source: content['examples/components/menubar'] ?? '' };
+  return { source };
 }

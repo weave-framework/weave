@@ -1,5 +1,5 @@
 import DocPage from '../../lib/doc-page/doc-page';
-import { content } from '../../content/content.gen';
+import { source } from '../../content/ui/chips.gen';
 
 // `<DocPage>` is referenced in chips.html.
 void DocPage;
@@ -10,5 +10,5 @@ interface Setup {
 
 /** UI → Chips (route `/ui/chips`). */
 export function setup(): Setup {
-  return { source: content['ui/chips'] ?? '' };
+  return { source };
 }

@@ -1,5 +1,5 @@
 import DocPage from '../../../lib/doc-page/doc-page';
-import { content } from '../../../content/content.gen';
+import { source } from '../../../content/examples/components/progress-bar.gen';
 
 // `<DocPage>` is referenced in progress-bar.html.
 void DocPage;
@@ -12,5 +12,5 @@ interface ProgressBarExamplesSetup {
  *  gallery covering the whole `<ProgressBar>` surface. Authored in Markdown
  *  (src/content/examples/components/progress-bar.md) and rendered by <DocPage>. */
 export function setup(): ProgressBarExamplesSetup {
-  return { source: content['examples/components/progress-bar'] ?? '' };
+  return { source };
 }

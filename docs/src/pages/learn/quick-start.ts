@@ -1,5 +1,5 @@
 import DocPage from '../../lib/doc-page/doc-page';
-import { content } from '../../content/content.gen';
+import { source } from '../../content/learn/quick-start.gen';
 
 // `<DocPage>` is referenced in quick-start.html.
 void DocPage;
@@ -11,5 +11,5 @@ interface QuickStartSetup {
 /** Learn → quick-start (route `/learn/quick-start`). Content authored in
  *  Markdown (src/content/learn/quick-start.md) and rendered by <DocPage>. */
 export function setup(): QuickStartSetup {
-  return { source: content['learn/quick-start'] ?? '' };
+  return { source };
 }

@@ -1,5 +1,5 @@
 import DocPage from '../../../lib/doc-page/doc-page';
-import { content } from '../../../content/content.gen';
+import { source } from '../../../content/examples/components/card.gen';
 
 // `<DocPage>` is referenced in card.html.
 void DocPage;
@@ -12,5 +12,5 @@ interface CardExamplesSetup {
  *  gallery covering the whole `<Card>` surface. Authored in Markdown
  *  (src/content/examples/components/card.md) and rendered by <DocPage>. */
 export function setup(): CardExamplesSetup {
-  return { source: content['examples/components/card'] ?? '' };
+  return { source };
 }

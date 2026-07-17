@@ -1,5 +1,5 @@
 import DocPage from '../../../lib/doc-page/doc-page';
-import { content } from '../../../content/content.gen';
+import { source } from '../../../content/examples/components/toolbar.gen';
 
 // `<DocPage>` is referenced in toolbar.html.
 void DocPage;
@@ -12,5 +12,5 @@ interface ToolbarExamplesSetup {
  *  gallery covering the whole `<Toolbar>` surface. Authored in Markdown
  *  (src/content/examples/components/toolbar.md) and rendered by <DocPage>. */
 export function setup(): ToolbarExamplesSetup {
-  return { source: content['examples/components/toolbar'] ?? '' };
+  return { source };
 }

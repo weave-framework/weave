@@ -1,5 +1,5 @@
 import DocPage from '../../lib/doc-page/doc-page';
-import { content } from '../../content/content.gen';
+import { source } from '../../content/ui/badge.gen';
 
 // `<DocPage>` is referenced in badge.html.
 void DocPage;
@@ -11,5 +11,5 @@ interface BadgeSetup {
 /** UI → Badge (route `/ui/badge`). Content authored in Markdown
  *  (src/content/ui/badge.md) and rendered by <DocPage>. */
 export function setup(): BadgeSetup {
-  return { source: content['ui/badge'] ?? '' };
+  return { source };
 }

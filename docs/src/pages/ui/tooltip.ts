@@ -1,5 +1,5 @@
 import DocPage from '../../lib/doc-page/doc-page';
-import { content } from '../../content/content.gen';
+import { source } from '../../content/ui/tooltip.gen';
 
 // `<DocPage>` is referenced in tooltip.html.
 void DocPage;
@@ -10,5 +10,5 @@ interface Setup {
 
 /** UI → Tooltip (route `/ui/tooltip`). */
 export function setup(): Setup {
-  return { source: content['ui/tooltip'] ?? '' };
+  return { source };
 }

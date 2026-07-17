@@ -1,5 +1,5 @@
 import DocPage from '../../lib/doc-page/doc-page';
-import { content } from '../../content/content.gen';
+import { source } from '../../content/ui/button-toggle.gen';
 
 // `<DocPage>` is referenced in button-toggle.html.
 void DocPage;
@@ -10,5 +10,5 @@ interface Setup {
 
 /** UI → Button Toggle (route `/ui/button-toggle`). */
 export function setup(): Setup {
-  return { source: content['ui/button-toggle'] ?? '' };
+  return { source };
 }

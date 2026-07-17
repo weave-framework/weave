@@ -1,654 +1,339 @@
 import type { Component } from '@weave-framework/runtime/dom';
-import CounterDemo from '../demos/counter-demo';
-import ButtonEvents from '../demos/ui/button-events';
-import ButtonVariants from '../demos/ui/button-variants';
-import ButtonDisabled from '../demos/ui/button-disabled';
-import ButtonConfirm from '../demos/ui/button-confirm';
-import IconBasic from '../demos/ui/icon-basic';
-import IconColor from '../demos/ui/icon-color';
-import BadgeVariants from '../demos/ui/badge-variants';
-import BadgeMax from '../demos/ui/badge-max';
-import CardBasic from '../demos/ui/card-basic';
-import CardInteractive from '../demos/ui/card-interactive';
-import ButtonToggleSingle from '../demos/ui/button-toggle-single';
-import ButtonToggleMulti from '../demos/ui/button-toggle-multi';
-import ToolbarBasic from '../demos/ui/toolbar-basic';
-import RippleBasic from '../demos/ui/ripple-basic';
-import DividerBasic from '../demos/ui/divider-basic';
-import InputBasic from '../demos/ui/input-basic';
-import InputFeatures from '../demos/ui/input-features';
-import InputAdornments from '../demos/ui/input-adornments';
-import InputClearable from '../demos/ui/input-clearable';
-import InputTypes from '../demos/ui/input-types';
-import InputMultiline from '../demos/ui/input-multiline';
-import InputPassword from '../demos/ui/input-password';
-import InputPasswordTooltip from '../demos/ui/input-password-tooltip';
-import InputStates from '../demos/ui/input-states';
-import InputValidation from '../demos/ui/input-validation';
-import CheckboxBasic from '../demos/ui/checkbox-basic';
-import CheckboxTristate from '../demos/ui/checkbox-tristate';
-import RadioBasic from '../demos/ui/radio-basic';
-import SlideToggleBasic from '../demos/ui/slide-toggle-basic';
-import FormFieldBasic from '../demos/ui/form-field-basic';
-import FormFieldError from '../demos/ui/form-field-error';
-import SelectBasic from '../demos/ui/select-basic';
-import SelectMultiple from '../demos/ui/select-multiple';
-import ChipsBasic from '../demos/ui/chips-basic';
-import SliderBasic from '../demos/ui/slider-basic';
-import DatepickerBasic from '../demos/ui/datepicker-basic';
-import DateRangePickerBasic from '../demos/ui/date-range-picker-basic';
-import TimepickerBasic from '../demos/ui/timepicker-basic';
-import ProgressBarDemo from '../demos/ui/progress-bar-demo';
-import ProgressSpinnerDemo from '../demos/ui/progress-spinner-demo';
-import TooltipDemo from '../demos/ui/tooltip-demo';
-import DialogDemo from '../demos/ui/dialog-demo';
-import SnackbarDemo from '../demos/ui/snackbar-demo';
-import TabsDemo from '../demos/ui/tabs-demo';
-import ExpansionDemo from '../demos/ui/expansion-demo';
-import ListDemo from '../demos/ui/list-demo';
-import GridListDemo from '../demos/ui/grid-list-demo';
-import StepperDemo from '../demos/ui/stepper-demo';
-import PaginatorDemo from '../demos/ui/paginator-demo';
-import SidenavDemo from '../demos/ui/sidenav-demo';
-import MenuDemo from '../demos/ui/menu-demo';
-import MenubarDemo from '../demos/ui/menubar-demo';
-import ContextMenuDemo from '../demos/ui/context-menu-demo';
-import TableDemo from '../demos/ui/table-demo';
-import TreeDemo from '../demos/ui/tree-demo';
-import BottomSheetDemo from '../demos/ui/bottom-sheet-demo';
-import PopoverEditDemo from '../demos/ui/popover-edit-demo';
-import AutocompleteBasic from '../demos/ui/autocomplete-basic';
-import TodoApp from '../demos/examples/todo-app';
-import DashboardApp from '../demos/examples/dashboard-app';
-import SettingsApp from '../demos/examples/settings-app';
-import WizardApp from '../demos/examples/wizard-app';
-import KanbanApp from '../demos/examples/kanban-app';
-import ExAutocompleteAsync from '../demos/ui/ex-autocomplete-async';
-import ExAutocompleteBasic from '../demos/ui/ex-autocomplete-basic';
-import ExAutocompleteClearable from '../demos/ui/ex-autocomplete-clearable';
-import ExAutocompleteControl from '../demos/ui/ex-autocomplete-control';
-import ExAutocompleteDisabled from '../demos/ui/ex-autocomplete-disabled';
-import ExAutocompleteFilter from '../demos/ui/ex-autocomplete-filter';
-import ExAutocompleteMinChars from '../demos/ui/ex-autocomplete-min-chars';
-import ExAutocompleteOptionShape from '../demos/ui/ex-autocomplete-option-shape';
-import ExAutocompletePosition from '../demos/ui/ex-autocomplete-position';
-import ExAutocompleteValueOninput from '../demos/ui/ex-autocomplete-value-oninput';
-import ExBadgeClass from '../demos/ui/ex-badge-class';
-import ExBadgeCount from '../demos/ui/ex-badge-count';
-import ExBadgeLabel from '../demos/ui/ex-badge-label';
-import ExBadgeMax from '../demos/ui/ex-badge-max';
-import ExBadgePosition from '../demos/ui/ex-badge-position';
-import ExBadgeVariants from '../demos/ui/ex-badge-variants';
-import ExBottomSheetActions from '../demos/ui/ex-bottom-sheet-actions';
-import ExBottomSheetAfterClosed from '../demos/ui/ex-bottom-sheet-after-closed';
-import ExBottomSheetBasic from '../demos/ui/ex-bottom-sheet-basic';
-import ExBottomSheetContentFactory from '../demos/ui/ex-bottom-sheet-content-factory';
-import ExBottomSheetHeader from '../demos/ui/ex-bottom-sheet-header';
-import ExBottomSheetNoDrag from '../demos/ui/ex-bottom-sheet-no-drag';
-import ExBottomSheetNonDismissable from '../demos/ui/ex-bottom-sheet-non-dismissable';
-import ExBottomSheetOnClose from '../demos/ui/ex-bottom-sheet-on-close';
-import ExBottomSheetScrolling from '../demos/ui/ex-bottom-sheet-scrolling';
-import ExButtonAriaCurrent from '../demos/ui/ex-button-aria-current';
-import ExButtonClass from '../demos/ui/ex-button-class';
-import ExButtonContent from '../demos/ui/ex-button-content';
-import ExButtonDisabled from '../demos/ui/ex-button-disabled';
-import ExButtonEvents from '../demos/ui/ex-button-events';
-import ExButtonToggleClass from '../demos/ui/ex-button-toggle-class';
-import ExButtonToggleDisabled from '../demos/ui/ex-button-toggle-disabled';
-import ExButtonToggleIcons from '../demos/ui/ex-button-toggle-icons';
-import ExButtonToggleMulti from '../demos/ui/ex-button-toggle-multi';
-import ExButtonToggleOptionDisabled from '../demos/ui/ex-button-toggle-option-disabled';
-import ExButtonToggleSingle from '../demos/ui/ex-button-toggle-single';
-import ExButtonType from '../demos/ui/ex-button-type';
-import ExButtonVariants from '../demos/ui/ex-button-variants';
-import ExCardClass from '../demos/ui/ex-card-class';
-import ExCardInteractive from '../demos/ui/ex-card-interactive';
-import ExCardMedia from '../demos/ui/ex-card-media';
-import ExCardMinimal from '../demos/ui/ex-card-minimal';
-import ExCardParts from '../demos/ui/ex-card-parts';
-import ExCheckboxBasic from '../demos/ui/ex-checkbox-basic';
-import ExCheckboxForms from '../demos/ui/ex-checkbox-forms';
-import ExCheckboxName from '../demos/ui/ex-checkbox-name';
-import ExCheckboxStates from '../demos/ui/ex-checkbox-states';
-import ExCheckboxTristate from '../demos/ui/ex-checkbox-tristate';
-import ExChipsAdd from '../demos/ui/ex-chips-add';
-import ExChipsBasic from '../demos/ui/ex-chips-basic';
-import ExChipsControl from '../demos/ui/ex-chips-control';
-import ExChipsDisabled from '../demos/ui/ex-chips-disabled';
-import ExChipsReadonly from '../demos/ui/ex-chips-readonly';
-import ExChipsRemoveLabel from '../demos/ui/ex-chips-remove-label';
-import ExContextMenuBasic from '../demos/ui/ex-context-menu-basic';
-import ExContextMenuContent from '../demos/ui/ex-context-menu-content';
-import ExContextMenuCustom from '../demos/ui/ex-context-menu-custom';
-import ExContextMenuItems from '../demos/ui/ex-context-menu-items';
-import ExContextMenuSelected from '../demos/ui/ex-context-menu-selected';
-import ExContextMenuTemplate from '../demos/ui/ex-context-menu-template';
-import ExContextMenuPosition from '../demos/ui/ex-context-menu-position';
-import ExContextMenuStrings from '../demos/ui/ex-context-menu-strings';
-import ExDatepickerBasic from '../demos/ui/ex-datepicker-basic';
-import ExDatepickerBounds from '../demos/ui/ex-datepicker-bounds';
-import ExDatepickerClearable from '../demos/ui/ex-datepicker-clearable';
-import ExDatepickerControl from '../demos/ui/ex-datepicker-control';
-import ExDatepickerEditable from '../demos/ui/ex-datepicker-editable';
-import ExDatepickerFilter from '../demos/ui/ex-datepicker-filter';
-import ExDatepickerFormat from '../demos/ui/ex-datepicker-format';
-import ExDatepickerPosition from '../demos/ui/ex-datepicker-position';
-import ExDatepickerStates from '../demos/ui/ex-datepicker-states';
-import ExDateRangePickerBasic from '../demos/ui/ex-date-range-picker-basic';
-import ExDateRangePickerBounds from '../demos/ui/ex-date-range-picker-bounds';
-import ExDateRangePickerControl from '../demos/ui/ex-date-range-picker-control';
-import ExDialogActions from '../demos/ui/ex-dialog-actions';
-import ExDialogAlert from '../demos/ui/ex-dialog-alert';
-import ExDialogBasic from '../demos/ui/ex-dialog-basic';
-import ExDialogHeader from '../demos/ui/ex-dialog-header';
-import ExDialogNodeContent from '../demos/ui/ex-dialog-node-content';
-import ExDialogNondismissable from '../demos/ui/ex-dialog-nondismissable';
-import ExDialogOnclose from '../demos/ui/ex-dialog-onclose';
-import ExDialogResult from '../demos/ui/ex-dialog-result';
-import ExDialogSize from '../demos/ui/ex-dialog-size';
-import ExDividerCustom from '../demos/ui/ex-divider-custom';
-import ExDividerHorizontal from '../demos/ui/ex-divider-horizontal';
-import ExDividerSemantic from '../demos/ui/ex-divider-semantic';
-import ExDividerVertical from '../demos/ui/ex-divider-vertical';
-import ExExpansionBasic from '../demos/ui/ex-expansion-basic';
-import ExExpansionCustomClass from '../demos/ui/ex-expansion-custom-class';
-import ExExpansionDefaultOpen from '../demos/ui/ex-expansion-default-open';
-import ExExpansionDisabledAll from '../demos/ui/ex-expansion-disabled-all';
-import ExExpansionDisabledPanel from '../demos/ui/ex-expansion-disabled-panel';
-import ExExpansionHeadingLevel from '../demos/ui/ex-expansion-heading-level';
-import ExExpansionRichBody from '../demos/ui/ex-expansion-rich-body';
-import ExExpansionSingle from '../demos/ui/ex-expansion-single';
-import ExFormFieldClass from '../demos/ui/ex-form-field-class';
-import ExFormFieldControl from '../demos/ui/ex-form-field-control';
-import ExFormFieldLabelHint from '../demos/ui/ex-form-field-label-hint';
-import ExFormFieldManualError from '../demos/ui/ex-form-field-manual-error';
-import ExFormFieldUnlabelled from '../demos/ui/ex-form-field-unlabelled';
-import ExFormFieldWrapCheckbox from '../demos/ui/ex-form-field-wrap-checkbox';
-import ExFormFieldWrapSelect from '../demos/ui/ex-form-field-wrap-select';
-import ExGridListBasic from '../demos/ui/ex-grid-list-basic';
-import ExGridListClass from '../demos/ui/ex-grid-list-class';
-import ExGridListCustomized from '../demos/ui/ex-grid-list-customized';
-import ExGridListItems from '../demos/ui/ex-grid-list-items';
-import ExGridListSpan from '../demos/ui/ex-grid-list-span';
-import ExGridListTiles from '../demos/ui/ex-grid-list-tiles';
-import ExIconColor from '../demos/ui/ex-icon-color';
-import ExIconLabel from '../demos/ui/ex-icon-label';
-import ExIconName from '../demos/ui/ex-icon-name';
-import ExIconSrc from '../demos/ui/ex-icon-src';
-import ExIconSvg from '../demos/ui/ex-icon-svg';
-import ExListBasic from '../demos/ui/ex-list-basic';
-import ExListClass from '../demos/ui/ex-list-class';
-import ExListDisabled from '../demos/ui/ex-list-disabled';
-import ExListDisabledRow from '../demos/ui/ex-list-disabled-row';
-import ExListMeta from '../demos/ui/ex-list-meta';
-import ExListPlain from '../demos/ui/ex-list-plain';
-import ExListReorderable from '../demos/ui/ex-list-reorderable';
-import ExListRowTemplate from '../demos/ui/ex-list-row-template';
-import ExMenuAccessors from '../demos/ui/ex-menu-accessors';
-import ExMenuBasic from '../demos/ui/ex-menu-basic';
-import ExMenuCustom from '../demos/ui/ex-menu-custom';
-import ExMenuSelected from '../demos/ui/ex-menu-selected';
-import ExMenuTemplate from '../demos/ui/ex-menu-template';
-import ExMenuDescriptions from '../demos/ui/ex-menu-descriptions';
-import ExMenuDividersDisabled from '../demos/ui/ex-menu-dividers-disabled';
-import ExMenuPosition from '../demos/ui/ex-menu-position';
-import ExMenuStrings from '../demos/ui/ex-menu-strings';
-import ExMenubarBasic from '../demos/ui/ex-menubar-basic';
-import ExMenubarClass from '../demos/ui/ex-menubar-class';
-import ExMenubarDescriptions from '../demos/ui/ex-menubar-descriptions';
-import ExMenubarDisabledItems from '../demos/ui/ex-menubar-disabled-items';
-import ExMenubarDisabledMenu from '../demos/ui/ex-menubar-disabled-menu';
-import ExMenubarDividers from '../demos/ui/ex-menubar-dividers';
-import ExMenubarSelectObject from '../demos/ui/ex-menubar-select-object';
-import ExPaginatorBasic from '../demos/ui/ex-paginator-basic';
-import ExPaginatorDisabled from '../demos/ui/ex-paginator-disabled';
-import ExPaginatorJump from '../demos/ui/ex-paginator-jump';
-import ExPaginatorLabelClass from '../demos/ui/ex-paginator-label-class';
-import ExPaginatorPageSize from '../demos/ui/ex-paginator-page-size';
-import ExPaginatorWindow from '../demos/ui/ex-paginator-window';
-import ExPopoverEditBasic from '../demos/ui/ex-popover-edit-basic';
-import ExPopoverEditCustomEditor from '../demos/ui/ex-popover-edit-custom-editor';
-import ExPopoverEditDisabled from '../demos/ui/ex-popover-edit-disabled';
-import ExPopoverEditPlaceholder from '../demos/ui/ex-popover-edit-placeholder';
-import ExPopoverEditPosition from '../demos/ui/ex-popover-edit-position';
-import ExPopoverEditTable from '../demos/ui/ex-popover-edit-table';
-import ExProgressBarClass from '../demos/ui/ex-progress-bar-class';
-import ExProgressBarDeterminate from '../demos/ui/ex-progress-bar-determinate';
-import ExProgressBarIndeterminate from '../demos/ui/ex-progress-bar-indeterminate';
-import ExProgressBarValues from '../demos/ui/ex-progress-bar-values';
-import ExProgressSpinnerBasic from '../demos/ui/ex-progress-spinner-basic';
-import ExProgressSpinnerClass from '../demos/ui/ex-progress-spinner-class';
-import ExProgressSpinnerInButton from '../demos/ui/ex-progress-spinner-in-button';
-import ExProgressSpinnerSizes from '../demos/ui/ex-progress-spinner-sizes';
-import ExRadioBasic from '../demos/ui/ex-radio-basic';
-import ExRadioDisabled from '../demos/ui/ex-radio-disabled';
-import ExRadioForms from '../demos/ui/ex-radio-forms';
-import ExRadioName from '../demos/ui/ex-radio-name';
-import ExRippleBasic from '../demos/ui/ex-ripple-basic';
-import ExRippleCentered from '../demos/ui/ex-ripple-centered';
-import ExRippleDisabled from '../demos/ui/ex-ripple-disabled';
-import ExRippleReactive from '../demos/ui/ex-ripple-reactive';
-import ExSelectAdornments from '../demos/ui/ex-select-adornments';
-import ExSelectBasic from '../demos/ui/ex-select-basic';
-import ExSelectClearable from '../demos/ui/ex-select-clearable';
-import ExSelectCustom from '../demos/ui/ex-select-custom';
-import ExSelectMultiple from '../demos/ui/ex-select-multiple';
-import ExSelectOptions from '../demos/ui/ex-select-options';
-import ExSelectPosition from '../demos/ui/ex-select-position';
-import ExSelectStates from '../demos/ui/ex-select-states';
-import ExSelectValidation from '../demos/ui/ex-select-validation';
-import ExSidenavApi from '../demos/ui/ex-sidenav-api';
-import ExSidenavBackdrop from '../demos/ui/ex-sidenav-backdrop';
-import ExSidenavBasic from '../demos/ui/ex-sidenav-basic';
-import ExSidenavClass from '../demos/ui/ex-sidenav-class';
-import ExSidenavControlled from '../demos/ui/ex-sidenav-controlled';
-import ExSidenavModes from '../demos/ui/ex-sidenav-modes';
-import ExSidenavPosition from '../demos/ui/ex-sidenav-position';
-import ExSidenavResponsive from '../demos/ui/ex-sidenav-responsive';
-import ExSlideToggleBasic from '../demos/ui/ex-slide-toggle-basic';
-import ExSlideToggleForms from '../demos/ui/ex-slide-toggle-forms';
-import ExSlideToggleName from '../demos/ui/ex-slide-toggle-name';
-import ExSlideToggleStates from '../demos/ui/ex-slide-toggle-states';
-import ExSliderBasic from '../demos/ui/ex-slider-basic';
-import ExSliderClass from '../demos/ui/ex-slider-class';
-import ExSliderControl from '../demos/ui/ex-slider-control';
-import ExSliderDisabled from '../demos/ui/ex-slider-disabled';
-import ExSliderFormat from '../demos/ui/ex-slider-format';
-import ExSliderRange from '../demos/ui/ex-slider-range';
-import ExSliderStep from '../demos/ui/ex-slider-step';
-import ExSliderUncontrolled from '../demos/ui/ex-slider-uncontrolled';
-import ExSnackbarAction from '../demos/ui/ex-snackbar-action';
-import ExSnackbarBasic from '../demos/ui/ex-snackbar-basic';
-import ExSnackbarDuration from '../demos/ui/ex-snackbar-duration';
-import ExSnackbarPoliteness from '../demos/ui/ex-snackbar-politeness';
-import ExSnackbarPositions from '../demos/ui/ex-snackbar-positions';
-import ExSnackbarQueue from '../demos/ui/ex-snackbar-queue';
-import ExSnackbarRef from '../demos/ui/ex-snackbar-ref';
-import ExStepperBasic from '../demos/ui/ex-stepper-basic';
-import ExStepperDisabled from '../demos/ui/ex-stepper-disabled';
-import ExStepperExternalNav from '../demos/ui/ex-stepper-external-nav';
-import ExStepperLabels from '../demos/ui/ex-stepper-labels';
-import ExStepperLinear from '../demos/ui/ex-stepper-linear';
-import ExStepperOptional from '../demos/ui/ex-stepper-optional';
-import ExTableBasic from '../demos/ui/ex-table-basic';
-import ExTableCustomCells from '../demos/ui/ex-table-custom-cells';
-import ExTableEmpty from '../demos/ui/ex-table-empty';
-import ExTableExpandable from '../demos/ui/ex-table-expandable';
-import ExTableHidden from '../demos/ui/ex-table-hidden';
-import ExTableResizable from '../demos/ui/ex-table-resizable';
-import ExTableSelection from '../demos/ui/ex-table-selection';
-import ExTableSingleSelect from '../demos/ui/ex-table-single-select';
-import ExTableSorting from '../demos/ui/ex-table-sorting';
-import ExTableSticky from '../demos/ui/ex-table-sticky';
-import ExTabsActivateOnFocus from '../demos/ui/ex-tabs-activate-on-focus';
-import ExTabsBasic from '../demos/ui/ex-tabs-basic';
-import ExTabsClass from '../demos/ui/ex-tabs-class';
-import ExTabsContent from '../demos/ui/ex-tabs-content';
-import ExTabsDisabled from '../demos/ui/ex-tabs-disabled';
-import ExTabsDisabledAll from '../demos/ui/ex-tabs-disabled-all';
-import ExTabsLabel from '../demos/ui/ex-tabs-label';
-import ExTabsSlidingIndicator from '../demos/ui/ex-tabs-sliding-indicator';
-import ExTabsTemplate from '../demos/ui/ex-tabs-template';
-import ExTabsUncontrolled from '../demos/ui/ex-tabs-uncontrolled';
-import ExTimepickerBasic from '../demos/ui/ex-timepicker-basic';
-import ExTimepickerBounds from '../demos/ui/ex-timepicker-bounds';
-import ExTimepickerClass from '../demos/ui/ex-timepicker-class';
-import ExTimepickerClearable from '../demos/ui/ex-timepicker-clearable';
-import ExTimepickerControl from '../demos/ui/ex-timepicker-control';
-import ExTimepickerFormat from '../demos/ui/ex-timepicker-format';
-import ExTimepickerPlaceholder from '../demos/ui/ex-timepicker-placeholder';
-import ExTimepickerPosition from '../demos/ui/ex-timepicker-position';
-import ExTimepickerStates from '../demos/ui/ex-timepicker-states';
-import ExTimepickerStep from '../demos/ui/ex-timepicker-step';
-import ExToolbarClass from '../demos/ui/ex-toolbar-class';
-import ExToolbarInk from '../demos/ui/ex-toolbar-ink';
-import ExToolbarParts from '../demos/ui/ex-toolbar-parts';
-import ExToolbarRole from '../demos/ui/ex-toolbar-role';
-import ExToolbarSticky from '../demos/ui/ex-toolbar-sticky';
-import ExTooltipBasic from '../demos/ui/ex-tooltip-basic';
-import ExTooltipDelay from '../demos/ui/ex-tooltip-delay';
-import ExTooltipDisabled from '../demos/ui/ex-tooltip-disabled';
-import ExTooltipOnButton from '../demos/ui/ex-tooltip-on-button';
-import ExTooltipPositions from '../demos/ui/ex-tooltip-positions';
-import ExTreeAccessors from '../demos/ui/ex-tree-accessors';
-import ExTreeControlled from '../demos/ui/ex-tree-controlled';
-import ExTreeExpandable from '../demos/ui/ex-tree-expandable';
-import ExTreeFlat from '../demos/ui/ex-tree-flat';
-import ExTreeLabelled from '../demos/ui/ex-tree-labelled';
-import ExTreeNested from '../demos/ui/ex-tree-nested';
-import ExTreeNodeContent from '../demos/ui/ex-tree-node-content';
-import ExTreeReorderable from '../demos/ui/ex-tree-reorderable';
-import ExTreeSelectionMultiple from '../demos/ui/ex-tree-selection-multiple';
-import ExTreeSelectionSingle from '../demos/ui/ex-tree-selection-single';
+import { lazy } from '@weave-framework/runtime/dom';
 
 /**
- * Live-demo registry: maps a `:::demo <key>` directive to a real Weave component.
- * The renderer instantiates the component so the example actually runs on the page.
- * Add a demo here and reference it by key from any markdown page.
+ * Every live demo a docs page can embed, keyed by its `@demo` name.
  *
- * UI-library demos (keys prefixed by component name) import the real
- * `@weave-framework/ui/<component>` and use it exactly as a consumer would.
+ * LAZY, one chunk per demo — and it has to be. These were 321 static imports, so every page pulled every
+ * demo: ~733 KB raw in one shared chunk that /learn/templates downloaded to render zero demos. Now a page
+ * fetches only the demos it actually embeds.
+ *
+ * It costs nothing at prerender: `lazy()` hands its import to the headless render's async sink, so the build
+ * still settles it and writes the demo's real HTML (see runtime/server's settleAsync, and the smoke that
+ * pins it). Lazy here means "not in everyone's bundle", not "not in the HTML".
+ *
+ * AUTO-GENERATABLE SHAPE — keep it: one `name: lazy(() => import('…'))` per line, nothing else.
  */
 export const demos: Record<string, Component> = {
-  counter: CounterDemo,
-  'ex-autocomplete-async': ExAutocompleteAsync,
-  'ex-autocomplete-basic': ExAutocompleteBasic,
-  'ex-autocomplete-clearable': ExAutocompleteClearable,
-  'ex-autocomplete-control': ExAutocompleteControl,
-  'ex-autocomplete-disabled': ExAutocompleteDisabled,
-  'ex-autocomplete-filter': ExAutocompleteFilter,
-  'ex-autocomplete-min-chars': ExAutocompleteMinChars,
-  'ex-autocomplete-option-shape': ExAutocompleteOptionShape,
-  'ex-autocomplete-position': ExAutocompletePosition,
-  'ex-autocomplete-value-oninput': ExAutocompleteValueOninput,
-  'ex-badge-class': ExBadgeClass,
-  'ex-badge-count': ExBadgeCount,
-  'ex-badge-label': ExBadgeLabel,
-  'ex-badge-max': ExBadgeMax,
-  'ex-badge-position': ExBadgePosition,
-  'ex-badge-variants': ExBadgeVariants,
-  'ex-bottom-sheet-actions': ExBottomSheetActions,
-  'ex-bottom-sheet-after-closed': ExBottomSheetAfterClosed,
-  'ex-bottom-sheet-basic': ExBottomSheetBasic,
-  'ex-bottom-sheet-content-factory': ExBottomSheetContentFactory,
-  'ex-bottom-sheet-header': ExBottomSheetHeader,
-  'ex-bottom-sheet-no-drag': ExBottomSheetNoDrag,
-  'ex-bottom-sheet-non-dismissable': ExBottomSheetNonDismissable,
-  'ex-bottom-sheet-on-close': ExBottomSheetOnClose,
-  'ex-bottom-sheet-scrolling': ExBottomSheetScrolling,
-  'ex-button-aria-current': ExButtonAriaCurrent,
-  'ex-button-class': ExButtonClass,
-  'ex-button-content': ExButtonContent,
-  'ex-button-disabled': ExButtonDisabled,
-  'ex-button-events': ExButtonEvents,
-  'ex-button-toggle-class': ExButtonToggleClass,
-  'ex-button-toggle-disabled': ExButtonToggleDisabled,
-  'ex-button-toggle-icons': ExButtonToggleIcons,
-  'ex-button-toggle-multi': ExButtonToggleMulti,
-  'ex-button-toggle-option-disabled': ExButtonToggleOptionDisabled,
-  'ex-button-toggle-single': ExButtonToggleSingle,
-  'ex-button-type': ExButtonType,
-  'ex-button-variants': ExButtonVariants,
-  'ex-card-class': ExCardClass,
-  'ex-card-interactive': ExCardInteractive,
-  'ex-card-media': ExCardMedia,
-  'ex-card-minimal': ExCardMinimal,
-  'ex-card-parts': ExCardParts,
-  'ex-checkbox-basic': ExCheckboxBasic,
-  'ex-checkbox-forms': ExCheckboxForms,
-  'ex-checkbox-name': ExCheckboxName,
-  'ex-checkbox-states': ExCheckboxStates,
-  'ex-checkbox-tristate': ExCheckboxTristate,
-  'ex-chips-add': ExChipsAdd,
-  'ex-chips-basic': ExChipsBasic,
-  'ex-chips-control': ExChipsControl,
-  'ex-chips-disabled': ExChipsDisabled,
-  'ex-chips-readonly': ExChipsReadonly,
-  'ex-chips-remove-label': ExChipsRemoveLabel,
-  'ex-context-menu-basic': ExContextMenuBasic,
-  'ex-context-menu-content': ExContextMenuContent,
-  'ex-context-menu-custom': ExContextMenuCustom,
-  'ex-context-menu-items': ExContextMenuItems,
-  'ex-context-menu-selected': ExContextMenuSelected,
-  'ex-context-menu-template': ExContextMenuTemplate,
-  'ex-context-menu-position': ExContextMenuPosition,
-  'ex-context-menu-strings': ExContextMenuStrings,
-  'ex-datepicker-basic': ExDatepickerBasic,
-  'ex-datepicker-bounds': ExDatepickerBounds,
-  'ex-datepicker-clearable': ExDatepickerClearable,
-  'ex-datepicker-control': ExDatepickerControl,
-  'ex-datepicker-editable': ExDatepickerEditable,
-  'ex-datepicker-filter': ExDatepickerFilter,
-  'ex-datepicker-format': ExDatepickerFormat,
-  'ex-datepicker-position': ExDatepickerPosition,
-  'ex-datepicker-states': ExDatepickerStates,
-  'ex-date-range-picker-basic': ExDateRangePickerBasic,
-  'ex-date-range-picker-bounds': ExDateRangePickerBounds,
-  'ex-date-range-picker-control': ExDateRangePickerControl,
-  'ex-dialog-actions': ExDialogActions,
-  'ex-dialog-alert': ExDialogAlert,
-  'ex-dialog-basic': ExDialogBasic,
-  'ex-dialog-header': ExDialogHeader,
-  'ex-dialog-node-content': ExDialogNodeContent,
-  'ex-dialog-nondismissable': ExDialogNondismissable,
-  'ex-dialog-onclose': ExDialogOnclose,
-  'ex-dialog-result': ExDialogResult,
-  'ex-dialog-size': ExDialogSize,
-  'ex-divider-custom': ExDividerCustom,
-  'ex-divider-horizontal': ExDividerHorizontal,
-  'ex-divider-semantic': ExDividerSemantic,
-  'ex-divider-vertical': ExDividerVertical,
-  'ex-expansion-basic': ExExpansionBasic,
-  'ex-expansion-custom-class': ExExpansionCustomClass,
-  'ex-expansion-default-open': ExExpansionDefaultOpen,
-  'ex-expansion-disabled-all': ExExpansionDisabledAll,
-  'ex-expansion-disabled-panel': ExExpansionDisabledPanel,
-  'ex-expansion-heading-level': ExExpansionHeadingLevel,
-  'ex-expansion-rich-body': ExExpansionRichBody,
-  'ex-expansion-single': ExExpansionSingle,
-  'ex-form-field-class': ExFormFieldClass,
-  'ex-form-field-control': ExFormFieldControl,
-  'ex-form-field-label-hint': ExFormFieldLabelHint,
-  'ex-form-field-manual-error': ExFormFieldManualError,
-  'ex-form-field-unlabelled': ExFormFieldUnlabelled,
-  'ex-form-field-wrap-checkbox': ExFormFieldWrapCheckbox,
-  'ex-form-field-wrap-select': ExFormFieldWrapSelect,
-  'ex-grid-list-basic': ExGridListBasic,
-  'ex-grid-list-class': ExGridListClass,
-  'ex-grid-list-customized': ExGridListCustomized,
-  'ex-grid-list-items': ExGridListItems,
-  'ex-grid-list-span': ExGridListSpan,
-  'ex-grid-list-tiles': ExGridListTiles,
-  'ex-icon-color': ExIconColor,
-  'ex-icon-label': ExIconLabel,
-  'ex-icon-name': ExIconName,
-  'ex-icon-src': ExIconSrc,
-  'ex-icon-svg': ExIconSvg,
-  'ex-list-basic': ExListBasic,
-  'ex-list-class': ExListClass,
-  'ex-list-disabled': ExListDisabled,
-  'ex-list-disabled-row': ExListDisabledRow,
-  'ex-list-meta': ExListMeta,
-  'ex-list-plain': ExListPlain,
-  'ex-list-reorderable': ExListReorderable,
-  'ex-list-row-template': ExListRowTemplate,
-  'ex-menu-accessors': ExMenuAccessors,
-  'ex-menu-basic': ExMenuBasic,
-  'ex-menu-custom': ExMenuCustom,
-  'ex-menu-selected': ExMenuSelected,
-  'ex-menu-template': ExMenuTemplate,
-  'ex-menu-descriptions': ExMenuDescriptions,
-  'ex-menu-dividers-disabled': ExMenuDividersDisabled,
-  'ex-menu-position': ExMenuPosition,
-  'ex-menu-strings': ExMenuStrings,
-  'ex-menubar-basic': ExMenubarBasic,
-  'ex-menubar-class': ExMenubarClass,
-  'ex-menubar-descriptions': ExMenubarDescriptions,
-  'ex-menubar-disabled-items': ExMenubarDisabledItems,
-  'ex-menubar-disabled-menu': ExMenubarDisabledMenu,
-  'ex-menubar-dividers': ExMenubarDividers,
-  'ex-menubar-select-object': ExMenubarSelectObject,
-  'ex-paginator-basic': ExPaginatorBasic,
-  'ex-paginator-disabled': ExPaginatorDisabled,
-  'ex-paginator-jump': ExPaginatorJump,
-  'ex-paginator-label-class': ExPaginatorLabelClass,
-  'ex-paginator-page-size': ExPaginatorPageSize,
-  'ex-paginator-window': ExPaginatorWindow,
-  'ex-popover-edit-basic': ExPopoverEditBasic,
-  'ex-popover-edit-custom-editor': ExPopoverEditCustomEditor,
-  'ex-popover-edit-disabled': ExPopoverEditDisabled,
-  'ex-popover-edit-placeholder': ExPopoverEditPlaceholder,
-  'ex-popover-edit-position': ExPopoverEditPosition,
-  'ex-popover-edit-table': ExPopoverEditTable,
-  'ex-progress-bar-class': ExProgressBarClass,
-  'ex-progress-bar-determinate': ExProgressBarDeterminate,
-  'ex-progress-bar-indeterminate': ExProgressBarIndeterminate,
-  'ex-progress-bar-values': ExProgressBarValues,
-  'ex-progress-spinner-basic': ExProgressSpinnerBasic,
-  'ex-progress-spinner-class': ExProgressSpinnerClass,
-  'ex-progress-spinner-in-button': ExProgressSpinnerInButton,
-  'ex-progress-spinner-sizes': ExProgressSpinnerSizes,
-  'ex-radio-basic': ExRadioBasic,
-  'ex-radio-disabled': ExRadioDisabled,
-  'ex-radio-forms': ExRadioForms,
-  'ex-radio-name': ExRadioName,
-  'ex-ripple-basic': ExRippleBasic,
-  'ex-ripple-centered': ExRippleCentered,
-  'ex-ripple-disabled': ExRippleDisabled,
-  'ex-ripple-reactive': ExRippleReactive,
-  'ex-select-adornments': ExSelectAdornments,
-  'ex-select-basic': ExSelectBasic,
-  'ex-select-clearable': ExSelectClearable,
-  'ex-select-custom': ExSelectCustom,
-  'ex-select-multiple': ExSelectMultiple,
-  'ex-select-options': ExSelectOptions,
-  'ex-select-position': ExSelectPosition,
-  'ex-select-states': ExSelectStates,
-  'ex-select-validation': ExSelectValidation,
-  'ex-sidenav-api': ExSidenavApi,
-  'ex-sidenav-backdrop': ExSidenavBackdrop,
-  'ex-sidenav-basic': ExSidenavBasic,
-  'ex-sidenav-class': ExSidenavClass,
-  'ex-sidenav-controlled': ExSidenavControlled,
-  'ex-sidenav-modes': ExSidenavModes,
-  'ex-sidenav-position': ExSidenavPosition,
-  'ex-sidenav-responsive': ExSidenavResponsive,
-  'ex-slide-toggle-basic': ExSlideToggleBasic,
-  'ex-slide-toggle-forms': ExSlideToggleForms,
-  'ex-slide-toggle-name': ExSlideToggleName,
-  'ex-slide-toggle-states': ExSlideToggleStates,
-  'ex-slider-basic': ExSliderBasic,
-  'ex-slider-class': ExSliderClass,
-  'ex-slider-control': ExSliderControl,
-  'ex-slider-disabled': ExSliderDisabled,
-  'ex-slider-format': ExSliderFormat,
-  'ex-slider-range': ExSliderRange,
-  'ex-slider-step': ExSliderStep,
-  'ex-slider-uncontrolled': ExSliderUncontrolled,
-  'ex-snackbar-action': ExSnackbarAction,
-  'ex-snackbar-basic': ExSnackbarBasic,
-  'ex-snackbar-duration': ExSnackbarDuration,
-  'ex-snackbar-politeness': ExSnackbarPoliteness,
-  'ex-snackbar-positions': ExSnackbarPositions,
-  'ex-snackbar-queue': ExSnackbarQueue,
-  'ex-snackbar-ref': ExSnackbarRef,
-  'ex-stepper-basic': ExStepperBasic,
-  'ex-stepper-disabled': ExStepperDisabled,
-  'ex-stepper-external-nav': ExStepperExternalNav,
-  'ex-stepper-labels': ExStepperLabels,
-  'ex-stepper-linear': ExStepperLinear,
-  'ex-stepper-optional': ExStepperOptional,
-  'ex-table-basic': ExTableBasic,
-  'ex-table-custom-cells': ExTableCustomCells,
-  'ex-table-empty': ExTableEmpty,
-  'ex-table-expandable': ExTableExpandable,
-  'ex-table-hidden': ExTableHidden,
-  'ex-table-resizable': ExTableResizable,
-  'ex-table-selection': ExTableSelection,
-  'ex-table-single-select': ExTableSingleSelect,
-  'ex-table-sorting': ExTableSorting,
-  'ex-table-sticky': ExTableSticky,
-  'ex-tabs-activate-on-focus': ExTabsActivateOnFocus,
-  'ex-tabs-basic': ExTabsBasic,
-  'ex-tabs-class': ExTabsClass,
-  'ex-tabs-content': ExTabsContent,
-  'ex-tabs-disabled': ExTabsDisabled,
-  'ex-tabs-disabled-all': ExTabsDisabledAll,
-  'ex-tabs-label': ExTabsLabel,
-  'ex-tabs-sliding-indicator': ExTabsSlidingIndicator,
-  'ex-tabs-template': ExTabsTemplate,
-  'ex-tabs-uncontrolled': ExTabsUncontrolled,
-  'ex-timepicker-basic': ExTimepickerBasic,
-  'ex-timepicker-bounds': ExTimepickerBounds,
-  'ex-timepicker-class': ExTimepickerClass,
-  'ex-timepicker-clearable': ExTimepickerClearable,
-  'ex-timepicker-control': ExTimepickerControl,
-  'ex-timepicker-format': ExTimepickerFormat,
-  'ex-timepicker-placeholder': ExTimepickerPlaceholder,
-  'ex-timepicker-position': ExTimepickerPosition,
-  'ex-timepicker-states': ExTimepickerStates,
-  'ex-timepicker-step': ExTimepickerStep,
-  'ex-toolbar-class': ExToolbarClass,
-  'ex-toolbar-ink': ExToolbarInk,
-  'ex-toolbar-parts': ExToolbarParts,
-  'ex-toolbar-role': ExToolbarRole,
-  'ex-toolbar-sticky': ExToolbarSticky,
-  'ex-tooltip-basic': ExTooltipBasic,
-  'ex-tooltip-delay': ExTooltipDelay,
-  'ex-tooltip-disabled': ExTooltipDisabled,
-  'ex-tooltip-on-button': ExTooltipOnButton,
-  'ex-tooltip-positions': ExTooltipPositions,
-  'ex-tree-accessors': ExTreeAccessors,
-  'ex-tree-controlled': ExTreeControlled,
-  'ex-tree-expandable': ExTreeExpandable,
-  'ex-tree-flat': ExTreeFlat,
-  'ex-tree-labelled': ExTreeLabelled,
-  'ex-tree-nested': ExTreeNested,
-  'ex-tree-node-content': ExTreeNodeContent,
-  'ex-tree-reorderable': ExTreeReorderable,
-  'ex-tree-selection-multiple': ExTreeSelectionMultiple,
-  'ex-tree-selection-single': ExTreeSelectionSingle,
-  'button-events': ButtonEvents,
-  'button-variants': ButtonVariants,
-  'button-disabled': ButtonDisabled,
-  'button-confirm': ButtonConfirm,
-  'icon-basic': IconBasic,
-  'icon-color': IconColor,
-  'badge-variants': BadgeVariants,
-  'badge-max': BadgeMax,
-  'card-basic': CardBasic,
-  'card-interactive': CardInteractive,
-  'button-toggle-single': ButtonToggleSingle,
-  'button-toggle-multi': ButtonToggleMulti,
-  'toolbar-basic': ToolbarBasic,
-  'ripple-basic': RippleBasic,
-  'divider-basic': DividerBasic,
-  'input-basic': InputBasic,
-  'input-features': InputFeatures,
-  'input-adornments': InputAdornments,
-  'input-clearable': InputClearable,
-  'input-types': InputTypes,
-  'input-multiline': InputMultiline,
-  'input-password': InputPassword,
-  'input-password-tooltip': InputPasswordTooltip,
-  'input-states': InputStates,
-  'input-validation': InputValidation,
-  'checkbox-basic': CheckboxBasic,
-  'checkbox-tristate': CheckboxTristate,
-  'radio-basic': RadioBasic,
-  'slide-toggle-basic': SlideToggleBasic,
-  'form-field-basic': FormFieldBasic,
-  'form-field-error': FormFieldError,
-  'select-basic': SelectBasic,
-  'select-multiple': SelectMultiple,
-  'chips-basic': ChipsBasic,
-  'slider-basic': SliderBasic,
-  'autocomplete-basic': AutocompleteBasic,
-  'datepicker-basic': DatepickerBasic,
-  'date-range-picker-basic': DateRangePickerBasic,
-  'timepicker-basic': TimepickerBasic,
-  'progress-bar-demo': ProgressBarDemo,
-  'progress-spinner-demo': ProgressSpinnerDemo,
-  'tooltip-demo': TooltipDemo,
-  'dialog-demo': DialogDemo,
-  'snackbar-demo': SnackbarDemo,
-  'tabs-demo': TabsDemo,
-  'expansion-demo': ExpansionDemo,
-  'list-demo': ListDemo,
-  'grid-list-demo': GridListDemo,
-  'stepper-demo': StepperDemo,
-  'paginator-demo': PaginatorDemo,
-  'sidenav-demo': SidenavDemo,
-  'menu-demo': MenuDemo,
-  'menubar-demo': MenubarDemo,
-  'context-menu-demo': ContextMenuDemo,
-  'table-demo': TableDemo,
-  'tree-demo': TreeDemo,
-  'bottom-sheet-demo': BottomSheetDemo,
-  'popover-edit-demo': PopoverEditDemo,
-  'examples-todo': TodoApp,
-  'examples-dashboard': DashboardApp,
-  'examples-settings': SettingsApp,
-  'examples-signup': WizardApp,
-  'examples-kanban': KanbanApp,
+  counter: lazy(() => import('../demos/counter-demo')),
+  'ex-autocomplete-async': lazy(() => import('../demos/ui/ex-autocomplete-async')),
+  'ex-autocomplete-basic': lazy(() => import('../demos/ui/ex-autocomplete-basic')),
+  'ex-autocomplete-clearable': lazy(() => import('../demos/ui/ex-autocomplete-clearable')),
+  'ex-autocomplete-control': lazy(() => import('../demos/ui/ex-autocomplete-control')),
+  'ex-autocomplete-disabled': lazy(() => import('../demos/ui/ex-autocomplete-disabled')),
+  'ex-autocomplete-filter': lazy(() => import('../demos/ui/ex-autocomplete-filter')),
+  'ex-autocomplete-min-chars': lazy(() => import('../demos/ui/ex-autocomplete-min-chars')),
+  'ex-autocomplete-option-shape': lazy(() => import('../demos/ui/ex-autocomplete-option-shape')),
+  'ex-autocomplete-position': lazy(() => import('../demos/ui/ex-autocomplete-position')),
+  'ex-autocomplete-value-oninput': lazy(() => import('../demos/ui/ex-autocomplete-value-oninput')),
+  'ex-badge-class': lazy(() => import('../demos/ui/ex-badge-class')),
+  'ex-badge-count': lazy(() => import('../demos/ui/ex-badge-count')),
+  'ex-badge-label': lazy(() => import('../demos/ui/ex-badge-label')),
+  'ex-badge-max': lazy(() => import('../demos/ui/ex-badge-max')),
+  'ex-badge-position': lazy(() => import('../demos/ui/ex-badge-position')),
+  'ex-badge-variants': lazy(() => import('../demos/ui/ex-badge-variants')),
+  'ex-bottom-sheet-actions': lazy(() => import('../demos/ui/ex-bottom-sheet-actions')),
+  'ex-bottom-sheet-after-closed': lazy(() => import('../demos/ui/ex-bottom-sheet-after-closed')),
+  'ex-bottom-sheet-basic': lazy(() => import('../demos/ui/ex-bottom-sheet-basic')),
+  'ex-bottom-sheet-content-factory': lazy(() => import('../demos/ui/ex-bottom-sheet-content-factory')),
+  'ex-bottom-sheet-header': lazy(() => import('../demos/ui/ex-bottom-sheet-header')),
+  'ex-bottom-sheet-no-drag': lazy(() => import('../demos/ui/ex-bottom-sheet-no-drag')),
+  'ex-bottom-sheet-non-dismissable': lazy(() => import('../demos/ui/ex-bottom-sheet-non-dismissable')),
+  'ex-bottom-sheet-on-close': lazy(() => import('../demos/ui/ex-bottom-sheet-on-close')),
+  'ex-bottom-sheet-scrolling': lazy(() => import('../demos/ui/ex-bottom-sheet-scrolling')),
+  'ex-button-aria-current': lazy(() => import('../demos/ui/ex-button-aria-current')),
+  'ex-button-class': lazy(() => import('../demos/ui/ex-button-class')),
+  'ex-button-content': lazy(() => import('../demos/ui/ex-button-content')),
+  'ex-button-disabled': lazy(() => import('../demos/ui/ex-button-disabled')),
+  'ex-button-events': lazy(() => import('../demos/ui/ex-button-events')),
+  'ex-button-toggle-class': lazy(() => import('../demos/ui/ex-button-toggle-class')),
+  'ex-button-toggle-disabled': lazy(() => import('../demos/ui/ex-button-toggle-disabled')),
+  'ex-button-toggle-icons': lazy(() => import('../demos/ui/ex-button-toggle-icons')),
+  'ex-button-toggle-multi': lazy(() => import('../demos/ui/ex-button-toggle-multi')),
+  'ex-button-toggle-option-disabled': lazy(() => import('../demos/ui/ex-button-toggle-option-disabled')),
+  'ex-button-toggle-single': lazy(() => import('../demos/ui/ex-button-toggle-single')),
+  'ex-button-type': lazy(() => import('../demos/ui/ex-button-type')),
+  'ex-button-variants': lazy(() => import('../demos/ui/ex-button-variants')),
+  'ex-card-class': lazy(() => import('../demos/ui/ex-card-class')),
+  'ex-card-interactive': lazy(() => import('../demos/ui/ex-card-interactive')),
+  'ex-card-media': lazy(() => import('../demos/ui/ex-card-media')),
+  'ex-card-minimal': lazy(() => import('../demos/ui/ex-card-minimal')),
+  'ex-card-parts': lazy(() => import('../demos/ui/ex-card-parts')),
+  'ex-checkbox-basic': lazy(() => import('../demos/ui/ex-checkbox-basic')),
+  'ex-checkbox-forms': lazy(() => import('../demos/ui/ex-checkbox-forms')),
+  'ex-checkbox-name': lazy(() => import('../demos/ui/ex-checkbox-name')),
+  'ex-checkbox-states': lazy(() => import('../demos/ui/ex-checkbox-states')),
+  'ex-checkbox-tristate': lazy(() => import('../demos/ui/ex-checkbox-tristate')),
+  'ex-chips-add': lazy(() => import('../demos/ui/ex-chips-add')),
+  'ex-chips-basic': lazy(() => import('../demos/ui/ex-chips-basic')),
+  'ex-chips-control': lazy(() => import('../demos/ui/ex-chips-control')),
+  'ex-chips-disabled': lazy(() => import('../demos/ui/ex-chips-disabled')),
+  'ex-chips-readonly': lazy(() => import('../demos/ui/ex-chips-readonly')),
+  'ex-chips-remove-label': lazy(() => import('../demos/ui/ex-chips-remove-label')),
+  'ex-context-menu-basic': lazy(() => import('../demos/ui/ex-context-menu-basic')),
+  'ex-context-menu-content': lazy(() => import('../demos/ui/ex-context-menu-content')),
+  'ex-context-menu-custom': lazy(() => import('../demos/ui/ex-context-menu-custom')),
+  'ex-context-menu-items': lazy(() => import('../demos/ui/ex-context-menu-items')),
+  'ex-context-menu-selected': lazy(() => import('../demos/ui/ex-context-menu-selected')),
+  'ex-context-menu-template': lazy(() => import('../demos/ui/ex-context-menu-template')),
+  'ex-context-menu-position': lazy(() => import('../demos/ui/ex-context-menu-position')),
+  'ex-context-menu-strings': lazy(() => import('../demos/ui/ex-context-menu-strings')),
+  'ex-datepicker-basic': lazy(() => import('../demos/ui/ex-datepicker-basic')),
+  'ex-datepicker-bounds': lazy(() => import('../demos/ui/ex-datepicker-bounds')),
+  'ex-datepicker-clearable': lazy(() => import('../demos/ui/ex-datepicker-clearable')),
+  'ex-datepicker-control': lazy(() => import('../demos/ui/ex-datepicker-control')),
+  'ex-datepicker-editable': lazy(() => import('../demos/ui/ex-datepicker-editable')),
+  'ex-datepicker-filter': lazy(() => import('../demos/ui/ex-datepicker-filter')),
+  'ex-datepicker-format': lazy(() => import('../demos/ui/ex-datepicker-format')),
+  'ex-datepicker-position': lazy(() => import('../demos/ui/ex-datepicker-position')),
+  'ex-datepicker-states': lazy(() => import('../demos/ui/ex-datepicker-states')),
+  'ex-date-range-picker-basic': lazy(() => import('../demos/ui/ex-date-range-picker-basic')),
+  'ex-date-range-picker-bounds': lazy(() => import('../demos/ui/ex-date-range-picker-bounds')),
+  'ex-date-range-picker-control': lazy(() => import('../demos/ui/ex-date-range-picker-control')),
+  'ex-dialog-actions': lazy(() => import('../demos/ui/ex-dialog-actions')),
+  'ex-dialog-alert': lazy(() => import('../demos/ui/ex-dialog-alert')),
+  'ex-dialog-basic': lazy(() => import('../demos/ui/ex-dialog-basic')),
+  'ex-dialog-header': lazy(() => import('../demos/ui/ex-dialog-header')),
+  'ex-dialog-node-content': lazy(() => import('../demos/ui/ex-dialog-node-content')),
+  'ex-dialog-nondismissable': lazy(() => import('../demos/ui/ex-dialog-nondismissable')),
+  'ex-dialog-onclose': lazy(() => import('../demos/ui/ex-dialog-onclose')),
+  'ex-dialog-result': lazy(() => import('../demos/ui/ex-dialog-result')),
+  'ex-dialog-size': lazy(() => import('../demos/ui/ex-dialog-size')),
+  'ex-divider-custom': lazy(() => import('../demos/ui/ex-divider-custom')),
+  'ex-divider-horizontal': lazy(() => import('../demos/ui/ex-divider-horizontal')),
+  'ex-divider-semantic': lazy(() => import('../demos/ui/ex-divider-semantic')),
+  'ex-divider-vertical': lazy(() => import('../demos/ui/ex-divider-vertical')),
+  'ex-expansion-basic': lazy(() => import('../demos/ui/ex-expansion-basic')),
+  'ex-expansion-custom-class': lazy(() => import('../demos/ui/ex-expansion-custom-class')),
+  'ex-expansion-default-open': lazy(() => import('../demos/ui/ex-expansion-default-open')),
+  'ex-expansion-disabled-all': lazy(() => import('../demos/ui/ex-expansion-disabled-all')),
+  'ex-expansion-disabled-panel': lazy(() => import('../demos/ui/ex-expansion-disabled-panel')),
+  'ex-expansion-heading-level': lazy(() => import('../demos/ui/ex-expansion-heading-level')),
+  'ex-expansion-rich-body': lazy(() => import('../demos/ui/ex-expansion-rich-body')),
+  'ex-expansion-single': lazy(() => import('../demos/ui/ex-expansion-single')),
+  'ex-form-field-class': lazy(() => import('../demos/ui/ex-form-field-class')),
+  'ex-form-field-control': lazy(() => import('../demos/ui/ex-form-field-control')),
+  'ex-form-field-label-hint': lazy(() => import('../demos/ui/ex-form-field-label-hint')),
+  'ex-form-field-manual-error': lazy(() => import('../demos/ui/ex-form-field-manual-error')),
+  'ex-form-field-unlabelled': lazy(() => import('../demos/ui/ex-form-field-unlabelled')),
+  'ex-form-field-wrap-checkbox': lazy(() => import('../demos/ui/ex-form-field-wrap-checkbox')),
+  'ex-form-field-wrap-select': lazy(() => import('../demos/ui/ex-form-field-wrap-select')),
+  'ex-grid-list-basic': lazy(() => import('../demos/ui/ex-grid-list-basic')),
+  'ex-grid-list-class': lazy(() => import('../demos/ui/ex-grid-list-class')),
+  'ex-grid-list-customized': lazy(() => import('../demos/ui/ex-grid-list-customized')),
+  'ex-grid-list-items': lazy(() => import('../demos/ui/ex-grid-list-items')),
+  'ex-grid-list-span': lazy(() => import('../demos/ui/ex-grid-list-span')),
+  'ex-grid-list-tiles': lazy(() => import('../demos/ui/ex-grid-list-tiles')),
+  'ex-icon-color': lazy(() => import('../demos/ui/ex-icon-color')),
+  'ex-icon-label': lazy(() => import('../demos/ui/ex-icon-label')),
+  'ex-icon-name': lazy(() => import('../demos/ui/ex-icon-name')),
+  'ex-icon-src': lazy(() => import('../demos/ui/ex-icon-src')),
+  'ex-icon-svg': lazy(() => import('../demos/ui/ex-icon-svg')),
+  'ex-list-basic': lazy(() => import('../demos/ui/ex-list-basic')),
+  'ex-list-class': lazy(() => import('../demos/ui/ex-list-class')),
+  'ex-list-disabled': lazy(() => import('../demos/ui/ex-list-disabled')),
+  'ex-list-disabled-row': lazy(() => import('../demos/ui/ex-list-disabled-row')),
+  'ex-list-meta': lazy(() => import('../demos/ui/ex-list-meta')),
+  'ex-list-plain': lazy(() => import('../demos/ui/ex-list-plain')),
+  'ex-list-reorderable': lazy(() => import('../demos/ui/ex-list-reorderable')),
+  'ex-list-row-template': lazy(() => import('../demos/ui/ex-list-row-template')),
+  'ex-menu-accessors': lazy(() => import('../demos/ui/ex-menu-accessors')),
+  'ex-menu-basic': lazy(() => import('../demos/ui/ex-menu-basic')),
+  'ex-menu-custom': lazy(() => import('../demos/ui/ex-menu-custom')),
+  'ex-menu-selected': lazy(() => import('../demos/ui/ex-menu-selected')),
+  'ex-menu-template': lazy(() => import('../demos/ui/ex-menu-template')),
+  'ex-menu-descriptions': lazy(() => import('../demos/ui/ex-menu-descriptions')),
+  'ex-menu-dividers-disabled': lazy(() => import('../demos/ui/ex-menu-dividers-disabled')),
+  'ex-menu-position': lazy(() => import('../demos/ui/ex-menu-position')),
+  'ex-menu-strings': lazy(() => import('../demos/ui/ex-menu-strings')),
+  'ex-menubar-basic': lazy(() => import('../demos/ui/ex-menubar-basic')),
+  'ex-menubar-class': lazy(() => import('../demos/ui/ex-menubar-class')),
+  'ex-menubar-descriptions': lazy(() => import('../demos/ui/ex-menubar-descriptions')),
+  'ex-menubar-disabled-items': lazy(() => import('../demos/ui/ex-menubar-disabled-items')),
+  'ex-menubar-disabled-menu': lazy(() => import('../demos/ui/ex-menubar-disabled-menu')),
+  'ex-menubar-dividers': lazy(() => import('../demos/ui/ex-menubar-dividers')),
+  'ex-menubar-select-object': lazy(() => import('../demos/ui/ex-menubar-select-object')),
+  'ex-paginator-basic': lazy(() => import('../demos/ui/ex-paginator-basic')),
+  'ex-paginator-disabled': lazy(() => import('../demos/ui/ex-paginator-disabled')),
+  'ex-paginator-jump': lazy(() => import('../demos/ui/ex-paginator-jump')),
+  'ex-paginator-label-class': lazy(() => import('../demos/ui/ex-paginator-label-class')),
+  'ex-paginator-page-size': lazy(() => import('../demos/ui/ex-paginator-page-size')),
+  'ex-paginator-window': lazy(() => import('../demos/ui/ex-paginator-window')),
+  'ex-popover-edit-basic': lazy(() => import('../demos/ui/ex-popover-edit-basic')),
+  'ex-popover-edit-custom-editor': lazy(() => import('../demos/ui/ex-popover-edit-custom-editor')),
+  'ex-popover-edit-disabled': lazy(() => import('../demos/ui/ex-popover-edit-disabled')),
+  'ex-popover-edit-placeholder': lazy(() => import('../demos/ui/ex-popover-edit-placeholder')),
+  'ex-popover-edit-position': lazy(() => import('../demos/ui/ex-popover-edit-position')),
+  'ex-popover-edit-table': lazy(() => import('../demos/ui/ex-popover-edit-table')),
+  'ex-progress-bar-class': lazy(() => import('../demos/ui/ex-progress-bar-class')),
+  'ex-progress-bar-determinate': lazy(() => import('../demos/ui/ex-progress-bar-determinate')),
+  'ex-progress-bar-indeterminate': lazy(() => import('../demos/ui/ex-progress-bar-indeterminate')),
+  'ex-progress-bar-values': lazy(() => import('../demos/ui/ex-progress-bar-values')),
+  'ex-progress-spinner-basic': lazy(() => import('../demos/ui/ex-progress-spinner-basic')),
+  'ex-progress-spinner-class': lazy(() => import('../demos/ui/ex-progress-spinner-class')),
+  'ex-progress-spinner-in-button': lazy(() => import('../demos/ui/ex-progress-spinner-in-button')),
+  'ex-progress-spinner-sizes': lazy(() => import('../demos/ui/ex-progress-spinner-sizes')),
+  'ex-radio-basic': lazy(() => import('../demos/ui/ex-radio-basic')),
+  'ex-radio-disabled': lazy(() => import('../demos/ui/ex-radio-disabled')),
+  'ex-radio-forms': lazy(() => import('../demos/ui/ex-radio-forms')),
+  'ex-radio-name': lazy(() => import('../demos/ui/ex-radio-name')),
+  'ex-ripple-basic': lazy(() => import('../demos/ui/ex-ripple-basic')),
+  'ex-ripple-centered': lazy(() => import('../demos/ui/ex-ripple-centered')),
+  'ex-ripple-disabled': lazy(() => import('../demos/ui/ex-ripple-disabled')),
+  'ex-ripple-reactive': lazy(() => import('../demos/ui/ex-ripple-reactive')),
+  'ex-select-adornments': lazy(() => import('../demos/ui/ex-select-adornments')),
+  'ex-select-basic': lazy(() => import('../demos/ui/ex-select-basic')),
+  'ex-select-clearable': lazy(() => import('../demos/ui/ex-select-clearable')),
+  'ex-select-custom': lazy(() => import('../demos/ui/ex-select-custom')),
+  'ex-select-multiple': lazy(() => import('../demos/ui/ex-select-multiple')),
+  'ex-select-options': lazy(() => import('../demos/ui/ex-select-options')),
+  'ex-select-position': lazy(() => import('../demos/ui/ex-select-position')),
+  'ex-select-states': lazy(() => import('../demos/ui/ex-select-states')),
+  'ex-select-validation': lazy(() => import('../demos/ui/ex-select-validation')),
+  'ex-sidenav-api': lazy(() => import('../demos/ui/ex-sidenav-api')),
+  'ex-sidenav-backdrop': lazy(() => import('../demos/ui/ex-sidenav-backdrop')),
+  'ex-sidenav-basic': lazy(() => import('../demos/ui/ex-sidenav-basic')),
+  'ex-sidenav-class': lazy(() => import('../demos/ui/ex-sidenav-class')),
+  'ex-sidenav-controlled': lazy(() => import('../demos/ui/ex-sidenav-controlled')),
+  'ex-sidenav-modes': lazy(() => import('../demos/ui/ex-sidenav-modes')),
+  'ex-sidenav-position': lazy(() => import('../demos/ui/ex-sidenav-position')),
+  'ex-sidenav-responsive': lazy(() => import('../demos/ui/ex-sidenav-responsive')),
+  'ex-slide-toggle-basic': lazy(() => import('../demos/ui/ex-slide-toggle-basic')),
+  'ex-slide-toggle-forms': lazy(() => import('../demos/ui/ex-slide-toggle-forms')),
+  'ex-slide-toggle-name': lazy(() => import('../demos/ui/ex-slide-toggle-name')),
+  'ex-slide-toggle-states': lazy(() => import('../demos/ui/ex-slide-toggle-states')),
+  'ex-slider-basic': lazy(() => import('../demos/ui/ex-slider-basic')),
+  'ex-slider-class': lazy(() => import('../demos/ui/ex-slider-class')),
+  'ex-slider-control': lazy(() => import('../demos/ui/ex-slider-control')),
+  'ex-slider-disabled': lazy(() => import('../demos/ui/ex-slider-disabled')),
+  'ex-slider-format': lazy(() => import('../demos/ui/ex-slider-format')),
+  'ex-slider-range': lazy(() => import('../demos/ui/ex-slider-range')),
+  'ex-slider-step': lazy(() => import('../demos/ui/ex-slider-step')),
+  'ex-slider-uncontrolled': lazy(() => import('../demos/ui/ex-slider-uncontrolled')),
+  'ex-snackbar-action': lazy(() => import('../demos/ui/ex-snackbar-action')),
+  'ex-snackbar-basic': lazy(() => import('../demos/ui/ex-snackbar-basic')),
+  'ex-snackbar-duration': lazy(() => import('../demos/ui/ex-snackbar-duration')),
+  'ex-snackbar-politeness': lazy(() => import('../demos/ui/ex-snackbar-politeness')),
+  'ex-snackbar-positions': lazy(() => import('../demos/ui/ex-snackbar-positions')),
+  'ex-snackbar-queue': lazy(() => import('../demos/ui/ex-snackbar-queue')),
+  'ex-snackbar-ref': lazy(() => import('../demos/ui/ex-snackbar-ref')),
+  'ex-stepper-basic': lazy(() => import('../demos/ui/ex-stepper-basic')),
+  'ex-stepper-disabled': lazy(() => import('../demos/ui/ex-stepper-disabled')),
+  'ex-stepper-external-nav': lazy(() => import('../demos/ui/ex-stepper-external-nav')),
+  'ex-stepper-labels': lazy(() => import('../demos/ui/ex-stepper-labels')),
+  'ex-stepper-linear': lazy(() => import('../demos/ui/ex-stepper-linear')),
+  'ex-stepper-optional': lazy(() => import('../demos/ui/ex-stepper-optional')),
+  'ex-table-basic': lazy(() => import('../demos/ui/ex-table-basic')),
+  'ex-table-custom-cells': lazy(() => import('../demos/ui/ex-table-custom-cells')),
+  'ex-table-empty': lazy(() => import('../demos/ui/ex-table-empty')),
+  'ex-table-expandable': lazy(() => import('../demos/ui/ex-table-expandable')),
+  'ex-table-hidden': lazy(() => import('../demos/ui/ex-table-hidden')),
+  'ex-table-resizable': lazy(() => import('../demos/ui/ex-table-resizable')),
+  'ex-table-selection': lazy(() => import('../demos/ui/ex-table-selection')),
+  'ex-table-single-select': lazy(() => import('../demos/ui/ex-table-single-select')),
+  'ex-table-sorting': lazy(() => import('../demos/ui/ex-table-sorting')),
+  'ex-table-sticky': lazy(() => import('../demos/ui/ex-table-sticky')),
+  'ex-tabs-activate-on-focus': lazy(() => import('../demos/ui/ex-tabs-activate-on-focus')),
+  'ex-tabs-basic': lazy(() => import('../demos/ui/ex-tabs-basic')),
+  'ex-tabs-class': lazy(() => import('../demos/ui/ex-tabs-class')),
+  'ex-tabs-content': lazy(() => import('../demos/ui/ex-tabs-content')),
+  'ex-tabs-disabled': lazy(() => import('../demos/ui/ex-tabs-disabled')),
+  'ex-tabs-disabled-all': lazy(() => import('../demos/ui/ex-tabs-disabled-all')),
+  'ex-tabs-label': lazy(() => import('../demos/ui/ex-tabs-label')),
+  'ex-tabs-sliding-indicator': lazy(() => import('../demos/ui/ex-tabs-sliding-indicator')),
+  'ex-tabs-template': lazy(() => import('../demos/ui/ex-tabs-template')),
+  'ex-tabs-uncontrolled': lazy(() => import('../demos/ui/ex-tabs-uncontrolled')),
+  'ex-timepicker-basic': lazy(() => import('../demos/ui/ex-timepicker-basic')),
+  'ex-timepicker-bounds': lazy(() => import('../demos/ui/ex-timepicker-bounds')),
+  'ex-timepicker-class': lazy(() => import('../demos/ui/ex-timepicker-class')),
+  'ex-timepicker-clearable': lazy(() => import('../demos/ui/ex-timepicker-clearable')),
+  'ex-timepicker-control': lazy(() => import('../demos/ui/ex-timepicker-control')),
+  'ex-timepicker-format': lazy(() => import('../demos/ui/ex-timepicker-format')),
+  'ex-timepicker-placeholder': lazy(() => import('../demos/ui/ex-timepicker-placeholder')),
+  'ex-timepicker-position': lazy(() => import('../demos/ui/ex-timepicker-position')),
+  'ex-timepicker-states': lazy(() => import('../demos/ui/ex-timepicker-states')),
+  'ex-timepicker-step': lazy(() => import('../demos/ui/ex-timepicker-step')),
+  'ex-toolbar-class': lazy(() => import('../demos/ui/ex-toolbar-class')),
+  'ex-toolbar-ink': lazy(() => import('../demos/ui/ex-toolbar-ink')),
+  'ex-toolbar-parts': lazy(() => import('../demos/ui/ex-toolbar-parts')),
+  'ex-toolbar-role': lazy(() => import('../demos/ui/ex-toolbar-role')),
+  'ex-toolbar-sticky': lazy(() => import('../demos/ui/ex-toolbar-sticky')),
+  'ex-tooltip-basic': lazy(() => import('../demos/ui/ex-tooltip-basic')),
+  'ex-tooltip-delay': lazy(() => import('../demos/ui/ex-tooltip-delay')),
+  'ex-tooltip-disabled': lazy(() => import('../demos/ui/ex-tooltip-disabled')),
+  'ex-tooltip-on-button': lazy(() => import('../demos/ui/ex-tooltip-on-button')),
+  'ex-tooltip-positions': lazy(() => import('../demos/ui/ex-tooltip-positions')),
+  'ex-tree-accessors': lazy(() => import('../demos/ui/ex-tree-accessors')),
+  'ex-tree-controlled': lazy(() => import('../demos/ui/ex-tree-controlled')),
+  'ex-tree-expandable': lazy(() => import('../demos/ui/ex-tree-expandable')),
+  'ex-tree-flat': lazy(() => import('../demos/ui/ex-tree-flat')),
+  'ex-tree-labelled': lazy(() => import('../demos/ui/ex-tree-labelled')),
+  'ex-tree-nested': lazy(() => import('../demos/ui/ex-tree-nested')),
+  'ex-tree-node-content': lazy(() => import('../demos/ui/ex-tree-node-content')),
+  'ex-tree-reorderable': lazy(() => import('../demos/ui/ex-tree-reorderable')),
+  'ex-tree-selection-multiple': lazy(() => import('../demos/ui/ex-tree-selection-multiple')),
+  'ex-tree-selection-single': lazy(() => import('../demos/ui/ex-tree-selection-single')),
+  'button-events': lazy(() => import('../demos/ui/button-events')),
+  'button-variants': lazy(() => import('../demos/ui/button-variants')),
+  'button-disabled': lazy(() => import('../demos/ui/button-disabled')),
+  'button-confirm': lazy(() => import('../demos/ui/button-confirm')),
+  'icon-basic': lazy(() => import('../demos/ui/icon-basic')),
+  'icon-color': lazy(() => import('../demos/ui/icon-color')),
+  'badge-variants': lazy(() => import('../demos/ui/badge-variants')),
+  'badge-max': lazy(() => import('../demos/ui/badge-max')),
+  'card-basic': lazy(() => import('../demos/ui/card-basic')),
+  'card-interactive': lazy(() => import('../demos/ui/card-interactive')),
+  'button-toggle-single': lazy(() => import('../demos/ui/button-toggle-single')),
+  'button-toggle-multi': lazy(() => import('../demos/ui/button-toggle-multi')),
+  'toolbar-basic': lazy(() => import('../demos/ui/toolbar-basic')),
+  'ripple-basic': lazy(() => import('../demos/ui/ripple-basic')),
+  'divider-basic': lazy(() => import('../demos/ui/divider-basic')),
+  'input-basic': lazy(() => import('../demos/ui/input-basic')),
+  'input-features': lazy(() => import('../demos/ui/input-features')),
+  'input-adornments': lazy(() => import('../demos/ui/input-adornments')),
+  'input-clearable': lazy(() => import('../demos/ui/input-clearable')),
+  'input-types': lazy(() => import('../demos/ui/input-types')),
+  'input-multiline': lazy(() => import('../demos/ui/input-multiline')),
+  'input-password': lazy(() => import('../demos/ui/input-password')),
+  'input-password-tooltip': lazy(() => import('../demos/ui/input-password-tooltip')),
+  'input-states': lazy(() => import('../demos/ui/input-states')),
+  'input-validation': lazy(() => import('../demos/ui/input-validation')),
+  'checkbox-basic': lazy(() => import('../demos/ui/checkbox-basic')),
+  'checkbox-tristate': lazy(() => import('../demos/ui/checkbox-tristate')),
+  'radio-basic': lazy(() => import('../demos/ui/radio-basic')),
+  'slide-toggle-basic': lazy(() => import('../demos/ui/slide-toggle-basic')),
+  'form-field-basic': lazy(() => import('../demos/ui/form-field-basic')),
+  'form-field-error': lazy(() => import('../demos/ui/form-field-error')),
+  'select-basic': lazy(() => import('../demos/ui/select-basic')),
+  'select-multiple': lazy(() => import('../demos/ui/select-multiple')),
+  'chips-basic': lazy(() => import('../demos/ui/chips-basic')),
+  'slider-basic': lazy(() => import('../demos/ui/slider-basic')),
+  'autocomplete-basic': lazy(() => import('../demos/ui/autocomplete-basic')),
+  'datepicker-basic': lazy(() => import('../demos/ui/datepicker-basic')),
+  'date-range-picker-basic': lazy(() => import('../demos/ui/date-range-picker-basic')),
+  'timepicker-basic': lazy(() => import('../demos/ui/timepicker-basic')),
+  'progress-bar-demo': lazy(() => import('../demos/ui/progress-bar-demo')),
+  'progress-spinner-demo': lazy(() => import('../demos/ui/progress-spinner-demo')),
+  'tooltip-demo': lazy(() => import('../demos/ui/tooltip-demo')),
+  'dialog-demo': lazy(() => import('../demos/ui/dialog-demo')),
+  'snackbar-demo': lazy(() => import('../demos/ui/snackbar-demo')),
+  'tabs-demo': lazy(() => import('../demos/ui/tabs-demo')),
+  'expansion-demo': lazy(() => import('../demos/ui/expansion-demo')),
+  'list-demo': lazy(() => import('../demos/ui/list-demo')),
+  'grid-list-demo': lazy(() => import('../demos/ui/grid-list-demo')),
+  'stepper-demo': lazy(() => import('../demos/ui/stepper-demo')),
+  'paginator-demo': lazy(() => import('../demos/ui/paginator-demo')),
+  'sidenav-demo': lazy(() => import('../demos/ui/sidenav-demo')),
+  'menu-demo': lazy(() => import('../demos/ui/menu-demo')),
+  'menubar-demo': lazy(() => import('../demos/ui/menubar-demo')),
+  'context-menu-demo': lazy(() => import('../demos/ui/context-menu-demo')),
+  'table-demo': lazy(() => import('../demos/ui/table-demo')),
+  'tree-demo': lazy(() => import('../demos/ui/tree-demo')),
+  'bottom-sheet-demo': lazy(() => import('../demos/ui/bottom-sheet-demo')),
+  'popover-edit-demo': lazy(() => import('../demos/ui/popover-edit-demo')),
+  'examples-todo': lazy(() => import('../demos/examples/todo-app')),
+  'examples-dashboard': lazy(() => import('../demos/examples/dashboard-app')),
+  'examples-settings': lazy(() => import('../demos/examples/settings-app')),
+  'examples-signup': lazy(() => import('../demos/examples/wizard-app')),
+  'examples-kanban': lazy(() => import('../demos/examples/kanban-app')),
 };

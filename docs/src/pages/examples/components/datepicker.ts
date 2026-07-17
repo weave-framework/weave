@@ -1,5 +1,5 @@
 import DocPage from '../../../lib/doc-page/doc-page';
-import { content } from '../../../content/content.gen';
+import { source } from '../../../content/examples/components/datepicker.gen';
 
 // `<DocPage>` is referenced in datepicker.html.
 void DocPage;
@@ -11,5 +11,5 @@ interface DatepickerExamplesSetup {
 /** Examples → Components → Datepicker (route `/examples/components/datepicker`). Authored in Markdown
  *  (src/content/examples/components/datepicker.md) and rendered by <DocPage>. */
 export function setup(): DatepickerExamplesSetup {
-  return { source: content['examples/components/datepicker'] ?? '' };
+  return { source };
 }

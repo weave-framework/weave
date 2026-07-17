@@ -1,5 +1,5 @@
 import DocPage from '../../../lib/doc-page/doc-page';
-import { content } from '../../../content/content.gen';
+import { source } from '../../../content/examples/components/radio.gen';
 
 // `<DocPage>` is referenced in radio.html.
 void DocPage;
@@ -12,5 +12,5 @@ interface RadioExamplesSetup {
  *  gallery covering the whole `<Radio>` surface. Authored in Markdown
  *  (src/content/examples/components/radio.md) and rendered by <DocPage>. */
 export function setup(): RadioExamplesSetup {
-  return { source: content['examples/components/radio'] ?? '' };
+  return { source };
 }

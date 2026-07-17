@@ -1,5 +1,5 @@
 import DocPage from '../../lib/doc-page/doc-page';
-import { content } from '../../content/content.gen';
+import { source } from '../../content/ui/icon.gen';
 
 // `<DocPage>` is referenced in icon.html.
 void DocPage;
@@ -11,5 +11,5 @@ interface IconSetup {
 /** UI → Icon (route `/ui/icon`). Content authored in Markdown
  *  (src/content/ui/icon.md) and rendered by <DocPage>. */
 export function setup(): IconSetup {
-  return { source: content['ui/icon'] ?? '' };
+  return { source };
 }

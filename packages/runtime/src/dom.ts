@@ -1304,7 +1304,7 @@ export function lazy(
   const start = (): void => {
     if (started) return;
     started = true;
-    loader().then(
+    const p: Promise<void> = loader().then(
       (m) => {
         resolved = (typeof m === 'function' ? m : m.default) as Component;
         state.set('ready');
@@ -1314,6 +1314,13 @@ export function lazy(
         state.set('error');
       }
     );
+    // Under a headless render, hand the load to it so it settles before serializing — a lazy component then
+    // PRERENDERS, instead of freezing at its placeholder because the render finished first. Via the same
+    // global sink `data` uses; absent in a browser, so this is one `undefined` compare (I3).
+    const sink: Promise<unknown>[] | undefined = (globalThis as Record<string, unknown>).__weaveAsync as
+      | Promise<unknown>[]
+      | undefined;
+    if (sink) sink.push(p);
   };
 
   const Lazy: Component & { preload: () => void } = ((props = {}, slots = {}) => {

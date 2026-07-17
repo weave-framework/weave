@@ -1,5 +1,5 @@
 import DocPage from '../../../lib/doc-page/doc-page';
-import { content } from '../../../content/content.gen';
+import { source } from '../../../content/examples/components/snackbar.gen';
 
 // `<DocPage>` is referenced in snackbar.html.
 void DocPage;
@@ -11,5 +11,5 @@ interface SnackbarExamplesSetup {
 /** Examples → Components → Snackbar (route `/examples/components/snackbar`). Authored in Markdown
  *  (src/content/examples/components/snackbar.md) and rendered by <DocPage>. */
 export function setup(): SnackbarExamplesSetup {
-  return { source: content['examples/components/snackbar'] ?? '' };
+  return { source };
 }

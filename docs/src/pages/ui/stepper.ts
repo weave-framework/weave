@@ -1,5 +1,5 @@
 import DocPage from '../../lib/doc-page/doc-page';
-import { content } from '../../content/content.gen';
+import { source } from '../../content/ui/stepper.gen';
 
 // `<DocPage>` is referenced in stepper.html.
 void DocPage;
@@ -10,5 +10,5 @@ interface Setup {
 
 /** UI → Stepper (route `/ui/stepper`). */
 export function setup(): Setup {
-  return { source: content['ui/stepper'] ?? '' };
+  return { source };
 }

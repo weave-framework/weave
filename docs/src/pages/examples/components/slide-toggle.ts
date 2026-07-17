@@ -1,5 +1,5 @@
 import DocPage from '../../../lib/doc-page/doc-page';
-import { content } from '../../../content/content.gen';
+import { source } from '../../../content/examples/components/slide-toggle.gen';
 
 // `<DocPage>` is referenced in slide-toggle.html.
 void DocPage;
@@ -12,5 +12,5 @@ interface SlideToggleExamplesSetup {
  *  gallery covering the whole `<SlideToggle>` surface. Authored in Markdown
  *  (src/content/examples/components/slide-toggle.md) and rendered by <DocPage>. */
 export function setup(): SlideToggleExamplesSetup {
-  return { source: content['examples/components/slide-toggle'] ?? '' };
+  return { source };
 }

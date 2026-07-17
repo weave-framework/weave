@@ -2,9 +2,9 @@ import { signal, computed, type Signal, type Computed } from '@weave-framework/r
 import { navigate } from '@weave-framework/router';
 import Input from '@weave-framework/ui/input';
 import Icon from '@weave-framework/ui/icon';
-import { entries } from './build-index';
 import { search, type Result } from './search';
 import { scrollToHash } from '../util/scroll';
+import type { SearchEntry } from './build-index';
 
 // Capitalized tags in the template resolve to these imports.
 void Input;
@@ -31,16 +31,31 @@ export function setup(): SearchBoxSetup {
   const open = signal(false);
   const active = signal(0);
 
-  const results = computed<Result[]>(() => (query().trim() ? search(entries, query()) : []));
+  // The index is the WHOLE docs corpus — every page's markdown, parsed. A static import put it in every
+  // page's download (~217 KB gz) and ran the parse at module init, on pages the reader never searches. The
+  // search box lives in the shell, so that was every page. Loaded on first use instead: the chunk and the
+  // parse both wait until someone actually opens search.
+  const index = signal<SearchEntry[] | null>(null);
+  const loadIndex = (): void => {
+    if (index()) return;
+    void import('./build-index').then((m) => index.set(m.entries));
+  };
+
+  const results = computed<Result[]>(() => {
+    const idx: SearchEntry[] | null = index();
+    return idx && query().trim() ? search(idx, query()) : [];
+  });
 
   // Input's value binding calls this on every keystroke.
   const setQuery = (value: string): void => {
+    loadIndex();
     query.set(value);
     open.set(true);
     active.set(0);
   };
 
   const onFocus = (): void => {
+    loadIndex(); // warm it while they are typing the first character
     if (query().trim()) open.set(true);
   };
   // Delay close so a click on a result registers before the panel hides.

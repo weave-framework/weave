@@ -1,5 +1,5 @@
 import DocPage from '../../../lib/doc-page/doc-page';
-import { content } from '../../../content/content.gen';
+import { source } from '../../../content/examples/components/tabs.gen';
 
 // `<DocPage>` is referenced in tabs.html.
 void DocPage;
@@ -12,5 +12,5 @@ interface TabsExamplesSetup {
  *  gallery covering the whole `<Tabs>` surface. Authored in Markdown
  *  (src/content/examples/components/tabs.md) and rendered by <DocPage>. */
 export function setup(): TabsExamplesSetup {
-  return { source: content['examples/components/tabs'] ?? '' };
+  return { source };
 }

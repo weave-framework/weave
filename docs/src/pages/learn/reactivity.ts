@@ -1,5 +1,5 @@
 import DocPage from '../../lib/doc-page/doc-page';
-import { content } from '../../content/content.gen';
+import { source } from '../../content/learn/reactivity.gen';
 
 // `<DocPage>` is referenced in reactivity.html.
 void DocPage;
@@ -11,5 +11,5 @@ interface ReactivitySetup {
 /** Learn → reactivity (route `/learn/reactivity`). Content authored in
  *  Markdown (src/content/learn/reactivity.md) and rendered by <DocPage>. */
 export function setup(): ReactivitySetup {
-  return { source: content['learn/reactivity'] ?? '' };
+  return { source };
 }

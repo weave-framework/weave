@@ -1,5 +1,5 @@
 import DocPage from '../../../lib/doc-page/doc-page';
-import { content } from '../../../content/content.gen';
+import { source } from '../../../content/examples/components/icon.gen';
 
 // `<DocPage>` is referenced in icon.html.
 void DocPage;
@@ -12,5 +12,5 @@ interface IconExamplesSetup {
  *  gallery covering the whole `<Icon>` surface. Authored in Markdown
  *  (src/content/examples/components/icon.md) and rendered by <DocPage>. */
 export function setup(): IconExamplesSetup {
-  return { source: content['examples/components/icon'] ?? '' };
+  return { source };
 }

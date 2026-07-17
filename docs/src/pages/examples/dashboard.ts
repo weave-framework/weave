@@ -1,5 +1,5 @@
 import DocPage from '../../lib/doc-page/doc-page';
-import { content } from '../../content/content.gen';
+import { source } from '../../content/examples/dashboard.gen';
 
 // `<DocPage>` is referenced in dashboard.html.
 void DocPage;
@@ -10,5 +10,5 @@ interface Setup {
 
 /** Examples → Data dashboard (route `/examples/dashboard`). */
 export function setup(): Setup {
-  return { source: content['examples/dashboard'] ?? '' };
+  return { source };
 }

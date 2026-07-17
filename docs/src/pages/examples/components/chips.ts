@@ -1,5 +1,5 @@
 import DocPage from '../../../lib/doc-page/doc-page';
-import { content } from '../../../content/content.gen';
+import { source } from '../../../content/examples/components/chips.gen';
 
 // `<DocPage>` is referenced in chips.html.
 void DocPage;
@@ -12,5 +12,5 @@ interface ChipsExamplesSetup {
  *  gallery covering the whole `<Chips>` surface. Authored in Markdown
  *  (src/content/examples/components/chips.md) and rendered by <DocPage>. */
 export function setup(): ChipsExamplesSetup {
-  return { source: content['examples/components/chips'] ?? '' };
+  return { source };
 }

@@ -1,5 +1,5 @@
 import DocPage from '../../lib/doc-page/doc-page';
-import { content } from '../../content/content.gen';
+import { source } from '../../content/learn/introduction.gen';
 
 // `<DocPage>` is referenced in introduction.html.
 void DocPage;
@@ -11,5 +11,5 @@ interface IntroductionSetup {
 /** Learn → Introduction (route `/learn/introduction`). Content authored in
  *  Markdown (src/content/learn/introduction.md) and rendered by <DocPage>. */
 export function setup(): IntroductionSetup {
-  return { source: content['learn/introduction'] ?? '' };
+  return { source };
 }

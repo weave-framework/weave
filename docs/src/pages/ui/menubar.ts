@@ -1,5 +1,5 @@
 import DocPage from '../../lib/doc-page/doc-page';
-import { content } from '../../content/content.gen';
+import { source } from '../../content/ui/menubar.gen';
 
 // `<DocPage>` is referenced in menubar.html.
 void DocPage;
@@ -10,5 +10,5 @@ interface Setup {
 
 /** UI → Menubar (route `/ui/menubar`). */
 export function setup(): Setup {
-  return { source: content['ui/menubar'] ?? '' };
+  return { source };
 }

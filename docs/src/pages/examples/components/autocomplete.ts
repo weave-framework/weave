@@ -1,5 +1,5 @@
 import DocPage from '../../../lib/doc-page/doc-page';
-import { content } from '../../../content/content.gen';
+import { source } from '../../../content/examples/components/autocomplete.gen';
 
 // `<DocPage>` is referenced in autocomplete.html.
 void DocPage;
@@ -12,5 +12,5 @@ interface AutocompleteExamplesSetup {
  *  gallery covering the whole `<Autocomplete>` surface. Authored in Markdown
  *  (src/content/examples/components/autocomplete.md) and rendered by <DocPage>. */
 export function setup(): AutocompleteExamplesSetup {
-  return { source: content['examples/components/autocomplete'] ?? '' };
+  return { source };
 }

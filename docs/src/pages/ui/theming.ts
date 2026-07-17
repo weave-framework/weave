@@ -1,5 +1,5 @@
 import DocPage from '../../lib/doc-page/doc-page';
-import { content } from '../../content/content.gen';
+import { source } from '../../content/ui/theming.gen';
 
 // `<DocPage>` is referenced in theming.html.
 void DocPage;
@@ -10,5 +10,5 @@ interface Setup {
 
 /** UI → Styling & theming (route `/ui/theming`). */
 export function setup(): Setup {
-  return { source: content['ui/theming'] ?? '' };
+  return { source };
 }

@@ -1,5 +1,5 @@
 import DocPage from '../../lib/doc-page/doc-page';
-import { content } from '../../content/content.gen';
+import { source } from '../../content/ui/input.gen';
 
 // `<DocPage>` is referenced in input.html.
 void DocPage;
@@ -10,5 +10,5 @@ interface Setup {
 
 /** UI → Input (route `/ui/input`). */
 export function setup(): Setup {
-  return { source: content['ui/input'] ?? '' };
+  return { source };
 }

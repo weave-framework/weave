@@ -1,5 +1,5 @@
 import DocPage from '../../lib/doc-page/doc-page';
-import { content } from '../../content/content.gen';
+import { source } from '../../content/ui/progress-bar.gen';
 
 // `<DocPage>` is referenced in progress-bar.html.
 void DocPage;
@@ -10,5 +10,5 @@ interface Setup {
 
 /** UI → Progress Bar (route `/ui/progress-bar`). */
 export function setup(): Setup {
-  return { source: content['ui/progress-bar'] ?? '' };
+  return { source };
 }

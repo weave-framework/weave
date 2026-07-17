@@ -1,5 +1,5 @@
 import DocPage from '../../lib/doc-page/doc-page';
-import { content } from '../../content/content.gen';
+import { source } from '../../content/ui/sidenav.gen';
 
 // `<DocPage>` is referenced in sidenav.html.
 void DocPage;
@@ -10,5 +10,5 @@ interface Setup {
 
 /** UI → Sidenav (route `/ui/sidenav`). */
 export function setup(): Setup {
-  return { source: content['ui/sidenav'] ?? '' };
+  return { source };
 }

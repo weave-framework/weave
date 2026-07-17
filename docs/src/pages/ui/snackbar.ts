@@ -1,5 +1,5 @@
 import DocPage from '../../lib/doc-page/doc-page';
-import { content } from '../../content/content.gen';
+import { source } from '../../content/ui/snackbar.gen';
 
 // `<DocPage>` is referenced in snackbar.html.
 void DocPage;
@@ -10,5 +10,5 @@ interface Setup {
 
 /** UI → Snackbar (route `/ui/snackbar`). */
 export function setup(): Setup {
-  return { source: content['ui/snackbar'] ?? '' };
+  return { source };
 }

@@ -1,5 +1,5 @@
 import DocPage from '../../lib/doc-page/doc-page';
-import { content } from '../../content/content.gen';
+import { source } from '../../content/learn/static-generation.gen';
 
 // `<DocPage>` is referenced in static-generation.html.
 void DocPage;
@@ -11,5 +11,5 @@ interface StaticGenerationSetup {
 /** Learn → static generation & resume (route `/learn/static-generation`). Content authored in
  *  Markdown (src/content/learn/static-generation.md) and rendered by <DocPage>. */
 export function setup(): StaticGenerationSetup {
-  return { source: content['learn/static-generation'] ?? '' };
+  return { source };
 }

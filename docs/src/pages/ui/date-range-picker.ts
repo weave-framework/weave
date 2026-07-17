@@ -1,5 +1,5 @@
 import DocPage from '../../lib/doc-page/doc-page';
-import { content } from '../../content/content.gen';
+import { source } from '../../content/ui/date-range-picker.gen';
 
 // `<DocPage>` is referenced in date-range-picker.html.
 void DocPage;
@@ -10,5 +10,5 @@ interface Setup {
 
 /** UI → DateRangePicker (route `/ui/date-range-picker`). */
 export function setup(): Setup {
-  return { source: content['ui/date-range-picker'] ?? '' };
+  return { source };
 }

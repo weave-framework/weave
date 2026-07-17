@@ -1,5 +1,5 @@
 import DocPage from '../../lib/doc-page/doc-page';
-import { content } from '../../content/content.gen';
+import { source } from '../../content/ui/datepicker.gen';
 
 // `<DocPage>` is referenced in datepicker.html.
 void DocPage;
@@ -10,5 +10,5 @@ interface Setup {
 
 /** UI → Datepicker (route `/ui/datepicker`). */
 export function setup(): Setup {
-  return { source: content['ui/datepicker'] ?? '' };
+  return { source };
 }

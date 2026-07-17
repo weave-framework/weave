@@ -1,5 +1,5 @@
 import DocPage from '../../../lib/doc-page/doc-page';
-import { content } from '../../../content/content.gen';
+import { source } from '../../../content/examples/components/table.gen';
 
 // `<DocPage>` is referenced in table.html.
 void DocPage;
@@ -11,5 +11,5 @@ interface TableExamplesSetup {
 /** Examples → Components → Table (route `/examples/components/table`). Authored in Markdown
  *  (src/content/examples/components/table.md) and rendered by <DocPage>. */
 export function setup(): TableExamplesSetup {
-  return { source: content['examples/components/table'] ?? '' };
+  return { source };
 }

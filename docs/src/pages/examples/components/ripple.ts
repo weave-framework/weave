@@ -1,5 +1,5 @@
 import DocPage from '../../../lib/doc-page/doc-page';
-import { content } from '../../../content/content.gen';
+import { source } from '../../../content/examples/components/ripple.gen';
 
 // `<DocPage>` is referenced in ripple.html.
 void DocPage;
@@ -12,5 +12,5 @@ interface RippleExamplesSetup {
  *  gallery covering the whole `<Ripple>` surface. Authored in Markdown
  *  (src/content/examples/components/ripple.md) and rendered by <DocPage>. */
 export function setup(): RippleExamplesSetup {
-  return { source: content['examples/components/ripple'] ?? '' };
+  return { source };
 }

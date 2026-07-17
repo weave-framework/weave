@@ -1,5 +1,5 @@
 import DocPage from '../../../lib/doc-page/doc-page';
-import { content } from '../../../content/content.gen';
+import { source } from '../../../content/examples/components/button-toggle.gen';
 
 // `<DocPage>` is referenced in button-toggle.html.
 void DocPage;
@@ -12,5 +12,5 @@ interface ButtonToggleExamplesSetup {
  *  gallery covering the whole `<ButtonToggle>` surface. Authored in Markdown
  *  (src/content/examples/components/button-toggle.md) and rendered by <DocPage>. */
 export function setup(): ButtonToggleExamplesSetup {
-  return { source: content['examples/components/button-toggle'] ?? '' };
+  return { source };
 }

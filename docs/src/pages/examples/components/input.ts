@@ -1,5 +1,5 @@
 import DocPage from '../../../lib/doc-page/doc-page';
-import { content } from '../../../content/content.gen';
+import { source } from '../../../content/examples/components/input.gen';
 
 // `<DocPage>` is referenced in input.html.
 void DocPage;
@@ -12,5 +12,5 @@ interface InputExamplesSetup {
  *  gallery covering the whole `<Input>` surface. Authored in Markdown
  *  (src/content/examples/components/input.md) and rendered by <DocPage>. */
 export function setup(): InputExamplesSetup {
-  return { source: content['examples/components/input'] ?? '' };
+  return { source };
 }

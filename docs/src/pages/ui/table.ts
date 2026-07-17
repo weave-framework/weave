@@ -1,5 +1,5 @@
 import DocPage from '../../lib/doc-page/doc-page';
-import { content } from '../../content/content.gen';
+import { source } from '../../content/ui/table.gen';
 
 // `<DocPage>` is referenced in table.html.
 void DocPage;
@@ -10,5 +10,5 @@ interface Setup {
 
 /** UI → Table (route `/ui/table`). */
 export function setup(): Setup {
-  return { source: content['ui/table'] ?? '' };
+  return { source };
 }

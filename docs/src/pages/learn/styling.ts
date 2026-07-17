@@ -1,5 +1,5 @@
 import DocPage from '../../lib/doc-page/doc-page';
-import { content } from '../../content/content.gen';
+import { source } from '../../content/learn/styling.gen';
 
 // `<DocPage>` is referenced in styling.html.
 void DocPage;
@@ -11,5 +11,5 @@ interface StylingSetup {
 /** Learn → styling (route `/learn/styling`). Content authored in
  *  Markdown (src/content/learn/styling.md) and rendered by <DocPage>. */
 export function setup(): StylingSetup {
-  return { source: content['learn/styling'] ?? '' };
+  return { source };
 }

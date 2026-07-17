@@ -1,5 +1,5 @@
 import DocPage from '../../lib/doc-page/doc-page';
-import { content } from '../../content/content.gen';
+import { source } from '../../content/ui/progress-spinner.gen';
 
 // `<DocPage>` is referenced in progress-spinner.html.
 void DocPage;
@@ -10,5 +10,5 @@ interface Setup {
 
 /** UI → Progress Spinner (route `/ui/progress-spinner`). */
 export function setup(): Setup {
-  return { source: content['ui/progress-spinner'] ?? '' };
+  return { source };
 }

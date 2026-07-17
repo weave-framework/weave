@@ -1,5 +1,5 @@
 import DocPage from '../../lib/doc-page/doc-page';
-import { content } from '../../content/content.gen';
+import { source } from '../../content/examples/kanban.gen';
 
 // `<DocPage>` is referenced in kanban.html.
 void DocPage;
@@ -10,5 +10,5 @@ interface Setup {
 
 /** Examples → Kanban board (route `/examples/kanban`). */
 export function setup(): Setup {
-  return { source: content['examples/kanban'] ?? '' };
+  return { source };
 }
