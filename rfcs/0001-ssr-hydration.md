@@ -1,16 +1,24 @@
 # RFC 0001: Server-side rendering & hydration
 
-- **Status:** Accepted (scoped) — 2026-07-04. **Still Accepted, NOT Implemented — deliberately (2026-07-17).**
-  The render+resume half is built and gated (`weave build --ssg` prerenders every route; the client ADOPTS that
-  DOM — `setup` never re-runs — proven end-to-end in a real browser by `pnpm verify:resume`). What is missing is
-  the PAYLOAD half of E1.2: *"only interactive components ship handler chunks; static subtrees ship zero JS"*.
-  **Per-ROUTE chunking now ships** (2026-07-17): a reader of one docs page went 350.8 KB gz → 9.1 KB + their
-  own ~0.5 KB route chunk (~36×), gated by `verify:resume` through the real CLI. **Per-COMPONENT does not** — an
-  interactive island still rides its route's chunk, so a mostly-static page still pays for it, and *"static
-  subtrees ship zero JS"* is not yet literally true. Per-page cost is pinned by `verify:resume`'s budget
-  (7.6 KB gz + a 135 B snapshot on a 3-component page). Remaining design choice: RFC 0009 question #1's
-  per-component half. Also unbuilt: E1.3's `@weave-framework/data` → resume payload (`packages/data`
-  has no serialize/resume seam at all), and there is no SSR/SSG page on the docs site.
+- **Status:** **Implemented (as scoped)** — 2026-07-17. Accepted 2026-07-04.
+  This RFC scoped itself to **Phase 1 = SSG only**, explicitly deferring request-time SSR, streaming and RSC.
+  That scope is delivered, and the client-attach step is **resume** rather than the hydration this RFC assumed
+  — the deeper primitive [RFC 0009](0009-resumable-signal-core.md) defined and this RFC's own header points at.
+  Every exit criterion in PHASE-E-PLAN, checked against a real build rather than an intention:
+  - **builds · resumes · is interactive** — `weave build --ssg` prerenders every route; the client adopts that
+    DOM and `setup` never re-runs. Gated by `pnpm verify:resume`: a real app, the real CLI, a real browser.
+  - **data** — a `resource()` is awaited before the HTML is written and travels in the snapshot, so the client
+    resumes with it present (E1.3). Gated, with the failure mode pinned alongside it.
+  - **static subtrees ship no JS** — per-route splitting by default, per-component via `lazy()`, which now
+    prerenders (see RFC 0009 Q#1). Measured on the docs: a page went **1555.7 KB → 169.7 KB raw**.
+  - **per-page budget** — `verify:resume` pins 7.6 KB gz + a 135 B snapshot on a 3-component page; drop it to
+    7 KB and the gate fails.
+  - **SSR guide** — `/learn/static-generation`, on Weave's own terms, and it documents what CANNOT resume as
+    plainly as what can.
+
+  **Honest edges.** "Zero JS" is reachable, not automatic: a static subtree inside an eagerly-imported
+  component still ships, and `lazy()` is the author's opt-in. Per-HANDLER chunks (RFC 0009 §2's sketch —
+  a chunk per `on:click`) are not built. Request-time SSR + streaming remain out of scope, as decided here.
 - **Author(s):** Aidas Josas (@aidasjosas)
 - **Discussion:** decided directly by the maintainer (no community to gauge yet); this RFC is
   the decision record.

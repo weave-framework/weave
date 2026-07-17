@@ -138,15 +138,21 @@ the client with `setup` never called on the client.
 
 1. **Handler-chunk granularity** — one chunk per handler (max laziness, more requests) vs per-component
    vs per-route. Likely per-route default, per-component opt-in.
-   **PER-ROUTE: ANSWERED + SHIPPED (2026-07-17).** The RFC's own default was right. `--ssg` had been
-   generating the routes manifest with static imports for BOTH bundles — a real constraint (the synchronous
-   headless render cannot await a lazy chunk) applied to the wrong side — so every route linked one `main.js`
-   holding the whole app. The CLI now emits both manifests and aliases the eager one into the SERVER bundle
-   only; the client keeps `lazy()` and esbuild splits per page. Measured on the real docs: a reader of one page
-   went **350.8 KB gz → 9.1 KB + ~0.5 KB** for their own route (~36×). Gated by `verify:resume` through the
-   real CLI, with both halves DoD-proven (drop the split → 0 chunks; drop the alias → pages prerender empty).
-   **PER-COMPONENT: still open.** An interactive component inside a route still rides its route's chunk, so a
-   mostly-static page pays for its one island. That is the remaining half of *"static subtrees ship zero JS"*.
+   **RESOLVED — exactly as leaned, both halves shipped (2026-07-17).**
+   - *Per-route, by default*: `--ssg` used to force STATIC imports on both bundles (a synchronous headless
+     render cannot await a lazy chunk), so every route shipped one `main.js` with the whole app. The manifest
+     is lazy now and esbuild splits per page.
+   - *Per-component, opt-in*: `lazy()` — and the thing that made it usable is that it now **prerenders**. It
+     hands its import to the headless render's async sink (E1.3's settle), so the build writes the component's
+     real HTML. Lazy means "not in everyone's bundle", **not** "not in the HTML". Before that, opting in cost
+     you the prerender, which is not a trade anyone should take.
+   - *Per-handler* (a chunk per `on:click`, loaded on first interaction — §2's sketch): NOT built, and no
+     longer obviously worth it. Per-component already reaches the payload this question was asked about.
+   Measured on the real docs, what a reader of /learn/templates downloads: **1555.7 KB → 169.7 KB raw**. The
+   two things that had defeated splitting were an all-pages content map and a registry of 321 static demo
+   imports — both per-page now.
+   *Note the trap this took: file sizes on disk said "36× better" while the browser was still fetching 1.5 MB.
+   A route chunk is small; what it IMPORTS is the number. Measure the network, not the directory.*
 
 2. **Snapshot placement** — inline `<script type="application/weave">` vs a separate fetch. Inline for
    SSG; revisit for streaming in E1.
