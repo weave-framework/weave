@@ -33,6 +33,8 @@ $tokens: (
     font-size: 14px,
     line-height: 1.3,
     // Font-size of the ▸ disclosure glyph.
-    toggle-glyph: 12px,
+    // Disclosure chevron <Icon> size (was a 12px ▸ glyph, which renders larger than its
+    // font-size — a lucide chevron needs a touch more to read at the same weight).
+    toggle-glyph: 14px,
   ),
 );

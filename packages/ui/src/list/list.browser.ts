@@ -18,6 +18,8 @@ import {
   type ListItem,
   type ListRowContext,
 } from '@weave-framework/ui/list';
+import * as IconMod from '@weave-framework/ui/icon';
+import { toComponent } from '../internal/compose.js';
 
 const rt: typeof dom & { signal: typeof signal; effect: typeof effect } = { ...dom, signal, effect };
 
@@ -37,7 +39,7 @@ function mount(props: ListProps): { list: HTMLElement; rows: HTMLElement[]; disp
       r: unknown,
       k: unknown
     ) => HTMLElement;
-    return fn(ctx, rt, {});
+    return fn(ctx, rt, { Icon: toComponent(IconMod as never) });
   });
   document.body.appendChild(list);
   const rows: HTMLElement[] = Array.from(list.querySelectorAll<HTMLElement>('.weave-list__row'));

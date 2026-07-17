@@ -103,8 +103,8 @@ export const template: string =
   ' aria-expanded={{ expandedAttr(n) }} aria-selected={{ selectedAttr(n) }}' +
   ' tabindex={{ tabindexFor(n) }} style={{ indentStyle(n) }}' +
   ' on:click={{ () => onActivate(n) }}>' +
-  '@if (reorderable()) {<span class="weave-tree__drag-handle" aria-hidden="true">⠿</span>}' +
-  '<span class={{ toggleClass(n) }} aria-hidden="true" on:click={{ (e) => onToggle(n, e) }}></span>' +
+  '@if (reorderable()) {<span class="weave-tree__drag-handle" aria-hidden="true"><Icon name={{ \'grip-vertical\' }} /></span>}' +
+  '<span class={{ toggleClass(n) }} aria-hidden="true" on:click={{ (e) => onToggle(n, e) }}>@if (n.expandable) {<Icon name={{ \'chevron-right\' }} />}</span>' +
   '<span class="weave-tree__content">@render (contentNode(n))</span>' +
   '</div>' +
   '}' +

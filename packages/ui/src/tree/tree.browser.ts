@@ -4,6 +4,8 @@ import * as dom from '@weave-framework/runtime/dom';
 import { compileTemplate, inferCtxNames, parseTemplate } from '@weave-framework/compiler';
 import { setup, template, type TreeProps, type TreeContext } from '@weave-framework/ui/tree';
 import { setDirection } from '@weave-framework/ui/cdk';
+import * as IconMod from '@weave-framework/ui/icon';
+import { toComponent } from '../internal/compose.js';
 
 const rt: typeof dom & { signal: typeof signal; effect: typeof effect } = { ...dom, signal, effect };
 const tick = (): Promise<void> => new Promise<void>((r) => queueMicrotask(r));
@@ -56,7 +58,7 @@ async function mount<N>(props: TreeProps<N>): Promise<Mounted> {
     const ctx: Ctx<N> = setup<N>(props);
     const { code } = compileTemplate(template, { mode: 'function', scope: SCOPE });
     const make: MakeRender<N> = new Function('ctx', 'rt', '_c', code.replace('return render(ctx, {});', 'return render;')) as MakeRender<N>;
-    return make(ctx, rt, {})(ctx, {});
+    return make(ctx, rt, { Icon: toComponent(IconMod as never) })(ctx, {});
   });
   document.body.appendChild(host);
   await tick();

@@ -65,6 +65,7 @@
     justify-content: center;
     width: var(--weave-list-drag-handle-size);
     color: var(--weave-list-drag-handle);
+    --weave-icon-size: var(--weave-list-drag-handle-size); // the grip is a lucide <Icon> now
     cursor: grab;
     touch-action: none;
     user-select: none;

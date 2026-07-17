@@ -523,9 +523,11 @@ check('table selected row = accentSoft tint + 2px accent inline-start border (vi
 check('table sticky columns are position:sticky; expand chevron rotates on [aria-expanded]', /\.weave-table__cell--sticky-start,\s*\.weave-table__cell--sticky-end\s*{[\s\S]*?position:\s*sticky/.test(cssStyles) && /\.weave-table__expand-toggle\[aria-expanded=true\]::before\s*{[\s\S]*?transform:\s*rotate\(90deg\)/.test(cssStyles));
 check('table resize grip = col-resize hairline lighting to accent on hover/focus (U5)', /\.weave-table__resize-grip\s*{[\s\S]*?cursor:\s*col-resize[\s\S]*?touch-action:\s*none/.test(cssStyles) && /\.weave-table__resize-grip:hover::after,\s*\.weave-table__resize-grip:focus-visible::after\s*{[\s\S]*?background:\s*var\(--weave-table-resize-grip-active\)/.test(cssStyles));
 
-/* ── tree (U4 §4.10): indented treeitem rows, rotating ▸ marker, accent selection mark ── */
+/* ── tree (U4 §4.10): indented treeitem rows, rotating chevron <Icon>, accent selection mark ── */
 check('all-styles emits .weave-tree node indented by depth (indent × --weave-tree-depth)', /\.weave-tree__node\s*{[\s\S]*?padding-inline-start:\s*calc\(\s*var\(--weave-tree-node-padding-x\)\s*\+\s*var\(--weave-tree-indent\)\s*\*\s*var\(--weave-tree-depth,\s*0\)\s*\)/.test(cssStyles));
-check('tree disclosure marker rotates on [aria-expanded]', /\.weave-tree__toggle::before\s*{[\s\S]*?content:\s*["']▸["']/.test(cssStyles) && /\.weave-tree__node\[aria-expanded=true\]\s*\.weave-tree__toggle::before\s*{[\s\S]*?transform:\s*rotate\(90deg\)/.test(cssStyles));
+// The disclosure marker is a lucide chevron <Icon> now (not a ▸ glyph): the toggle sizes it via
+// --weave-icon-size, and an expanded node rotates the .weave-icon 90° (right → down).
+check('tree disclosure chevron <Icon> rotates on [aria-expanded]', /\.weave-tree__toggle\s*{[\s\S]*?--weave-icon-size:\s*var\(--weave-tree-toggle-glyph\)/.test(cssStyles) && /\.weave-tree__node\[aria-expanded=true\]\s*\.weave-tree__toggle\s*\.weave-icon\s*{[\s\S]*?transform:\s*rotate\(90deg\)/.test(cssStyles));
 check('tree selected node = accentSoft tint + 2px accent left border (via [aria-selected])', /\.weave-tree__node\[aria-selected=true\]\s*{[\s\S]*?background:\s*var\(--weave-tree-selected-background\)[\s\S]*?border-inline-start-color:\s*var\(--weave-tree-selected-marker\)/.test(cssStyles));
 
 /* ── datepicker (U4 §4.13): underline field + calendar grid, selected fill, today ring ── */

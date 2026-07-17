@@ -53,21 +53,17 @@
     width: var(--weave-tree-toggle-size);
     height: var(--weave-tree-toggle-size);
     color: var(--weave-tree-toggle);
-    font-size: var(--weave-tree-toggle-glyph);
+    // The disclosure marker is a lucide chevron <Icon> now, not a ▸ glyph. Size it via the
+    // icon var; a leaf renders no <Icon> at all, and the fixed toggle width keeps content aligned.
+    --weave-icon-size: var(--weave-tree-toggle-glyph);
   }
 
-  .weave-tree__toggle::before {
-    content: '\25B8'; // ▸
-    display: inline-block;
+  .weave-tree__toggle .weave-icon {
     transition: transform var(--weave-tree-duration) ease;
   }
 
-  // A leaf keeps the toggle's width (so content aligns) but shows no glyph.
-  .weave-tree__toggle--leaf::before {
-    content: '';
-  }
-
-  .weave-tree__node[aria-expanded='true'] .weave-tree__toggle::before {
+  // Expanded: rotate the chevron from pointing right to pointing down.
+  .weave-tree__node[aria-expanded='true'] .weave-tree__toggle .weave-icon {
     transform: rotate(90deg);
   }
 
@@ -88,6 +84,7 @@
     justify-content: center;
     width: var(--weave-tree-drag-handle-size);
     color: var(--weave-tree-drag-handle);
+    --weave-icon-size: var(--weave-tree-drag-handle-size); // the grip is a lucide <Icon> now
     cursor: grab;
     touch-action: none;
     user-select: none;

@@ -115,7 +115,7 @@ export const template: string =
   '<div class="weave-list__row" role={{ rowRole() }} aria-selected={{ ariaSelected(item) }}' +
   ' aria-disabled={{ ariaDisabled(item) }} tabindex={{ tabindexFor(item) }}' +
   ' on:click={{ (e) => activate(item, e) }}>' +
-  '@if (reorderable()) {<span class="weave-list__drag-handle" aria-hidden="true">⠿</span>}' +
+  '@if (reorderable()) {<span class="weave-list__drag-handle" aria-hidden="true"><Icon name={{ \'grip-vertical\' }} /></span>}' +
   '@if (hasTemplate()) {' +
   '@key (rowKey(item)) {' +
   '@render (rowBody(item, $index))' +

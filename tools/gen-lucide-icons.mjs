@@ -18,6 +18,7 @@ const NAMES = [
   'chevrons-left', 'chevrons-right', 'chevrons-up-down',
   // core UI
   'house', 'menu', 'search', 'settings', 'ellipsis', 'ellipsis-vertical',
+  'grip-vertical', // list/tree reorder drag handle
   'x', 'check', 'plus', 'minus',
   // people / comms
   'user', 'mail', 'bell', 'message-circle', 'share-2',
