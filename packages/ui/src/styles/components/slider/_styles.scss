@@ -52,7 +52,8 @@
     width: var(--weave-slider-cap-size);
     height: var(--weave-slider-cap-size);
     background: var(--weave-slider-cap);
-    transform: translateX(-50%);
+    // Centred, then nudged 1px toward the fill: on a 3px thumb the odd cap reads better a hair left.
+    transform: translateX(calc(-50% - var(--weave-slider-cap-nudge)));
   }
 
   // Focus shows on the thumb (a small ring around the handle), not a box around the whole

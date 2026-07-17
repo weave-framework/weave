@@ -15,7 +15,8 @@ $tokens: (
     track-height: 2px,
     thumb-width: 3px,
     thumb-height: 18px,
-    cap-size: 5px,
+    cap-nudge: 1px, // shift the accent cap 1px toward the fill side (visual centring on the 3px bar)
+    cap-size: 6px,
     duration: ref.ref('motion.fast'),
   ),
 );

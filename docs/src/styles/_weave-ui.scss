@@ -62,8 +62,10 @@
    measured 1.00:1: not faint, gone, leaving the ink knob as a stray black square. */
 @include weave.slide-toggle-overrides((border: var(--field-line)));
 /* The slider's inactive track was `color.field` too — the backdrop colour — so you could not
-   see how long the slider was, only the accent fill up to the thumb. Give it the visible line. */
-@include weave.slider-overrides((track: var(--field-line)));
+   see how long the slider was, only the accent fill up to the thumb. Give it a SOFTENED line:
+   `--field-line` at full strength (3.24:1) read too loud for an inactive rail, so mix it 60%
+   into the backdrop (~1.9:1) — clearly there, subordinate to the accent fill. */
+@include weave.slider-overrides((track: color-mix(in srgb, var(--field-line) 60%, transparent)));
 @include weave.checkbox-overrides((border: var(--field-line)));
 @include weave.radio-overrides((border: var(--field-line)));
 @include weave.chips-overrides((border: var(--field-line)));
