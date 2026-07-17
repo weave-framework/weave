@@ -2,8 +2,7 @@
 
 import { build, buildSsg } from './build.js';
 import { dev } from './dev.js';
-import { generateRoutes, staticRoutePaths, EAGER_ROUTES } from './routes.js';
-import { join } from 'node:path';
+import { generateRoutes, staticRoutePaths } from './routes.js';
 import { loadConfig } from './config.js';
 import type { ResolvedConfig } from './config.js';
 import { discoverCustomElements, generateEntry, generateServerEntry, type CustomElement } from './entry.js';
@@ -15,28 +14,21 @@ function flag(args: string[], name: string): string | undefined {
 }
 
 /**
- * Regenerate the file-based routes module from the pages dir (when configured).
+ * Regenerate the file-based routes module from the pages dir (when configured). Always LAZY
+ * (`lazy(() => import(…))`) — that is what esbuild's `splitting` splits on, so each page becomes its own
+ * chunk and a reader downloads only their own route.
  *
- * `ssg` emits TWO modules, because the two bundles want opposite things and used to be handed the same one:
- *  - `routes.gen.ts` — LAZY (`lazy(() => import(…))`), what app code imports and what the CLIENT bundle gets,
- *    so esbuild's `splitting` gives every page its own chunk and a reader downloads only their route.
- *  - `routes.eager.gen.ts` — STATIC imports, aliased in for the SERVER bundle only ({@link EAGER_ROUTES}).
- *    The headless render is synchronous, so a lazy chunk's `import()` would not resolve in time and the route
- *    would render empty.
- *
- * Emitting only the eager one (what `--ssg` did) is why every prerendered route shipped the same `main.js`:
- * the payload half of islands was switched off by a constraint that only ever applied to the server.
- * Both files are git-ignored; a later `dev`/`build` rewrites `routes.gen.ts` lazy anyway.
+ * `--ssg` used to force STATIC imports here, for a real reason: the headless render is synchronous, so a lazy
+ * chunk's `import()` could not resolve before the render finished and the route prerendered EMPTY. But that
+ * constraint belonged to the server, and it was applied to both bundles — so every prerendered route shipped
+ * one `main.js` holding the whole app. E1.3 removed the constraint at its root: `lazy()` now hands its import
+ * to the headless render's async sink, so the render settles it and the route prerenders in full. One manifest,
+ * lazy, for both sides. (The eager twin + the server-side alias plugin that briefly existed here are gone —
+ * `verify:resume` proves a routed app still prerenders without them.)
  */
-function syncRoutes(config: ResolvedConfig, ssg: boolean = false): void {
+function syncRoutes(config: ResolvedConfig): void {
   if (!config.routesDir) return;
-  const written: string = generateRoutes(config.routesDir, { lazy: true });
-  if (!ssg) {
-    console.log(`weave routes → ${written}`);
-    return;
-  }
-  const eager: string = generateRoutes(config.routesDir, { lazy: false, out: join(config.routesDir, EAGER_ROUTES) });
-  console.log(`weave routes → ${written} (lazy, client) + ${eager} (eager, server render)`);
+  console.log(`weave routes → ${generateRoutes(config.routesDir, { lazy: true })}`);
 }
 
 /** Build the framework-owned entry (Level C) when the config declares a `root` component. */
@@ -62,9 +54,7 @@ export async function main(argv: string[]): Promise<void> {
     try {
       if (config) {
         const ssg: boolean = rest.includes('--ssg');
-        // file-based routing: regenerate routes.gen.ts before bundling — eager for --ssg (synchronous
-        // headless render), lazy otherwise (code-split SPA chunks).
-        syncRoutes(config, ssg);
+        syncRoutes(config); // file-based routing: regenerate routes.gen.ts (lazy) before bundling
         // An explicit `--out` overrides the config's `outDir` (used by `@weave-framework/nx`, which
         // passes the workspace-root `dist/<project>` path); with no flag the config value stands, so
         // a standalone `weave build` is unchanged.

@@ -3,13 +3,11 @@
 import { build as esbuild } from 'esbuild';
 import { mkdir, mkdtemp, writeFile, readFile, rm, cp } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
-import { join, dirname, resolve } from 'node:path';
+import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
 import { weave, type WeaveState } from './plugin.js';
 import { entryPlugin, VIRTUAL_ENTRY } from './entry.js';
-import { EAGER_ROUTES } from './routes.js';
-import type { Plugin, PluginBuild, OnResolveArgs } from 'esbuild';
 import { compileStyleFileWithAssets, type StyleAsset, type StyleLang } from './styles.js';
 import { injectHtml } from './html.js';
 import { prerender } from './prerender.js';
@@ -142,32 +140,6 @@ interface ServerRenderer {
   dispose: () => Promise<void>;
 }
 
-/**
- * Point the SERVER bundle's `routes.gen` import at the EAGER twin the CLI emits beside it
- * (`routes.eager.gen.ts` — static imports, no `lazy()`).
- *
- * The two bundles want opposite things from the same module. The headless render is synchronous, so the
- * server needs static imports — a lazy chunk's `import()` could not resolve before the render finished, and
- * the route would come out empty. The CLIENT wants the opposite: `lazy()` is what gives esbuild's `splitting`
- * something to split, so a reader downloads only their own route's chunk.
- *
- * `--ssg` used to satisfy the server by generating the module eager for BOTH — which is why every prerendered
- * route shipped the same `main.js`. The constraint only ever applied to the server; this confines it there.
- * A no-op when the eager twin is absent (no file-based routing), so a hand-written router is untouched.
- */
-function eagerRoutesPlugin(): Plugin {
-  return {
-    name: 'weave-eager-routes',
-    setup(build: PluginBuild): void {
-      build.onResolve({ filter: /routes\.gen(\.ts)?$/ }, (args: OnResolveArgs) => {
-        const from: string = resolve(args.resolveDir, args.path);
-        const eager: string = join(dirname(from), EAGER_ROUTES);
-        return existsSync(eager) ? { path: eager } : undefined;
-      });
-    },
-  };
-}
-
 /** Bundle the server entry for Node and import it ONCE, returning its `render(route)` + a cleanup handle. */
 async function loadServerEntry(
   serverEntry: { code: string; resolveDir: string },
@@ -186,7 +158,6 @@ async function loadServerEntry(
     outExtension: { '.js': '.mjs' }, // a bare .js in a temp dir is CommonJS to Node; force ESM
     minify: minify ?? false,
     plugins: [
-      eagerRoutesPlugin(), // before `weave` — this only redirects a path, it does not load anything
       weave(state, { styleLang, resumable }),
       entryPlugin(serverEntry.code, serverEntry.resolveDir),
     ],

@@ -27,14 +27,6 @@ export function scanRoutes(dir: string): string[] {
   return out.sort();
 }
 
-/**
- * Filename of the STATIC-import routes module `--ssg` emits alongside the lazy one, and which the SERVER
- * bundle is aliased onto (the headless render is synchronous — a lazy chunk's `import()` cannot resolve in
- * time). The client keeps the lazy `routes.gen.ts` so esbuild's `splitting` gives each page its own chunk.
- * Shared here so the emitter (cli) and the aliasing plugin (build) cannot drift apart on the name.
- */
-export const EAGER_ROUTES: string = 'routes.eager.gen.ts';
-
 export interface GenerateRoutesOptions {
   /** Output module path (default `<dir>/routes.gen.ts`). */
   out?: string;

@@ -55,7 +55,6 @@ await esbuild({
     contents: `
       export { generateServerEntry, generateEntry, discoverCustomElements } from './packages/cli/src/entry.ts';
       export { buildSsg } from './packages/cli/src/build.ts';
-      export { generateRoutes, EAGER_ROUTES } from './packages/cli/src/routes.ts';
     `,
     resolveDir: repo,
     sourcefile: 'resume-gate-entry.ts',
@@ -68,8 +67,7 @@ await esbuild({
   external: ['esbuild'],
   outfile: entryOut,
 });
-const { generateServerEntry, generateEntry, discoverCustomElements, buildSsg, generateRoutes, EAGER_ROUTES } =
-  await import(pathToFileURL(entryOut).href);
+const { generateServerEntry, generateEntry, discoverCustomElements, buildSsg } = await import(pathToFileURL(entryOut).href);
 
 console.log('verify:resume — a real app, built by the real CLI, resumed in a real browser\n');
 
@@ -330,11 +328,13 @@ export default defineConfig({
     // gz per page; now 9.1 KB + the page's own ~0.5 KB chunk).
     ok(!mainJs.includes('HOME_ONLY_MARKER'), "main.js does NOT carry the '/' route's code");
     ok(!mainJs.includes('ABOUT_ONLY_MARKER'), "main.js does NOT carry the '/about' route's code");
-    // …and the pages still PRERENDER, which is the half the eager server alias buys. Without it, splitting
-    // would be bought with empty HTML — the trade this whole change exists to avoid.
+    // …and the pages still PRERENDER — splitting must never be bought with empty HTML. That works because
+    // `lazy()` hands its import to the headless render's async sink (E1.3), so the render settles it. Before
+    // that a lazy route prerendered EMPTY, which is why --ssg forced static imports on both bundles and every
+    // route shipped the whole app.
     const homeHtml = readFileSync(join(rout, 'index.html'), 'utf8');
     const aboutHtml = readFileSync(join(rout, 'about', 'index.html'), 'utf8');
-    ok(/HOME_ONLY_MARKER/.test(homeHtml) && !/ABOUT_ONLY_MARKER/.test(homeHtml), "'/' prerendered its OWN route (the eager server alias works)");
+    ok(/HOME_ONLY_MARKER/.test(homeHtml) && !/ABOUT_ONLY_MARKER/.test(homeHtml), "'/' prerendered its OWN route — lazy, and still full HTML");
     ok(/ABOUT_ONLY_MARKER/.test(aboutHtml), "'/about' prerendered its own route");
   } finally {
     rmSync(rapp, { recursive: true, force: true });
