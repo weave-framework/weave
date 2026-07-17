@@ -2,7 +2,8 @@
 
 import { build, buildSsg } from './build.js';
 import { dev } from './dev.js';
-import { generateRoutes, staticRoutePaths } from './routes.js';
+import { generateRoutes, staticRoutePaths, EAGER_ROUTES } from './routes.js';
+import { join } from 'node:path';
 import { loadConfig } from './config.js';
 import type { ResolvedConfig } from './config.js';
 import { discoverCustomElements, generateEntry, generateServerEntry, type CustomElement } from './entry.js';
@@ -14,15 +15,28 @@ function flag(args: string[], name: string): string | undefined {
 }
 
 /**
- * Regenerate the file-based routes module from the pages dir (when configured). `eager` (SSG) emits static
- * imports instead of `lazy()` chunks: the headless server render is synchronous, so a lazy chunk's async
- * import would not resolve in time and the route would render empty. A later normal `dev`/`build` rewrites it
- * lazy again (the file is git-ignored).
+ * Regenerate the file-based routes module from the pages dir (when configured).
+ *
+ * `ssg` emits TWO modules, because the two bundles want opposite things and used to be handed the same one:
+ *  - `routes.gen.ts` — LAZY (`lazy(() => import(…))`), what app code imports and what the CLIENT bundle gets,
+ *    so esbuild's `splitting` gives every page its own chunk and a reader downloads only their route.
+ *  - `routes.eager.gen.ts` — STATIC imports, aliased in for the SERVER bundle only ({@link EAGER_ROUTES}).
+ *    The headless render is synchronous, so a lazy chunk's `import()` would not resolve in time and the route
+ *    would render empty.
+ *
+ * Emitting only the eager one (what `--ssg` did) is why every prerendered route shipped the same `main.js`:
+ * the payload half of islands was switched off by a constraint that only ever applied to the server.
+ * Both files are git-ignored; a later `dev`/`build` rewrites `routes.gen.ts` lazy anyway.
  */
-function syncRoutes(config: ResolvedConfig, eager: boolean = false): void {
+function syncRoutes(config: ResolvedConfig, ssg: boolean = false): void {
   if (!config.routesDir) return;
-  const written: string = generateRoutes(config.routesDir, { lazy: !eager });
-  console.log(`weave routes → ${written}${eager ? ' (eager, for --ssg)' : ''}`);
+  const written: string = generateRoutes(config.routesDir, { lazy: true });
+  if (!ssg) {
+    console.log(`weave routes → ${written}`);
+    return;
+  }
+  const eager: string = generateRoutes(config.routesDir, { lazy: false, out: join(config.routesDir, EAGER_ROUTES) });
+  console.log(`weave routes → ${written} (lazy, client) + ${eager} (eager, server render)`);
 }
 
 /** Build the framework-owned entry (Level C) when the config declares a `root` component. */

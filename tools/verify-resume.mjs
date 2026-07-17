@@ -29,7 +29,8 @@
 import { build as esbuild } from 'esbuild';
 import { chromium } from 'playwright';
 import { createServer } from 'node:http';
-import { mkdirSync, mkdtempSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, writeFileSync, readFileSync, readdirSync, existsSync, rmSync } from 'node:fs';
 import { gzipSync } from 'node:zlib';
 import { dirname, join, extname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -54,6 +55,7 @@ await esbuild({
     contents: `
       export { generateServerEntry, generateEntry, discoverCustomElements } from './packages/cli/src/entry.ts';
       export { buildSsg } from './packages/cli/src/build.ts';
+      export { generateRoutes, EAGER_ROUTES } from './packages/cli/src/routes.ts';
     `,
     resolveDir: repo,
     sourcefile: 'resume-gate-entry.ts',
@@ -66,7 +68,8 @@ await esbuild({
   external: ['esbuild'],
   outfile: entryOut,
 });
-const { generateServerEntry, generateEntry, discoverCustomElements, buildSsg } = await import(pathToFileURL(entryOut).href);
+const { generateServerEntry, generateEntry, discoverCustomElements, buildSsg, generateRoutes, EAGER_ROUTES } =
+  await import(pathToFileURL(entryOut).href);
 
 console.log('verify:resume — a real app, built by the real CLI, resumed in a real browser\n');
 
@@ -261,9 +264,87 @@ export function setup(): { slug: Signal<string> } {
   rmSync(outDir, { recursive: true, force: true });
 }
 
+/* ── per-route code splitting: a page must not carry every OTHER page ── */
+
+// The gate for E1.2's payload half. `--ssg` used to generate the routes manifest with STATIC imports for BOTH
+// bundles, because the headless render is synchronous and cannot await a lazy chunk. That constraint is the
+// server's alone, but it was applied to the client too — so every prerendered route linked one main.js holding
+// the whole app (the real docs: 350.8 KB gz, on every page). The fix aliases the eager manifest into the SERVER
+// bundle only; the client keeps `lazy()` and esbuild's `splitting` gives each page its own chunk (docs: 9.1 KB
+// + ~0.5 KB). Nothing else here would notice this regressing: the pages would still render, still resume, and
+// still pass every other assertion — they would just quietly get 36× heavier again.
+await routeSplitGate();
+
+async function routeSplitGate() {
+  const rapp = mkdtempSync(join(here, '.resume-gate-routed-'));
+  // outDir must live OUTSIDE the app: publicDir defaults to the project root, so a dist/ inside it would be
+  // copied into itself (cp EINVAL).
+  const rout = mkdtempSync(join(here, '.resume-gate-routed-out-'));
+  try {
+    // Driven through the REAL CLI binary, not buildSsg directly — because the thing that can regress lives in
+    // the CLI (`syncRoutes` decides lazy-vs-eager) as much as in the bundler (the server-side alias). A first
+    // draft called generateRoutes itself and therefore could NOT see `syncRoutes` being reverted: it passed
+    // happily with the bug put back. A gate that cannot fail is not a gate.
+    const pages = join(rapp, 'src', 'pages');
+    mkdirSync(pages, { recursive: true });
+    writeFileSync(join(pages, 'index.ts'), `import { signal, type Signal } from '@weave-framework/runtime';
+export const template = '<h1 class="t">HOME_ONLY_MARKER {{ n() }}</h1>';
+export function setup(): { n: Signal<number> } { return { n: signal(1) }; }
+`);
+    writeFileSync(join(pages, 'about.ts'), `import { signal, type Signal } from '@weave-framework/runtime';
+export const template = '<h1 class="t">ABOUT_ONLY_MARKER {{ n() }}</h1>';
+export function setup(): { n: Signal<number> } { return { n: signal(2) }; }
+`);
+    writeFileSync(join(rapp, 'src', 'app.ts'), `import { createRouter, RouterView, type Router } from '@weave-framework/router';
+import { routes } from './pages/routes.gen';
+void RouterView;
+export const template = '<main><RouterView router={{ router }} /></main>';
+export function setup(): { router: Router } {
+  // Declared, not returned inline: a const is what E1.11 re-derives. An inline-returned VALUE is not
+  // (returnEntries takes functions only), so returning createRouter(routes) straight out of the object
+  // makes the whole root unserializable and it falls back to CSR — with only a build warning to say so.
+  const router: Router = createRouter(routes);
+  return { router };
+}
+`);
+    writeFileSync(join(rapp, 'weave.config.ts'), `import { defineConfig } from '@weave-framework/cli';
+export default defineConfig({
+  root: 'src/app',
+  routesDir: 'src/pages',
+  build: { minify: false },
+  ssg: { resume: true },
+});
+`);
+    const cli = join(repo, 'packages', 'cli', 'bin', 'weave.mjs');
+    execFileSync(process.execPath, [cli, 'build', '--ssg', '--config', join(rapp, 'weave.config.ts'), '--out', rout], {
+      cwd: rapp,
+      stdio: 'pipe',
+    });
+
+    const mainJs = readFileSync(join(rout, 'main.js'), 'utf8');
+    const chunks = readdirSync(rout).filter((f) => f.endsWith('.js') && f !== 'main.js');
+    ok(chunks.length >= 2, `each page is its own chunk (got ${chunks.length}: ${chunks.join(', ')})`);
+    // THE assertion: a route's code must not sit in the bundle EVERY page downloads. Before this, `--ssg`
+    // generated the manifest with static imports for both bundles — because the synchronous headless render
+    // cannot await a lazy chunk — so one main.js carried the whole app to every route (the real docs: 350.8 KB
+    // gz per page; now 9.1 KB + the page's own ~0.5 KB chunk).
+    ok(!mainJs.includes('HOME_ONLY_MARKER'), "main.js does NOT carry the '/' route's code");
+    ok(!mainJs.includes('ABOUT_ONLY_MARKER'), "main.js does NOT carry the '/about' route's code");
+    // …and the pages still PRERENDER, which is the half the eager server alias buys. Without it, splitting
+    // would be bought with empty HTML — the trade this whole change exists to avoid.
+    const homeHtml = readFileSync(join(rout, 'index.html'), 'utf8');
+    const aboutHtml = readFileSync(join(rout, 'about', 'index.html'), 'utf8');
+    ok(/HOME_ONLY_MARKER/.test(homeHtml) && !/ABOUT_ONLY_MARKER/.test(homeHtml), "'/' prerendered its OWN route (the eager server alias works)");
+    ok(/ABOUT_ONLY_MARKER/.test(aboutHtml), "'/about' prerendered its own route");
+  } finally {
+    rmSync(rapp, { recursive: true, force: true });
+    rmSync(rout, { recursive: true, force: true });
+  }
+}
+
 console.log(
   failures === 0
-    ? '\n✓ resume round-trip works — real CLI build, real browser, multi-root, setup never re-ran.'
+    ? '\n✓ resume round-trip works — real CLI build, real browser, multi-root, setup never re-ran, routes split.'
     : `\n✗ ${failures} check(s) failed.`
 );
 process.exit(failures ? 1 : 0);
