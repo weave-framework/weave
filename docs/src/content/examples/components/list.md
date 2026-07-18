@@ -8,7 +8,7 @@ covering the full component surface.
 import List from '@weave-framework/ui/list';
 ```
 ```scss
-@use '@weave-framework/ui/list';
+@use 'pkg:@weave-framework/ui/list';
 ```
 
 ## Basic — items + value + onChange
@@ -132,7 +132,8 @@ and rounded corners.
 
 ## Reorderable — drag to sort
 
-`reorderable` shows a per-row drag handle; `onReorder` fires with `{ previousIndex, currentIndex }` on a
+`reorderable` shows a per-row drag handle (a lucide `grip-vertical` icon); `onReorder` fires with
+`{ previousIndex, currentIndex }` on a
 committed drop. The list is controlled, so you reorder `items` yourself with `moveItemInArray`. Row-body
 clicks still select — only the handle drags.
 
@@ -166,8 +167,9 @@ export function setup() {
 
 `rowTemplate` hands `<List>` an authored `@snippet` that renders the **whole** body of each
 `.weave-list__row` — a colour dot, the name, tag pills, a muted description, trailing action
-buttons — from the row's [`ListRowContext`](/ui/list): `row.item` (with your `data` payload) plus
-`row.value`, `row.title`, `row.index`, `row.selected` and `row.disabled`. The framework still owns
+buttons — from the row's [`ListRowContext`](/ui/list): `row.item` (the whole `ListItem`) plus the
+unpacked `row.value`, `row.title`, `row.meta`, `row.data` (your payload), `row.index`, `row.selected`
+and `row.disabled`. The framework still owns
 the row, its role, `aria-selected`, roving tabindex, keyboard nav and (when `reorderable`) the drag
 handle rendered **before** the template; `row.title` stays the accessible name + typeahead target.
 It re-renders when a row's `selected` flips. Omit it for the default title + meta — fully
@@ -186,11 +188,13 @@ are plain controls. In *selectable* mode a click on an interactive descendant (a
 
 @snippet roleRow(row) {
   <div class="role-main">
-    <span class="role-dot" style={{ dot(row.data.color) }}></span>
-    <span class="role-name">{{ row.data.name }}</span>
-    <Badge variant={{ 'tag' }}>{{ row.data.users }} users</Badge>
-    @if (row.data.system) { <Badge variant={{ 'tag' }}>system</Badge> }
-    <p class="role-desc">{{ row.data.description }}</p>
+    <div class="role-head">
+      <span class="role-dot" style={{ dot(row.data.color) }}></span>
+      <span class="role-name">{{ row.data.name }}</span>
+      <Badge variant={{ 'tag' }}>{{ row.data.users }} users</Badge>
+      @if (row.data.system) { <Badge variant={{ 'tag' }}>system</Badge> }
+    </div>
+    <span class="role-desc">{{ row.data.description }}</span>
   </div>
   <div class="role-actions">
     <Button variant={{ 'icon' }} label={{ 'Edit' }} on:click={{ () => edit(row.data) }}>
@@ -220,11 +224,13 @@ export function setup() {
     { id: 'viewer', name: 'Viewer', color: '#3b82f6', users: 42, system: false, description: 'Read-only access.' },
   ];
   const items: ListItem<Role>[] = roles.map((r) => ({ value: r.id, title: r.name, data: r }));
+  const lastAction = signal('—');
   return {
     items,
-    dot: (color: string) => `background:${color}`,
-    edit: (r: Role) => console.log('edit', r.id),
-    remove: (r: Role) => console.log('delete', r.id),
+    lastAction,
+    dot: (color: string) => `width:10px; height:10px; border-radius:50%; flex:none; background:${color}`,
+    edit: (r: Role) => lastAction.set(`Edit ${r.name}`),
+    remove: (r: Role) => lastAction.set(`Delete ${r.name}`),
   };
 }
 ~~~

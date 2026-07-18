@@ -1,8 +1,8 @@
 # Menubar
 
-The classic application menu bar — a row of top-level menus (File / Edit / View) that each drop down. Unlike a
-single [Menu](/ui/menu), the bar is always visible and you move between menus with the arrow keys. Each dropdown is
-the shared Menu, so items behave identically.
+The classic application menu bar — a row of top-level menus (File / Edit / View) that each drop down. Where a
+single [Menu](/ui/menu) hides behind its trigger, the bar stays visible and you move between its menus with the
+arrow keys. Each dropdown is that same Menu panel, so items behave identically.
 
 :::demo menubar-demo
 
@@ -13,7 +13,7 @@ import Menubar from '@weave-framework/ui/menubar';
 ```
 
 ```scss
-@use '@weave-framework/ui/menubar';
+@use 'pkg:@weave-framework/ui/menubar';
 ```
 
 ## Basic usage
@@ -39,13 +39,16 @@ export function setup() {
 ~~~
 :::
 
-Menu items use the same shape as [Menu](/ui/menu) (`value` / `label` / `divider` / `disabled` …).
+Menu items use the same shape as [Menu](/ui/menu) (`value` / `label` / `divider` / `disabled` …). A top-level menu
+can carry `disabled: true` of its own to grey out the whole entry.
 
 ## Accessibility
 
 It's the APG menubar pattern: `role="menubar"` of top items, each opening the shared `role="menu"`. **Left / Right**
-move between top menus (roving tab stop); **↓** opens the focused one; while a menu is open, Left / Right switch to
-the neighbouring menu; Esc closes. Give the bar a `label` for its accessible name.
+move between top menus (wrapping, skipping disabled, one roving tab stop), **Home / End** jump to the ends, and
+typeahead matches a top label; **↓ / Enter / Space** open the focused menu on its first item; while a menu is open,
+Left / Right switch to the neighbouring menu; Esc closes and returns focus to its top item. Give the bar a `label`
+for its accessible name.
 
 ## API reference
 
@@ -53,7 +56,7 @@ the neighbouring menu; Esc closes. Give the bar a `label` for its accessible nam
 
 | Prop | Type | Default | Description |
 | --- | --- | --- | --- |
-| `menus` | `MenubarMenu[]` | — | The top-level menus, each `{ label, items }`. |
-| `onSelect` | `(value: string \| MenuItem) => void` | — | Called with the chosen item's value. |
+| `menus` | `MenubarMenu[]` | — | The top-level menus, left to right, each `{ label, items, disabled? }`. |
+| `onSelect` | `(value: string \| MenuItem) => void` | — | Called with the chosen item's value (or the whole item object). |
 | `label` | `string` | — | Accessible name for the menubar. |
 | `class` | `string` | — | Extra classes forwarded onto the container. |

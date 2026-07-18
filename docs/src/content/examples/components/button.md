@@ -8,7 +8,7 @@ covering the full component surface.
 import Button from '@weave-framework/ui/button';
 ```
 ```scss
-@use '@weave-framework/ui/button';
+@use 'pkg:@weave-framework/ui/button';
 ```
 
 ## Variants

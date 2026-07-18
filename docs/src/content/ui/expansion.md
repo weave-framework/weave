@@ -12,7 +12,7 @@ import Expansion from '@weave-framework/ui/expansion';
 ```
 
 ```scss
-@use '@weave-framework/ui/expansion';
+@use 'pkg:@weave-framework/ui/expansion';
 ```
 
 ## Basic usage
@@ -65,8 +65,9 @@ default 3); its body is a `role="region"` labelled by the header, and a closed r
 | --- | --- | --- | --- |
 | `panels` | `ExpansionPanel[]` | — | The panels, each `{ id, header, body, disabled? }`. |
 | `multi` | `boolean` | `true` | Independent panels (`false` = single-open accordion). |
-| `value` | `string[]` | — | Controlled open set (ids). Ignored when uncontrolled. |
+| `value` | `string[]` | — | Controlled open set (ids). When set, the panel is controlled and `defaultOpen` is ignored. |
 | `onChange` | `(open: string[]) => void` | — | Called with the next open set on toggle. |
-| `defaultOpen` | `string[]` | `[]` | Uncontrolled initial open set. |
+| `defaultOpen` | `string[]` | `[]` | Uncontrolled initial open set (ignored when `value` is given). |
+| `disabled` | `boolean` | `false` | Disable the whole accordion (on top of per-panel `disabled`). |
 | `headingLevel` | `number` | `3` | ARIA heading level for the headers. |
 | `class` | `string` | — | Extra classes forwarded onto the container. |

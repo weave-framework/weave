@@ -61,8 +61,34 @@ All relative paths in the config are resolved against the **directory containing
 | `dev.port` | `number` | — (auto) | Dev-server listen port. When unset, the dev server picks a port. |
 | `dev.proxy` | `Record<string, string \| ProxyRule>` | — (off) | Dev-server proxy table — forward matching request paths to a backend so API calls stay same-origin. See below. |
 | `build.minify` | `boolean` | `true` | Minify the production JS/CSS bundle. |
+| `ssg.routes` | `string[]` | derived (see below) | Routes to prerender with `weave build --ssg` — one `index.html` each. |
+| `ssg.resume` | `boolean` | `false` | Opt into the islands build: the server embeds a per-instance state snapshot and the client **adopts** the server DOM in place. See below. |
 
 There is no separate "enable routing" flag: routing is on exactly when `routesDir` is set. Likewise there is no "disable minify" flag beyond setting `build.minify: false`.
+
+## `ssg` — static generation
+
+`weave build --ssg` renders the root component headlessly to real HTML and writes an `index.html` per route. The `ssg` key configures it; the `--ssg` flag is what turns it on (there is no config flag that enables SSG on its own).
+
+~~~ts title="weave.config.ts"
+export default defineConfig({
+  root: 'src/app/app',
+  routesDir: 'src/pages',
+  ssg: { routes: ['/', '/about', '/pricing'], resume: true },
+});
+~~~
+
+**Which routes are prerendered** — the first of these that applies:
+
+1. `ssg.routes`, when you set it explicitly;
+2. otherwise every static route derived from `routesDir` (dynamic segments like `[id]` are not prerendered);
+3. otherwise just `/`, for a root-only app.
+
+**`--ssg` requires `root`.** It renders the root component, so a config using the hand-written `entry` escape hatch opts out and the build fails with a message saying so.
+
+**`ssg.resume`** switches both the client and server entries into the islands build. Instead of the default first-paint-shell plus a client-side remount, the server embeds a state snapshot and the client adopts the existing DOM: `setup` never re-runs, and static content ships no JavaScript. Leave it `false` (the default) for the plain prerendered-shell behaviour.
+
+See [Static generation](/learn/static-generation) for the full walkthrough. Rendering per request (request-time SSR and streaming) is deliberately not built.
 
 ## `dev.proxy` — forward API calls to your backend (dev only)
 

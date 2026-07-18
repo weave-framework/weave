@@ -11,7 +11,9 @@ bordered box in each demo (or focus it and press the context-menu key / Shift+F1
 import { contextMenu } from '@weave-framework/ui/context-menu';
 ```
 ```scss
-@use '@weave-framework/ui/context-menu';
+// The action has no stylesheet of its own — its panel *is* the `.weave-menu` visual,
+// so pull in the menu styles.
+@use 'pkg:@weave-framework/ui/menu';
 ```
 
 :::callout tip "Never inline the options"
@@ -251,7 +253,7 @@ on the checked row) and the selected styling. `optionLabel` still drives the acc
 @snippet langRow(row) {
   <span
     style="display:flex; align-items:center; gap:10px; padding:8px 12px; width:100%;"
-    style:background={{ row.checked ? 'var(--surface-active)' : 'transparent' }}
+    style:background={{ row.checked ? 'color-mix(in srgb, var(--accent) 12%, transparent)' : 'transparent' }}
     style:font-weight={{ row.checked ? '600' : '400' }}
   >
     <span>{{ row.item.flag }}</span>

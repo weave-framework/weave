@@ -9,7 +9,7 @@ the examples, covering the full option surface. A Bottom Sheet is opened **imper
 import { openBottomSheet } from '@weave-framework/ui/bottom-sheet';
 ```
 ```scss
-@use '@weave-framework/ui/bottom-sheet';
+@use 'pkg:@weave-framework/ui/bottom-sheet';
 ```
 
 ## Basic — title + content

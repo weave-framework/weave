@@ -66,7 +66,7 @@ Worth understanding once, because it explains every edge case below. At build ti
 
 The key rule of the rewrite: **only the rightmost compound selector is scoped.** In `.a .b`, only `.b` gets the `[data-w-<hash>]` — the ancestor `.a` is left alone (it still has to match an element in *this* component, which already carries the attribute, so scoping the tail is enough and keeps descendant selectors working). The attribute is inserted before the first pseudo in the compound (`.btn:hover` → `.btn[data-w-<hash>]:hover`), or appended if there's none.
 
-This is compile-time, attribute-based scoping (the Svelte-proven approach): zero runtime cost, SSR-safe, and leak-proof because Weave only marks the DOM **it** generated.
+This is compile-time, attribute-based scoping: zero runtime cost, SSR-safe, and leak-proof because Weave only marks the DOM **it** generated.
 
 ## Styling the component's own root: `:host`
 
@@ -94,13 +94,13 @@ Because there's no shadow root, `:host` is rewritten to a **separate** attribute
 | You write | Compiles to | Meaning |
 | --- | --- | --- |
 | `:host` | `[data-w-<hash>-h]` | the component's root element(s) |
-| `:host(.active)` | `.active[data-w-<hash>-h]` | the root **when** it also matches `.active` (Angular semantics) |
+| `:host(.active)` | `.active[data-w-<hash>-h]` | the root **when** it also matches `.active` |
 | `:host .child` | `[data-w-<hash>-h] .child` | a descendant, with `:host` in ancestor position |
 
 The host attribute is **only** stamped on the root when your CSS actually uses `:host` — there's no extra attribute on components that never style their host.
 
 :::callout info "`:host-context(...)` is not supported"
-Angular's `:host-context(...)` (styling a component based on an *ancestor* outside it) has no equivalent — it's left untouched by the rewriter rather than implemented, so it won't do what you expect. Style from the ancestor's own component instead, or use a CSS variable / class set higher up the tree.
+There is no `:host-context(...)`-style selector for styling a component based on an *ancestor* outside it. If you write one it is left untouched by the rewriter rather than implemented, so it won't do what you expect. Style from the ancestor's own component instead, or use a CSS variable / class set higher up the tree.
 :::
 
 ## Reaching outside the scope: `:global`

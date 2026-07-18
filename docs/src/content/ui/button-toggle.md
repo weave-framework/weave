@@ -13,7 +13,7 @@ import ButtonToggle from '@weave-framework/ui/button-toggle';
 ```
 
 ```scss
-@use '@weave-framework/ui/button-toggle';
+@use 'pkg:@weave-framework/ui/button-toggle';
 ```
 
 ## When to use it
@@ -49,8 +49,16 @@ export function setup() {
 ~~~
 :::
 
-Each option is `{ value, label?, disabled? }` — `value` is the key `value`/`onChange` speak in, `label` is the
-visible text (defaults to `value`).
+Each option is `{ value, label?, icon?, disabled? }` — `value` is the key `value`/`onChange` speak in, `label` is
+the visible text (defaults to `value`), and `icon` is an optional leading icon — a name in the active
+[Icon](/ui/icon) registry (lucide by default):
+
+```html
+<ButtonToggle options={{ [
+  { value: 'light', label: 'Light', icon: 'sun' },
+  { value: 'dark', label: 'Dark', icon: 'moon' },
+] }} value={{ theme() }} onChange={{ setTheme }} />
+```
 
 ## Multi-select
 
@@ -115,7 +123,7 @@ segments, and selection state exposed on the native ARIA attribute. Give the gro
 
 | Prop | Type | Default | Description |
 | --- | --- | --- | --- |
-| `options` | `ButtonToggleOption[]` | — | The segments, left to right. Each is `{ value, label?, disabled? }`. |
+| `options` | `ButtonToggleOption[]` | — | The segments, left to right. Each is `{ value, label?, icon?, disabled? }`. |
 | `multiple` | `boolean` | `false` | Multi-select (toolbar) instead of single-select (radio group). |
 | `value` | `string \| string[] \| null` | — | Controlled value — a key (single) or array of keys (multi). |
 | `onChange` | `(value: string \| string[]) => void` | — | Called with the next value on select/toggle. |

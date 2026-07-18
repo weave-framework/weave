@@ -3,7 +3,7 @@
 Every other section of these docs shows you *one thread at a time* — a signal here, a `<Select>` there. This
 section weaves them together. Each page below is a **complete, runnable application** built with nothing but
 Weave: the reactive core, the router, the store, the forms package, and the `@weave-framework/ui` component
-library. No React, no state library, no UI kit, no build plugins — just Weave.
+library. No third-party state library, no external UI kit, no build plugins — just Weave.
 
 Every demo on these pages is the **real app running live**, right here on the page, and the full source sits
 directly underneath it in a tabbed block. Read it top to bottom, then lift it straight into your own project —
@@ -19,8 +19,8 @@ block *is* that source, compiled and mounted — what you read is what runs.
 Want a full, standalone app rather than a page-sized example? **[Weave Analytics](https://demo.weaveframework.dev)**
 is a live dashboard deployed on its own — KPIs, a chart, a filterable data table, an activity feed, and five
 distinct sidebar views including a real settings form — around a dozen `@weave-framework/ui` components wired
-together. Its entire dark-violet look comes from **one `weave.theme((…))` call**, so it doubles as a demonstration
-of token re-skinning. **[Open the live demo ↗](https://demo.weaveframework.dev)**
+together. Its entire dark-violet look comes from **one `@include weave.theme((…))`**, so it doubles as a
+demonstration of token re-skinning. **[Open the live demo ↗](https://demo.weaveframework.dev)**
 
 ## The apps
 

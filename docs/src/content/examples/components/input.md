@@ -8,7 +8,7 @@ covering the full component surface.
 import Input from '@weave-framework/ui/input';
 ```
 ```scss
-@use '@weave-framework/ui/input';
+@use 'pkg:@weave-framework/ui/input';
 ```
 
 ## Basic — value + onInput
@@ -54,7 +54,7 @@ underline. Empty slots collapse, so there's no dead gap.
 
 ## Clearable
 
-`clearable` shows a `×` button when the field is non-empty and editable; it empties the value and
+`clearable` shows a clear button (a lucide `x` icon) when the field is non-empty and editable; it empties the value and
 refocuses.
 
 :::demo input-clearable
@@ -115,13 +115,16 @@ the app can react — here it drives the readout under the third field.
 
 :::tabs
 ~~~html title="app.html"
-<Input control={{ … }} type={{ 'password' }} revealable revealTooltip={{ 'native' }} revealLabel={{ 'Show' }} hideLabel={{ 'Hide' }} />
-<Input control={{ … }} type={{ 'password' }} revealable revealTooltip={{ 'weave' }} />
-<Input control={{ … }} type={{ 'password' }} revealable revealTooltip={{ 'none' }} onRevealToggle={{ onToggle }} />
+<Input value={{ a() }} onInput={{ setA }} type={{ 'password' }} revealable={{ true }}
+  revealTooltip={{ 'native' }} label={{ 'Native title' }} revealLabel={{ 'Show' }} hideLabel={{ 'Hide' }} />
+<Input value={{ b() }} onInput={{ setB }} type={{ 'password' }} revealable={{ true }}
+  revealTooltip={{ 'weave' }} label={{ 'Weave tooltip' }} />
+<Input value={{ c() }} onInput={{ setC }} type={{ 'password' }} revealable={{ true }}
+  revealTooltip={{ 'none' }} label={{ 'No tooltip + onRevealToggle' }} onRevealToggle={{ onToggle }} />
 ~~~
 ~~~ts title="app.ts"
 const shown = signal(false);
-const onToggle = (revealed) => shown.set(revealed); // {{ shown() ? 'visible' : 'hidden' }}
+const onToggle = (revealed) => shown.set(revealed); // drives "{{ shown() ? 'visible' : 'hidden' }}"
 ~~~
 :::
 

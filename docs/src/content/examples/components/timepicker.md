@@ -9,7 +9,7 @@ it stays unambiguous regardless of how it's displayed.
 import Timepicker from '@weave-framework/ui/timepicker';
 ```
 ```scss
-@use '@weave-framework/ui/timepicker';
+@use 'pkg:@weave-framework/ui/timepicker';
 ```
 
 ## Basic — value + onChange
@@ -69,7 +69,7 @@ export function setup() {
 
 ## Clearable
 
-`clearable` adds a `×` button (accessible name from `clearLabel`, default `'Clear'`) that resets the value
+`clearable` adds a clear button — a lucide `x` icon (accessible name from `clearLabel`, default `'Clear'`) that resets the value
 to `null`.
 
 :::demo ex-timepicker-clearable

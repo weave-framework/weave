@@ -23,7 +23,7 @@ already present.
 
 :::callout tip "Per-component styles, if you prefer"
 Instead of `all-styles()`, you can pull just the components you use — each has its own Sass entry:
-`@use '@weave-framework/ui/button';`. The umbrella `all-styles()` is simplest; per-component keeps the CSS lean.
+`@use 'pkg:@weave-framework/ui/button';`. The umbrella `all-styles()` is simplest; per-component keeps the CSS lean.
 :::
 
 ## How tokens are named
@@ -35,10 +35,19 @@ There are two tiers, both plain CSS custom properties:
 | **Global** | `--weave-<group>-<key>` | `--weave-color-accent`, `--weave-shape-radius` |
 | **Component** | `--weave-<name>-<key>` | `--weave-button-background`, `--weave-input-border` |
 
-The global groups are **`color`**, **`text`** (typography), **`shape`** (radii, borders), and **`motion`**
-(durations). Component tokens mostly *reference* the globals (so changing one accent recolours everything), with a
-few literals of their own. Because they're real custom properties, you can read or override them from anywhere —
-even plain CSS, no Sass required:
+There are four global groups, and these are all of their keys:
+
+| Group | Keys |
+| --- | --- |
+| `color` | `canvas`, `surface`, `ink`, `sub`, `line`, `field`, `accent`, plus the status colours `paid`, `error`, `neutral` |
+| `text` | `base`, `label`, `display` |
+| `shape` | `radius` |
+| `motion` | `fast`, `sheet`, `ripple` |
+
+Component tokens mostly *reference* the globals (so changing one accent recolours everything), with a few literals
+of their own. Component keys are grouped as `color`, `size` and `typography` in the schema, but they flatten into
+one flat `--weave-<name>-<key>` namespace — `--weave-button-padding-y`, `--weave-toolbar-height`. Because they're
+real custom properties, you can read or override them from anywhere — even plain CSS, no Sass required:
 
 ```css
 .dark-corner { --weave-color-accent: #b25dff; } /* recolours every Weave component inside */
@@ -67,8 +76,8 @@ If you only touch one concern, the matching partial mixin emits just that slice 
 
 ```scss
 @include weave.colors((color: (accent: #e5484d)));   // only colour vars
-@include weave.sizes((shape: (radius: 2px)));         // only shape / size vars
-@include weave.typography((text: (font: 'Inter')));   // only typography vars
+@include weave.sizes((shape: (radius: 2px)));        // only shape / size vars
+@include weave.typography((text: (base: 14px)));     // only typography vars
 ```
 
 ## Per-component overrides
@@ -78,13 +87,15 @@ global; inside a selector it's **scoped** to that subtree:
 
 ```scss
 // globally: thicker dividers everywhere
-@include weave.divider-overrides((thickness: 2px, margin-top: 8px));
+@include weave.divider-overrides((thickness: 2px));
 
 // scoped: compact buttons only inside .toolbar
 .toolbar { @include weave.button-overrides((padding-y: 4px)); }
 ```
 
-The generic form is `weave.overrides('<name>', (...))` if you'd rather pass the name as a string.
+The generic form is `weave.overrides('<name>', (...))` if you'd rather pass the name as a string. Either way the
+map keys are that component's own token keys — set one it doesn't define and you emit a custom property nothing
+reads, so check the component's page for the names it actually uses.
 
 ## Dark mode
 
@@ -119,6 +130,19 @@ The same building blocks the components use are yours too:
 ```scss
 .my-control:focus-visible { @include weave.focus-ring; }          // the accent focus ring
 .my-control:focus-visible { @include weave.focus-ring(#e5484d, 3px, 2px); } // colour, width, offset
+
+.my-title { @include weave.truncate; }        // one line, ellipsised
+.my-legend { @include weave.visually-hidden; } // present for screen readers, off-screen visually
+```
+
+## Reduced motion
+
+`all-styles()` already includes `reduced-motion()`, which collapses transitions and animations on the library's own
+`weave-*` elements under `prefers-reduced-motion: reduce`. If you compile per-component instead of using
+`all-styles()`, include it yourself:
+
+```scss
+@include weave.reduced-motion();
 ```
 
 ## Register your own component
@@ -149,4 +173,6 @@ first-class citizen of the same engine.
 | `overrides($name, $map)` | The same, with the name as a string. |
 | `define($name, $grouped)` | Register your own component's tokens. |
 | `ref('group.key')` | Resolve a theme token to its `var(--weave-…)`. |
-| `focus-ring($color?, $width?, $offset?)` | The shared accent focus ring. |
+| `focus-ring($color?, $width?, $offset?)` | The shared accent focus ring. Defaults: accent, `2px`, `1px`. |
+| `truncate()` / `visually-hidden()` | Shared helpers the components use themselves. |
+| `reduced-motion()` | Honour `prefers-reduced-motion` (already inside `all-styles()`). |

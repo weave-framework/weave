@@ -1,7 +1,7 @@
 # Autocomplete
 
-A text field that suggests as you type. It's an [Input](/ui/input) — the same underline field, prefix/suffix
-slots, clear button and value binding — with a `role="listbox"` of matching options that opens beneath it. Focus
+A text field that suggests as you type. It's an [Input](/ui/input) — the same underline field, clear button and
+value binding — with a `role="listbox"` of matching options that opens beneath it. Focus
 stays in the field; the active suggestion is tracked with `aria-activedescendant` (the WAI-ARIA combobox +
 `aria-autocomplete="list"` pattern). Free text is allowed, and the data can be static or fetched from an API.
 
@@ -14,11 +14,12 @@ import Autocomplete from '@weave-framework/ui/autocomplete';
 ```
 
 ```scss
-@use '@weave-framework/ui/autocomplete';
+@use 'pkg:@weave-framework/ui/autocomplete';
 ```
 
 > Autocomplete **composes** the real `<Input>` component — you don't import Input yourself; the field, its
-> underline, clear button and value binding are Input's, so the two stay identical by construction.
+> underline, clear button and value binding are Input's, so the two stay identical by construction. It renders
+> that Input with no children, so Input's `prefix` / `suffix` slots aren't reachable through Autocomplete.
 
 ## Basic usage
 
@@ -121,10 +122,11 @@ Open with typing or ↓, move with ↑/↓, select with Enter, close with Esc.
 | `optionDescription` | `(o: T) => string` | `o.description` | Optional subtext per suggestion. |
 | `minChars` | `number` | `1` | Characters before suggestions show. |
 | `placeholder` | `string` | — | Placeholder text. |
-| `clearable` | `boolean` | `false` | Show a `×` clear button when non-empty. |
+| `clearable` | `boolean` | `false` | Show the inline clear button (a lucide `x` icon) when non-empty. |
+| `clearLabel` | `string` | `'Clear'` | Accessible name for the clear button. |
 | `disabled` | `boolean` | `false` | Disable the field. |
 | `required` | `boolean` | `false` | Mark required (native). |
+| `name` | `string` | — | Native `name` for form submission. |
 | `label` | `string` | — | Accessible name (when not wrapped by a FormField). |
 | `noResultsText` | `string` | `'No results'` | Text for the empty-results row. |
 | `position` | `MenuPosition` | `'bottom-start'` | Panel position relative to the field. |
-| `class` | `string` | — | Extra classes forwarded onto the root. |

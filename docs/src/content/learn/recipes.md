@@ -41,14 +41,15 @@ There are two overloads. Pick by whether the fetch depends on reactive state:
 | `resource(fetcher, opts?)` | One-shot load with no reactive input (page-level data, a config blob). Under the hood the source defaults to `() => true`, so it fetches once and never re-runs on its own. You can still force a reload with `refetch()`. |
 
 ~~~ts
-// Sourceless — fetches once on mount.
-const config = resource(({ signal }) => api.get('/config', { signal }));
+// Sourceless — fetches once on mount. The first arg is the (constant) source value;
+// the abort info is still the SECOND argument.
+const config = resource((_, { signal }) => api.get('/config', { signal }));
 
 // With a source — refetches every time the id changes.
 const user = resource(() => userId(), (id, { signal }) => api.get(`/users/${id}`, { signal }));
 ~~~
 
-Notice the fetcher's argument shape differs: the sourceless form's fetcher gets only `(info)`, the sourced form gets `(value, info)`.
+The fetcher signature is the same in both shapes — `(value, info)`. The only difference is what `value` is: the sourced form passes your source's current value, while the sourceless form passes a constant `true` (its internal source is `() => true`). So reach for `info` as the **second** parameter either way.
 
 ### What the source value means
 
@@ -109,7 +110,7 @@ const todos = resource(
 
 ## A fetch client with interceptors
 
-`createClient()` is a thin, optional wrapper over `fetch`: base URL, default headers, JSON handling, an error hook, and a functional interceptor chain for auth/logging/retry — the zero-RxJS analog of Angular's `HttpInterceptorFn`. Its methods drop straight into a `resource` fetcher.
+`createClient()` is a thin, optional wrapper over `fetch`: base URL, default headers, JSON handling, an error hook, and a functional interceptor chain for auth/logging/retry. Its methods drop straight into a `resource` fetcher.
 
 ~~~ts title="data/api.ts"
 import { createClient, type Interceptor } from '@weave-framework/data';
@@ -148,7 +149,7 @@ Everything is optional — `createClient()` with no arguments is a valid bare cl
 const api = createClient({
   baseUrl: '/api',
   headers: () => ({ Authorization: `Bearer ${store.token()}` }),
-  onError: (e) => reportToSentry(e),
+  onError: (e) => reportError(e),
 });
 ~~~
 
@@ -268,7 +269,7 @@ try {
 
 ## Mutations with action
 
-Where `resource` is for reads, `action` is for writes (form submits, mutations) — the Weave analog of React's `useActionState`. It wraps an async function with reactive `pending`/`error`/`result`:
+Where `resource` is for reads, `action` is for writes (form submits, mutations). It wraps an async function with reactive `pending`/`error`/`result`:
 
 ~~~ts
 import { action } from '@weave-framework/data';
@@ -302,7 +303,7 @@ The reactive signals are fire-and-forget: if two runs overlap, **only the latest
 // I get THIS run's result back, even if another run finished after me.
 try {
   const created = await save.run(input);
-  router.go(`/tasks/${created.id}`);
+  navigate(`/tasks/${created.id}`);
 } catch (e) {
   // and save.error() (the latest run's error) is also live in the template
 }
@@ -321,7 +322,7 @@ Two ways, depending on taste.
 
 **By hand, in a store** — write the expected value, call the server, reconcile or roll back. This is shown in full on the [Store](/learn/store#optimistic-mutations) page and needs nothing but `signal.set`.
 
-**Declaratively, with `optimistic`** — show an overlay value over a base while a mutation is in flight, reconciling automatically when the real base changes (the analog of React's `useOptimistic`). Call it inside a component `setup`, so its internal watcher disposes on unmount.
+**Declaratively, with `optimistic`** — show an overlay value over a base while a mutation is in flight, reconciling automatically when the real base changes. Call it inside a component `setup`, so its internal watcher disposes on unmount.
 
 `optimistic(base, reduce?)` takes a base getter and an optional reducer:
 

@@ -13,7 +13,7 @@ import Select from '@weave-framework/ui/select';
 ```
 
 ```scss
-@use '@weave-framework/ui/select';
+@use 'pkg:@weave-framework/ui/select';
 ```
 
 ## Basic usage
@@ -42,7 +42,7 @@ export function setup() {
 :::
 
 `placeholder` shows when nothing is selected; `label` names the control when it isn't wrapped in a
-[FormField](/ui/form-field).
+[FormField](/ui/form-field). With an empty `options` list the panel won't open — there's nothing to show.
 
 ## Any option shape
 
@@ -66,8 +66,9 @@ value emitted is the option's *value*; pass `emit="object"` to get the whole sel
 
 ## Multiple
 
-`multiple` lets you pick several — the panel stays open, options show a check, the field summarises as
-`"N selected"`, and the value becomes an **array**:
+`multiple` lets you pick several — the panel stays open, selected options are check-marked, and the value becomes
+an **array**. The field shows the one label while a single option is picked, and summarises as `"N selected"` once
+there's more than one:
 
 :::demo select-multiple
 
@@ -95,8 +96,9 @@ export function setup() {
 ## Binding, clearable & more
 
 Same two dialects as every Weave control — `value` + `onChange`, or a forms `control` (a `Field`) that also marks
-`touched` on close and drives the error state. Add `clearable={{ true }}` for a `×` that empties the selection,
-`disabled`, `required`, and `position` to place the panel:
+`touched` on close and drives the error state. Add `clearable={{ true }}` for an inline clear button that appears
+once something is selected and empties the selection (name it with `clearLabel`), plus `disabled`, `required`, and
+`position` to place the panel:
 
 ```html
 <Select control={{ form.controls.country }} options={{ countries }} clearable={{ true }} required={{ true }} />
@@ -123,14 +125,15 @@ arrows (or **typeahead** — start typing a label), select with Enter/Space, clo
 | `onChange` | `(value: SelectValue<T>) => void` | — | Called with the next value. |
 | `control` | `Field` | — | A forms field — two-way + touched-on-close + error state. Wins over `value`. |
 | `optionValue` | `(o: T) => string` | `o.value` | Pick the value field. |
-| `optionLabel` | `(o: T) => string` | `o.label` | Pick the display field. |
-| `optionDescription` | `(o: T) => string` | `o.description` | Optional subtext per option. |
-| `optionDisabled` | `(o: T) => boolean` | — | Disable individual options. |
+| `optionLabel` | `(o: T) => string` | `o.label ?? o.value` | Pick the display field. |
+| `optionDescription` | `(o: T) => string \| undefined` | `o.description` | Optional subtext per option. |
+| `optionDisabled` | `(o: T) => boolean` | `o.disabled` | Disable individual options. |
 | `emit` | `'value' \| 'object'` | `'value'` | Emit the option's value or the whole object. |
 | `placeholder` | `string` | — | Shown when nothing is selected. |
-| `clearable` | `boolean` | `false` | Show a `×` clear button. |
+| `clearable` | `boolean` | `false` | Show an inline clear button while something is selected. |
 | `disabled` | `boolean` | `false` | Disable the control. |
 | `required` | `boolean` | `false` | Mark required (aria). |
 | `label` | `string` | — | Accessible name (when not wrapped by a FormField). |
+| `clearLabel` | `string` | `'Clear'` | Accessible name for the clear button. |
 | `position` | `MenuPosition` | `'bottom-start'` | Panel position relative to the trigger. |
 | `class` | `string` | — | Extra classes forwarded onto the root. |

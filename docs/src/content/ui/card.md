@@ -13,7 +13,7 @@ import Card from '@weave-framework/ui/card';
 ```
 
 ```scss
-@use '@weave-framework/ui/card';
+@use 'pkg:@weave-framework/ui/card';
 ```
 
 ## When to use it

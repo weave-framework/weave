@@ -13,7 +13,7 @@ import Sidenav from '@weave-framework/ui/sidenav';
 ```
 
 ```scss
-@use '@weave-framework/ui/sidenav';
+@use 'pkg:@weave-framework/ui/sidenav';
 ```
 
 ## Basic usage
@@ -66,8 +66,9 @@ shown only in `over` mode).
 
 ## Accessibility
 
-In `over` mode the open drawer is modal: focus is trapped, the background is `inert`, and Esc / backdrop-click close
-it, restoring focus. The role of the drawer is yours to set (`navigation` is typical) — Sidenav stays an
+In `over` mode the open drawer is modal: it carries `aria-modal="true"`, focus is trapped, the background is
+`inert` (the backdrop stays clickable so it can close the drawer), and Esc / backdrop-click close it, restoring
+focus. The role of the drawer is yours to set (`navigation` is typical) — Sidenav stays an
 unopinionated layout shell.
 
 ## API reference
@@ -79,7 +80,7 @@ unopinionated layout shell.
 | `mode` | `'side' \| 'over' \| 'push'` | *(responsive)* | Fixed mode; omit for responsive behaviour. |
 | `opened` | `boolean` | — | Controlled open state. |
 | `onOpenedChange` | `(opened: boolean) => void` | — | Called when the open state changes. |
-| `defaultOpened` | `boolean` | — | Uncontrolled initial open state (explicit mode). |
+| `defaultOpened` | `boolean` | `true` | Uncontrolled initial open state (explicit mode; responsive mode derives it from the breakpoint). |
 | `position` | `'start' \| 'end'` | `'start'` | Which edge the drawer docks to. |
 | `breakpoint` | `string` | Narrow (900px) | Media query driving responsive mode. |
 | `backdrop` | `boolean` | *(over only)* | Force the backdrop on/off. |

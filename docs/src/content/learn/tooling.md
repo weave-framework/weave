@@ -24,7 +24,7 @@ Here's the one thing that explains almost everything else. Every command checks 
 
 The config is auto-discovered in the current working directory. `--config <path>` works on **every** command and forces the config-driven pipeline by pointing at an explicit file.
 
-## The four commands
+## The commands
 
 | Command | What it does |
 |---------|--------------|
@@ -32,6 +32,7 @@ The config is auto-discovered in the current working directory. `--config <path>
 | `weave build` | One-shot production bundle into `dist/` (or `outDir`) |
 | `weave check` | Static type-check of your templates and components |
 | `weave routes` | Generate the file-based route module from a pages dir |
+| `weave mcp` | Start the MCP server over stdio (see [below](#ai-editor-integration-mcp)) |
 
 Below, each command's flags are spelled out in full. Where a flag only matters in one pipeline, the table says so.
 
@@ -72,6 +73,7 @@ Produces a static bundle you can deploy. Both pipelines minify by default and co
 | `[entry]` (positional) | legacy | `src/main.ts` | The hand-written entry module. Ignored in config mode. |
 | `--out <dir>` | both | `dist` (legacy) / config `outDir` | Output directory. In config mode an explicit `--out` **overrides** the config's `outDir` (this is how `@weave-framework/nx` redirects the build to the workspace-root `dist/<project>`); with no flag the config's `outDir` stands. |
 | `--no-minify` | legacy | minified | Skip minification (handy for inspecting output). In config mode, control this with `build.minify` in the config. |
+| `--ssg` | config only | off | Prerender each route to real HTML at build time. Requires a config `root` (it renders the root headlessly); `entry` mode opts out. Pair with `ssg.resume` to adopt that HTML on the client — see [Static generation & resume](/learn/static-generation). |
 
 ### weave check
 
@@ -123,7 +125,10 @@ One config file is the source of truth for the config-driven pipeline. Every opt
 | `routesDir` | `string` | — | Pages directory; routes regenerate before each build/dev. |
 | `styles` | `string[]` | `[]` | Global stylesheets, compiled and concatenated *before* component CSS. |
 | `dev.port` | `number` | esbuild picks | Dev server port (config mode only). |
+| `dev.proxy` | `ProxyTable` | — | Proxy matching dev-server request paths to a backend (`target`, `changeOrigin`, `rewrite`). |
 | `build.minify` | `boolean` | `true` | Minify the production bundle. |
+| `ssg.routes` | `string[]` | derived from `routesDir` | Explicit list of routes for `weave build --ssg`. Falls back to every static route under `routesDir`, else just `/`. |
+| `ssg.resume` | `boolean` | `false` | Make the client **adopt** the prerendered HTML instead of re-rendering over it. See [Static generation & resume](/learn/static-generation). |
 
 Define it with the typed helper for autocomplete:
 
@@ -174,7 +179,7 @@ Weave has real IDE integration — red squiggles on type errors *inside template
 
 > **Where to get the plugins.** They are **not on the VS Code Marketplace or the JetBrains Marketplace yet** — you install them from a file. Download the latest build from the repo's [`plugins/editor/`](https://github.com/weave-framework/weave/tree/main/plugins/editor) folder:
 > - VS Code → [`plugins/editor/vscode/weave-language-0.5.0.vsix`](https://github.com/weave-framework/weave/tree/main/plugins/editor/vscode)
-> - WebStorm → [`plugins/editor/webstorm/weave-webstorm-0.13.0.zip`](https://github.com/weave-framework/weave/tree/main/plugins/editor/webstorm)
+> - WebStorm → [`plugins/editor/webstorm/weave-webstorm-0.21.0.zip`](https://github.com/weave-framework/weave/tree/main/plugins/editor/webstorm)
 >
 > (Use whatever the newest version in those folders is.)
 
@@ -214,7 +219,7 @@ WebStorm needs **two** things — a host plugin and the Weave plugin:
 
 Two pieces do the work, both reusing the same virtual-module machinery as `weave check`:
 
-- **`@weave-framework/language-server`** — a Volar LSP server (TypeScript + CSS services) used by both editors. It reports template diagnostics on the `.html` side.
+- **The Weave language server** — a Volar LSP server (TypeScript + CSS services) used by both editors. It reports template diagnostics on the `.html` side. It ships **inside** the two editor plugins; there is nothing to install separately.
 - **`@weave-framework/typescript-plugin`** — a tsserver plugin that takes over component `.ts` files (and `.weave` SFCs) so imports used only in templates aren't marked unused, and a parent's import of a child resolves the child's typed props.
 
 ## Formatting templates: Prettier
@@ -283,7 +288,7 @@ For programmatic access: `inspect()` snapshots all named nodes, `inspectGraph()`
 Equivalently, `weave mcp` starts the same server. The tools are `weave_compile_template` (validate markup → real compiler errors), `weave_check` (project diagnostics), `weave_routes` (file-based route tree), and `weave_scaffold_component` (generate a component's files — returned, never written without you).
 
 :::callout info "What you just learned"
-One `weave` CLI does it all — once `@weave-framework/cli` is a dev dependency you run it as `weave <cmd>` (via `npm run`/`npx`). The four commands are `dev` (watch + live-reload), `build` (static `dist/`), `check` (template + child-prop type-checking), and `routes` (file-based route gen). The big idea: a `weave.config.ts` switches `dev`/`build` into the full config-driven pipeline, while no config drops you into a bare legacy flag-driven one — and `dev` behaves quite differently between them (in-memory server vs esbuild's serve, port from config vs `--port`). Flags like `--config`, `--out`, `--serve`, `--port`, `--no-minify`, and `--eager` each belong to a specific command and pipeline. `styleLang` really compiles `css`/`scss`/`sass` differently, and editor support is a shared Volar server behind a VS Code extension and a WebStorm/LSP4IJ plugin.
+One `weave` CLI does it all — once `@weave-framework/cli` is a dev dependency you run it as `weave <cmd>` (via `npm run`/`npx`). The commands are `dev` (watch + live-reload), `build` (static `dist/`, plus `--ssg` prerendering), `check` (template + child-prop type-checking), `routes` (file-based route gen), and `mcp` (the AI-editor server). The big idea: a `weave.config.ts` switches `dev`/`build` into the full config-driven pipeline, while no config drops you into a bare legacy flag-driven one — and `dev` behaves quite differently between them (in-memory server vs esbuild's serve, port from config vs `--port`). Flags like `--config`, `--out`, `--serve`, `--port`, `--no-minify`, and `--eager` each belong to a specific command and pipeline. `styleLang` really compiles `css`/`scss`/`sass` differently, and editor support is a shared Volar server behind a VS Code extension and a WebStorm/LSP4IJ plugin.
 :::
 
 [Next: Recipes →](/learn/recipes) · [Reference: configuration →](/reference/config) · [Installation →](/learn/installation)

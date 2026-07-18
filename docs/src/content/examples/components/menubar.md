@@ -8,7 +8,7 @@ covering the full component surface.
 import Menubar from '@weave-framework/ui/menubar';
 ```
 ```scss
-@use '@weave-framework/ui/menubar';
+@use 'pkg:@weave-framework/ui/menubar';
 ```
 
 ## Basic — menus + onSelect

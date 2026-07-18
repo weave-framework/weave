@@ -9,7 +9,7 @@ event handler, not by placing a tag in the template.
 import { openDialog } from '@weave-framework/ui/dialog';
 ```
 ```scss
-@use '@weave-framework/ui/dialog';
+@use 'pkg:@weave-framework/ui/dialog';
 ```
 
 ## Basic — title + content

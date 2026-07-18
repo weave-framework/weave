@@ -100,20 +100,23 @@ Always provide `track` (a stable, unique key). The `@empty` block is optional an
 ### @defer
 
 ~~~html
-@defer (trigger) { … } @placeholder { … }
+@defer (on viewport) { … } @placeholder { … }
+@defer (when ready()) { … }
 ~~~
 
-The `@placeholder` is optional. Triggers:
+The `@placeholder` is optional. Triggers — note the `on` keyword on the DOM/timing ones:
 
 | Trigger | Fires when |
 |---------|-----------|
-| `idle` | the browser is idle (`requestIdleCallback`, falling back to a 1 ms timer) |
-| `viewport` | the placeholder's root element scrolls into view (`IntersectionObserver`) |
-| `interaction` | the placeholder is clicked or keyed (`click` / `keydown`) |
-| `hover` | the pointer enters or focuses the placeholder (`pointerenter` / `focusin`) |
-| `timer(ms)` | after `ms` milliseconds |
+| `on idle` | the browser is idle (`requestIdleCallback`, falling back to a 1 ms timer) |
+| `on viewport` | the placeholder's root element scrolls into view (`IntersectionObserver`) |
+| `on interaction` | the placeholder is clicked or keyed (`click` / `keydown`) |
+| `on hover` | the pointer enters or focuses the placeholder (`pointerenter` / `focusin`) |
+| `on timer(ms)` | after `ms` milliseconds |
 | `when expr()` | the (reactive) condition becomes truthy — fires once, then disarms |
 | `immediate` | right away (e.g. to code-split with `lazy()` without waiting on anything) |
+
+`when` and `immediate` are written bare; everything else takes the `on` prefix. Anything else is a compile error naming the valid forms.
 
 `viewport`, `interaction`, and `hover` observe the placeholder's root element — provide a `@placeholder`, or there is nothing to observe and they fire immediately. `idle`, `viewport`, and the unsupported-API fallbacks degrade gracefully (fire immediately) when the platform lacks the API.
 
@@ -135,13 +138,14 @@ Accepts a Promise, a `@weave-framework/data` resource (a refetch re-shows the pe
 
 ~~~html
 @snippet name(param, other) { … }
+@snippet row(item: Task) { … }        <!-- a parameter may carry a TS type -->
 @render (name(arg, value))
 ~~~
 
 A named, parameterized template fragment; `@render` invokes it. A snippet can also be passed to a child as a prop — the render-prop / scoped-slot pattern.
 
-:::callout info "Snippet parameters are bare identifiers only"
-Each parameter must be a plain identifier (`param`, `other`, `$x`, `_y`). Default values, destructuring, and type annotations are **not** supported — `@snippet row(item, sep = ',')` is a compile error (`Invalid @snippet parameter`). Pass any defaults from the call site at `@render` instead.
+:::callout info "Snippet parameters are `name` or `name: Type`"
+Each parameter is a plain identifier (`param`, `$x`, `_y`), optionally with a TypeScript type annotation (`item: Task`). The annotation is consumed by `weave check` to type the snippet body — an untyped parameter is `any`. Nothing else is accepted: default values and destructuring are **not** supported, so `@snippet row(item, sep = ',')` is a compile error (`Invalid @snippet parameter 'sep = ','' (expected 'name' or 'name: Type')`). Pass any defaults from the call site at `@render` instead.
 :::
 
 ## Components & slots
@@ -172,6 +176,20 @@ The component must render exactly one root element (a fragment / text / empty ro
 ~~~
 
 Renders an element whose tag name is dynamic; it rebuilds (disposing the old element's effects) when `this` changes. All other attributes and children apply to the created element.
+
+## Built-in components
+
+These are ordinary components, not directives — import them from `@weave-framework/runtime/dom` and use them as capitalized tags:
+
+| Tag | Prop | What it does |
+|-----|------|--------------|
+| `<Dynamic is={{ comp }}>` | `is` | Render a **component** chosen at runtime, swapping reactively when `is` changes (the outgoing branch is disposed). |
+| `<KeepAlive is={{ comp }}>` | `is` | Like `Dynamic`, but the outgoing instance is **detached and cached** — its DOM and live state survive the swap and are restored when you swap back. All cached instances dispose with the `<KeepAlive>`. |
+| `<Portal to="body">` | `to` | Render the default slot into a **different DOM location** while staying in the logical component tree, so context, owner-scoped effects, and disposal behave as if it lived here. For modals, tooltips, and toasts escaping an `overflow`/`z-index` ancestor. `to` is a CSS selector or an `Element`, defaults to `document.body`, and is resolved **once** at mount. |
+| `<Teleport to="body">` | `to` | An alias of `<Portal>` — one implementation, either name. |
+| `<ErrorBoundary fallback={{ fn }}>` | `fallback`, `resetKey` | Catch an error thrown while rendering (or in an effect of) its children. `fallback` is `(err, reset) => Node`; the optional reactive `resetKey` clears the error when it changes — e.g. `resetKey={{ path() }}` to recover on navigation. Without a `fallback` the failed subtree renders nothing. |
+
+`<Dynamic>` swaps a component; `<w:element>` above swaps a *tag name*. Reach for either sparingly — plain `@if` and component composition first.
 
 ## Escaping
 

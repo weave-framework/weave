@@ -8,7 +8,7 @@ examples, covering the full component surface.
 import SlideToggle from '@weave-framework/ui/slide-toggle';
 ```
 ```scss
-@use '@weave-framework/ui/slide-toggle';
+@use 'pkg:@weave-framework/ui/slide-toggle';
 ```
 
 ## Basic — checked + onChange

@@ -8,7 +8,7 @@ on the [DateRangePicker reference page](/ui/date-range-picker); this page is jus
 import DateRangePicker from '@weave-framework/ui/date-range-picker';
 ```
 ```scss
-@use '@weave-framework/ui/date-range-picker';
+@use 'pkg:@weave-framework/ui/date-range-picker';
 ```
 
 ## Basic — value + onChange

@@ -8,7 +8,7 @@ covering the full component surface.
 import Stepper from '@weave-framework/ui/stepper';
 ```
 ```scss
-@use '@weave-framework/ui/stepper';
+@use 'pkg:@weave-framework/ui/stepper';
 ```
 
 ## Basic — steps + value + onChange

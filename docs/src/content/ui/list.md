@@ -13,7 +13,7 @@ import List from '@weave-framework/ui/list';
 ```
 
 ```scss
-@use '@weave-framework/ui/list';
+@use 'pkg:@weave-framework/ui/list';
 ```
 
 ## Basic usage
@@ -54,7 +54,8 @@ Set `selectable={{ false }}` for a semantic list with no selection or keyboard f
 ## Accessibility
 
 Selectable, it's a `role="listbox"` of `role="option"` rows with `aria-selected`, a single roving tab stop, and
-**Up / Down / Home / End** navigation (wrapping, skipping disabled); Enter / Space / click selects. Give it a
+**Up / Down / Home / End** navigation (wrapping, skipping disabled) plus typeahead on the row `title`; Enter /
+Space / click selects. Give it a
 `label` for its accessible name. Non-selectable, it's a plain `role="list"`.
 
 ## API reference
@@ -67,7 +68,8 @@ Selectable, it's a `role="listbox"` of `role="option"` rows with `aria-selected`
 | `selectable` | `boolean` | `true` | Listbox (selectable) vs a plain semantic list. |
 | `value` | `string \| null` | — | Controlled selected key (single-select). |
 | `onChange` | `(value: string) => void` | — | Called with the next value on select. |
-| `reorderable` | `boolean` | `false` | Show a per-row drag handle and let rows be dragged to reorder. |
+| `disabled` | `boolean` | `false` | Disable the whole list (every row is skipped by keyboard nav and not selectable). |
+| `reorderable` | `boolean` | `false` | Show a per-row drag handle (a lucide `grip-vertical` Icon) and let rows be dragged to reorder. Pointer-drag only — the listbox keeps Space / arrows for selection. |
 | `onReorder` | `(event: DropEvent) => void` | — | Called on a committed reorder with `{ previousIndex, currentIndex }` (the list is controlled — you reorder `items`). |
 | `rowTemplate` | `(row: ListRowContext<T>) => Node` | — | Renders the whole body of each row (replacing the default title + meta spans) from the row's data + state. See below. |
 | `label` | `string` | — | Accessible name for the list. |

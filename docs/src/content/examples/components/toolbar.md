@@ -8,7 +8,7 @@ covering the full component surface.
 import Toolbar from '@weave-framework/ui/toolbar';
 ```
 ```scss
-@use '@weave-framework/ui/toolbar';
+@use 'pkg:@weave-framework/ui/toolbar';
 ```
 
 ## Part classes — start, spacer, end

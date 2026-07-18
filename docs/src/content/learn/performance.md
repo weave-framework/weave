@@ -46,9 +46,9 @@ out rather than reported as noise.
 
 ## What the numbers say
 
-- **≈1.4× vanilla overall.** On the public benchmark that range is where the fast keyed
-  frameworks live — between Solid (closest to vanilla) and React. Weave is right in
-  that group while shipping a runtime with zero third-party dependencies.
+- **≈1.4× vanilla overall.** That is the range the published benchmark associates with
+  fast keyed rendering — achieved here while shipping a runtime with zero third-party
+  dependencies.
 - **Targeted updates are essentially free.** *Update every 10th row* comes in at ~1×
   vanilla: Weave re-runs only the text bindings of the rows that changed. With no diff
   step, a precise mutation costs about what the direct DOM write costs — this is the
@@ -57,11 +57,10 @@ out rather than reported as noise.
   each row's reactive scope as the node is removed, so effects never leak. On a thousand
   rows that is a couple of milliseconds.
 
-## For an apples-to-apples cross-framework table
+## Where to find independent numbers
 
-We deliberately don't publish our own React/Solid runs here — doing that fairly (matched
-versions, tuning, throttling) is a whole discipline, and an independent source is more
-trustworthy than a framework grading its own homework. For current cross-framework
-figures, see the live
-[js-framework-benchmark results](https://krausest.github.io/js-framework-benchmark/current.html),
-then compare Weave's ~1.4× vanilla ratio against them.
+We deliberately publish only Weave's own vanilla-relative ratio here. Running other
+libraries fairly (matched versions, tuning, throttling) is a whole discipline, and an
+independent source is more trustworthy than a project grading its own homework. For
+current published figures across the field, see the live
+[js-framework-benchmark results](https://krausest.github.io/js-framework-benchmark/current.html).

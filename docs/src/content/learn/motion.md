@@ -94,7 +94,7 @@ The applied scale is `start + (1 - start) * t`, so at `t = 0` the element is at 
 
 ### `slide`
 
-Collapses / expands the element's **height** (with `overflow: hidden`) while fading the height in. There is **no width option** — it animates height only.
+Collapses / expands the element's **height** (with `overflow: hidden`). There is **no width option** — and unlike the other three it does **not** touch opacity, so it animates height alone.
 
 :::callout tip "slide measures the element at play time"
 `slide` reads `node.offsetHeight` *when the transition is created* (at play time) and animates from `0` up to that measured height. The element must be measurable at that moment — laid out, not `display:none`. The height is captured once, so a element whose content grows mid-animation won't track the new height.
@@ -107,7 +107,7 @@ Collapses / expands the element's **height** (with `overflow: hidden`) while fad
 ~~~
 
 :::callout info "Equivalent shapes"
-`fade` and `slide` take only the common options (`delay`/`duration`/`easing`). `fly` adds `x`/`y`; `scale` adds `start`. All four also fade opacity except — well, `fade` *is* the opacity, and `slide` fades alongside the height.
+`fade` and `slide` take only the common options (`delay`/`duration`/`easing`). `fly` adds `x`/`y`; `scale` adds `start`. As for opacity: `fade` *is* opacity, `fly` and `scale` fade alongside their transform, and `slide` doesn't touch opacity at all.
 :::
 
 ## Wiring built-ins into a template
@@ -194,12 +194,12 @@ Modals, tooltips, and toasts often need to render outside an `overflow:hidden` o
 Because the content still lives in your component tree, the `@if`, the transitions, and any `inject()` inside work exactly as if it rendered inline — it just *appears* at `body`.
 
 :::callout info "`to` resolves once, and falls back to body"
-`to` is a CSS selector or an `Element`, resolved **once** at mount (default `document.body`). If a selector matches **nothing**, `<Portal>` quietly falls back to `document.body` rather than throwing — unlike [`mount()`](/learn/custom-elements), which *does* throw on a non-matching selector. So a typo'd `to` won't crash; your content just lands on `body`. Double-check the selector if a modal shows up somewhere unexpected.
+`to` is a CSS selector or an `Element`, resolved **once** at mount (default `document.body`). If a selector matches **nothing**, `<Portal>` quietly falls back to `document.body` rather than throwing — unlike [`mountComponent()`](/learn/custom-elements), which *does* throw on a non-matching selector. So a typo'd `to` won't crash; your content just lands on `body`. Double-check the selector if a modal shows up somewhere unexpected.
 :::
 
 ## Custom transitions
 
-A transition is a function `(node, params) => config`. The config is the Svelte-style contract — every field is optional:
+A transition is a function `(node, params) => config`. Every field of the config is optional:
 
 | Field | Default | Meaning |
 |-------|---------|---------|

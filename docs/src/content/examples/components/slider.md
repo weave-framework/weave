@@ -8,7 +8,7 @@ covering the full component surface.
 import Slider from '@weave-framework/ui/slider';
 ```
 ```scss
-@use '@weave-framework/ui/slider';
+@use 'pkg:@weave-framework/ui/slider';
 ```
 
 ## Basic — value + onChange

@@ -8,7 +8,7 @@ covering the full component surface.
 import Icon from '@weave-framework/ui/icon';
 ```
 ```scss
-@use '@weave-framework/ui/icon';
+@use 'pkg:@weave-framework/ui/icon';
 ```
 
 ## Basic — name

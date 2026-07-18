@@ -8,7 +8,7 @@ covering the full component surface.
 import Card from '@weave-framework/ui/card';
 ```
 ```scss
-@use '@weave-framework/ui/card';
+@use 'pkg:@weave-framework/ui/card';
 ```
 
 ## Parts — the full stack

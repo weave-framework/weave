@@ -89,7 +89,7 @@ In practice the `T extends object` constraint pushes you away from this — `und
 :::callout info "No reset, no teardown"
 A store has no `dispose`, `reset`, or `clear` on the `store` API itself — once the factory runs, that instance lives for the entire lifetime of the module. There is no way to swap it out short of reloading the module.
 
-This matters in two places. **Tests:** state leaks between test cases that import the same store module; isolate them by re-importing the module fresh (e.g. `vi.resetModules()`) rather than expecting a built-in reset. **HMR:** a hot reload that doesn't re-evaluate the store module keeps the old instance and its current values.
+This matters in two places. **Tests:** state leaks between test cases that import the same store module; isolate them by re-importing the module fresh (whatever your test runner's module-reset facility is) rather than expecting a built-in reset. **HMR:** a hot reload that doesn't re-evaluate the store module keeps the old instance and its current values.
 
 A `clear()` *action* (like `useCart`'s above) resets the *data* inside the store — but the instance, and its signals, are the same objects as before. That's an application choice you write, not part of `store`.
 :::

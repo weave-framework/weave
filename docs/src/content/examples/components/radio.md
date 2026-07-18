@@ -8,7 +8,7 @@ covering the full component surface.
 import RadioGroup from '@weave-framework/ui/radio';
 ```
 ```scss
-@use '@weave-framework/ui/radio';
+@use 'pkg:@weave-framework/ui/radio';
 ```
 
 ## Basic — value + onChange

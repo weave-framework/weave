@@ -8,7 +8,7 @@ covering the full component surface.
 import Tabs from '@weave-framework/ui/tabs';
 ```
 ```scss
-@use '@weave-framework/ui/tabs';
+@use 'pkg:@weave-framework/ui/tabs';
 ```
 
 ## Basic — value + onChange
@@ -190,7 +190,7 @@ radius, full height). Off by default — Weave has no sliding marker unless aske
 .weave-tabs__indicator {
   height: 100%;
   border-radius: 999px;
-  background: var(--surface-active);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
 }
 ~~~
 :::

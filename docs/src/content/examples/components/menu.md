@@ -12,7 +12,7 @@ compiles to `() => { … }`, which JS reads as a block, so the options are silen
 import { menu } from '@weave-framework/ui/menu';
 ```
 ```scss
-@use '@weave-framework/ui/menu';
+@use 'pkg:@weave-framework/ui/menu';
 ```
 
 ## Basic — items + onSelect
@@ -252,7 +252,7 @@ template-local value, add it inline — `{ ...langMenu, itemTemplate: langRow }`
 @snippet langRow(row) {
   <span
     style="display:flex; align-items:center; gap:10px; padding:8px 12px; width:100%;"
-    style:background={{ row.checked ? 'var(--surface-active)' : 'transparent' }}
+    style:background={{ row.checked ? 'color-mix(in srgb, var(--accent) 12%, transparent)' : 'transparent' }}
     style:font-weight={{ row.checked ? '600' : '400' }}
   >
     <span>{{ row.item.flag }}</span>

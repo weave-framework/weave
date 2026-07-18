@@ -8,7 +8,7 @@ covering the full component surface.
 import GridList from '@weave-framework/ui/grid-list';
 ```
 ```scss
-@use '@weave-framework/ui/grid-list';
+@use 'pkg:@weave-framework/ui/grid-list';
 ```
 
 ## Basic — the container

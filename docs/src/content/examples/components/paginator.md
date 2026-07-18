@@ -8,7 +8,7 @@ covering the full component surface.
 import Paginator from '@weave-framework/ui/paginator';
 ```
 ```scss
-@use '@weave-framework/ui/paginator';
+@use 'pkg:@weave-framework/ui/paginator';
 ```
 
 ## Basic — length + pageSize + pageIndex + onPage

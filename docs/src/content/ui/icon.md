@@ -13,7 +13,7 @@ import Icon from '@weave-framework/ui/icon';
 ```
 
 ```scss
-@use '@weave-framework/ui/icon';
+@use 'pkg:@weave-framework/ui/icon';
 ```
 
 ## When to use it
@@ -50,13 +50,16 @@ That's why an `<Icon>` inside a `<Button>` automatically matches the button's te
 
 ## Where the SVG comes from
 
-Three sources, checked in this order. Pick whichever fits:
+Three sources. Pick whichever fits — you'd normally set just one:
 
 | Prop | Use it for | Example |
 | --- | --- | --- |
 | `name` | An icon from the active registry (built-in Lucide by default). | `<Icon name={{ 'star' }} />` |
 | `svg` | A complete `<svg>…</svg>` string you supply inline. | `<Icon svg={{ mySvg }} />` |
 | `src` | A URL to a standalone `.svg` file (fetched, then rendered). | `<Icon src={{ '/logo.svg' }} />` |
+
+If you set more than one they don't merge — the most direct wins: `src` (once its fetch lands) over `svg`, and
+`svg` over `name`.
 
 ```html
 <!-- your own inline SVG, bypassing the registry -->
@@ -91,15 +94,38 @@ Need brand icons or a different set? Register more sources once, at app start �
 source is a `name → svg` function; the built-in set stays as the fallback unless you turn it off.
 
 ```ts
-import { configureIcons } from '@weave-framework/ui/icon';
+import { configureIcons, inlineIcons, spriteIcons } from '@weave-framework/ui/icon';
 
 configureIcons({
-  sources: [(name) => brandIcons[name]], // consulted first
-  builtin: true, // keep Lucide as the fallback (default)
+  sources: [inlineIcons(brandIcons), spriteIcons('/icons/sprite.svg')], // consulted in order
+  builtin: true, // append Lucide as the last source (default)
+  global: true, // back every bare <Icon> with this registry (default)
 });
 ```
 
-Changing `name` (or a source's async cache filling in) re-renders the icon in place — no reload.
+`configureIcons` returns the registry. Two source helpers ship with it: `inlineIcons(map)` for an in-memory
+`name → svg` map, and `spriteIcons(url)` for an SVG sprite fetched once and indexed by element `id`. A source can
+also just be your own `(name) => svg | undefined` function, sync or async. A source may return either a complete
+`<svg>` or only the inner geometry — bare geometry gets wrapped in the standard Weave `<svg>` for you.
+
+Sources are consulted in order and the first hit wins; `builtin: false` drops the Lucide fallback entirely.
+Changing `name` (or an async source's cache filling in) re-renders the icon in place — no reload.
+
+For a registry scoped to one subtree rather than the whole app, pass `global: false` and provide it via the
+exported `IconContext`; a context-provided registry beats the global one.
+
+## Customising
+
+Size and stroke come from the icon token schema:
+
+```scss
+@use 'pkg:@weave-framework/ui' as weave;
+
+@include weave.icon-overrides((size: 20px, stroke: 1.6));
+```
+
+They emit `--weave-icon-size` and `--weave-icon-stroke`, so you can also scale icons for one region by setting
+those custom properties on a container.
 
 ## API reference
 

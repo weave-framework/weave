@@ -12,7 +12,7 @@ import ProgressSpinner from '@weave-framework/ui/progress-spinner';
 ```
 
 ```scss
-@use '@weave-framework/ui/progress-spinner';
+@use 'pkg:@weave-framework/ui/progress-spinner';
 ```
 
 ## Usage

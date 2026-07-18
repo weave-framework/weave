@@ -13,7 +13,7 @@ import Badge from '@weave-framework/ui/badge';
 ```
 
 ```scss
-@use '@weave-framework/ui/badge';
+@use 'pkg:@weave-framework/ui/badge';
 ```
 
 ## When to use it
@@ -70,9 +70,9 @@ always shows; a `tag` is always its text).
 
 ## Accessibility
 
-You don't wire up the announcement — the Badge does it. For a `count`, the number is exposed as the host's
-`aria-label` (so a screen reader says "Notifications, 3"), while the pill itself is `aria-hidden` (it's a visual
-echo). Override the announced text with `label` when you want something richer than the bare number:
+You don't wire up the announcement — the Badge does it. For a `count`, the number is set as `aria-label` on the
+badge container that wraps your host, while the pill itself is `aria-hidden` (it's a visual echo). Override that
+text with `label` when you want something richer than the bare number:
 
 ```html
 <Badge content={{ 3 }} label={{ '3 unread notifications' }}>
@@ -92,7 +92,7 @@ A `tag` badge is just its own text, so it needs no extra labelling.
 | `content` | `string \| number` | — | The count/text for a `count` badge. |
 | `max` | `number` | — | Cap the displayed count (over `max` shows `max+`). |
 | `position` | `'top-end' \| 'top-start' \| 'bottom-end' \| 'bottom-start'` | `'top-end'` | Corner for the overlaid mark. |
-| `label` | `string` | — | Accessible name for the host (defaults to the count). |
+| `label` | `string` | — | `aria-label` for the badge container (`count`/`dot`; defaults to the count). Ignored for `tag`. |
 | `class` | `string` | — | Extra classes forwarded onto the container. |
 
 ### Slots

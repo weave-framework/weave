@@ -11,7 +11,7 @@ there's nothing to import in JavaScript.
 Styles only — there's no JS component:
 
 ```scss
-@use '@weave-framework/ui/divider';
+@use 'pkg:@weave-framework/ui/divider';
 ```
 
 ## Usage
@@ -26,8 +26,8 @@ Put the `weave-divider` class on an empty element between the things you're sepa
 
 ## Vertical
 
-Add `weave-divider--vertical` for a vertical rule — handy between inline actions. It takes the height of its flex
-row, so give the row a height (or let its content set one):
+Add `weave-divider--vertical` for a vertical rule — handy between inline actions. It's a fixed 16px tall
+(`--weave-divider-height`) and centres itself in its row:
 
 ```html
 <div style="display:flex; align-items:center; gap:14px; height:32px;">
@@ -45,10 +45,14 @@ with `role="separator"` instead so assistive tech announces the break.
 
 ## Customising
 
-Every value comes from the divider's token schema, so you can retint or resize it without touching markup:
+Every value comes from the divider's token schema — `line` (the rule's colour), `thickness`, and `height` (the
+vertical rule's length) — so you can retint or resize it without touching markup:
 
 ```scss
 @use 'pkg:@weave-framework/ui' as weave;
 
-@include weave.divider-overrides((thickness: 2px, margin-top: 8px));
+@include weave.divider-overrides((thickness: 2px, height: 28px));
 ```
+
+They land as `--weave-divider-thickness`, `--weave-divider-line`, and `--weave-divider-height`, so you can also
+override them inline on a single rule.

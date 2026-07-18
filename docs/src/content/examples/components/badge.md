@@ -8,7 +8,7 @@ covering the full component surface.
 import Badge from '@weave-framework/ui/badge';
 ```
 ```scss
-@use '@weave-framework/ui/badge';
+@use 'pkg:@weave-framework/ui/badge';
 ```
 
 ## Variants

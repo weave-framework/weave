@@ -134,7 +134,7 @@ export function setup() {
 }
 ~~~
 
-> SSR note: loaders are the seam a future server render awaits and serializes into the page (see [RFC 0001](https://github.com/weave-framework/weave/blob/main/rfcs/0001-ssr-hydration.md)). Today they run on the client.
+> Loaders run on the client. For build-time data that ships inside the HTML, see [Static generation & resume](/learn/static-generation) — a `resource()` is awaited during a `--ssg` prerender and travels in the snapshot. Request-time server rendering is deliberately out of scope (see [RFC 0001](https://github.com/weave-framework/weave/blob/main/rfcs/0001-ssr-hydration.md)).
 
 ## Placing views: RouterView
 
@@ -276,7 +276,7 @@ Both are reactive reads — call them inside an effect/computed and they re-run 
 
 A `Match` is `{ view: Component; params: Record<string,string> }`.
 
-A router **owns its own signals** (path / query / navigation) — so multiple routers, isolated tests, and a future per-request SSR render each get their own URL. The module-level `navigate()` / `currentPath()` / `currentQuery()` are sugar that delegate to the active router; inside a routed component, `useRouter()` is the canonical way to reach it:
+A router **owns its own signals** (path / query / navigation) — so multiple routers and isolated tests each get their own URL, and a headless render can be pointed at a path with `setServerLocation`. The module-level `navigate()` / `currentPath()` / `currentQuery()` are sugar that delegate to the active router; inside a routed component, `useRouter()` is the canonical way to reach it:
 
 ~~~ts
 import { useRouter } from '@weave-framework/router';

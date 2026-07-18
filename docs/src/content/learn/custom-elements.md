@@ -45,7 +45,7 @@ When you use `entry`, the config's `mount` is **ignored** — you choose the mou
 
 ## Exposing a component as a custom element
 
-A Weave component can be published as a native custom element (Web Component) so plain HTML — or React, or Angular, or no framework at all — can use `<my-widget>`. Opt in by exporting a `tag` (and the props you want reflected) from the component:
+A Weave component can be published as a native custom element (Web Component), so any page that can render HTML can use `<my-widget>`. Opt in by exporting a `tag` (and the props you want reflected) from the component:
 
 :::tabs
 ~~~ts title="components/badge/badge.ts"

@@ -10,7 +10,7 @@ the control in the default slot, a hint or error line below — and it auto-wire
 import FormField from '@weave-framework/ui/form-field';
 ```
 ```scss
-@use '@weave-framework/ui/form-field';
+@use 'pkg:@weave-framework/ui/form-field';
 ```
 
 ## Label + hint

@@ -1,8 +1,8 @@
 # Chips
 
-A little row of removable tags — labels, categories, selected filters — each with an `×` to dismiss it, optionally
-trailed by a dashed **"+ Add"** chip. The value is simply the **array of chip strings**; removing one emits the
-shorter array.
+A little row of removable tags — labels, categories, selected filters — each with a remove button (a lucide `x`
+icon) to dismiss it, optionally trailed by a dashed **Add** chip (a lucide `plus` icon beside its label). The value
+is simply the **array of chip strings**; removing one emits the shorter array.
 
 :::demo chips-basic
 
@@ -13,12 +13,12 @@ import Chips from '@weave-framework/ui/chips';
 ```
 
 ```scss
-@use '@weave-framework/ui/chips';
+@use 'pkg:@weave-framework/ui/chips';
 ```
 
 ## Basic usage
 
-Bind the array with `value` + `onChange`. Add an `onAdd` handler to show the "+ Add" chip — Chips is controlled, so
+Bind the array with `value` + `onChange`. Add an `onAdd` handler to show the Add chip — Chips is controlled, so
 you decide what adding means (prompt, open a picker, append a default):
 
 :::tabs
@@ -35,7 +35,7 @@ export function setup() {
   return {
     tags,
     setTags: (v) => tags.set(v),          // called when a chip is removed
-    addTag: () => tags.set([...tags(), `tag-${(n += 1)}`]), // the "+ Add" chip
+    addTag: () => tags.set([...tags(), `tag-${(n += 1)}`]), // the Add chip
   };
 }
 ~~~
@@ -54,7 +54,7 @@ A bound `control` drives the array two-way and marks `touched` when a chip is re
 
 ## Options
 
-- `removable` (default `true`) — show the `×` on each chip; set `false` for read-only tags.
+- `removable` (default `true`) — show the remove button on each chip; set `false` for read-only tags.
 - `onAdd` + `addLabel` — the trailing add chip and its text (default `'Add'`).
 - `removeLabel(chip)` — customise each remove button's `aria-label` (default `Remove <chip>`).
 - `disabled` — no focus, no removal.
@@ -62,8 +62,8 @@ A bound `control` drives the array two-way and marks `touched` when a chip is re
 ## Accessibility
 
 The chips are a roving-tabindex `role="group"`: Arrow / Home / End move focus between chips, and
-**Backspace or Delete removes the focused chip**, then moves focus to its neighbour. Each `×` is a real `<button>`
-with an `aria-label`. Give the group a `label` for its accessible name.
+**Backspace or Delete removes the focused chip**, then moves focus to its neighbour. Each remove control is a real
+`<button>` with an `aria-label`. Give the group a `label` for its accessible name.
 
 ## API reference
 
@@ -74,10 +74,10 @@ with an `aria-label`. Give the group a `label` for its accessible name.
 | `value` | `string[]` | — | Controlled chip array. Ignored when `control` is set. |
 | `onChange` | `(next: string[]) => void` | — | Called with the next array on remove. |
 | `control` | `Field<string[]>` | — | A forms field — two-way + touched-on-remove. Wins over `value`. |
-| `removable` | `boolean` | `true` | Show the `×` remove button on each chip. |
+| `removable` | `boolean` | `true` | Show the remove button (a lucide `x` icon) on each chip. |
 | `disabled` | `boolean` | `false` | Disable the whole group. |
 | `label` | `string` | — | Accessible name for the group. |
-| `onAdd` | `() => void` | — | When set, render a "+ Add" chip that calls this. |
+| `onAdd` | `() => void` | — | When set, render a dashed Add chip that calls this. |
 | `addLabel` | `string` | `'Add'` | Text for the add chip. |
 | `removeLabel` | `(chip: string) => string` | `Remove <chip>` | aria-label for a chip's remove button. |
 | `class` | `string` | — | Extra classes forwarded onto the group. |

@@ -8,7 +8,7 @@ covering the full component surface.
 import Table from '@weave-framework/ui/table';
 ```
 ```scss
-@use '@weave-framework/ui/table';
+@use 'pkg:@weave-framework/ui/table';
 ```
 
 ## Basic — columns + dataSource
@@ -76,7 +76,7 @@ export function setup() {
 ## Selection — multiple
 
 `selectable` adds a leading checkbox column (composing the real [Checkbox](/ui/checkbox)) with a tri-state
-header select-all. `selectionMode="multiple"` allows many rows; `onSelectionChange` reports the selected
+header select-all. `selectionMode={{ 'multiple' }}` allows many rows; `onSelectionChange` reports the selected
 rows.
 
 :::demo ex-table-selection
@@ -106,7 +106,7 @@ export function setup() {
 
 ## Selection — single
 
-`selectionMode="single"` replaces the previous pick on each click and drops the header select-all.
+`selectionMode={{ 'single' }}` replaces the previous pick on each click and drops the header select-all.
 
 :::demo ex-table-single-select
 

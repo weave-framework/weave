@@ -75,7 +75,7 @@ last.set('Byron');
 fullName(); // "Ada Byron" — recomputed, because `last` changed
 ~~~
 
-You never reach for `useMemo` or `useCallback` here — caching is the default, not an opt-in. A `computed` is read-only: it has no `.set`, `.update`, or `.peek`. You just call it.
+There is no memoization helper to reach for — caching is the default, not an opt-in. A `computed` is read-only: it has no `.set`, `.update`, or `.peek`. You just call it.
 
 ### The equals option
 
@@ -283,7 +283,7 @@ count.set(5);
 await tick(); // …but this waits for onMount-timed work, if you need it.
 ~~~
 
-If you call it inside a `batch`, the queued effects flush first, then the microtask resolves — so `await tick()` is also a way to settle a batch and its deferred work in one go. It's the Weave analog of Svelte's `tick()` or Vue's `nextTick()` — just rarely needed, because there's no render queue to wait on.
+If you call it inside a `batch`, the queued effects flush first, then the microtask resolves — so `await tick()` is also a way to settle a batch and its deferred work in one go. You'll rarely need it, because there's no render queue to wait on.
 
 ## catchError — the programmatic error boundary
 
@@ -438,31 +438,31 @@ How it differs from a bare `effect`, and the one footgun about `prev`:
 | Previous value | not available | passed as second arg (`undefined` on first call) |
 | Runs on creation | always | only with `immediate: true` |
 
-### fromObservable / toObservable — the RxJS / Angular bridge
+### fromObservable / toObservable — the Observable bridge
 
-Two thin adapters that bridge between a Weave reactive value and an **RxJS/Angular-style Observable** — the migration seam for code that speaks Observables (Angular's `HttpClient`, `async` pipe, `Subject` state). **Zero dependency:** the bridge only duck-types the Observable contract (`{ subscribe(observer) }`), so it needs no `rxjs` import.
+Two thin adapters that bridge between a Weave reactive value and any **Observable-shaped** object. **Zero dependency:** the bridge only duck-types the Observable contract (`{ subscribe(observer) }`), so it imports nothing.
 
-~~~ts title="fromObservable(observable, initial?) — Observable → signal"
+~~~ts title="fromObservable(observable, initial?) — Observable → accessor"
 import { fromObservable } from '@weave-framework/runtime';
 
-// http.get(...) returns an Observable — read it as a reactive value:
-const user = fromObservable(http.get<User>('/me'));
+// `stream` is anything with a .subscribe(observer) — read it as a reactive value:
+const user = fromObservable(stream);
 // template: @if (user()) { {{ user()!.name }} }
 ~~~
 
-~~~ts title="toObservable(source) — signal → Observable"
+~~~ts title="toObservable(source) — accessor → Observable"
 import { signal, toObservable } from '@weave-framework/runtime';
 
 const count = signal(0);
-const count$ = toObservable(() => count()); // hand to an async pipe / rxjs.from()
+const count$ = toObservable(() => count()); // hand to any Observable consumer
 ~~~
 
-- **`fromObservable`** subscribes and pushes each emission into a read-only accessor; it **auto-unsubscribes when the surrounding owner disposes** (call it inside a component/`setup`). The accessor returns `initial` (or `undefined`) until the first emission. If the stream **errors**, the error is re-thrown on the next read — mirroring Angular's `toSignal`, so it lands in a `catchError` boundary or a local try/catch.
-- **`toObservable`** returns a minimal Observable: each `subscribe(observer)` emits the **current** value immediately, then on every change, and returns an `unsubscribe`. It carries the `Symbol.observable` interop hook, so Angular's `async` pipe and `rxjs.from(...)` accept it directly.
-- Full RxJS *operator* interop stays out of scope by design — but source↔signal bridging covers the bulk of an Angular migration (the `async` pipe, `valueChanges`/`statusChanges`, Observable-returning services).
+- **`fromObservable`** subscribes and pushes each emission into a read-only accessor; it **auto-unsubscribes when the surrounding owner disposes** (call it inside a component/`setup`). The accessor returns `initial` (or `undefined`) until the first emission. If the stream **errors**, the error is re-thrown on the next read — so it lands in a `catchError` boundary or a local try/catch.
+- **`toObservable`** returns a minimal Observable: each `subscribe(observer)` emits the **current** value immediately, then on every change, and returns an `unsubscribe`. It carries the `Symbol.observable` interop hook, so interop-aware consumers accept it directly.
+- Operator libraries stay out of scope by design — this is source↔signal bridging only.
 
 :::callout info "What you just learned"
-`signal` is the source (with an `equals` option); `computed` is a cached, **lazy** derivation (also with `equals`) — its body may never run if nobody reads it, and a throw inside it surfaces at the reader. `effect` runs **immediately**, returns a `stop()` handle, supports cleanups (before each re-run and on disposal), and a throw inside it goes **up the owner chain** to an error boundary. `batch` groups effect flushes (reads still see writes immediately; nested batches flush at the outermost end), `untrack` and `peek` read without subscribing (`untrack` even un-subscribes computed reads), and `tick` flushes then awaits a microtask. `catchError(handler, fn)` is the programmatic error boundary. Ownership — `root`, `getOwner`, `createOwner`, `runInOwner`, `disposeOwner` — disposes your effects for you, and is the fix for leaking nested effects. The extras — `linkedSignal`, `debounced`, `watch`, and the `fromObservable`/`toObservable` RxJS/Angular bridge — are thin, optional conveniences over those primitives.
+`signal` is the source (with an `equals` option); `computed` is a cached, **lazy** derivation (also with `equals`) — its body may never run if nobody reads it, and a throw inside it surfaces at the reader. `effect` runs **immediately**, returns a `stop()` handle, supports cleanups (before each re-run and on disposal), and a throw inside it goes **up the owner chain** to an error boundary. `batch` groups effect flushes (reads still see writes immediately; nested batches flush at the outermost end), `untrack` and `peek` read without subscribing (`untrack` even un-subscribes computed reads), and `tick` flushes then awaits a microtask. `catchError(handler, fn)` is the programmatic error boundary. Ownership — `root`, `getOwner`, `createOwner`, `runInOwner`, `disposeOwner` — disposes your effects for you, and is the fix for leaking nested effects. The extras — `linkedSignal`, `debounced`, `watch`, and the `fromObservable`/`toObservable` Observable bridge — are thin, optional conveniences over those primitives.
 :::
 
 [Next: Components →](/learn/components) · [Full reactive API in the Reference →](/reference/runtime)

@@ -27,11 +27,15 @@ ends a lot of meetings early.
 
 ## Upgrades stay boring — on purpose
 
-Stability isn't a milestone Weave is waiting on — it's a standing priority, and the record backs it up:
-**every release since the first public one — over a hundred of them — has been a patch or a minor. Never a
-major. Not one breaking change to the code you write.** New capability lands additively, behind its own
-surface: static generation and resume arrived in 1.6.0 as a whole new rendering mode, and existing code did not
-change by a character. That is what a minor is *for*, and why routine upgrades stay boring. Boring is the goal.
+Stability isn't a milestone Weave is waiting on — it's a standing priority, and the public record backs it up.
+The API was frozen at **1.0**, and **every release since — more than twenty of them, up to the current 1.6.0 —
+has been a patch or a minor. Not one breaking change to the code you write.** New capability lands additively,
+behind its own surface: static generation and resume arrived in 1.6.0 as a whole new rendering mode, and existing
+code did not change by a character. That is what a minor is *for*, and why routine upgrades stay boring. Boring
+is the goal.
+
+(Before 1.0, Weave was on a `0.x` line where the shape of things was still settling — that's what a `0.x` is for.
+The commitment below starts from the 1.0 freeze, which is the version you'd be adopting.)
 
 We won't pretend a breaking change can *never* happen — one day something may genuinely need to change at its root.
 What we commit to is that when that day comes, it won't blindside you:

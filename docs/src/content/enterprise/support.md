@@ -29,7 +29,7 @@ When Weave is on your critical path and best-effort isn't enough:
 Want Weave working in your codebase fast, or running alongside what you already have?
 
 - Architecture and adoption review
-- **Incremental integration** into an existing React, Angular, or plain-JavaScript app
+- **Incremental integration** into an existing application, whatever it's built with
 - Migration planning, custom components, and internal training
 - Performance and accessibility deep-dives
 

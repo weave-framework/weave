@@ -9,7 +9,7 @@ surface, so return it from `setup` and reference it in the template with `use:ri
 import { ripple } from '@weave-framework/ui/ripple';
 ```
 ```scss
-@use '@weave-framework/ui/ripple';
+@use 'pkg:@weave-framework/ui/ripple';
 ```
 
 ## Basic — from the pointer

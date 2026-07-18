@@ -3,7 +3,7 @@
 Let's get something on screen. By the end of this page you'll have a running app, a component you wrote, and a feel for the loop: edit a file, see it live.
 
 :::callout info "First, get Weave running"
-This page assumes you've already got a project. If not, the quickest start is `npm create weave@latest my-app` (or pnpm/yarn) — see [Installation](/learn/installation), which also covers adding Weave to an existing project. Weave is **1.0** (published on npm under the `@weave-framework/*` scope), so the shapes on this page are stable.
+This page assumes you've already got a project. If not, the quickest start is `npm create weave@latest my-app` (or pnpm/yarn) — see [Installation](/learn/installation), which also covers adding Weave to an existing project. Weave is past **1.0** (published on npm under the `@weave-framework/*` scope) with a frozen API, so the shapes on this page are stable.
 :::
 
 ## The shape of a project
@@ -107,7 +107,7 @@ When you click, only the number text changes. The button isn't re-rendered, and 
 
 ## 3. Run it
 
-Weave ships a CLI with four commands. The one you'll live in is `dev`:
+Weave ships a CLI. The command you'll live in is `dev`:
 
 ~~~bash
 weave dev      # start the dev server (watch + live-reload)

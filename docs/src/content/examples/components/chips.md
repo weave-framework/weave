@@ -8,12 +8,12 @@ covering the full component surface.
 import Chips from '@weave-framework/ui/chips';
 ```
 ```scss
-@use '@weave-framework/ui/chips';
+@use 'pkg:@weave-framework/ui/chips';
 ```
 
 ## Basic — value + onChange
 
-The value is the array of chip strings, bound with `value` + `onChange`. Removing a chip (its `×`, or
+The value is the array of chip strings, bound with `value` + `onChange`. Removing a chip (its remove button, or
 Backspace/Delete on a focused chip) calls `onChange` with the shorter array — you hold the state, Chips
 just reflects it.
 
@@ -36,7 +36,8 @@ export function setup() {
 
 ## Add chip — onAdd + addLabel
 
-`onAdd` renders the dashed **"+ Add"** chip; `addLabel` sets its text (default `'Add'`). Chips is
+`onAdd` renders the dashed **add** chip — a lucide `plus` icon followed by the text; `addLabel` sets
+that text (default `'Add'`). Chips is
 controlled, so you decide what adding means — here we prompt and append.
 
 :::demo ex-chips-add
@@ -62,7 +63,7 @@ export function setup() {
 
 ## Read-only — removable
 
-`removable={{ false }}` drops the `×` button on every chip, leaving a plain display row of tags.
+`removable={{ false }}` drops the remove button (a lucide `x` icon) on every chip, leaving a plain display row of tags.
 
 :::demo ex-chips-readonly
 

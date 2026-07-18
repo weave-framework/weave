@@ -1,7 +1,7 @@
 # Ripple
 
 The little ink splash that blooms from where you click. Ripple isn't a component — it's a Weave **`use:` action**
-you attach to any surface, so you can give that Material-style click feedback to your own elements. `<Button>`
+you attach to any surface, so you can give that expanding click feedback to your own elements. `<Button>`
 already uses it; this is how you add it anywhere else.
 
 :::demo ripple-basic
@@ -13,7 +13,7 @@ import { ripple } from '@weave-framework/ui/ripple';
 ```
 
 ```scss
-@use '@weave-framework/ui/ripple';
+@use 'pkg:@weave-framework/ui/ripple';
 ```
 
 ## Basic usage
@@ -59,7 +59,31 @@ export function setup() {
 ~~~
 :::
 
-Prefer a named `setup` value when the options are reactive or shared across several hosts (the same way `<Button>` configures its own ripple) — `use:ripple={{ opts }}` reads whatever `opts` holds.
+The options object is handed to the action once, when it attaches — swapping in a *different* object later won't
+reconfigure it. Both `centered` and `disabled` are read fresh at each pointer-down, though, so to change the
+behaviour over time keep **one** object in `setup` and let it answer differently. That's exactly how `<Button>`
+suppresses its own ripple while disabled:
+
+:::tabs
+~~~html title="app.html"
+<div use:ripple={{ opts }}>Quiet while busy</div>
+~~~
+~~~ts title="app.ts"
+import { signal } from '@weave-framework/runtime';
+import { ripple } from '@weave-framework/ui/ripple';
+
+export function setup() {
+  const busy = signal(false);
+  // A stable object with a live getter — read on every pointer-down.
+  const opts = {
+    get disabled() {
+      return busy();
+    },
+  };
+  return { ripple, opts, busy };
+}
+~~~
+:::
 
 ## The host
 

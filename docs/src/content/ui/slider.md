@@ -13,7 +13,7 @@ import Slider from '@weave-framework/ui/slider';
 ```
 
 ```scss
-@use '@weave-framework/ui/slider';
+@use 'pkg:@weave-framework/ui/slider';
 ```
 
 ## Basic usage
@@ -46,7 +46,8 @@ Three ways to hold the value:
 
 - **Controlled** — `value` + `onChange` (above).
 - **Uncontrolled** — `defaultValue` and let the slider keep its own state.
-- **Forms** — a `control` (`Field<number>`), which marks `touched` on release and drives `aria-invalid`.
+- **Forms** — a `control` (`Field<number>`), which marks `touched` when a drag ends or a key changes the value, and
+  drives `aria-invalid`.
 
 ```html
 <Slider control={{ form.controls.level }} step={{ 5 }} />
@@ -56,9 +57,10 @@ Three ways to hold the value:
 ## Accessibility
 
 It's the full WAI-ARIA slider pattern: `aria-valuemin` / `aria-valuemax` / `aria-valuenow`, plus `aria-valuetext`
-from your `format`. Focus it and use **← / →** (or **↑ / ↓**) to step, **Page Up / Page Down** for a bigger jump,
-and **Home / End** for the ends. Pointer drag works too (with pointer capture, so the drag survives leaving the
-track). Give it a `label` for its accessible name.
+from your `format`. Focus it and use **← / →** (or **↑ / ↓**) to step, **Page Up / Page Down** for a bigger jump
+(a tenth of the range, or one `step` if that's larger), and **Home / End** for the ends. Under `dir="rtl"` the
+horizontal arrows flip to match the reversed track; ↑ / ↓ always mean more / less. Pointer drag works too (with
+pointer capture, so the drag survives leaving the track). Give it a `label` for its accessible name.
 
 ## API reference
 
@@ -72,7 +74,7 @@ track). Give it a `label` for its accessible name.
 | `value` | `number` | — | Controlled value. Ignored when `control` is set. |
 | `onChange` | `(value: number) => void` | — | Called with the next value on change. |
 | `defaultValue` | `number` | `min` | Uncontrolled initial value (ignored when `value`/`control` set). |
-| `control` | `Field<number>` | — | A forms field — two-way + touched-on-release + aria-invalid. Wins over `value`. |
+| `control` | `Field<number>` | — | A forms field — two-way + touched on drag-end/key + aria-invalid. Wins over `value`. |
 | `disabled` | `boolean` | `false` | Disable the slider. |
 | `label` | `string` | — | Accessible name. |
 | `format` | `(value: number) => string` | *the number* | Formats the value for `aria-valuetext`. |

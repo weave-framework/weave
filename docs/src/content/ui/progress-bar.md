@@ -13,7 +13,7 @@ import ProgressBar from '@weave-framework/ui/progress-bar';
 ```
 
 ```scss
-@use '@weave-framework/ui/progress-bar';
+@use 'pkg:@weave-framework/ui/progress-bar';
 ```
 
 ## Determinate

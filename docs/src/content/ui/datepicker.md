@@ -16,13 +16,13 @@ import Datepicker from '@weave-framework/ui/datepicker';
 ```
 
 ```scss
-@use '@weave-framework/ui/datepicker';
+@use 'pkg:@weave-framework/ui/datepicker';
 ```
 
 ## Basic usage
 
 Bind a `Date | null` with `value` + `onChange`. `placeholder` shows when nothing is picked; `clearable={{ true }}`
-adds a `×` to reset it:
+adds a clear button to reset it:
 
 :::tabs
 ~~~html title="app.html"
@@ -55,7 +55,7 @@ picker, say:
 ## Navigating years & months
 
 The day view's header ("June 2026") is a button: click it (or press **Enter** on it) to open a **year grid** of 24
-years — the ‹ / › buttons page by 24. Choose a year and the panel switches to a **month grid** (Jan–Dec, no paging
+years — the previous / next buttons page by 24. Choose a year and the panel switches to a **month grid** (Jan–Dec, no paging
 needed); choose a month and it opens that month's day calendar to pick the day. Everything stays in the one popover.
 Years and months that fall entirely outside `min` / `max` are disabled in their grids. Each grid is fully keyboard
 navigable (see [Accessibility](#accessibility)).
@@ -139,7 +139,7 @@ committing the day) and **Esc** closes and returns focus. It's a non-modal popov
 | `displayFormat` | `Intl.DateTimeFormatOptions` | `{ dateStyle: 'medium' }` | The field's display format. |
 | `editable` | `boolean` | `false` | Swap the button trigger for a typeable input. |
 | `placeholder` | `string` | — | Shown when nothing is selected. |
-| `clearable` | `boolean` | `false` | Show a `×` clear button. |
+| `clearable` | `boolean` | `false` | Show a clear button when a date is set. |
 | `disabled` | `boolean` | `false` | Disable the control. |
 | `required` | `boolean` | `false` | Mark required (aria). |
 | `label` | `string` | — | Accessible name (when not wrapped by a FormField). |

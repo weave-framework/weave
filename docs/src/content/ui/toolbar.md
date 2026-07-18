@@ -13,7 +13,7 @@ import Toolbar from '@weave-framework/ui/toolbar';
 ```
 
 ```scss
-@use '@weave-framework/ui/toolbar';
+@use 'pkg:@weave-framework/ui/toolbar';
 ```
 
 ## When to use it

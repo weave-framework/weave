@@ -8,7 +8,7 @@ covering the full component surface.
 import Tree from '@weave-framework/ui/tree';
 ```
 ```scss
-@use '@weave-framework/ui/tree';
+@use 'pkg:@weave-framework/ui/tree';
 ```
 
 ## Nested model (default)
@@ -76,7 +76,7 @@ export function setup() {
 
 ## Selection — single
 
-`selectable` with the default `selectionMode="single"` marks one node with the accent tint + left
+`selectable` with the default `selectionMode={{ 'single' }}` marks one node with the accent tint + left
 border (the same mark as [List](/ui/list)). `onSelectionChange` reports the selection.
 
 :::demo ex-tree-selection-single
@@ -99,7 +99,7 @@ export function setup() {
 
 ## Selection — multiple
 
-`selectionMode="multiple"` makes each click toggle a node in or out of the set, so several rows stay
+`selectionMode={{ 'multiple' }}` makes each click toggle a node in or out of the set, so several rows stay
 selected at once. `onSelectionChange` reports the full set.
 
 :::demo ex-tree-selection-multiple
@@ -230,7 +230,8 @@ export function setup() {
 
 ## Reorderable
 
-`reorderable` adds a per-node drag handle (`⠿`). On a committed drag Tree emits `onReorder` with indices
+`reorderable` adds a per-node drag handle (a lucide `grip-vertical` icon). On a committed drag Tree emits
+`onReorder` with indices
 over the visible order; the consumer applies it to its own model (node clicks still select / expand).
 
 :::demo ex-tree-reorderable

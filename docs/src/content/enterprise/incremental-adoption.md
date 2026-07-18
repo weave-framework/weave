@@ -1,6 +1,6 @@
 # Adopt Weave one piece at a time
 
-You don't have to rewrite an app to try Weave — or even to ship it to production. Weave compiles any component to a **standard custom element**, so a single Weave widget drops into whatever you already run — React, Angular, Vue, or plain HTML — with no rewrite and no bridge library.
+You don't have to rewrite an app to try Weave — or even to ship it to production. Weave compiles any component to a **standard custom element**, so a single Weave widget drops into whatever you already run — any framework that can render a DOM element, or plain HTML — with no rewrite and no bridge library.
 
 That matters, because the safest way to adopt a framework is at the edges: pick one non-critical screen or widget, build it in Weave, ship it, and see how it feels — before betting anything bigger.
 
@@ -22,19 +22,15 @@ The build registers it for you — now it's a real DOM element, usable from anyw
 <weave-rating value="4"></weave-rating>
 ~~~
 
-**In React:**
-
-~~~jsx
-function Review({ score }) {
-  return <weave-rating value={score} />;
-}
-~~~
-
-**In Angular** (add `CUSTOM_ELEMENTS_SCHEMA` to the module, as with any web component):
+**In a templating framework** — write the tag exactly as you'd write any other element, using whatever binding syntax your host already uses for attributes and properties:
 
 ~~~html
-<weave-rating [attr.value]="score"></weave-rating>
+<weave-rating value="4"></weave-rating>
 ~~~
+
+Because it's a standard custom element, no host-specific wrapper or adapter is involved. Some hosts need to be told that an unknown tag is a custom element rather than a typo (a schema, a compiler option, or a tag-name allowlist) — that's the same one-line setup those hosts require for any web component, and your host's own documentation covers it.
+
+**Setting rich data:** get a reference to the element and assign the property directly — `el.value = { … }` — which works identically from any host.
 
 Props cross the boundary two ways, both feeding the same reactive signal: as **attributes** (`value="4"` — kebab-cased, string values) or as **JS properties** (`el.value = 4` — any value). Set either, and the component re-renders. Full detail in [Custom elements](/learn/custom-elements).
 
@@ -86,11 +82,11 @@ Under the hood each target runs the existing `weave` CLI with `cwd` set to the p
 
 ### Make a project use Weave — not the framework beside it
 
-In a **mixed workspace** (say Angular projects next to Weave ones — including a project you're migrating from Angular to Weave), Nx and your editor decide a project's tooling from that project's own config. A project keeps behaving like the old framework until three files say "this is Weave". Set them on the project and both the `nx` CLI and the editor switch over:
+In a **mixed workspace** — projects using other tooling sitting next to Weave ones, including a project you're converting to Weave — Nx and your editor decide a project's tooling from that project's own config. A project keeps behaving the way it did until three files say "this is Weave". Set them on the project and both the `nx` CLI and the editor switch over:
 
 1. **`weave.config.{ts,js,json}` at the project root** — this is the marker the inference plugin (and the CLI) key off. Its presence is what makes `nx build`/`serve`/`check` resolve to Weave. Without it, the project isn't a Weave project.
 
-2. **A project-local `tsconfig.json`** — scopes the project as its own TypeScript program, so the editor's TS service treats its `.ts` + `.html` pairs as Weave, not as part of a sibling framework's program:
+2. **A project-local `tsconfig.json`** — scopes the project as its own TypeScript program, so the editor's TS service treats its `.ts` + `.html` pairs as Weave, not as part of a sibling project's program:
 
    ~~~jsonc title="apps/my-app/tsconfig.json"
    {
@@ -105,7 +101,7 @@ In a **mixed workspace** (say Angular projects next to Weave ones — including 
 
 3. **`.prettierrc` routing `*.html` to the `weave` parser** — so templates format instead of getting mangled (`nx g @weave-framework/nx:application` writes all three for you).
 
-**Migrating an existing project (e.g. Angular → Weave):** the project's `project.json` still carries the *old* framework's `build`/`serve`/`lint` targets, and that's what makes Nx — and the IDE — keep treating it (and its `.html` files) as that framework. Drop those targets and let the Weave plugin infer, or declare the Weave executors explicitly. A project-level `project.json` target **always wins** over any inferred one, so this is the reliable override:
+**Converting an existing project:** the project's `project.json` still carries its previous `build`/`serve`/`lint` targets, and that's what makes Nx — and the IDE — keep treating it (and its `.html` files) the old way. Drop those targets and let the Weave plugin infer, or declare the Weave executors explicitly. A project-level `project.json` target **always wins** over any inferred one, so this is the reliable override:
 
 ~~~jsonc title="apps/my-app/project.json"
 {
@@ -113,7 +109,7 @@ In a **mixed workspace** (say Angular projects next to Weave ones — including 
   "projectType": "application",
   "sourceRoot": "apps/my-app/src",
   "targets": {
-    // remove the old @angular-devkit / @nx/angular build, serve and lint targets, then:
+    // remove the project's previous build, serve and lint targets, then:
     "build":  { "executor": "@weave-framework/nx:build",  "options": { "config": "weave.config.ts" },
                 "outputs": ["{workspaceRoot}/dist/{projectRoot}"], "cache": true },
     "serve":  { "executor": "@weave-framework/nx:serve",  "options": { "config": "weave.config.ts" } },
@@ -122,10 +118,10 @@ In a **mixed workspace** (say Angular projects next to Weave ones — including 
 }
 ~~~
 
-If two plugins try to infer the same target name (e.g. both a framework plugin and Weave want `build`), give the Weave plugin explicit target names in `nx.json` so they coexist — or just rely on the explicit `project.json` targets above, which outrank every inferred target:
+If two plugins try to infer the same target name (e.g. both another plugin and Weave want `build`), give the Weave plugin explicit target names in `nx.json` so they coexist — or just rely on the explicit `project.json` targets above, which outrank every inferred target:
 
 ~~~jsonc title="nx.json"
 { "plugins": [{ "plugin": "@weave-framework/nx/plugin", "options": { "buildTargetName": "build", "checkTargetName": "check" } }] }
 ~~~
 
-Run `nx show project my-app --web` to see exactly which plugin each target comes from. Once the project declares Weave (the three files above) and no longer declares the old framework's targets, its `.html` files are Weave templates — a `.ts` + `.html` pair whose `.ts` exports `setup`, with no `@Component({ templateUrl })` referencing them — so the editor's Weave support (the VS Code extension or the WebStorm plugin) owns them and the old framework's template checker stops flagging them. If the templates still show native-HTML/other-framework errors after this, the project is still being seen as that framework somewhere — re-check its `project.json` targets and that its `.ts` files aren't decorated components.
+Run `nx show project my-app --web` to see exactly which plugin each target comes from. Once the project declares Weave (the three files above) and no longer declares its previous targets, its `.html` files are Weave templates — a `.ts` + `.html` pair whose `.ts` exports `setup`, with no decorator metadata pointing at them as a template — so the editor's Weave support (the VS Code extension or the WebStorm plugin) owns them and the previous template checker stops flagging them. If the templates still show unexpected errors after this, the project is still being classified the old way somewhere — re-check its `project.json` targets and that its `.ts` files carry no component decorators.

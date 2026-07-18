@@ -16,7 +16,7 @@ import Button from '@weave-framework/ui/button';
 ```
 
 ```scss
-@use '@weave-framework/ui/button';
+@use 'pkg:@weave-framework/ui/button';
 ```
 
 :::callout tip "One import, real usage"

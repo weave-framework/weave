@@ -8,7 +8,7 @@ covering the full component surface.
 import Select from '@weave-framework/ui/select';
 ```
 ```scss
-@use '@weave-framework/ui/select';
+@use 'pkg:@weave-framework/ui/select';
 ```
 
 ## Basic — value + onChange
@@ -145,7 +145,7 @@ export function setup() {
 
 ## Clearable
 
-`clearable` shows a `×` button once something is selected; it empties the value. `clearLabel` names the
+`clearable` shows a clear button (a lucide `x` icon) once something is selected; it empties the value. `clearLabel` names the
 button for assistive tech (default `'Clear'`).
 
 :::demo ex-select-clearable

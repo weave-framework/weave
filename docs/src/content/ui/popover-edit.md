@@ -13,7 +13,7 @@ import { popoverEdit } from '@weave-framework/ui/popover-edit';
 ```
 
 ```scss
-@use '@weave-framework/ui/popover-edit';
+@use 'pkg:@weave-framework/ui/popover-edit';
 ```
 
 ## Basic usage
@@ -46,15 +46,18 @@ via `onCommit`; **Esc** cancels; focus returns to the host either way.
 
 ## A custom editor
 
-For anything other than plain text — a Select, a date field, a number — pass an `editor` factory that returns
-`{ element, value, focusTarget? }`. The action manages the overlay, commit, and focus; you supply the control:
+For anything other than plain text — a Select, a date field, a number — pass an `editor` factory that receives the
+current value and returns a `PopoverEditor`: `{ element, read, focusTarget? }`. `element` is the DOM to put in the
+popover, `read()` is called on commit to get the new value, and `focusTarget` is what gets focus on open (defaults
+to `element`). The action manages the overlay, commit, and focus; you supply the control:
 
 ```ts
 const editCfg = {
   value: () => status(),
   onCommit: (next) => status.set(next),
   editor: (current) => {
-    // build and return { element, value: () => theSelectValue }
+    // build the control, then:
+    return { element: el, read: () => el.value };
   },
 };
 ```
@@ -67,11 +70,15 @@ const editCfg = {
 | `onCommit` | `(next: string) => void` | — | Called with the new value on commit. |
 | `editor` | `(value: string) => PopoverEditor` | *(text field)* | Build a custom editor. |
 | `placeholder` | `string` | — | Placeholder for the default text editor. |
-| `label` | `string` | — | Accessible name for the default editor. |
+| `label` | `string` | `'Edit'` (panel) | Accessible name for the popover dialog, and for the default text editor. |
 | `position` | `MenuPosition` | `'bottom-start'` | Popover position relative to the host. |
 | `disabled` | `boolean \| () => boolean` | `false` | Disable editing (reactive). |
 
 ## Accessibility
 
-The host is made interactive (click / Enter / F2 to open, so it's keyboard-reachable) and the editor opens in a
-non-modal overlay with focus moved into it and restored to the host on commit or cancel. Esc always cancels.
+The host gets `aria-haspopup="dialog"` and `aria-expanded`, and opens on click / Enter / F2. The editor opens in a
+non-modal `role="dialog"` overlay with focus moved into it (the default text editor's contents are selected) and
+restored to the host on commit or cancel. Esc always cancels.
+
+Give the host its own keyboard reachability — `use:popoverEdit` wires the key handler, but a non-interactive
+element such as a `<span>` or `<td>` still needs a `tabindex` of your own to receive focus.

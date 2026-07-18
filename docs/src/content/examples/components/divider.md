@@ -8,7 +8,7 @@ A Divider isn't a JavaScript component — it's a **CSS class**, so there's noth
 Pull in the styles once:
 
 ```scss
-@use '@weave-framework/ui/divider';
+@use 'pkg:@weave-framework/ui/divider';
 ```
 
 ## Horizontal
@@ -32,8 +32,9 @@ separating — here, between stacked list rows.
 
 ## Vertical
 
-Add `weave-divider--vertical` for a vertical rule — handy between inline actions. It takes the height of its
-flex row, so give the row a height (or let its content set one).
+Add `weave-divider--vertical` for a vertical rule — handy between inline actions. It centres itself in the
+row and stands `--weave-divider-height` tall (16px by default), so override that token if you want it taller
+or shorter.
 
 :::demo ex-divider-vertical
 

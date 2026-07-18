@@ -13,7 +13,7 @@ import RadioGroup from '@weave-framework/ui/radio';
 ```
 
 ```scss
-@use '@weave-framework/ui/radio';
+@use 'pkg:@weave-framework/ui/radio';
 ```
 
 ## Basic usage
@@ -86,9 +86,9 @@ don't pass one.
 
 | Prop | Type | Default | Description |
 | --- | --- | --- | --- |
-| `options` | `RadioOption[]` | — | The radios, top to bottom. Each is `{ value, label?, disabled? }`. |
+| `options` | `RadioOption[]` | — | The radios, top to bottom. Each is `{ value, label?, disabled? }`; `label` falls back to `value`. |
 | `value` | `string \| null` | — | Controlled selected key. Ignored when `control` is set. |
-| `onChange` | `(value: string) => void` | — | Called with the next value on select. |
+| `onChange` | `(value: string) => void` | — | Called with the next value on select. Ignored when `control` is set. |
 | `control` | `Field<string>` | — | A forms field — two-way + touched + aria-invalid. Wins over `value`. |
 | `name` | `string` | *(auto)* | Shared native `name`. |
 | `disabled` | `boolean` | `false` | Disable the whole group. |

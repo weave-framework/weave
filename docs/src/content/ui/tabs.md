@@ -12,7 +12,7 @@ import Tabs from '@weave-framework/ui/tabs';
 ```
 
 ```scss
-@use '@weave-framework/ui/tabs';
+@use 'pkg:@weave-framework/ui/tabs';
 ```
 
 ## Basic usage
@@ -41,7 +41,10 @@ export function setup() {
 :::
 
 Leave `value` off and pass `defaultIndex` for an uncontrolled strip. Disable a single tab with `disabled` on its
-item (it's skipped in keyboard nav).
+item (it's skipped in keyboard nav), or the whole strip with `disabled` on `<Tabs>`.
+
+Panel content is appended into its panel once, on mount — all panels stay in the DOM and the inactive ones are
+`hidden`, so panel state survives switching tabs.
 
 ## Activation
 
@@ -68,7 +71,7 @@ skipping disabled), **Home / End** jump to the ends, and the panel is focusable.
 | `slidingIndicator` | `boolean` | `false` | Render an animated `.weave-tabs__indicator` that slides + resizes to the active tab. App CSS owns its look. |
 | `disabled` | `boolean` | `false` | Disable the whole tab set. |
 | `label` | `string` | — | Accessible name for the `role="tablist"`. |
-| `tabTemplate` | `(row: TabRowContext<T>) => Node` | — | Renders the whole content of each tab button (replacing the default label span) from the tab's data + state. See below. |
+| `tabTemplate` | `(row: TabRowContext<T>) => Node` | — | Renders the whole content of each tab button (replacing the default label span *and* the accent marker) from the tab's data + state. See below. |
 | `class` | `string` | — | Extra classes forwarded onto the container. |
 
 ### `tabTemplate` — custom tab-button content
@@ -77,8 +80,8 @@ Pass an authored `@snippet` as `tabTemplate` to render the whole content of each
 button — an icon before the label, a badge, two lines. The framework still owns the button, ARIA,
 roving tabindex and the panels; the template only fills the button's inner content. `label` stays
 the accessible name (`aria-label`), and the active tab is styled via the `[aria-selected='true']`
-hook. It re-renders when a tab's `selected` state flips. Omit it for the default label span — fully
-back-compatible. Parallels the menu's `itemTemplate`. See the
+hook. It re-renders when a tab's `selected` state flips, or when that tab's data object changes.
+Omit it for the default label span. Parallels the menu's `itemTemplate`. See the
 [Custom tab-button content example](/examples/components/tabs).
 
 The snippet receives a `TabRowContext<T>`:

@@ -8,7 +8,7 @@ covering the full component surface.
 import Sidenav from '@weave-framework/ui/sidenav';
 ```
 ```scss
-@use '@weave-framework/ui/sidenav';
+@use 'pkg:@weave-framework/ui/sidenav';
 ```
 
 ## Basic — side mode + slots
@@ -132,7 +132,7 @@ export function setup() {
 
 ## Position — end edge
 
-`position="end"` docks the drawer to the trailing edge instead of the default `'start'`.
+`position={{ 'end' }}` docks the drawer to the trailing edge instead of the default `'start'`.
 
 :::demo ex-sidenav-position
 

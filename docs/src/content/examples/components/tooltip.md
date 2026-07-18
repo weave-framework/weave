@@ -9,7 +9,7 @@ element, so return it from `setup` and apply it with `use:tooltip`.
 import { tooltip } from '@weave-framework/ui/tooltip';
 ```
 ```scss
-@use '@weave-framework/ui/tooltip';
+@use 'pkg:@weave-framework/ui/tooltip';
 ```
 
 ## Basic — a string hint
@@ -118,14 +118,17 @@ picks up hover and focus.
 :::tabs
 ~~~html title="app.html"
 <Button use:tooltip={{ 'Sends the message right away' }}>Send</Button>
-<Button variant={{ 'ghost' }} use:tooltip={{ { text: 'This cannot be undone', position: 'bottom' } }}>Delete</Button>
+<Button variant={{ 'ghost' }} use:tooltip={{ deleteTip }}>Delete</Button>
 ~~~
 ~~~ts title="app.ts"
-import { tooltip } from '@weave-framework/ui/tooltip';
+import { tooltip, type TooltipOptions } from '@weave-framework/ui/tooltip';
 import Button from '@weave-framework/ui/button';
 
 export function setup() {
-  return { tooltip };
+  // Keep the options object in setup: an inline object literal as a `use:` argument
+  // compiles to `() => { … }`, which JS reads as a block, not an object.
+  const deleteTip: TooltipOptions = { text: 'This cannot be undone', position: 'bottom' };
+  return { tooltip, deleteTip };
 }
 ~~~
 :::

@@ -8,7 +8,7 @@ just the examples, covering the full component surface.
 import ButtonToggle from '@weave-framework/ui/button-toggle';
 ```
 ```scss
-@use '@weave-framework/ui/button-toggle';
+@use 'pkg:@weave-framework/ui/button-toggle';
 ```
 
 ## Single-select — value + onChange

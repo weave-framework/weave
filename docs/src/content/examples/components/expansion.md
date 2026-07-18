@@ -8,7 +8,7 @@ covering the full component surface.
 import Expansion from '@weave-framework/ui/expansion';
 ```
 ```scss
-@use '@weave-framework/ui/expansion';
+@use 'pkg:@weave-framework/ui/expansion';
 ```
 
 ## Basic — value + onChange

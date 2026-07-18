@@ -2,7 +2,7 @@
 
 The workhorse text field — a real native `<input>` (or `<textarea>`) dressed as a Weave **underline field**: a
 1.5px baseline that turns accent on focus, transparent everywhere else. It comes with batteries: a clear button,
-prefix/suffix slots, multiline, and first-class binding to signals or a forms field.
+a password reveal toggle, prefix/suffix slots, multiline, and first-class binding to signals or a forms field.
 
 :::demo input-basic
 
@@ -13,7 +13,7 @@ import Input from '@weave-framework/ui/input';
 ```
 
 ```scss
-@use '@weave-framework/ui/input';
+@use 'pkg:@weave-framework/ui/input';
 ```
 
 ## Basic usage
@@ -84,8 +84,24 @@ export function setup() {
 
 ## Clearable
 
-`clearable` adds a `×` button that appears when the field is non-empty and editable; clicking it empties the value
-and refocuses. `clearLabel` sets its accessible name (default `'Clear'`).
+`clearable` adds a clear button (a lucide `x` [Icon](/ui/icon)) that appears when the field is non-empty and
+editable; clicking it empties the value and refocuses. `clearLabel` sets its accessible name (default `'Clear'`).
+
+## Password reveal
+
+On a single-line `type="password"` field, `revealable` adds an eye toggle that switches the value between hidden and
+visible (the icon flips `eye` → `eye-off`, and the native type becomes `text` while revealed). The toggle's
+accessible name follows the state — `revealLabel` (default `'Show password'`) while hidden, `hideLabel` (default
+`'Hide password'`) while revealed — and it carries `aria-pressed`:
+
+```html
+<Input type={{ 'password' }} revealable={{ true }} control={{ form.controls.password }} />
+```
+
+`revealTooltip` picks the visible hint on that toggle: `'native'` (the default — the browser `title`), `'weave'`
+(the styled [Tooltip](/ui/tooltip), whose overlay code is lazily imported only in this mode), or `'none'`. The
+accessible name is present in every mode. `onRevealToggle` fires with the new state (`true` = now plaintext) if the
+app wants to react.
 
 ## Multiline
 
@@ -100,7 +116,8 @@ clearable, slots) works the same:
 
 Because it's a real input, focus, keyboard, and form participation are native. Give it a name — either a `label`
 prop or, better, wrap it in a [FormField](/ui/form-field), which wires the `<label for>`, the hint/error line
-(`aria-describedby`), and the invalid state for you. The clear button is a real `<button>` with an `aria-label`.
+(`aria-describedby`), and the invalid state for you. The clear and reveal buttons are real `<button>`s with an
+`aria-label`.
 
 ## API reference
 
@@ -120,8 +137,14 @@ prop or, better, wrap it in a [FormField](/ui/form-field), which wires the `<lab
 | `required` | `boolean` | `false` | Mark the native input required. |
 | `name` | `string` | — | Native `name` for form submission. |
 | `label` | `string` | — | Accessible name (when not wrapped by a FormField). |
-| `clearable` | `boolean` | `false` | Show a `×` clear button when non-empty and editable. |
+| `clearable` | `boolean` | `false` | Show a clear button (lucide `x`) when non-empty and editable. |
 | `clearLabel` | `string` | `'Clear'` | Accessible name for the clear button. |
+| `revealable` | `boolean` | `false` | On a single-line `type="password"`, show the eye reveal toggle. |
+| `revealLabel` | `string` | `'Show password'` | Accessible name for the reveal toggle while the value is hidden. |
+| `hideLabel` | `string` | `'Hide password'` | Accessible name for the reveal toggle while the value is revealed. |
+| `revealTooltip` | `boolean \| 'none' \| 'native' \| 'weave'` | `'native'` | Which tooltip renders on the reveal toggle. `true` → `'native'`, `false` → `'none'`. |
+| `onRevealToggle` | `(revealed: boolean) => void` | — | Called each time the reveal toggle flips, with the new state. |
+| `onInputRef` | `(el: HTMLInputElement \| HTMLTextAreaElement) => void` | — | Called with the native field once it exists — lets a composer (e.g. Autocomplete) add its own ARIA. |
 | `class` | `string` | — | Extra classes forwarded onto the field wrapper. |
 
 ### Slots

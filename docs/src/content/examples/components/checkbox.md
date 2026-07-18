@@ -8,7 +8,7 @@ covering the full component surface.
 import Checkbox from '@weave-framework/ui/checkbox';
 ```
 ```scss
-@use '@weave-framework/ui/checkbox';
+@use 'pkg:@weave-framework/ui/checkbox';
 ```
 
 ## Basic — checked + onChange

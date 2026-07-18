@@ -14,7 +14,7 @@ import FormField from '@weave-framework/ui/form-field';
 ```
 
 ```scss
-@use '@weave-framework/ui/form-field';
+@use 'pkg:@weave-framework/ui/form-field';
 ```
 
 ## Basic usage
@@ -84,9 +84,13 @@ never jumps — it's the same slot, showing guidance or a problem.
 
 ## Accessibility
 
-This is the piece that makes a control properly labelled: the `<label for>` binds to the control's id, the
-hint/error is linked with `aria-describedby`, and `aria-invalid` reflects the error state. Prefer wrapping controls
-in a FormField over a bare `label` prop whenever there's a visible label.
+This is the piece that makes a control properly labelled: the `<label for>` binds to the control's id (FormField
+generates one if the control has none), and the hint/error line is linked with `aria-describedby`. Prefer wrapping
+controls in a FormField over a bare `label` prop whenever there's a visible label.
+
+FormField manages `aria-invalid` only when it owns the error signal — that is, when you passed `error` or
+`control`. Otherwise it leaves the attribute alone, so it never fights a control that sets its own (an Input bound
+to the same forms field, say).
 
 ## API reference
 
@@ -97,7 +101,7 @@ in a FormField over a bare `label` prop whenever there's a visible label.
 | `label` | `string` | — | Label text (uppercase). Omit for an unlabelled field. |
 | `hint` | `string` | — | Hint shown below when there's no error. |
 | `error` | `string` | — | Manual error message — sets the error state when non-empty. |
-| `control` | `Field` | — | A forms field — error state auto-derives from `touched() && error()`. |
+| `control` | `FormFieldControl` | — | A forms field (`Field`) — error state auto-derives from `touched() && error()`. |
 | `class` | `string` | — | Extra classes forwarded onto the root. |
 
 ### Slots

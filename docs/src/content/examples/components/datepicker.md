@@ -8,7 +8,7 @@ the examples, covering the full component surface. The value is a plain local-mi
 import Datepicker from '@weave-framework/ui/datepicker';
 ```
 ```scss
-@use '@weave-framework/ui/datepicker';
+@use 'pkg:@weave-framework/ui/datepicker';
 ```
 
 ## Basic — value + onChange
@@ -35,7 +35,7 @@ export function setup() {
 
 ## Clearable
 
-`clearable` shows a `×` button once a date is set; it resets the value to `null` and re-focuses the
+`clearable` shows a clear button (a lucide `x` icon) once a date is set; it resets the value to `null` and re-focuses the
 field. `clearLabel` names that button.
 
 :::demo ex-datepicker-clearable

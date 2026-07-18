@@ -197,8 +197,8 @@ export function setup(props: { task: Task }) {
 
 Then `{{ task().title }}` in the template tracks changes to the parent's `task`. (If you destructured `const { task } = props`, you'd capture the value *once* and lose reactivity — so don't.)
 
-:::callout info "Coming from Angular or React?"
-Props are the equivalent of Angular's `@Input()` or a React prop. The difference: there's no change-detection pass and no re-render. A prop is a live getter into the parent, and only the bindings that actually read it react.
+:::callout info "No change detection, no re-render"
+A prop isn't a value handed over once per render pass — there are no render passes. It's a live getter into the parent, and only the bindings that actually read it react when it changes.
 :::
 
 ## Events: messages flowing up
@@ -223,7 +223,7 @@ There are two spellings, and they are **the same prop**:
 - A **plain callback prop**: `onClose={{ fn }}` → the child reads `props.onClose`.
 - The **`on:` form** for event-style names: `on:close={{ fn }}` → compiled to the prop `onClose` (the event name is capitalized and prefixed with `on`). So `on:close` and `onClose` arrive at exactly the same prop; `on:select` becomes `onSelect`, and so on.
 
-Use whichever reads better. The point is the same as everywhere else in UI: data flows down, events flow up. There's no `@Output` emitter to set up — a function *is* the channel.
+Use whichever reads better. The point is the same as everywhere else in UI: data flows down, events flow up. There's no emitter object to declare — a function *is* the channel.
 
 :::callout info "What counts as a child component"
 A tag is a **child component** when its name starts with an **uppercase letter** (`<TaskCard>`, `<Badge>`). A lowercase tag (`<div>`, `<my-widget>`) is a plain DOM element. That single rule is how the compiler decides whether to mount a component or emit an element — there is no registration step.
@@ -255,7 +255,7 @@ You can also write this as **`<Stepper bind:value={{ count }} />`** — `bind:va
 
 ## Slots: content flowing in
 
-Props pass *data*. **Slots** pass *markup* — they let a parent drop content into a hole the child leaves open. This is content projection (Angular's `<ng-content>`, React's `children`).
+Props pass *data*. **Slots** pass *markup* — they let a parent drop content into a hole the child leaves open. This is content projection.
 
 The child marks where content goes with `<slot>`:
 
@@ -397,10 +397,10 @@ Full override (write your own `template`) vs patch (`export const patch`) — pi
 
 ## A note on privacy
 
-Only the names your template reads are visible to it — whether you return them by hand or let Weave synthesize the return — and only props + `on:` events cross the boundary into a child. A component's internal signals and helpers stay private by construction — there's no `@ViewChild` reaching into a child's guts. When a deeply nested component needs shared state, lift it: a signal passed down, a [context](/learn/lifecycle-context-di) provided to a subtree, or a [store](/learn/store) shared app-wide.
+Only the names your template reads are visible to it — whether you return them by hand or let Weave synthesize the return — and only props + `on:` events cross the boundary into a child. A component's internal signals and helpers stay private by construction — there is no mechanism for reaching into a child's internals from outside. When a deeply nested component needs shared state, lift it: a signal passed down, a [context](/learn/lifecycle-context-di) provided to a subtree, or a [store](/learn/store) shared app-wide.
 
 :::callout info "What you just learned"
-A component is an optional `setup` (runs once, exposes the template's names — return them or let Weave synthesize the return; may be omitted, `async`, or expose nothing) + a template. Template and styles can come from a **sibling file**, an **inline string**, an **explicit file**, a **`styles` array**, or a **`.weave`** single file — and Weave fails loud on ambiguity (declaration *and* a sibling), a missing file, `${…}` in a backtick, or a non-static value. A tag is a child component iff it starts **uppercase**, and only static / `{{ }}` / `on:` attributes are legal on it. Props flow **down** as reactive getters (don't destructure); events flow **up** as callback props where `on:x` *is* `onX`; two-way means passing the **signal** itself. There's no default-props mechanism — default inside `setup`. A returned binding **shadows** a like-named prop. Slots project markup in (default, named, static `slot=`, whitespace-only falls back), and `@snippet`/`@render` reuse markup within a component.
+A component is an optional `setup` (runs once, exposes the template's names — return them or let Weave synthesize the return; may be omitted, `async`, or expose nothing) + a template. Template and styles can come from a **sibling file**, an **inline string**, an **explicit file**, a **`styles` array**, or a **`.weave`** single file — and Weave fails loud on ambiguity (declaration *and* a sibling), a missing file, `${…}` in a backtick, or a non-static value. A tag is a child component iff it starts **uppercase**, and only static / `{{ }}` / `on:` attributes are legal on it. Props flow **down** as reactive getters (don't destructure); events flow **up** as callback props where `on:x` *is* `onX`; two-way means passing the **signal** itself. Defaults come from a static `export const propDefaults`, or inline inside `setup`. A returned binding **shadows** a like-named prop. Slots project markup in (default, named, static `slot=`, whitespace-only falls back), and `@snippet`/`@render` reuse markup within a component.
 :::
 
 [Next: Templates →](/learn/templates) · [Reference: @weave-framework/runtime →](/reference/runtime)

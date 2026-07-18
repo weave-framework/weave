@@ -16,14 +16,14 @@ import DateRangePicker from '@weave-framework/ui/date-range-picker';
 ```
 
 ```scss
-@use '@weave-framework/ui/date-range-picker';
+@use 'pkg:@weave-framework/ui/date-range-picker';
 ```
 
 ## Basic usage
 
 Bind a `DateRange | null` (i.e. `{ start: Date | null, end: Date | null }`) with `value` + `onChange`. The value
 only commits on the **second** click; closing the popover early keeps the previous range. `placeholder` shows when
-nothing is picked; `clearable={{ true }}` adds a `×` to reset it:
+nothing is picked; `clearable={{ true }}` adds a clear button to reset it:
 
 :::tabs
 ~~~html title="app.html"
@@ -63,7 +63,7 @@ discarded — the committed value is unchanged.
 ## Navigating years & months
 
 The day view's header ("June 2026") is a button: click it (or press **Enter**) to open a **year grid** of 24 years —
-the ‹ / › buttons page by 24. Choose a year for a **month grid** (Jan–Dec), then a month to land on that month's day
+the previous / next buttons page by 24. Choose a year for a **month grid** (Jan–Dec), then a month to land on that month's day
 calendar. Years and months entirely outside `min` / `max` are disabled. Every grid is fully keyboard navigable
 (see [Accessibility](#accessibility)).
 
@@ -141,7 +141,7 @@ returns focus. It's a non-modal popover (click-away also closes and discards a h
 | `displayFormat` | `Intl.DateTimeFormatOptions` | `{ dateStyle: 'medium' }` | The field's display format (both ends). |
 | `separator` | `string` | `' – '` | Sits between the two formatted dates in the field. |
 | `placeholder` | `string` | — | Shown when nothing is selected. |
-| `clearable` | `boolean` | `false` | Show a `×` clear button. |
+| `clearable` | `boolean` | `false` | Show a clear button when a range is set. |
 | `disabled` | `boolean` | `false` | Disable the control. |
 | `required` | `boolean` | `false` | Mark required (aria). |
 | `label` | `string` | — | Accessible name (when not wrapped by a FormField). |

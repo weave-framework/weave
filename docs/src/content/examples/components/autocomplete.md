@@ -9,7 +9,7 @@ underline, clear button and value binding are Input's by construction.
 import Autocomplete from '@weave-framework/ui/autocomplete';
 ```
 ```scss
-@use '@weave-framework/ui/autocomplete';
+@use 'pkg:@weave-framework/ui/autocomplete';
 ```
 
 ## Basic — options + onSelect
@@ -64,7 +64,7 @@ export function setup() {
 
 ## Clearable
 
-`clearable` shows a `×` button when the field is non-empty; `clearLabel` names it for assistive tech (default
+`clearable` shows a clear button (a lucide `x` icon) when the field is non-empty; `clearLabel` names it for assistive tech (default
 `'Clear'`). It empties the value and refocuses the field.
 
 :::demo ex-autocomplete-clearable

@@ -4,7 +4,7 @@ Three related ideas that all flow from one mechanism — the **owner tree**. Whe
 
 ## Lifecycle: there's less than you think
 
-There's no `ngOnInit`, no `componentDidMount`, no `useEffect` ceremony. `setup` *is* the "created" hook — it runs once, synchronously, *before* your component's nodes are in the document. For everything after that, you need just three functions: `onMount`, `onCleanup`, and `onDispose`. The catch is that they're easy to mix up, and when you reach for the wrong one nothing yells at you — it just quietly does nothing. So let's nail down exactly what each one does, and where each one goes silent.
+There is no set of lifecycle methods to override. `setup` *is* the "created" hook — it runs once, synchronously, *before* your component's nodes are in the document. For everything after that, you need just three functions: `onMount`, `onCleanup`, and `onDispose`. The catch is that they're easy to mix up, and when you reach for the wrong one nothing yells at you — it just quietly does nothing. So let's nail down exactly what each one does, and where each one goes silent.
 
 ### onMount — after the DOM is live
 

@@ -6,7 +6,7 @@ There are three building blocks — `field`, `group` (aka `form`), and `fieldArr
 
 ## The mental model: one `Control`, three shapes
 
-Everything in `@weave-framework/forms` is a **`Control`**. A `field`, a `group`, and a `fieldArray` all implement the same interface, which is why they nest to any depth (`form → fieldArray → group → field`) and aggregate validity/values/touched the whole way up. It's the Weave analog of Angular's `AbstractControl`.
+Everything in `@weave-framework/forms` is a **`Control`**. A `field`, a `group`, and a `fieldArray` all implement the same interface, which is why they nest to any depth (`form → fieldArray → group → field`) and aggregate validity/values/touched the whole way up. One interface, three shapes — that's the whole design.
 
 Here's the shared shape every control gives you:
 
@@ -242,7 +242,7 @@ A group exposes the full `Control` interface plus a few group-only members:
 | Member | Type | Meaning |
 |--------|------|---------|
 | `controls` | object | The child controls — reach them as `group.controls.title`, etc. |
-| `value()` | reactive | Nested `{ name: value }` snapshot of every child (Angular's `FormGroup.value`) |
+| `value()` | reactive | Nested `{ name: value }` snapshot of every child |
 | `valid()` | reactive | `true` when every child is valid **and** there's no group-level (`_form`) error |
 | `formError()` | reactive | The group-level (`_form`) cross-field error, or `null` |
 | `validating()` | reactive | `true` while any descendant is running an async check |

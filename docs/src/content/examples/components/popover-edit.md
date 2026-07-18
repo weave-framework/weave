@@ -8,7 +8,7 @@ the examples, covering the full action surface.
 import { popoverEdit } from '@weave-framework/ui/popover-edit';
 ```
 ```scss
-@use '@weave-framework/ui/popover-edit';
+@use 'pkg:@weave-framework/ui/popover-edit';
 ```
 
 Every options object lives in `setup()` and is referenced by name — an inline object literal passed to a

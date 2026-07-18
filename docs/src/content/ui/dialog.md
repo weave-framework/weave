@@ -13,7 +13,7 @@ import { openDialog } from '@weave-framework/ui/dialog';
 ```
 
 ```scss
-@use '@weave-framework/ui/dialog';
+@use 'pkg:@weave-framework/ui/dialog';
 ```
 
 ## Basic usage
@@ -45,18 +45,21 @@ export function setup() {
 ~~~
 :::
 
-`content`, `header`, and `actions` accept a **string, a DOM node, or a factory** returning a node — so you can pass
-plain text or build a rich body. The demo above wires two footer buttons that call `ref.close('deleted')` /
-`ref.close()`.
+`content`, `header`, and `actions` are each a `DialogContent` — **a string, a DOM node, or a factory** returning a
+node (`Node | string | () => Node`) — so you can pass plain text or build a rich body. The demo above wires two
+footer buttons that call `ref.close('deleted')` / `ref.close()`.
+
+The header and actions regions only exist when you supply them: omit `header` *and* `title` and there's no header
+region; omit `actions` and there's no footer. `content` is mandatory and is the only region that scrolls.
 
 ## Options
 
 | Option | Type | Default | Description |
 | --- | --- | --- | --- |
-| `content` | `Node \| string \| () => Node` | — | **Required.** The body (scrolls when tall). |
+| `content` | `DialogContent` | — | **Required.** The body (scrolls when tall). |
 | `title` | `string` | — | Convenience header text (wires `aria-labelledby`). |
-| `header` | `ModalContent` | — | Custom header node (wins over `title`). |
-| `actions` | `ModalContent` | — | Footer button area. |
+| `header` | `DialogContent` | — | Custom header node (wins over `title`). |
+| `actions` | `DialogContent` | — | Footer button area. |
 | `width` / `height` | `number \| string` | 560px / auto | Preferred size (clamped to the viewport). |
 | `role` | `'dialog' \| 'alertdialog'` | `'dialog'` | Use `alertdialog` for confirmations / destructive prompts. |
 | `dismissable` | `boolean` | `true` | Esc + backdrop-click close. |
@@ -72,6 +75,8 @@ plain text or build a rich body. The demo above wires two footer buttons that ca
 
 ## Accessibility
 
-It's a real modal: `role="dialog"` (or `alertdialog`) with `aria-modal="true"`, focus moves inside on open and is
+It's a real modal: `role="dialog"` (or `alertdialog`) with `aria-modal="true"`. Whichever way you supply the header
+(`header` or `title`) it becomes the dialog's `aria-labelledby`, and the content region is always its
+`aria-describedby`. Focus moves inside on open and is
 **restored to the opener** on close, Tab is trapped within, and the background is marked `inert` so assistive tech
 can't wander out. Esc and backdrop-click close it (unless `dismissable: false`).

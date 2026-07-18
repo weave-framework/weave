@@ -173,7 +173,7 @@ export const tooltip: Action<string> = (el, text) => {
 
 Three tear-down options, all fired when the region unmounts: return a cleanup function, call `onDispose` inside the action, or create an `effect` (its disposal is tied to the element's region).
 
-**Reactive actions.** For an argument that should *react*, return an `{ update, destroy }` handle (the Svelte-style contract) — `update(arg)` runs whenever `use:action={{ arg }}` changes, `destroy()` on removal:
+**Reactive actions.** For an argument that should *react*, return an `{ update, destroy }` handle — `update(arg)` runs whenever `use:action={{ arg }}` changes, `destroy()` on removal:
 
 ~~~ts
 export const tooltip: Action<string> = (el, text) => {

@@ -9,7 +9,7 @@ covering the full option surface. Unlike most components, a snackbar is shown **
 import { snackbar } from '@weave-framework/ui/snackbar';
 ```
 ```scss
-@use '@weave-framework/ui/snackbar';
+@use 'pkg:@weave-framework/ui/snackbar';
 ```
 
 ## Basic — message + action

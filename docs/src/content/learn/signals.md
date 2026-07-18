@@ -34,7 +34,7 @@ const user  = signal<{ id: number } | null>(null);
 const items = signal<string[]>([]);
 ~~~
 
-The optional second argument is an options object. Right now it has exactly one field, `equals`, covered in [Skipping no-op writes](#skipping-no-op-writes) below. If you leave it off, you get the sensible default — so most of the time you'll just write `signal(initial)`.
+The optional second argument is an options object with two fields: `equals`, covered in [Skipping no-op writes](#skipping-no-op-writes) below, and `name` — a label that makes the signal visible to the [DevTools panel](/learn/tooling#devtools-inspecting-the-reactive-graph). Leave the object off and you get the sensible defaults, so most of the time you'll just write `signal(initial)`.
 
 ## Reading: just call it
 
@@ -178,7 +178,7 @@ That's all you need here. The full story on effects — cleanup functions, batch
 
 | Call | What it does | Returns |
 |------|--------------|---------|
-| `signal(initial, opts?)` | Create a signal. `opts.equals(a, b)` customizes change detection (default `Object.is`). | the signal |
+| `signal(initial, opts?)` | Create a signal. `opts.equals(a, b)` customizes change detection (default `Object.is`); `opts.name` labels it for DevTools. | the signal |
 | `count()` | Read the value; subscribes the current effect/computed (if any). | current value |
 | `count.peek()` | Read the value **without** subscribing. | current value |
 | `count.set(value)` | Write a plain value. No-op if `equals` says it's unchanged. | the resulting value |

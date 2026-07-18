@@ -13,7 +13,7 @@ import { tooltip } from '@weave-framework/ui/tooltip';
 ```
 
 ```scss
-@use '@weave-framework/ui/tooltip';
+@use 'pkg:@weave-framework/ui/tooltip';
 ```
 
 ## Basic usage
@@ -47,16 +47,30 @@ Instead of a bare string, pass an options object for more control (placement, de
 
 ```ts
 export function setup() {
-  const tip = { text: 'Deletes forever', position: 'top' };
+  const tip = { text: 'Deletes forever', position: 'bottom', delay: 400 };
   return { tooltip, tip };
 }
 ```
+
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `text` | `string` | — | The hint text. Plain string — a tooltip is non-interactive. |
+| `position` | `PositionName` | `'top'` | Preferred side; flips to the opposite one when it would overflow. |
+| `delay` | `number` | `150` | Delay (ms) before **hover** shows it. Focus always shows with no delay. |
+| `disabled` | `boolean` | `false` | Suppress the tooltip without detaching the action. |
+
+`position` takes any of the CDK position names — `'top'`, `'bottom'`, `'left'`, `'right'`, and their
+`-start` / `-end` variants (`'bottom-start'`, `'right-end'`, …).
 
 ## Accessibility
 
 A tooltip supplements a control that already has its own accessible name — it's a hint, not the label. Keep the
 element itself meaningful (real button text, or an `aria-label` on an icon button), and use the tooltip for the
 extra detail. It appears on focus as well as hover, so keyboard users get it too.
+
+It follows the WAI-ARIA tooltip pattern: the panel is `role="tooltip"`, and while it's shown the host carries an
+`aria-describedby` pointing at it — so the hint reaches assistive tech as the trigger's *description*, not its name.
+The panel itself is never focused and never captures the pointer.
 
 :::callout warn "Not for essential information"
 Don't hide anything the user *must* have inside a tooltip — it's transient and unavailable on touch. Use it for

@@ -12,23 +12,38 @@ import GridList from '@weave-framework/ui/grid-list';
 ```
 
 ```scss
-@use '@weave-framework/ui/grid-list';
+@use 'pkg:@weave-framework/ui/grid-list';
 ```
 
 ## Usage
 
-Put whatever tiles you like in the default slot — cards, images, links. The grid handles the columns and gaps:
+Put your tiles in the default slot and give each one the `weave-grid-list__tile` part class — that's what makes a
+cell square, surfaced, and separated by the hairline gap. The container handles the columns:
 
 ```html
 <GridList>
-  <img src="/a.jpg" alt="" />
-  <img src="/b.jpg" alt="" />
-  <img src="/c.jpg" alt="" />
+  <div class="weave-grid-list__tile">A</div>
+  <div class="weave-grid-list__tile weave-grid-list__tile--accent">B</div>
+  <div class="weave-grid-list__tile">C</div>
 </GridList>
 ```
 
-It's an unopinionated container, so the tiles' content, aspect ratio, and interactivity are yours — wrap a tile in a
-link or button if it should be clickable.
+Columns auto-fill to the container width (`repeat(auto-fill, minmax(96px, 1fr))`), so the grid reflows with no JS.
+Add `weave-grid-list__tile--accent` to fill a single tile with the accent colour. The tile's *content* is yours —
+an image, a label, a link or button if it should be clickable.
+
+## Customising
+
+Everything comes from the grid-list token schema, so you can resize the cells or retint them globally:
+
+```scss
+@use 'pkg:@weave-framework/ui' as weave;
+
+@include weave.grid-list-overrides((min-tile: 120px, gap: 2px));
+```
+
+The keys are `min-tile` (96px), `gap` (1px), `radius`, and the colours `border`, `tile-background`, `tile-text`,
+`accent-background`, `accent-text` — each emitted as `--weave-grid-list-<key>`.
 
 ## Accessibility
 
