@@ -5,6 +5,59 @@
   margin-top: 2px;
 }
 
+/* Jump index — the page opens with every export at a glance, grouped by kind, so you pick a
+   symbol instead of scrolling past 56 expanded sections to find it. Each entry anchors to its
+   own section further down the same page (so Ctrl+F and existing #anchor links still work). */
+.api-index {
+  margin: 20px 0 32px;
+  padding: 16px 18px 6px;
+  background: var(--raised);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.api-index__group {
+  margin-bottom: 14px;
+}
+
+.api-index__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+}
+
+.api-index__n {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.api-index__list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 2px 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.api-index__link {
+  display: block;
+  padding: 3px 6px;
+  border-radius: 5px;
+  font-family: var(--mono);
+  font-size: 13px;
+  text-decoration: none;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.api-index__link:hover {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  text-decoration: none;
+}
+
 .api {
   margin: 8px 0 36px;
   padding-top: 8px;
