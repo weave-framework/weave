@@ -131,7 +131,8 @@ export const template: string =
   '@for (col of dataCols(); track col.key) {' +
   '<th class={{ headClass(col) }} scope="col" style={{ headStyle(col) }} aria-sort={{ ariaSort(col) }}>' +
   '@if (col.sortable) {<button type="button" class={{ sortClass(col) }} on:click={{ () => cycleSort(col.key) }}>' +
-  '@render (headNode(col))<span class="weave-table__sort-arrow" aria-hidden="true">{{ arrow(col) }}</span></button>}' +
+  '@render (headNode(col))<span class="weave-table__sort-arrow" aria-hidden="true">' +
+  '@if (arrow(col)) {<Icon name={{ arrow(col) }} />}</span></button>}' +
   '@if (!col.sortable) {@render (headNode(col))}' +
   '@if (isResizable(col)) {<span class="weave-table__resize-grip" role="separator" aria-orientation="vertical"' +
   ' tabindex="0" aria-label={{ resizeLabel(col) }} data-col={{ col.key }}' +
@@ -144,7 +145,8 @@ export const template: string =
   '<tr class={{ rowClass(row) }} aria-selected={{ ariaSelected(row) }}>' +
   '@if (expandable()) {<td class="weave-table__cell weave-table__expand weave-table__cell--sticky-start" style={{ expandStyle() }}>' +
   '<button type="button" class="weave-table__expand-toggle" aria-label="Toggle row details"' +
-  ' aria-expanded={{ ariaExpanded(row) }} on:click={{ () => toggleExpand(row) }}></button></td>}' +
+  ' aria-expanded={{ ariaExpanded(row) }} on:click={{ () => toggleExpand(row) }}>' +
+  '<Icon name={{ \'chevron-right\' }} /></button></td>}' +
   '@if (selectable()) {<td class="weave-table__cell weave-table__select weave-table__cell--sticky-start" style={{ selectStyle() }}>' +
   '<Checkbox checked={{ isSelected(row) }} onChange={{ (checked) => toggleSelect(row, checked) }} label="Select row" /></td>}' +
   '@for (cell of cellsFor(row); track cell.key) {' +
@@ -418,10 +420,12 @@ export function setup<T = Record<string, unknown>>(props: TableProps<T>): TableC
       if (s.active !== col.key || !s.direction) return 'none';
       return s.direction === 'asc' ? 'ascending' : 'descending';
     },
+    // The sort indicator is a lucide icon NAME (not a ↑/↓ character) — '' when this column is
+    // not the active sort, which the template uses as the render condition.
     arrow: (col: TableColumn<T>): string => {
       const s: SortState = sortState();
       if (s.active !== col.key || !s.direction) return '';
-      return s.direction === 'desc' ? '↓' : '↑';
+      return s.direction === 'desc' ? 'arrow-down' : 'arrow-up';
     },
     cycleSort,
     isResizable,

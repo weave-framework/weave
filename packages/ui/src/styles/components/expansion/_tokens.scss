@@ -27,6 +27,11 @@ $tokens: (
     header-size: 13px,
     header-weight: 600,
     body-size: 13px,
+    // DEPRECATED, no-op. The +/− marker was a text character whose weight this set; it is a
+    // lucide <Icon> now, so font-weight no longer reaches it. Still emitted because the
+    // design-token contract is part of the frozen public API (VERSIONING.md): a token is
+    // deprecated first and only removed in a major. To change the marker's heaviness, set
+    // `--weave-icon-stroke` on `.weave-expansion__marker`.
     marker-weight: 400,
   ),
 );

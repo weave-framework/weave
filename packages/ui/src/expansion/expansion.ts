@@ -66,7 +66,7 @@ export const template: string =
   ' aria-disabled={{ disabledAttr(panel) }} on:click={{ () => toggle(panel) }}' +
   ' on:keydown={{ onHeaderKeydown }}>' +
   '<span class="weave-expansion__title">{{ panel.header }}</span>' +
-  '<span class="weave-expansion__marker" aria-hidden="true"></span>' +
+  '<span class="weave-expansion__marker" aria-hidden="true"><Icon name={{ markerIcon(panel) }} /></span>' +
   '</button>' +
   '</div>' +
   '<div class="weave-expansion__region" id={{ regionId(panel) }} role="region"' +
@@ -86,6 +86,8 @@ export interface ExpansionContext {
   headerId: (panel: ExpansionPanel) => string;
   regionId: (panel: ExpansionPanel) => string;
   expandedAttr: (panel: ExpansionPanel) => string;
+  /** lucide icon name for the open/closed marker — `minus` when open, `plus` when closed. */
+  markerIcon: (panel: ExpansionPanel) => string;
   openAttr: (panel: ExpansionPanel) => string | undefined;
   hiddenAttr: (panel: ExpansionPanel) => string | undefined;
   disabledAttr: (panel: ExpansionPanel) => string | undefined;
@@ -166,6 +168,7 @@ export function setup(props: ExpansionProps): ExpansionContext {
     headerId,
     regionId,
     expandedAttr: (panel): string => (isOpen(panel) ? 'true' : 'false'),
+    markerIcon: (panel): string => (isOpen(panel) ? 'minus' : 'plus'),
     openAttr: (panel): string | undefined => (isOpen(panel) ? 'true' : undefined),
     hiddenAttr: (panel): string | undefined => (isOpen(panel) ? undefined : 'true'),
     disabledAttr: (panel): string | undefined => (isPanelDisabled(panel) ? 'true' : undefined),

@@ -10,6 +10,8 @@ import {
 } from '@weave-framework/runtime';
 import * as dom from '@weave-framework/runtime/dom';
 import { compileTemplate } from '@weave-framework/compiler';
+import * as IconMod from '@weave-framework/ui/icon';
+import { toComponent } from '../internal/compose.js';
 import {
   setup,
   template,
@@ -25,7 +27,7 @@ const tick = (): Promise<void> => new Promise<void>((r) => queueMicrotask(r));
 
 const SCOPE: string[] = [
   'host', 'panels', 'rootClass', 'headingLevel', 'headerId', 'regionId',
-  'expandedAttr', 'openAttr', 'hiddenAttr', 'disabledAttr', 'isClosed', 'toggle', 'onHeaderKeydown',
+  'expandedAttr', 'markerIcon', 'openAttr', 'hiddenAttr', 'disabledAttr', 'isClosed', 'toggle', 'onHeaderKeydown',
 ];
 
 interface Mounted {
@@ -45,7 +47,7 @@ function mount(props: ExpansionProps): Mounted {
       r: unknown,
       k: unknown
     ) => HTMLElement;
-    return fn(ctx, rt, {});
+    return fn(ctx, rt, { Icon: toComponent(IconMod as never) });
   });
   document.body.appendChild(root);
   return {
@@ -134,6 +136,25 @@ test('click opens a panel (aria-expanded/data-open/aria-hidden/inert flip)', asy
   assert.equal(regions[0].getAttribute('data-open'), 'true');
   assert.ok(!regions[0].hasAttribute('aria-hidden'), 'open region drops aria-hidden');
   assert.equal(regions[0].inert, false, 'open region is not inert');
+  dispose();
+});
+
+// The +/− marker used to be a CSS `content:` character flipped by an [aria-expanded] selector.
+// It is a lucide `plus`/`minus` <Icon> chosen in the template now, so the flip is behaviour and
+// belongs here rather than in the stylesheet gate. lucide draws `plus` as two <path>s (a cross)
+// and `minus` as one — a structural difference that does not depend on reading the icon's name.
+test('the marker icon flips plus → minus when a panel opens', async () => {
+  const { headers, dispose } = mount({ panels: PANELS });
+  const marker = (): SVGSVGElement =>
+    headers[0].querySelector('.weave-expansion__marker svg') as SVGSVGElement;
+  assert.ok(marker(), 'marker renders an icon');
+  assert.equal(marker().querySelectorAll('path').length, 2, 'closed = plus (two strokes)');
+  headers[0].click();
+  await tick();
+  assert.equal(marker().querySelectorAll('path').length, 1, 'open = minus (one stroke)');
+  headers[0].click();
+  await tick();
+  assert.equal(marker().querySelectorAll('path').length, 2, 'closed again = plus');
   dispose();
 });
 

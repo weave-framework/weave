@@ -5,6 +5,7 @@ import { compileTemplate, inferCtxNames, parseTemplate } from '@weave-framework/
 import { ArrayDataSource, setDirection } from '@weave-framework/ui/cdk';
 import { toComponent } from '../internal/compose.js';
 import * as CheckboxMod from '@weave-framework/ui/checkbox';
+import * as IconMod from '@weave-framework/ui/icon';
 import { setup, template, type TableProps, type TableContext, type SortState, type TableColumn } from '@weave-framework/ui/table';
 
 const rt: typeof dom & { signal: typeof signal; effect: typeof effect } = { ...dom, signal, effect };
@@ -35,7 +36,10 @@ interface Mounted {
 }
 
 const SCOPE: string[] = inferCtxNames(parseTemplate(template));
-const CHILDREN: Record<string, unknown> = { Checkbox: toComponent(CheckboxMod as never) };
+const CHILDREN: Record<string, unknown> = {
+  Checkbox: toComponent(CheckboxMod as never),
+  Icon: toComponent(IconMod as never), // sort indicator + row expand chevron
+};
 
 async function mount(props: TableProps<Row>): Promise<Mounted> {
   const owner: Owner = createOwner();

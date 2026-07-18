@@ -63,11 +63,15 @@
     @include helpers.focus-ring;
   }
 
+  // Reserves its width whether or not a column is the active sort, so activating a sort never
+  // shifts the header label. The indicator itself is a lucide arrow <Icon>, not a ↑/↓ character.
   .weave-table__sort-arrow {
-    display: inline-block;
-    width: 1em;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--weave-table-arrow-size);
     color: var(--weave-table-sort-arrow);
-    font-size: var(--weave-table-arrow-size);
+    --weave-icon-size: var(--weave-table-arrow-size);
   }
 
   /* ── column resize grip (drag the header edge; keyboard on the separator) ── */
@@ -169,16 +173,16 @@
     border: 0;
     background: transparent;
     color: var(--weave-table-header-text);
+    --weave-icon-size: 16px; // the ▸ is a lucide chevron <Icon> now
     cursor: pointer;
   }
 
-  .weave-table__expand-toggle::before {
-    content: '\25B8'; // ▸
-    display: inline-block;
+  // The disclosure marker is a lucide chevron <Icon>, not a ▸ glyph (same treatment as Tree).
+  .weave-table__expand-toggle .weave-icon {
     transition: transform var(--weave-table-duration) ease;
   }
 
-  .weave-table__expand-toggle[aria-expanded='true']::before {
+  .weave-table__expand-toggle[aria-expanded='true'] .weave-icon {
     transform: rotate(90deg);
   }
 
