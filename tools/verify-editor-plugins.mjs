@@ -125,8 +125,18 @@ if (!shipped) die(`${zipName} bundles no server/server.cjs — the plugin would 
  *                for one nobody reviewed.
  *   sourceSha  — of the language-server sources with line endings normalised, so editing the
  *                server without rebuilding and re-shipping the plugin fails.
- * Neither depends on which machine ran esbuild. Limitation, stated plainly: a dependency bump
- * alone moves neither hash — `pnpm update` under the server does not trip this. */
+ * Neither depends on which machine ran esbuild.
+ *
+ * `sourceSha` also folds in the lockfile's RESOLVED versions for the language server's own
+ * dependencies, because "built from the current source" has to mean the current Volar too — the
+ * bundle is mostly Volar, and bumping it changes what the shipped server does while every source
+ * file stays byte-identical. Taking the resolved versions (not the `^2.4.11` specifiers) means a
+ * caret bump moves the hash; scoping it to this package's importer block means an unrelated bump
+ * elsewhere in the monorepo does NOT force a plugin rebuild.
+ *
+ * Residual gap, stated rather than papered over: a bump that only moves a TRANSITIVE dependency
+ * still slips through. Closing that would mean hashing the whole lockfile, which is the cry-wolf
+ * failure this gate already made once, in a milder costume. */
 const manifestPath = join(pluginDir, 'bundled-server.json');
 const lsSrc = join(root, 'packages/language-server/src');
 
@@ -144,7 +154,29 @@ function hashSources(dir) {
     }
   };
   walk(dir);
+  h.update(lockfileDeps());
   return h.digest('hex');
+}
+
+/**
+ * The lockfile's `importers` block for the language server: its direct dependencies with the
+ * RESOLVED versions, so a caret bump (`^2.4.11` → 2.4.29) moves the hash even though every
+ * source file is byte-identical. Shipping a months-old Volar is exactly the kind of stale this
+ * gate exists to catch.
+ */
+function lockfileDeps() {
+  const lock = readFileSync(join(root, 'pnpm-lock.yaml'), 'utf8').split(/\r?\n/);
+  const start = lock.findIndex((l) => l === '  packages/language-server:');
+  if (start === -1) die('pnpm-lock.yaml has no importer block for packages/language-server');
+  // Runs until the next importer at the same indent (two spaces, then a path).
+  let end = lock.length;
+  for (let i = start + 1; i < lock.length; i++) {
+    if (/^ {2}\S/.test(lock[i])) {
+      end = i;
+      break;
+    }
+  }
+  return lock.slice(start, end).join('\n');
 }
 
 const shippedSha = createHash('sha256').update(shipped).digest('hex');
@@ -170,7 +202,8 @@ if (process.argv.includes('--update') || !existsSync(manifestPath)) {
   }
   if (m.sourceSha !== sourceSha) {
     die(
-      `packages/language-server/src has changed since ${zipName} was built.\n` +
+      `the language server changed since ${zipName} was built — either its sources or the\n` +
+        `  resolved versions of its dependencies (a Volar bump moves this too).\n` +
         `  recorded: ${m.sourceSha}\n  actual:   ${sourceSha}\n` +
         `A stale bundled server does not fail loudly — it reports WRONG diagnostics on correct code\n` +
         `(0.21.0 predated auto-expose and turned every binding red). Rebuild the plugin, copy its\n` +
@@ -305,7 +338,8 @@ if (process.argv.includes('--update') || !existsSync(vscodeManifestPath)) {
   }
   if (m.sourceSha !== sourceSha) {
     die(
-      `packages/language-server/src has changed since ${vsixName} was built.\n` +
+      `the language server changed since ${vsixName} was built — either its sources or the\n` +
+        `  resolved versions of its dependencies (a Volar bump moves this too).\n` +
         `  recorded: ${m.sourceSha}\n  actual:   ${sourceSha}\n` +
         `Rebuild the extension (editor/vscode: build.mjs -> vsce package -> inject-plugin.mjs),\n` +
         `copy the .vsix into plugins/editor/vscode/, and re-run with --update.`
