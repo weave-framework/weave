@@ -1,6 +1,13 @@
 # RFC 0003: Router v2 (Phase C — C5)
 
-- **Status:** Accepted (build spec) — 2026-07-04
+- **Status:** ✅ **Implemented** — shipped in `@weave-framework/router` and frozen at 1.0. Accepted
+  (as a build spec) 2026-07-04. Verified against `packages/router/src/index.ts`: `createRouter(routes,
+  { basename?, viewTransitions? })`, `route()` with path-literal param inference, `useRouter()`,
+  `useLoaderData<T>()`, `RouterView`, `Link`, and the retained module sugar (`navigate`, `back`,
+  `currentPath`, `currentQuery`, `afterEach`, `beforeEach`, `setScrollHandling`, `setBasename`,
+  `prefetch`). U1–U4 all landed; U5 (Tier-2 quick wins) also shipped.
+  **Divergence from the spec below:** `beforeEach` (a leave guard) and `setServerLocation` are part of
+  the shipped surface and are not in the API sketch here.
 - **Author(s):** Aidas Josas (@aidasjosas) — design decisions delegated to and locked by the
   maintainer's agent this session.
 - **Discussion:** decision record for the C5 roadmap item; the public router API frozen at 1.0
@@ -23,8 +30,8 @@ promise stability.
   give each request its own router + URL. Doing router v2 *before* SSR de-risks the most.
 - **Typed params.** `/user/:id` today yields an untyped `Record<string,string>`; developers
   want `params.id` to exist and be typed.
-- **Data loading.** Route-level loaders are table-stakes (Remix/React-Router/SolidStart/Nuxt);
-  today loading is punted entirely to the component. Loaders also serialize cleanly for SSR.
+- **Data loading.** Route-level loaders are table-stakes for a router of this kind; today loading
+  is punted entirely to the component. Loaders also serialize cleanly for SSR.
 - **View Transitions.** The native API is now broadly available; wiring it into navigation is a
   cheap, high-delight win.
 

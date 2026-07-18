@@ -3,6 +3,46 @@
 Human-readable highlights, one section per release — everything notable that landed since
 the previous one. For the granular, per-version log see [CHANGELOG.md](CHANGELOG.md).
 
+## Unreleased
+
+Two correctness fixes in the framework, plus a pass over the documentation site's own presentation.
+
+### 🐛 Fixes
+
+- **A nested `@for` no longer reads the wrong row.** Every loop row function took a parameter
+  literally named `_row`, so an inner loop shadowed its parent. An outer loop variable referenced
+  inside a nested loop compiled to the *inner* item — silently, with no error. Where the inner item
+  happened to carry a same-named property the value looked plausible; where it did not, the binding
+  rendered empty. Each loop now gets its own row identifier. The magic names (`$index`, `$first`,
+  `$last`, …) still rebind to the innermost loop, which is the correct shadowing.
+
+- **A bare `#fragment` scrolls instead of navigating away.** `navigate('#section')` took the empty
+  string before the `#` as the destination path, which resolves to `/` — so an in-page anchor threw
+  the app back to the root route and lost the page you were reading. A bare fragment now keeps the
+  current path and query and just scrolls.
+
+- **`<Sidenav>` fills its container.** The shell set no height, so a drawer stopped at its last nav
+  item instead of running the full height of the box it was given. Auto-height parents are
+  unaffected (it resolves to a no-op there).
+
+- **`<Tree>` and `<List>` use real icons.** The tree disclosure marker was a CSS `▸` glyph and both
+  components drew their reorder handle as a `⠿` character; they are lucide `<Icon>`s now
+  (`chevron-right`, `grip-vertical`). `grip-vertical` joins the built-in icon set. The tree's
+  `toggle-glyph` token moves 12px → 14px, since a chevron icon needs slightly more than the glyph
+  did to read at the same weight.
+
+### 📚 Documentation site
+
+- Each API reference package page now opens with a **jump index** of its exports, grouped by kind
+  with a per-entry badge — `@weave-framework/runtime` alone is 56 symbols, previously all expanded
+  end to end with no way to see what the package contained.
+- **API anchors are unique.** A function and a same-named type collided (`resource` and `Resource`
+  both became `#resource`), which is a duplicate DOM id and sent half those links to the wrong
+  symbol. Existing deep links still resolve.
+- Component demos read as finished, anchored surfaces rather than floating on the backdrop, and the
+  Progress Bar — previously zero-width in the demo stage, with a track the colour of the page — is
+  visible.
+
 ## 1.6.0 — 2026-07-17
 
 The big one: **Weave renders to HTML at build time, and the browser resumes it instead of rebuilding it.**

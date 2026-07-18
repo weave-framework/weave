@@ -14,6 +14,40 @@
 > already left it behind — Phase E ran 94 commits without a bump, and then released as one MINOR. The public
 > promise wins; the habit is retired.)*
 
+## Unreleased
+
+### Fixed — compiler
+- **Nested `@for` row shadowing.** Row functions all took a parameter named `_row`, so a nested loop
+  shadowed its parent's and an outer loop variable read inside the inner loop resolved to the inner
+  item — no error, just the wrong object. Each loop now gets its own identifier (`_row0`, `_row1`, …)
+  from a dedicated counter, so `_b` block numbering is unchanged. `$index`/`$count`/`$first`/`$last`/
+  `$even`/`$odd` still rebind to the innermost loop (correct shadowing, via `childScope` layering).
+  Regression test renders a real nested loop and asserts the outer variable resolves in both a text
+  interpolation and an attribute.
+
+### Fixed — router
+- **`navigate('#fragment')` no longer navigates to `/`.** The target was split on `#` and the empty
+  remainder taken as the path. A bare fragment now preserves the current path *and* query, and falls
+  through to the existing fragment-scroll handling.
+
+### Fixed — ui
+- **`<Sidenav>`**: `.weave-sidenav` gets `height: 100%` so the shell fills a sized container (no-op in
+  an auto-height parent); drawer and content stretch via the default flex `align-items: stretch`.
+- **`<Tree>`**: disclosure marker is a lucide `chevron-right` `<Icon>` instead of a CSS `::before` `▸`
+  glyph, rotated 90° when expanded; rendered only for expandable nodes. Token `toggle-glyph` 12px → 14px.
+- **`<Tree>` / `<List>`**: reorder drag handle is a lucide `grip-vertical` `<Icon>` instead of a `⠿`
+  character. `grip-vertical` added to the built-in lucide set (and to the generator's name list).
+
+### Documentation site
+- API reference package pages open with a jump index of their exports, grouped by kind, with a
+  per-entry kind badge; anchor jumps scroll smoothly (honouring `prefers-reduced-motion`).
+- Generated API anchors are now unique per package — `slugify` lowercases, so a function and a
+  same-named type produced one shared `#anchor` (a duplicate DOM id). Anchors are assigned after the
+  sort, so the established anchor is kept and the collision is disambiguated by kind.
+- Demo-stage presentation: raised surfaces for tabs/stepper/menubar/list/paginator/tree/table/
+  grid-list/expansion, full-width tabs/stepper/menubar, visible Progress Bar, and a context-menu
+  right-click target that reads as a box.
+
 ## 1.6.0 — 2026-07-17
 
 **Phase E — SSG + a resumable signal core.** 94 commits, released as one MINOR: everything below is new,

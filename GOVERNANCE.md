@@ -45,9 +45,10 @@ voice matters most, in two ways:
 - **Demand** — is this genuinely needed, or just theoretically nice?
 - **Priority** — of the good ideas, which should be built first?
 
-Reactions and discussion are **input, not a binding vote.** Some foundational work (say,
-server-side rendering) may not top a popularity poll yet still needs to come first; the
-maintainer sequences the roadmap, informed by the signal.
+Reactions and discussion are **input, not a binding vote.** Some foundational work — a change
+deep in the reactive core, say — may not top a popularity poll yet still has to come first,
+because everything else is built on it; the maintainer sequences the roadmap, informed by the
+signal.
 
 ### Then: design, build, review
 

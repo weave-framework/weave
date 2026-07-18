@@ -1,7 +1,13 @@
-# RFC 0008: Component extension (`extendComponent`)
+# RFC 0008: Component extension (shipped as `export const extend`)
 
-- **Status:** ✅ Implemented — 2026-07-06. **Both modes shipped** via the **component-file authoring
-  form** (below): `#1` full template override AND `#3` declarative patches. Accepted 2026-07-06
+- **Status:** ✅ **Implemented** — 2026-07-06. **Both modes shipped** via the **component-file authoring
+  form** (below): `#1` full template override (published in npm **1.1.0**) AND `#3` declarative patches
+  (published in npm **1.2.0**). Verified: `extendSetup` in `packages/runtime/src/dom.ts`, the `extend`/
+  `patch` handling in `packages/compiler/src/component.ts` + `packages/cli/src/plugin.ts`, and
+  `applyPatches` in `packages/compiler/src/patch.ts`. **Note the title:** the shipped primitive is
+  `export const extend = Base` in a component file — there is **no exported `extendComponent()`
+  function**, despite this RFC's title and sketches (see "the original inline sketch", below).
+  Accepted 2026-07-06
   (maintainer, per GOVERNANCE — the RFC is the decision record). Resolved: **authoring form A = a
   component FILE that declares `export const extend = Base`** (NOT an inline `extendComponent(...)`
   call — the loader only build-processes component files, and template composition must be
@@ -244,6 +250,12 @@ is a deliberate boundary, not a bug: it keeps a base component's internals encap
   because "any component" is framework-wide, not UI-only.
 - Loader recognition + template composition in **`packages/cli`** (the dev/build loader) reusing
   **`packages/compiler`** (`parseTemplate`, the AST, `compileTemplate`).
+
+> **As built.** The second bullet holds (`packages/cli/src/plugin.ts` + `packages/compiler/src/patch.ts`).
+> The first does not: there is no public `extendComponent` or `TemplatePatcher`. The runtime side is
+> `extendSetup` in `@weave-framework/runtime/dom`, marked `@internal` — the compiler emits it, authors
+> never call it. Patches are the static `export const patch = [ … ]` op array read at build time, not a
+> `TemplatePatcher` callback.
 
 ## Alternatives considered
 

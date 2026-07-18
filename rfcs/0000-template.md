@@ -1,6 +1,6 @@
 # RFC: <title>
 
-- **Status:** Draft
+- **Status:** Draft <!-- Draft | Accepted | Partially implemented | Implemented | Deferred | Declined | Superseded — see README.md -->
 - **Author(s):** <your name / handle>
 - **Discussion:** <link to the GitHub Discussion, if any>
 

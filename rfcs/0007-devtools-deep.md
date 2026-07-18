@@ -1,6 +1,10 @@
 # RFC 0007: DevTools deep — trigger-trace & component tree
 
-- **Status:** ✅ Implemented — 2026-07-05 (`0.2.152→0.2.154`: trigger-trace `inspectTrace`/`traceFor` + component/owner tree `inspectTree` + panel Trace/Tree tabs)
+- **Status:** ✅ **Implemented** — 2026-07-05 (`0.2.152→0.2.154`): trigger-trace + component/owner tree + panel
+  Trace/Tree tabs. Verified in `packages/runtime/src/devtools.ts` (`inspectTrace`, `traceFor`, `inspectTree`,
+  alongside the pre-existing `inspectGraph`) and `packages/runtime/src/devtools-panel.ts` (`mountDevtoolsPanel`).
+  **Divergence from the design below:** the per-node trace accessor shipped as **`traceFor(id, limit?)`**, keyed by
+  dev-node id — there is no `inspect(sig)` taking a signal.
 - **Author(s):** Aidas Josas (@aidasjosas) — prep for a dedicated session; the depth follow-on to
   the shipped DevTools (introspection `0.2.131`, reactive panel + dep-graph this session).
 - **Discussion:** design direction + first steps.
@@ -17,7 +21,7 @@ changing it cause) and a **component/owner tree** (the scope hierarchy, not a fl
 - A flat node list + static edges answer "what depends on what" but not "**what just happened**"
   — the question you actually have when debugging an unexpected re-render.
 - A component tree maps the reactive graph back onto the shape developers think in (components /
-  scopes), the way React/Vue DevTools show a tree.
+  scopes), rather than a flat list of nodes.
 
 ## How it fits Weave
 

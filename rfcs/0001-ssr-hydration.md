@@ -1,7 +1,9 @@
 # RFC 0001: Server-side rendering & hydration
 
-- **Status:** **Implemented (as scoped)** — 2026-07-17. Accepted 2026-07-04.
-  This RFC scoped itself to **Phase 1 = SSG only**, explicitly deferring request-time SSR, streaming and RSC.
+- **Status:** **◐ Partially implemented** — 2026-07-17. Accepted 2026-07-04.
+  **Phase 1 (SSG) is delivered; request-time SSR and streaming are NOT built and remain deliberately deferred**
+  — exactly as this RFC scoped itself. Do not read this as the whole RFC being implemented.
+  This RFC scoped Phase 1 to **SSG only**, explicitly deferring request-time SSR, streaming and RSC.
   That scope is delivered, and the client-attach step is **resume** rather than the hydration this RFC assumed
   — the deeper primitive [RFC 0009](0009-resumable-signal-core.md) defined and this RFC's own header points at.
   Every exit criterion in PHASE-E-PLAN, checked against a real build rather than an intention:
@@ -37,9 +39,9 @@
 
 ## Decision (2026-07-04)
 
-**Accepted, with a deliberately narrow scope and schedule.** SSR is a real competitive gap
-(every meta-framework — Next/Nuxt/SvelteKit/SolidStart/Angular Universal — has it), and it is
-the single most-cited blocker for content-first / SEO-sensitive adopters. We commit to closing
+**Accepted, with a deliberately narrow scope and schedule.** Server rendering is a real gap in
+what Weave can do, and it is the single most-cited blocker for content-first / SEO-sensitive
+adopters. We commit to closing
 that gap. But it is also the largest permanent cost Weave can take on — a *second render path,
 maintained forever* — and a half-built SSR would damage trust more than its absence. So:
 
@@ -82,9 +84,9 @@ the DOM. That is great for apps behind a login, but it costs on:
 - **SEO / link previews** — crawlers and unfurlers that don’t run JS see an empty `#app`.
   (Our own docs work around this only because they’re a rich SPA a human drives.)
 
-These are the two requests most likely to block adoption by teams evaluating Weave against
-Next/Nuxt/SvelteKit/SolidStart. Everything else Weave already does well; this is the gap
-that turns “nice framework” into “can’t use it for our marketing site.”
+These are the two requests most likely to block adoption by teams building content-first
+sites. Everything else Weave already does well; this is the gap that turns “nice framework”
+into “can’t use it for our marketing site.”
 
 It’s worth *considering* now (not necessarily building now) because the architecture that
 makes Weave fast on the client — compiled templates with **compile-time child-index paths**
@@ -112,6 +114,22 @@ The non-negotiables constrain the design more than they forbid it:
   needs a hydration story.
 
 ## Design
+
+> **What actually shipped (2026-07-17) — read this before the design below.** The sections that
+> follow are the design as proposed; the delivered API differs and the delivered API is what
+> exists. Verified against source:
+>
+> | Proposed here | Shipped |
+> |---|---|
+> | `@weave-framework/ssr` package | **no such package** — server rendering lives in `@weave-framework/runtime/server` (`renderToString`, `renderComponent`, `renderPage`, `renderDocument`; `packages/runtime/src/server.ts`) |
+> | `renderToString(App, { props })` | `renderToString(node)` — takes an already-rendered node, not a component + props |
+> | `hydrate(App, '#app', { props })` from `runtime/dom` | **no `hydrate`** — the client attaches by **resume**: `resumePage()` / `resume()` in `@weave-framework/runtime/graph`, per RFC 0009 |
+> | a compiler "hydrate mode" whose `bindX` helpers skip the initial write | a **resumable codegen target** (`resumable` option in `packages/compiler/src/codegen.ts`) plus adopt helpers in `@weave-framework/runtime/adopt` |
+> | (not proposed) | the build entry point: `weave build --ssg`, configured by `ssg: { routes?, resume? }` in `weave.config.ts` (`packages/cli/src/config.ts`) |
+>
+> The mismatch-policy machinery this RFC anticipated is moot in the shipped shape: a component
+> that cannot adopt the server DOM degrades to a plain client-rendered island in place rather
+> than reconciling a diff.
 
 Three pieces: a **server render**, a **hydrate** entry, and the **compiler** support that
 lets one component definition do both.

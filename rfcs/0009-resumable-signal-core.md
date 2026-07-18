@@ -48,6 +48,20 @@ opt-in compile target + new runtime entries.
 
 ## Design
 
+> **Naming divergence — what shipped.** The design below names the primitives
+> `serializeGraph` / `deserializeGraph` / `mode: 'resumable'`. Those names were exploratory; the
+> built API differs. Verified against source:
+>
+> | Proposed here | Shipped |
+> |---|---|
+> | `serializeGraph(root: Owner): Wire` | `serialize(value, options?): Wire` — `@weave-framework/runtime/serialize`, plus `snapshot(state)` in `runtime/graph` for the page snapshot |
+> | `deserializeGraph(wire): ResumeHandle` | `deserialize(wire, options?): unknown`; the resume handle is `ResumeApp`, returned by `resume(root, options)` / `resumePage(options)` in `@weave-framework/runtime/graph` |
+> | custom-class hook | `registerSerializableType()` + `SerializableType`; a non-serializable value throws `SerializeError` |
+> | compiler target `mode: 'resumable'` | a boolean codegen option — `resumable?: boolean` in `packages/compiler/src/codegen.ts` (the eager path stays the default) |
+> | `@weave-framework/runtime/resume` as *the* resume entry | split across `runtime/resume` (lazy-handler wiring: `resumableHandler`, `collectResumable`), `runtime/adopt` (DOM adoption), `runtime/graph` (state map, `resumePage`, `resume`) and `runtime/server` (headless render: `renderToString`, `renderPage`, `renderDocument`) |
+>
+> The snapshot element id shipped as specified: `SNAPSHOT_ID = '__weave_snapshot__'`.
+
 ### 1. The wire format (`serializeGraph` / `deserializeGraph`)
 
 A compact, in-house, zero-dependency encoding of a reactive-graph snapshot. Requirements:

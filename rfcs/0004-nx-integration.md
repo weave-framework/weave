@@ -1,6 +1,10 @@
 # RFC 0004: Nx integration (`@weave-framework/nx`)
 
-- **Status:** ✅ Implemented — 2026-07-05 (`0.2.156`, `@weave-framework/nx`: createNodesV2 inference + build/serve/check executors + application/library/component generators)
+- **Status:** ✅ **Implemented** — 2026-07-05 (`0.2.156`); `@weave-framework/nx` is published on npm.
+  Verified in `packages/nx/src`: `createNodesV2` inference (`plugin.ts`), `build`/`serve`/`check`
+  executors, and `application`/`library`/`component` generators.
+  The **"Docs & bookkeeping checklist"** below was the execution plan for the building session; it is
+  kept as the historical record and its unticked boxes are **not** an open to-do list.
 - **Author(s):** Aidas Josas (@aidasjosas) — designed this session by the maintainer's agent,
   scoped as a **pre-launch enterprise-adoption** deliverable.
 - **Discussion:** decision record + full execution checklist for the "make Weave easy to

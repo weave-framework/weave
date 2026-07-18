@@ -10,7 +10,7 @@
 
 [![npm](https://img.shields.io/npm/v/@weave-framework/runtime?label=npm&color=8b5cf6)](https://www.npmjs.com/package/@weave-framework/runtime) [![license: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE) [![zero dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)](#-built-to-be-trusted)
 
-[📚 **Documentation**](https://weaveframework.dev/) · [🚀 Get started](https://weaveframework.dev/) · [🎡 Live demo](https://demo.weaveframework.dev) · [🗺️ Roadmap](#-where-its-headed)
+[📚 **Documentation**](https://weaveframework.dev/) · [🚀 Get started](https://weaveframework.dev/) · [🎡 Live demo](https://demo.weaveframework.dev) · [🗺️ Roadmap](TODO.md)
 
 **Weave is 1.0 — the public API is stable and frozen.** Breaking changes only ever land in a major version, deprecated‑first. [Read the 1.0 notes →](https://github.com/weave-framework/weave/releases/tag/v1.0.0)
 
@@ -50,19 +50,21 @@ So what does that get you?
 - **A real IDE citizen.** First‑class VS Code **and** WebStorm support, with the kind of editor experience you'd expect from a mature framework.
 - **Honest TypeScript.** Types flow through by inference, your editor understands your UI for free, and there's no decorator boilerplate to wade through.
 
-None of this makes the others "wrong." It's a different set of trade‑offs — small, fast, signal‑native, low‑ceremony — for people who want exactly that.
-
 ---
 
-## 🗺️ Where it's headed
+## 🗺️ Where it stands
 
-Weave's core is solid — signal-native, covered by a broad browser test suite, and dogfooded end to end by a complete demo app. It evolves deliberately, and one rule sits above the rest: *don't break your app.* As of **1.0**, that's a formal promise: the public API is frozen and versioned under [semver](VERSIONING.md) — breaking changes only ever land in a major, deprecated‑first. On the horizon:
+Weave's core is solid — signal-native, covered by a broad browser test suite, and dogfooded end to end by a complete demo app. It evolves deliberately, and one rule sits above the rest: *don't break your app.* As of **1.0**, that's a formal promise: the public API is frozen and versioned under [semver](VERSIONING.md) — breaking changes only ever land in a major, deprecated‑first.
 
-- **Documentation site** — the home this README keeps pointing you toward: live today, and filling in component by component.
-- **Static generation & resume** — `weave build --ssg` prerenders every route to real HTML, and `ssg: { resume: true }` lets the browser **adopt** that HTML instead of rebuilding it: the signal graph crosses the wire in a snapshot, and `setup()` never runs on the client. Opt‑in and additive — a normal build is unchanged, and a SPA‑only app pays zero bytes for it. **Shipped** — see [Static generation & resume](https://weaveframework.dev/learn/static-generation). Request‑time SSR and streaming remain deliberately deferred.
-- **DevTools** — an in‑app panel to watch the fabric update live: named signals/computeds/effects, their values, who triggers whom, a temporal trigger‑trace, and a component/owner tree. **Shipped** — `mountDevtoolsPanel()`.
-- **Editor & monorepo integration** — an **MCP server** (`@weave-framework/mcp`) so AI editors can compile‑check, type‑check, and scaffold through structured tools, and an **Nx plugin** (`@weave-framework/nx`) so a Weave app is a first‑class project with inferred cached targets. **Shipped.**
-- **More of everything** — the long tail of polish that turns a framework into a daily driver.
+**Woven in already:**
+
+- **The documentation site** — the home this README keeps pointing you toward, complete: guides, the full API reference, every UI component, worked examples, and search.
+- **Static generation & resume** — `weave build --ssg` prerenders every route to real HTML, and `ssg: { resume: true }` lets the browser **adopt** that HTML instead of rebuilding it: the signal graph crosses the wire in a snapshot, and `setup()` never runs on the client. Opt‑in and additive — a normal build is unchanged, and a SPA‑only app pays zero bytes for it. See [Static generation & resume](https://weaveframework.dev/learn/static-generation).
+- **DevTools** — an in‑app panel to watch the fabric update live: named signals/computeds/effects, their values, who triggers whom, a temporal trigger‑trace, and a component/owner tree. `mountDevtoolsPanel()`.
+- **Editor & monorepo integration** — an **MCP server** (`@weave-framework/mcp`) so AI editors can compile‑check, type‑check, and scaffold through structured tools, and an **Nx plugin** (`@weave-framework/nx`) so a Weave app is a first‑class project with inferred cached targets.
+- **Component extension** — a component can `extend` another: reuse its whole setup and behaviour, then override the template outright or patch it declaratively.
+
+**Still ahead** — the live list, with what we've deliberately left out, is the [public roadmap](TODO.md). Request‑time SSR and streaming are a conscious omission, not a gap: static generation covers SEO and first paint without a server in the request path.
 
 Ideas and contributions are welcome — the roadmap is a direction, not a fence.
 

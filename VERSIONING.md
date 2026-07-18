@@ -37,6 +37,20 @@ Weave follows [Semantic Versioning](https://semver.org). One question decides a 
   a UI token/DOM-contract change, or a type that's narrowed so previously-valid code no
   longer type-checks.
 
+## One version, every package
+
+Every `@weave-framework/*` package (and `create-weave`) shares a **single lockstep version**, released
+together. If you see `1.6.0` on one, that's the version of all of them — so packages that are meant to work
+together always do, and there's no compatibility matrix to reason about. A release publishes the whole set in
+dependency order.
+
+## How a release happens
+
+Releases are cut from `main` by CI, not by hand: a commit whose message contains the marker `[publish]` triggers
+the release workflow, which publishes every package to npm and creates a matching GitHub Release, with the notes
+taken from that version's section of [RELEASE-NOTES.md](RELEASE-NOTES.md). The documentation site deploys under
+the same gate, so the docs never get ahead of the packages they describe. Ordinary commits publish nothing.
+
 ## When a breaking change is genuinely needed
 
 We won't pretend it can never happen — one day something may need to change at its root.

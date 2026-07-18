@@ -21,11 +21,11 @@ this list is a live intention, not a historical note.
 ## Planned — framework
 
 - **Component extension — `weave check` for patch markup.** ([RFC 0008](rfcs/0008-component-extension.md) —
-  the last follow-on.) A component can **`extend`** another — reuse its whole `setup` context and behaviour,
-  then either a full-template override (`#1`, 1.1.0) or *declarative patches* against the base template
-  (`#3`, 1.2.0). Both shipped; see [Extending a component](https://weaveframework.dev/learn/components). Still
-  planned: `weave check` type-checking of the markup inside `#3` `patch` ops (today a typo in a patched
-  expression surfaces at build/runtime, not in the editor; `#1` extensions are already fully checked).
+  the last follow-on.) Extending a component already works both ways — a full-template override, or
+  *declarative patches* against the base template (see
+  [Extending a component](https://weaveframework.dev/learn/components)). What's still planned is `weave check`
+  type-checking of the markup inside `patch` ops: today a typo in a patched expression surfaces at
+  build/runtime rather than in the editor, while full overrides are already fully checked.
 - **Splitting below the component.** `weave build --ssg` splits per route, and `lazy()` splits per component —
   but an interactive component still carries its whole module. Shipping *one handler* and nothing else, so a
   mostly-static page pays only for the island on it, is sketched in
@@ -38,7 +38,7 @@ this list is a live intention, not a historical note.
 
 Not planned — these are conscious design choices, not omissions:
 
-- **Request-time SSR, streaming, RSC** — static generation shipped in 1.6.0 and covers SEO and first paint
+- **Request-time SSR and streaming** — static generation shipped in 1.6.0 and covers SEO and first paint
   without a server in the request path. Rendering per request is a different set of trade-offs and waits for a
   real need, not a checklist.
 - **A full animation system** beyond the transition callbacks above — CSS covers the rest.

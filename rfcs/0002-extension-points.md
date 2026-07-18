@@ -1,8 +1,11 @@
 # RFC 0002: Component extension points (plugins)
 
-- **Status:** ◐ Partially implemented — 2026-07-05. The **schema-driven forms / field-type registry** slice shipped
-  (`0.2.151`, `@weave-framework/forms/schema`: `fieldType()` registry + `schemaForm()` builder). The broader
-  component extension points (Table `columnTypes`, feature-pipeline plugins) remain design-of-record.
+- **Status:** ◐ **Partially implemented** — 2026-07-05. The **schema-driven forms / field-type registry** slice
+  shipped (`0.2.151`, `@weave-framework/forms/schema`: `fieldType()` + `fieldTypeNames()` registry + `schemaForm()`
+  builder — verified in `packages/forms/src/schema.ts`). The broader component extension points remain
+  **design-of-record, not built**: `packages/ui/src/table/table.ts` has no `columnTypes` / `col.type` registry —
+  the only cell escape hatch is still `col.cell` — and the feature-pipeline plugins (kind B) do not exist.
+  The unresolved questions below are therefore still genuinely open.
 - **Author(s):** Aidas Josas (@aidasjosas)
 - **Discussion:** captured from a design session; not yet gauged. This RFC records the
   *direction and open questions*, not a final API.

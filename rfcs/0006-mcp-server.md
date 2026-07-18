@@ -1,6 +1,10 @@
 # RFC 0006: Weave MCP server (`@weave-framework/mcp`)
 
-- **Status:** ✅ Implemented — 2026-07-05 (`0.2.155`, `@weave-framework/mcp`: in-house JSON-RPC/stdio; tools compile_template/check/routes/scaffold_component; `weave mcp` + `weave-mcp` bin). docs_search deferred (docs index is app-local, not a package dep).
+- **Status:** ✅ **Implemented** — 2026-07-05 (`0.2.155`); `@weave-framework/mcp` is published on npm.
+  In-house JSON-RPC over stdio, no MCP SDK. Verified in `packages/mcp/src/tools`: `weave_compile_template`,
+  `weave_check`, `weave_routes`, `weave_scaffold_component`; launched via `weave mcp` / the `weave-mcp` bin.
+  **Not built** from the table below: `weave_docs_search` (deferred — the docs index is app-local, not a
+  package dependency) and the optional `weave_build`.
 - **Author(s):** Aidas Josas (@aidasjosas) — prep for a dedicated session (Tier-2 item).
 - **Discussion:** design direction + first steps so a fresh session can build it without re-deriving.
 

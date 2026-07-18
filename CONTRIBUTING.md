@@ -17,6 +17,9 @@ Weave has a few hard, non-negotiable principles. A change that breaks one won't 
   SCSS mixins; every value flows from a component's own design tokens.
 - **Fail loud, not silent.** Ambiguous input should error at parse/compile time with a
   clear message rather than misbehave at runtime.
+- **Accessible by construction** (for UI). Components follow the WAI-ARIA patterns — correct
+  roles and state, keyboard support, focus management, reduced motion — as part of the change,
+  not as a follow-up.
 - **A fix isn't done until a test fails without it.** Add a test that reproduces the bug
   (or covers the feature) and would fail on `main` — then make it pass.
 
@@ -36,6 +39,11 @@ pnpm lint                    # eslint .
 pnpm verify:ui-sass          # verify the UI token schemas compile
 ```
 
+Beyond those four, the repo has a family of `verify:*` scripts that check contracts an ordinary
+test can't see — bundle-size budgets, the server-render/resume round-trip in a real browser, the
+UI library's consumability from its built `dist`, and each editor/tooling integration. CI runs
+them all; `package.json` lists them.
+
 The repo is a pnpm workspace under `packages/`. The framework runtime, compiler, CLI,
 router, forms, store, i18n, data layer, and UI library are each their own package.
 
@@ -45,8 +53,9 @@ router, forms, store, i18n, data layer, and UI library are each their own packag
 2. Make your change with a focused scope — one logical change per pull request.
 3. **Add or update tests** (`*.browser.ts`) so the change is covered and would fail
    without it. Keep the suite green.
-4. Make sure `pnpm typecheck`, `pnpm lint`, and `pnpm test` all pass locally. CI runs the
-   same gates on your pull request.
+4. Make sure `pnpm typecheck`, `pnpm lint`, and `pnpm test` all pass locally. CI runs those on
+   your pull request, plus the build, the size budgets, and the `verify:*` suite — so it's worth
+   running the `verify:*` script closest to what you touched before pushing.
 5. Match the surrounding code — naming, comment density, and idioms. New code should read
    like the code already there.
 

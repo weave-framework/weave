@@ -1,6 +1,10 @@
 # RFC 0005: Public API surface audit (freeze prep)
 
-- **Status:** Implemented — 2026-07-05 (runtime/dom split done via option 1; surface audited to 151 documented exports, 0 undocumented; `VERSIONING.md` finalised; **shipped in 1.0.0**)
+- **Status:** ✅ **Implemented** — 2026-07-05. The `runtime/dom` split was done via **option 1**
+  (`@internal` JSDoc); surface audited to 151 documented exports, 0 undocumented; `VERSIONING.md`
+  finalised; **shipped in 1.0.0** and the public API has been frozen since. Verified:
+  `packages/runtime/src/dom.ts` carries the `@internal` tags and `docs/tools/gen-api.mjs` skips
+  `@internal` exports.
 - **Author(s):** Aidas Josas (@aidasjosas) — audit produced by the maintainer's agent as the
   pre-1.0 **API-freeze** groundwork ([[weave-launch-sequencing]]).
 - **Discussion:** a findings + checklist doc. The public/internal *decisions* are the
