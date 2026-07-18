@@ -154,7 +154,7 @@ For services/state shared down a subtree without prop-drilling: `createContext` 
 ```ts
 // session.ts
 import { createContext } from '@weave-framework/runtime';
-export const SessionContext = createContext<Session>('session');
+export const SessionContext = createContext<Session>();          // or createContext<Session>(fallback)
 
 // ancestor setup(): provide(SessionContext, session)
 // descendant setup(): const session = inject(SessionContext)

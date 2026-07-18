@@ -20,14 +20,15 @@ ICU syntax; formatters wrap native `Intl`.
 
 ```ts
 // i18n/i18n.ts
-import { createI18n, setGlobalI18n } from '@weave-framework/i18n';
+import { createI18n } from '@weave-framework/i18n';
 export const i18n = createI18n({
-  locale: 'en',
-  fallback: 'en',
+  lang: 'en',                 // NOT `locale` — the config key is `lang`
+  fallbackLang: 'en',         // NOT `fallback`
+  langs: ['en', 'lt'],        // advertised languages for a switcher (defaults to keys of `messages`)
   loader: (lang) => import(`./messages/${lang}.json`).then((m) => m.default),
 });
-setGlobalI18n(i18n);   // powers the bare t()/setLocale()/locale() exports
 ```
+The exact `I18nConfig` keys are **`lang`** (required), `fallbackLang`, `langs`, `messages`, `loader`, `missing`, and `global`. `global` defaults to **`true`**, so `createI18n` already registers the instance behind the bare `t()`/`setLocale()`/`locale()` exports — you do **not** need `setGlobalI18n` in the normal case. Pass `global: false` for a secondary instance, and call `setGlobalI18n(i18n)` only if you later want to swap which instance is global.
 
 ## Translate — same `t()` in template and `.ts`
 
@@ -62,7 +63,9 @@ setLocale('lt');   // loads the catalog (via `loader`) then flips the signal
 locale();          // current locale (reactive)
 loading();         // true while a catalog is loading (reactive)
 ```
-A language `<select>` just calls `setLocale(code)` on change; everything reading `t()`/`locale()` updates.
+A language `<select>` just calls `setLocale(code)` on change; everything reading `t()`/`locale()` updates. Populate it from the instance's **`i18n.availableLangs()`**.
+
+The `I18n` instance returned by `createI18n` also exposes `locale()`, `loading()`, `setLocale(lang)`, `load(lang, scope?)`, `t`, **`has(key)`**, and **`scoped(scope)`** (a `t` bound to a key namespace).
 
 ## Locale-aware formatting (Intl)
 

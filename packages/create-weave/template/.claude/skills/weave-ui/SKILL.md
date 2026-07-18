@@ -13,7 +13,8 @@ description: >-
 
 # Weave UI (@weave-framework/ui)
 
-A Material+CDK-equivalent component library built ON Weave — signal-native,
+A full application component library built ON Weave, in two layers: styled
+components on top of a headless behavior layer (the CDK). Signal-native,
 zero-dep, accessible (WAI-ARIA), themeable via SCSS tokens. Two audiences:
 **(1) consuming** the ready components, **(2) authoring** new ones. Each component
 is a subpath import; the dist ships a typed `export default`, so
@@ -36,7 +37,11 @@ import Dialog from '@weave-framework/ui/dialog';
 
 ### The catalog (import name = subpath)
 
-`button` · `button-toggle` · `badge` · `card` · `divider` · `icon` · `toolbar` · `sidenav` · `menu` · `menubar` · `context-menu` · `tabs` · `stepper` · `expansion` · `list` · `grid-list` · `table` · `paginator` · `tree` · `input` · `form-field` · `select` · `autocomplete` · `checkbox` · `radio` · `slide-toggle` · `slider` · `chips` · `datepicker` · `timepicker` · `dialog` · `bottom-sheet` · `snackbar` · `tooltip` · `popover-edit` · `progress-bar` · `progress-spinner`.
+All **38**, each importable as `@weave-framework/ui/<name>`:
+
+`autocomplete` · `badge` · `bottom-sheet` · `button` · `button-toggle` · `card` · `checkbox` · `chips` · `context-menu` · `date-range-picker` · `datepicker` · `dialog` · `expansion` · `form-field` · `grid-list` · `icon` · `input` · `list` · `menu` · `menubar` · `paginator` · `popover-edit` · `progress-bar` · `progress-spinner` · `radio` · `ripple` · `select` · `sidenav` · `slide-toggle` · `slider` · `snackbar` · `stepper` · `table` · `tabs` · `timepicker` · `toolbar` · `tooltip` · `tree`.
+
+Don't invent a component outside this list. Note `divider` and `overlay` are **style-only** subpaths (SCSS, no JS component to import); `context-menu` is JS-only.
 
 Form controls (`input`, `select`, `checkbox`, `radio`, `slide-toggle`, `slider`, `datepicker`, `chips`, `autocomplete`) integrate with **weave-forms** (`use:control`) and with `bind:`. Overlays (`dialog`, `menu`, `tooltip`, `snackbar`, `bottom-sheet`) sit on the CDK overlay/positioning layer.
 
