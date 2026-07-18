@@ -4,7 +4,7 @@
  * ES module each:
  *
  *  - `.weave` SFC (split by `parseSfc`)
- *  - separate files (Angular-style): a `.ts` with a co-located `<base>.<styleLang>`
+ *  - separate files: a `.ts` with a co-located `<base>.<styleLang>`
  *    template's `<base>.html` (and optional `<base>.<styleLang>` styles).
  *
  * Styles can be authored in `.css`, `.scss`, or `.sass` — picked per project via

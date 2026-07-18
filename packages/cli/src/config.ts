@@ -1,5 +1,5 @@
 /**
- * Weave app config (Angular-style) — one file declares everything the build/dev
+ * Weave app config — one file declares everything the build/dev
  * pipeline needs: the entry module, the HTML shell, the output dir, the global
  * entry stylesheets, and the component style language. The CLI reads it instead
  * of long `--out`/`--serve` flags.

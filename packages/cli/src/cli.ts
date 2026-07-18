@@ -47,7 +47,7 @@ export async function main(argv: string[]): Promise<void> {
   const entry: string = rest.find((a) => !a.startsWith('-')) ?? 'src/main.ts';
   const outdir: string = flag(rest, '--out') ?? 'dist';
   // A `weave.config.ts/json` (auto-discovered in cwd, or via `--config`) switches both
-  // build + dev into the config-driven pipeline (Angular-style); else the flags drive it.
+  // build + dev into the config-driven pipeline; else the flags drive it.
   const config: ResolvedConfig | null = await loadConfig(process.cwd(), flag(rest, '--config'));
 
   if (cmd === 'build') {
