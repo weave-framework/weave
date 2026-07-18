@@ -12,11 +12,23 @@
 
 ## Summary
 
-A second extension model for Weave, alongside "author a component and use it". Today the only
-way to extend the library is **composition from the outside** — you write a new component and
-place it. This RFC proposes **extension from the inside**: a way for a developer to *plug a
-missing piece into an existing component* — a new cell renderer, a new field type, a new
-behaviour — without forking or re-authoring that component.
+A second extension model for Weave, alongside "author a component and use it". This RFC proposes
+**extension from the inside**: a way for a developer to *plug a missing piece into an existing
+component* — a new cell renderer, a new field type, a new behaviour — without forking or
+re-authoring that component.
+
+> **Since this was written, [RFC 0008](0008-component-extension.md) shipped — and it is a
+> different mechanism, not this one.** When this RFC was drafted, composition from the outside
+> (write a new component and place it) was the only option; that premise no longer holds. 0008
+> lets you *subclass* a component: a component file declares `export const extend = Base` and
+> overrides its `setup`, or patches its template declaratively. That is author-side — **you**
+> derive a new component from a base you name.
+>
+> What this RFC asks for is not that. It is a **registry an unmodified component calls into**:
+> the app registers a `timestamp` column type once, and every `<Table>` in the app resolves
+> `type: 'timestamp'` through it without anyone deriving anything. 0008 does not provide that,
+> so the scope below is still open rather than superseded — but a reader looking for "extend a
+> built-in component" should check 0008 first, because for many cases it is now the answer.
 
 A plugin here is **not** "just another component". A plugin is a **registered extension that a
 component calls into during its own work**, at points the component deliberately exposes
