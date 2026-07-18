@@ -222,6 +222,27 @@ test('@for reflects immutable item updates on reused rows', () => {
   assert.equal(li.textContent, 'A', 'reused row reflects new item value');
 });
 
+// Every @for row used to be named `_row`, so a nested @for's parameter SHADOWED its parent's.
+// An outer loop variable referenced inside the inner loop then silently read the INNER item —
+// no error, just wrong values (and `undefined` for any property the inner item happens to lack).
+test('a nested @for can read the OUTER loop variable (rows must not shadow)', () => {
+  const groups: Signal<{ k: string; tag: string; items: { id: number; n: string }[] }[]> = signal([
+    { k: 'a', tag: 'F', items: [{ id: 1, n: 'one' }, { id: 2, n: 'two' }] },
+    { k: 'b', tag: 'T', items: [{ id: 3, n: 'three' }] },
+  ]);
+  const el: Element = render(
+    '<div>@for (g of groups(); track g.k) { <section>' +
+      '@for (s of g.items; track s.id) { <span data-tag={{ g.tag }}>{{ g.k }}/{{ s.n }}</span> }' +
+      '</section> }</div>',
+    { groups },
+    ['groups']
+  );
+  host().appendChild(el);
+  const spans: HTMLSpanElement[] = [...el.querySelectorAll('span')];
+  assert.deepEqual(spans.map((s) => s.textContent), ['a/one', 'a/two', 'b/three'], 'outer var in text');
+  assert.deepEqual(spans.map((s) => s.getAttribute('data-tag')), ['F', 'F', 'T'], 'outer var in an attribute');
+});
+
 test('@for @empty shows when the list is empty', () => {
   const items: Signal<number[]> = signal<number[]>([]);
   const el: Element = render(

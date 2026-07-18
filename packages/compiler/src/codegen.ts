@@ -154,6 +154,7 @@ class Gen {
   private tplN: number = 0;
   private fnN: number = 0;
   private refN: number = 0;
+  private rowN: number = 0;
 
   constructor(
     public mode: 'module' | 'function',
@@ -211,6 +212,13 @@ class Gen {
   }
   fn(prefix: string = '_b'): string {
     return `${prefix}${this.fnN++}`;
+  }
+  /** A unique `@for` row parameter. Nested loops MUST NOT share one name: a shared `_row` made
+   *  the inner block's parameter shadow its parent's, so an outer loop variable read inside a
+   *  nested loop silently resolved to the inner item. Its own counter (not `fn()`'s) so block
+   *  function numbering stays stable. */
+  row(): string {
+    return `_row${this.rowN++}`;
   }
 }
 
@@ -1220,16 +1228,20 @@ function compileFragment(
     // rows). Positional adoptability is gated by emitChildren (≤1 block/level, nothing indexed after it).
     blockAnchor(path);
     const rowFn: string = gen.fn();
+    // Unique per loop: a nested @for must not shadow its parent's row (see Gen.row()). The magic
+    // names ($index/$first/…) still rebind to the innermost loop — that shadowing IS correct —
+    // because childScope layers this map over the parent's.
+    const rowVar: string = gen.row();
     const forScope: Scope = childScope(sc, {
-      [node.item]: '_row.item',
-      $index: '_row.index',
-      $count: '_row.count',
-      $first: '_row.first',
-      $last: '_row.last',
-      $even: '_row.even',
-      $odd: '_row.odd',
+      [node.item]: `${rowVar}.item`,
+      $index: `${rowVar}.index`,
+      $count: `${rowVar}.count`,
+      $first: `${rowVar}.first`,
+      $last: `${rowVar}.last`,
+      $even: `${rowVar}.even`,
+      $odd: `${rowVar}.odd`,
     });
-    childDecls.push(compileFragment(gen, node.children, forScope, rowFn, '_row'));
+    childDecls.push(compileFragment(gen, node.children, forScope, rowFn, rowVar));
 
     let emptyArg: string = '';
     if (node.empty) {
