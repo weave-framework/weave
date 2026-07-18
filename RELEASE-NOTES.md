@@ -3,7 +3,7 @@
 Human-readable highlights, one section per release — everything notable that landed since
 the previous one. For the granular, per-version log see [CHANGELOG.md](CHANGELOG.md).
 
-## Unreleased
+## 1.7.0 — 2026-07-18
 
 Correctness fixes in the framework and a substantial repair of the WebStorm editing experience,
 plus a pass over the documentation site's own presentation.
@@ -14,7 +14,7 @@ plus a pass over the documentation site's own presentation.
   plugin had gone stale: it predated `auto-expose` (a `setup()` may omit its `return`), so it typed
   the template context as `void` and flagged *every* binding of *every* such component. On a real
   application that was 1642 false errors across 39 of 41 files — while `weave check` on the same
-  files reported none. Install `weave-webstorm-0.22.0.zip`. A new CI gate now fails the build if the
+  files reported none. Install `weave-webstorm-0.23.0.zip`. A new CI gate now fails the build if the
   server inside the shipped `.zip` ever differs from the one in the repository again.
 
 - **Template highlighting is no longer one lonely colored word.** A call inside a binding —
@@ -52,6 +52,24 @@ plus a pass over the documentation site's own presentation.
   (`chevron-right`, `grip-vertical`). `grip-vertical` joins the built-in icon set. The tree's
   `toggle-glyph` token moves 12px → 14px, since a chevron icon needs slightly more than the glyph
   did to read at the same weight.
+
+### ⚠️ Deprecated (still emitted, still safe to set)
+
+Five design tokens became inert during this cycle — the rules that read them went away when a `×`
+character became a lucide icon and a `marked` button's underline became a tonal fill. They are **kept
+and emitted**, because the design-token contract is frozen public API: a token is deprecated first and
+removed only in a major. If you set one of these, nothing breaks — but nothing happens either, so move
+to the replacement when convenient.
+
+| Deprecated | Instead |
+| --- | --- |
+| `--weave-button-mark-width` | no replacement — `marked` is a tonal fill, not an underline |
+| `--weave-chips-remove-font-size` | `--weave-chips-remove-icon` |
+| `--weave-input-clear-size` | sized by the icon rules |
+| `--weave-datepicker-cell-size` *(typography)* | `--weave-datepicker-cell-font` |
+| `--weave-date-range-picker-cell-size` *(typography)* | `--weave-date-range-picker-cell-font` |
+
+(The `sizing` group's `cell-size` on both pickers is untouched and still does what it always did.)
 
 ### 📚 Documentation site
 

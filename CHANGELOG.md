@@ -14,7 +14,24 @@
 > already left it behind — Phase E ran 94 commits without a bump, and then released as one MINOR. The public
 > promise wins; the habit is retired.)*
 
-## Unreleased
+## 1.7.0 — 2026-07-18
+
+### Deprecated — ui
+- **Five design tokens are inert but kept.** `button.mark-width`, `chips.remove-font-size`,
+  `input.clear-size` and `typography.cell-size` on both pickers stopped being read when their glyphs
+  became lucide icons (and the picker token was renamed to `cell-font`). They had been **deleted**;
+  deleting a public token is a MAJOR change that fails silently for the consumer — their override
+  simply stops applying — so all five are restored as deprecated no-ops, each naming its replacement.
+  See RELEASE-NOTES for the table.
+
+### Added — tooling
+- **`verify:ui-tokens`** (in CI): the `--weave-*` names the library actually emits are snapshotted in
+  `packages/ui/token-contract.json`. A removed token fails hard; a new one fails until recorded with
+  `--update`. Ground truth is the built stylesheet, not the SCSS source. 617 tokens recorded.
+- **`skills:check` / `skills:install`**: the skill suite exists in three places and two are derived
+  copies. The one in a user profile — what an agent actually loads — sat two months behind, teaching a
+  `field()` signature that does not exist. The template copy is checked in CI; the profile copy cannot
+  be reached from CI, so it is checked at session start instead.
 
 ### Fixed — editor tooling
 - **A call inside a binding had no color (WebStorm plugin `0.23.0`).** `WEAVE_BINDING_CALL` fell back
