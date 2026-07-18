@@ -14,9 +14,9 @@ interface Setup {
 export function setup(): Setup {
   const chosen = signal('');
   const options = [
-    { value: 'ng', label: 'Angular' },
-    { value: 'rc', label: 'React' },
-    { value: 'wv', label: 'Weave' },
+    { value: 'am', label: 'Amber' },
+    { value: 'aq', label: 'Aqua' },
+    { value: 'az', label: 'Azure' },
   ];
   return { options, chosen, onSelect: (item) => chosen.set((item as { label: string }).label) };
 }

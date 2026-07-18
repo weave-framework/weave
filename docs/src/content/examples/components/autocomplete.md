@@ -21,7 +21,7 @@ Give it `options` and an `onSelect` callback. Suggestions are the options whose 
 
 :::tabs
 ~~~html title="app.html"
-<Autocomplete options={{ options }} onSelect={{ onSelect }} label={{ 'Framework' }} placeholder={{ 'Type to search…' }} />
+<Autocomplete options={{ options }} onSelect={{ onSelect }} label={{ 'Color' }} placeholder={{ 'Type to search…' }} />
 ~~~
 ~~~ts title="app.ts"
 import { signal } from '@weave-framework/runtime';
@@ -30,9 +30,9 @@ import Autocomplete from '@weave-framework/ui/autocomplete';
 export function setup() {
   const chosen = signal('');
   const options = [
-    { value: 'ng', label: 'Angular' },
-    { value: 'rc', label: 'React' },
-    { value: 'wv', label: 'Weave' },
+    { value: 'am', label: 'Amber' },
+    { value: 'aq', label: 'Aqua' },
+    { value: 'az', label: 'Azure' },
   ];
   return { options, chosen, onSelect: (item) => chosen.set(item.label) };
 }
@@ -71,7 +71,7 @@ export function setup() {
 
 :::tabs
 ~~~html title="app.html"
-<Autocomplete options={{ options }} onSelect={{ onSelect }} label={{ 'Framework' }} clearable={{ true }} clearLabel={{ 'Clear framework' }} />
+<Autocomplete options={{ options }} onSelect={{ onSelect }} label={{ 'Color' }} clearable={{ true }} clearLabel={{ 'Clear color' }} />
 ~~~
 :::
 
@@ -204,7 +204,7 @@ export function setup() {
 
 :::tabs
 ~~~html title="app.html"
-<Autocomplete options={{ options }} value={{ 'React' }} disabled={{ true }} label={{ 'Framework' }} />
+<Autocomplete options={{ options }} value={{ 'Aqua' }} disabled={{ true }} label={{ 'Color' }} />
 ~~~
 :::
 
@@ -217,6 +217,6 @@ classes onto the root for styling hooks.
 
 :::tabs
 ~~~html title="app.html"
-<Autocomplete options={{ options }} onSelect={{ onSelect }} position={{ 'top-start' }} class={{ 'my-autocomplete' }} label={{ 'Framework' }} placeholder={{ 'Opens upward…' }} />
+<Autocomplete options={{ options }} onSelect={{ onSelect }} position={{ 'top-start' }} class={{ 'my-autocomplete' }} label={{ 'Color' }} placeholder={{ 'Opens upward…' }} />
 ~~~
 :::

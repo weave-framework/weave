@@ -10,9 +10,9 @@ interface Setup {
 /** `disabled` greys the field and stops the suggestion panel from opening. */
 export function setup(): Setup {
   const options = [
-    { value: 'ng', label: 'Angular' },
-    { value: 'rc', label: 'React' },
-    { value: 'wv', label: 'Weave' },
+    { value: 'am', label: 'Amber' },
+    { value: 'aq', label: 'Aqua' },
+    { value: 'az', label: 'Azure' },
   ];
   return { options };
 }

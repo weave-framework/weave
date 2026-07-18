@@ -28,7 +28,7 @@ typed text (case-insensitive); picking one fills the field with its label and fi
 
 :::tabs
 ~~~html title="app.html"
-<Autocomplete options={{ options }} onSelect={{ onSelect }} label={{ 'Framework' }} placeholder={{ 'Type to search…' }} clearable={{ true }} />
+<Autocomplete options={{ options }} onSelect={{ onSelect }} label={{ 'Color' }} placeholder={{ 'Type to search…' }} clearable={{ true }} />
 ~~~
 ~~~ts title="app.ts"
 import { signal } from '@weave-framework/runtime';
@@ -37,9 +37,9 @@ import Autocomplete from '@weave-framework/ui/autocomplete';
 export function setup() {
   const chosen = signal('');
   const options = [
-    { value: 'ng', label: 'Angular' },
-    { value: 'rc', label: 'React' },
-    { value: 'wv', label: 'Weave' },
+    { value: 'am', label: 'Amber' },
+    { value: 'aq', label: 'Aqua' },
+    { value: 'az', label: 'Azure' },
   ];
   return { options, chosen, onSelect: (item) => chosen.set(item.label) };
 }
