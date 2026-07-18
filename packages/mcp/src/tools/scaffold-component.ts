@@ -28,7 +28,12 @@ export function generateComponent(
   const base: string = kebab(name) || 'component';
   const files: GeneratedFile[] = [];
 
-  const styleImport: string = styleLang === 'none' ? '' : `\n// styles: ./${base}.${styleLang}`;
+  // The sibling stylesheet is picked up by the SAME convention as the sibling template — nothing in
+  // the `.ts` refers to it. This used to emit `// styles: ./name.css`, which reads like a directive
+  // and is not one: deleting that line changes nothing, and a reader (human or agent) could
+  // reasonably copy it elsewhere expecting it to attach a stylesheet. Say what is actually true.
+  const styleNote: string =
+    styleLang === 'none' ? '' : `\n// ${base}.${styleLang} beside this file is picked up automatically.`;
   files.push({
     path: `${base}/${base}.ts`,
     content:
@@ -37,7 +42,7 @@ export function generateComponent(
       `  const count: Signal<number> = signal(0);\n` +
       `  const inc = (): void => { count.set((n) => n + 1); };\n` +
       `  return { count, inc };\n` +
-      `}${styleImport}\n`,
+      `}${styleNote}\n`,
   });
 
   files.push({

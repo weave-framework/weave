@@ -35,8 +35,16 @@ export const RPC_INTERNAL_ERROR: number = -32603;
 export interface McpTool {
   name: string;
   description: string;
-  /** JSON Schema describing the tool's `arguments` object. */
-  inputSchema: object;
+  /**
+   * JSON Schema describing the tool's `arguments` object. Typed rather than left as `object` so
+   * the server can actually READ `required` — it was declared by every tool and enforced by none.
+   */
+  inputSchema: {
+    type: 'object';
+    properties: Record<string, unknown>;
+    required?: string[];
+    [k: string]: unknown;
+  };
   handler: (args: Record<string, unknown>) => Promise<McpToolResult> | McpToolResult;
 }
 

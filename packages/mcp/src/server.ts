@@ -87,6 +87,24 @@ export class McpServer {
       if (!tool) {
         return this.err(id, RPC_INVALID_PARAMS, `unknown tool: ${String(params.name)}`);
       }
+      // Every tool declares `required` in its inputSchema, and nothing enforced it: a caller that
+      // omitted a required argument (or misspelled it) fell through to the handler, which saw
+      // `undefined` and reported whatever that produced downstream — `weave_compile_template`
+      // answered "Empty template fragment", which sends the agent looking at its markup instead
+      // of at its call. Say which argument is missing.
+      const missing: string[] = (tool.inputSchema.required ?? []).filter(
+        (k: string) => (params.arguments ?? {})[k] === undefined
+      );
+      if (missing.length) {
+        return this.ok(
+          id,
+          textResult(
+            `${tool.name}: missing required argument${missing.length > 1 ? 's' : ''}: ` +
+              `${missing.join(', ')}. Expected: ${Object.keys(tool.inputSchema.properties).join(', ')}.`,
+            true
+          )
+        );
+      }
       try {
         const result: McpToolResult = await tool.handler(params.arguments ?? {});
         return this.ok(id, result);

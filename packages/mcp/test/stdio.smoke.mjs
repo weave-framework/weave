@@ -97,6 +97,35 @@ try {
   const checkText = check.result.content[0].text;
   const checkJson = JSON.parse(checkText);
   ok(Array.isArray(checkJson.diagnostics), 'weave_check returned a diagnostics array over stdio');
+
+  // A declared `required` that nothing enforces is a trap. The handler saw `undefined` and reported
+  // whatever that produced downstream — this tool answered "Empty template fragment", which sends the
+  // agent off to inspect its markup instead of its own call.
+  send({
+    jsonrpc: '2.0',
+    id: 5,
+    method: 'tools/call',
+    params: { name: 'weave_compile_template', arguments: { scope: [] } },
+  });
+  const missing = await waitFor(5);
+  const missingText = missing.result.content.map((c) => c.text).join('');
+  ok(missing.result.isError === true, 'a missing required argument comes back as an isError result');
+  ok(/missing required argument: template/.test(missingText), 'and the message names it', missingText);
+
+  // The scaffold used to emit `// styles: ./name.css`, which reads like a directive and is not one:
+  // the sibling stylesheet is picked up by convention, and deleting that line changes nothing. Proven
+  // by building a scaffolded component in a real app both ways — identical CSS output.
+  send({
+    jsonrpc: '2.0',
+    id: 6,
+    method: 'tools/call',
+    params: { name: 'weave_scaffold_component', arguments: { name: 'UserCard', styleLang: 'scss' } },
+  });
+  const scaffold = await waitFor(6);
+  const scaffoldTs = JSON.parse(scaffold.result.content[0].text).files.find((f) =>
+    f.path.endsWith('.ts')
+  ).content;
+  ok(!scaffoldTs.includes('// styles:'), 'scaffold emits no fake `// styles:` directive', scaffoldTs);
 } catch (e) {
   ok(false, `threw: ${e.message}`);
 } finally {

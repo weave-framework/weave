@@ -16,6 +16,18 @@
 
 ## Unreleased
 
+### Fixed — mcp
+- **A declared `required` argument was never enforced.** Every tool listed `required` in its
+  `inputSchema` and the server never read it, so a caller that omitted or misspelled an argument fell
+  through to the handler with `undefined` — `weave_compile_template` answered *"Empty template
+  fragment"*, which points an agent at its markup instead of at its own call. Missing arguments are now
+  named in an `isError` result. (`McpTool.inputSchema` is typed rather than `object`, so the schema is a
+  contract the server can actually read.)
+- **The scaffold emitted a directive that does not exist.** A generated component carried
+  `// styles: ./name.css`, which reads like a mechanism and is not one: the sibling stylesheet is picked
+  up by the same convention as the sibling template. Verified by building a scaffolded component in a
+  real app with and without the line — identical CSS. It now states what is actually true.
+
 ### Fixed — editor tooling
 - **The VS Code extension had the WebStorm bug, older.** The shipped `weave-language-0.5.0.vsix`
   bundled a language server built on 30 June — it predated `auto-expose`, so every `{{ binding }}`
