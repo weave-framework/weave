@@ -313,3 +313,39 @@ if (process.argv.includes('--update') || !existsSync(vscodeManifestPath)) {
   }
   console.log(`✔ ${vsixName} bundles a server built from the current language-server source`);
 }
+
+/* ─────────────────── the docs must name the artifact that exists ───────────────────
+ * The install instructions carry a literal filename, and on 2026-07-18 the live site was still
+ * telling readers to download `weave-language-0.5.0.vsix` and `weave-webstorm-0.21.0.zip` — the
+ * exact two builds whose stale servers had just been replaced for reddening every binding in a
+ * correct file. Fixing the artifact and leaving the docs pointing at the old one sends every new
+ * reader straight back into the bug.
+ *
+ * A version written in prose drifts by default. This makes it drift loudly instead.
+ */
+const docSources = [
+  'docs/src/content/learn/tooling.md',
+  'plugins/editor/vscode/README.md',
+  'plugins/editor/webstorm/README.md',
+  'README.md',
+];
+const named = new Map(); // filename -> [where]
+for (const rel of docSources) {
+  const p = join(root, rel);
+  if (!existsSync(p)) continue;
+  for (const m of readFileSync(p, 'utf8').matchAll(/weave-(?:webstorm-[\d.]+\.zip|language-[\d.]+\.vsix)/g)) {
+    if (!named.has(m[0])) named.set(m[0], []);
+    if (!named.get(m[0]).includes(rel)) named.get(m[0]).push(rel);
+  }
+}
+const wrong = [...named].filter(([f]) => f !== zipName && f !== vsixName);
+if (wrong.length) {
+  die(
+    `the docs name editor plugin builds that are not the ones shipped:\n` +
+      wrong.map(([f, where]) => `    ${f}  (in ${where.join(', ')})`).join('\n') +
+      `\n  Shipped: ${zipName} and ${vsixName}.\n` +
+      `  A reader following those instructions installs the old build — which is how a stale server\n` +
+      `  reaches someone weeks after it was fixed.`
+  );
+}
+console.log(`✔ install instructions name the shipped builds (${named.size} reference${named.size === 1 ? '' : 's'})`);
