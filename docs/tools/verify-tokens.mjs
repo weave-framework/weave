@@ -92,6 +92,12 @@ try {
     const local = new Set([...src.matchAll(/define\(\s*['"]([a-z0-9-]+)['"]/gi)].map((m) => m[1]));
     src.split(/\r?\n/).forEach((line, i) => {
       for (const m of line.matchAll(/(--weave-([a-z0-9-]+))/gi)) {
+        // A documented PATTERN, not a token: `--weave-grid-list-<key>` describes the shape of a
+        // family. The regex stops at `<` and captures `--weave-grid-list-`, a trailing-dash
+        // fragment the library can never emit — a false failure. (`--weave-<name>-<key>` never
+        // tripped this, because there the placeholder starts immediately; only a real prefix
+        // followed by `<` does.) A genuine token reference is never followed by `<`.
+        if (line[m.index + m[0].length] === '<') continue;
         if ([...local].some((n) => m[2].startsWith(n + '-'))) continue;
         if (!mentioned.has(m[1])) mentioned.set(m[1], []);
         mentioned.get(m[1]).push({ file: relative(ROOT, f), line: i + 1 });

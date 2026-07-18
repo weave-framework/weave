@@ -1,4 +1,6 @@
-// Public SCSS entry: `@use '@weave-framework/ui' as weave;`
+// Public SCSS entry: `@use 'pkg:@weave-framework/ui' as weave;`
+// The `pkg:` prefix is required, not decorative — the CLI compiles with dart-sass'
+// NodePackageImporter and no loadPaths, and that importer only resolves `pkg:` URLs.
 //
 //   @include weave.theme(( color: (accent: #2f9e8f) ));  // set theme (partial override)
 //   @include weave.all-styles();                         // structural CSS for built-ins

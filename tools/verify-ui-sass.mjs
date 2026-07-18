@@ -16,15 +16,23 @@ const uiSrc = join(root, 'packages', 'ui', 'src');
 
 // Resolve `@weave-framework/ui` (+ subpaths) to local scss files — self-contained,
 // no node_modules symlink needed. Mirrors the dev's package-importer resolution.
+//
+// The `pkg:` prefix is the form a real app must use: the CLI compiles with dart-sass'
+// NodePackageImporter and NO loadPaths (packages/cli/src/styles.ts), and that importer only
+// handles the `pkg:` URL scheme — a bare `@use '@weave-framework/ui/button'` does not resolve
+// in a consumer's build. Accept both here so the fixtures can be written the way a user must
+// actually write them, while the older bare form used by existing fixtures keeps working.
+const PKG = '@weave-framework/ui';
 const importer = {
   findFileUrl(url) {
-    if (url === '@weave-framework/ui') {
+    const spec = url.startsWith('pkg:') ? url.slice('pkg:'.length) : url;
+    if (spec === PKG) {
       return pathToFileURL(join(uiSrc, 'styles', '_index.scss'));
     }
-    if (url.startsWith('@weave-framework/ui/')) {
+    if (spec.startsWith(`${PKG}/`)) {
       // Component SCSS lives under styles/components/<name>/ (a barrel _index.scss forwards
       // the split _tokens + _styles partials). Behavior .ts stays per-component folder.
-      const sub = url.slice('@weave-framework/ui/'.length);
+      const sub = spec.slice(`${PKG}/`.length);
       return pathToFileURL(join(uiSrc, 'styles', 'components', sub, '_index.scss'));
     }
     return null;

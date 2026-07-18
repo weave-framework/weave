@@ -1,15 +1,22 @@
 name: Publish to npm
 
-# Publishes every @weave-framework/* package (at the current lockstep version) to npm AND
-# creates a matching GitHub Release — but ONLY when the pushed commit is explicitly marked
-# for release. Mark it by putting [publish] anywhere in the commit message. Ordinary commits
-# (which still bump the version) are ignored, so nothing reaches npm until you say so.
+# Publishes the packages listed in the ORDER array of tools/publish-packages.mjs (16 of the 17
+# workspace packages, at the current lockstep version) to npm AND creates a matching GitHub
+# Release — but ONLY when the pushed commit is explicitly marked for release. Mark it by putting
+# [publish] anywhere in the commit message. Ordinary commits are ignored, so nothing reaches npm
+# until you say so.
 #
-#   git commit -m "release: U6 gallery + a11y audit [publish]"
-#   git push        →  npm publish  +  GitHub Release v0.2.XX
+# NOT published: @weave-framework/language-server. It is a build input — editor/vscode bundles it
+# into a self-contained .vsix — so it is marked `private` and absent from ORDER.
+#
+# The version is semver, decided by the change (VERSIONING.md) — an ordinary commit does NOT bump
+# it. You set the version deliberately in the release commit.
+#
+#   git commit -m "release: SSG + resumable core [publish]"
+#   git push        →  npm publish  +  GitHub Release v1.6.0
 #
 #   git commit -m "fix: tidy a token"
-#   git push        →  version bumped, npm stays silent
+#   git push        →  nothing published, npm stays silent
 #
 # The version comes from package.json (the lockstep version committed in that commit — no
 # tag to keep in sync). The Release notes body is the matching "## 0.2.XX" section of
