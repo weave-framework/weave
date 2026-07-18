@@ -544,6 +544,28 @@ test('a #fragment in the target scrolls to that element instead of the top', asy
   }
 });
 
+// A bare `#fragment` has no path part, so `to.split('#')[0]` is the empty string. Taken as a
+// path that resolved to `/` — so an in-page anchor link silently navigated the app away to the
+// root route. It must mean "this page, scroll there" and leave path + query untouched.
+test('a bare #fragment keeps the current route (scrolls in place, no navigation away)', async () => {
+  const sec: HTMLDivElement = document.createElement('div');
+  sec.id = 'bare-frag';
+  document.body.appendChild(sec);
+  let intoView: boolean = false;
+  sec.scrollIntoView = (): void => { intoView = true; };
+  try {
+    navigate('/deep/route?q=1');
+    await tick();
+    navigate('#bare-frag');
+    await tick();
+    assert.equal(currentPath(), '/deep/route', 'bare #fragment left the route alone');
+    assert.equal(currentQuery().q, '1', 'bare #fragment left the query alone');
+    assert.ok(intoView, 'scrolled to the fragment element');
+  } finally {
+    sec.remove();
+  }
+});
+
 test('navigation saves the current scroll, and a pop restores it', async () => {
   const desc: PropertyDescriptor | undefined = Object.getOwnPropertyDescriptor(window, 'scrollY');
   let fakeY: number = 0;

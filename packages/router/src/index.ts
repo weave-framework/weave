@@ -442,8 +442,12 @@ function navigateState(state: RouterState, to: string, opts?: NavigateOptions): 
   const hash: string = to.includes('#') ? to.slice(to.indexOf('#')) : '';
   const noHash: string = to.split('#')[0];
   const qI: number = noHash.indexOf('?');
-  const nextPath: string = qI === -1 ? noHash : noHash.slice(0, qI);
-  const nextSearch: string = qI === -1 ? '' : noHash.slice(qI);
+  // A bare `#fragment` carries no path part, so `noHash` is empty. Read as a path that resolved
+  // to `/`, which meant an in-page anchor link silently navigated the app to the root route. It
+  // means "this page, scroll there" — keep the current path and query.
+  const bareHash: boolean = hash !== '' && noHash === '';
+  const nextPath: string = bareHash ? state.path.peek() : qI === -1 ? noHash : noHash.slice(0, qI);
+  const nextSearch: string = bareHash ? state.search.peek() : qI === -1 ? '' : noHash.slice(qI);
   // A bare same-URL navigation is a no-op — unless there's a `#fragment` to scroll to.
   if (nextPath === state.path.peek() && nextSearch === state.search.peek() && !hash) return;
   // Fast path: no before-leave guards → commit synchronously (unchanged behavior + timing).
