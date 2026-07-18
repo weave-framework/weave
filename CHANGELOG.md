@@ -14,6 +14,24 @@
 > already left it behind — Phase E ran 94 commits without a bump, and then released as one MINOR. The public
 > promise wins; the habit is retired.)*
 
+## Unreleased
+
+### Fixed — editor tooling
+- **The VS Code extension had the WebStorm bug, older.** The shipped `weave-language-0.5.0.vsix`
+  bundled a language server built on 30 June — it predated `auto-expose`, so every `{{ binding }}`
+  of a component whose `setup()` omits its `return` came up red (11 false errors in one file, 1642
+  across 41, with `weave check` clean on the same tree). Its staged tsserver plugin was also still
+  under the pre-rename `@weave/` scope, which VS Code resolves *by name*, so the `.ts` side silently
+  loaded no plugin and kept its `TS1192`. Ships `0.6.0`, verified at 0 diagnostics across the same
+  41 files. `editor/vscode/build.mjs` also stops hard-coding the staged plugin's version.
+- **The editor-plugin gate went red on a correct tree the first time CI ran it.** It compared the
+  server inside the shipped archive to a fresh local build byte for byte, and esbuild is not
+  byte-reproducible across platforms — the Linux runner's bundle was 76 bytes larger than the
+  Windows one from the same commit. Now pinned to two platform-stable hashes (the shipped bytes,
+  and the language-server sources with line endings normalised) in a committed manifest per plugin.
+  Renamed `verify:webstorm-plugin` → **`verify:editor-plugins`**; it covers both editors, and
+  additionally asserts the `.vsix` carries a correctly scoped tsserver plugin.
+
 ## 1.7.0 — 2026-07-18
 
 ### Deprecated — ui

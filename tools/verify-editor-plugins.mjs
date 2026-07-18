@@ -53,7 +53,16 @@ function eachZipEntry(buf, visit) {
   let p = buf.readUInt32LE(eocd + 16); // offset of first central-directory entry
 
   for (let i = 0; i < count; i++) {
-    if (buf.readUInt32LE(p) !== 0x02014b50) die('corrupt zip central directory');
+    // Not necessarily corruption. An older `.vsix` here had a stale central-directory offset —
+    // rewritten in place by a packaging step that never fixed it. Lenient readers cope by
+    // scanning local headers; this one trusts the directory, so report what actually happened
+    // instead of calling a file corrupt.
+    if (buf.readUInt32LE(p) !== 0x02014b50) {
+      die(
+        `the archive's central directory does not start where its own footer says (offset ${p}).\n` +
+          `  Likely rewritten in place by a packaging step without fixing offsets — rebuild it.`
+      );
+    }
     const method = buf.readUInt16LE(p + 10);
     const compSize = buf.readUInt32LE(p + 20);
     const nameLen = buf.readUInt16LE(p + 28);
@@ -240,3 +249,67 @@ console.log(
   `✔ ${keys.size} semantic colour keys covered ` +
     `(${explicit.length} stated explicitly in both schemes, ${keys.size - explicit.length} on verified fallbacks)`
 );
+
+/* ─────────────────────────── the VS Code extension ───────────────────────────
+ * The same trap, one editor over. The shipped `weave-language-0.5.0.vsix` bundled a server
+ * built on 30 June — older still than the WebStorm one — so a VS Code user got the identical
+ * wall of red on correct code, and its staged tsserver plugin was still under the pre-rename
+ * `@weave/` scope, which VS Code's TypeScript extension resolves by name and therefore could
+ * not load at all.
+ *
+ * Same invariant, same two hashes. The `.vsix` is a plain zip (no nested jar).
+ */
+const vscodeDir = join(root, 'plugins/editor/vscode');
+const vsixes = readdirSync(vscodeDir).filter((f) => f.endsWith('.vsix'));
+if (vsixes.length === 0) die(`no .vsix in ${vscodeDir}`);
+if (vsixes.length > 1) {
+  die(`${vsixes.length} .vsix files in ${vscodeDir} (${vsixes.join(', ')}) — ship exactly one`);
+}
+const vsixName = vsixes[0];
+const vsix = readFileSync(join(vscodeDir, vsixName));
+
+const vsixServer = readZipEntry(vsix, (n) => n === 'extension/dist/server.cjs');
+if (!vsixServer) die(`${vsixName} bundles no extension/dist/server.cjs — it would start no language server`);
+
+// The tsserver plugin is resolved BY NAME from the extension's own node_modules, so a stale
+// scope is not a warning — the plugin silently never loads and `.ts` files keep their TS1192.
+const stagedPlugin = readZipEntry(
+  vsix,
+  (n) => n === 'extension/node_modules/@weave-framework/typescript-plugin/index.cjs'
+);
+if (!stagedPlugin) {
+  die(
+    `${vsixName} does not carry extension/node_modules/@weave-framework/typescript-plugin/index.cjs.\n` +
+      `VS Code resolves that contribution by name; without it the .ts side silently gets no plugin.`
+  );
+}
+
+const vscodeManifestPath = join(vscodeDir, 'bundled-server.json');
+const vsixServerSha = createHash('sha256').update(vsixServer).digest('hex');
+
+if (process.argv.includes('--update') || !existsSync(vscodeManifestPath)) {
+  writeFileSync(
+    vscodeManifestPath,
+    JSON.stringify({ vsix: vsixName, serverSha: vsixServerSha, sourceSha }, null, 2) + '\n'
+  );
+  console.log(`✔ recorded ${vsixName} (server ${vsixServerSha.slice(0, 12)}…, source ${sourceSha.slice(0, 12)}…)`);
+} else {
+  const m = JSON.parse(readFileSync(vscodeManifestPath, 'utf8'));
+  if (m.vsix !== vsixName) die(`the shipped extension is ${vsixName} but the manifest records ${m.vsix}.`);
+  if (m.serverSha !== vsixServerSha) {
+    die(
+      `the server inside ${vsixName} is not the one recorded.\n` +
+        `  recorded: ${m.serverSha}\n  actual:   ${vsixServerSha}\n` +
+        `The .vsix was replaced without re-recording. If intentional, re-run with --update.`
+    );
+  }
+  if (m.sourceSha !== sourceSha) {
+    die(
+      `packages/language-server/src has changed since ${vsixName} was built.\n` +
+        `  recorded: ${m.sourceSha}\n  actual:   ${sourceSha}\n` +
+        `Rebuild the extension (editor/vscode: build.mjs -> vsce package -> inject-plugin.mjs),\n` +
+        `copy the .vsix into plugins/editor/vscode/, and re-run with --update.`
+    );
+  }
+  console.log(`✔ ${vsixName} bundles a server built from the current language-server source`);
+}

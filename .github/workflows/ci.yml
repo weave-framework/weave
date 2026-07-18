@@ -143,11 +143,11 @@ jobs:
         run: pnpm verify:tsplugin
       - name: Language server
         run: pnpm verify:ls
-      # The shipped WebStorm .zip bundles a COPY of that server. Unchecked, the copy went two
-      # months stale and turned every binding in a real app red while every gate above stayed
-      # green — the framework was fine, only the thing the user actually installs was not.
-      - name: WebStorm plugin bundles the current server
-        run: pnpm verify:webstorm-plugin
+      # Both shipped editor plugins bundle a COPY of that server. Unchecked, the WebStorm copy went
+      # two months stale and the VS Code one nearly three, turning every binding in a real app red
+      # while every gate above stayed green — the framework was fine, only what the user installs.
+      - name: Editor plugins bundle the current server
+        run: pnpm verify:editor-plugins
       # The skills are copied into the create-weave template, and that copy is derived output that
       # must be committed current. (The other copy — the one in a user profile — is invisible here;
       # the script reports it without failing.)
