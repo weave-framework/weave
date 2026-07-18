@@ -36,6 +36,7 @@
     "build:ls": "node packages/language-server/build.mjs",
     "verify:ls": "node packages/language-server/build.mjs && node tools/verify-language-server.mjs && node tools/verify-ls-push-diagnostics.mjs",
     "verify:webstorm-plugin": "node packages/language-server/build.mjs && node tools/verify-webstorm-plugin.mjs",
+    "verify:ui-tokens": "node tools/verify-ui-token-contract.mjs",
     "skills:check": "node tools/skills-sync.mjs --check",
     "skills:install": "node tools/skills-sync.mjs --install",
     "typecheck": "tsc --noEmit -p packages/runtime/tsconfig.json && tsc --noEmit -p packages/compiler/tsconfig.json && tsc --noEmit -p packages/prettier-plugin/tsconfig.json && tsc --noEmit -p packages/check/tsconfig.json && tsc --noEmit -p packages/store/tsconfig.json && tsc --noEmit -p packages/router/tsconfig.json && tsc --noEmit -p packages/forms/tsconfig.json && tsc --noEmit -p packages/i18n/tsconfig.json && tsc --noEmit -p packages/data/tsconfig.json && tsc --noEmit -p packages/cli/tsconfig.json && tsc --noEmit -p packages/language-server/tsconfig.json && tsc --noEmit -p packages/typescript-plugin/tsconfig.json && tsc --noEmit -p packages/ui/tsconfig.json && tsc --noEmit -p packages/mcp/tsconfig.json && tsc --noEmit -p packages/nx/tsconfig.json && tsc --noEmit -p packages/create-weave/template/tsconfig.json",

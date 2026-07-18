@@ -35,9 +35,12 @@ $tokens: (
     padding-y: 9px,
     gap: 8px,
     icon-size: 34px,
-    // `mark-width` lived here while `marked` drew a 2px underline. The underline is gone,
-    // so the token is gone too: a public token that no rule reads is worse than no token —
-    // it invites you to set it and then silently ignores you.
+    // DEPRECATED, no-op. `marked` drew a 2px accent underline whose thickness this set; the
+    // variant is a tonal rounded rect now, so no rule reads it. An inert token IS a wart —
+    // it invites you to set it and then silently ignores you — but the design-token contract
+    // is part of the frozen public API (VERSIONING.md), so it is deprecated here and removed
+    // only in a major. Same call as expansion's `marker-weight`.
+    mark-width: 2px,
     hover-opacity: 0.85,
     duration: ref.ref('motion.fast'),
   ),

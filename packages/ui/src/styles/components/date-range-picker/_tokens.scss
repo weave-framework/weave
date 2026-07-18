@@ -54,6 +54,10 @@ $tokens: (
   typography: (
     font-size: 13px,
     weight: 500,
+    // DEPRECATED, no-op — superseded by `cell-font`, which this was renamed to. See the same
+    // token in datepicker: a rename removes the old name, and the design-token contract is
+    // frozen public API (VERSIONING.md), so it is deprecated first and dropped in a major.
+    cell-size: 12px,
     cell-font: 13px,
     weekday-size: 11px,
     month-label-size: 13px,

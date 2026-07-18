@@ -17,6 +17,10 @@ $tokens: (
     padding-y: 6px,
     gap: 8px,
     border-width: 1.5px,
+    // DEPRECATED, no-op. The clear affordance was a `×` CHARACTER this sized; it is a lucide
+    // <Icon> now, sized by the icon rules. Kept because the design-token contract is frozen
+    // public API (VERSIONING.md) — deprecated first, removed in a major.
+    clear-size: 15px,
     reveal-size: 18px,
     font-size: 13px,
     duration: ref.ref('motion.fast'),

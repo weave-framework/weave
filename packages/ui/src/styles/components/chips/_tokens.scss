@@ -25,5 +25,10 @@ $tokens: (
   typography: (
     font-size: 12px,
     line-height: 1.4,
+    // DEPRECATED, no-op. The remove affordance was a `×` CHARACTER whose size this set; it is
+    // a lucide <Icon> now, so font-size no longer reaches it. Kept because the design-token
+    // contract is frozen public API (VERSIONING.md) — deprecated first, removed in a major.
+    // To size the icon, use `size.remove-icon`.
+    remove-font-size: 14px,
   ),
 );

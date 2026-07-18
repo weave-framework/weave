@@ -62,7 +62,9 @@ jobs:
       # Build the docs first: verify-tokens' second pass reads dist/app.css as the ground
       # truth for which `--weave-*` names the library actually emits.
       - name: Docs tokens
-        run: pnpm docs:build && pnpm docs:tokens
+        # verify:ui-tokens reads the same built stylesheet: a public design token may be
+        # deprecated but never deleted, and a deletion fails silently for the consumer.
+        run: pnpm docs:build && pnpm docs:tokens && pnpm verify:ui-tokens
 
   test:
     name: browser suite
