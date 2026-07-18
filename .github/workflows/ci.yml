@@ -146,5 +146,10 @@ jobs:
       # green — the framework was fine, only the thing the user actually installs was not.
       - name: WebStorm plugin bundles the current server
         run: pnpm verify:webstorm-plugin
+      # The skills are copied into the create-weave template, and that copy is derived output that
+      # must be committed current. (The other copy — the one in a user profile — is invisible here;
+      # the script reports it without failing.)
+      - name: Skills copies are current
+        run: pnpm skills:check
       - name: Dev proxy
         run: pnpm verify:dev-proxy
