@@ -1,6 +1,6 @@
 # Menu
 
-A dropdown of actions that opens from a trigger — the "⋯" overflow, an "Actions ▾" button. Menu is a Weave
+A dropdown of actions that opens from a trigger — an overflow button, an "Actions" button with a chevron. Menu is a Weave
 **`use:` action**: attach it to any trigger element with a list of items, and it handles opening, keyboard, and
 positioning.
 
@@ -23,10 +23,11 @@ entries; `onSelect` fires with the chosen one:
 
 :::tabs
 ~~~html title="app.html"
-<button use:menu={{ menuOpts }}>Actions ▾</button>
+<button use:menu={{ menuOpts }}>Actions <Icon name={{ 'chevron-down' }} /></button>
 ~~~
 ~~~ts title="app.ts"
 import { menu } from '@weave-framework/ui/menu';
+import Icon from '@weave-framework/ui/icon';
 
 export function setup() {
   const menuOpts = {

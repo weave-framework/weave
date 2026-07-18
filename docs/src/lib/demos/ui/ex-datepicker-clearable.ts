@@ -10,7 +10,7 @@ interface Setup {
   fmt: (d: Date | null) => string;
 }
 
-/** `clearable` shows a `×` once a date is set; `clearLabel` names it for assistive tech. */
+/** `clearable` shows a clear button once a date is set; `clearLabel` names it for assistive tech. */
 export function setup(): Setup {
   const date = signal<Date | null>(new Date());
   return {

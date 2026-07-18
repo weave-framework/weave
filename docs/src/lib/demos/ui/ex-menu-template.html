@@ -1,5 +1,5 @@
 <div style="display:flex; gap:16px; align-items:center;">
-  <Button use:menu={{ { ...langMenu, itemTemplate: langRow } }}>Language ▾</Button>
+  <Button use:menu={{ { ...langMenu, itemTemplate: langRow } }}>Language <Icon name={{ 'chevron-down' }} /></Button>
   <span class="demo-note">Locale: {{ locale() }}</span>
 
   @snippet langRow(row) {

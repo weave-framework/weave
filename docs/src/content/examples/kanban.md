@@ -7,7 +7,7 @@ keyboard, and you apply the result with `moveItemInArray`. Everything else is [`
 
 :::demo examples-kanban
 
-**Drag a card by its grip** (⠿) to reorder it within a lane. Use the **‹ ›** arrows to move a card to the previous
+**Drag a card by its grip** to reorder it within a lane. Use the **chevron** buttons to move a card to the previous
 or next lane. The lane counts keep themselves in sync.
 
 ## What it shows
@@ -77,8 +77,8 @@ onMount(() => {
 :::
 
 :::callout note "Reordering within a lane vs. moving between lanes"
-`dropList` reorders *one* container. Moving a card to a **different** lane is a separate action — here, the ‹ ›
-arrows, which splice the ticket out of one lane's array and push it onto the next:
+`dropList` reorders *one* container. Moving a card to a **different** lane is a separate action — here, the
+chevron buttons, which splice the ticket out of one lane's array and push it onto the next:
 
 ```ts
 const moveLane = (t: Ticket, lane: LaneId, dir: number) => {
@@ -108,7 +108,7 @@ are identical bar their title and lane id; here's one:
       <div class="kanban__card-wrap">
         <Card class="kanban__card">
           <div class="kanban__card-top">
-            <span class="kanban__grip" aria-hidden="true">⠿</span>
+            <span class="kanban__grip" aria-hidden="true"><Icon name={{ 'grip-vertical' }} /></span>
             <span class={{ prioClass(c) }}>{{ prioLabel(c) }}</span>
           </div>
           <p class="kanban__card-title">{{ c.title }}</p>

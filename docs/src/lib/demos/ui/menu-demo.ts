@@ -1,8 +1,11 @@
 import { signal } from '@weave-framework/runtime';
 import { menu } from '@weave-framework/ui/menu';
+import Icon from '@weave-framework/ui/icon';
 
 // `menu` is a use: action — it must be in scope for `use:menu` in the template.
 void menu;
+// Capitalized tags in the template resolve to this import.
+void Icon;
 
 interface Setup {
   menu: typeof menu;

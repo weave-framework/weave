@@ -308,7 +308,7 @@ Render it with `@for` over `controls()`:
   <div class="row">
     <input type="checkbox" use:control={{ item.controls.done }} />
     <input type="text" use:control={{ item.controls.text }} />
-    <button type="button" on:click={{ () => removeItem(item) }}>×</button>
+    <button type="button" on:click={{ () => removeItem(item) }}>Remove</button>
   </div>
 } @empty {
   <p class="muted">No items yet.</p>

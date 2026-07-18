@@ -17,7 +17,7 @@ interface Setup {
 }
 
 /**
- * `reorderable` adds a per-node drag handle (⠿). On a committed drag Tree emits `onReorder`
+ * `reorderable` adds a per-node drag handle. On a committed drag Tree emits `onReorder`
  * with indices over the visible order; the consumer applies it to its own model — here we
  * move the item in a signal-backed array.
  */

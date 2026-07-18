@@ -14,7 +14,7 @@ interface Setup {
   fmt: (t: Time | null) => string;
 }
 
-/** `clearable` adds a `×` button (labelled by `clearLabel`) that resets the value to `null`. */
+/** `clearable` adds a clear button (labelled by `clearLabel`) that resets the value to `null`. */
 export function setup(): Setup {
   const time = signal<Time | null>({ hours: 18, minutes: 45 });
   const pad = (n: number): string => String(n).padStart(2, '0');

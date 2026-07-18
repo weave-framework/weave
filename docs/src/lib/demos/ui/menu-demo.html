@@ -1,4 +1,4 @@
 <div style="display:flex; gap:16px; align-items:center;">
-  <button use:menu={{ menuOpts }} style="padding:8px 16px; border:1px solid var(--border); border-radius:6px; cursor:pointer; background:none; color:inherit;">Actions ▾</button>
+  <button use:menu={{ menuOpts }} style="display:inline-flex; align-items:center; gap:6px; padding:8px 16px; border:1px solid var(--border); border-radius:6px; cursor:pointer; background:none; color:inherit;">Actions <Icon name={{ 'chevron-down' }} /></button>
   <span class="demo-note">Picked: {{ picked() || '—' }}</span>
 </div>

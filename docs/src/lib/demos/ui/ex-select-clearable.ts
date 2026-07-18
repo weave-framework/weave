@@ -11,7 +11,7 @@ interface Setup {
 }
 
 /**
- * `clearable` shows a `×` button once something is selected; it empties the value.
+ * `clearable` shows a clear button once something is selected; it empties the value.
  * `clearLabel` names it for assistive tech.
  */
 export function setup(): Setup {

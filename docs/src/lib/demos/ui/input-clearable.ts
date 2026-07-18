@@ -9,7 +9,7 @@ interface Setup {
   setText: (v: string) => void;
 }
 
-/** Clearable — the × shows only when the field is non-empty and editable; it empties + refocuses. */
+/** Clearable — the clear button shows only when the field is non-empty and editable; it empties + refocuses. */
 export function setup(): Setup {
   const text = signal('Clear me');
   return { text, setText: (v) => text.set(v) };

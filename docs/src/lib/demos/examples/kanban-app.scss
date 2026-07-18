@@ -54,10 +54,11 @@
 }
 
 .kanban__grip {
+  display: inline-flex;
+  align-items: center;
   cursor: grab;
   color: var(--muted);
-  font-size: 1.1rem;
-  line-height: 1;
+  --weave-icon-size: 18px; // the grip is a lucide <Icon> now, not a ⠿ character
   user-select: none;
   touch-action: none;
 }

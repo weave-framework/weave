@@ -24,11 +24,12 @@ chosen value. Compose it onto a `<Button>` — `use:` forwards to the button's r
 
 :::tabs
 ~~~html title="app.html"
-<Button use:menu={{ actions }}>Actions ▾</Button>
+<Button use:menu={{ actions }}>Actions <Icon name={{ 'chevron-down' }} /></Button>
 ~~~
 ~~~ts title="app.ts"
 import { menu, type MenuOptions } from '@weave-framework/ui/menu';
 import Button from '@weave-framework/ui/button';
+import Icon from '@weave-framework/ui/icon';
 
 export function setup() {
   const picked = signal('—');
@@ -54,7 +55,7 @@ each choice does.
 
 :::tabs
 ~~~html title="app.html"
-<Button variant={{ 'ghost' }} use:menu={{ visibility }}>Visibility ▾</Button>
+<Button variant={{ 'ghost' }} use:menu={{ visibility }}>Visibility <Icon name={{ 'chevron-down' }} /></Button>
 ~~~
 ~~~ts title="app.ts"
 const visibility: MenuOptions = {
@@ -77,7 +78,7 @@ in keyboard navigation. Neither is selectable.
 
 :::tabs
 ~~~html title="app.html"
-<Button use:menu={{ fileMenu }}>File ▾</Button>
+<Button use:menu={{ fileMenu }}>File <Icon name={{ 'chevron-down' }} /></Button>
 ~~~
 ~~~ts title="app.ts"
 const fileMenu: MenuOptions = {
@@ -105,9 +106,9 @@ Default is `'bottom-start'` (below, left-aligned).
 
 :::tabs
 ~~~html title="app.html"
-<Button use:menu={{ below }}>Bottom-end ▾</Button>
-<Button use:menu={{ above }}>Top-start ▴</Button>
-<Button use:menu={{ right }}>Right-start ▸</Button>
+<Button use:menu={{ below }}>Bottom-end <Icon name={{ 'chevron-down' }} /></Button>
+<Button use:menu={{ above }}>Top-start <Icon name={{ 'chevron-up' }} /></Button>
+<Button use:menu={{ right }}>Right-start <Icon name={{ 'chevron-right' }} /></Button>
 ~~~
 ~~~ts title="app.ts"
 const items = [
@@ -132,7 +133,7 @@ receives that string.
 
 :::tabs
 ~~~html title="app.html"
-<Button variant={{ 'ghost' }} use:menu={{ sortMenu }}>Sort by ▾</Button>
+<Button variant={{ 'ghost' }} use:menu={{ sortMenu }}>Sort by <Icon name={{ 'chevron-down' }} /></Button>
 ~~~
 ~~~ts title="app.ts"
 const sortMenu: MenuOptions<string> = {
@@ -152,7 +153,7 @@ receive the whole item — not just a value string — in `onSelect`.
 
 :::tabs
 ~~~html title="app.html"
-<Button use:menu={{ assignMenu }}>Assign to ▾</Button>
+<Button use:menu={{ assignMenu }}>Assign to <Icon name={{ 'chevron-down' }} /></Button>
 ~~~
 ~~~ts title="app.ts"
 interface User { id: string; name: string; role: string; suspended: boolean; sep?: boolean; }
@@ -181,7 +182,7 @@ every open, so re-opening always shows the current choice ticked.
 
 :::tabs
 ~~~html title="app.html"
-<Button variant={{ 'ghost' }} use:menu={{ viewMenu }}>Density: {{ density() }} ▾</Button>
+<Button variant={{ 'ghost' }} use:menu={{ viewMenu }}>Density: {{ density() }} <Icon name={{ 'chevron-down' }} /></Button>
 ~~~
 ~~~ts title="app.ts"
 const density = signal('comfortable');
@@ -208,7 +209,7 @@ content swap; when the row's design depends on its state (checked / active), use
 
 :::tabs
 ~~~html title="app.html"
-<Button use:menu={{ langMenu }}>Language ▾</Button>
+<Button use:menu={{ langMenu }}>Language <Icon name={{ 'chevron-down' }} /></Button>
 ~~~
 ~~~ts title="app.ts"
 interface Lang { value: string; label: string; flag: string; }
@@ -247,7 +248,7 @@ template-local value, add it inline — `{ ...langMenu, itemTemplate: langRow }`
 
 :::tabs
 ~~~html title="app.html"
-<Button use:menu={{ { ...langMenu, itemTemplate: langRow } }}>Language ▾</Button>
+<Button use:menu={{ { ...langMenu, itemTemplate: langRow } }}>Language <Icon name={{ 'chevron-down' }} /></Button>
 
 @snippet langRow(row) {
   <span

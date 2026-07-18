@@ -8,7 +8,7 @@ interface Setup {
   tags: () => string[];
 }
 
-/** `removable={{ false }}` drops the `×` button — read-only display tags. */
+/** `removable={{ false }}` drops the remove button — read-only display tags. */
 export function setup(): Setup {
   const tags = signal<string[]>(['stable', 'zero-dep', 'signal-native']);
   return { tags };

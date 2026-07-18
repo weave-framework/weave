@@ -432,7 +432,7 @@ A `use:` action attaches to a single-root component the same way it does to an e
   }
 </script>
 
-<Button use:menu={{ accountMenu }}>Account ▾</Button>   <!-- component trigger -->
+<Button use:menu={{ accountMenu }}>Account</Button>     <!-- component trigger -->
 <a use:menu={{ accountMenu }}>Account (footer)</a>       <!-- same menu, native trigger -->
 ~~~
 

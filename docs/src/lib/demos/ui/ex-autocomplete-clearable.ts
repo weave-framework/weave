@@ -10,7 +10,7 @@ interface Setup {
   onSelect: (item: unknown) => void;
 }
 
-/** `clearable` shows a `×` button when the field is non-empty; `clearLabel` names it for AT. */
+/** `clearable` shows a clear button when the field is non-empty; `clearLabel` names it for AT. */
 export function setup(): Setup {
   const chosen = signal('');
   const options = [
