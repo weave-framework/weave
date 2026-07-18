@@ -3,8 +3,7 @@
  * filtering and virtualization can be swapped underneath without the component knowing.
  * A component calls `connect()` to get a **read-only signal of the rows to render** and
  * `disconnect()` to release resources; the concrete source (a static array, a signal, a
- * paged fetcher…) lives behind the interface. Signal-native — our streams are signals,
- * not RxJS. Zero-dep.
+ * paged fetcher…) lives behind the interface. Signal-native and zero-dep.
  *
  *   const ds = new ArrayDataSource(rows);          // rows: T[] | Signal<T[]>
  *   const view = ds.connect();                     // () => T[] (reactive, read-only)

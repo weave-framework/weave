@@ -197,7 +197,7 @@ export function setRef(target: Signal<Element | null> | ((el: Element) => void),
  * tied to the element's region). All fire when the region unmounts. For reactivity
  * over `arg`, pass a getter (`use:tip={() => x()}`) and read it inside an `effect`.
  */
-/** A `use:` action's optional return: a teardown fn, or a Svelte-style `{ update, destroy }` handle. */
+/** A `use:` action's optional return: a teardown fn, or an `{ update, destroy }` handle. */
 export interface ActionResult<A = void> {
   /** Called with the new argument whenever the (reactive) `use:action={arg}` argument changes. */
   update?: (arg: A) => void;
@@ -256,7 +256,7 @@ export function componentRoot(node: Node | null, tag: string): Element {
 
 /* ──────────────────────────── transitions ──────────────────────────── */
 
-/** What a transition function returns — the Svelte-style transition contract. */
+/** What a transition function returns — the transition contract. */
 export interface TransitionConfig {
   /** ms before the animation starts. */
   delay?: number;
@@ -1378,7 +1378,7 @@ export const ErrorBoundary: Component = (props = {}, slots = {}) => {
   };
 
   // Optional `resetKey`: a reactive value that clears the error when it changes
-  // (the React `resetKeys` pattern) — e.g. `resetKey={path()}` to recover on
+  // — e.g. `resetKey={path()}` to recover on
   // navigation without remounting the protected content. The initial run is skipped.
   const resetKey: unknown = (props as { resetKey?: unknown }).resetKey;
   if (resetKey !== undefined) {
@@ -1445,7 +1445,7 @@ export const Portal: Component = (props = {}, slots = {}) => {
 };
 
 /**
- * `<Teleport>` — the familiar name (Vue) for {@link Portal}. Identical behaviour: render the
+ * `<Teleport>` — an alias for {@link Portal}. Identical behaviour: render the
  * default slot into a different DOM location (`to` selector/element) while staying in the
  * logical component tree. Provided as an alias so either name works; there is one implementation.
  */

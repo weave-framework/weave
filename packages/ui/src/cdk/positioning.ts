@@ -1,7 +1,6 @@
 /**
- * Connected positioning — the in-house "floating" engine (our @floating-ui / Material
- * `FlexibleConnectedPositionStrategy`, zero-dep). Anchors an overlay panel to an origin
- * element via a list of preferred connected positions, then:
+ * Connected positioning — the in-house, zero-dep "floating" engine. Anchors an overlay
+ * panel to an origin element via a list of preferred connected positions, then:
  *   • picks the first preferred position that fully fits the viewport,
  *   • **flips** to a fallback when the preferred one overflows,
  *   • **shifts** (clamps) along the axes to keep the panel on-screen if none fit,

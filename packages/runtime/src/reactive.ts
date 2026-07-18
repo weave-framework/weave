@@ -1,9 +1,8 @@
 /**
  * Weave — reactive core (TypeScript port of v0.1 `src/reactive.js`, behavior identical).
  *
- * Fine-grained signals. No dependency arrays, no RxJS, no Virtual DOM. This is
- * the single primitive the whole framework is built on, answering the analysis's
- * #1 finding: every modern framework is converging on signals.
+ * Fine-grained signals — no dependency arrays, no Virtual DOM. This is
+ * the single primitive the whole framework is built on.
  *
  * Algorithm: a push-pull reactive graph with three node states (CLEAN / CHECK /
  * DIRTY). Writes push "maybe-dirty" (CHECK) downstream cheaply; reads pull to
@@ -209,8 +208,8 @@ export function signal<T>(initial: T, opts: { equals?: (a: T, b: T) => boolean; 
 }
 
 /**
- * A cached derived value. Recomputes lazily, only when a dependency changed.
- * No manual memoization (useMemo / useCallback) is ever needed.
+ * A cached derived value. Recomputes lazily, only when a dependency changed —
+ * so memoizing by hand is never needed.
  */
 export function computed<T>(fn: () => T, opts: { equals?: (a: T, b: T) => boolean; name?: string } = {}): Computed<T> {
   const c: Computation = {
@@ -227,7 +226,7 @@ export function computed<T>(fn: () => T, opts: { equals?: (a: T, b: T) => boolea
   c.update = () => updateIfNecessary(c);
   // Tie the memo to the owner active at creation: on unmount, detach it from its sources (so a
   // long-lived signal — router / i18n / store — stops holding the memo and its closure alive) and
-  // run its cleanups. Reset to DIRTY so a read after disposal recomputes and re-links (Solid semantics).
+  // run its cleanups. Reset to DIRTY so a read after disposal recomputes and re-links.
   const owner: Owner | null = currentOwner;
   if (owner) {
     owner._disposers.push(() => {
@@ -409,8 +408,8 @@ export function batch<T>(fn: () => T): T {
  * Resolve after pending microtask-scheduled work has run — `onMount` callbacks,
  * deferred `ErrorBoundary` swaps, etc. Reactive updates in Weave are **synchronous**
  * (the DOM is already current right after a `signal.set` outside a `batch`), so
- * `await tick()` is for waiting on that microtask-queued work before reading the DOM
- * — the analog of Svelte's `tick()` / Vue's `nextTick()`. If called inside a `batch`,
+ * `await tick()` is for waiting on that microtask-queued work before reading the DOM.
+ * If called inside a `batch`,
  * the queued effects flush first, then the microtask resolves.
  */
 export function tick(): Promise<void> {

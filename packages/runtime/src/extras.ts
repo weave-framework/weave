@@ -4,9 +4,9 @@
  * them touch the reactive graph internals, so the core stays minimal and these
  * only ship when imported.
  *
- *  - `linkedSignal`   — a writable signal that *resets* from a source (Angular).
- *  - `debounced`      — a read-only value that trails its source by `ms` (Vue/util).
- *  - `watch`          — an effect with old/new values + explicit source (Vue).
+ *  - `linkedSignal`   — a writable signal that *resets* from a source.
+ *  - `debounced`      — a read-only value that trails its source by `ms`.
+ *  - `watch`          — an effect with old/new values + explicit source.
  *  - `fromObservable` — bridge an RxJS/Angular Observable INTO a Weave reactive value.
  *  - `toObservable`   — bridge a Weave source OUT to a minimal Observable (async pipe / rxjs).
  */
@@ -129,8 +129,7 @@ function teardown(sub: Unsubscribable | (() => void)): void {
  * `observable` and pushes each emission into a read-only accessor; auto-unsubscribes when
  * the surrounding owner (component) disposes. The accessor returns `initial` (or
  * `undefined`) until the first emission. If the stream errors, the error is re-thrown on
- * the next read — mirroring Angular's `toSignal`, so it routes to a `catchError` boundary
- * or a local try/catch.
+ * the next read, so it routes to a `catchError` boundary or a local try/catch.
  *
  * Call it inside a component/owner scope so the auto-unsubscribe fires on unmount.
  *

@@ -36,8 +36,7 @@ export interface FieldOptions<T> {
  * The shared shape of every form control — a {@link Field}, a nested {@link Group},
  * or a {@link FieldArray}. Aggregation (a group's validity/values/reset) is defined
  * purely in terms of this interface, so the three compose recursively to any depth
- * (`form → group → fieldArray → group → field`), the Weave analog of Angular's
- * `AbstractControl` (`FormControl` / `FormGroup` / `FormArray`).
+ * (`form → group → fieldArray → group → field`).
  */
 export interface Control<T> {
   /** Current value — a field's value, a group's nested snapshot, or an array's items. Reactive. */
@@ -49,8 +48,8 @@ export interface Control<T> {
   /** Whether this control (or any descendant) has been touched. Reactive. */
   touched: () => boolean;
   /**
-   * Whether this control (or any descendant) has changed from its initial value — the
-   * Weave analog of Angular's `dirty`. `touched` is about *interaction* (blurred), `dirty`
+   * Whether this control (or any descendant) has changed from its initial value.
+   * `touched` is about *interaction* (blurred), `dirty`
    * is about *value change*. `pristine` is simply `!dirty()`. Cleared by {@link reset}.
    */
   dirty: () => boolean;
@@ -183,14 +182,14 @@ export interface GroupOptions<C extends Controls> {
 }
 
 /**
- * A group of named controls — the Weave analog of Angular's `FormGroup`. A `Group`
+ * A group of named controls. A `Group`
  * is itself a {@link Control}, so groups nest arbitrarily (and live inside a
  * {@link FieldArray}). `form` is just the conventional name for the top-level group.
  */
 export interface Group<C extends Controls> extends Control<ValuesOf<C>> {
   /** The child controls (fields / nested groups / arrays) — `group.controls.name`. */
   controls: C;
-  /** Nested `{ name: value }` snapshot of every child value (Angular's `FormGroup.value`). Reactive. */
+  /** Nested `{ name: value }` snapshot of every child value. Reactive. */
   value: () => ValuesOf<C>;
   /** True when every child is valid AND there is no group-level cross-field error. Reactive. */
   valid: () => boolean;
@@ -322,7 +321,7 @@ export function group<C extends Controls>(controls: C, opts: GroupOptions<C> = {
 /** Aggregate named controls into one form — the conventional name for a top-level {@link group}. */
 export const form: typeof group = group;
 
-/** A dynamic list of like-typed controls — the Weave analog of Angular's `FormArray`. */
+/** A dynamic list of like-typed controls, each added/removed at runtime. */
 export interface FieldArray<T> extends Control<T[]> {
   /** The live list of item controls — render with `@for (c of arr.controls(); …)`. Reactive. */
   controls: () => Control<T>[];

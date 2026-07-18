@@ -41,9 +41,9 @@ export interface GlobalPositionConfig {
 }
 
 /**
- * A viewport-relative position strategy (centered by default) — the analogue of
- * Material's `GlobalPositionStrategy`. For anchored dropdowns, use the connected
- * strategy from `positioning.ts` instead.
+ * A viewport-relative position strategy (centered by default): the panel is placed
+ * against the viewport itself, not against an origin element. For anchored dropdowns,
+ * use the connected strategy from `positioning.ts` instead.
  */
 export function globalPosition(config: GlobalPositionConfig = {}): PositionStrategy {
   const cfg: GlobalPositionConfig = { centerHorizontally: true, centerVertically: true, ...config };

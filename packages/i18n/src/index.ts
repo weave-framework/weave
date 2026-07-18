@@ -9,8 +9,8 @@
  *
  * The same `t` works in a template *and* in plain `.ts`: called inside a tracked
  * scope (binding / `computed` / `effect`) it subscribes and re-runs on language
- * change; called bare it returns the current snapshot. One import, no RxJS, no
- * `selectTranslate` vs `translate` split.
+ * change; called bare it returns the current snapshot. One import, one function —
+ * no separate reactive-vs-snapshot API.
  *
  * Resolution per call: active language → fallback language → `missing` handler.
  * Lazy `loader` fills languages (and scopes) on demand; ICU plural/select/number/
@@ -226,8 +226,8 @@ function currentLocale(): string | undefined {
 }
 
 /**
- * Format a number with `Intl.NumberFormat` — the standalone replacement for Angular's
- * `{{ n | number }}` (Weave has no pipes; you call a function). Locale defaults to the active
+ * Format a number with `Intl.NumberFormat`. Weave has no template pipes — you call a
+ * function. Locale defaults to the active
  * i18n locale (reactive), else the runtime default. `{{ formatNumber(n, { minimumFractionDigits: 2 }) }}`.
  */
 export function formatNumber(value: number, options?: Intl.NumberFormatOptions, locale?: string): string {
@@ -235,8 +235,8 @@ export function formatNumber(value: number, options?: Intl.NumberFormatOptions, 
 }
 
 /**
- * Format a money amount with `Intl.NumberFormat`'s currency style — the replacement for
- * `{{ v | currency:'EUR' }}` (and for ICU's unsupported `{v, number, currency}`).
+ * Format a money amount with `Intl.NumberFormat`'s currency style (and the stand-in for
+ * ICU's unsupported `{v, number, currency}`).
  * `{{ formatCurrency(9.9, 'EUR') }}` → `"€9.90"` (per locale).
  */
 export function formatCurrency(
@@ -249,7 +249,7 @@ export function formatCurrency(
 }
 
 /**
- * Format a ratio as a percent with `Intl.NumberFormat` — the replacement for `{{ v | percent }}`.
+ * Format a ratio as a percent with `Intl.NumberFormat`.
  * The value is a ratio, so `formatPercent(0.42)` → `"42%"`.
  */
 export function formatPercent(value: number, options?: Intl.NumberFormatOptions, locale?: string): string {
@@ -257,9 +257,9 @@ export function formatPercent(value: number, options?: Intl.NumberFormatOptions,
 }
 
 /**
- * Format a date/time with `Intl.DateTimeFormat` — the replacement for `{{ d | date }}`. Accepts a
+ * Format a date/time with `Intl.DateTimeFormat`. Accepts a
  * `Date`, an epoch ms number, or a date string. Use `dateStyle`/`timeStyle` (`'short'|'medium'|
- * 'long'|'full'`) for the Angular-preset feel: `{{ formatDate(d, { dateStyle: 'medium' }) }}`.
+ * 'long'|'full'`) for ready-made locale presets: `{{ formatDate(d, { dateStyle: 'medium' }) }}`.
  */
 export function formatDate(
   value: Date | number | string,
@@ -271,8 +271,8 @@ export function formatDate(
 }
 
 /**
- * Format a relative time with `Intl.RelativeTimeFormat` — no Angular pipe equivalent, but a common
- * need. `formatRelativeTime(-3, 'day')` → `"3 days ago"`; `formatRelativeTime(2, 'hour')` → `"in 2 hours"`.
+ * Format a relative time with `Intl.RelativeTimeFormat`.
+ * `formatRelativeTime(-3, 'day')` → `"3 days ago"`; `formatRelativeTime(2, 'hour')` → `"in 2 hours"`.
  */
 export function formatRelativeTime(
   value: number,
@@ -285,7 +285,7 @@ export function formatRelativeTime(
 
 /**
  * Join a list with `Intl.ListFormat` (locale-correct conjunction/disjunction) — e.g.
- * `formatList(['a', 'b', 'c'])` → `"a, b, and c"` in en. No Angular pipe equivalent.
+ * `formatList(['a', 'b', 'c'])` → `"a, b, and c"` in en.
  */
 export function formatList(items: readonly string[], options?: Intl.ListFormatOptions, locale?: string): string {
   return new Intl.ListFormat(locale ?? currentLocale(), options).format(items);

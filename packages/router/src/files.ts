@@ -1,6 +1,6 @@
 /**
- * File-based routing — turn a directory of page files into a `Route[]` tree
- * (the Next/Nuxt/SvelteKit convention). Pure + zero-dep so it is fully testable:
+ * File-based routing — turn a directory of page files into a `Route[]` tree, so the
+ * folder layout is the route table. Pure + zero-dep so it is fully testable:
  * {@link fileToRoutes} maps a list of file specifiers to a manifest, and
  * {@link emitRoutesModule} serialises that manifest into an importable module.
  * The CLI supplies the actual directory scan; everything here is string work.

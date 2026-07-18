@@ -1,6 +1,5 @@
 /**
- * Weave scoped CSS — compile-time attribute scoping (Svelte-proven, SSR-safe,
- * zero runtime cost). Each component's styles are hashed to an attribute
+ * Weave scoped CSS — compile-time attribute scoping (SSR-safe, zero runtime cost). Each component's styles are hashed to an attribute
  * (`data-w-<hash>`); the compiler stamps that attribute on every element the
  * template emits (see codegen), and here we rewrite the CSS so each rule's
  * rightmost compound selector carries the same `[data-w-<hash>]` — so the styles
@@ -175,7 +174,8 @@ function scopeSelector(raw: string, attr: string, host: string): string {
 
 /**
  * Rewrite `:host` / `:host(<sel>)` tokens to the host attribute. `:host` →
- * `[host]`; `:host(.active)` → `.active[host]` (Angular semantics). Leaves
+ * `[host]`; `:host(.active)` → `.active[host]` (standard `:host()` semantics: the
+ * argument must match the host itself). Leaves
  * unrelated tokens (and `:host-context(...)`, not supported) untouched.
  */
 function rewriteHost(s: string, host: string): string {

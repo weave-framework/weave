@@ -1,6 +1,5 @@
 /**
- * `<FormField>` — the lean label / hint / error frame around a control (NOT Angular's
- * heavy `mat-form-field`). A `__label` above (uppercase 10px), the control in the default
+ * `<FormField>` — the lean label / hint / error frame around a control. A `__label` above (uppercase 10px), the control in the default
  * slot, and a `__hint` / `__error` line below (11px). It **auto-wires** the slotted
  * control: generates an `id`, points the label's `for` at it, links the hint/error via
  * `aria-describedby`, and sets `aria-invalid` in the error state — so the simplest usage

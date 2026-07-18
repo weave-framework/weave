@@ -3,7 +3,7 @@
  *
  * A row of real `<button role=tab>`s over a 1px rule; the active tab is inked and
  * marked with a small accent square before its label (the Weave "mark" — no sliding
- * underline, which reads as Material). Exactly one `role=tabpanel` is shown; the rest
+ * underline). Exactly one `role=tabpanel` is shown; the rest
  * are `hidden`. Selection is the **active index** (design), controlled via `value` +
  * `onChange` or uncontrolled from `defaultIndex`.
  *

@@ -85,7 +85,7 @@ export interface OpenMenuConfig<T> extends OptionAccessors<T> {
   /**
    * Highlight (focus) the first item on open. `true` for a keyboard open (↓/Enter/F10) so
    * the user can act immediately; `false` for a pointer open — no item is pre-highlighted
-   * (matches native/Material menus), focus rests on the panel and the first arrow moves in.
+   * (matching native platform menus), focus rests on the panel and the first arrow moves in.
    */
   focusFirst: boolean;
   /** Is this option a hairline separator (not selectable)? Default: `item.divider`. */

@@ -6,7 +6,7 @@
  *    globals (Math, JSON, document, …) are left untouched.
  *  - **template locals** — framework-provided reactive values from `@for`
  *    (the loop item + `$index`/`$first`/…), `@let`, and `@if (…; as x)`. These
- *    read as plain values in the template (Angular-style) but are backed by
+ *    read as plain values in the template but are backed by
  *    accessors, so a reference like `todo` rewrites to `<accessor>()`.
  *
  * Everything else (globals, locally-bound arrow params, property names after

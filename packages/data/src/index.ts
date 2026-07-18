@@ -8,10 +8,9 @@
  * thin wrapper over `fetch` (base URL, default headers, JSON, error hook) whose
  * methods drop straight into a resource fetcher.
  *
- * This is deliberately NOT an Angular-style HttpClient (no RxJS) — just the few
- * primitives an app actually needs, built on signals. It does ship a small
- * functional-interceptor chain (`(req, next) => Promise<Response>`), the zero-RxJS
- * analog of Angular's `HttpInterceptorFn`, for auth/logging/retry/caching.
+ * This is deliberately not a full HTTP client stack — just the few primitives an
+ * app actually needs, built on signals. It does ship a small functional-interceptor
+ * chain (`(req, next) => Promise<Response>`) for auth/logging/retry/caching.
  */
 
 import { signal, effect, batch, onCleanup, watch } from '@weave-framework/runtime';
@@ -188,8 +187,8 @@ export interface Action<I, T> {
 
 /**
  * Wrap an async action (submit / mutation) with reactive `pending`/`error`/`result`
- * — the write-side counterpart to `resource` (which is for reads). The Weave analog
- * of React's `useActionState`. If runs overlap, only the **latest** updates the
+ * — the write-side counterpart to `resource` (which is for reads). If runs
+ * overlap, only the **latest** updates the
  * signals (a stale slow run can't clobber a newer one); every caller still gets its
  * own promise result back from `run`.
  */
@@ -245,8 +244,7 @@ export interface Optimistic<T, U> {
 
 /**
  * Show an optimistic value over `base` while a mutation is in flight, reconciling
- * automatically when the real `base` changes — the Weave analog of React's
- * `useOptimistic`. `reduce` folds each pending update onto the current value
+ * automatically when the real `base` changes. `reduce` folds each pending update onto the current value
  * (default: replace). Must be called inside an owner (component `setup`) so its
  * internal watcher disposes on unmount.
  */
@@ -301,8 +299,8 @@ export interface WeaveRequest {
 export type RequestHandler = (req: WeaveRequest) => Promise<Response>;
 
 /**
- * A functional interceptor — the zero-RxJS analog of Angular's `HttpInterceptorFn`.
- * Wrap `next(req)` to read/replace the request, inspect or retry the response, or
+ * A functional interceptor — a plain function that sits between a request and the
+ * handler that performs it. Wrap `next(req)` to read/replace the request, inspect or retry the response, or
  * short-circuit (return a `Response` without calling `next`). Interceptors run in
  * the order given; the first is outermost.
  */
