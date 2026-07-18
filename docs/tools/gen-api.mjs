@@ -171,6 +171,23 @@ function extract(pkg) {
   // Stable, readable order: functions first, then consts, then types/interfaces.
   const order = { function: 0, const: 1, class: 2, enum: 3, interface: 4, type: 5, value: 6 };
   symbols.sort((a, b) => (order[a.kind] - order[b.kind]) || a.name.localeCompare(b.name));
+
+  // Anchors must be UNIQUE. `slugify` lowercases, so `resource` (function) and `Resource`
+  // (interface) both became `#resource` — two <h3>s sharing one DOM id, which is invalid HTML
+  // and made every link to the second one land on the first. @weave-framework/data alone had
+  // three such pairs (action, optimistic, resource).
+  //
+  // Assigned AFTER the sort so "first wins" is deterministic (functions lead), which keeps the
+  // established anchor for the more-linked symbol and leaves existing deep links intact; the
+  // loser is disambiguated by its kind.
+  const seen = new Set();
+  for (const s of symbols) {
+    const base = slugify(s.name);
+    let a = base;
+    for (let n = 2; seen.has(a); n++) a = n === 2 ? `${base}-${s.kind}` : `${base}-${s.kind}-${n}`;
+    seen.add(a);
+    s.anchor = a;
+  }
   return symbols;
 }
 
