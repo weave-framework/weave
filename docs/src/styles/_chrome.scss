@@ -58,6 +58,20 @@ $topbar-h: var(--weave-toolbar-height, 52px);
   height: calc(100vh - #{$topbar-h});
 }
 
+/* Anchor jumps glide instead of teleporting. It goes on `.weave-sidenav__content`, NOT on
+   `html`: the window does not scroll on this site (window.scrollY stays 0) — the sidenav's
+   content pane is the real scroll container, so `html { scroll-behavior }` would do nothing.
+   Honour prefers-reduced-motion: a long jump animating is exactly what that setting is for. */
+.weave-sidenav.layout > .weave-sidenav__content {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .weave-sidenav.layout > .weave-sidenav__content {
+    scroll-behavior: auto;
+  }
+}
+
 // The layout drawer is transparent (the chrome paints the sidebar). Target the drawer ELEMENT
 // directly, NOT the --weave-sidenav-drawer-background token: that custom property inherits, and
 // every <Sidenav> demo on a docs page lives INSIDE this layout sidenav — so setting the token

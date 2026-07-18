@@ -16,6 +16,8 @@ interface ApiPageProps {
 interface ApiGroup {
   kind: string;
   label: string;
+  /** Single-letter badge shown against every entry in the group. */
+  letter: string;
   items: ApiSymbol[];
 }
 
@@ -32,13 +34,13 @@ interface ApiPageSetup {
 
 /** Index grouping + display order. `runtime` alone exports 56 symbols, so the page opens
  *  with a jump index rather than 56 expanded sections you have to scroll past. */
-const KIND_ORDER: { kind: string; label: string }[] = [
-  { kind: 'function', label: 'Functions' },
-  { kind: 'class', label: 'Classes' },
-  { kind: 'interface', label: 'Interfaces' },
-  { kind: 'type', label: 'Types' },
-  { kind: 'const', label: 'Constants' },
-  { kind: 'enum', label: 'Enums' },
+const KIND_ORDER: { kind: string; label: string; letter: string }[] = [
+  { kind: 'function', label: 'Functions', letter: 'F' },
+  { kind: 'class', label: 'Classes', letter: 'C' },
+  { kind: 'interface', label: 'Interfaces', letter: 'I' },
+  { kind: 'type', label: 'Types', letter: 'T' },
+  { kind: 'const', label: 'Constants', letter: 'K' },
+  { kind: 'enum', label: 'Enums', letter: 'E' },
 ];
 
 /** Renders a package's API reference: the generated skeleton (signatures + TSDoc +
@@ -72,12 +74,17 @@ export function setup(props: ApiPageProps): ApiPageSetup {
     const byName = (a: ApiSymbol, b: ApiSymbol): number => a.name.localeCompare(b.name);
     const known = new Set(KIND_ORDER.map((k) => k.kind));
     const out: ApiGroup[] = [];
-    for (const { kind, label } of KIND_ORDER) {
+    for (const { kind, label, letter } of KIND_ORDER) {
       const items = all.filter((s) => s.kind === kind).sort(byName);
-      if (items.length) out.push({ kind, label, items });
+      if (items.length) out.push({ kind, label, letter, items });
     }
     for (const kind of new Set(all.filter((s) => !known.has(s.kind)).map((s) => s.kind))) {
-      out.push({ kind, label: kind, items: all.filter((s) => s.kind === kind).sort(byName) });
+      out.push({
+        kind,
+        label: kind,
+        letter: (kind[0] ?? '?').toUpperCase(),
+        items: all.filter((s) => s.kind === kind).sort(byName),
+      });
     }
     return out;
   };

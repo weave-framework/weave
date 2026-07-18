@@ -11,12 +11,17 @@
       @for (g of groups(); track g.kind) {
         <div class="api-index__group">
           <p class="api-index__title">
-            <span class="api-kind" data-kind={{ g.kind }}>{{ g.label }}</span>
+            {{ g.label }}
             <span class="api-index__n">{{ g.items.length }}</span>
           </p>
           <ul class="api-index__list">
             @for (s of g.items; track s.anchor) {
-              <li><a class="api-index__link" href={{ hrefFor(s.anchor) }}>{{ s.name }}</a></li>
+              <li>
+                <a class="api-index__link" href={{ hrefFor(s.anchor) }}>
+                  <span class="api-index__badge" data-kind={{ g.kind }} aria-hidden="true">{{ g.letter }}</span>
+                  <span class="api-index__name">{{ s.name }}</span>
+                </a>
+              </li>
             }
           </ul>
         </div>

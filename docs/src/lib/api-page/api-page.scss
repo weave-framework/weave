@@ -25,11 +25,56 @@
   align-items: center;
   gap: 8px;
   margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--fg);
 }
 
 .api-index__n {
   color: var(--muted);
   font-size: 12px;
+  font-weight: 400;
+}
+
+/* Per-entry kind badge — a tinted chip carrying the kind's initial (F/C/I/T/K/E). Within a
+   group it repeats the heading, which is the point: the letter+colour make each row scannable
+   on its own, so a name spotted mid-grid still says what it is. Tinted rather than solid so a
+   column of them stays quiet next to the names. */
+.api-index__badge {
+  --k: var(--accent);
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  background: color-mix(in srgb, var(--k) 15%, transparent);
+  color: var(--k);
+}
+
+.api-index__badge[data-kind='function'] {
+  --k: var(--tok-func);
+}
+.api-index__badge[data-kind='const'] {
+  --k: var(--tok-number);
+}
+.api-index__badge[data-kind='type'],
+.api-index__badge[data-kind='interface'] {
+  --k: var(--tok-property);
+}
+.api-index__badge[data-kind='class'],
+.api-index__badge[data-kind='enum'] {
+  --k: var(--tok-keyword);
+}
+
+.api-index__name {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .api-index__list {
@@ -42,15 +87,15 @@
 }
 
 .api-index__link {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
   padding: 3px 6px;
   border-radius: 5px;
   font-family: var(--mono);
   font-size: 13px;
   text-decoration: none;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
 }
 
 .api-index__link:hover {
