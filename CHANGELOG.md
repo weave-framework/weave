@@ -16,6 +16,25 @@
 
 ## Unreleased
 
+### Changed — skills
+- **The skills now cover the whole public API, and a gate keeps them there.** They are what an AI agent
+  reads before writing Weave code, so an omission is not a documentation gap — it is an agent inventing an
+  API in its place, which is exactly how `field('', { validate })` came to be taught. Measured: **84 public
+  exports were never mentioned** (41 of 56 in runtime, 18 in router, 12 in data, 10 in forms, 3 in i18n),
+  including `onMount`, `provide`/`inject`, every devtools export, every transition, `Interceptor` and
+  `Optimistic`. All now documented from source, with the failure modes that matter.
+- **New gate `verify:skills`** (in CI): every public export of a package must appear in its skill; every
+  fenced `ts`/`html` example must parse; `weave-templates` must show every block, directive and special
+  attribute the parser accepts. A fence now carries a promise — `ts`/`html` is real code and is checked,
+  shorthand notation goes in `txt`.
+
+### Fixed — skills
+- **The component skill taught a resource leak.** Its lifecycle example was
+  `onMount(() => { const id = setInterval(…); onCleanup(() => clearInterval(id)) })`. `onCleanup` registers
+  on the *running computation* (`if (listener) …`) and an `onMount` callback fires later on a microtask,
+  outside any computation — so it silently registered nothing and the interval outlived the component. Uses
+  `onDispose` now, and both hooks are documented with the distinction spelled out.
+
 ### Changed — mcp
 - **The server now speaks MCP up to `2025-11-25` (was `2024-11-05`) and NEGOTIATES.** The revision date
   marks the last backwards-incompatible protocol change, not a release of this package, and the server was

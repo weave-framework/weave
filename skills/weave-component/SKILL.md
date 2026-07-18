@@ -4,7 +4,7 @@ description: >-
   Author or edit a Weave component — a `setup()` function plus a sibling template.
   Use this whenever you create, modify, or review a `.ts`/`.weave` Weave component:
   writing `setup()`, exposing state to the template, `props`, `propDefaults`,
-  pairing template/styles, component lifecycle (`onMount`/`onCleanup`), events,
+  pairing template/styles, component lifecycle (`onMount`/`onDispose`), events,
   two-way binding, slots, or component-scoped context/DI (`provide`/`inject`).
   Trigger it even when the user just says "make a Weave component/page/widget" or
   is unsure how state reaches the template. For the template markup itself use
@@ -134,17 +134,32 @@ A **bare** attribute on a component is the boolean `true`: `<Button disabled>` �
 All functional — call these inside `setup`, not as overridden methods:
 
 - **`onMount(fn)`** — run after the component is in the DOM (measure, focus, start an observer).
-- **`onCleanup(fn)` / `onDispose(fn)`** — run on unmount (clear timers, unsubscribe). Effects clean up automatically; use these for imperative resources.
+- **`onDispose(fn)`** — run on unmount (clear timers, unsubscribe). **This is the one you want in
+  `setup` and inside `onMount`.** It registers on the owner scope.
+- **`onCleanup(fn)`** — registers on the **currently running computation** (an `effect`/`computed`),
+  and runs before each re-run as well as on dispose. It is `if (listener) …` — **with no computation
+  running it silently registers nothing**. In a bare `setup` body, or inside an `onMount` callback
+  (which fires later, on a microtask, outside any computation), it is a no-op and your resource
+  leaks with no error anywhere.
 - Reactive side effects use **`effect(() => …)`** (see weave-reactivity).
 
 ```ts
-import { onMount, onCleanup } from '@weave-framework/runtime';
+import { onMount, onDispose } from '@weave-framework/runtime';
 export function setup() {
   onMount(() => {
     const id = setInterval(tick, 1000);
-    onCleanup(() => clearInterval(id));
+    onDispose(() => clearInterval(id)); // onCleanup here would do NOTHING
   });
 }
+```
+
+An `onMount` callback may also just **return** its teardown, which is equivalent:
+
+```ts
+onMount(() => {
+  const id = setInterval(tick, 1000);
+  return () => clearInterval(id);
+});
 ```
 
 ## Context & dependency injection

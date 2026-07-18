@@ -153,5 +153,9 @@ jobs:
       # the script reports it without failing.)
       - name: Skills copies are current
         run: pnpm skills:check
+      # The skills are what an AI agent reads before writing Weave code, so an omitted export is
+      # not a documentation gap — it is an agent inventing an API in its place. This one caught 84.
+      - name: Skills cover the public API
+        run: pnpm verify:skills
       - name: Dev proxy
         run: pnpm verify:dev-proxy
