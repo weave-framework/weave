@@ -17,6 +17,13 @@ plus a pass over the documentation site's own presentation.
   files reported none. Install `weave-webstorm-0.22.0.zip`. A new CI gate now fails the build if the
   server inside the shipped `.zip` ever differs from the one in the repository again.
 
+- **Template highlighting is no longer one lonely colored word.** A call inside a binding —
+  `{{ rangeValue() }}`, `{{ adapter() }}` — rendered as plain black text, because the color key it
+  inherited from has no foreground in *any* scheme WebStorm ships. A bare identifier next to it was
+  colored, which made the whole thing look broken rather than merely plain. Calls and directive
+  prefixes now carry explicit colors, and remain retunable under
+  **Settings → Editor → Color Scheme → Weave**.
+
 - **The editor now actually enforces a child component's props.** Because the server never resolved
   an imported component's synthesized default export, `typeof Child` fell back to `any` and every
   `<Child prop={{ … }}>` check quietly passed — passing a number where a handler belongs, or a prop

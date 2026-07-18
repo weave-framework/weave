@@ -17,6 +17,16 @@
 ## Unreleased
 
 ### Fixed — editor tooling
+- **A call inside a binding had no color (WebStorm plugin `0.23.0`).** `WEAVE_BINDING_CALL` fell back
+  to `DEFAULT_FUNCTION_CALL`, which has no foreground in **any** scheme the IDE ships — Default,
+  IntelliJ Light and Darcula all leave it as plain text. `{{ onPick }}` was colored (its
+  `DEFAULT_INSTANCE_FIELD` fallback is), every `{{ foo() }}` was not, and the highlighting read as
+  broken. Colors are now stated outright in bundled `colorSchemes/Weave{Default,Darcula}.xml` via
+  `additionalTextAttributes`, for calls and for the `on:`/`use:`/`bind:` prefixes (same hole in the
+  light scheme). `verify:webstorm-plugin` gained two checks: every `WEAVE_*` key must have an
+  explicit color in both schemes or a recorded measurement proving its fallback is colored, and
+  every `<additionalTextAttributes file=…>` path must resolve inside the jar — a wrong path is not a
+  build error, the IDE just logs it and leaves the colors unset.
 - **The WebStorm plugin's bundled language server was stale, and it made every binding red.** The
   server inside `weave-webstorm-0.21.0.zip` was built just before `auto-expose` landed, so it typed a
   `setup()` that omits its `return` as `void` and reported *"Property 'x' does not exist on type

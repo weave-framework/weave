@@ -15,9 +15,23 @@ hover. Works for both `.weave` single-file components and the separate `.ts` + `
 In WebStorm: **Settings → Plugins → ⚙ (gear) → Install Plugin from Disk…** → pick the
 **latest** `weave-webstorm-*.zip` from this folder → **Restart**.
 
-- **`weave-webstorm-0.22.0.zip`** — current/complete: HTML syntax coloring, go-to-definition,
+- **`weave-webstorm-0.23.0.zip`** — current/complete: HTML syntax coloring, go-to-definition,
   hover, and red-squiggle diagnostics, plus the Weave logo. Built on the M10 unified `{{ }}`
   binding syntax. Verified working on WebStorm 261 (2026.1).
+  - **0.23.0** — **a call inside a binding was never colored.** `WEAVE_BINDING_CALL` fell back to
+    `DEFAULT_FUNCTION_CALL`, which carries **no foreground in any scheme the IDE ships** — Default,
+    IntelliJ Light and Darcula all leave it as plain text. So `{{ onPick }}` was purple (its
+    `DEFAULT_INSTANCE_FIELD` fallback *is* colored) while `{{ rangeValue() }}`, `{{ adapter() }}`
+    and every other call rendered black: in a twelve-line template exactly one identifier had a
+    color. A `TextAttributesKey` fallback is not a promise of a color, and the plugin was treating
+    it as one. The colors are now stated outright in bundled `colorSchemes/Weave{Default,Darcula}.xml`
+    (`additionalTextAttributes`) — calls take the scheme's own function color (`#00627A` light,
+    `#FFC66D` dark), as do the `on:`/`use:`/`bind:` prefixes, which had the same hole in the light
+    scheme. `verify:webstorm-plugin` now fails if any `WEAVE_*` key has neither an explicit color in
+    both bundled schemes nor a recorded measurement showing its fallback really is colored, and it
+    resolves every `<additionalTextAttributes file=…>` path against the jar (a wrong path is not a
+    build error — the IDE just logs it and leaves the colors unset). Everything stays retunable
+    under **Settings → Editor → Color Scheme → Weave**.
   - **0.22.0** — **the bundled language server was two months stale, and it made every binding
     red.** The server shipped inside 0.21.0 predated `auto-expose` (a `setup()` may omit its
     `return`), so it typed the template context as `void` and reported *"Property 'x' does not
