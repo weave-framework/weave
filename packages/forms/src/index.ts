@@ -4,7 +4,7 @@
  * A `field` is a writable signal plus derived `error`/`valid`/`touched`, so a
  * template binds the value with `bind:value={f.value}` and reads errors with
  * `{{ f.error() }}` — all surgically reactive, no form library, no boilerplate.
- * A `form` aggregates fields into one `valid`/`values`/`reset` and can run a
+ * A `form` aggregates fields into one `valid`/`value`/`reset` and can run a
  * cross-field `validate` over the whole snapshot.
  *
  * Validation layers, in precedence order, all surfaced through `field.error()`:
@@ -343,9 +343,10 @@ export interface FieldArray<T> extends Control<T[]> {
  * ```ts
  * const tags = fieldArray(() => field('', [validators.required()]));
  * tags.push();                       // add a blank tag
+ * // A seeded group: the seed type IS the item's value type, so it mirrors the group's shape.
  * const checklist = fieldArray(
- *   (s) => group({ text: field(s ?? ''), done: field(false) }),
- *   ['Write tests']                  // one seeded item
+ *   (s) => group({ text: field(s?.text ?? ''), done: field(s?.done ?? false) }),
+ *   [{ text: 'Write tests', done: false }]
  * );
  * ```
  *

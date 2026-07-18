@@ -358,7 +358,7 @@ Step by step, on submit it:
 
 1. **Prevents default** (`e.preventDefault()`).
 2. **Marks every field touched** (`touchAll()`) — so *all* errors show, not just visited ones.
-3. **Awaits async validation** via `validateAsync()` — which settles any in-flight async check, then reports validity. Internally this is a **bounded poll** (~30 ms ticks, capped at ~2 s) that only ever waits on a debounced/in-flight async validator; sync reactivity is already settled.
+3. **Awaits async validation** via `validateAsync()` — which settles any in-flight async check, then reports validity. Internally it watches `validating()` flip back to false with an `effect`: **no polling, no timeout, and no chance of resolving mid-validation**. If nothing is validating it resolves immediately. Sync reactivity is already settled by then, so this only ever waits on a debounced or in-flight async validator.
 4. **If invalid**, focuses the first control that `use:control` flagged `aria-invalid="true"` and **stops** — your handler never runs.
 5. **If valid**, runs your `handler(values())`, tracking `submitting()` (true for the duration) and `submitError()`.
 

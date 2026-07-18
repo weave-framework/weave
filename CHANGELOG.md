@@ -16,6 +16,16 @@
 
 ## Unreleased
 
+### Fixed — forms docs
+- **The submit page described an implementation that no longer exists.** `/learn/forms` said `validateAsync()`
+  is *"a bounded poll (~30 ms ticks, capped at ~2 s)"*. It watches `validating()` flip to false with an
+  `effect` — no polling, no timeout, no chance of resolving mid-validation. The source comment says so
+  outright; the docs were describing a replaced version.
+- **The `fieldArray` JSDoc example did not type-check.** A group-returning factory with `['Write tests']`
+  makes the item type both `string` and `{text,done}` (`TS2322`, verified). That example shows up in editor
+  tooltips and the generated API reference. Seeds now mirror the group shape. Also: the module JSDoc named
+  the aggregate member `values`; it is `value`.
+
 ### Changed — skills
 - **The skills now cover the whole public API, and a gate keeps them there.** They are what an AI agent
   reads before writing Weave code, so an omission is not a documentation gap — it is an agent inventing an
