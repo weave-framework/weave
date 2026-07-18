@@ -66,6 +66,8 @@ Prefer explicit `project.json` targets over inference? The same three are availa
 zero-dependency; the executors shell out to the existing `weave` CLI rather than re-implementing the
 build.
 
+📚 **Guides + full API reference:** [Tooling guide](https://weaveframework.dev/learn/tooling)
+
 ## License
 
 MIT

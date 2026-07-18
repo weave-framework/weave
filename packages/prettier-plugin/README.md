@@ -73,8 +73,9 @@ Prettier's normal HTML formatter, untouched.
 
 The current release reindents block structure and formats expressions, but does **not** aggressively
 reflow inline text runs — so nothing that could change rendering (significant whitespace between
-inline elements, `<pre>`/`<textarea>` content) is altered. Prettier-grade inline whitespace reflow
-is a planned follow-up.
+inline elements, `<pre>`/`<textarea>` content) is altered.
+
+📚 **Guides + full API reference:** [Tooling guide](https://weaveframework.dev/learn/tooling)
 
 ## License
 

@@ -6,6 +6,10 @@ file-based routes, and scaffold a component through structured tools instead of 
 
 Part of [Weave](https://weaveframework.dev).
 
+```bash
+npm install -D @weave-framework/mcp
+```
+
 ## Tools
 
 | Tool | What it does |

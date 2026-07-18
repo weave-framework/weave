@@ -8,7 +8,7 @@
 
 *No Virtual DOM. No dependency arrays. No ceremony. Just the threads you need, woven tight.*
 
-[📚 **Documentation**](https://weaveframework.dev/) · [🚀 Get started](https://weaveframework.dev/)
+[📚 **Documentation**](https://weaveframework.dev/) · [🚀 Get started](https://weaveframework.dev/learn/quick-start)
 
 </div>
 
@@ -43,20 +43,40 @@ npm create weave@latest my-app
 
 ---
 
-## 🪡 Woven from the best threads
+## 🧵 A first thread
 
-We love the frameworks that came before. React made components mainstream, Angular brought structure and a real toolchain, Vue made the on‑ramp gentle, Svelte showed how small a runtime can be, Solid proved signals could carry an entire UI. Weave isn't here to dunk on any of them — it's here to take the threads developers reached for again and again, and weave them into one coherent piece of cloth.
+A component is a `setup()` function plus a sibling template. State is signals; the template reads them.
 
-So what does Weave do *a little differently*?
+```ts
+// counter.ts
+import { signal, computed } from '@weave-framework/runtime';
+
+export function setup() {
+  const count = signal(0);
+  const double = computed(() => count() * 2);
+  return { count, double, inc: () => count.set((n) => n + 1) };
+}
+```
+
+```html
+<!-- counter.html -->
+<button on:click={{ inc }}>{{ count() }} → {{ double() }}</button>
+```
+
+Press the button and Weave updates exactly the two text nodes that read those signals — nothing else is touched. No re‑render, no diff, nothing to memoize.
+
+---
+
+## 🪡 What it's woven from
 
 - **Signals all the way down.** Reactivity is one model, and it powers everything — from a single piece of text to the router. There's no second system to learn and no observables to bridge.
 - **Dependencies track themselves.** Things update when — and only when — what they depend on actually changes. Nothing to declare by hand, nothing to cache, nothing to forget.
 - **No Virtual DOM.** Your interface maps straight onto the page, so updates stay surgical and the runtime that ships stays genuinely small.
 - **Batteries included, not bolted on.** Routing, state, forms, translations, and motion are all first‑party and share the same reactive core — so they compose instead of competing.
 - **A real IDE citizen.** First‑class VS Code **and** WebStorm support, with the kind of editor experience you'd expect from a mature framework.
-- **Honest TypeScript.** Types flow through by inference, your editor understands your UI for free, and there's no decorator boilerplate to wade through.
+- **Honest TypeScript.** Types flow through by inference, your editor understands your UI for free, and there's no decorator boilerplate to wade through. Type‑checking reaches all the way into your templates.
 
-None of this makes the others "wrong." It's a different set of trade‑offs — small, fast, signal‑native, low‑ceremony — for people who want exactly that.
+It's one set of trade‑offs — small, fast, signal‑native, low‑ceremony — for people who want exactly that.
 
 ---
 
