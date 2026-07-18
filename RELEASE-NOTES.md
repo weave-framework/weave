@@ -5,9 +5,24 @@ the previous one. For the granular, per-version log see [CHANGELOG.md](CHANGELOG
 
 ## Unreleased
 
-Two correctness fixes in the framework, plus a pass over the documentation site's own presentation.
+Correctness fixes in the framework and a substantial repair of the WebStorm editing experience,
+plus a pass over the documentation site's own presentation.
 
 ### 🐛 Fixes
+
+- **WebStorm no longer paints correct code red.** The language server bundled inside the WebStorm
+  plugin had gone stale: it predated `auto-expose` (a `setup()` may omit its `return`), so it typed
+  the template context as `void` and flagged *every* binding of *every* such component. On a real
+  application that was 1642 false errors across 39 of 41 files — while `weave check` on the same
+  files reported none. Install `weave-webstorm-0.22.0.zip`. A new CI gate now fails the build if the
+  server inside the shipped `.zip` ever differs from the one in the repository again.
+
+- **The editor now actually enforces a child component's props.** Because the server never resolved
+  an imported component's synthesized default export, `typeof Child` fell back to `any` and every
+  `<Child prop={{ … }}>` check quietly passed — passing a number where a handler belongs, or a prop
+  the child does not declare, produced no error. The same gap stripped inline handler parameters of
+  their contextual type, so `onChange={{ (v) => … }}` reported a *spurious* implicit-`any`. Both are
+  fixed, and a prop error is now pinned to the prop name in the template.
 
 - **A nested `@for` no longer reads the wrong row.** Every loop row function took a parameter
   literally named `_row`, so an inner loop shadowed its parent. An outer loop variable referenced

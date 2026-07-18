@@ -141,5 +141,10 @@ jobs:
         run: pnpm verify:tsplugin
       - name: Language server
         run: pnpm verify:ls
+      # The shipped WebStorm .zip bundles a COPY of that server. Unchecked, the copy went two
+      # months stale and turned every binding in a real app red while every gate above stayed
+      # green — the framework was fine, only the thing the user actually installs was not.
+      - name: WebStorm plugin bundles the current server
+        run: pnpm verify:webstorm-plugin
       - name: Dev proxy
         run: pnpm verify:dev-proxy

@@ -15,9 +15,25 @@ hover. Works for both `.weave` single-file components and the separate `.ts` + `
 In WebStorm: **Settings → Plugins → ⚙ (gear) → Install Plugin from Disk…** → pick the
 **latest** `weave-webstorm-*.zip` from this folder → **Restart**.
 
-- **`weave-webstorm-0.19.0.zip`** — current/complete: HTML syntax coloring, go-to-definition,
+- **`weave-webstorm-0.22.0.zip`** — current/complete: HTML syntax coloring, go-to-definition,
   hover, and red-squiggle diagnostics, plus the Weave logo. Built on the M10 unified `{{ }}`
   binding syntax. Verified working on WebStorm 261 (2026.1).
+  - **0.22.0** — **the bundled language server was two months stale, and it made every binding
+    red.** The server shipped inside 0.21.0 predated `auto-expose` (a `setup()` may omit its
+    `return`), so it typed the template context as `void` and reported *"Property 'x' does not
+    exist on type 'void'"* on **every** `{{ }}` binding in **every** component whose `setup`
+    omits the return — 1642 false errors across 39 of 41 files in a real app. The `.zip` now
+    carries a server built from the same commit, and `pnpm verify:webstorm-plugin` fails the
+    build if the two ever drift again.
+    Two real defects surfaced while proving the fix, both of which had made the editor
+    **silently under-report** (the CLI `weave check` was right all along):
+    - the server never built a virtual for an imported component `.ts`, so it never saw the
+      synthesized default export — `typeof Child` degraded to `any` and **every**
+      `<Child prop={{ … }}>` check silently passed, including a wrong type or a prop the child
+      does not declare. An inline handler's parameter also lost its contextual type.
+    - the emitted prop KEY carried no source mapping, and TypeScript pins a contract violation
+      to the key — so even once the contract resolved, the diagnostic mapped nowhere and Volar
+      dropped it.
   - **0.19.0** — the **"Missing }"** fix (0.18) narrowed to only the PARSER's lexer, and the
     highlighter reverted to HTML delegation so **full HTML coloring returns**. The bogus "Missing }"
     came from the parser's lexer building the JavaScript plugin's `on*`-attribute JS embedding into the

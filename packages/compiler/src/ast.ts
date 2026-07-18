@@ -207,6 +207,10 @@ export interface StaticAttr {
   /** True for a valueless attribute (`disabled`, no `=`). On a component tag this
    *  becomes the boolean prop `true` (not the empty string `""`). */
   bare?: boolean;
+  /** Offset of the attribute NAME. On a component tag the prop contract's errors
+   *  (wrong type, unknown prop) are reported by TypeScript at the property key, so
+   *  the key needs its own mapping or the diagnostic lands nowhere and is dropped. */
+  nameOffset?: Offset;
 }
 /** name={expr} */
 export interface ExprAttr {
@@ -214,6 +218,8 @@ export interface ExprAttr {
   name: string;
   expr: string;
   offset?: Offset;
+  /** Offset of the attribute NAME — see `StaticAttr.nameOffset`. */
+  nameOffset?: Offset;
 }
 /** .prop={expr} */
 export interface PropAttr {
@@ -250,6 +256,8 @@ export interface BindAttr {
   name: string;
   expr: string;
   offset?: Offset;
+  /** Offset of the bound name (after `bind:`) — see `StaticAttr.nameOffset`. */
+  nameOffset?: Offset;
 }
 /** ref={expr} or bind:this={expr} */
 export interface RefAttr {

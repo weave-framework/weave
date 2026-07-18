@@ -59,6 +59,24 @@ const toMapping = (m: WeaveMapping): CodeMapping => ({
 });
 
 const siblingTs = (htmlFsPath: string): string => htmlFsPath.replace(/\.html$/i, '.ts');
+const siblingHtml = (tsFsPath: string): string => tsFsPath.replace(/\.ts$/i, '.html');
+
+const HAS_SETUP: RegExp = /export\s+(?:async\s+)?function\s+setup\b|export\s+(?:const|let|var)\s+setup\b/;
+
+/**
+ * Is this `.ts` a Weave component (sibling `.html` + an exported `setup`)? Such a file has
+ * no hand-written `export default` — the loader synthesizes one — so the project must be
+ * taught about it or every `import Child from './child'` resolves to nothing.
+ */
+function isComponentTs(fsPath: string): boolean {
+  if (!fsPath.endsWith('.ts') || fsPath.endsWith('.d.ts')) return false;
+  if (!existsSync(siblingHtml(fsPath))) return false;
+  try {
+    return HAS_SETUP.test(readFileSync(fsPath, 'utf8'));
+  } catch {
+    return false;
+  }
+}
 
 /** Build the Volar language plugin. `ts` is the editor-provided TypeScript module. */
 export function createWeaveLanguagePlugin(ts: typeof import('typescript')): LanguagePlugin<URI> {
@@ -68,10 +86,15 @@ export function createWeaveLanguagePlugin(ts: typeof import('typescript')): Lang
       // Only claim a `.html` that is a Weave template (has a sibling component `.ts`),
       // so ordinary web pages keep their normal HTML support.
       if (uri.path.endsWith('.html') && existsSync(siblingTs(uri.fsPath))) return 'weave-html';
+      // A component `.ts` is claimed too — NOT to type-check it here (WebStorm's own TS
+      // service owns that file), but so this project sees its synthesized default export.
+      // Without it `import Child from './child'` resolves to nothing, `typeof Child`
+      // degrades to `any`, and every `<Child prop={{ … }}>` check silently passes.
+      if (isComponentTs(uri.fsPath)) return 'weave-ts';
       return undefined;
     },
     createVirtualCode(uri: URI, languageId: string, snapshot: ts.IScriptSnapshot, ctx: CodegenContext<URI>): VirtualCode | undefined {
-      if (languageId !== 'weave' && languageId !== 'weave-html') return undefined;
+      if (languageId !== 'weave' && languageId !== 'weave-html' && languageId !== 'weave-ts') return undefined;
       return buildRoot(uri, languageId, snapshot, ctx);
     },
     updateVirtualCode(uri: URI, code: VirtualCode, snapshot: ts.IScriptSnapshot, ctx: CodegenContext<URI>): VirtualCode {
@@ -106,7 +129,9 @@ export function createWeaveLanguagePlugin(ts: typeof import('typescript')): Lang
  */
 function buildRoot(uri: URI, languageId: string, snapshot: ts.IScriptSnapshot, ctx: CodegenContext<URI>): VirtualCode {
   try {
-    return languageId === 'weave' ? buildSfcRoot(uri, snapshot) : buildTemplateRoot(uri, snapshot, ctx);
+    if (languageId === 'weave') return buildSfcRoot(uri, snapshot);
+    if (languageId === 'weave-ts') return buildTsComponentRoot(uri, snapshot);
+    return buildTemplateRoot(uri, snapshot, ctx);
   } catch {
     return { id: 'root', languageId, snapshot, mappings: [], embeddedCodes: [] };
   }
@@ -146,6 +171,37 @@ function buildSfcRoot(uri: URI, snapshot: ts.IScriptSnapshot): VirtualCode {
     snapshot: snapshotOf(source),
     mappings: [],
     embeddedCodes,
+  };
+}
+
+/**
+ * A component `.ts`: the same virtual `weave check` builds — the verbatim script plus the
+ * appended template harness and synthesized typed default export.
+ *
+ * Only the script region is mapped back to the file. The harness and the default export are
+ * therefore PRESENT for the type system (so a parent importing this component resolves it)
+ * but raise no diagnostics here — this server does not own the `.ts` editing experience, and
+ * duplicating the editor's own TypeScript errors would be noise.
+ */
+function buildTsComponentRoot(uri: URI, snapshot: ts.IScriptSnapshot): VirtualCode {
+  const source: string = snapshot.getText(0, snapshot.getLength());
+  const htmlPath: string = siblingHtml(uri.fsPath);
+  const htmlSource: string = existsSync(htmlPath) ? readFileSync(htmlPath, 'utf8') : '';
+  const v: Virtual = buildVirtualSeparate(uri.fsPath, source, htmlPath, htmlSource);
+
+  const tsCode: VirtualCode = {
+    id: 'ts',
+    languageId: 'typescript',
+    snapshot: snapshotOf(v.text),
+    mappings: v.mappings.filter((m) => m.source === 'script').map(toMapping),
+  };
+
+  return {
+    id: 'root',
+    languageId: 'weave-ts',
+    snapshot: snapshotOf(source),
+    mappings: [],
+    embeddedCodes: [tsCode],
   };
 }
 

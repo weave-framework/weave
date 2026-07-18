@@ -16,6 +16,33 @@
 
 ## Unreleased
 
+### Fixed — editor tooling
+- **The WebStorm plugin's bundled language server was stale, and it made every binding red.** The
+  server inside `weave-webstorm-0.21.0.zip` was built just before `auto-expose` landed, so it typed a
+  `setup()` that omits its `return` as `void` and reported *"Property 'x' does not exist on type
+  'void'"* on **every** `{{ }}` binding of **every** such component: 1642 false errors across 39 of 41
+  files in a real app, while `weave check` on the same tree reported none. Shipped `0.22.0` with a
+  server built from the same commit. New gate `verify:webstorm-plugin` (in CI) fails if the
+  `server/server.cjs` inside the shipped `.zip` is not byte-identical to
+  `packages/language-server/dist/server.cjs` — nothing checked that copy before.
+
+### Fixed — language server
+- **A child component's prop contract was inert in the editor.** The server never built a virtual for
+  an imported component `.ts`, so it never saw the synthesized default export; `typeof Child`
+  degraded to `any` and every `<Child prop={{ … }}>` silently passed — a wrong prop type, a prop the
+  child does not declare, both accepted. The same degradation stripped an inline handler parameter of
+  its contextual type, producing a *spurious* "implicitly has an 'any' type" on correct code. The
+  server now claims a component `.ts` (script region mapped only, so it does not duplicate the
+  editor's own TypeScript diagnostics). `weave check` was unaffected throughout — the CLI and the
+  editor disagreed, which is exactly what the shared emitter exists to prevent.
+
+### Fixed — check
+- **A prop-contract diagnostic mapped nowhere and was dropped.** TypeScript pins a mismatched-prop
+  (TS2322) or unknown-prop (TS2353) error to the property *key*, and the key was emitted as unmapped
+  scaffolding. `weave check` (line-mapped) still reported them, so the loss was invisible from the
+  CLI. Attribute names on a component tag now carry a `nameOffset` through the parser, and the
+  emitter writes the key mapped — the error lands on the prop name in the template.
+
 ### Fixed — compiler
 - **Nested `@for` row shadowing.** Row functions all took a parameter named `_row`, so a nested loop
   shadowed its parent's and an outer loop variable read inside the inner loop resolved to the inner

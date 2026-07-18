@@ -104,6 +104,8 @@ interface Line {
 interface Builder {
   lit(s: string): Builder;
   expr(srcOffset: number | undefined, exprStr: string, locals: Set<string>): Builder;
+  /** Verbatim text that still maps back to source (an identifier we emit, not rewrite). */
+  mapped(srcOffset: number | undefined, s: string): Builder;
   push(offset?: number): void;
 }
 
@@ -213,6 +215,11 @@ function emit(nodes: TemplateNode[], ctx: Set<string>): Line[] {
         text += code;
         return api;
       },
+      mapped(srcOffset: number | undefined, s: string): Builder {
+        if (srcOffset !== undefined) segs.push({ col: text.length, src: srcOffset, len: s.length });
+        text += s;
+        return api;
+      },
       push(offset?: number): void {
         lines.push({ text, offset, segs });
       },
@@ -242,18 +249,28 @@ function emit(nodes: TemplateNode[], ctx: Set<string>): Line[] {
   // props all surface, each pinned to its own attribute. Events stay outside the
   // contract (the runtime wires them) but their handler bodies are still checked.
   const emitComponent = (node: ElementNode, locals: Set<string>): void => {
-    const dataProps: Array<{ key: string; expr?: string; srcOffset?: number; staticVal?: string }> = [];
+    const dataProps: Array<{
+      key: string;
+      expr?: string;
+      srcOffset?: number;
+      keyOffset?: number;
+      staticVal?: string;
+    }> = [];
     for (const attr of node.attrs) {
       if (attr.type === 'static') {
         if (attr.name === 'slot') continue; // slot marker, stripped by codegen
         // A bare attribute (`<Button disabled>`) type-checks as the boolean `true`,
         // matching what codegen emits; a quoted value stays a string literal.
-        dataProps.push({ key: attr.name, staticVal: attr.bare ? 'true' : JSON.stringify(attr.value) });
+        dataProps.push({
+          key: attr.name,
+          staticVal: attr.bare ? 'true' : JSON.stringify(attr.value),
+          keyOffset: attr.nameOffset,
+        });
       } else if (attr.type === 'attr') {
-        dataProps.push({ key: attr.name, expr: attr.expr, srcOffset: attr.offset });
+        dataProps.push({ key: attr.name, expr: attr.expr, srcOffset: attr.offset, keyOffset: attr.nameOffset });
       } else if (attr.type === 'bind') {
         // `bind:value={{ sig }}` passes the signal itself — check it against the child's prop.
-        dataProps.push({ key: attr.name, expr: attr.expr, srcOffset: attr.offset });
+        dataProps.push({ key: attr.name, expr: attr.expr, srcOffset: attr.offset, keyOffset: attr.nameOffset });
       } else {
         emitAttr(attr, locals); // events / stray directives — checked, not part of props
       }
@@ -269,10 +286,24 @@ function emit(nodes: TemplateNode[], ctx: Set<string>): Line[] {
       .lit(`>[0]> = {`)
       .push(anchor ?? node.tagOffset);
     for (const p of dataProps) {
+      // The KEY is emitted mapped (not as scaffolding): TypeScript reports a prop-contract
+      // violation — a mismatched type (TS2322) or a prop the child doesn't declare (TS2353)
+      // — at the property key. Unmapped, those diagnostics fall outside every mapping and
+      // the editor silently shows nothing, while `weave check` (line-mapped) still flags them.
       if (p.expr !== undefined) {
-        mk().lit(`    ${propKey(p.key)}: (`).expr(p.srcOffset, p.expr, locals).lit('),').push(p.srcOffset);
+        mk()
+          .lit('    ')
+          .mapped(p.keyOffset, propKey(p.key))
+          .lit(': (')
+          .expr(p.srcOffset, p.expr, locals)
+          .lit('),')
+          .push(p.srcOffset ?? p.keyOffset);
       } else {
-        push(`    ${propKey(p.key)}: (${p.staticVal}),`);
+        mk()
+          .lit('    ')
+          .mapped(p.keyOffset, propKey(p.key))
+          .lit(`: (${p.staticVal}),`)
+          .push(p.keyOffset);
       }
     }
     push(`  };`);

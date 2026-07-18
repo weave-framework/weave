@@ -582,6 +582,11 @@ class Parser {
       const prefix: string = attr.mode === 'both' ? 'transition:' : attr.mode === 'in' ? 'in:' : 'out:';
       attr.nameOffset = nameStart + prefix.length;
     }
+    // The three forms that become a child component's PROPS carry their name offset too:
+    // TypeScript pins a prop-contract error (wrong type, unknown prop) to the property
+    // key, so without this the diagnostic maps nowhere and never reaches the editor.
+    if (attr.type === 'static' || attr.type === 'attr') attr.nameOffset = nameStart;
+    if (attr.type === 'bind') attr.nameOffset = nameStart + 'bind:'.length;
     return attr;
   }
 

@@ -74,6 +74,56 @@ const panelHtmlUri = pathToFileURL(panelHtmlPath).toString();
 const nopeLine = panelHtmlSource.split('\n').findIndex((l) => l.includes('<Nope'));
 const badgeCol = panelHtmlSource.split('\n')[1].indexOf('Badge');
 
+/* ---------- child-component prop contract: Field.ts/.html used by Form.html ----------
+ * `Field.ts` is a REAL Weave component in the separate-file form: an exported `setup`, a
+ * sibling template, and NO hand-written `export default` (the loader synthesizes it). A
+ * parent importing it must still see its prop contract. Two independent things have to
+ * hold or the whole check silently passes everything:
+ *   1. the server must build Field.ts's virtual (with the synthesized default export),
+ *      else `typeof Field` degrades to `any`;
+ *   2. the emitted property KEY must be source-mapped, because TypeScript pins a
+ *      contract violation to the key — an unmapped diagnostic is dropped by Volar.
+ */
+const fieldTsPath = join(fixtureDir, 'Field.ts');
+writeFileSync(
+  fieldTsPath,
+  [
+    'export interface FieldProps {',
+    '  onChange?: (value: string | null) => void;',
+    '  label?: string;',
+    '}',
+    'export function setup(props: FieldProps) {',
+    "  const fire = (): void => props.onChange?.('x');",
+    '  return { fire };',
+    '}',
+  ].join('\n')
+);
+writeFileSync(join(fixtureDir, 'Field.html'), '<button on:click={{ fire }}>{{ fire }}</button>\n');
+const formTsPath = join(fixtureDir, 'Form.ts');
+writeFileSync(
+  formTsPath,
+  [
+    "import Field from './Field';",
+    'export function setup() {',
+    '  const take = (s: string | null): void => { void s; };',
+    '  return { Field, take };',
+    '}',
+  ].join('\n')
+);
+const formHtmlPath = join(fixtureDir, 'Form.html');
+const formHtmlSource = [
+  '<div>',
+  '  <Field onChange={{ 12345 }} />',
+  "  <Field bogusProp={{ 'nope' }} />",
+  '  <Field onChange={{ (v) => take(v) }} />',
+  '</div>',
+].join('\n');
+writeFileSync(formHtmlPath, formHtmlSource);
+const formHtmlUri = pathToFileURL(formHtmlPath).toString();
+const formLines = formHtmlSource.split('\n');
+const wrongTypeLine = formLines.findIndex((l) => l.includes('12345'));
+const unknownPropLine = formLines.findIndex((l) => l.includes('bogusProp'));
+
 /* ---------- minimal LSP client over stdio ---------- */
 const child = spawn(process.execPath, [serverPath, '--stdio'], { stdio: ['pipe', 'pipe', 'pipe'] });
 let stderr = '';
@@ -236,6 +286,51 @@ try {
   const tagLandsInTs = tagDefs.some((d) => /(panel|badge)\.ts$/i.test((d.uri || d.targetUri || '').toLowerCase()));
   if (!tagLandsInTs) fail(`component tag: go-to-def on <Badge> did not land in a .ts (defs: ${JSON.stringify(tagDefs.map((d) => d.uri || d.targetUri))})`);
   pass('component tag: go-to-definition on <Badge> lands in the component .ts');
+
+  /* ===== scenario 2c: a child component's PROP CONTRACT is enforced in the editor ===== */
+  diags = await diagnose(formHtmlUri, 'weave-html', formHtmlSource);
+
+  const wrongType = diags.find((d) => /not assignable to type/.test(d.message));
+  if (!wrongType) {
+    fail(
+      'child props: a number passed to `onChange: (value: string | null) => void` was NOT flagged — ' +
+        `the child's prop contract is inert in the editor. Got: ${JSON.stringify(diags.map((d) => d.message))}`
+    );
+  }
+  if (wrongType.range.start.line !== wrongTypeLine) {
+    fail(`child props: wrong-type error mapped to line ${wrongType.range.start.line}, expected ${wrongTypeLine}`);
+  }
+  // Pinned to the prop NAME — the mapping that makes the diagnostic survive at all.
+  if (wrongType.range.start.character !== formLines[wrongTypeLine].indexOf('onChange')) {
+    fail(
+      `child props: wrong-type error pinned to column ${wrongType.range.start.character}, ` +
+        `expected the prop name at ${formLines[wrongTypeLine].indexOf('onChange')}`
+    );
+  }
+  pass(`child props: a mismatched prop is flagged on the prop name (Form.html:${wrongTypeLine + 1})`);
+
+  const unknownProp = diags.find((d) => /'bogusProp' does not exist/.test(d.message));
+  if (!unknownProp) {
+    fail(
+      'child props: a prop the child does not declare was NOT flagged — excess-property checking ' +
+        `is not reaching the editor. Got: ${JSON.stringify(diags.map((d) => d.message))}`
+    );
+  }
+  if (unknownProp.range.start.line !== unknownPropLine) {
+    fail(`child props: unknown-prop error mapped to line ${unknownProp.range.start.line}, expected ${unknownPropLine}`);
+  }
+  pass(`child props: an undeclared prop is flagged (Form.html:${unknownPropLine + 1})`);
+
+  // The inverse: a handler's parameter must be CONTEXTUALLY TYPED from the child's contract.
+  // If the child degrades to `any`, this shows up as a spurious "implicitly has an 'any' type".
+  const implicitAny = diags.find((d) => /implicitly has an 'any' type/.test(d.message));
+  if (implicitAny) {
+    fail(
+      `child props: an arrow parameter lost its contextual type ("${implicitAny.message}") — ` +
+        'the child component resolved to `any` instead of its prop contract'
+    );
+  }
+  pass('child props: an inline handler parameter is contextually typed from the child contract');
 
   /* ===== scenario 3: a malformed template must NOT crash the server ===== */
   // The editor reparses on every keystroke, so half-typed templates (mismatched/
