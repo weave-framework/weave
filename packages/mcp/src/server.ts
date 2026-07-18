@@ -15,8 +15,27 @@ import {
   type McpToolResult,
 } from './jsonrpc.js';
 
-/** The MCP protocol revision this server speaks. */
-export const PROTOCOL_VERSION: string = '2024-11-05';
+/**
+ * Every MCP revision this server speaks, newest first.
+ *
+ * A revision date marks the last BACKWARDS-INCOMPATIBLE change to the protocol, not a release of
+ * this package. This server is stdio-only and advertises exactly one capability (`tools`), which is
+ * why it spans the whole range: everything added since 2024-11-05 is either HTTP-transport business
+ * (OAuth/resource metadata, the `MCP-Protocol-Version` header), negotiated through a capability we
+ * do not advertise (elicitation, sampling, tasks, resources, prompts, completions), or purely
+ * additive (structured content, resource links, icons, `title`). The one REMOVAL — JSON-RPC batching,
+ * dropped in 2025-06-18 — never existed here: `handle()` takes a single request, so there is nothing
+ * to remove. Checked against the spec's changelogs rather than assumed.
+ */
+export const SUPPORTED_PROTOCOL_VERSIONS: readonly string[] = [
+  '2025-11-25',
+  '2025-06-18',
+  '2025-03-26',
+  '2024-11-05',
+];
+
+/** The newest revision this server speaks — what an unknown client is offered. */
+export const PROTOCOL_VERSION: string = SUPPORTED_PROTOCOL_VERSIONS[0];
 
 export interface McpServerOptions {
   name?: string;
@@ -63,8 +82,16 @@ export class McpServer {
     const isNotification: boolean = req.id === undefined || req.id === null;
 
     if (req.method === 'initialize') {
+      // "If the server supports the requested protocol version, it MUST respond with the SAME
+      // version. Otherwise, the server MUST respond with another protocol version it supports."
+      // Echoing our own constant regardless — which is what this did — is a spec violation the
+      // moment we speak more than one revision, and it would make an older client disconnect
+      // (the spec tells it to) even though we can talk to it perfectly well.
+      const asked: unknown = (req.params as { protocolVersion?: unknown } | undefined)?.protocolVersion;
+      const agreed: string =
+        typeof asked === 'string' && SUPPORTED_PROTOCOL_VERSIONS.includes(asked) ? asked : PROTOCOL_VERSION;
       return this.ok(id, {
-        protocolVersion: PROTOCOL_VERSION,
+        protocolVersion: agreed,
         capabilities: { tools: {} },
         serverInfo: { name: this.name, version: this.version },
       });

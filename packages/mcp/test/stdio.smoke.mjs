@@ -67,6 +67,24 @@ try {
   const init = await waitFor(1);
   ok(init.result?.serverInfo?.name === '@weave-framework/mcp', 'initialize → serverInfo over stdio');
   ok(typeof init.result?.protocolVersion === 'string', 'initialize → protocolVersion');
+  // An `initialize` with no version at all must still get our newest, not undefined.
+  ok(init.result?.protocolVersion === '2025-11-25', 'a version-less client is offered the newest', init.result?.protocolVersion);
+
+  // Version negotiation, which is the whole point of the field: "If the server supports the
+  // requested protocol version, it MUST respond with the SAME version. Otherwise … another
+  // protocol version it supports." Echoing our own constant regardless makes an older client
+  // disconnect (the spec instructs it to) over a session that would have worked fine.
+  for (const [i, [asked, expected]] of [
+    ['2025-11-25', '2025-11-25'],
+    ['2024-11-05', '2024-11-05'], // the revision this server used to hard-code
+    ['2025-06-18', '2025-06-18'],
+    ['1.0.0', '2025-11-25'], // unknown → our newest
+  ].entries()) {
+    const rid = 100 + i;
+    send({ jsonrpc: '2.0', id: rid, method: 'initialize', params: { protocolVersion: asked, capabilities: {} } });
+    const res = await waitFor(rid);
+    ok(res.result?.protocolVersion === expected, `negotiate: client asks ${asked} → ${expected}`, res.result?.protocolVersion);
+  }
 
   send({ jsonrpc: '2.0', method: 'notifications/initialized' }); // no response expected
 

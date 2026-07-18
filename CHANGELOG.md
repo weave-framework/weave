@@ -16,6 +16,16 @@
 
 ## Unreleased
 
+### Changed — mcp
+- **The server now speaks MCP up to `2025-11-25` (was `2024-11-05`) and NEGOTIATES.** The revision date
+  marks the last backwards-incompatible protocol change, not a release of this package, and the server was
+  about a year behind. Checked against the spec changelogs rather than assumed: for a stdio server that
+  advertises only `tools`, everything added since is HTTP-transport business, gated behind a capability it
+  does not advertise, or purely additive — and the one REMOVAL (JSON-RPC batching, dropped in 2025-06-18)
+  was never implemented here. It now declares the full supported range and echoes the version the client
+  asked for when it is one of them, per the spec: answering with its own constant regardless would make an
+  older client disconnect, which the spec tells it to do, over a session that would have worked.
+
 ### Fixed — mcp
 - **A declared `required` argument was never enforced.** Every tool listed `required` in its
   `inputSchema` and the server never read it, so a caller that omitted or misspelled an argument fell

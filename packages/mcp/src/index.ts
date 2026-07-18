@@ -29,7 +29,12 @@ export function runStdioServer(opts: McpServerOptions & StdioOptions = {}): Prom
   return runStdio(createServer(opts), opts);
 }
 
-export { McpServer, PROTOCOL_VERSION, type McpServerOptions } from './server.js';
+export {
+  McpServer,
+  PROTOCOL_VERSION,
+  SUPPORTED_PROTOCOL_VERSIONS,
+  type McpServerOptions,
+} from './server.js';
 export { runStdio, type StdioOptions } from './stdio.js';
 export {
   textResult,
