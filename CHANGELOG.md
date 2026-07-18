@@ -14,7 +14,7 @@
 > already left it behind — Phase E ran 94 commits without a bump, and then released as one MINOR. The public
 > promise wins; the habit is retired.)*
 
-## Unreleased
+## 1.8.0 — 2026-07-19
 
 ### Fixed — forms docs
 - **The submit page described an implementation that no longer exists.** `/learn/forms` said `validateAsync()`

@@ -3,6 +3,65 @@
 Human-readable highlights, one section per release — everything notable that landed since
 the previous one. For the granular, per-version log see [CHANGELOG.md](CHANGELOG.md).
 
+## 1.8.0 — 2026-07-19
+
+A release about the parts of Weave that *teach* — the skills an AI agent reads, the MCP server it
+calls, the JSDoc your editor shows on hover. None of it changes how your app runs. All of it changes
+whether the code written against Weave is correct.
+
+The theme, plainly: **documentation that is wrong is worse than documentation that is missing.**
+Missing docs make someone look things up. Wrong docs get copied.
+
+### ✨ MCP server speaks the current protocol, and negotiates
+
+`@weave-framework/mcp` declared MCP revision `2024-11-05` — about a year behind current. It now
+speaks through **`2025-11-25`** and, more importantly, **negotiates**: it answers with the version the
+client asked for when it knows that one, instead of always announcing its own. Bumping the number
+alone would have been a regression — the spec tells a client to disconnect when handed a version it
+does not support, so an older client would have been shown the door over a session that worked fine.
+
+Also: a tool called with a missing argument now says which one. Every tool declared `required` in its
+schema and nothing enforced it, so `weave_compile_template` answered *"Empty template fragment"* — a
+message that sends you to inspect your markup when the fault was in the call.
+
+### 🐛 The skills no longer teach a resource leak
+
+The component skill's lifecycle example was:
+
+```ts
+onMount(() => {
+  const id = setInterval(tick, 1000);
+  onCleanup(() => clearInterval(id)); // registers nothing
+});
+```
+
+`onCleanup` registers on the **currently running computation**, and an `onMount` callback fires later
+on a microtask, where there is none. It silently did nothing. Every component written from that
+example kept its interval running after unmount, with no error anywhere. It uses `onDispose` now, and
+both hooks are documented with the distinction spelled out.
+
+### 📚 The skills now cover the whole public API
+
+They are what an AI assistant reads before writing Weave code, so a gap there is not a missing
+paragraph — it is an assistant inventing an API in its place. Measured: **84 public exports were never
+mentioned**, including `onMount`, `provide`/`inject`, the entire devtools surface, every transition,
+`Interceptor` and `Optimistic`. All documented now, written from the source, weighted toward what
+goes wrong rather than what exists.
+
+A new CI gate keeps it that way: every public export must appear in its skill, every `ts`/`html`
+example must parse, and the templates skill must show every block, directive and special attribute
+the parser accepts. A code fence now carries a promise — `ts`/`html` is real, checked code you can
+paste; shorthand notation lives in `txt`.
+
+### 🐛 Two documentation defects worth naming
+
+- **`/learn/forms` described an implementation that no longer exists.** It called `validateAsync()`
+  *"a bounded poll (~30 ms ticks, capped at ~2 s)"*. It watches `validating()` with an effect: no
+  polling, no timeout. A reader was budgeting for a two-second cap that was never there.
+- **The `fieldArray` JSDoc example did not compile.** Its seeds did not match the shape its factory
+  returned (`TS2322`). That snippet is what your editor shows on hover and what the published API
+  reference prints — a broken example handed over at the exact moment you are about to copy it.
+
 ## 1.7.0 — 2026-07-18
 
 Correctness fixes in the framework and a substantial repair of the WebStorm editing experience,
