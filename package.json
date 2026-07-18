@@ -35,7 +35,7 @@
     "verify:tsplugin": "node packages/typescript-plugin/test/unused-import.smoke.mjs",
     "build:ls": "node packages/language-server/build.mjs",
     "verify:ls": "node packages/language-server/build.mjs && node tools/verify-language-server.mjs && node tools/verify-ls-push-diagnostics.mjs",
-    "verify:webstorm-plugin": "node packages/language-server/build.mjs && node tools/verify-webstorm-plugin.mjs",
+    "verify:webstorm-plugin": "node tools/verify-webstorm-plugin.mjs",
     "verify:ui-tokens": "node tools/verify-ui-token-contract.mjs",
     "skills:check": "node tools/skills-sync.mjs --check",
     "skills:install": "node tools/skills-sync.mjs --install",

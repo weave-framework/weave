@@ -6,21 +6,22 @@
  * every single binding — 1642 false errors across 39 of 41 files in a real app. The framework
  * was fine, `weave check` was clean, and the editor was a wall of red.
  *
- * This gate makes that state unrepresentable: the `server/server.cjs` inside the shipped
- * `.zip` must be byte-identical to `packages/language-server/dist/server.cjs`. Rebuild the
- * server (`pnpm build:ls`) and the plugin, then re-copy the `.zip` into `plugins/`.
+ * This gate makes that state unrepresentable: the server inside the shipped `.zip`, and the
+ * language-server source it was built from, are both pinned by hash in `bundled-server.json`.
+ * Change the server and the gate fails until the plugin is rebuilt, re-shipped, and re-recorded
+ * with `--update`. (See the note above the check for why this is not a byte comparison.)
  *
  * Zero-dep by RULE #1: the nested zip (server inside a .jar inside the plugin .zip) is read
  * with a minimal central-directory parser over `node:zlib`.
  */
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync, readdirSync, writeFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { inflateRawSync } from 'node:zlib';
+import { createHash } from 'node:crypto';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const pluginDir = join(root, 'plugins/editor/webstorm');
-const builtServer = join(root, 'packages/language-server/dist/server.cjs');
 
 const die = (msg) => {
   console.error(`\n✖ ${msg}\n`);
@@ -103,25 +104,72 @@ if (!jar) die(`${zipName} contains no weave-webstorm-*.jar`);
 const shipped = readZipEntry(jar, (n) => n === 'server/server.cjs');
 if (!shipped) die(`${zipName} bundles no server/server.cjs — the plugin would start no language server`);
 
-let built;
-try {
-  built = readFileSync(builtServer);
-} catch {
-  die(`no built server at ${builtServer} — run \`pnpm build:ls\` first`);
+/* The invariant is "the shipped server was built from the CURRENT source", and the first cut of
+ * this gate tried to prove it by comparing the zip's bytes to a fresh local build. That was wrong:
+ * esbuild's output is not byte-reproducible across platforms (the Linux runner produced a bundle
+ * 76 bytes larger than the Windows one from the same commit), so the gate went red on a correct
+ * tree the first time CI ran it. A gate that cries wolf is worse than none — it teaches everyone
+ * to scroll past red.
+ *
+ * So the check is pinned to two platform-stable hashes recorded in a committed manifest:
+ *   serverSha  — of the bytes actually inside the shipped .zip, so the artifact cannot be swapped
+ *                for one nobody reviewed.
+ *   sourceSha  — of the language-server sources with line endings normalised, so editing the
+ *                server without rebuilding and re-shipping the plugin fails.
+ * Neither depends on which machine ran esbuild. Limitation, stated plainly: a dependency bump
+ * alone moves neither hash — `pnpm update` under the server does not trip this. */
+const manifestPath = join(pluginDir, 'bundled-server.json');
+const lsSrc = join(root, 'packages/language-server/src');
+
+/** Hash a directory's files with line endings normalised, so Windows CRLF and Linux LF agree. */
+function hashSources(dir) {
+  const h = createHash('sha256');
+  const walk = (d) => {
+    for (const e of readdirSync(d, { withFileTypes: true }).sort((a, b) => (a.name < b.name ? -1 : 1))) {
+      const p = join(d, e.name);
+      if (e.isDirectory()) walk(p);
+      else {
+        h.update(e.name);
+        h.update(readFileSync(p, 'utf8').replace(/\r\n/g, '\n'));
+      }
+    }
+  };
+  walk(dir);
+  return h.digest('hex');
 }
 
-if (!shipped.equals(built)) {
-  die(
-    `the language server inside ${zipName} is NOT the one in packages/language-server/dist.\n` +
-      `  shipped: ${shipped.length} bytes\n` +
-      `  built  : ${built.length} bytes\n` +
-      `A stale bundled server does not fail loudly — it reports WRONG diagnostics on correct code\n` +
-      `(0.21.0 predated auto-expose and turned every binding red). Rebuild the plugin and re-copy\n` +
-      `its .zip into plugins/editor/webstorm/.`
+const shippedSha = createHash('sha256').update(shipped).digest('hex');
+const sourceSha = hashSources(lsSrc);
+
+if (process.argv.includes('--update') || !existsSync(manifestPath)) {
+  writeFileSync(
+    manifestPath,
+    JSON.stringify({ zip: zipName, serverSha: shippedSha, sourceSha }, null, 2) + '\n'
   );
+  console.log(`✔ recorded ${zipName} (server ${shippedSha.slice(0, 12)}…, source ${sourceSha.slice(0, 12)}…)`);
+} else {
+  const m = JSON.parse(readFileSync(manifestPath, 'utf8'));
+  if (m.zip !== zipName) {
+    die(`the shipped plugin is ${zipName} but the manifest records ${m.zip} — rebuild and re-record.`);
+  }
+  if (m.serverSha !== shippedSha) {
+    die(
+      `the server inside ${zipName} is not the one recorded in bundled-server.json.\n` +
+        `  recorded: ${m.serverSha}\n  actual:   ${shippedSha}\n` +
+        `The .zip was replaced without re-recording. If that was intentional, re-run with --update.`
+    );
+  }
+  if (m.sourceSha !== sourceSha) {
+    die(
+      `packages/language-server/src has changed since ${zipName} was built.\n` +
+        `  recorded: ${m.sourceSha}\n  actual:   ${sourceSha}\n` +
+        `A stale bundled server does not fail loudly — it reports WRONG diagnostics on correct code\n` +
+        `(0.21.0 predated auto-expose and turned every binding red). Rebuild the plugin, copy its\n` +
+        `.zip into plugins/editor/webstorm/, and re-run this with --update.`
+    );
+  }
+  console.log(`✔ ${zipName} bundles a server built from the current language-server source`);
 }
-
-console.log(`✔ ${zipName} bundles the current language server (${built.length} bytes, byte-identical)`);
 
 /* ─────────────────────────── semantic colours ───────────────────────────
  * A `TextAttributesKey` fallback is NOT a promise of a colour. `DEFAULT_FUNCTION_CALL` carries no
