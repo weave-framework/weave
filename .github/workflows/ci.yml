@@ -157,6 +157,11 @@ jobs:
       # not a documentation gap — it is an agent inventing an API in its place. This one caught 84.
       - name: Skills cover the public API
         run: pnpm verify:skills
+      # The public/private split lived entirely in .git/info/exclude + a local hook, neither of which git
+      # versions or clones — one missed restore step on a new machine and `git add .` stages the private
+      # working notes into public history. This gate travels with the repo.
+      - name: No private paths in the public repo
+        run: pnpm verify:no-private
       - name: Dev proxy
         run: pnpm verify:dev-proxy
       # A failed rebuild used to reload the browser into a bundle that no longer existed — a white page,

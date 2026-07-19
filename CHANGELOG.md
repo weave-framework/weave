@@ -16,6 +16,14 @@
 
 ## Unreleased
 
+### Added — repository safety
+- **A tracked gate keeps private working files out of the public repository.** The public/private split was
+  enforced entirely by `.git/info/exclude` and a local `.git/hooks/pre-commit` — git versions and clones
+  neither, so the whole boundary rested on one manual restore step being remembered on every machine. One
+  miss and `git add .` stages the private working notes into public history, where a push is permanent.
+  `verify:no-private` reads the tracked file list in CI and fails if any private path appears. The path
+  names themselves reveal nothing, which is what makes the check safe to run in public.
+
 ### Fixed — release engineering
 - **Publishing is gated on a green suite.** The publish workflow was conditioned only on the `[publish]`
   marker: a marked commit with failing tests shipped to npm — with a provenance attestation — while CI went
