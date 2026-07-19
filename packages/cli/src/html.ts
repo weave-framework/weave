@@ -51,9 +51,17 @@ export function injectHtml(html: string, opts: InjectOptions): string {
   }
 
   if (opts.liveReload) {
-    const client: string = `<script>new EventSource(${JSON.stringify(
-      opts.liveReload
-    )}).addEventListener("message",()=>location.reload());</script>`;
+    // Two messages, not one. A failed rebuild used to send `reload` like any other, so the page reloaded
+    // into a bundle that no longer existed (404) and went WHITE, with the real error only in the terminal.
+    // Now a failure sends `error:<text>` and paints an overlay over the last working page; the next
+    // successful build sends `reload` and the overlay goes with it.
+    const client: string = `<script>(function(){var o;new EventSource(${JSON.stringify(opts.liveReload)})
+.addEventListener("message",function(e){var d=e.data||"";
+if(d.indexOf("error:")===0){if(!o){o=document.createElement("div");o.id="__weave_error";
+o.setAttribute("style","position:fixed;inset:0;z-index:2147483647;overflow:auto;margin:0;padding:24px;"
++"background:#1b1b1fef;color:#ffb4ab;font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap");
+document.body.appendChild(o);}o.textContent=decodeURIComponent(d.slice(6));return;}
+if(o){o.remove();o=undefined;}location.reload();});})();</script>`;
     out = out.replace(/<\/body>/i, `    ${client}\n  </body>`);
   }
 

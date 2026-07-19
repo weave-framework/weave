@@ -22,6 +22,8 @@ export interface BuildConfig {
   virtualEntry?: { code: string; resolveDir: string };
   outDir: string;
   minify?: boolean;
+  /** Emit .js.map files alongside the bundle (default true). */
+  sourcemap?: boolean;
   styleLang?: StyleLang;
   /** Global entry stylesheets (absolute paths), compiled + prepended to `app.css` in order. */
   styles?: string[];
@@ -51,6 +53,9 @@ export async function build(config: BuildConfig): Promise<void> {
     splitting: true,
     outdir: outDir,
     minify: config.minify ?? true,
+    // Linked maps (a separate .js.map) so a production stack trace resolves to the author's source. Opt
+    // out with `build.sourcemap: false` in weave.config.ts if the maps should not be published.
+    sourcemap: config.sourcemap === false ? false : 'linked',
     plugins: [
       weave(state, { styleLang: config.styleLang, resumable: config.resumable }),
       ...(ve ? [entryPlugin(ve.code, ve.resolveDir)] : []),

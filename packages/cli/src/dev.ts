@@ -198,6 +198,23 @@ async function devInMemory(config: DevConfig): Promise<DevServer> {
     name: 'weave:dev-capture',
     setup(build: PluginBuild): void {
       build.onEnd((result: BuildResult): void => {
+        // A FAILED build has no output files. Clearing and repopulating from that empty list wiped the
+        // served bundle, and the unconditional reload below then sent the browser to a `/main.js` that
+        // no longer existed — a white page, with the real error visible only in the terminal. On a syntax
+        // error, the most common event in a dev loop, the tool erased the evidence.
+        //
+        // Keep the last GOOD outputs and push the error instead: the page stays as it was, with an overlay
+        // naming the failure. The next successful build swaps the outputs and reloads, clearing it.
+        if (result.errors.length > 0) {
+          const text: string = result.errors
+            .map((e) => {
+              const at: string = e.location ? ` (${e.location.file}:${e.location.line}:${e.location.column})` : '';
+              return `${e.text}${at}`;
+            })
+            .join('\n\n');
+          for (const res of clients) res.write(`data: error:${encodeURIComponent(text)}\n\n`);
+          return;
+        }
         outputs.clear();
         for (const file of result.outputFiles ?? []) {
           const rel: string = relative(config.outdir, file.path).split(sep).join('/');
@@ -216,6 +233,9 @@ async function devInMemory(config: DevConfig): Promise<DevServer> {
     splitting: true,
     outdir: config.outdir,
     write: false, // everything stays in memory — dev creates no dist/
+    // Inline maps so a breakpoint lands in the author's .ts/.html instead of the bundled output. Inline
+    // rather than linked because dev serves from memory: a separate .map file would need its own route.
+    sourcemap: 'inline',
     banner,
     plugins: [
       weave(state, { styleLang: config.styleLang, dev: true }),

@@ -16,6 +16,20 @@
 
 ## Unreleased
 
+### Fixed — CLI / dev loop
+- **A failed rebuild no longer reloads the browser into a white page.** `weave dev` cleared its in-memory
+  outputs, repopulated them from a failed build's empty output list, and notified every client anyway — so
+  a syntax error reloaded the page into a `/main.js` that no longer existed, and the real error was visible
+  only in the terminal. The last good bundle is now kept, and the client is sent the build error instead,
+  painted as an overlay over the still-working page. The next successful build swaps the bundle, reloads
+  and clears the overlay. Gated by `verify:dev-overlay`, which drives the real dev server through
+  break-and-repair.
+
+### Added — CLI
+- **Source maps in `weave dev` and `weave build`.** Neither emitted any, so breakpoints and stack traces
+  landed in bundled output with no way back to the author's `.ts`/`.html`. Dev emits inline maps (it serves
+  from memory); production emits linked `.js.map` files, opt-out via `build.sourcemap: false`.
+
 ### Fixed — forms + router
 - **`fieldArray.dirty()` sees compensating edits.** It compared the item COUNT against the seeds and asked
   each item whether it differed from its own initial — never the array value against the seed values. So

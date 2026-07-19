@@ -159,3 +159,7 @@ jobs:
         run: pnpm verify:skills
       - name: Dev proxy
         run: pnpm verify:dev-proxy
+      # A failed rebuild used to reload the browser into a bundle that no longer existed — a white page,
+      # with the real error only in the terminal. This drives the real dev server through break-and-repair.
+      - name: Dev server survives a failed rebuild
+        run: pnpm verify:dev-overlay
