@@ -44,6 +44,14 @@
   changes at most once — a third of the refresh loop. Also adds the first direct test of `$count`,
   covering shrink as well as growth (only `$last` was exercised before, and only while growing).
 
+### Added — tests
+- **`packages/ui/src/shared/` has tests.** 760 lines shared by up to seven components had zero direct
+  coverage — only whatever their consumers happened to exercise, so a defect in the engine surfaced as
+  "the datepicker behaves oddly" and every fix had to be verified twice. 25 tests added: the calendar
+  engine on the boundaries where date arithmetic breaks (month ends, leap day, year rollover, min/max,
+  dateFilter, roving focus, the 24-year page), the option model's fallback chain, and the position
+  table's flip invariants. Mutation-checked — each deliberately broken behaviour fails its own test.
+
 ## 1.8.0 — 2026-07-19
 
 ### Fixed — forms docs
