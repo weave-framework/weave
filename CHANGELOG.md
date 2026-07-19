@@ -16,6 +16,14 @@
 
 ## Unreleased
 
+### Fixed — compiler
+- **An arrow parameter shadows a component binding only inside its own body.** Parameters were collected
+  into one flat set applied to the ENTIRE expression, so a binding sharing a name with any arrow parameter
+  anywhere was left unrewritten everywhere: `items().map((x) => x * 2).length + x` emitted a trailing bare
+  `x` — a ReferenceError at runtime, or a silent read of a same-named global. Shadowing is now lexical, from
+  the parameter list to the end of the body, in both the rewrite and the inference pass (they must agree, or
+  a name inference drops is one the emit would have prefixed).
+
 ### Fixed — runtime
 - **`@await` re-renders when the resource's data changes without a loading bounce.** The then-branch was
   rebuilt only when the await STATE changed, and `resource.mutate(next)` — the documented optimistic-update

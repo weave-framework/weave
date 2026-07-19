@@ -72,10 +72,20 @@ export function rewrite(expr: string, scope: Scope, ctxRef: string = 'ctx', oute
   // to `ctx.value` (which yields `(ctx.value) =>`, a syntax error) even when a
   // same-named ctx binding exists. Same basis as `freeIdentifiers`, so inference
   // and rewriting agree on what is a parameter.
-  const params: Set<string> = arrowParams(expr);
-  // Each `${…}` is rewritten by a RECURSIVE call, which used to start with an empty param set — so an
-  // enclosing arrow's params were forgotten inside it and `items().map((_, i) => `#${i}`)` emitted `ctx.i`.
-  if (outerParams) for (const p of outerParams) params.add(p);
+  // Params that apply to the WHOLE expression: only the ones inherited from an enclosing arrow (a `${…}`
+  // is rewritten by a recursive call, and forgetting them there emitted `ctx.i` for `map((_, i) => `#${i}`)`).
+  // This expression's OWN arrows shadow lexically instead — see `arrowScopes`.
+  const params: Set<string> = new Set<string>(outerParams ?? []);
+  const scopes: ArrowScope[] = arrowScopes(expr);
+  /** Is `name` bound by an arrow whose body covers `pos`? */
+  const shadowedAt = (name: string, pos: number): boolean =>
+    scopes.some((sc) => pos >= sc.start && pos < sc.end && sc.params.has(name));
+  /** Every param in scope at `pos` — the inherited ones plus any arrow whose body covers that offset. */
+  const paramsAt = (pos: number): Set<string> => {
+    const all: Set<string> = new Set<string>(params);
+    for (const sc of scopes) if (pos >= sc.start && pos < sc.end) for (const p of sc.params) all.add(p);
+    return all;
+  };
   // The chain of unclosed brackets at the cursor. A `,` alone cannot tell `{ a, b }` from `f(a, b)` — only the
   // nearest opener can, and mistaking the second for the first emitted `f("k", a: ctx.a, b)`, which fails the
   // BUILD (the real <Menubar>'s `removeEventListener("keydown", arrowListener, true)`).
@@ -185,7 +195,7 @@ export function rewrite(expr: string, scope: Scope, ctxRef: string = 'ctx', oute
             }
             k++;
           }
-          const sub: RewriteResult = rewrite(expr.slice(exprStart, k), scope, ctxRef, params);
+          const sub: RewriteResult = rewrite(expr.slice(exprStart, k), scope, ctxRef, paramsAt(exprStart));
           if (sub.reactive) reactive = true;
           // Splice the rewritten interpolation in WITH its segments (offset into this expr/out), so
           // source coverage + the verbatim invariant hold through `${ … }` for editor tooling.
@@ -234,7 +244,7 @@ export function rewrite(expr: string, scope: Scope, ctxRef: string = 'ctx', oute
         continue;
       }
 
-      if (binding && !isProperty && !isObjectKey && !params.has(name)) {
+      if (binding && !isProperty && !isObjectKey && !params.has(name) && !shadowedAt(name, i)) {
         // `{ name }` object shorthand must expand to `{ name: <value> }` — a bare `{ ctx.name }` /
         // `{ accessor() }` is a syntax error. Detect a shorthand key: between `{`|`,` and `,`|`}`.
         if (binding.kind !== 'local' && brackets[brackets.length - 1] === '{') {
@@ -374,39 +384,119 @@ export function isJsGlobal(name: string): boolean {
   return NON_CTX.has(name);
 }
 
-/** Collect arrow-function parameter names in `expr` (so they aren't treated as ctx). */
-function arrowParams(expr: string): Set<string> {
-  const params: Set<string> = new Set<string>();
-  const ID: RegExp = /^[A-Za-z_$][\w$]*$/;
+/** A lexical region in which an arrow's parameters shadow the outer scope: `[start, end)` of its body. */
+interface ArrowScope {
+  start: number;
+  end: number;
+  params: ReadonlySet<string>;
+}
+
+/**
+ * Where each arrow's parameters are actually in scope.
+ *
+ * The previous approach collected one flat set for the whole expression, which over-applies: a ctx binding
+ * sharing a name with ANY parameter anywhere was left bare everywhere. `items().map((x) => x * 2).length + x`
+ * emitted a trailing bare `x` — a ReferenceError, or a silent read of a same-named global. Shadowing is
+ * lexical, so record the range each parameter list covers and consult it per position.
+ *
+ * A body ends at the matching `}` for a block, otherwise at the first `,` or `)` that closes the arrow's own
+ * expression (a concise body cannot contain either at its own depth). Bounded conservatively: anything the
+ * scan cannot delimit runs to the end of the expression, which reproduces the old over-application for that
+ * one arrow rather than under-shadowing it into a syntax error.
+ */
+function arrowScopes(expr: string): ArrowScope[] {
+  const out: ArrowScope[] = [];
+  const n: number = expr.length;
   let at: number = expr.indexOf('=>');
   while (at !== -1) {
-    let k: number = at - 1;
-    while (k >= 0 && /\s/.test(expr[k])) k--;
-    if (expr[k] === ')') {
-      // (a, b, …) => …  — walk back to the matching '('
-      let depth: number = 1;
-      let m: number = k - 1;
-      for (; m >= 0; m--) {
-        if (expr[m] === ')') depth++;
-        else if (expr[m] === '(') {
-          depth--;
-          if (depth === 0) break;
+    const { params, start }: { params: Set<string>; start: number } = paramsBefore(expr, at);
+    if (params.size > 0) {
+      let i: number = at + 2;
+      while (i < n && /\s/.test(expr[i])) i++;
+      let end: number = n;
+      if (expr[i] === '{' || expr[i] === '(' || expr[i] === '[') {
+        const close: number = matchBracket(expr, i);
+        if (close >= 0) end = close + 1;
+      } else {
+        // A concise body: it ends where the enclosing call/list continues.
+        let depth: number = 0;
+        for (let k: number = i; k < n; k++) {
+          const c: string = expr[k];
+          if (c === '"' || c === "'" || c === '`') {
+            k = scanString(expr, k) - 1;
+            continue;
+          }
+          if (c === '(' || c === '[' || c === '{') depth++;
+          else if (c === ')' || c === ']' || c === '}') {
+            if (depth === 0) {
+              end = k;
+              break;
+            }
+            depth--;
+          } else if (c === ',' && depth === 0) {
+            end = k;
+            break;
+          }
         }
       }
-      for (const raw of expr.slice(m + 1, k).split(',')) {
-        const name: string = raw.trim().split(/[\s=:]/)[0].replace(/[{}[\]().]/g, '');
-        if (ID.test(name)) params.add(name);
-      }
-    } else {
-      // single bare param:  x => …
-      let m: number = k;
-      while (m >= 0 && ID_CHAR.test(expr[m])) m--;
-      const name: string = expr.slice(m + 1, k + 1);
-      if (ID.test(name)) params.add(name);
+      out.push({ start, end, params });
     }
     at = expr.indexOf('=>', at + 2);
   }
-  return params;
+  return out;
+}
+
+/** Index of the bracket matching the opener at `i`, or -1. Strings are skipped. */
+function matchBracket(s: string, i: number): number {
+  const open: string = s[i];
+  const close: string = open === '{' ? '}' : open === '(' ? ')' : ']';
+  let depth: number = 0;
+  for (let k: number = i; k < s.length; k++) {
+    const c: string = s[k];
+    if (c === '"' || c === "'" || c === '`') {
+      k = scanString(s, k) - 1;
+      continue;
+    }
+    if (c === open) depth++;
+    else if (c === close) {
+      depth--;
+      if (depth === 0) return k;
+    }
+  }
+  return -1;
+}
+
+/**
+ * The parameters of the arrow whose `=>` sits at `at`, plus where their scope BEGINS — the start of the
+ * parameter list, not the arrow. The names in the list are themselves references to shadow: without that,
+ * `(value) => …` with a ctx binding named `value` emitted `(ctx.value) =>`, a syntax error.
+ */
+function paramsBefore(expr: string, at: number): { params: Set<string>; start: number } {
+  const params: Set<string> = new Set<string>();
+  const ID: RegExp = /^[A-Za-z_$][\w$]*$/;
+  let k: number = at - 1;
+  while (k >= 0 && /\s/.test(expr[k])) k--;
+  if (expr[k] === ')') {
+    let depth: number = 1;
+    let m: number = k - 1;
+    for (; m >= 0; m--) {
+      if (expr[m] === ')') depth++;
+      else if (expr[m] === '(') {
+        depth--;
+        if (depth === 0) break;
+      }
+    }
+    for (const raw of expr.slice(m + 1, k).split(',')) {
+      const name: string = raw.trim().split(/[\s=:]/)[0].replace(/[{}[\]().]/g, '');
+      if (ID.test(name)) params.add(name);
+    }
+    return { params, start: Math.max(m, 0) };
+  }
+  let m: number = k;
+  while (m >= 0 && ID_CHAR.test(expr[m])) m--;
+  const name: string = expr.slice(m + 1, k + 1);
+  if (ID.test(name)) params.add(name);
+  return { params, start: m + 1 };
 }
 
 /**
@@ -416,11 +506,20 @@ function arrowParams(expr: string): Set<string> {
  */
 export function freeIdentifiers(expr: string, outerParams?: ReadonlySet<string>): string[] {
   const out: Set<string> = new Set<string>();
-  const params: Set<string> = arrowParams(expr);
-  // A `${…}` is walked by a RECURSIVE call, which used to start with an empty param set — so an enclosing
-  // arrow's params were forgotten inside it: `items.map((_, i) => `#${i}`)` inferred `i` as component data and
-  // compiled it to `ctx.i`. Carry them in.
-  if (outerParams) for (const p of outerParams) params.add(p);
+  // Only an ENCLOSING arrow's params apply to the whole expression (a `${…}` is walked by a recursive call,
+  // and forgetting them there inferred `i` from `items.map((_, i) => `#${i}`)` as component data). This
+  // expression's own arrows shadow lexically — the same basis `rewrite` uses, and they MUST agree: if
+  // inference drops a name that rewrite would prefix, the binding is missing from the emitted scope.
+  const params: Set<string> = new Set<string>(outerParams ?? []);
+  const scopes: ArrowScope[] = arrowScopes(expr);
+  const shadowedAt = (name: string, pos: number): boolean =>
+    scopes.some((sc) => pos >= sc.start && pos < sc.end && sc.params.has(name));
+  /** Every param in scope at `pos` — the inherited ones plus any arrow whose body covers that offset. */
+  const paramsAt = (pos: number): Set<string> => {
+    const all: Set<string> = new Set<string>(params);
+    for (const sc of scopes) if (pos >= sc.start && pos < sc.end) for (const p of sc.params) all.add(p);
+    return all;
+  };
   let i: number = 0;
   const n: number = expr.length;
   // The last SIGNIFICANT character — tracked, not read back out of the raw text. Reading it back sees whatever
@@ -470,7 +569,7 @@ export function freeIdentifiers(expr: string, outerParams?: ReadonlySet<string>)
             }
             k++;
           }
-          for (const id of freeIdentifiers(expr.slice(start, k), params)) out.add(id);
+          for (const id of freeIdentifiers(expr.slice(start, k), paramsAt(start))) out.add(id);
           continue;
         }
         k++;
@@ -501,7 +600,7 @@ export function freeIdentifiers(expr: string, outerParams?: ReadonlySet<string>)
       // An explicit object-literal key (`{ key: … }` / `, key: …`) is a property name, not component
       // data — don't infer it as ctx. Shorthand `{ key }` (next is `,`/`}`) IS a value ref → kept.
       const isObjectKey: boolean = (prev === '{' || prev === ',') && next === ':';
-      if (!isProperty && !isObjectKey && !NON_CTX.has(name) && !params.has(name)) out.add(name);
+      if (!isProperty && !isObjectKey && !NON_CTX.has(name) && !params.has(name) && !shadowedAt(name, i)) out.add(name);
       sig = name[name.length - 1];
       i = j;
       continue;

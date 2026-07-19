@@ -34,6 +34,36 @@ test('rewrite: ctx binding prefixes __ctx. and maps the name verbatim', () => {
   assertFullSourceCoverage(expr, r.segments);
 });
 
+test('rewrite: an arrow parameter shadows only INSIDE its own body', () => {
+  // `arrowParams` collected every parameter in the expression into one flat set applied to the WHOLE
+  // string, so a ctx binding sharing a name with any arrow parameter anywhere was left bare wherever it
+  // appeared. `items().map((x) => x * 2).length + x` emitted a trailing bare `x` — a ReferenceError at
+  // runtime, or worse a silent read of a global with that name. Shadowing is lexical: it starts at the
+  // arrow's parameter list and ends with its body.
+  const scope: ReturnType<typeof ctxScope> = ctxScope(['items', 'x']);
+
+  const after: ReturnType<typeof rewrite> = rewrite('items().map((x) => x * 2).length + x', scope);
+  assert.equal(after.code, 'ctx.items().map((x) => x * 2).length + ctx.x', 'a reference AFTER the arrow is ctx');
+  assertVerbatim('items().map((x) => x * 2).length + x', after.code, after.segments);
+  assertFullSourceCoverage('items().map((x) => x * 2).length + x', after.segments);
+
+  const before: ReturnType<typeof rewrite> = rewrite('x + items().map((x) => x * 2).length', scope);
+  assert.equal(before.code, 'ctx.x + ctx.items().map((x) => x * 2).length', 'a reference BEFORE the arrow is ctx');
+
+  const inside: ReturnType<typeof rewrite> = rewrite('items().map((x) => x * 2)', scope);
+  assert.equal(inside.code, 'ctx.items().map((x) => x * 2)', 'inside the body the parameter still wins');
+
+  const block: ReturnType<typeof rewrite> = rewrite('items().map((x) => { return x; }) || x', scope);
+  assert.equal(block.code, 'ctx.items().map((x) => { return x; }) || ctx.x', 'a block body ends the shadow at its `}`');
+
+  const nested: ReturnType<typeof rewrite> = rewrite('items().map((x) => x).concat(items().map((y) => x))', scope);
+  assert.equal(
+    nested.code,
+    'ctx.items().map((x) => x).concat(ctx.items().map((y) => ctx.x))',
+    'a sibling arrow does not inherit the first one’s parameter'
+  );
+});
+
 test('rewrite: an arrow parameter shadows a same-named ctx binding (B1 — no `(ctx.x) =>`)', () => {
   // Regression: with `value` in scope, `(value) => value * 2` compiled to
   // `(ctx.value) => ctx.value * 2` — a SyntaxError. The arrow param must stay bare.
