@@ -8,6 +8,24 @@ import { snapshot, resume, resumePage, SNAPSHOT_ID, collectStates, registerState
 import { compileTemplate, compileComponent, type CompileResult } from '@weave-framework/compiler';
 
 /**
+ * Strip HTML comments, repeating until the string stops changing.
+ *
+ * A single `replace` pass is not enough: removing one comment can splice the surrounding text into a NEW
+ * `<!--`, which then survives. The assertions below check rendered markup with Weave's block markers
+ * (`<!--[-->`, `<!--]-->`) removed, so a leftover marker means the assertion quietly tests a different
+ * string than intended. (CodeQL: js/incomplete-multi-character-sanitization.)
+ */
+function stripComments(html: string): string {
+  let prev: string;
+  let out: string = html;
+  do {
+    prev = out;
+    out = out.replace(/<!--[\s\S]*?-->/g, '');
+  } while (out !== prev);
+  return out;
+}
+
+/**
  * A compiled render fn plus the resume extras the compiler attaches to it (`render.adopt` / `.derive` /
  * `.handlers`). Written out longhand at 17 call sites before this had a name; each site spelled a slightly
  * different subset of the same shape, which is exactly how a "style" rule ends up unsatisfiable.
@@ -432,7 +450,7 @@ test('E1.2c-3: adopt replays a @for island — the heading adopts in place, the 
   const serverNode: HTMLElement = render({ title, items }) as HTMLElement;
   const wire: Wire = snapshot({ title, items });
   const serverHtml: string = serverNode.outerHTML;
-  assert.ok(/<li[^>]*>1<\/li>/.test(serverHtml.replace(/<!--[\s\S]*?-->/g, '')), 'server rendered the rows');
+  assert.ok(/<li[^>]*>1<\/li>/.test(stripComments(serverHtml)), 'server rendered the rows');
 
   // ── client ── fresh parse + resume (no handlers factory — the list has no events)
   const container: HTMLElement = host();
@@ -482,7 +500,7 @@ test('E1.2c-4: adopt resumes a block PLUS a trailing interp — the tail after t
   const serverNode: HTMLElement = render({ head, show, tail }) as HTMLElement;
   const wire: Wire = snapshot({ head, show, tail });
   const serverHtml: string = serverNode.outerHTML;
-  assert.ok(serverHtml.includes('body') && serverHtml.replace(/<!--[\s\S]*?-->/g, '').includes('T'), 'server rendered branch + tail');
+  assert.ok(serverHtml.includes('body') && stripComments(serverHtml).includes('T'), 'server rendered branch + tail');
 
   // ── client ──
   const container: HTMLElement = host();

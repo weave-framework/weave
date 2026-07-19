@@ -32,7 +32,7 @@ import { createServer } from 'node:http';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, writeFileSync, readFileSync, readdirSync, existsSync, rmSync } from 'node:fs';
 import { gzipSync } from 'node:zlib';
-import { dirname, join, extname, resolve, sep } from 'node:path';
+import { dirname, join, extname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -187,20 +187,26 @@ export function setup(): { slug: Signal<string> } {
   /* ── serve the emitted files exactly as a static host would ── */
 
   const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8' };
+  // Every file the build emitted, indexed by the URL that serves it. Built ONCE, up front.
+  //
+  // The obvious shape — join the request path onto outDir and read it — is a path traversal: stripping
+  // leading slashes does not stop `/../../secret` from climbing out, and a containment check afterwards is
+  // easy to get subtly wrong. An allowlist removes the tainted path from the problem entirely: a request
+  // either names something the build produced, or it gets a 404. (CodeQL: js/path-injection.)
+  const served = new Map();
+  const indexDir = (dir, prefix) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const abs = join(dir, entry.name);
+      if (entry.isDirectory()) indexDir(abs, prefix + entry.name + '/');
+      else served.set(prefix + entry.name, abs);
+    }
+  };
+  indexDir(outDir, '/');
+
   server = createServer((req, res) => {
     const url = (req.url || '/').split('?')[0];
-    // Resolve, then confirm the result is still inside `outDir`. Stripping the leading slashes does not stop
-    // `/../../secret` from climbing out, and this server — though local, ephemeral and bound to a random
-    // port — is still a real HTTP server reading whatever path a request names.
-    // (CodeQL: js/path-injection.)
-    const file = resolve(outDir, url === '/' ? 'index.html' : decodeURIComponent(url).replace(/^\/+/, ''));
-    const root = resolve(outDir);
-    if (file !== root && !file.startsWith(root + sep)) {
-      res.writeHead(403);
-      res.end('forbidden');
-      return;
-    }
-    if (!existsSync(file)) {
+    const file = served.get(url === '/' ? '/index.html' : url);
+    if (!file) {
       res.writeHead(404);
       res.end('not found');
       return;
