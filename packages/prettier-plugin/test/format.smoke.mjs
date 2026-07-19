@@ -186,5 +186,20 @@ const  count=signal(0)
   ok(('' /* bare <style> */).match(STYLE_LANG) === null, 'STYLE_LANG on empty attrs → no lang (defaults to css)');
 }
 
+/* ── 7. an explicitly EMPTY attribute stays explicitly empty ──
+ * The parser separates `disabled` (no `=`, `bare: true`) from `disabled=""` (an empty string), and the
+ * difference is load-bearing: on a component tag a bare attribute becomes the boolean prop `true`, an
+ * empty one the string `""`. Printing the empty form as bare therefore changes a child's prop TYPE and
+ * VALUE — a formatter silently editing the program. The block-1 fixture could not catch it because none
+ * of its attributes is empty, so the AST comparison never saw the case. */
+{
+  const src = `<Toggle disabled="" title="" flag>text</Toggle>`;
+  const f1 = await fmt(src, 'empty-attr.html');
+  ok(JSON.stringify(astOf(src)) === JSON.stringify(astOf(f1)), 'an empty attribute value survives formatting (no semantic change)');
+  ok(/disabled=""/.test(f1), '`disabled=""` is NOT printed as a bare attribute');
+  ok(/(^|\s)flag(\s|>)/.test(f1), 'a genuinely bare attribute is still printed bare');
+  ok(f1 === (await fmt(f1, 'empty-attr.html')), 'idempotent');
+}
+
 console.log(failures ? `\n✖ ${failures} check(s) failed\n` : '\n✓ all checks passed\n');
 process.exit(failures ? 1 : 0);

@@ -137,7 +137,12 @@ function printRaw(nodes: TemplateNode[], options?: ParserOptions): Doc {
 function printAttr(attr: Attr): string {
   switch (attr.type) {
     case 'static':
-      return attr.value === '' ? attr.name : `${attr.name}="${attr.value}"`;
+      // The BARE flag decides, not the emptiness of the value. The parser sets it only for an attribute
+      // written with no `=` at all, and the two are not interchangeable: on a component tag a bare
+      // attribute becomes the boolean prop `true`, an explicit `disabled=""` the string `""`. Printing
+      // the empty form as bare rewrote a child's prop type and value — a formatter changing what the
+      // program does, which is the one thing a formatter may never do.
+      return attr.bare ? attr.name : `${attr.name}="${attr.value}"`;
     case 'attr':
       return `${attr.name}={{ ${attr.expr} }}`;
     case 'prop':

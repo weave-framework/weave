@@ -16,6 +16,18 @@
 
 ## Unreleased
 
+### Fixed — prettier plugin
+- **Formatting no longer rewrites an explicitly empty attribute into a bare one.** `disabled=""` was printed
+  as `disabled`, and the two are not interchangeable: the parser marks a valueless attribute `bare`, and on a
+  component tag that becomes the boolean prop `true` while `disabled=""` is the string `""`. One formatting
+  pass therefore changed a child component's prop type and value — a formatter silently editing the program,
+  which is the one thing a formatter may never do. The printer now branches on the `bare` flag the parser
+  actually sets, instead of inferring it from an empty value.
+
+  The package's own "no semantic change" gate compares normalized ASTs before and after formatting and would
+  have caught this, but no fixture contained an empty attribute — so the case was never presented to it. A
+  fixture now covers both forms, and it fails without the fix.
+
 ### Fixed — compiler + runtime
 - **A destructured handler parameter no longer kills the handler on resume.** Deciding whether a `setup`
   binding can be rebuilt after resume meant asking which names its body reads that the client will not have.
