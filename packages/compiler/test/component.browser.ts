@@ -93,6 +93,26 @@ test('inferCtxNames excludes @for item, $vars, and @let names', () => {
   assert.deepEqual(l, ['n']);
 });
 
+test('@for: `track` is keyed by the ROW even when a ctx binding shares the loop variable name', () => {
+  // The keyFn is `(item, $index) => <track>`, so `track` must resolve against the ROW parameter. It was
+  // rewritten against the PARENT scope instead, so when a ctx binding shared the loop variable's name the
+  // parameter stopped shadowing and every row got `ctx.item.id` — one constant key for the whole list.
+  // Keyed reconciliation then reuses the wrong nodes, state bleeds between rows and removals collapse,
+  // all silently. The inference pass directly above already scopes `track` correctly; this is the codegen
+  // half disagreeing with the compiler's own scope model.
+  //
+  // The trigger is narrower than "the names match": `item` only enters ctx because the <h1> references it
+  // OUTSIDE the loop. Used solely as a loop variable it is never inferred as component data, and the bug
+  // stays masked — which is why a test written without that heading would pass either way.
+  const { code } = compileComponent({
+    template: '<h1>{{ item }}</h1><ul>@for (item of items(); track item.id) { <li>{{ item.t }}</li> }</ul>',
+  });
+  const keyFn: RegExpExecArray | null = /\(item, \$index\) => ([^,]+),/.exec(code);
+  assert.ok(keyFn, `expected a keyFn in the emitted eachBlock; got:\n${code}`);
+  assert.equal(keyFn![1].trim(), 'item.id', 'track reads the row parameter, not the ctx binding');
+  assert.ok(!code.includes('=> ctx.item.id'), 'track must not resolve to ctx.item');
+});
+
 test('inferCtxNames: a name used outside a @for is still ctx even if a loop shadows it', () => {
   // `item` is component data in the heading AND, separately, a loop var inside @for — the loop's
   // block-local binding must not erase the ctx usage elsewhere (declared is per-scope, not global).

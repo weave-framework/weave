@@ -16,6 +16,18 @@
 
 ## Unreleased
 
+### Fixed — compiler
+- **`@for ... track` is keyed by the row, not by a same-named component binding.** The key function is
+  `(item, $index) => <track>`, so `track` must resolve against the row parameter — but it was rewritten
+  against the PARENT scope. When a `setup` binding shared the loop variable name, the parameter stopped
+  shadowing and every row keyed on the same `ctx.<name>`: one constant key for the whole list, so keyed
+  reconciliation reused the wrong nodes, state bled between rows and removals collapsed, all silently.
+  The inference pass already scoped `track` correctly; this was the codegen half disagreeing with the
+  compiler own scope model.
+
+  The trigger is narrower than it looks: the name must ALSO be referenced outside the loop, since a name
+  used only as a loop variable never enters the inferred component scope in the first place.
+
 ### Fixed — runtime (security)
 - **`renderDocument` escapes what it interpolates (stored XSS in SSG output).** The page title, `lang` and
   the client-entry URL were written into the document raw. A title is routinely DERIVED FROM DATA — a

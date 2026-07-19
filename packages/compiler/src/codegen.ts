@@ -1266,7 +1266,16 @@ function compileFragment(
     }
 
     const list: string = rewrite(node.list, sc).code;
-    const track: string = node.track ? rewrite(node.track, sc).code : '$index';
+    // `track` is the body of `(item, $index) => …`, so it resolves against the ROW, not the parent scope.
+    // Rewriting it against `sc` meant a ctx binding sharing the loop variable's name won: the parameter
+    // stopped shadowing and every row keyed on the same `ctx.<name>`, so keyed reconciliation reused the
+    // wrong nodes and state bled between rows — silently. `infer.ts` already scopes `track` this way; this
+    // is the codegen half agreeing with it. The row vars are real lexical parameters here (not the
+    // accessor-backed locals the BODY sees), hence `local` rather than `childScope`'s `call`.
+    const keyScope: Scope = new Map(sc);
+    keyScope.set(node.item, { kind: 'local' });
+    keyScope.set('$index', { kind: 'local' });
+    const track: string = node.track ? rewrite(node.track, keyScope).code : '$index';
     const keyFn: string = `(${node.item}, $index) => ${track}`;
     emitBlockReplay(path, (a) => `${gen.H('eachBlock')}(${a}, () => ${list}, ${keyFn}, ${rowFn}${emptyArg})`);
   }
