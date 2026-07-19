@@ -207,7 +207,7 @@ class Gen {
   }
   tpl(html: string, svg: boolean = false): string {
     const v: string = `_t${this.tplN++}`;
-    this.templates.push(`const ${v} = ${this.H(svg ? 'templateSvg' : 'template')}(${JSON.stringify(html)});`);
+    this.templates.push(`const ${v} = ${this.H(svg ? 'templateSvg' : 'template')}(${q(html)});`);
     return v;
   }
   fn(prefix: string = '_b'): string {
@@ -994,7 +994,7 @@ function compileFragment(
           throw new Error(`'${attr.type}' binding on <${node.tag}> is not supported yet (props, on:event, use:, bind: only)`);
       }
     }
-    if (eventKeys.length) props.push(`'$events': [${eventKeys.map((k) => JSON.stringify(k)).join(', ')}]`);
+    if (eventKeys.length) props.push(`'$events': [${eventKeys.map((k) => q(k)).join(', ')}]`);
 
     // E1.2c-6: a STATIC-position (depth-1) resumable component is a resume boundary. Give it a snapshot id;
     // the create mount tags the child with `$wid` (so the child self-registers its ctx) and the adopt walk
@@ -1362,13 +1362,51 @@ function trimTop(nodes: TemplateNode[]): TemplateNode[] {
   return nodes.filter((n) => !(n.type === 'text' && n.value.trim() === ''));
 }
 
+/**
+ * A JavaScript string literal for `s`, safe in a CODE position.
+ *
+ * `JSON.stringify` alone is not: it produces valid JSON, but this output is JavaScript SOURCE, and JSON
+ * leaves two things raw that JavaScript cares about.
+ *
+ *  - **`</script>`** — the emitted module carries template text verbatim, so an attribute value containing
+ *    `</script>` breaks out of any `<script>` block the module is inlined into. Weave inlines script content
+ *    itself for the SSG snapshot, and consumers inline bundles. Escaping `<` costs nothing: `<` is the
+ *    same character at runtime.
+ *  - **U+2028 / U+2029** — valid inside a JSON string and, since ES2019, inside a JS string too; but they
+ *    remain line terminators to plenty of tooling that reads this output.
+ *
+ * Escaping is lossless — every form here decodes back to the original character.
+ * (CodeQL: js/bad-code-sanitization.)
+ */
+/**
+ * A JavaScript string literal for `s`, safe in a CODE position.
+ *
+ * `JSON.stringify` alone is not. Its output is valid JSON, but this is JavaScript SOURCE, and JSON
+ * leaves two things raw that matter here:
+ *
+ *  - **`</`** — the emitted module carries template text verbatim, so an attribute value holding
+ *    `</script>` closes any script block the module is inlined into. Only the SLASH is escaped, which is
+ *    the same character at runtime but cannot terminate a tag; ordinary markup stays readable, so a
+ *    hoisted template still reads as `<div …>` in the output.
+ *  - **U+2028 / U+2029** — legal inside a JS string since ES2019, but still line terminators to a good
+ *    deal of tooling that reads this output.
+ *
+ * The separators are matched as ESCAPES: a literal U+2028 written into this regex does not even parse —
+ * the parser reads it as a line terminator and calls the regex unterminated. That is the defect in
+ * miniature, the character escaping its own quoting.
+ *
+ * Lossless: every form emitted here decodes back to the original text.
+ * (CodeQL: js/bad-code-sanitization.)
+ */
 function q(s: string): string {
-  return JSON.stringify(s);
+  return JSON.stringify(s)
+    .replace(/<\//g, '<\\/')
+    .replace(/[\u2028\u2029]/g, (c) => '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0'));
 }
 
 /** Object-literal key: bare when a valid identifier, quoted otherwise. */
 function propKey(name: string): string {
-  return /^[A-Za-z_$][\w$]*$/.test(name) ? name : JSON.stringify(name);
+  return /^[A-Za-z_$][\w$]*$/.test(name) ? name : q(name);
 }
 
 /** Name a node the way its author wrote it (`<RouterView>`, `@for`), so a diagnostic points at real source. */

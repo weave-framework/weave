@@ -18,6 +18,12 @@ on:
   pull_request:
     branches: [main]
 
+# Least privilege for GITHUB_TOKEN. Without this the default token is granted write scopes this workflow
+# never uses — it only reads the repo and runs tests. Flagged by CodeQL (actions/missing-workflow-permissions)
+# on all three jobs; set once here so a job added later inherits it rather than being forgotten.
+permissions:
+  contents: read
+
 # A new push to the same branch cancels the previous run — no point finishing a run for a commit
 # that has already been replaced.
 concurrency:

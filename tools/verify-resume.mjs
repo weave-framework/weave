@@ -32,7 +32,7 @@ import { createServer } from 'node:http';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, writeFileSync, readFileSync, readdirSync, existsSync, rmSync } from 'node:fs';
 import { gzipSync } from 'node:zlib';
-import { dirname, join, extname } from 'node:path';
+import { dirname, join, extname, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -189,7 +189,17 @@ export function setup(): { slug: Signal<string> } {
   const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8' };
   server = createServer((req, res) => {
     const url = (req.url || '/').split('?')[0];
-    const file = join(outDir, url === '/' ? 'index.html' : url.replace(/^\/+/, ''));
+    // Resolve, then confirm the result is still inside `outDir`. Stripping the leading slashes does not stop
+    // `/../../secret` from climbing out, and this server — though local, ephemeral and bound to a random
+    // port — is still a real HTTP server reading whatever path a request names.
+    // (CodeQL: js/path-injection.)
+    const file = resolve(outDir, url === '/' ? 'index.html' : decodeURIComponent(url).replace(/^\/+/, ''));
+    const root = resolve(outDir);
+    if (file !== root && !file.startsWith(root + sep)) {
+      res.writeHead(403);
+      res.end('forbidden');
+      return;
+    }
     if (!existsSync(file)) {
       res.writeHead(404);
       res.end('not found');

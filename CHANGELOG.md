@@ -16,6 +16,15 @@
 
 ## Unreleased
 
+### Fixed — compiler (security hardening)
+- **Emitted code escapes sequences that can break out of a JavaScript string literal.** The compiler builds
+  JS source by interpolating template text into string literals, and quoted it with `JSON.stringify` — which
+  is correct for JSON but leaves two things raw that JavaScript source cannot carry. A template value
+  containing a closing script tag came through verbatim, so the generated module terminated any script
+  block it was inlined into; and U+2028/U+2029 stayed raw, which is legal in a modern JS string but is still
+  a line terminator to plenty of tooling. Only the slash of a closing tag is escaped, so ordinary markup in
+  the hoisted template stays readable. Three emit sites that bypassed the quoting helper now use it.
+
 ### Fixed — reactivity (behaviour change)
 - **An invalidation arriving while an effect runs is no longer discarded.** A running computation is DIRTY
   for its whole execution and `markDirty` returned early on an already-DIRTY node, so an update aimed at an

@@ -249,7 +249,11 @@ try {
   });
 
   const doc = readFileSync(join(rrout, 'index.html'), 'utf8');
-  const json = (doc.match(/id="__weave_snapshot__">([^<]*)/) || [])[1].replace(/\u003c/g, '<');
+  // No un-escaping step, deliberately: scriptSafe writes < as a JSON string escape, which the JSON.parse
+  // below already decodes. This line used to replace that escape with <, but in a regex the escape IS <,
+  // so it replaced the character with itself and only looked like it handled something.
+  // (CodeQL: js/identity-replacement.)
+  const json = (doc.match(/id="__weave_snapshot__">([^<]*)/) || [])[1];
   const state = deserialize(JSON.parse(json));
   // The router made the root unserializable BEFORE E1.11 (the build actually failed). Now it is re-derived
   // client-side, so the root IS captured — and E1.12 captures the routed view's ctx under $route:0.

@@ -432,7 +432,7 @@ test('E1.2c-3: adopt replays a @for island — the heading adopts in place, the 
   const serverNode: HTMLElement = render({ title, items }) as HTMLElement;
   const wire: Wire = snapshot({ title, items });
   const serverHtml: string = serverNode.outerHTML;
-  assert.ok(/<li[^>]*>1<\/li>/.test(serverHtml.replace(/<!--[^>]*-->/g, '')), 'server rendered the rows');
+  assert.ok(/<li[^>]*>1<\/li>/.test(serverHtml.replace(/<!--[\s\S]*?-->/g, '')), 'server rendered the rows');
 
   // ── client ── fresh parse + resume (no handlers factory — the list has no events)
   const container: HTMLElement = host();
@@ -482,7 +482,7 @@ test('E1.2c-4: adopt resumes a block PLUS a trailing interp — the tail after t
   const serverNode: HTMLElement = render({ head, show, tail }) as HTMLElement;
   const wire: Wire = snapshot({ head, show, tail });
   const serverHtml: string = serverNode.outerHTML;
-  assert.ok(serverHtml.includes('body') && serverHtml.replace(/<!--[^>]*-->/g, '').includes('T'), 'server rendered branch + tail');
+  assert.ok(serverHtml.includes('body') && serverHtml.replace(/<!--[\s\S]*?-->/g, '').includes('T'), 'server rendered branch + tail');
 
   // ── client ──
   const container: HTMLElement = host();

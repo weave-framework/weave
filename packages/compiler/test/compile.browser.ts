@@ -409,3 +409,25 @@ test('module mode references components by name and emits getter props', () => {
   assert.ok(code.includes('get x()'), 'reactive prop is a getter');
   assert.ok(code.includes('onGo:'), 'on:go mapped to onGo prop');
 });
+
+test('emitted code escapes sequences that would break out of a JS string literal', () => {
+  // The emitter builds JavaScript SOURCE by interpolating template text into string literals, so the
+  // quoting has to be safe for a code position, not merely valid JSON. `JSON.stringify` is not: it leaves
+  // `</script>` and U+2028/U+2029 raw. A module carrying a raw `</script>` from an attribute value breaks
+  // out the moment that module is inlined into HTML — which Weave itself does for the SSG snapshot, and
+  // consumers do when they inline a bundle. Flagged by CodeQL as js/bad-code-sanitization.
+  const LS: string = ' ';
+  const PS: string = ' ';
+  const { code } = compileTemplate(
+    `<div title="a${LS}b${PS}c" data-x="</script><script>boom()</script>"></div>`,
+    ['x']
+  );
+  assert.ok(!code.includes('</script'), `no raw </script in the emitted module; got:\n${code}`);
+  assert.ok(!code.includes(LS), 'no raw U+2028 in the emitted module');
+  assert.ok(!code.includes(PS), 'no raw U+2029 in the emitted module');
+
+  // …and the escaping must be lossless: the values still arrive intact at runtime.
+  const decoded: string = new Function(`return ${/template\((".*?")\)/.exec(code)?.[1] ?? '""'}`)() as string;
+  assert.ok(decoded.includes('</script>'), 'the value round-trips to the original text');
+  assert.ok(decoded.includes(`a${LS}b${PS}c`), 'the separators round-trip too');
+});

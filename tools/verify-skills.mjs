@@ -123,7 +123,11 @@ for (const skill of skills) {
   if (pkg) {
     const exports = publicExports(pkg);
     const missing = exports.filter(
-      (n) => !NOT_TAUGHT[n] && !new RegExp(`\\b${n.replace(/\$/g, '\\$')}\\b`).test(md)
+      // Escape every regex metacharacter, not only `$`. An export name is normally a plain identifier, so
+      // the partial escape worked — but a partial escape is the kind that stops matching silently the day
+      // it does not, and this gate reports "documented" by finding the name in the prose.
+      // (CodeQL: js/incomplete-sanitization.)
+      (n) => !NOT_TAUGHT[n] && !new RegExp(`\\b${n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(md)
     );
     totalMissing += missing.length;
     if (missing.length) {
