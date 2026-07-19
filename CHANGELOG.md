@@ -14,7 +14,31 @@
 > already left it behind — Phase E ran 94 commits without a bump, and then released as one MINOR. The public
 > promise wins; the habit is retired.)*
 
-## Unreleased
+## 2.0.0 — 2026-07-19
+
+**Why this is a MAJOR and not a patch.** Almost everything here is a bug fix, and most of it moves behaviour
+toward what was always documented. But four changes make existing code behave differently without being
+edited, and [VERSIONING.md](VERSIONING.md) is explicit that a changed default behaviour is a major:
+
+- **A reactive update aimed at a running effect is no longer discarded.** A mutually-writing effect pair that
+  has no fixed point used to terminate quietly — because the update was dropped. It now converges if it can,
+  and throws after 100 passes if it cannot. If you relied on such a pair settling on an arbitrary value, it
+  will now report instead.
+- **`@await` rebuilds its `@then` subtree when the awaited value changes.** It previously kept rendering the
+  old value; DOM state inside that branch is now reset on a data change, where before it persisted (while
+  showing stale data).
+- **`store()` factories run in their own root.** Effects created inside a store used to die with the first
+  component that used it. They now live for the app's lifetime — so effects that silently stopped will start
+  running again.
+- **The Prettier plugin's output changed** in two places (an explicitly empty attribute is no longer printed
+  bare; whitespace between inline elements is preserved). A `--check` step in CI will flag files formatted by
+  an older version until they are reformatted.
+
+Nothing was removed or renamed, and no signature changed: code that compiles against 1.x still compiles.
+
+This release also closes a full external audit (24 defects) and every open GitHub code-scanning alert (11),
+including **two security fixes**: a stored XSS in SSG document generation, and a code-injection path in the
+compiler's own emitted output.
 
 ### Fixed — compiler (security hardening)
 - **Emitted code escapes sequences that can break out of a JavaScript string literal.** The compiler builds

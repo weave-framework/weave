@@ -3,6 +3,91 @@
 Human-readable highlights, one section per release — everything notable that landed since
 the previous one. For the granular, per-version log see [CHANGELOG.md](CHANGELOG.md).
 
+## 2.0.0 — 2026-07-19
+
+A release made entirely of things that were already wrong. An external audit went through the whole
+codebase and produced 24 defects; GitHub code scanning had 11 open alerts. All 35 are closed here, each
+one reproduced before it was fixed and each fix pinned by a test that fails without it.
+
+**Why the major.** Nothing was removed, nothing was renamed, no signature changed — code written against
+1.x still compiles. But four fixes change how existing code *behaves*, and Weave's versioning promise says
+plainly that a changed default behaviour is a major. Paying that cost now is the honest option; the
+[CHANGELOG](CHANGELOG.md) lists all four at the top of the 2.0.0 section.
+
+### 🔒 Two security fixes
+
+**A stored XSS in static builds.** `renderDocument` wrote the page title, `lang` and the client-entry URL
+into the HTML without escaping. A title is routinely derived from data — a route-title effect reading a CMS
+record, a product name, a username — so a title containing a closing `</title>` followed by a script tag
+became executable markup baked into every generated page, and it persisted there. Now escaped for the
+position it lands in. `head` stays raw, because injecting markup is that option's documented purpose.
+
+**Code injection in the compiler's own output.** The compiler builds JavaScript source by interpolating
+template text into string literals, and quoted it with `JSON.stringify`. That is right for JSON and wrong
+for code: JSON leaves `</script>` and U+2028/U+2029 raw. A template attribute holding `</script>` came
+through verbatim, so the generated module terminated any script block it was inlined into. Three emit sites
+bypassed the quoting helper entirely — including the one carrying the whole hoisted template.
+
+### 🐛 The silent ones
+
+The defects worth naming are the ones that produced no error at all.
+
+**A reactive update aimed at a running effect was dropped.** A running computation is marked dirty for its
+whole execution, and the invalidation check returned early on an already-dirty node — so an update arriving
+mid-run vanished. The effect finished holding a value that was already stale, went clean, and left the
+queue. Nothing threw, nothing looped; it was simply one update behind, permanently, and every later run
+landed one behind again.
+
+**`@await` showed stale data.** The rendered branch was rebuilt only when the await *state* changed, and
+`resource.mutate()` — the documented optimistic-update path — writes data while leaving `loading` false. So
+the branch kept showing the previous value. Refetches survived only because they bounce through `pending`
+first, which is a different transition entirely. Two documented APIs, quietly incompatible.
+
+**`@for … track` could key every row identically.** The key expression was resolved against the parent
+scope instead of the row, so when a component binding shared the loop variable's name the parameter stopped
+shadowing and every row got the same key. Keyed reconciliation then reused nodes for the wrong rows, state
+bled between them, and removals collapsed.
+
+**A store died with the component that happened to use it first.** `store()` ran its factory under whichever
+owner was ambient at the first call, so every effect created inside it was disposed when that one component
+unmounted — while every other consumer went on holding the same half-dead instance. Order-dependent, and
+invisible: the signals kept working, so the store still looked alive.
+
+**Two ways the formatter changed your program.** The Prettier plugin printed `disabled=""` as bare
+`disabled` — a different prop *type* on a component tag — and dropped whitespace between inline elements, so
+`<span><b>a</b><b>b</b></span>` started rendering "a b" instead of "ab". A formatter may reflow anything it
+likes except the output.
+
+### 🧭 Router, at the edges where the browser pushes back
+
+A malformed percent-escape in a URL threw inside route resolution and blanked the page instead of falling
+back to `*`. A guard redirect pushed a history entry instead of replacing it, so Back returned to the
+guarded page, the guard fired again, and the user was trapped. A guard-vetoed multi-entry pop rolled back by
+exactly one entry regardless of how far the jump went, leaving the URL and the rendered page disagreeing.
+
+### 🛠 The daily loop
+
+**`weave check` honours your `tsconfig.json`.** It used a hardcoded option set with no `paths` and no
+`baseUrl`, so any project using path aliases got "Cannot find module" on every aliased import — a wall of
+errors from the framework's own quality tool, against a project that is correct.
+
+**A failed rebuild no longer reloads the browser into nothing.** `weave dev` cleared its in-memory outputs,
+refilled them from a failed build's empty list, and reloaded anyway — so a syntax error produced a white
+page with the real error only in the terminal. The last good bundle is now kept and the error is painted
+over the still-working page.
+
+**Source maps.** Neither `weave dev` nor `weave build` emitted any. Both do now.
+
+### ⚙️ Release engineering
+
+Publishing was gated only on a `[publish]` marker — no test ran before packages went to npm with a
+provenance attestation. The suite now runs inside the publish job. And a partial publish can be resumed:
+the failure message used to promise that npm skips already-published packages, which it does not.
+
+### Full detail
+
+Every entry, with the reasoning: [CHANGELOG.md](CHANGELOG.md).
+
 ## 1.8.0 — 2026-07-19
 
 A release about the parts of Weave that *teach* — the skills an AI agent reads, the MCP server it
