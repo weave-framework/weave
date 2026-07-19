@@ -22,7 +22,7 @@
  */
 import { build } from 'esbuild';
 import { chromium } from 'playwright';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -38,15 +38,22 @@ const ok = (cond, msg) => {
 };
 
 // 1. Bundle the real Weave esbuild plugin so this Node script can use it as the loader.
+//
+// The bundle must live INSIDE the repo: `esbuild` and `typescript` stay external (they are the host's, and
+// bundling TypeScript would add ~9.5 MB per run), and Node resolves an external only from the importer's
+// location — from a tmp dir there is no node_modules to find. The fixture below still uses a tmp dir; only
+// the bundle moved. (This broke exactly once, when `typescript` joined the external list and nothing here
+// re-ran until later.)
 const tmp = mkdtempSync(join(tmpdir(), 'weave-ui-compose-'));
-const pluginJs = join(tmp, 'plugin.mjs');
+const pluginJs = join(repo, 'tools', '.verify-ui-compose-plugin.mjs');
+process.on('exit', () => rmSync(pluginJs, { force: true }));
 await build({
   entryPoints: [join(repo, 'packages/cli/src/plugin.ts')],
   bundle: true,
   format: 'esm',
   platform: 'node',
   outfile: pluginJs,
-  // node built-ins + esbuild (types only) are provided by the host runtime.
+  // node built-ins + esbuild + typescript are provided by the host runtime.
   external: ['esbuild', 'typescript'],
 });
 const { weave } = await import(pathToFileURL(pluginJs).href);

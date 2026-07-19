@@ -16,6 +16,14 @@
 
 ## Unreleased
 
+### Fixed — prettier plugin
+- **Formatting no longer changes rendered whitespace between inline elements.** A body made only of elements
+  took the block layout, which drops whitespace-only text nodes and rejoins children with a newline and
+  indent — and HTML collapses that back to a single space. So `<span><b>a</b><b>b</b></span>` ("ab") became
+  "a b", and a document that had a space became indistinguishable from one that did not. Elements whose
+  children are all inline-level now keep the inline layout, where whitespace is preserved as written. Bodies
+  of block-level elements are still reflowed onto their own lines.
+
 ### Fixed — weave check
 - **`weave check` honours the project's `tsconfig.json`.** It used a hardcoded option set with no `paths`
   and no `baseUrl`, so any app with path aliases — the norm in a real codebase, and universal in one being

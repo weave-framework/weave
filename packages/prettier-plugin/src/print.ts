@@ -242,9 +242,34 @@ function printComment(value: string): Doc {
   return `<!-- ${value.trim()} -->`;
 }
 
-/** An element/block body is "inline" when it holds real text or an interpolation. */
+/**
+ * HTML elements whose boxes sit in the text flow, so whitespace BETWEEN them is rendered.
+ *
+ * This is the whole reason the list exists: for these tags, `<b>a</b><b>b</b>` and `<b>a</b> <b>b</b>` are
+ * two different documents ("ab" vs "a b"). The block layout below drops whitespace-only text nodes and
+ * rejoins children with a newline + indent, which HTML then collapses back to ONE SPACE — so reformatting a
+ * whitespace-sensitive run silently changed what the page renders. A formatter may reflow anything it likes
+ * except the output.
+ */
+const INLINE_TAGS: ReadonlySet<string> = new Set([
+  'a', 'abbr', 'b', 'bdi', 'bdo', 'br', 'cite', 'code', 'data', 'dfn', 'em', 'i', 'kbd', 'mark', 'q',
+  'rp', 'rt', 'ruby', 's', 'samp', 'small', 'span', 'strong', 'sub', 'sup', 'time', 'u', 'var', 'wbr',
+  'img', 'button', 'input', 'label', 'select', 'textarea',
+]);
+
+/**
+ * An element/block body is "inline" when it holds real text or an interpolation — or when it is a run of
+ * inline-level elements, where the whitespace between them is content and must survive the round trip.
+ */
 function shouldInline(nodes: TemplateNode[]): boolean {
-  return nodes.some((n) => (n.type === 'text' && !isBlank(n.value)) || n.type === 'interp');
+  if (nodes.some((n) => (n.type === 'text' && !isBlank(n.value)) || n.type === 'interp')) return true;
+  // A body made only of inline-level elements (and the whitespace between them). A component tag is NOT
+  // assumed inline: it renders whatever its own template says, so block layout stays the safe default.
+  const elements: TemplateNode[] = nodes.filter((n) => !(n.type === 'text' && isBlank(n.value)));
+  return (
+    elements.length > 1 &&
+    elements.every((n) => n.type === 'element' && INLINE_TAGS.has(n.tag.toLowerCase()))
+  );
 }
 
 function isBlank(s: string): boolean {

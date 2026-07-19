@@ -201,5 +201,32 @@ const  count=signal(0)
   ok(f1 === (await fmt(f1, 'empty-attr.html')), 'idempotent');
 }
 
+/* ── 8. whitespace between INLINE elements is content, and must survive formatting ──
+ * `<span><b>a</b><b>b</b></span>` renders "ab"; with a space between the tags it renders "a b". The block
+ * layout dropped whitespace-only text nodes and rejoined children with newline+indent, which HTML collapses
+ * back to a single space — so formatting turned the first document into the second. The AST comparison in
+ * block 1 cannot see it (`canon()` filters whitespace-only text on purpose, since reindentation is allowed),
+ * so this asserts on the RENDERED text instead: what the browser would show, before and after. */
+{
+  const tight = '<span><b>a</b><b>b</b></span>';
+  const spaced = '<span><b>a</b> <b>b</b></span>';
+  const f1 = await fmt(tight, 'inline.html');
+  const f2 = await fmt(spaced, 'inline.html');
+
+  // Collapse exactly as HTML does: any whitespace run between inline elements becomes one space.
+  const rendered = (s) => s.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').split(' ').join('').trim();
+
+  ok(rendered(f1) === 'ab', `tight inline run still renders "ab" (got ${JSON.stringify(rendered(f1))})`);
+  ok(rendered(f2) === 'a b', `spaced inline run still renders "a b" (got ${JSON.stringify(rendered(f2))})`);
+  ok(rendered(f1) !== rendered(f2), 'the two documents stay distinguishable after formatting');
+  ok(f1 === (await fmt(f1, 'inline.html')), 'idempotent (tight)');
+  ok(f2 === (await fmt(f2, 'inline.html')), 'idempotent (spaced)');
+
+  // A block-level body must still be reflowed onto its own lines — the fix must not inline everything.
+  const block = '<div><section>a</section><section>b</section></div>';
+  const f3 = await fmt(block, 'block.html');
+  ok(/\n/.test(f3), 'a body of block-level elements is still laid out on separate lines');
+}
+
 console.log(failures ? `\n✖ ${failures} check(s) failed\n` : '\n✓ all checks passed\n');
 process.exit(failures ? 1 : 0);
