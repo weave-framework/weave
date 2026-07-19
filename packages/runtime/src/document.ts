@@ -38,17 +38,23 @@ export function scriptSafe(json: string): string {
   return json.replace(/</g, '\\u003c');
 }
 
+/** Copies of `server-dom.ts:27-28` — this entry is DOM-free and must not import the DOM-typed half. */
+const escapeText = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const escapeAttr = (s: string): string => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+
 /** Assemble a complete HTML document from a {@link PageArtifact} — the SSG output for one page. */
 export function renderDocument(artifact: PageArtifact, options: DocumentOptions = {}): string {
   // An explicit option wins; else the title the render captured (document.title); else none.
   const title: string = options.title ?? artifact.title ?? '';
   const { head = '', entry, lang } = options;
+  // The title is routinely derived from DATA (a route-title effect reading a CMS record), so unescaped it is
+  // a stored XSS in every generated page. `head` is the one raw hole by design — injecting markup is its job.
   return (
-    `<!DOCTYPE html>\n<html${lang ? ` lang="${lang}"` : ''}>\n<head>\n<meta charset="utf-8">\n` +
-    (title ? `<title>${title}</title>\n` : '') +
+    `<!DOCTYPE html>\n<html${lang ? ` lang="${escapeAttr(lang)}"` : ''}>\n<head>\n<meta charset="utf-8">\n` +
+    (title ? `<title>${escapeText(title)}</title>\n` : '') +
     (head ? head + '\n' : '') +
     `</head>\n<body>\n${artifact.html}\n${artifact.snapshotScript}\n` +
-    (entry ? `<script type="module" src="${entry}"></script>\n` : '') +
+    (entry ? `<script type="module" src="${escapeAttr(entry)}"></script>\n` : '') +
     `</body>\n</html>\n`
   );
 }

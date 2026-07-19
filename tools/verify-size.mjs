@@ -82,7 +82,12 @@ const BUDGETS = [
     // 8192 → 8704 (E1.9: renderPage declares the server render via collectResumable + maps dropped instances
     // to build warnings) → 9472 (E1.3 async render; see the note above — measured 8.9, ~6% headroom, the
     // margin this file runs). Server-only — never ships to a browser.
-    budget: 9_472,
+    // → 9600 (2026-07-19: renderDocument escaped nothing it interpolated. A page title is routinely derived
+    // from data — a route-title effect reading a CMS record — so a title carrying a closing title tag plus a
+    // script was a STORED XSS baked into every statically generated page. Two escapers + the calls; the prose
+    // was trimmed first, recovering 335 of the 376 bytes. The remaining 41 are not worth deleting the "why"
+    // over, and this entry never reaches a browser.)
+    budget: 9_600,
   },
 ];
 

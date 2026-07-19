@@ -16,6 +16,15 @@
 
 ## Unreleased
 
+### Fixed — runtime (security)
+- **`renderDocument` escapes what it interpolates (stored XSS in SSG output).** The page title, `lang` and
+  the client-entry URL were written into the document raw. A title is routinely DERIVED FROM DATA — a
+  route-title effect reading a CMS record, a product name, a username — so a title containing a closing
+  title tag followed by a script tag was executable markup baked into every statically generated page, and
+  it persisted there. The snapshot JSON was already escaped; the document own interpolations were not.
+  Title is now HTML-escaped, `lang` and `entry` attribute-escaped. `head` stays raw — injecting markup is
+  that option documented purpose, and it takes author markup, not data.
+
 ### Fixed — store
 - **A store no longer dies with the component that happened to use it first.** `store(factory)` is an
   app-lifetime singleton, but the factory ran synchronously under whatever owner was ambient at the FIRST

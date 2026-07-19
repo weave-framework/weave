@@ -178,6 +178,29 @@ console.log('verify:server — headless render to string\n');
   ok((await renderPage(Plain, {})).title === undefined, 'title is reset between renders (no leak)');
 }
 
+// 7b) renderDocument escapes what it interpolates. The title is routinely derived from DATA — a route-title
+//     effect setting document.title from a CMS record or a user's name — so an unescaped `</title><script>`
+//     is a STORED XSS baked into every statically generated page. `head` is deliberately raw markup (the
+//     option's documented purpose) and stays raw; everything else is escaped.
+{
+  const evil = '</title><script>globalThis.__pwned = 1;</script>';
+  const doc = renderDocument({ html: '<p>x</p>', snapshotScript: '', title: evil }, { entry: '/app.js' });
+  ok(!doc.includes('<script>globalThis.__pwned'), 'a captured title cannot break out of <title>');
+  ok(doc.includes('&lt;/title&gt;'), 'the title is HTML-escaped');
+
+  const doc2 = renderDocument({ html: '', snapshotScript: '' }, { title: 'a & b < c' });
+  ok(doc2.includes('<title>a &amp; b &lt; c</title>'), 'ampersands and angle brackets are escaped');
+
+  const doc3 = renderDocument({ html: '', snapshotScript: '' }, { lang: 'en" onload="alert(1)' });
+  ok(!/onload="alert/.test(doc3), 'lang cannot break out of its attribute');
+
+  const doc4 = renderDocument({ html: '', snapshotScript: '' }, { entry: '/app.js" onload="alert(1)' });
+  ok(!/onload="alert/.test(doc4), 'the client entry URL cannot break out of its attribute');
+
+  const doc5 = renderDocument({ html: '', snapshotScript: '' }, { head: '<meta name="x" content="y">' });
+  ok(doc5.includes('<meta name="x" content="y">'), 'head stays RAW markup (that is what the option is for)');
+}
+
 // 8) E1.4 — the ISLANDS path: a resumable-compiled component renders headlessly (markers + block boundaries
 //    serialize), and renderPage({ resumable: true }) captures the per-instance state MAP ({ $root, c0 }) that
 //    the client resumePage rebuilds. This is the SSG↔resume seam end-to-end, headless.
