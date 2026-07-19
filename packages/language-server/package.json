@@ -1,6 +1,6 @@
 {
   "name": "@weave-framework/language-server",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "//": "NOT published. This is a build input, not a distributable: editor/vscode bundles it into a self-contained .vsix via esbuild (see editor/vscode/build.mjs), so nothing installs it from the registry. It is absent from the publish ORDER in tools/publish-packages.mjs, and `private` keeps the manifest honest — and makes an accidental `npm publish` from this directory impossible.",
   "private": true,
   "description": "Weave language server — Volar-based IDE support (.weave + template type-checking) for VS Code and WebStorm.",

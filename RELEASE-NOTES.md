@@ -3,6 +3,17 @@
 Human-readable highlights, one section per release — everything notable that landed since
 the previous one. For the granular, per-version log see [CHANGELOG.md](CHANGELOG.md).
 
+## 2.0.1 — 2026-07-19
+
+A same-day fix to 2.0.0: `npm create weave` was still scaffolding projects onto 1.x.
+
+The template pinned its dependencies at `^1.0.0`, and a caret range does not cross a major — so a brand-new
+project created minutes after 2.0.0 shipped installed 1.8.0 and got none of it, including both security
+fixes. Exactly the people least able to notice.
+
+The ranges now follow the release major, and a gate (`verify:template-ranges`) fails the build if they ever
+drift again. Nothing else changed.
+
 ## 2.0.0 — 2026-07-19
 
 A release made entirely of things that were already wrong. An external audit went through the whole

@@ -14,6 +14,16 @@
 > already left it behind — Phase E ran 94 commits without a bump, and then released as one MINOR. The public
 > promise wins; the habit is retired.)*
 
+## 2.0.1 — 2026-07-19
+
+### Fixed — scaffold
+- **`npm create weave` installs the current major.** The scaffold template caret-pinned every
+  `@weave-framework/*` dependency at `^1.0.0`, and a caret does not cross a major — so a project created
+  after 2.0.0 shipped still installed 1.8.0, missing every fix in that release including both security
+  fixes. The ranges track the release major now, and `verify:template-ranges` fails the build if they drift
+  again. Caught by the post-publish end-to-end scaffold; neither the dry run (which packs but does not
+  resolve) nor the browser suite (whose bundler resolves workspace paths directly) can see this.
+
 ## 2.0.0 — 2026-07-19
 
 **Why this is a MAJOR and not a patch.** Almost everything here is a bug fix, and most of it moves behaviour

@@ -154,6 +154,11 @@ jobs:
       # while every gate above stayed green — the framework was fine, only what the user installs.
       - name: Editor plugins bundle the current server
         run: pnpm verify:editor-plugins
+      # A caret range does not cross a major: when 2.0.0 shipped the scaffold still pinned ^1.0.0, so
+      # `npm create weave@latest` kept installing 1.8.0 and every fix in the major — including two security
+      # fixes — missed brand-new projects entirely. The dry run cannot see this; it packs, it does not resolve.
+      - name: Scaffold template tracks the release major
+        run: pnpm verify:template-ranges
       # The skills are copied into the create-weave template, and that copy is derived output that
       # must be committed current. (The other copy — the one in a user profile — is invisible here;
       # the script reports it without failing.)
