@@ -16,6 +16,19 @@
 
 ## Unreleased
 
+### Fixed — store
+- **A store no longer dies with the component that happened to use it first.** `store(factory)` is an
+  app-lifetime singleton, but the factory ran synchronously under whatever owner was ambient at the FIRST
+  call — the first consuming component. Every `effect`/`watch`/`computed` created inside registered its
+  disposer there, so unmounting that one component permanently killed the store's own reactions while every
+  other consumer went on holding the same, now half-dead, instance. The failure is silent and depends on
+  mount order: the signals keep working, so the store still looks alive. `optimistic()` uses `watch`
+  internally, which makes a store-created optimistic exactly this case — its overlay would never clear again.
+  The factory now runs in its own `root()`, which is what a global store's lifetime always meant.
+
+  `@weave-framework/store` consequently depends on `@weave-framework/runtime` (for `root`), as
+  `forms`/`router`/`data`/`i18n` already do. Still zero third-party dependencies.
+
 ### Fixed — prettier plugin
 - **Formatting no longer rewrites an explicitly empty attribute into a bare one.** `disabled=""` was printed
   as `disabled`, and the two are not interchangeable: the parser marks a valueless attribute `bare`, and on a

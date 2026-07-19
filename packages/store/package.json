@@ -35,5 +35,8 @@
       "./package.json": "./package.json"
     }
   },
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "@weave-framework/runtime": "workspace:*"
+  }
 }
