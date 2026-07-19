@@ -9,6 +9,7 @@
  */
 
 import ts from 'typescript';
+import { dirname } from 'node:path';
 import type { Virtual } from './emit.js';
 
 export interface Diagnostic {
@@ -42,10 +43,45 @@ const OPTIONS: ts.CompilerOptions = {
 const norm = (p: string): string => p.replace(/\\/g, '/').toLowerCase();
 
 /** Type-check the given virtual modules; returns diagnostics mapped to original source. */
+/**
+ * The compiler options to check with: the project's own `tsconfig.json` where one exists, overlaid with the
+ * few settings this checker requires, else {@link OPTIONS} on its own.
+ *
+ * Why this matters more than it looks: with hardcoded options, an app that uses `paths` aliases — the norm
+ * in any real codebase, and universal in one migrating from another framework — got "Cannot find module" on
+ * every aliased import. A wall of errors from the framework's own quality tool, on a correct project, is the
+ * fastest way to make someone switch that tool off for good.
+ *
+ * Only the invariants are overlaid. `noEmit` because this never writes; the virtual-host settings because
+ * the sources are synthesized in memory. Everything else — `paths`, `baseUrl`, `lib`, `strict`, `types`,
+ * `jsx` — belongs to the project, and disagreeing with its tsconfig means disagreeing with the editor.
+ */
+function optionsFor(searchFrom: string): ts.CompilerOptions {
+  const configPath: string | undefined = ts.findConfigFile(searchFrom, ts.sys.fileExists, 'tsconfig.json');
+  if (!configPath) return OPTIONS;
+
+  const read: { config?: unknown; error?: ts.Diagnostic } = ts.readConfigFile(configPath, ts.sys.readFile);
+  if (read.error || !read.config) return OPTIONS; // unreadable/malformed → the defaults, not a crash
+
+  const parsed: ts.ParsedCommandLine = ts.parseJsonConfigFileContent(read.config, ts.sys, dirname(configPath));
+  return {
+    ...parsed.options,
+    // Invariants — the checker cannot work without these, whatever the project says.
+    noEmit: true,
+    skipLibCheck: true,
+    // A project may not have `lib` set at all; keep a DOM-capable floor so template expressions that touch
+    // the DOM still resolve.
+    lib: parsed.options.lib ?? OPTIONS.lib,
+  };
+}
+
+/** Type-check the given virtual modules; returns diagnostics mapped to original source. */
 export function runCheck(virtuals: Virtual[]): Diagnostic[] {
   const byPath: Map<string, Virtual> = new Map(virtuals.map((v) => [norm(v.path), v]));
+  // Search from the first virtual's directory: every virtual belongs to the project being checked.
+  const options: ts.CompilerOptions = virtuals.length ? optionsFor(dirname(virtuals[0].path)) : OPTIONS;
 
-  const host: ts.CompilerHost = ts.createCompilerHost(OPTIONS, true);
+  const host: ts.CompilerHost = ts.createCompilerHost(options, true);
   const getSourceFile: ts.CompilerHost['getSourceFile'] = host.getSourceFile.bind(host);
   const readFile: ts.CompilerHost['readFile'] = host.readFile.bind(host);
   const fileExists: ts.CompilerHost['fileExists'] = host.fileExists.bind(host);
@@ -60,7 +96,7 @@ export function runCheck(virtuals: Virtual[]): Diagnostic[] {
 
   const program: ts.Program = ts.createProgram(
     virtuals.map((v) => v.path),
-    OPTIONS,
+    options,
     host
   );
 

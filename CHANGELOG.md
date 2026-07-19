@@ -16,6 +16,15 @@
 
 ## Unreleased
 
+### Fixed — weave check
+- **`weave check` honours the project's `tsconfig.json`.** It used a hardcoded option set with no `paths`
+  and no `baseUrl`, so any app with path aliases — the norm in a real codebase, and universal in one being
+  migrated from another framework — got "Cannot find module" on every aliased import. The project config is
+  now discovered and parsed, with only the checker's own invariants overlaid (`noEmit`, `skipLibCheck`, and
+  a DOM-capable `lib` floor when the project sets none). Everything else — `paths`, `baseUrl`, `strict`,
+  `types`, `lib` — belongs to the project, since disagreeing with its tsconfig means disagreeing with the
+  editor. A missing or malformed config falls back to the previous defaults rather than failing.
+
 ### Added — repository safety
 - **A tracked gate keeps private working files out of the public repository.** The public/private split was
   enforced entirely by `.git/info/exclude` and a local `.git/hooks/pre-commit` — git versions and clones
