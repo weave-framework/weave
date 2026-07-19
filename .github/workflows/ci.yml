@@ -162,6 +162,10 @@ jobs:
       # working notes into public history. This gate travels with the repo.
       - name: No private paths in the public repo
         run: pnpm verify:no-private
+      # The commit-msg hook checks three vendor names in the MESSAGE only, and lives in .git/hooks where git
+      # neither versions nor clones it. This checks tracked file CONTENT and the unpushed messages, in CI.
+      - name: No authorship claims in the public repo
+        run: pnpm verify:authorship
       - name: Dev proxy
         run: pnpm verify:dev-proxy
       # A failed rebuild used to reload the browser into a bundle that no longer existed — a white page,

@@ -27,11 +27,19 @@ const PRIVATE = [
   /^internal\//,
   /^\.workspace\//,
   /^\.aigit/,
-  // The agent-config directory. Written as a character class on purpose: this file is PUBLIC, and the
-  // pre-commit hook refuses any staged content carrying that tool's name — the same policy that keeps the
-  // public history free of AI traces. Splitting the literal satisfies both rules without weakening either.
-  /^\.cl[a]ude\//,
 ];
+
+/**
+ * Top-level dot-directories that ARE public and expected. Anything else at that level is treated as
+ * private-side tooling.
+ *
+ * Structural rather than a name list, and that is the point. An earlier version spelled one directory out
+ * with the literal split up to slip past the commit hook — which is exactly the move that put the wrong
+ * sentence in this file to begin with. Enumerating what is allowed reveals nothing, catches directories
+ * nobody thought to list, and needs no evasion.
+ */
+const PUBLIC_DOT_DIRS = /^\.(github|vscode|husky|changeset|editorconfig|gitattributes|gitignore|npmrc|nvmrc)/;
+const PRIVATE_DOT_DIR = /^\.[a-z0-9_-]+\//i;
 
 const r = spawnSync('git', ['ls-files'], { encoding: 'utf8' });
 if (r.status !== 0) {
@@ -40,7 +48,9 @@ if (r.status !== 0) {
 }
 
 const tracked = r.stdout.split('\n').map((l) => l.trim()).filter(Boolean);
-const leaked = tracked.filter((f) => PRIVATE.some((re) => re.test(f)));
+const leaked = tracked.filter(
+  (f) => PRIVATE.some((re) => re.test(f)) || (PRIVATE_DOT_DIR.test(f) && !PUBLIC_DOT_DIRS.test(f))
+);
 
 console.log('\ntools/verify-no-private-paths.mjs');
 if (leaked.length) {

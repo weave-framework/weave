@@ -70,8 +70,10 @@ window to migrate.
 
 **Weave is 1.0.** The public API surface above was audited and settled ([RFC 0005](rfcs/0005-api-surface-audit.md)),
 and the promise is now in full force: **breaking changes land only in a major version, deprecated first.** The
-`0.2.x` line got there the honest way — over a hundred releases with no breaking change to the code you write —
-so 1.0 is a formalisation of what already held, not a reset.
+`0.2.x` line shipped over a hundred releases without a breaking change to the code you write, so 1.0 formalises
+a practice that was already in place rather than starting a new one. That line was short — days, not months —
+so treat it as evidence of discipline, not of long-run maturity; the guarantees below are what you can hold us
+to, and they are enforced by CI rather than by intent.
 
 Pre-1.0 history is preserved in [CHANGELOG.md](CHANGELOG.md); from 1.0 on, the version number carries the
 guarantee.

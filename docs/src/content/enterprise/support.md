@@ -19,8 +19,11 @@ When Weave is on your critical path and best-effort isn't enough:
 
 - A **direct support channel**, not the public queue
 - **Priority triage** of your bug reports — your issues jump the line
-- **Response within a defined number of business days**, agreed up front
+- **Response targets agreed with you before we start**, scoped to what we can actually hold to
 - Guidance on upgrades and version pinning
+
+Terms are set per engagement. We would rather agree a narrower commitment and meet it than publish a
+number here that turns out to be optimistic for your situation.
 
 [Get in touch →](mailto:support@weaveframework.dev)
 
