@@ -17,6 +17,15 @@
 ## Unreleased
 
 ### Fixed — compiler + runtime
+- **A destructured handler parameter no longer kills the handler on resume.** Deciding whether a `setup`
+  binding can be rebuilt after resume meant asking which names its body reads that the client will not have.
+  That answer was assembled lexically, and a destructuring pattern defeated it: `({ id, label }) => …` was
+  reported as reading its own `id`, and `({ a: { b } }) => …` its own `b`. A binding blamed for a name it
+  does not read is refused, and a refused handler falls back to a `ctx.<name>` that resume never
+  reconstructs — so the control was inert after resume, silently. The analysis now runs on the TypeScript
+  AST, where a parameter pattern binds exactly the names it binds and a type annotation references nothing.
+  TypeScript is **injected by the CLI, never imported by the compiler** (an optional peer dependency), so the
+  compiler keeps its zero-dependency install and nothing new reaches the browser bundles.
 - **Listener modifiers no longer change meaning between build targets.** In a resumable build
   (`--ssg` + `ssg.resume`), `once`/`capture`/`passive` were dropped with only a code comment saying so,
   so `on:click|once` fired on EVERY click while the same template on the eager target fired one.
