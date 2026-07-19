@@ -16,6 +16,22 @@
 
 ## Unreleased
 
+### Fixed — runtime
+- **`@await` re-renders when the resource's data changes without a loading bounce.** The then-branch was
+  rebuilt only when the await STATE changed, and `resource.mutate(next)` — the documented optimistic-update
+  path — writes `data` while leaving `loading` false. So the state stayed `then`, the write was a no-op by
+  equality, and the rendered branch went on showing the previous value with no error anywhere. Refetches
+  survived only because they bounce through `pending` first, a different transition. Two documented APIs
+  were silently incompatible. The branch now tracks the value.
+
+  The whole `@then` subtree is rebuilt rather than patched in place. That is deliberate: the alias is a
+  plain function parameter by contract, not an accessor, so nothing inside the branch can track the value.
+  Making it an accessor would be the fine-grained fix and a breaking change to every existing `@then` body,
+  which the frozen API does not allow.
+- **An awaited value that IS a function is stored, not invoked.** `value.set(data)` handed a raw value to
+  `Signal.set`, which reads any function argument as an updater — so a resource or promise resolving to a
+  function was called with the previous value. Same class as the `field.reset`/route-loader fix above.
+
 ### Fixed — prettier plugin
 - **Formatting no longer changes rendered whitespace between inline elements.** A body made only of elements
   took the block layout, which drops whitespace-only text nodes and rejoins children with a newline and

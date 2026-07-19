@@ -1025,7 +1025,6 @@ export function awaitBlock(
   const state: Signal<'pending' | 'then' | 'catch'> = signal<'pending' | 'then' | 'catch'>('pending');
   const value: Signal<unknown> = signal<unknown>(undefined);
   const failure: Signal<unknown> = signal<unknown>(undefined);
-  const thenThunk: (() => Node) | null = then ? () => then(value()) : null;
   const catchThunk: (() => Node) | null = onCatch ? () => onCatch(failure()) : null;
 
   let token: number = 0; // bumped each time the source changes; guards stale settles
@@ -1038,24 +1037,42 @@ export function awaitBlock(
       if (src.loading()) return void state.set('pending');
       const err: unknown = src.error();
       if (err != null) {
-        batch(() => { failure.set(err); state.set('catch'); });
+        batch(() => { failure.set(() => err); state.set('catch'); });
         return;
       }
-      batch(() => { value.set(src.data()); state.set('then'); });
+      // `set(() => …)`: Signal.set reads a function argument as an updater, so a resource resolving
+      // to a function would be CALLED with the previous value instead of stored.
+      batch(() => { const d: unknown = src.data(); value.set(() => d); state.set('then'); });
       return;
     }
 
     // A Promise (or plain value): re-enter pending, settle once, ignore if superseded.
     state.set('pending');
     Promise.resolve(src).then(
-      (v) => { if (my === token) batch(() => { value.set(v); state.set('then'); }); },
-      (e) => { if (my === token) batch(() => { failure.set(e); state.set('catch'); }); }
+      (v) => { if (my === token) batch(() => { value.set(() => v); state.set('then'); }); },
+      (e) => { if (my === token) batch(() => { failure.set(() => e); state.set('catch'); }); }
     );
   });
 
   ifBlock(anchor, () => {
     const s: 'pending' | 'then' | 'catch' = state();
-    return s === 'pending' ? pendingThunk : s === 'catch' ? catchThunk : thenThunk;
+    if (s === 'pending') return pendingThunk;
+    if (s === 'catch') return catchThunk;
+    if (!then) return null;
+    // Read the VALUE here, not just the state, and hand back a fresh thunk for it.
+    //
+    // `ifBlock` swaps only when the returned thunk's identity changes, and `thenThunk` was a single stable
+    // closure — so once the state reached 'then' it never swapped again. `resource.mutate(next)` (the
+    // documented optimistic-update path) writes `data` and leaves `loading` false, so `state.set('then')`
+    // was a no-op by equality and the branch went on rendering the OLD value, silently. Refetches only
+    // survived because they bounce through 'pending' first, which is a different transition entirely.
+    //
+    // The whole then-subtree is rebuilt rather than updated in place. That is the coarse answer, and it is
+    // the one the frozen API permits: the alias is a plain function PARAMETER by contract (see codegen's
+    // note on `@await`), not an accessor, so nothing inside the branch can track the value. Making it an
+    // accessor would be the fine-grained fix and a breaking change to every existing `@then` body.
+    const v: unknown = value();
+    return () => then(v);
   });
 }
 

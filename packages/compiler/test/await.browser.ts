@@ -202,6 +202,40 @@ test('resource: a refetch (loading again) shows pending, then the new value', as
   h.remove();
 });
 
+test('resource: data changing WITHOUT a loading bounce still re-renders @then', () => {
+  // The then-branch was rebuilt only when `state()` changed. `resource.mutate(next)` — the documented
+  // optimistic-update path — writes `data` and leaves `loading` false, so state stays 'then', the signal
+  // write is a no-op by equality, and the rendered branch kept the OLD value with no error anywhere. The
+  // only reason refetches survived is that they bounce through 'pending' first, which is a different code
+  // path. Two documented APIs (`@await` and `mutate`) were silently incompatible.
+  const r: { loading: Signal<boolean>; data: Signal<string | undefined>; error: Signal<unknown> } =
+    mockResource<string>({ loading: false, data: 'first' });
+  const h: HTMLElement = host(
+    render('<div>@await (r) { <span class="l">…</span> } @then (u) { <b class="d">{{ u }}</b> }</div>', { r }, ['r'])
+  );
+  assert.equal(h.querySelector('.d')?.textContent, 'first');
+
+  r.data.set('mutated'); // no loading bounce — exactly what mutate() does
+  assert.equal(h.querySelector('.d')?.textContent, 'mutated', 'then reflects the new data');
+  assert.equal(h.querySelector('.l'), null, 'and never flashed pending');
+
+  r.data.set('mutated again');
+  assert.equal(h.querySelector('.d')?.textContent, 'mutated again', 'and keeps tracking');
+  h.remove();
+});
+
+test('resource: a FUNCTION-valued resolution is stored, not invoked', () => {
+  // `value.set(src.data())` handed a raw value to `Signal.set`, which reads any function as an updater.
+  const fn = (): string => 'F';
+  const r: { loading: Signal<boolean>; data: Signal<(() => string) | undefined>; error: Signal<unknown> } =
+    mockResource<() => string>({ loading: false, data: fn });
+  const h: HTMLElement = host(
+    render('<div>@await (r) { <span class="l">…</span> } @then (u) { <b class="d">{{ u() }}</b> }</div>', { r }, ['r'])
+  );
+  assert.equal(h.querySelector('.d')?.textContent, 'F', 'the awaited value is the function itself');
+  h.remove();
+});
+
 /* ──────────────────────────── optional parts ──────────────────────────── */
 
 test('no pending block: nothing renders until @then', async () => {
