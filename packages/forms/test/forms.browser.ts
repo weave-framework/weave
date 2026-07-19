@@ -33,6 +33,45 @@ test('fieldArray.dirty(): item-set change (push/removeAt) or a dirty item; reset
   assert.equal(arr.dirty(), true, 'a dirty item makes the array dirty');
 });
 
+test('fieldArray.dirty(): compensating edits that restore the LENGTH are still dirty', () => {
+  // `dirty` compared the length against the seeds and asked each item whether it differed from ITS OWN
+  // initial — never the array's value against the seed values. So any pair of edits that restored the count
+  // read clean: remove one and add another, or reorder. `dirty` is the documented "unsaved changes" signal
+  // and feeds router leave-guards, so the warning was simply not raised.
+  const arr: FieldArray<string> = fieldArray<string>((s) => field(s ?? ''), ['a', 'b']);
+  arr.removeAt(0);
+  arr.push('c');
+  assert.deepEqual(arr.value(), ['b', 'c'], 'the value really did change');
+  assert.equal(arr.dirty(), true, 'remove + push is dirty even though the length matches');
+
+  const reorder: FieldArray<string> = fieldArray<string>((s) => field(s ?? ''), ['x', 'y']);
+  reorder.removeAt(0);
+  reorder.push('x');
+  assert.deepEqual(reorder.value(), ['y', 'x'], 'same members, different order');
+  assert.equal(reorder.dirty(), true, 'a pure reorder is dirty');
+
+  const blanked: FieldArray<string> = fieldArray<string>((s) => field(s ?? ''), ['seeded']);
+  blanked.removeAt(0);
+  blanked.push();
+  assert.equal(blanked.dirty(), true, 'replacing an item with a blank one is dirty');
+
+  arr.reset();
+  assert.equal(arr.dirty(), false, 'reset still returns to pristine');
+});
+
+test('a field holding a FUNCTION stores it rather than calling it', () => {
+  // `Signal.set` treats any function argument as an updater `(prev) => next`, so `value.set(initial)` in
+  // `reset()` INVOKED a function-valued initial with the current value and stored the result. A field can
+  // legitimately hold a formatter, a factory or a component.
+  const fn = (): string => 'original';
+  const other = (): string => 'other';
+  const f: Field<() => string> = field<() => string>(fn);
+  f.value.set(() => other);
+  assert.is(f.value(), other, 'writing a function value stores it');
+  f.reset();
+  assert.is(f.value(), fn, 'reset restores the function itself, not the result of calling it');
+});
+
 test('field validates reactively (first failure wins)', () => {
   const email: Field<string> = field('', [validators.required(), validators.email()]);
   assert.equal(email.valid(), false);

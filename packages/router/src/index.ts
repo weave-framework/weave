@@ -810,7 +810,10 @@ function createLoaderResource(match: Match, router: Router, depth: number): Load
       .then(() => match.loader!({ params, query, signal }))
       .then(
         (value: unknown) => {
-          if (my === token) batch(() => { dataSig.set(value); loadingSig.set(false); });
+          // `set(() => value)`, not `set(value)`: `Signal.set` reads ANY function argument as an updater
+          // `(prev) => next`, so a loader resolving to a FUNCTION — a component, a factory, a formatter —
+          // was CALLED with the previous data and whatever it returned was stored instead of the value.
+          if (my === token) batch(() => { dataSig.set(() => value); loadingSig.set(false); });
         },
         (err: unknown) => {
           if (my === token) batch(() => { errorSig.set(err); loadingSig.set(false); });

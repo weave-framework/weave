@@ -151,7 +151,11 @@ export function field<T>(
     dirty: computed(() => !Object.is(value(), initial)),
     validating: () => validating(),
     reset: () => {
-      value.set(initial);
+      // `set(() => initial)`, not `set(initial)`: `Signal.set` treats ANY function argument as an updater
+      // `(prev) => next`, so a `Field<Function>` — a field holding a formatter, a factory, a component —
+      // would have its initial value CALLED with the current value and the result stored. The rest of the
+      // file already writes through this form for the same reason (`submitError`).
+      value.set(() => initial);
       touched.set(false);
       external.set(null);
       asyncError.set(null);
@@ -364,8 +368,20 @@ export function fieldArray<T>(factory: (seed?: T) => Control<T>, seeds: T[] = []
     valid: () => items().every((c) => c.valid()),
     validating: () => items().some((c) => c.validating()),
     touched: () => items().some((c) => c.touched()),
-    // Dirty if the item set changed (push/removeAt) or any current item is dirty.
-    dirty: () => items().length !== seeds.length || items().some((c) => c.dirty()),
+    // Dirty when the array's VALUE differs from the seeds, or any item is dirty in its own right.
+    //
+    // Comparing lengths was not enough: it asked each item whether it differed from ITS OWN initial, and
+    // asked the array only whether the COUNT had changed — so any pair of edits restoring the count read
+    // clean. `removeAt(0)` then `push('c')` on `['a','b']` yields `['b','c']`, every item pristine against
+    // the value it was constructed with and the length unchanged. A pure reorder is the same story. Since
+    // `dirty` is the documented "unsaved changes" signal and feeds router leave-guards, the prompt was
+    // simply never raised — the user lost the edit with no warning.
+    dirty: () => {
+      const current: T[] = items().map((c) => c.value());
+      if (current.length !== seeds.length) return true;
+      if (current.some((v, i) => !Object.is(v, seeds[i]))) return true;
+      return items().some((c) => c.dirty());
+    },
     reset: () => items.set(seeds.map((s) => factory(s))),
     touchAll: () => items().forEach((c) => c.touchAll()),
     push: (seed?: T) => items.set((xs) => [...xs, factory(seed)]),

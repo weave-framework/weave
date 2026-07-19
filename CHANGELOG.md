@@ -16,6 +16,18 @@
 
 ## Unreleased
 
+### Fixed — forms + router
+- **`fieldArray.dirty()` sees compensating edits.** It compared the item COUNT against the seeds and asked
+  each item whether it differed from its own initial — never the array value against the seed values. So
+  `removeAt(0)` followed by `push(...)` read clean, as did a pure reorder: same length, every item pristine
+  against the value it was constructed with. `dirty` is the documented unsaved-changes signal and feeds
+  router leave-guards, so the prompt was never raised and the edit was lost without warning.
+- **A function-valued signal write stores the function.** `Signal.set` treats any function argument as an
+  updater `(prev) => next`, so two places that wrote a raw value invoked it instead: `field.reset()` called
+  a function-valued initial and stored the result, and a route loader resolving to a function (a component,
+  a factory, a formatter) had it called with the previous data. Both now write through `set(() => value)`,
+  which `resource.mutate` and the forms submit path already did.
+
 ### Fixed — UI
 - **Layered modals released out of order no longer strand the page unscrollable.** `blockScroll` snapshotted
   `body.style.overflow` per instance, so opening A then B and closing A FIRST restored the pre-A value while

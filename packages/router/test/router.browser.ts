@@ -194,6 +194,28 @@ test('a route loader is exposed via useLoaderData(): loading → data, re-runs o
   assert.equal(el.textContent, 'LOADED:2', 'loader re-ran on a param change');
 });
 
+test('a loader resolving to a FUNCTION stores it instead of calling it', async () => {
+  // The loader result went into `dataSig.set(value)`, and `Signal.set` reads any function argument as an
+  // updater `(prev) => next` — so a loader returning a component, a factory or a formatter was INVOKED
+  // with the previous data and its return value stored. Returning a function from a loader is ordinary
+  // (a lazily-resolved renderer, a per-route formatter).
+  const payload = (): string => 'the function itself';
+  let ld: LoaderData<() => string> | null = null;
+  const Probe: Component = () => {
+    ld = useLoaderData<() => string>(); // capture the handle; read it AFTER the loader settles
+    return span('probe');
+  };
+  const r: Router = createRouter([
+    route('/fn', { component: Probe, loader: () => Promise.resolve(payload) }),
+    { path: '*', component: NotFound },
+  ]);
+  navigate('/fn');
+  mountComponent(RouterView, host(), { router: r });
+  await flush();
+  assert.ok(ld, 'the probe mounted');
+  assert.is(ld!.data(), payload, 'the loader value is the function, not the result of calling it');
+});
+
 test('useLoaderData() throws when the route has no loader', () => {
   let threw: boolean = false;
   const NoLoader: Component = () => {
