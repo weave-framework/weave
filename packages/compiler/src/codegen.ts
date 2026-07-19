@@ -1365,22 +1365,6 @@ function trimTop(nodes: TemplateNode[]): TemplateNode[] {
 /**
  * A JavaScript string literal for `s`, safe in a CODE position.
  *
- * `JSON.stringify` alone is not: it produces valid JSON, but this output is JavaScript SOURCE, and JSON
- * leaves two things raw that JavaScript cares about.
- *
- *  - **`</script>`** — the emitted module carries template text verbatim, so an attribute value containing
- *    `</script>` breaks out of any `<script>` block the module is inlined into. Weave inlines script content
- *    itself for the SSG snapshot, and consumers inline bundles. Escaping `<` costs nothing: `<` is the
- *    same character at runtime.
- *  - **U+2028 / U+2029** — valid inside a JSON string and, since ES2019, inside a JS string too; but they
- *    remain line terminators to plenty of tooling that reads this output.
- *
- * Escaping is lossless — every form here decodes back to the original character.
- * (CodeQL: js/bad-code-sanitization.)
- */
-/**
- * A JavaScript string literal for `s`, safe in a CODE position.
- *
  * `JSON.stringify` alone is not. Its output is valid JSON, but this is JavaScript SOURCE, and JSON
  * leaves two things raw that matter here:
  *
