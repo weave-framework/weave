@@ -43,6 +43,21 @@ function compile(source) {
   return sass.compileString(source, { importers: [importer], style: 'expanded' }).css.toLowerCase();
 }
 
+/**
+ * Compile and CAPTURE Sass warnings. A typo'd token name compiles to a perfectly valid custom
+ * property that no rule ever reads — it fails as silence, so listening for the warning is the only
+ * way to test the guard at all.
+ */
+function compileWithWarnings(source) {
+  const warnings = [];
+  const css = sass.compileString(source, {
+    importers: [importer],
+    style: 'expanded',
+    logger: { warn: (msg) => warnings.push(msg) },
+  }).css.toLowerCase();
+  return { css, warnings };
+}
+
 let pass = 0;
 let fail = 0;
 function check(name, cond) {
@@ -88,6 +103,28 @@ const cssOverride = compile(
 );
 check('override changes existing token', /--weave-divider-thickness:\s*2px/.test(cssOverride));
 check('override adds new token (auto-var)', /--weave-divider-margin-top:\s*8px/.test(cssOverride));
+
+/* ── overrides(): an unknown token name warns, but still emits ── */
+const typo = compileWithWarnings(
+  `@use '@weave-framework/ui' as weave;\n@include weave.overrides('button', (backgrond: red));`,
+);
+check(
+  'unknown token name warns',
+  typo.warnings.some((w) => /has no token/.test(w) && /backgrond/.test(w)),
+);
+check('unknown token is still emitted (adding one is legitimate)', /--weave-button-backgrond:\s*red/.test(typo.css));
+
+const correct = compileWithWarnings(
+  `@use '@weave-framework/ui' as weave;\n@include weave.overrides('button', (background: red));`,
+);
+check('a real token name does NOT warn', correct.warnings.length === 0);
+
+// A component the consumer defined themselves has no builtin schema, so every key would read as
+// "unknown" — warning about all of them would make the guard unusable for its main audience.
+const custom = compileWithWarnings(
+  `@use '@weave-framework/ui' as weave;\n@include weave.overrides('my-widget', (anything: 1px));`,
+);
+check('a non-builtin component never warns', custom.warnings.length === 0);
 
 /* ── scoped override: lands under the selector, not :root ── */
 const cssScoped = compile(

@@ -156,7 +156,23 @@ $_builtins: (
 }
 
 // Override existing tokens + add new ones (one map). At root → global; in a selector → scoped.
+//
+// Unknown keys are WARNED, not rejected: adding a token is a legitimate use (that is the "+ add new
+// ones" half, and a custom `define()`d component has no builtin schema at all), but a typo is
+// indistinguishable from an addition at the CSS level — `--weave-button-backgrond: red` is a
+// perfectly valid custom property that no rule will ever read. It fails as silence, which is the
+// worst way to fail: nothing happens and nothing says why.
 @mixin overrides($name, $map) {
+  $schema: map.get($_builtins, $name);
+  @if $schema != null {
+    $known: token-utils.flatten($schema, null);
+    @each $key, $value in $map {
+      @if not map.has-key($known, $key) {
+        @warn 'weave: `#{$name}` has no token `#{$key}` — `--weave-#{$name}-#{$key}` will be emitted but '
+            + 'nothing reads it. Check the spelling, or ignore this if you are adding a token of your own.';
+      }
+    }
+  }
   @include sass-utils.current-selector-or-root() {
     @each $key, $value in $map {
       --weave-#{$name}-#{$key}: #{$value};

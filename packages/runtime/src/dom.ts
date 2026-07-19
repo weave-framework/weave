@@ -720,7 +720,8 @@ interface EachRow<T> extends Row {
   owner: Owner;
   itemSig: Signal<T>;
   indexSig: Signal<number>;
-  countSig: Signal<number>;
+  // No `countSig` — `$count` is block-wide, so one signal is shared by every row rather than stored
+  // (and rewritten) per row. See `eachBlock`.
 }
 
 /**
@@ -741,6 +742,10 @@ export function eachBlock<T>(
   // survives reconciles driven by an external signal.
   const host: Owner | null = getOwner();
   let rows: EachRow<T>[] = [];
+  // `$count` is the SAME number for every row, so it is one signal for the whole block rather than
+  // one per row. Per-row it meant N writes and N equality checks on every reconcile for a value that
+  // changes at most once — a third of the refresh loop's work, for a 1000-row list, doing nothing.
+  const countSig: Signal<number> = signal(0);
   let emptyOwner: Owner | null = null;
   let emptyNodes: ChildNode[] = [];
 
@@ -784,7 +789,6 @@ export function eachBlock<T>(
     rows = reconcileKeyed(parent, anchor, rows, data, keyOf, (item, i) => {
       const itemSig: Signal<T> = signal(item) as Signal<T>;
       const indexSig: Signal<number> = signal(i);
-      const countSig: Signal<number> = signal(data.length);
       const ctx: ForContext<T> = {
         item: itemSig,
         index: indexSig,
@@ -822,7 +826,6 @@ export function eachBlock<T>(
         owner,
         itemSig,
         indexSig,
-        countSig,
       } as EachRow<T>;
     }) as EachRow<T>[];
 
@@ -830,10 +833,10 @@ export function eachBlock<T>(
     // updates and reorders flow into the existing DOM. Batch so a row's three writes coalesce
     // into ONE flush instead of three per row (a binding reading >1 of them recomputes once).
     batch(() => {
+      countSig.set(data.length); // once for the block, not once per row
       rows.forEach((r, i) => {
         r.itemSig.set(data[i] as T);
         r.indexSig.set(i);
-        r.countSig.set(data.length);
       });
     });
   });

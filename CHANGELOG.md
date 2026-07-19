@@ -31,6 +31,19 @@
   which is the failure this subsystem hides best: resume on the documentation site was dead for an unknown
   period and nothing said a word. Resilient AND audible.
 
+### Changed — ui
+- **A typo in `overrides()` now warns.** `overrides('button', (backgrond: red))` emitted
+  `--weave-button-backgrond` — a perfectly valid custom property that no rule reads, so nothing happened
+  and nothing said why. Unknown keys are checked against the component's real token schema (the
+  `$_builtins` registry the engine already had) and warned, not rejected: adding a token is legitimate,
+  and a component you `define()`d yourself has no builtin schema, so it never warns.
+
+### Changed — runtime
+- **`@for` writes one `$count` per block instead of one per row.** The value is identical for every row,
+  so a 1000-row list was doing 1000 writes and 1000 equality checks per reconcile for a number that
+  changes at most once — a third of the refresh loop. Also adds the first direct test of `$count`,
+  covering shrink as well as growth (only `$last` was exercised before, and only while growing).
+
 ## 1.8.0 — 2026-07-19
 
 ### Fixed — forms docs

@@ -208,6 +208,30 @@ test('@for renders, reacts, and exposes $index/$first/$last', () => {
   assert.deepEqual([...el.querySelectorAll('li')].map((l) => l.textContent), ['0:a', '1:b', '2:c!']);
 });
 
+test('@for: $count is block-wide and tracks BOTH growth and shrink', () => {
+  // `$count` is the same number for every row, so it is one signal for the whole block rather than
+  // one per row. This pins the behaviour that refactor must preserve — and covers shrinking, which
+  // the $index/$first/$last test above does not: rows are REMOVED there, so a per-row count would
+  // have looked correct while a stale shared one would not.
+  const items: Signal<{ id: number }[]> = signal([{ id: 1 }, { id: 2 }, { id: 3 }]);
+  const el: Element = render(
+    '<ul>@for (it of items(); track it.id) { <li>{{ it.id }}/{{ $count }}{{ $last ? "!" : "" }}</li> }</ul>',
+    { items },
+    ['items']
+  );
+  host().appendChild(el);
+  const read = (): (string | null)[] => [...el.querySelectorAll('li')].map((l) => l.textContent);
+  assert.deepEqual(read(), ['1/3', '2/3', '3/3!'], 'every row sees the same count');
+  items.set((xs) => [...xs, { id: 4 }]);
+  assert.deepEqual(read(), ['1/4', '2/4', '3/4', '4/4!'], 'growth updates every surviving row');
+  items.set((xs) => xs.slice(0, 2));
+  assert.deepEqual(read(), ['1/2', '2/2!'], 'shrink updates the rows that remain');
+  items.set(() => []);
+  assert.deepEqual(read(), [], 'emptying removes every row');
+  items.set(() => [{ id: 9 }]);
+  assert.deepEqual(read(), ['9/1!'], 'refilling after empty starts from a correct count');
+});
+
 test('@for reflects immutable item updates on reused rows', () => {
   const items: Signal<{ id: number; t: string }[]> = signal([{ id: 1, t: 'a' }]);
   const el: Element = render(
