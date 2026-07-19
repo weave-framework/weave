@@ -43,7 +43,7 @@ await esbuild({
   target: 'node18',
   // Bundle the @weave-framework/* workspace sources (their `.ts` can't be Node-imported directly), but keep
   // `esbuild` external — buildSsg calls it internally, and it resolves from node_modules at runtime.
-  external: ['esbuild'],
+  external: ['esbuild', 'typescript'],
   outfile: out,
 });
 const { generateServerEntry, generateEntry, discoverCustomElements, buildSsg, staticRoutePaths, deserialize } = await import(pathToFileURL(out).href);

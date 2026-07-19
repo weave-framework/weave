@@ -45,10 +45,7 @@ export interface ResumeControl {
 
 const PREFIX: "data-won-" = 'data-won-';
 
-/**
- * Marks which of an element's resumable handlers are `once`. Space-separated event types, because one
- * element can carry several handlers and only some of them may be once-only. @internal
- */
+/** Which of an element's handlers are `once` — space-separated types (an element may carry several). @internal */
 export const ONCE_ATTR: "data-won-once" = 'data-won-once';
 
 /** The attribute an element carries to reference a resumable handler for `event` (shared with the compiler). */
@@ -63,8 +60,7 @@ function discoverEventTypes(root: Element): Set<string> {
     const attrs: NamedNodeMap = el.attributes;
     for (let i: number = 0; i < attrs.length; i++) {
       const name: string = attrs[i].name;
-      // `data-won-once` shares the prefix but is a FLAG, not an event site — without this guard the
-      // scan invents an event type called "once" and attaches a listener for it.
+      // A FLAG, not an event site — without this the scan invents an event type called "once".
       if (name === ONCE_ATTR) continue;
       if (name.startsWith(PREFIX)) types.add(name.slice(PREFIX.length));
     }
@@ -94,9 +90,8 @@ export function resumeEvents(root: Element, options: ResumeOptions): ResumeContr
       if (node.hasAttribute(attr)) {
         const ref: string | null = node.getAttribute(attr);
         const el: Element = node;
-        // `once`: drop THIS type's marker before invoking, so a handler that re-enters (or an event
-        // that fires again before the handler settles) cannot reach it a second time. Removing the
-        // marker is the delegated equivalent of `{ once: true }` — the walk simply stops matching.
+        // `once`: drop this type's marker BEFORE invoking, so a re-entrant handler cannot reach it
+        // twice. Removing the marker is the delegated equivalent of `{ once: true }`.
         const onceList: string | null = el.getAttribute(ONCE_ATTR);
         if (onceList !== null && onceList.split(' ').includes(type)) {
           el.removeAttribute(attr);
@@ -161,13 +156,11 @@ let activeSink: HandlerSink | null = null;
  * event site) is the stable prefix a later chunk-splitter (E0.3) maps to an importable handler export.
  * Returns the generated id.
  *
- * **`once` is carried** — pass `once: true` and the element is stamped with {@link ONCE_ATTR}, which the
- * delegated dispatch honours by removing this event's marker after the first invoke. `capture` and
- * `passive` are NOT expressible here and must never reach this function: `capture` needs its own
- * capture-phase listener, and `passive` is a property of the listener REGISTRATION, which delegation
- * shares across every element of that event type. The compiler refuses to adopt a component using
- * either (they fall back to a client render, where the eager path applies them correctly).
- * The guard modifiers `preventDefault`/`stopPropagation`/`self` always apply — they live in the body.
+ * **`once` is carried** ({@link ONCE_ATTR}; the dispatch drops the marker after the first invoke).
+ * `capture`/`passive` cannot reach here — `capture` needs its own capture-phase listener and `passive`
+ * is a property of the listener REGISTRATION, which delegation shares per event type, so the compiler
+ * refuses to adopt a component using either (it client-renders, where the eager path applies them).
+ * `preventDefault`/`stopPropagation`/`self` always apply — they live in the handler body.
  */
 export function resumableHandler(
   node: Element,

@@ -64,7 +64,7 @@ await esbuild({
   format: 'esm',
   platform: 'node',
   target: 'node18',
-  external: ['esbuild'],
+  external: ['esbuild', 'typescript'],
   outfile: entryOut,
 });
 const { generateServerEntry, generateEntry, discoverCustomElements, buildSsg } = await import(pathToFileURL(entryOut).href);

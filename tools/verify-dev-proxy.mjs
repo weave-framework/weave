@@ -40,7 +40,7 @@ await build({
   format: 'esm',
   platform: 'node',
   outfile: devJs,
-  external: ['esbuild'],
+  external: ['esbuild', 'typescript'],
 });
 const { dev } = await import(pathToFileURL(devJs).href);
 process.on('exit', () => rmSync(devJs, { force: true }));

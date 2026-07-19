@@ -21,6 +21,7 @@ import { inferCtxNames } from './infer.js';
 import { injectAutoReturn } from './auto-return.js';
 import { extractSetupBindings, extractReturnedNames, extractModuleImports, unresolvedRefs, type SetupBindings } from './handlers.js';
 import { rewrite, ctxScope, type Scope } from './scope.js';
+import type { TsLike } from './ts-refs.js';
 import { scopeCss, scopeAttr, hostAttr, hashCss } from './css.js';
 
 export interface ComponentSource {
@@ -48,6 +49,15 @@ export interface ComponentOptions {
    * resume this child in place via `adoptComponent`. Default false → the eager module is byte-for-byte.
    */
   resumable?: boolean;
+  /**
+   * The caller's TypeScript instance, used to analyse `setup` source on the AST instead of lexically (see
+   * `ts-refs.ts`). Optional and INJECTED, never imported: `handlers.ts` is reachable from the compiler's
+   * barrel, so a static `import 'typescript'` would pull 9.5 MB into every browser-test bundle that touches
+   * the compiler. Omitted ⇒ the lexical path, which is what the compiler's own zero-dep tests run on.
+   *
+   * Only `resumable` builds consult it — plain template compilation never parses TypeScript.
+   */
+  ts?: TsLike;
 }
 
 export interface CompiledComponent {
@@ -106,7 +116,7 @@ interface ResumableSetup {
   warnings: string[];
 }
 
-function resumableSetup(script: string, scope: string[]): ResumableSetup {
+function resumableSetup(script: string, scope: string[], ts?: TsLike): ResumableSetup {
   const handlers: Map<string, string> = new Map();
   const computeds: Map<string, string> = new Map();
   const locals: Map<string, string> = new Map();
@@ -186,7 +196,7 @@ function resumableSetup(script: string, scope: string[]): ResumableSetup {
     changed = false;
     const check = (name: string, source: string, params: readonly string[]): void => {
       if (!settled.has(name)) return;
-      const missing: string[] = unresolvedRefs(source, union(settled, imports), params, name);
+      const missing: string[] = unresolvedRefs(source, union(settled, imports), params, name, undefined, ts);
       if (missing.length === 0) return;
       settled.delete(name);
       because.set(name, missing);
@@ -217,7 +227,7 @@ function resumableSetup(script: string, scope: string[]): ResumableSetup {
   for (const [name, derivable] of found.computeds) {
     const missing: string[] = settled.has(name)
       ? []
-      : unresolvedRefs(derivable.source, union(settled, imports), [], name);
+      : unresolvedRefs(derivable.source, union(settled, imports), [], name, undefined, ts);
     if (missing.length) {
       const chain: string[] = rootCause(missing);
       reasons.set(name, blame(chain));
@@ -265,7 +275,7 @@ function resumableSetup(script: string, scope: string[]): ResumableSetup {
   // Emitted after the bindings and helpers above, because an effect (or a mount hook) reads them.
   for (const call of found.calls) {
     if (!rebuildable.has(call.callee)) continue; // some other bare call — not ours to rebuild
-    const missing: string[] = unresolvedRefs(call.source, union(settled, imports), [], '');
+    const missing: string[] = unresolvedRefs(call.source, union(settled, imports), [], '', undefined, ts);
     if (missing.length) {
       // Neither an effect nor a hook binds a name, so there is no binding to blame and no way to degrade one
       // on its own: the component cannot be adopted at all. Say so — the subtree then client-renders, which
@@ -281,7 +291,7 @@ function resumableSetup(script: string, scope: string[]): ResumableSetup {
     if (!scope.includes(name)) continue; // the template never references it
     const missing: string[] = settled.has(name)
       ? []
-      : unresolvedRefs(handler.source, union(settled, imports), handler.params, name);
+      : unresolvedRefs(handler.source, union(settled, imports), handler.params, name, undefined, ts);
     if (missing.length) {
       reasons.set(name, blame(rootCause(missing)));
       continue; // the warning is raised by the caller, which knows whether it is actually a handler SITE
@@ -350,7 +360,7 @@ export function compileComponent(src: ComponentSource, opts: ComponentOptions = 
   const host: string | undefined = src.styles && /:host\b/.test(src.styles) ? hostAttr(hash) : undefined;
   // E1.5/E1.6 — resumable only: inline each named handler's `setup` body (`on:click={{ inc }}`) and re-derive
   // each `computed` over the resumed ctx (`{{ doubled() }}`), neither of which can cross the snapshot.
-  const resumed: ResumableSetup | undefined = opts.resumable && src.script ? resumableSetup(src.script, scope) : undefined;
+  const resumed: ResumableSetup | undefined = opts.resumable && src.script ? resumableSetup(src.script, scope, opts.ts) : undefined;
   // E1.49 — a lifecycle hook in `setup` is NOT a limit. E1.45 refused to adopt such a component, reasoning
   // that resume never runs `setup` so the hook never registers, and the server never ran it either — so its
   // work would be lost. True premise, wrong conclusion: `derive` runs on resume, and re-creates the hook the

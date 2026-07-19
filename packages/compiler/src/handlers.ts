@@ -18,8 +18,9 @@
  * emit falls back to today's `ctx.<name>` (inert on resume, never a crash) and the caller warns.
  */
 
-import { freeIdentifiers } from './scope.js';
+import { freeIdentifiers, isJsGlobal } from './scope.js';
 import { matchDelimited, skipOpaque, skipWs, startsWithWord } from './auto-return.js';
+import { unresolvedRefsTs, type TsLike } from './ts-refs.js';
 
 const SETUP_FN: RegExp = /export\s+(?:async\s+)?function\s+setup\b/;
 const SETUP_VAR: RegExp = /export\s+(?:const|let|var)\s+setup\s*=/;
@@ -583,8 +584,9 @@ export function isDerivable(
   derived: SetupDerived,
   resolvable: ReadonlySet<string>,
   name?: string,
+  ts?: TsLike,
 ): boolean {
-  return unresolvedRefs(derived.source, resolvable, [], name).length === 0;
+  return unresolvedRefs(derived.source, resolvable, [], name, undefined, ts).length === 0;
 }
 
 /**
@@ -596,8 +598,8 @@ export function isDerivable(
  * A leftover name is a `setup` local that does NOT survive to the client (`const step = 2`, a helper fn) — so
  * inlining it would throw a ReferenceError on the first click. Refuse instead.
  */
-export function isInlinable(handler: SetupHandler, ctxNames: ReadonlySet<string>, name?: string): boolean {
-  return unresolvedRefs(handler.source, ctxNames, handler.params, name).length === 0;
+export function isInlinable(handler: SetupHandler, ctxNames: ReadonlySet<string>, name?: string, ts?: TsLike): boolean {
+  return unresolvedRefs(handler.source, ctxNames, handler.params, name, undefined, ts).length === 0;
 }
 
 /**
@@ -614,7 +616,15 @@ export function unresolvedRefs(
   params: readonly string[] = [],
   name?: string,
   ignore?: string,
+  ts?: TsLike,
 ): string[] {
+  // With a TypeScript instance in hand, ASK THE PARSER. The lexical path below reconstructs by hand what an AST
+  // already knows, and two of its approximations are wrong in ways that cost real handlers: a DESTRUCTURED
+  // parameter (`({ id, label }) => …`) is blamed for reading its own `id`, and a nested one (`({ a: { b } })`)
+  // for reading `b`. A handler refused on that basis falls back to a dead `ctx.<name>`, so the control is inert
+  // after resume — silently. See `ts-refs.ts` for why `ts` is injected rather than imported.
+  if (ts) return unresolvedRefsTs(ts, source, ctxNames, params, name, ignore, isJsGlobal);
+
   // E1.18 — `freeIdentifiers` is the TEMPLATE basis, and a template has no type annotations (its `:` is a
   // ternary). Setup code has both, so analysing it raw reported TYPE names as ctx refs and the body's own
   // locals as unresolved: the real `<Checkbox>` warned that its handler "reads `el`, `HTMLInputElement`,

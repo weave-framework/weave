@@ -35,5 +35,13 @@
       "./package.json": "./package.json"
     }
   },
-  "license": "MIT"
+  "license": "MIT",
+  "peerDependencies": {
+    "typescript": "^5.7.0"
+  },
+  "peerDependenciesMeta": {
+    "typescript": {
+      "optional": true
+    }
+  }
 }

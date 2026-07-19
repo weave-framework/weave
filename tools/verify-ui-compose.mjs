@@ -47,7 +47,7 @@ await build({
   platform: 'node',
   outfile: pluginJs,
   // node built-ins + esbuild (types only) are provided by the host runtime.
-  external: ['esbuild'],
+  external: ['esbuild', 'typescript'],
 });
 const { weave } = await import(pathToFileURL(pluginJs).href);
 

@@ -365,6 +365,15 @@ const NON_CTX: Set<string> = new Set([
   'import',
 ]);
 
+/**
+ * Is `name` a JS global/keyword rather than component data? The one authority behind both reference paths —
+ * the lexical {@link freeIdentifiers} and the AST-backed `unresolvedRefsTs` — so the two cannot drift into
+ * disagreeing about what counts as a reference. (Still a hand-maintained list; see `ts-refs.ts`'s known limit.)
+ */
+export function isJsGlobal(name: string): boolean {
+  return NON_CTX.has(name);
+}
+
 /** Collect arrow-function parameter names in `expr` (so they aren't treated as ctx). */
 function arrowParams(expr: string): Set<string> {
   const params: Set<string> = new Set<string>();

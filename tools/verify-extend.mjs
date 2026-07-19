@@ -38,7 +38,7 @@ try {
     format: 'esm',
     platform: 'node',
     outfile: pluginJs,
-    external: ['esbuild'],
+    external: ['esbuild', 'typescript'],
   });
   const { weave } = await import(pathToFileURL(pluginJs).href);
 

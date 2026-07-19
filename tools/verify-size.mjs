@@ -37,7 +37,10 @@ const BUDGETS = [
   // 2560 → 3072 (E1.9: with no collecting session a resumable render is a LIVE client render, so it wires a
   // real listener and skips the marker — that is what makes a resumable bundle work under CSR at all: a
   // fallback root, a route swap, a `@for` row added after resume). Resume-only, 0 for a plain SPA (I3).
-  { label: 'runtime/resume (E0.2a/b dispatch)', files: ['packages/runtime/dist/resume.js'], budget: 3_072 },
+  // → 3328 (2026-07-19: `once` is now carried across the delegated dispatch. It used to be DROPPED, so
+  // `on:click|once` fired on every click in a resumable build and once in an eager one — the same template
+  // meaning two different things. Correctness, not a feature, and worth its 70 bytes.)
+  { label: 'runtime/resume (E0.2a/b dispatch)', files: ['packages/runtime/dist/resume.js'], budget: 3_328 },
   // runtime/adopt (E1.2a/c): DOM-adoption primitives. Server+client, own line — 0 bytes for a plain SPA (I3).
   // Grown across E1.2c (block adopt lands incrementally): E1.2a marker text-bind → E1.2c-1 block-boundary
   // cursor (blockStart/blockEndOf/clearBlock) → E1.2c-2 adoptIsland (@if/@switch island-replay). Budget
@@ -46,7 +49,11 @@ const BUDGETS = [
   // registers its root + handler factory so its OWN events resume). The SPA core (20.9 KB) is untouched; this
   // entry never ships to a plain client SPA. → 4608 (E1.12 self-adopting components + E1.13 re-attaching a
   // parent's component-level `on:` handlers, which defineComponent only forwards on the CREATE path).
-  { label: 'runtime/adopt (E1.2a/c DOM adopt)', files: ['packages/runtime/dist/adopt.js'], budget: 4_608 },
+  // → 4864 (2026-07-19: a server/client mismatch used to repair the DOM in SILENCE. The repair stays — it
+  // must not blank a page over one binding — but it now warns once, because a mismatch means the adopt walk
+  // disagreed with the server's DOM, and that is this subsystem's best-hidden failure. Note these entries
+  // are plain `tsc` output: comments ship, so the "why" costs budget here. That is a deliberate trade.)
+  { label: 'runtime/adopt (E1.2a/c DOM adopt)', files: ['packages/runtime/dist/adopt.js'], budget: 4_864 },
   // runtime/graph (E0.3/E1.2): resume entry — signal codec + snapshot/resume + resumePage (SSG client entry).
   // Budget raised 2048 → 2560 (E1.2 resumePage + SNAPSHOT_ID) → 3072 (E1.2c-6 per-instance state collection:
   // collectStates / registerState / ROOT_ID) → 3584 (E1.2c-6 resume states-map handling + ResumeApp.states)

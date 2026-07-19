@@ -23,6 +23,7 @@
  */
 
 import type { OnLoadArgs, OnLoadResult, Plugin, PluginBuild } from 'esbuild';
+import ts from 'typescript';
 import { readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
@@ -395,7 +396,7 @@ export function weave(state: WeaveState, options: WeaveOptions = {}): Plugin {
           ? await compileStyleSource(src.styles, styleLang, dirname(args.path))
           : undefined;
         try {
-          const { code, css, components, warnings } = compileComponent({ ...src, styles }, { filename: args.path, resumable });
+          const { code, css, components, warnings } = compileComponent({ ...src, styles }, { filename: args.path, resumable, ts });
           const wired: string = injectChildImports(code, components, dirname(args.path), src.script, args.path);
           return emit(wired, css, dirname(args.path), warnings, args.path);
         } catch (e) {
@@ -440,7 +441,7 @@ export function weave(state: WeaveState, options: WeaveOptions = {}): Plugin {
           try {
             const compiled: CompiledComponent = compileComponent(
               { script: decl.script, template: base.template, patches },
-              { filename: args.path, hash: hashCss(base.filename), resumable }
+              { filename: args.path, hash: hashCss(base.filename), resumable, ts }
             );
             // Base-template child tags resolve relative to the BASE dir; inserted tags the extension
             // itself imports are skipped by injectChildImports (explicit import wins).
@@ -471,7 +472,7 @@ export function weave(state: WeaveState, options: WeaveOptions = {}): Plugin {
         try {
           const { code, css, components, warnings } = compileComponent(
             { script: decl.script, template: template.text, styles: styles.css },
-            { filename: args.path, resumable }
+            { filename: args.path, resumable, ts }
           );
           const wired: string = injectChildImports(code, components, dir, decl.script, args.path);
           // Tell esbuild this module also depends on its template + style files, so a

@@ -39,18 +39,10 @@ function stringify(v: unknown): string {
   return v == null || v === false ? '' : String(v);
 }
 
-/**
- * Warn once per page for a structural server/client mismatch. Once, not per occurrence: one diverged
- * index typically produces a repair for every following binding at that level, and a hundred identical
- * lines would bury the signal instead of raising it.
- */
+/** Once per page: one diverged index repairs every following binding, and N identical lines bury the signal. */
 let warnedRepair: boolean = false;
 
-/**
- * Clear the once-per-page latch. Exists so a test can prove the warning FIRES rather than asserting
- * "at most one", which passes vacuously once any earlier test in the same page has consumed the latch —
- * a gate that cannot fail is not a gate. @internal
- */
+/** Clear the latch so a test can prove the warning FIRES, not merely "at most once". @internal */
 export function resetAdoptWarnings(): void {
   warnedRepair = false;
 }
@@ -58,12 +50,7 @@ export function resetAdoptWarnings(): void {
 function warnAdoptRepair(): void {
   if (warnedRepair) return;
   warnedRepair = true;
-  console.warn(
-    '[weave] resume: expected a server-rendered text node and found none — recreated it. The page works, ' +
-      'but the server and client disagree about this DOM, so some bindings may be attached to the wrong ' +
-      'nodes. This usually means the prerendered HTML was altered after the build, or a component rendered ' +
-      'differently on the server than on the client.'
-  );
+  console.warn('[weave] resume: server/client DOM mismatch — text recreated, bindings may be misplaced');
 }
 
 /**
@@ -300,11 +287,9 @@ export function bindTextResumable(anchor: Comment, fn: () => unknown): void {
 export function adoptText(anchor: Comment, fn: () => unknown): void {
   let t: Node | null = anchor.previousSibling;
   if (!t || t.nodeType !== 3 /* Text */) {
-    // The server text node this binding was compiled to adopt is not there. Repairing keeps the page
-    // working — deliberate, and the reason this does not throw: a mismatch should not blank a user's
-    // page over one binding. But a mismatch also means the adopt walk's index arithmetic disagreed
-    // with the DOM the server actually wrote, which is the failure mode this whole subsystem is most
-    // prone to and the one that hides best. Silence made it undiagnosable, so it says so, once.
+    // Repair rather than throw: a mismatch must not blank the page over one binding. But it means the
+    // adopt walk disagreed with the DOM the server wrote — this subsystem's best-hidden failure — so
+    // it is no longer silent.
     warnAdoptRepair();
     t = document.createTextNode('');
     anchor.parentNode!.insertBefore(t, anchor);
