@@ -14,6 +14,18 @@
 > already left it behind — Phase E ran 94 commits without a bump, and then released as one MINOR. The public
 > promise wins; the habit is retired.)*
 
+## Unreleased
+
+### Fixed — compiler + runtime
+- **Listener modifiers no longer change meaning between build targets.** In a resumable build
+  (`--ssg` + `ssg.resume`), `once`/`capture`/`passive` were dropped with only a code comment saying so,
+  so `on:click|once` fired on EVERY click while the same template on the eager target fired one.
+  `once` is now carried through the delegated dispatch (the runtime removes that event's marker after the
+  first invoke). `capture` and `passive` cannot be expressed by one delegated listener per event type —
+  `capture` needs its own capture-phase listener and `passive` is a property of the listener REGISTRATION,
+  which delegation shares — so a component using either now **refuses adoption and client-renders**, where
+  the eager path applies them correctly. Silent divergence is gone either way.
+
 ## 1.8.0 — 2026-07-19
 
 ### Fixed — forms docs

@@ -882,9 +882,24 @@ function compileFragment(
         if (gen.resumable) {
           // Resumable target (E0.2b): emit a handler REFERENCE instead of an eager listener. The runtime
           // helper stamps `data-won-<event>` + registers the handler for a delegated resume dispatch.
-          // once/capture/passive don't map onto the delegated path yet, so they're dropped here.
+          //
+          // Listener OPTIONS and delegation do not mix freely, and silently dropping them made the same
+          // source behave differently on the two targets — `on:click|once` fired every time:
+          //   `once`    — expressible: the runtime removes this event's marker after the first invoke.
+          //   `capture` — needs its own capture-phase listener at the root; not modelled.
+          //   `passive` — a property of the listener REGISTRATION, which delegation shares across every
+          //               element of that type, so it cannot be per-element at all.
+          // The two we cannot honour refuse adoption instead of lying: the component client-renders, and
+          // the eager path below applies the modifiers correctly.
+          const unsupported: string[] = attr.modifiers.filter((m) => m === 'capture' || m === 'passive');
+          if (unsupported.length) {
+            gen.cannotAdopt(
+              `\`on:${attr.name}|${unsupported.join('|')}\` — ${unsupported.join(' and ')} cannot be expressed by the delegated resume dispatch`
+            );
+          }
+          const once: string = attr.modifiers.includes('once') ? ', true' : '';
           const ref: string = gen.ref();
-          sink.push(`${gen.Hr('resumableHandler')}(${n}, ${q(attr.name)}, ${q(ref)}, ${handler});`);
+          sink.push(`${gen.Hr('resumableHandler')}(${n}, ${q(attr.name)}, ${q(ref)}, ${handler}${once});`);
           // Root-fragment handler → include in the emitted `handlers(ctx)` factory (E1.1). Block-local
           // handlers close over locals absent from `ctx`, so they stay in-render only (deferred slice).
           if (gen.fragmentDepth === 1) gen.resumableSites.push({ ref, code: handler });

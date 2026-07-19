@@ -45,6 +45,12 @@ export interface ResumeControl {
 
 const PREFIX: "data-won-" = 'data-won-';
 
+/**
+ * Marks which of an element's resumable handlers are `once`. Space-separated event types, because one
+ * element can carry several handlers and only some of them may be once-only. @internal
+ */
+export const ONCE_ATTR: "data-won-once" = 'data-won-once';
+
 /** The attribute an element carries to reference a resumable handler for `event` (shared with the compiler). */
 export function handlerAttr(event: string): string {
   return PREFIX + event;
@@ -57,6 +63,9 @@ function discoverEventTypes(root: Element): Set<string> {
     const attrs: NamedNodeMap = el.attributes;
     for (let i: number = 0; i < attrs.length; i++) {
       const name: string = attrs[i].name;
+      // `data-won-once` shares the prefix but is a FLAG, not an event site — without this guard the
+      // scan invents an event type called "once" and attaches a listener for it.
+      if (name === ONCE_ATTR) continue;
       if (name.startsWith(PREFIX)) types.add(name.slice(PREFIX.length));
     }
   };
@@ -85,6 +94,16 @@ export function resumeEvents(root: Element, options: ResumeOptions): ResumeContr
       if (node.hasAttribute(attr)) {
         const ref: string | null = node.getAttribute(attr);
         const el: Element = node;
+        // `once`: drop THIS type's marker before invoking, so a handler that re-enters (or an event
+        // that fires again before the handler settles) cannot reach it a second time. Removing the
+        // marker is the delegated equivalent of `{ once: true }` — the walk simply stops matching.
+        const onceList: string | null = el.getAttribute(ONCE_ATTR);
+        if (onceList !== null && onceList.split(' ').includes(type)) {
+          el.removeAttribute(attr);
+          const rest: string[] = onceList.split(' ').filter((t) => t !== type);
+          if (rest.length) el.setAttribute(ONCE_ATTR, rest.join(' '));
+          else el.removeAttribute(ONCE_ATTR);
+        }
         if (ref != null) {
           const resolved: ResumeHandler | Promise<ResumeHandler> | undefined = options.resolve(ref, el);
           if (resolved) {
@@ -140,11 +159,23 @@ let activeSink: HandlerSink | null = null;
  * The id is INSTANCE-unique — `siteRef#<n>` where `<n>` is a per-session counter — so repeated rows of a
  * `@for` each get their own handler rather than a shared one. `siteRef` (assigned by the compiler per
  * event site) is the stable prefix a later chunk-splitter (E0.3) maps to an importable handler export.
- * Returns the generated id. Note: `once`/`capture`/`passive` listener options are not carried by the
- * delegated resume path yet — a resumable build ignores those modifiers (the guard modifiers
- * `preventDefault`/`stopPropagation`/`self` still apply, since they live in the handler body).
+ * Returns the generated id.
+ *
+ * **`once` is carried** — pass `once: true` and the element is stamped with {@link ONCE_ATTR}, which the
+ * delegated dispatch honours by removing this event's marker after the first invoke. `capture` and
+ * `passive` are NOT expressible here and must never reach this function: `capture` needs its own
+ * capture-phase listener, and `passive` is a property of the listener REGISTRATION, which delegation
+ * shares across every element of that event type. The compiler refuses to adopt a component using
+ * either (they fall back to a client render, where the eager path applies them correctly).
+ * The guard modifiers `preventDefault`/`stopPropagation`/`self` always apply — they live in the body.
  */
-export function resumableHandler(node: Element, event: string, siteRef: string, handler: ResumeHandler): string {
+export function resumableHandler(
+  node: Element,
+  event: string,
+  siteRef: string,
+  handler: ResumeHandler,
+  once?: boolean
+): string {
   // No session ⇒ a LIVE CLIENT render of a resumable build (E1.9): a CSR fallback, a route swap, a `@for` row
   // added after resume. Nothing to bridge to, so wire a real listener. The marker is deliberately NOT stamped
   // — it means "awaiting resume", and would make the delegated dispatch fire this handler a second time.
@@ -154,6 +185,12 @@ export function resumableHandler(node: Element, event: string, siteRef: string, 
   }
   const id: string = `${siteRef}#${activeSink.n++}`;
   node.setAttribute(PREFIX + event, id);
+  if (once) {
+    // A space-separated list rather than one attribute per type: an element may carry several `once`
+    // handlers, and the dispatch needs to ask "is THIS type once?" cheaply.
+    const prev: string | null = node.getAttribute(ONCE_ATTR);
+    node.setAttribute(ONCE_ATTR, prev ? `${prev} ${event}` : event);
+  }
   activeSink.map.set(id, handler);
   return id;
 }

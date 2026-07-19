@@ -1474,3 +1474,35 @@ export function setup() {
   assert.ok(code.includes('render.adopt = adopt;'), 'a regex in an effect no longer refuses the component');
   assert.equal(warnings?.length ?? 0, 0, 'no phantom `$`/`a`/`z` refusal');
 });
+
+test('listener modifiers: `once` rides the delegated path; capture/passive refuse adoption', () => {
+  // The resumable path used to DROP once/capture/passive with only a code comment saying so, which made
+  // one source template behave differently on the two build targets — `on:click|once` fired every time.
+  const plain: CompileResult = compileTemplate('<button on:click={{ go }}>x</button>', {
+    scope: ['go'],
+    resumable: true,
+  });
+  assert.equal(/resumableHandler\([^)]*,\s*true\)/.test(plain.code), false, 'no once flag when unmodified');
+  assert.equal((plain.notAdoptable ?? []).length, 0, 'a plain handler stays adoptable');
+
+  const once: CompileResult = compileTemplate('<button on:click|once={{ go }}>x</button>', {
+    scope: ['go'],
+    resumable: true,
+  });
+  assert.ok(/resumableHandler\([^)]*,\s*true\)/.test(once.code), '`once` is passed to the runtime helper');
+  assert.equal((once.notAdoptable ?? []).length, 0, '`once` is expressible, so adoption is NOT refused');
+
+  // These two cannot be modelled by one delegated listener per event type. Refusing adoption is the
+  // honest answer: the component client-renders, where the eager path applies them correctly.
+  for (const mod of ['capture', 'passive']) {
+    const r: CompileResult = compileTemplate(`<button on:click|${mod}={{ go }}>x</button>`, {
+      scope: ['go'],
+      resumable: true,
+    });
+    const reasons: string[] = r.notAdoptable ?? [];
+    assert.ok(
+      reasons.some((x) => x.includes(mod)),
+      `\`${mod}\` refuses adoption and names itself (got ${JSON.stringify(reasons)})`
+    );
+  }
+});

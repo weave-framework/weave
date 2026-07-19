@@ -163,3 +163,68 @@ test('resume: extraEvents delegates a type not present at scan time', () => {
   ctl.dispose();
   root.remove();
 });
+
+test('resume: `once` fires exactly once, and stops matching after it', () => {
+  // The delegated path used to drop `once` silently: `on:click|once` in a resumable build fired on
+  // EVERY click, while the same source on the eager target fired one. Same template, two behaviours.
+  let fired: number = 0;
+  const root: HTMLElement = mount((r) => {
+    const btn: HTMLButtonElement = document.createElement('button');
+    btn.setAttribute('data-won-click', 'h1');
+    btn.setAttribute('data-won-once', 'click');
+    r.appendChild(btn);
+  });
+  const ctl: ResumeControl = resumeEvents(root, { resolve: () => (() => fired++) as ResumeHandler });
+  const btn: HTMLElement = root.querySelector('button') as HTMLElement;
+  btn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  btn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  btn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  assert.equal(fired, 1, 'three clicks, one invocation');
+  assert.equal(btn.hasAttribute('data-won-click'), false, 'the marker is removed after the first invoke');
+  assert.equal(btn.hasAttribute('data-won-once'), false, 'and the once-flag is cleaned up with it');
+  ctl.dispose();
+  root.remove();
+});
+
+test('resume: `once` on one event does not disarm the element’s other handlers', () => {
+  const hits: string[] = [];
+  const root: HTMLElement = mount((r) => {
+    const btn: HTMLButtonElement = document.createElement('button');
+    btn.setAttribute('data-won-click', 'c');
+    btn.setAttribute('data-won-mouseover', 'm');
+    btn.setAttribute('data-won-once', 'click'); // only the click is once
+    r.appendChild(btn);
+  });
+  const ctl: ResumeControl = resumeEvents(root, {
+    resolve: (ref) => (() => hits.push(ref)) as ResumeHandler,
+  });
+  const btn: HTMLElement = root.querySelector('button') as HTMLElement;
+  btn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  btn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  btn.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+  btn.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+  assert.deepEqual(hits, ['c', 'm', 'm'], 'click fired once, mouseover kept firing');
+  assert.equal(btn.getAttribute('data-won-mouseover'), 'm', 'the non-once marker survives');
+  ctl.dispose();
+  root.remove();
+});
+
+test('resume: `data-won-once` is not mistaken for an event type', () => {
+  // It shares the `data-won-` prefix with real event sites, so a naive scan attaches a listener for a
+  // non-existent event called "once".
+  const root: HTMLElement = mount((r) => {
+    const btn: HTMLButtonElement = document.createElement('button');
+    btn.setAttribute('data-won-once', 'click');
+    r.appendChild(btn);
+  });
+  const seen: string[] = [];
+  const orig: typeof root.addEventListener = root.addEventListener.bind(root);
+  root.addEventListener = ((type: string, fn: EventListener, o?: boolean) => {
+    seen.push(type);
+    orig(type, fn, o);
+  }) as typeof root.addEventListener;
+  const ctl: ResumeControl = resumeEvents(root, { resolve: () => (() => {}) as ResumeHandler });
+  assert.equal(seen.includes('once'), false, `no listener for a phantom "once" event (got ${JSON.stringify(seen)})`);
+  ctl.dispose();
+  root.remove();
+});
