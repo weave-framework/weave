@@ -16,6 +16,19 @@
 
 ## Unreleased
 
+### Fixed — reactivity (behaviour change)
+- **An invalidation arriving while an effect runs is no longer discarded.** A running computation is DIRTY
+  for its whole execution and `markDirty` returned early on an already-DIRTY node, so an update aimed at an
+  effect mid-run was dropped: the effect finished on a value that was already stale, went CLEAN and left the
+  queue. Nothing threw and nothing looped — it was simply one update behind, permanently, and every later
+  run landed one behind again. The invalidation is now recorded and the computation re-runs until it settles.
+
+  **This changes a documented behaviour.** Mutual effect writes previously "settled" precisely BECAUSE the
+  update was dropped — a pair like `y = x + 1` / `x = y + 1` has no fixed point, so settling meant stopping
+  at whatever value the lost update happened to leave. A pair that can converge now does; one that cannot
+  throws (after 100 passes) naming the cause, instead of silently producing an arbitrary answer. If you
+  relied on a divergent effect pair terminating quietly, it will now report.
+
 ### Fixed — compiler
 - **An arrow parameter shadows a component binding only inside its own body.** Parameters were collected
   into one flat set applied to the ENTIRE expression, so a binding sharing a name with any arrow parameter

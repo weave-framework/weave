@@ -37,6 +37,10 @@ interface Computation extends Source {
   cleanups: Array<() => void>;
   /** Owner at creation — an effect routes a thrown error up this chain (error boundary). */
   owner?: Owner | null;
+  /** True while {@link runOnce} is executing this node. */
+  running?: boolean;
+  /** An invalidation arrived mid-run; the node is not settled until it has run again. */
+  needsRerun?: boolean;
 }
 
 /** The computation currently collecting dependencies. */
@@ -58,6 +62,12 @@ function track(source: Source): void {
 
 /** A source changed: direct observers are DIRTY; everything downstream is CHECK. */
 function markDirty(node: Computation): void {
+  // A RUNNING node is DIRTY throughout, so the early return below used to DISCARD an invalidation aimed at
+  // it — the run finished on a stale value, went CLEAN and left the queue, permanently one update behind.
+  if (node.running) {
+    node.needsRerun = true;
+    return;
+  }
   if (node.state === DIRTY) return;
   node.state = DIRTY;
   propagate(node);
@@ -93,13 +103,36 @@ function dispose(c: Computation): void {
 }
 
 /** Recompute a memo/effect, re-tracking its dependencies. */
+/** Re-run cap before a mid-run invalidation cycle is called non-convergent. A real pair settles in 2-3. */
+const MAX_RERUNS: number = 100;
+
+/** Run `c`, repeating while invalidations arrive mid-run: converge, or report — never drop the update. */
 function run(c: Computation): void {
+  for (let pass: number = 0; ; pass++) {
+    c.needsRerun = false;
+    runOnce(c);
+    if (!c.needsRerun) return;
+    if (pass + 1 >= MAX_RERUNS) {
+      c.needsRerun = false;
+      const err: Error = new Error(
+        `[weave] effect did not settle after ${MAX_RERUNS} re-runs — it writes a signal it also reads ` +
+          `(directly, or through another effect).`
+      );
+      if (c.isEffect) handleError(err, c.owner ?? null);
+      else throw err;
+      return;
+    }
+  }
+}
+
+function runOnce(c: Computation): void {
   dispose(c);
   unlink(c);
   const prev: Computation | null = listener;
   listener = c;
   let threw: boolean = false;
   let error: unknown;
+  c.running = true;
   try {
     const result: unknown = c.fn();
     if (c.isMemo) {
@@ -118,6 +151,7 @@ function run(c: Computation): void {
     error = e;
   } finally {
     listener = prev;
+    c.running = false;
     // On throw, a memo must NOT stay CLEAN caching a stale value (fail-loud): leave it DIRTY so the
     // next read recomputes (and re-throws, or succeeds once the cause is fixed). Effects go back to
     // CLEAN — leaving an effect DIRTY would make `markDirty` early-return and never re-queue it.

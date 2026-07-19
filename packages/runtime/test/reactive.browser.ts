@@ -261,18 +261,89 @@ test('a throwing memo does not cache a stale value (H2 — fail-loud)', () => {
   assert.equal(m(), 42, 'recomputes once the cause is resolved');
 });
 
-test('mutual effects settle synchronously without hanging (loop-safety)', () => {
-  // A written signal is flushed eagerly, so the writing effect runs *nested* while the reading effect
-  // is still DIRTY — `markDirty` then early-returns and the cycle terminates instead of looping. This
-  // guards that property (the audit's "runaway" M8 is not reachable through normal signal/effect use).
+test('an effect invalidated WHILE it runs re-runs, and ends up with the current value', () => {
+  // A running effect is DIRTY for its whole execution, and `markDirty` early-returns on an already-DIRTY
+  // node. So an invalidation arriving mid-run was DISCARDED: the effect finished holding a value that was
+  // already stale, went CLEAN, and left the queue. Nothing threw and nothing looped — it was simply one
+  // update behind, permanently, and every later run landed one behind again.
+  //
+  // The shape: B runs, and while it runs a nested flush runs A, which writes the signal B just read.
+  root(() => {
+    const x: Signal<number> = signal(0);
+    const t: Signal<number> = signal(0);
+    const trigger: Signal<number> = signal(0);
+    const seen: number[] = [];
+
+    // A: reads x, writes t. Does NOT read `trigger`, so it is not queued by the write below.
+    effect(() => {
+      t.set(x() + 1);
+    });
+    // B: reads trigger and t, writes x. `trigger.set` queues ONLY B, so B is the effect that is RUNNING
+    // when its own write to x flushes A, and A's write to t invalidates B mid-run. B's write is
+    // IDEMPOTENT, so the pair converges — the point here is that the update is not lost, not that a
+    // divergent pair can be made to settle (see the two tests below for that).
+    effect(() => {
+      const round: number = trigger();
+      seen.push(t());
+      x.set(100 + round); // changes on each round, then is stable within the round → converges
+    });
+
+    seen.length = 0;
+    trigger.set(1);
+    assert.equal(seen.at(-1), t(), `the effect ended on the CURRENT value (saw ${seen.join(',')}, t=${t()})`);
+    assert.ok(seen.length > 1, 'it genuinely re-ran rather than never being invalidated');
+  });
+});
+
+test('a genuinely non-converging effect cycle fails loudly instead of silently', () => {
+  // The counterpart to the above: if re-running an effect can never settle, that must be reported. A
+  // silent drop and an infinite loop are both wrong; the third option is to bound it and say so.
+  let threw: unknown = null;
+  root(() => {
+    const n: Signal<number> = signal(0);
+    try {
+      effect(() => {
+        n.set(n() + 1); // reads and writes the same signal — cannot converge
+      });
+    } catch (e) {
+      threw = e;
+    }
+  });
+  assert.ok(threw, 'a non-converging effect throws rather than hanging or going quiet');
+  assert.ok(String(threw).includes('effect'), `the message names the problem (got: ${String(threw)})`);
+});
+
+test('mutual effects terminate: a convergent pair settles, a divergent one reports', () => {
+  // CONTRACT CHANGE, recorded deliberately. This test used to assert that `y = x + 1` / `x = y + 1`
+  // "settles synchronously without hanging", and it did — because `markDirty` DROPPED the invalidation
+  // aimed at the running effect. But that pair has no fixed point: settling meant stopping at whatever
+  // value the dropped update happened to leave behind. Termination by losing data is not termination.
+  //
+  // Now: a pair that CAN converge does, and a pair that cannot is reported instead of quietly producing
+  // an arbitrary answer. Both halves are asserted here so neither can regress into the other.
   let settled: boolean = false;
+  root(() => {
+    const a: Signal<number> = signal(0);
+    const b: Signal<number> = signal(0);
+    // Idempotent writes → a fixed point exists, and the pair reaches it.
+    effect(() => b.set(Math.min(a(), 3)));
+    effect(() => a.set(Math.min(b(), 3)));
+    a.set(5);
+    settled = true;
+  });
+  assert.ok(settled, 'a convergent mutual pair settles instead of looping forever');
+
+  let threw: unknown = null;
   root(() => {
     const x: Signal<number> = signal(0);
     const y: Signal<number> = signal(0);
-    effect(() => y.set(x() + 1)); // reads x, writes y
-    effect(() => x.set(y() + 1)); // reads y, writes x
-    x.set(5); // nudge the mutual pair
-    settled = true; // only reached if the writes settled rather than hanging
+    try {
+      effect(() => y.set(x() + 1));
+      effect(() => x.set(y() + 1)); // no fixed point — grows without bound
+      x.set(5);
+    } catch (e) {
+      threw = e;
+    }
   });
-  assert.ok(settled, 'mutual effect writes settle instead of looping forever');
+  assert.ok(threw, 'a divergent mutual pair is reported rather than settling on an arbitrary value');
 });

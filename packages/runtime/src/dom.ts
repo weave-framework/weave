@@ -1059,18 +1059,10 @@ export function awaitBlock(
     if (s === 'pending') return pendingThunk;
     if (s === 'catch') return catchThunk;
     if (!then) return null;
-    // Read the VALUE here, not just the state, and hand back a fresh thunk for it.
-    //
-    // `ifBlock` swaps only when the returned thunk's identity changes, and `thenThunk` was a single stable
-    // closure — so once the state reached 'then' it never swapped again. `resource.mutate(next)` (the
-    // documented optimistic-update path) writes `data` and leaves `loading` false, so `state.set('then')`
-    // was a no-op by equality and the branch went on rendering the OLD value, silently. Refetches only
-    // survived because they bounce through 'pending' first, which is a different transition entirely.
-    //
-    // The whole then-subtree is rebuilt rather than updated in place. That is the coarse answer, and it is
-    // the one the frozen API permits: the alias is a plain function PARAMETER by contract (see codegen's
-    // note on `@await`), not an accessor, so nothing inside the branch can track the value. Making it an
-    // accessor would be the fine-grained fix and a breaking change to every existing `@then` body.
+    // Track the VALUE, not just the state: `ifBlock` swaps on thunk identity, and a single stable thunk
+    // meant `mutate()` (which leaves `loading` false) never re-rendered — the branch showed stale data in
+    // silence. Rebuilding the subtree is the coarse answer the frozen API allows: the alias is a plain
+    // parameter by contract, not an accessor, so nothing inside the branch can subscribe to the value.
     const v: unknown = value();
     return () => then(v);
   });
