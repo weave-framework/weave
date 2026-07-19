@@ -16,6 +16,18 @@
 
 ## Unreleased
 
+### Fixed — UI
+- **Layered modals released out of order no longer strand the page unscrollable.** `blockScroll` snapshotted
+  `body.style.overflow` per instance, so opening A then B and closing A FIRST restored the pre-A value while
+  B was still open (the page scrolled behind the modal), and closing B then restored `hidden` with nothing
+  open — leaving the page permanently unscrollable short of a reload. The lock is now reference-counted:
+  captured on the first acquire, restored on the last release, order-independent.
+- **A Table column revealed after mount gets a working pointer drag.** The resize grips were attached once in
+  `onMount` by a single query, but the header is a keyed `@for` over reactive columns — so a column unhidden
+  or appended later produced a grip whose keyboard resize worked (a template binding, re-applied per element)
+  while pointer drag silently did not. Columns arriving asynchronously got no drag at all. Attachment now
+  re-runs whenever the column set changes, destroying the previous handles first.
+
 ### Fixed — router
 - **A malformed percent-escape in the URL no longer blanks the app.** `decodeURIComponent` throws
   `URIError` on a lone `%`, and it ran unguarded inside the route-resolution computed — so the throw

@@ -55,6 +55,38 @@ test('blockScroll: locks body overflow on enable, restores on disable', () => {
   assert.equal(document.body.style.overflow, prev, 'prior overflow restored');
 });
 
+test('blockScroll: layered locks released OUT OF ORDER still restore the page exactly once', () => {
+  // Each instance used to snapshot `body.style.overflow` at its own enable(). Open A (saves ''), open B
+  // (saves 'hidden'), then close A FIRST — nothing forbids it, a programmatic `ref.close()` does exactly
+  // that — and A restores '' while B is still open, so the page scrolls behind the modal. Closing B then
+  // restores its snapshot 'hidden', and the page can never scroll again: no overlay is open, and only a
+  // reload fixes it. The lock has to be counted, not per-instance.
+  const prev: string = document.body.style.overflow;
+  const a: ScrollStrategy = blockScroll();
+  const b: ScrollStrategy = blockScroll();
+
+  a.enable();
+  b.enable();
+  assert.equal(document.body.style.overflow, 'hidden', 'both locks held');
+
+  a.disable(); // the OUTER one closes first
+  assert.equal(document.body.style.overflow, 'hidden', 'still locked — B has not released yet');
+
+  b.disable();
+  assert.equal(document.body.style.overflow, prev, 'the last release restores the ORIGINAL value');
+});
+
+test('blockScroll: a double enable/disable on one instance does not unbalance the count', () => {
+  const prev: string = document.body.style.overflow;
+  const s: ScrollStrategy = blockScroll();
+  s.enable();
+  s.enable(); // idempotent — must not take a second reference
+  s.disable();
+  assert.equal(document.body.style.overflow, prev, 'one instance releases fully on one disable');
+  s.disable(); // already released — must not underflow and re-lock a later overlay
+  assert.equal(document.body.style.overflow, prev, 'a redundant disable is a no-op');
+});
+
 /* ─────────────────── wired into an overlay ─────────────────── */
 
 test('closeScroll: detaches the overlay on scroll', () => {

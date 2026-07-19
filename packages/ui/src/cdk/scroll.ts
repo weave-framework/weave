@@ -92,23 +92,50 @@ export function closeScroll(ref: OverlayRef): ScrollStrategy {
  * width so the page doesn't shift. Restores the exact prior inline styles on disable.
  */
 export function blockScroll(_ref?: OverlayRef): ScrollStrategy {
-  let prev: { overflow: string; paddingRight: string } | null = null;
+  // Whether THIS strategy currently holds a reference — the count itself is module-level (below), because
+  // the thing being locked is one shared `<body>`. Snapshotting per instance meant each overlay recorded
+  // whatever `overflow` happened to be at ITS enable(): open A (records ''), open B (records 'hidden'),
+  // then close A first — which nothing forbids, a programmatic `ref.close()` does exactly that — and A
+  // restored '' while B was still open, so the page scrolled behind the modal. Closing B then restored its
+  // snapshot 'hidden' with no overlay left open, and the page could never scroll again short of a reload.
+  let held: boolean = false;
   return {
     enable: () => {
-      if (!isBrowser || prev) return;
-      const scrollbar: number = window.innerWidth - document.documentElement.clientWidth;
-      prev = {
-        overflow: document.body.style.overflow,
-        paddingRight: document.body.style.paddingRight,
-      };
-      document.body.style.overflow = 'hidden';
-      if (scrollbar > 0) document.body.style.paddingRight = `${scrollbar}px`;
+      if (!isBrowser || held) return;
+      held = true;
+      acquireScrollLock();
     },
     disable: () => {
-      if (!prev) return;
-      document.body.style.overflow = prev.overflow;
-      document.body.style.paddingRight = prev.paddingRight;
-      prev = null;
+      if (!held) return;
+      held = false;
+      releaseScrollLock();
     },
   };
+}
+
+/**
+ * The one `<body>` lock, reference-counted. The original inline styles are captured on the 0→1 transition
+ * and restored on 1→0, so overlays may open and close in any order and the page returns to exactly the
+ * state it started in. Mirrors how the shared scroll dispatcher in this file is already structured.
+ */
+let scrollLocks: number = 0;
+let scrollPrev: { overflow: string; paddingRight: string } | null = null;
+
+function acquireScrollLock(): void {
+  if (scrollLocks++ > 0) return;
+  const scrollbar: number = window.innerWidth - document.documentElement.clientWidth;
+  scrollPrev = {
+    overflow: document.body.style.overflow,
+    paddingRight: document.body.style.paddingRight,
+  };
+  document.body.style.overflow = 'hidden';
+  if (scrollbar > 0) document.body.style.paddingRight = `${scrollbar}px`;
+}
+
+function releaseScrollLock(): void {
+  if (scrollLocks === 0 || --scrollLocks > 0) return;
+  if (!scrollPrev) return;
+  document.body.style.overflow = scrollPrev.overflow;
+  document.body.style.paddingRight = scrollPrev.paddingRight;
+  scrollPrev = null;
 }

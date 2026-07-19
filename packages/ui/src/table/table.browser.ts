@@ -329,6 +329,47 @@ test('table: dragging the grip resizes live + toggles [data-resizing]; min-width
   m.dispose();
 });
 
+test('table: a column revealed AFTER mount still gets a working pointer drag', async () => {
+  // The grips were attached once, in `onMount`, by a single `querySelectorAll` — but the header is a keyed
+  // `@for` over reactive `dataCols()`. A column unhidden (or appended, or made resizable) later produced a
+  // grip that pass never saw: its keyboard resize worked, because that is an `on:keydown` template binding
+  // re-applied per element, while pointer drag silently did not. Same root cause makes an asynchronously
+  // loaded `columns` yield NO working drag at all, since the mount pass matches nothing.
+  // `columns` is a plain array on the props object, and the compiled template makes it a GETTER over the
+  // author's signal — that is what "reactive when bound to a signal" means. Mirror that here.
+  const cols: Signal<TableColumn<Row>[]> = signal<TableColumn<Row>[]>([
+    { key: 'name', header: 'Name', width: 200, resizable: true },
+    { key: 'age', header: 'Age', width: 120, resizable: true, hidden: true },
+  ]);
+  const m: Mounted = await mount({
+    get columns(): TableColumn<Row>[] {
+      return cols();
+    },
+    dataSource: ROWS,
+  } as TableProps<Row>);
+
+  cols.set([
+    { key: 'name', header: 'Name', width: 200, resizable: true },
+    { key: 'age', header: 'Age', width: 120, resizable: true },
+  ]);
+  await tick();
+
+  const g: HTMLElement = grip(m, 'age');
+  resizePointer(g, 'pointerdown', 300);
+  assert.equal(m.host.getAttribute('data-resizing'), 'true', 'the newly revealed grip starts a drag');
+  resizePointer(g, 'pointermove', 340);
+  assert.equal(headWidth(m, 'age'), '160px', 'and it actually resizes (+40)');
+  resizePointer(g, 'pointerup', 0);
+
+  // The original column must not have been left with a duplicate (or dead) handler by the re-attach.
+  const g0: HTMLElement = grip(m, 'name');
+  resizePointer(g0, 'pointerdown', 300);
+  resizePointer(g0, 'pointermove', 320);
+  assert.equal(headWidth(m, 'name'), '220px', 'the pre-existing grip still resizes exactly once (+20)');
+  resizePointer(g0, 'pointerup', 0);
+  m.dispose();
+});
+
 /* ── numeric ── */
 test('table: numeric column marks cells tabular + right-aligned', async () => {
   const m: Mounted = await mount({ columns: COLS, dataSource: ROWS });

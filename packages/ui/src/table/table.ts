@@ -18,8 +18,8 @@
  *   import Checkbox from '@weave-framework/ui/checkbox';   // optional — the build auto-resolves the composed <Checkbox>
  *   <Table columns={{ cols }} dataSource={{ rows }} selectable expandable />
  */
-import { signal, onMount, type Signal, type Computed } from '@weave-framework/runtime';
-import { selectionModel, isDataSource, draggable, activeDirection, type SelectionModel, type DataSource } from '../cdk/index.js';
+import { signal, effect, onMount, type Signal, type Computed } from '@weave-framework/runtime';
+import { selectionModel, isDataSource, draggable, activeDirection, type SelectionModel, type DataSource, type DraggableRef } from '../cdk/index.js';
 
 export type SortDirection = 'asc' | 'desc';
 
@@ -325,22 +325,43 @@ export function setup<T = Record<string, unknown>>(props: TableProps<T>): TableC
     }
   };
 
-  // Attach a pointer-drag to each header grip once the table is in the DOM.
+  // Attach a pointer-drag to each header grip — RE-ATTACHING whenever the column set changes.
+  //
+  // This used to be a one-shot `onMount` + `querySelectorAll`, but the header is a keyed `@for` over the
+  // reactive `dataCols()`: unhiding a column, appending one, or flipping `resizable` creates a new grip
+  // element that the single startup pass never saw. Keyboard resize kept working (it is an `on:keydown`
+  // template binding, re-applied per element) while pointer drag silently did not — a half-working control
+  // with no visible difference. And if `columns` arrived asynchronously, the mount pass matched nothing at
+  // all and NO column ever got drag.
+  //
+  // Reading `dataCols()` makes this effect re-run on any column change; previous refs are destroyed first
+  // so grips that survived the re-render do not accumulate duplicate listeners.
+  let gripRefs: DraggableRef[] = [];
   onMount(() => {
     const el: HTMLElement | null = host();
     if (!el) return;
-    el.querySelectorAll<HTMLElement>('.weave-table__resize-grip').forEach((grip) => {
-      const key: string = grip.getAttribute('data-col') ?? '';
-      const col: TableColumn<T> | undefined = resizeCol(key);
-      if (!col) return;
-      draggable(grip, {
-        axis: 'x',
-        onStart: () => {
-          dragStartWidth = effWidth(col) ?? (grip.closest('th') as HTMLElement | null)?.offsetWidth ?? DEFAULT_STICKY_W;
-          el.setAttribute('data-resizing', 'true');
-        },
-        onMove: ({ dx }) => setWidth(col, dragStartWidth + dx),
-        onEnd: () => el.removeAttribute('data-resizing'),
+    // The effect is created INSIDE onMount so its first run already has the rendered header to query; it
+    // then re-runs on every `dataCols()` change. Creating it at setup time instead would fire once against
+    // an empty (or absent) DOM and attach nothing.
+    effect(() => {
+      dataCols(); // dependency: re-attach whenever the column set changes
+      for (const ref of gripRefs) ref.destroy();
+      gripRefs = [];
+      el.querySelectorAll<HTMLElement>('.weave-table__resize-grip').forEach((grip) => {
+        const key: string = grip.getAttribute('data-col') ?? '';
+        const col: TableColumn<T> | undefined = resizeCol(key);
+        if (!col) return;
+        gripRefs.push(
+          draggable(grip, {
+            axis: 'x',
+            onStart: () => {
+              dragStartWidth = effWidth(col) ?? (grip.closest('th') as HTMLElement | null)?.offsetWidth ?? DEFAULT_STICKY_W;
+              el.setAttribute('data-resizing', 'true');
+            },
+            onMove: ({ dx }) => setWidth(col, dragStartWidth + dx),
+            onEnd: () => el.removeAttribute('data-resizing'),
+          })
+        );
       });
     });
   });
