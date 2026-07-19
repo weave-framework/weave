@@ -59,6 +59,22 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
+      # THE GATE. Publishing was conditioned only on the `[publish]` marker: a commit carrying it with a red
+      # test suite shipped to npm — with a provenance attestation — minutes before CI went red in a parallel
+      # workflow, and an npm version is permanent. Run the suite here, in this job, before anything is
+      # published. Duplicating a few minutes of CI is the cheapest insurance in the repo.
+      - name: Install Playwright (browser suite)
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Test
+        run: pnpm test
+
       - name: Read lockstep version
         id: v
         run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"

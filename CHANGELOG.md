@@ -16,6 +16,21 @@
 
 ## Unreleased
 
+### Fixed — release engineering
+- **Publishing is gated on a green suite.** The publish workflow was conditioned only on the `[publish]`
+  marker: a marked commit with failing tests shipped to npm — with a provenance attestation — while CI went
+  red minutes later in a parallel workflow, and an npm version is permanent. Typecheck, lint and the browser
+  suite now run inside the publish job, before anything is uploaded.
+- **A partial publish can be resumed.** The failure message promised that "already-published packages will
+  be skipped by npm"; they are not — publishing over an existing version fails with E403. So a run that died
+  on package 9 of 16 died again on package 1 when re-run, stranding a half-published lockstep release. Each
+  package is now checked against the registry first and skipped if present, so a re-run resumes where it
+  stopped, and the message says what actually happens.
+- **`editor/vscode` is a workspace member again.** It declares `@weave-framework/language-server:
+  workspace:*` but was not listed in `pnpm-workspace.yaml`, so a fresh clone could not link it and
+  installing from the extension directory rejects `workspace:*` outright. It packaged only because a stale
+  `node_modules` survived locally; the hash gate checks the shipped artifact, not that it still builds.
+
 ### Fixed — CLI / dev loop
 - **A failed rebuild no longer reloads the browser into a white page.** `weave dev` cleared its in-memory
   outputs, repopulated them from a failed build's empty output list, and notified every client anyway — so

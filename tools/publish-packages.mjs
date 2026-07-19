@@ -18,6 +18,7 @@
  * `compilerOptions.plugins` to get the synthesized default export (`.ts`-side TS1192 fix).
  */
 import { spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -34,13 +35,41 @@ const ORDER = ['runtime', 'compiler', 'prettier-plugin', 'store', 'i18n', 'data'
   if (r.status !== 0) process.exit(r.status ?? 1);
 }
 
+/**
+ * Is `name@version` already on the registry?
+ *
+ * This exists because the old failure message promised something npm does not do. It said "already-published
+ * packages will be skipped by npm" — they are not: publishing over an existing version fails with E403. So a
+ * run that died on package 9 of 16 could not simply be re-run; it died again on package 1, leaving a
+ * half-published lockstep release with no documented way forward, exactly when the operator is under
+ * pressure. Checking first makes a re-run resume where it stopped, which is what the message always claimed.
+ */
+function alreadyPublished(name, version) {
+  const r = spawnSync('npm', ['view', `${name}@${version}`, 'version'], {
+    cwd: repo,
+    encoding: 'utf8',
+    shell: process.platform === 'win32',
+  });
+  // A missing package/version exits non-zero (E404) — that is the "not published" answer, not a failure.
+  return r.status === 0 && String(r.stdout).trim() === version;
+}
+
 for (const p of ORDER) {
+  const pkg = JSON.parse(readFileSync(join(repo, 'packages', p, 'package.json'), 'utf8'));
+  if (!dryRun && alreadyPublished(pkg.name, pkg.version)) {
+    process.stdout.write(`\n• ${pkg.name}@${pkg.version} already on the registry — skipping\n`);
+    continue;
+  }
   const args = ['publish', '--access', 'public', '--no-git-checks'];
   if (dryRun) args.push('--dry-run');
   process.stdout.write(`\n▶ pnpm ${args.join(' ')}  (packages/${p})\n`);
   const r = spawnSync('pnpm', args, { cwd: join(repo, 'packages', p), stdio: 'inherit', shell: process.platform === 'win32' });
   if (r.status !== 0) {
-    process.stderr.write(`\n✖ publish failed for @weave-framework/${p === 'create-weave' ? '' : ''}${p} (exit ${r.status}). Fix and re-run; already-published packages will be skipped by npm.\n`);
+    process.stderr.write(
+      `\n✖ publish failed for ${pkg.name}@${pkg.version} (exit ${r.status}).\n` +
+        `  Fix the cause and re-run: packages already on the registry are detected and skipped, so the run\n` +
+        `  resumes at this one rather than failing on the first.\n`
+    );
     process.exit(r.status ?? 1);
   }
 }

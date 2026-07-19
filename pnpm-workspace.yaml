@@ -1,5 +1,11 @@
 packages:
   - 'packages/*'
+  # The VS Code extension declares `@weave-framework/language-server: workspace:*` but was NOT a
+  # workspace member, so `pnpm install` in a fresh clone could not link it and installing from the
+  # extension directory rejects `workspace:*` outright. It only ever packaged here because a stale
+  # node_modules survived on this machine; CI's hash gate checks the shipped artifact, not that it
+  # can still be built.
+  - 'editor/vscode'
 
 # esbuild ships a platform binary via a postinstall script. This environment's
 # pnpm requires explicit per-package build approval.
