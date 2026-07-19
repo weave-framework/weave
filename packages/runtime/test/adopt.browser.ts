@@ -1,6 +1,6 @@
 import { test, assert } from '../../../tools/harness.js';
 import { signal, root, type Signal } from '@weave-framework/runtime';
-import { bindTextResumable, adoptText, DYN_TEXT, blockStart, blockEndOf, clearBlock } from '@weave-framework/runtime/adopt';
+import { bindTextResumable, adoptText, resetAdoptWarnings, DYN_TEXT, blockStart, blockEndOf, clearBlock } from '@weave-framework/runtime/adopt';
 import { ifBlock } from '@weave-framework/runtime/dom';
 
 /** Node types (avoid the Node global under the test bundler). */
@@ -74,6 +74,36 @@ test('adoptText: missing server text (mismatch) falls back to creating one rathe
   assert.equal((t as Text).data, 'x', 'binds it');
   v.set('y');
   assert.equal((t as Text).data, 'y', 'updates it');
+});
+
+test('adoptText: a mismatch repair WARNS, once — it must not be silent', () => {
+  // Repairing is deliberate (above): a mismatch should not blank the page over one binding. But a
+  // mismatch means the adopt walk's indices disagreed with the DOM the server wrote, which is the
+  // failure mode this subsystem hides best — resume on the docs site was dead for an unknown period
+  // and nothing said a word. So the repair is resilient AND audible.
+  const warnings: string[] = [];
+  const orig: typeof console.warn = console.warn;
+  console.warn = (...args: unknown[]): void => {
+    warnings.push(args.map(String).join(' '));
+  };
+  const repair = (): void => {
+    const span: HTMLElement = document.createElement('span');
+    const anchor: Comment = document.createComment('');
+    span.append(anchor); // no server text node to adopt
+    root(() => adoptText(anchor, () => 'x'));
+  };
+  try {
+    resetAdoptWarnings(); // otherwise an earlier repair in this page has consumed the latch
+    repair();
+    assert.equal(warnings.length, 1, 'the first repair warns');
+    assert.ok(/server/i.test(warnings[0]), `and says what disagreed (got: ${warnings[0]})`);
+    repair();
+    repair();
+    assert.equal(warnings.length, 1, 'further repairs stay quiet — one diverged index repairs many bindings');
+  } finally {
+    console.warn = orig;
+    resetAdoptWarnings();
+  }
 });
 
 /* ──────────── E1.2c — block-boundary markers (cursor-walk foundation) ──────────── */

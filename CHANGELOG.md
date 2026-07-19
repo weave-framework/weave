@@ -25,6 +25,11 @@
   `capture` needs its own capture-phase listener and `passive` is a property of the listener REGISTRATION,
   which delegation shares — so a component using either now **refuses adoption and client-renders**, where
   the eager path applies them correctly. Silent divergence is gone either way.
+- **A server/client DOM mismatch is no longer silent.** When `adoptText` cannot find the server text node
+  it was compiled to adopt, it still recreates one — a mismatch should not blank a page over one binding —
+  but it now warns once per page. A mismatch means the adopt walk disagreed with the DOM the server wrote,
+  which is the failure this subsystem hides best: resume on the documentation site was dead for an unknown
+  period and nothing said a word. Resilient AND audible.
 
 ## 1.8.0 — 2026-07-19
 

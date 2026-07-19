@@ -40,6 +40,33 @@ function stringify(v: unknown): string {
 }
 
 /**
+ * Warn once per page for a structural server/client mismatch. Once, not per occurrence: one diverged
+ * index typically produces a repair for every following binding at that level, and a hundred identical
+ * lines would bury the signal instead of raising it.
+ */
+let warnedRepair: boolean = false;
+
+/**
+ * Clear the once-per-page latch. Exists so a test can prove the warning FIRES rather than asserting
+ * "at most one", which passes vacuously once any earlier test in the same page has consumed the latch —
+ * a gate that cannot fail is not a gate. @internal
+ */
+export function resetAdoptWarnings(): void {
+  warnedRepair = false;
+}
+
+function warnAdoptRepair(): void {
+  if (warnedRepair) return;
+  warnedRepair = true;
+  console.warn(
+    '[weave] resume: expected a server-rendered text node and found none — recreated it. The page works, ' +
+      'but the server and client disagree about this DOM, so some bindings may be attached to the wrong ' +
+      'nodes. This usually means the prerendered HTML was altered after the build, or a component rendered ' +
+      'differently on the server than on the client.'
+  );
+}
+
+/**
  * CREATE side (the resumable server render): insert a `[` boundary marker immediately before a block's `]`
  * end anchor, BEFORE the block helper (`ifBlock`/`eachBlock`) fills content in front of that anchor — so the
  * block's rendered nodes land between `[` and `]` and the client can bound the region. Returns the marker.
@@ -273,6 +300,12 @@ export function bindTextResumable(anchor: Comment, fn: () => unknown): void {
 export function adoptText(anchor: Comment, fn: () => unknown): void {
   let t: Node | null = anchor.previousSibling;
   if (!t || t.nodeType !== 3 /* Text */) {
+    // The server text node this binding was compiled to adopt is not there. Repairing keeps the page
+    // working — deliberate, and the reason this does not throw: a mismatch should not blank a user's
+    // page over one binding. But a mismatch also means the adopt walk's index arithmetic disagreed
+    // with the DOM the server actually wrote, which is the failure mode this whole subsystem is most
+    // prone to and the one that hides best. Silence made it undiagnosable, so it says so, once.
+    warnAdoptRepair();
     t = document.createTextNode('');
     anchor.parentNode!.insertBefore(t, anchor);
   }
