@@ -750,6 +750,89 @@ test('beforeEach: gates navigate(to,{replace}); afterEach fires only on a commit
   }
 });
 
+test('a malformed percent-escape in a param segment does not blank the app', () => {
+  // `decodeURIComponent` throws `URIError` on a lone `%`, and it ran unguarded inside the resolution
+  // COMPUTED — so `matched()` threw, the RouterView effect died, and a hand-typed or mis-built URL emptied
+  // the page instead of landing on `*`. Any user-controlled URL is an input; this is the smallest one.
+  const r: Router = createRouter([
+    route('/user/:id', { component: User }),
+    { path: '*', component: NotFound },
+  ]);
+  navigate('/user/%zz');
+  assert.is(r.matched()?.view, User, 'resolution survives an undecodable segment');
+  assert.equal(r.params().id, '%zz', 'an undecodable segment is passed through raw rather than throwing');
+  navigate('/user/caf%C3%A9');
+  assert.equal(r.params().id, 'café', 'a well-formed escape still decodes');
+});
+
+test('a guard redirect REPLACES the history entry (no back-button trap)', async () => {
+  // Redirecting with pushState leaves [/admin, /login]: Back returns to /admin, the guard fires again and
+  // pushes /login again — the user can never get out. Every mainstream router replaces on redirect. The
+  // harness's real history is inert, so assert which API the router CALLS.
+  const pushes: string[] = [];
+  const replaces: string[] = [];
+  const realPush: typeof history.pushState = history.pushState.bind(history);
+  const realReplace: typeof history.replaceState = history.replaceState.bind(history);
+  history.pushState = ((s: unknown, t: string, u?: string): void => {
+    pushes.push(String(u));
+    realPush(s, t, u);
+  }) as typeof history.pushState;
+  history.replaceState = ((s: unknown, t: string, u?: string): void => {
+    replaces.push(String(u));
+    realReplace(s, t, u);
+  }) as typeof history.replaceState;
+  try {
+    const r: Router = createRouter([
+      route('/admin', { component: About, guard: () => '/login' }),
+      route('/login', { component: Login }),
+      { path: '*', component: NotFound },
+    ]);
+    mountComponent(RouterView, host(), { router: r });
+    pushes.length = 0;
+    replaces.length = 0;
+    navigate('/admin');
+    await settle();
+    assert.ok(
+      replaces.some((u) => u.includes('/login')),
+      `the redirect replaced the entry; pushes=${JSON.stringify(pushes)} replaces=${JSON.stringify(replaces)}`
+    );
+    assert.ok(!pushes.some((u) => u.includes('/login')), 'the redirect did not push a second entry');
+  } finally {
+    history.pushState = realPush;
+    history.replaceState = realReplace;
+  }
+});
+
+test('a guard-vetoed multi-entry pop rolls back by the distance actually travelled', async () => {
+  // The rollback was hardcoded to `history.go(±1)` while the jump could be any size (a history dropdown, a
+  // long-press back). Vetoing a 3-entry jump left the URL on an intermediate entry with the old page still
+  // rendered — URL and view desynced, and the resulting popstate was swallowed as "ours".
+  const gos: number[] = [];
+  const realGo: typeof history.go = history.go.bind(history);
+  history.go = ((delta?: number): void => void gos.push(delta ?? 0)) as typeof history.go;
+  try {
+    createRouter([{ path: '*', component: NotFound }]);
+    navigate('/multi-pop');
+    await settle();
+    const offNo: () => void = beforeEach(async () => false);
+    try {
+      // The router recorded the current entry as __wpos N; jump back three entries and veto it.
+      window.dispatchEvent(new PopStateEvent('popstate', { state: { __wpos: -3 } }));
+      await settle();
+      assert.ok(gos.length > 0, 'a vetoed pop rolled history back');
+      assert.notEqual(gos[0], 1, 'the rollback is not the hardcoded single step');
+    } finally {
+      offNo();
+    }
+  } finally {
+    history.go = realGo;
+    // The stubbed `go` never produced the reversal's own popstate, so the router's `reverting` latch is
+    // still armed and would swallow the NEXT test's first pop. Drain it with one guard-free pop.
+    window.dispatchEvent(new PopStateEvent('popstate', { state: { __wpos: 0 } }));
+    await settle();
+  }
+});
+
 // The Playwright harness serves a non-navigable page (`page.setContent`), so real
 // `history.pushState`/`back()` are inert and `location` is frozen — the router runs off
 // its signals here (the same reason the scroll test above drives pops via a synthetic

@@ -311,6 +311,19 @@ const scrollPositions: Map<number, number> = new Map<number, number>();
 let posSeq: number = 0;
 let curPos: number = 0;
 
+// Seed the position from the entry we actually loaded on. `pushState` state SURVIVES a reload, so after a
+// refresh in the middle of a history stack the restored entry still carries its `__wpos` while `curPos`
+// would reset to 0 — and every direction test after that is wrong: a Back to position 4 reads as `4 <= 0`
+// false, i.e. a Forward, so a vetoed pop rolled further back instead of returning. `posSeq` moves with it
+// so a subsequent push cannot mint a position that collides with an entry already in the stack.
+if (typeof history !== 'undefined') {
+  const boot: { __wpos?: number } | null = history.state as { __wpos?: number } | null;
+  if (boot && typeof boot.__wpos === 'number') {
+    curPos = boot.__wpos;
+    posSeq = boot.__wpos;
+  }
+}
+
 // Own scroll restoration so the browser's native one doesn't fight ours.
 if (typeof history !== 'undefined' && 'scrollRestoration' in history) {
   try {
@@ -370,17 +383,22 @@ if (typeof window !== 'undefined') {
       commit();
       return;
     }
-    // The browser has already moved the URL; remember the direction so a veto can undo it.
-    const wentBack: boolean = targetPos <= curPos;
+    // The browser has already moved the URL; remember HOW FAR so a veto can undo exactly that much. The
+    // rollback used to be a hardcoded ±1 while the jump can be any size (a history dropdown, a long-press
+    // back), so vetoing a three-entry jump landed on an intermediate entry with the old page still
+    // rendered — URL and view desynced, and the resulting popstate was swallowed as one of ours.
+    const delta: number = curPos - targetPos;
     void canLeave({ to, from, type: 'pop' }).then((ok) => {
       if (ok) {
         commit();
         return;
       }
-      // Cancelled: roll history the opposite way so the URL + entry match staying put.
+      // Cancelled: roll history back the way we came so the URL + entry match staying put. A zero delta
+      // (an entry with no recorded position) would be a no-op that leaves `reverting` armed to swallow
+      // someone else's pop, so fall back to a single step in the direction we appear to have travelled.
       reverting = true;
       try {
-        history.go(wentBack ? 1 : -1);
+        history.go(delta !== 0 ? delta : 1);
       } catch {
         reverting = false;
       }
@@ -500,6 +518,15 @@ function compileRoutes(routes: Route[]): Compiled[] {
     }));
 }
 
+/** Decode one path segment, passing it through unchanged when it is not valid percent-encoding. */
+function decodeParam(seg: string): string {
+  try {
+    return decodeURIComponent(seg);
+  } catch {
+    return seg;
+  }
+}
+
 /** Match a pattern's segments against a leading run of the path; return params + remainder. */
 function matchPrefix(
   segs: PatternSeg[],
@@ -509,7 +536,12 @@ function matchPrefix(
   const params: RouteParams = {};
   for (let i: number = 0; i < segs.length; i++) {
     const s: PatternSeg = segs[i];
-    if ('param' in s) params[s.param] = decodeURIComponent(pathSegs[i]);
+    // A lone or malformed `%` makes `decodeURIComponent` throw `URIError`, and this runs inside the
+    // resolution COMPUTED — so the throw escaped through `matched()`/`params()`, killed the RouterView
+    // effect and blanked the page instead of falling back to `*`. Any user-controlled URL reaches here,
+    // including one a mis-built link produced. An undecodable segment is passed through raw: the route
+    // still matches and the app still renders, which beats losing the whole page over one character.
+    if ('param' in s) params[s.param] = decodeParam(pathSegs[i]);
     else if (s.literal !== pathSegs[i]) return null;
   }
   return { params, rest: pathSegs.slice(segs.length) };
@@ -842,7 +874,10 @@ export const RouterView: Component = (props = {}) => {
   if (router && depth === 0) {
     effect(() => {
       const to: string | null = router.redirectTo();
-      if (to !== null && to !== router.path()) router.navigate(to);
+      // REPLACE, not push. Pushing left [/admin, /login] in history: Back returned to /admin, the guard
+      // re-fired and pushed /login again, so the user could never get back out. A redirect means "you were
+      // never here", which is what replacing the entry expresses.
+      if (to !== null && to !== router.path()) router.navigate(to, { replace: true });
     });
   }
 

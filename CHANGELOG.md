@@ -16,6 +16,22 @@
 
 ## Unreleased
 
+### Fixed — router
+- **A malformed percent-escape in the URL no longer blanks the app.** `decodeURIComponent` throws
+  `URIError` on a lone `%`, and it ran unguarded inside the route-resolution computed — so the throw
+  escaped through `matched()`/`params()`, killed the RouterView effect and emptied the page instead of
+  falling back to `*`. An undecodable segment is now passed through raw. Any user-controlled URL is an
+  input, including one a mis-built link produced.
+- **A guard redirect replaces its history entry instead of pushing one.** Visiting a guarded `/admin` that
+  redirects to `/login` left both entries in history: Back returned to `/admin`, the guard fired again and
+  pushed `/login` a second time, so the user could never navigate back out.
+- **A guard-vetoed pop rolls back by the distance actually travelled.** The rollback was hardcoded to one
+  entry while a pop can jump any distance (a history dropdown, a long-press back), so vetoing a three-entry
+  jump left the URL on an intermediate entry with the previous page still rendered. Relatedly, the current
+  history position is now seeded from `history.state` at startup: `pushState` state survives a reload, so
+  after a refresh mid-history the position reset to 0 and every direction test was wrong — a Back read as a
+  Forward, and a vetoed pop rolled further back instead of returning.
+
 ### Fixed — compiler
 - **`@for ... track` is keyed by the row, not by a same-named component binding.** The key function is
   `(item, $index) => <track>`, so `track` must resolve against the row parameter — but it was rewritten
