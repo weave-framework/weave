@@ -1,6 +1,11 @@
 import { test, assert } from '../../../../tools/harness.js';
+import { onMount, onDispose, effect, signal, type Signal } from '@weave-framework/runtime';
+import { type Component } from '@weave-framework/runtime/dom';
 import { overlayContainer } from '@weave-framework/ui/cdk';
-import { openDialog, type DialogOptions, type DialogRef } from '@weave-framework/ui/dialog';
+import { openDialog, component, type DialogOptions, type DialogRef } from '@weave-framework/ui/dialog';
+
+/** Flush microtasks — onMount is deferred via queueMicrotask. */
+const tick = (): Promise<void> => new Promise<void>((r) => queueMicrotask(r));
 
 const panel = (): HTMLElement | null => overlayContainer().querySelector('.weave-dialog');
 const backdrop = (): HTMLElement | null => overlayContainer().querySelector('.weave-overlay-backdrop');
@@ -191,5 +196,83 @@ test('dialog: close is idempotent (no double onClose / afterClosed)', async () =
   ref.close('b'); // no-op
   assert.equal(closes, 1, 'onClose fired once');
   assert.equal(await ref.afterClosed(), 'a', 'first result kept');
+  opener.remove();
+});
+
+/* ─────────────────── a component as content (FW-18) ─────────────────── */
+
+/**
+ * A probe component that records its lifecycle and stays reactive off a prop. `onMount`/`onDispose`
+ * only run under an owner, and `effect` only re-runs while its owner is live — so this shows both
+ * that `openDialog` mounted it with an owner and that it tore that owner down on close.
+ */
+function probe(log: string[]): Component {
+  return (props?: Record<string, unknown>): Node => {
+    const el: HTMLDivElement = document.createElement('div');
+    const label: () => string = (props?.label as () => string) ?? ((): string => '');
+    onMount((): void => { log.push('mount'); });
+    onDispose((): void => { log.push('dispose'); });
+    effect((): void => { el.textContent = label(); }); // tracks the signal → region stays live
+    return el;
+  };
+}
+
+test('dialog: a [Component, props] content region mounts with an owner and stays reactive (FW-18)', async () => {
+  const log: string[] = [];
+  const text: Signal<string> = signal<string>('first');
+  const { ref, opener } = openWith({ content: [probe(log), { label: text }] });
+  await tick(); // onMount is deferred
+  assert.deepEqual(log, ['mount'], 'the component mounted under an owner — onMount ran');
+  assert.equal(region('content')?.textContent, 'first', 'the effect rendered the prop');
+  text.set('second');
+  assert.equal(region('content')?.textContent, 'second', 'the region is live — a signal change re-renders it');
+  ref.close();
+  assert.deepEqual(log, ['mount', 'dispose'], 'closing disposed the component');
+  opener.remove();
+});
+
+test('dialog: closing disposes the component so its effects stop (FW-18)', () => {
+  const log: string[] = [];
+  const text: Signal<string> = signal<string>('a');
+  const { ref, opener } = openWith({ content: [probe(log), { label: text }] });
+  assert.equal(region('content')?.textContent, 'a');
+  ref.close();
+  assert.ok(log.includes('dispose'), 'onDispose ran on close');
+  const node: HTMLElement = region('content') as HTMLElement; // detached, but grab the last ref
+  text.set('b'); // must NOT re-run the disposed effect
+  assert.notEqual(node?.textContent, 'b', 'a disposed effect no longer tracks the signal');
+  opener.remove();
+});
+
+test('dialog: the component() helper is the tuple, and works in header and actions too (FW-18)', async () => {
+  const h: string[] = [];
+  const c: string[] = [];
+  const a: string[] = [];
+  const { ref, opener } = openWith({
+    header: component(probe(h)),
+    content: component(probe(c), { label: (): string => 'body' }),
+    actions: component(probe(a)),
+  });
+  await tick();
+  assert.deepEqual([h, c, a], [['mount'], ['mount'], ['mount']], 'every region mounted its component');
+  assert.equal(region('content')?.textContent, 'body');
+  ref.close();
+  assert.deepEqual([h, c, a], [['mount', 'dispose'], ['mount', 'dispose'], ['mount', 'dispose']], 'all disposed on close');
+  opener.remove();
+});
+
+test('dialog: a () => Node factory is unchanged — called bare, not treated as a component (FW-18)', () => {
+  let calls: number = 0;
+  const { ref, opener } = openWith({
+    content: (): Node => {
+      calls++;
+      const el: HTMLSpanElement = document.createElement('span');
+      el.textContent = 'made';
+      return el;
+    },
+  });
+  assert.equal(calls, 1, 'the factory was called once');
+  assert.equal(region('content')?.textContent, 'made', 'and its node inserted, exactly as before');
+  ref.close();
   opener.remove();
 });

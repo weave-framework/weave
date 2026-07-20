@@ -9,7 +9,7 @@ you can close (with a result) and await.
 ## Import
 
 ```ts
-import { openDialog } from '@weave-framework/ui/dialog';
+import { openDialog, component } from '@weave-framework/ui/dialog';
 ```
 
 ```scss
@@ -45,12 +45,41 @@ export function setup() {
 ~~~
 :::
 
-`content`, `header`, and `actions` are each a `DialogContent` — **a string, a DOM node, or a factory** returning a
-node (`Node | string | () => Node`) — so you can pass plain text or build a rich body. The demo above wires two
-footer buttons that call `ref.close('deleted')` / `ref.close()`.
+`content`, `header`, and `actions` are each a `DialogContent` — **a string, a DOM node, a factory** returning a
+node, **or a `[Component, props?]` tuple** (`Node | string | () => Node | [Component, Props]`) — so you can pass
+plain text, build a rich body, or hand over a whole component. The demo above wires two footer buttons that call
+`ref.close('deleted')` / `ref.close()`.
 
 The header and actions regions only exist when you supply them: omit `header` *and* `title` and there's no header
 region; omit `actions` and there's no footer. `content` is mandatory and is the only region that scrolls.
+
+### A component as content
+
+Most editors are a form inside a dialog. Hand `openDialog` the component directly — as a `[Component, props]` tuple,
+or the `component()` helper for a readable call site — and it is **mounted under its own owner and disposed when the
+dialog closes**. Its `onMount`, `effect`s and `onDispose` all run; a prop that is a signal keeps the region live:
+
+~~~ts title="edit-season.ts"
+import { openDialog, component } from '@weave-framework/ui/dialog';
+import SeasonEditor from './season-editor.js'; // a normal weave component
+
+export function setup() {
+  const editSeason = async (season) => {
+    const ref = openDialog({
+      title: 'Edit season',
+      content: component(SeasonEditor, { season }), // or the tuple: [SeasonEditor, { season }]
+      // actions: component(EditorActions, { onSave }),
+    });
+    const saved = await ref.afterClosed();
+    if (saved) { /* … */ }
+  };
+  return { editSeason };
+}
+~~~
+
+There is **no adapter to write** — `openDialog` already owns the open/close lifecycle, and the component's
+mount/dispose lifecycle rides the same path. A bare `() => Node` factory is unchanged: it is still called once,
+without an owner, so nothing existing behaves differently.
 
 ## Options
 

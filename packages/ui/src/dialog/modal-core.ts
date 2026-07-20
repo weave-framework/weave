@@ -7,6 +7,7 @@
  * are supplied by the caller. Internal — `dialog.ts` / `bottom-sheet.ts` are the surfaces.
  * Zero-dep.
  */
+import { mountComponent, type Component } from '@weave-framework/runtime/dom';
 import {
   createOverlay,
   blockScroll,
@@ -16,8 +17,34 @@ import {
   type PositionStrategy,
 } from '../cdk/index.js';
 
-/** Modal region content — a DOM node, a plain string, or a factory returning a node. */
-export type ModalContent = Node | string | (() => Node);
+/**
+ * A weave component to mount into a region, as `[Component, props?]`. Distinct from a bare
+ * `() => Node` factory: the tuple is mounted **under its own owner** (so its `onMount`, `effect`s
+ * and `onDispose` run) and torn down when the modal closes. A factory is still called bare and left
+ * to the caller — a component needs a lifecycle a factory does not.
+ */
+export type ComponentContent = readonly [Component, Record<string, unknown>?];
+
+/**
+ * Modal region content:
+ *  - a **DOM node** or **string** — inserted as-is;
+ *  - a **`() => Node` factory** — called once, bare (no owner);
+ *  - a **`[Component, props?]` tuple** — mounted with an owner and disposed on close.
+ */
+export type ModalContent = Node | string | (() => Node) | ComponentContent;
+
+/**
+ * Sugar for the tuple, so a call site reads `content: component(SeasonEditor, { season })` instead
+ * of a bare array. Purely a typed pass-through — the tuple form works without it.
+ */
+export function component(comp: Component, props?: Record<string, unknown>): ComponentContent {
+  return [comp, props];
+}
+
+/** A `[Component, props?]` tuple, told apart from a Node/string/factory by being an array. */
+function isComponentContent(content: ModalContent): content is ComponentContent {
+  return Array.isArray(content);
+}
 
 export interface ModalConfig {
   /** BEM block, e.g. `'weave-dialog'` — parts become `<block>__header/content/actions`. */
@@ -48,10 +75,21 @@ export interface ModalRef {
 
 let _seq: number = 0;
 
-function toNode(content: ModalContent): Node {
-  if (typeof content === 'function') return content();
-  if (typeof content === 'string') return document.createTextNode(content);
-  return content;
+/**
+ * Fill `host` with `content`, registering any teardown on `disposers`. A component tuple is mounted
+ * into the host under its own owner (via {@link mountComponent}) and its unmount pushed to
+ * `disposers`; everything else is appended as a plain node, exactly as before.
+ */
+function fillRegion(host: HTMLElement, content: ModalContent, disposers: Array<() => void>): void {
+  if (isComponentContent(content)) {
+    disposers.push(mountComponent(content[0], host, content[1]));
+    return;
+  }
+  if (typeof content === 'function') {
+    host.append(content());
+    return;
+  }
+  host.append(typeof content === 'string' ? document.createTextNode(content) : content);
 }
 
 /** Open a modal panel. Returns a {@link ModalRef}. */
@@ -59,6 +97,9 @@ export function openModal(config: ModalConfig): ModalRef {
   const id: number = ++_seq;
   const block: string = config.block;
   const dismissable: boolean = config.dismissable !== false;
+
+  // Teardown for any component region mounted below — run on close, before the overlay is gone.
+  const disposers: Array<() => void> = [];
 
   const panel: HTMLElement = document.createElement('div');
   panel.className = block;
@@ -71,7 +112,7 @@ export function openModal(config: ModalConfig): ModalRef {
     const header: HTMLElement = document.createElement('div');
     header.className = `${block}__header`;
     header.id = `${block}-title-${id}`;
-    header.append(toNode(headerContent));
+    fillRegion(header, headerContent, disposers);
     panel.appendChild(header);
     panel.setAttribute('aria-labelledby', header.id);
   }
@@ -80,7 +121,7 @@ export function openModal(config: ModalConfig): ModalRef {
   const content: HTMLElement = document.createElement('div');
   content.className = `${block}__content`;
   content.id = `${block}-content-${id}`;
-  content.append(toNode(config.content));
+  fillRegion(content, config.content, disposers);
   panel.appendChild(content);
   panel.setAttribute('aria-describedby', content.id);
 
@@ -88,7 +129,7 @@ export function openModal(config: ModalConfig): ModalRef {
   if (config.actions != null) {
     const actions: HTMLElement = document.createElement('div');
     actions.className = `${block}__actions`;
-    actions.append(toNode(config.actions));
+    fillRegion(actions, config.actions, disposers);
     panel.appendChild(actions);
   }
 
@@ -114,6 +155,9 @@ export function openModal(config: ModalConfig): ModalRef {
     if (closed) return;
     closed = true;
     result = r;
+    // Dispose mounted component regions first — stop their effects and remove their nodes while the
+    // panel is still attached — then tear down the overlay.
+    for (const dispose of disposers) dispose();
     trap.deactivate(); // restores focus to the opener
     ref.dispose();
     config.onClose?.(r);

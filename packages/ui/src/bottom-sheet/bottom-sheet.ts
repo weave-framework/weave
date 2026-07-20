@@ -20,6 +20,11 @@ import { openModal, type ModalContent, type ModalRef } from '../dialog/modal-cor
 
 export type BottomSheetContent = ModalContent;
 
+// A live weave component can fill any region — `content: component(Comp, props)` or the bare
+// `[Comp, props]` tuple — mounted with an owner and disposed when the sheet closes.
+export { component } from '../dialog/modal-core.js';
+export type { ComponentContent } from '../dialog/modal-core.js';
+
 export interface BottomSheetOptions {
   /** The body — required, always shown, scrolls vertically when tall. */
   content: BottomSheetContent;

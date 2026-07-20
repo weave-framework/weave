@@ -24,8 +24,17 @@
 import { globalPosition } from '../cdk/index.js';
 import { openModal, toLength, type ModalContent, type ModalRef } from './modal-core.js';
 
-/** Dialog region content — a DOM node, a plain string, or a factory returning a node. */
+/**
+ * Dialog region content — a DOM node, a plain string, a `() => Node` factory, or a
+ * `[Component, props?]` tuple that is mounted with an owner and disposed on close (use the
+ * {@link component} helper for a readable call site).
+ */
 export type DialogContent = ModalContent;
+
+// A live weave component can fill any region: `content: component(SeasonEditor, { season })`, or the
+// bare tuple `[SeasonEditor, { season }]`. openDialog mounts it under an owner and disposes it on close.
+export { component } from './modal-core.js';
+export type { ComponentContent } from './modal-core.js';
 
 export interface DialogOptions {
   /** The body — **required**, always shown, scrolls vertically when tall. */

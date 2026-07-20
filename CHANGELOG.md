@@ -16,6 +16,21 @@
 
 ## Unreleased
 
+### Added — UI
+- **`openDialog` / `openBottomSheet` can host a live component** ([FW-18](rfcs/0010-input-mask.md)).
+  A region (`content` / `header` / `actions`) now accepts a `[Component, props?]` tuple — or the
+  `component(Comp, props)` helper — and mounts it **under its own owner**, so the component's
+  `onMount`, `effect`s and `onDispose` run, and disposes that owner when the dialog closes. A
+  form-in-a-dialog (the shape every editor is) is now a plain component opened straight through
+  `openDialog`, with no per-app mount/dispose adapter.
+  - Before, `content` was `Node | string | (() => Node)`. A component factory *type-checked* as
+    `() => Node`, so it compiled — but `toNode` called it bare, outside any owner and never disposed:
+    reactivity inside the dialog was dead and its graph leaked on close. That case now has a real
+    lifecycle; the tuple is told apart from a factory by being an array.
+  - **Backward compatible.** A `Node`, a `string` and a bare `() => Node` factory behave exactly as
+    before (the factory is still called once, without an owner). Only the new tuple form is
+    owner-aware. The overlay, positioning, focus-trap, Esc and scroll-lock are untouched.
+
 ### Fixed — UI
 - **`use:mask` now works on `<Input>`, not just a bare `<input>`** ([FW-17](rfcs/0010-input-mask.md)).
   `use:` on a component forwards to its root element; `<Input>`'s root is the `<div class="weave-input">`
