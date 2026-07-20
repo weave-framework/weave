@@ -6,17 +6,15 @@
 
 ## Summary
 
-A headless CDK primitive that formats a text input **as the user types** — a caller-written
-template (`(999) 999-9999`) for positional formats, and a locale-aware numeric mode for
-currency, numbers and percentages. Applied to the existing `<Input>` as a directive; no new
-component.
+A headless CDK primitive that formats a text input **as the user types**, against a
+caller-written template: `(999) 999-9999`. One mechanism, no locale involvement. Applied to the
+existing `<Input>` as a directive; no new component, and `<Input>` itself is untouched.
 
 ## Motivation
 
-`@weave-framework/i18n` already formats numbers, currency, percentages and dates through `Intl`.
-That solves **display**. It does not solve **entry**: there is currently no supported way to
-format a value while it is being typed, keep the caret where the user expects it, and hand a
-clean value back to `@weave-framework/forms`.
+There is no supported way to format a value while it is being typed, keep the caret where the user
+expects it, and hand a clean value back to a form. Every screen that needs one grows its own
+`oninput` handler.
 
 Pulled by a real application (a dance-school admin app, the current dogfooding consumer): phone
 numbers, IBANs and prices are entered by hand in several forms, and each screen would otherwise
@@ -28,32 +26,56 @@ not speculative.
 - **Compose, don't duplicate.** A `<CurrencyInput>` / `<PhoneInput>` family would be `<Input>`
   copies differing in one behaviour. UI rule #1 rejects that. Masking is behaviour, so it belongs
   in the CDK layer beside `focus-trap`, `key-manager` and `drag-drop`.
-- **Zero third-party dependencies.** The numeric mode delegates to i18n's existing `Intl` wrappers
-  rather than reimplementing grouping and decimal rules. Nothing is vendored.
+- **Zero third-party dependencies**, and no new first-party ones either: `@weave-framework/ui`
+  depends only on `@weave-framework/runtime`, and this primitive keeps it that way (see "Wiring").
 - **One reactive model.** The mask holds no state of its own beyond caret bookkeeping; the value
-  lives in the caller's signal, reached through `use:control` as it already is.
+  lives in the caller's signal.
 - **Not `extend`/`patch` (RFC 0008).** Extension composes *markup*. This proposal changes no markup
   at all — only behaviour — so extension would be the wrong instrument.
 
 ## Design
 
-### Two modes, because one mechanism does not cover both
+### One mode: a positional template, and nothing else
 
-A positional template describes a **fixed-length** value whose separators sit at known offsets.
-A number does not: it groups from the right, grows while typing, and its separators are
-locale-dependent (`1,234.56` vs `1 234,56`). There is no template spelling of that, so the
-numeric mode is separate and delegates to `Intl`.
+A mask is a **string of characters matching a template**. That is the whole model.
 
 ```html
-<!-- positional: caller writes the template -->
-<Input use:mask={{ '(999) 999-9999' }} use:control={{ phone }} />
-<Input use:mask={{ 'LT99 9999 9999 9999 9999' }} use:control={{ iban }} />
-
-<!-- numeric: locale-driven, not template-driven -->
-<Input use:mask={{ currency('EUR') }} use:control={{ price }} />
-<Input use:mask={{ number({ maximumFractionDigits: 2 }) }} use:control={{ qty }} />
-<Input use:mask={{ percent() }} use:control={{ vat }} />
+<Input use:mask={{ mask(phone, '(999) 999-9999') }} />
+<Input use:mask={{ mask(iban, 'LT99 9999 9999 9999 9999') }} />
+<Input use:mask={{ mask(price, '999999,99') }}><span slot="suffix">€</span></Input>
 ```
+
+**There is no numeric/currency mode, and no `Intl` involvement.** An earlier draft of this RFC
+proposed one, on the reasoning that grouping (`1 234 567,89`) cannot be spelled as a positional
+template. That reasoning is correct and the conclusion was still wrong: a currency **symbol** is
+not a formatting problem — `<Input>` already has `prefix`/`suffix` slots, so `€` is markup, not
+mask behaviour. Dropping the numeric mode removes a second mechanism, a `@weave-framework/i18n`
+dependency, and a locale-reactivity question, from a package that otherwise depends only on
+`@weave-framework/runtime`.
+
+**What that costs, stated plainly:** no live thousands grouping while typing. A price is entered
+as `1234,56` with `€` in the suffix, not as `1 234,56 €`. Restoring grouping later is additive —
+nothing in the template design forecloses it.
+
+### Wiring: the mask owns the value channel
+
+`mask` takes a plain `Signal`, not a `Field`, and is **not** combined with `use:control` on the
+same element:
+
+```ts
+mask(value: Signal<string>, template: string, options?: MaskOptions): (el: Element) => void
+```
+
+`use:control` binds through `bindValue` (`packages/runtime/src/dom.ts`), which writes
+`input.value = String(model)` in an effect and reads `input.value` back on every `input` event. A
+mask rewriting `el.value` into its display form would therefore push the **display** value into the
+model — precisely what the value contract below forbids. Only one of the two can own the channel,
+and for a masked field it is the mask.
+
+Consequences: taking a `Signal` (from `runtime`) rather than a `Field` keeps `@weave-framework/ui`
+free of a `@weave-framework/forms` dependency, and `matchesMask` is an ordinary
+`(v) => string | null` validator the caller passes to `field()` — so the dependency runs from the
+application inward, never from `ui` to `forms`.
 
 ### Template alphabet
 
@@ -102,9 +124,9 @@ select-all. The model value strips them, so what is submitted is unaffected.
 
 The mask exposes two values and they are **not** the same:
 
-- **display value** — what sits in the DOM input, formatted.
-- **model value** — what `use:control` reads and writes: the unformatted characters for a
-  template mask (`37060012345`), a `number` for the numeric mode.
+- **display value** — what sits in the DOM input, formatted (`(370) 600-1234`).
+- **model value** — what the caller's signal holds: the characters the user actually supplied,
+  with every literal and placeholder stripped (`3706001234`).
 
 The model value is what validators see and what is submitted. A mask that leaked its display value
 into the model would make every server-side format assumption a caller's problem.
@@ -132,8 +154,7 @@ formatting. The specified rules:
 ### Placement — opt-in, and `<Input>` is untouched
 
 `packages/ui/src/cdk/mask.ts` + `mask.browser.ts`, published under **its own subpath export**,
-`@weave-framework/ui/mask`, alongside the per-component subpaths the package already has.
-`currency`, `number` and `percent` live there and call into `@weave-framework/i18n`; `phone`,
+`@weave-framework/ui/mask`, alongside the per-component subpaths the package already has. `phone`,
 `card` and `iban` — if provided at all — are exported **template constants**, not code.
 
 `<Input>` does not change by a single character and has no knowledge of masking. The package is
@@ -160,6 +181,12 @@ having its own version number.
   argument. Worth recording *why* it came up: from the outside, "a directive in the UI package"
   reads as though `<Input>` gains the capability by default. It does not, and the subpath plus
   `sideEffects: false` is what makes that true rather than merely intended.
+- **A locale-aware numeric mode** (`currency('EUR')`, `number()`, `percent()`), formatting through
+  `Intl`. Carried in an earlier draft and cut. It answered a question nobody had: a currency symbol
+  is a `suffix` slot on an `<Input>` that already exists, not a mask concern. Keeping it would have
+  meant two mechanisms in one primitive and a `@weave-framework/i18n` edge in a package with one
+  dependency. What it would genuinely have bought — live thousands grouping — is recorded as a
+  drawback rather than pretended away.
 - **A real phone-number library.** `libphonenumber` is ~150 KB *and* a third-party runtime
   dependency, which rule #1 forbids outright. Consequence, stated plainly rather than hidden: a
   template mask enforces *shape*, not validity. `(999) 999-9999` cannot know that a Lithuanian
@@ -173,9 +200,9 @@ having its own version number.
   separator, IME, and mobile virtual keyboards (which report input events inconsistently) are all
   known-hard. The test suite has to cover them explicitly or the primitive ships broken in the ways
   users actually notice.
-- **Numeric masks and locale switching.** Changing locale while a numeric input holds a value must
-  re-format the display without disturbing the model value; if the user is mid-edit, it must not
-  reformat under the caret.
+- **No live number grouping.** A positional template groups from the left and a number groups from
+  the right, so `1 234 567` is not expressible. Accepted deliberately (see "One mode"); the escape
+  hatch is that adding it later is additive.
 - **Size.** Additive to `@weave-framework/ui`, which is outside the 22 KB SPA-core budget — but
   `verify:size` still has to be re-run and the delta stated, not assumed harmless.
 - **Accessibility.** A formatted value read by a screen reader can be worse than a raw one (digits

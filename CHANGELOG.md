@@ -14,6 +14,27 @@
 > already left it behind — Phase E ran 94 commits without a bump, and then released as one MINOR. The public
 > promise wins; the habit is retired.)*
 
+## Unreleased
+
+### Added — UI
+- **Input masking — `@weave-framework/ui/mask`** ([RFC 0010](rfcs/0010-input-mask.md)). A headless CDK
+  primitive that formats a text input as the user types, against a template the caller writes:
+  `use:mask={{ { value: phone, template: '(999) 999-9999' } }}`. Tokens are `9` (digit), `a` (letter),
+  `*` (either) and `\` (escape); the alphabet is extensible via `tokens`, and redefining a builtin throws
+  rather than silently changing what a template means. Ships `compileMask` (the pure, DOM-free core) and
+  `matchesMask`, an ordinary `(value) => string | null` validator for `@weave-framework/forms`.
+  - The caller's signal holds the **model** value — typed characters only, never the formatted display —
+    so what is submitted never depends on the mask.
+  - Caret behaviour is the substance, not a detail: typing steps over literals, backspace across a
+    separator removes a data character rather than appearing to do nothing, a paste is re-masked, a
+    rejected character leaves the caret where it was, and an IME composition is left alone until it commits.
+  - The mask **owns the element's value channel**, so it is not combined with `use:control` on the same
+    element; bind the field's own signal instead.
+  - **No currency/number mode and no `Intl` involvement.** A currency symbol is a `prefix`/`suffix` slot on
+    `<Input>`, not mask behaviour. The cost, stated rather than hidden: no live thousands grouping — a price
+    is entered as `1234,56`. Adding grouping later is additive.
+  - `<Input>` is unchanged, and `@weave-framework/ui` still depends only on `@weave-framework/runtime`.
+
 ## 2.0.1 — 2026-07-19
 
 ### Fixed — scaffold

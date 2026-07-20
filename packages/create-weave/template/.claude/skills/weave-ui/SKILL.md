@@ -70,7 +70,21 @@ If a built-in falls short, follow these (they keep the library coherent):
 
 ### CDK primitives (`@weave-framework/ui/cdk`) — the headless behavior layer
 
-Build interactive components on these instead of reinventing them: **Overlay** + connected **positioning**, **Portal**, **focus-trap** / **focus-monitor**, **live-announcer**, **key-managers** (list/tree, RTL-aware), **Observers**, **BreakpointObserver**, **virtual scroll**, **drag & drop**, **SelectionModel**, clipboard, date-adapter. They are unstyled and reusable — the same overlay powers dialog/menu/tooltip.
+Build interactive components on these instead of reinventing them: **Overlay** + connected **positioning**, **Portal**, **focus-trap** / **focus-monitor**, **live-announcer**, **key-managers** (list/tree, RTL-aware), **Observers**, **BreakpointObserver**, **virtual scroll**, **drag & drop**, **SelectionModel**, **mask**, clipboard, date-adapter. They are unstyled and reusable — the same overlay powers dialog/menu/tooltip.
+
+**Input masking** (`@weave-framework/ui/mask`, RFC 0010) — format a text input as the user types, against a template you write:
+
+```html
+<Input use:mask={{ { value: phone, template: '(999) 999-9999' } }} />
+<Input use:mask={{ { value: price, template: '999999,99' } }}><span slot="suffix">€</span></Input>
+```
+
+Template tokens: `9` digit · `a` letter · `*` either · `\` escapes the next character into a literal · anything else is a literal. Extend the alphabet with `tokens: { H: (ch) => /[0-9a-f]/i.test(ch) }`; redefining a builtin throws.
+
+- `value` is a **`Signal<string>`, not a `Field`**, and holds the **model** value — typed characters only (`3706001234`), never the display (`(370) 600-1234`).
+- **Do not put `use:control` on the same element.** The mask owns the value channel; `bindValue` would push the display value into the model. Bind the field's own `.value` signal here instead.
+- Completeness is a validator, not an entry rule: `field('', [matchesMask('(999) 999-9999')])`.
+- There is **no currency/number mode** — a currency symbol is a `prefix`/`suffix` slot on `<Input>`. Consequence: no live thousands grouping, so a price is entered `1234,56`.
 
 ### Component composition mechanics
 
