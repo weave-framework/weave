@@ -7,6 +7,14 @@ packages:
   # can still be built.
   - 'editor/vscode'
 
+# Transitive-dependency version pins. pnpm 11 reads overrides here, not from package.json.
+overrides:
+  # nx → axios pulled 1.16.0, in the range GHSA-xj6q-8x83-jv6g flags for prototype pollution via
+  # Basic-auth subfields (>= 1.15.2, < 1.18.0). axios is a build-tool transitive (nx/@nx/devkit),
+  # never shipped runtime code, but the alert is on the tracked lockfile. Scope the override to the
+  # vulnerable range so any other range resolves normally; 1.16→1.18 is a minor bump nx accepts.
+  'axios@>=1.15.2 <1.18.0': '>=1.18.0'
+
 # esbuild ships a platform binary via a postinstall script. This environment's
 # pnpm requires explicit per-package build approval.
 allowBuilds:
