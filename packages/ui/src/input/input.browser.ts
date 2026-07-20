@@ -9,8 +9,10 @@ import {
   type Owner,
 } from '@weave-framework/runtime';
 import * as dom from '@weave-framework/runtime/dom';
+import { applyAction } from '@weave-framework/runtime/dom';
 import { compileTemplate } from '@weave-framework/compiler';
 import * as IconMod from '@weave-framework/ui/icon';
+import { mask } from '@weave-framework/ui/cdk';
 import { toComponent } from '../internal/compose.js';
 import { setup, template, type InputProps, type InputContext, type InputControl } from '@weave-framework/ui/input';
 
@@ -100,6 +102,52 @@ test('typing emits onInput and reflects two-way', () => {
   type(field, 'abc');
   assert.equal(seen.at(-1), 'abc');
   assert.equal(field.value, 'abc');
+  dispose();
+});
+
+/* ─────────────────────────── use:mask forwarding (FW-17) ─────────────────────────── */
+
+/**
+ * Mount a real `<Input>` and forward `use:mask` to its root the way the compiler does —
+ * `applyAction(root, mask, () => spec)`. This exercises the full chain the skill example relies on,
+ * including Input's own `.value` binding and `on:input` on the inner field, which a hand-built
+ * wrapper in the cdk test cannot.
+ */
+function mountMasked(
+  props: InputProps,
+  spec: { value: Signal<string>; template?: string; numeric?: Parameters<typeof mask>[1]['numeric'] },
+): { field: HTMLInputElement; dispose: () => void } {
+  const owner: Owner = createOwner();
+  const root: HTMLElement = runInOwner(owner, () => {
+    const ctx: InputContext = setup(props);
+    const { code } = compileTemplate(template, { mode: 'function', scope: SCOPE });
+    const make: MakeRender = new Function('ctx', 'rt', '_c', code.replace('return render(ctx, {});', 'return render;')) as MakeRender;
+    const el: HTMLElement = make(ctx, rt, { Icon: toComponent(IconMod as never) })(ctx, {});
+    applyAction(el, mask as never, () => spec); // exactly what `<Input use:mask={{ spec }}>` compiles to
+    return el;
+  });
+  document.body.appendChild(root);
+  const field: HTMLInputElement = root.querySelector<HTMLInputElement>('.weave-input__field')!;
+  return { field, dispose: (): void => { disposeOwner(owner); root.remove(); } };
+}
+
+test('use:mask on a real <Input> reaches the inner field and formats it (FW-17)', async () => {
+  const value: Signal<string> = signal('');
+  const { field, dispose } = mountMasked({}, { value, template: '(999) 999-9999' });
+  await tick(); // applyAction defers to onMount
+  type(field, '370');
+  assert.equal(field.value, '(370) ___-____', "Input's own .value binding does not clobber the mask");
+  assert.equal(value(), '370');
+  dispose();
+});
+
+test('use:mask numeric on a real <Input> — the skill example (FW-17)', async () => {
+  const value: Signal<string> = signal('');
+  const { field, dispose } = mountMasked({}, { value, numeric: { decimals: 2, decimalSeparator: ',', groupSeparator: '.' } });
+  await tick();
+  type(field, '1050');
+  assert.equal(field.value, '10,50');
+  assert.equal(value(), '10.50');
   dispose();
 });
 

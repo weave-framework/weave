@@ -359,6 +359,11 @@ export interface MaskSpec extends MaskOptions {
  *
  * An empty model renders an empty input — the template is not shown until there is something to
  * position against, so an untouched form is not a wall of underscores.
+ *
+ * **Applied to a wrapping component** — `<Input use:mask>` forwards the action to `<Input>`'s root
+ * `<div>`, not the `<input>` inside it. So when `el` is not itself a text control, the mask binds to
+ * the first `<input>`/`<textarea>` it contains. It never invents a control: an `el` with neither is
+ * a misuse and throws, rather than silently doing nothing (FW-17).
  */
 export const mask = (el: Element, spec: MaskSpec): void => {
   const hasTemplate: boolean = spec.template !== undefined;
@@ -371,11 +376,32 @@ export const mask = (el: Element, spec: MaskSpec): void => {
   if (!hasTemplate && !hasNumeric) {
     throw new Error('mask: pass either `template` (positional) or `numeric` (an amount).');
   }
+  const control: HTMLInputElement | HTMLTextAreaElement = resolveControl(el);
   if (spec.numeric !== undefined) {
-    numericMask(el, spec.value, spec.numeric);
+    numericMask(control, spec.value, spec.numeric);
     return;
   }
-  positionalMask(el, spec.value, spec.template as string, spec);
+  positionalMask(control, spec.value, spec.template as string, spec);
+};
+
+/**
+ * The text control the mask drives: `el` itself when it is an `<input>`/`<textarea>`, otherwise the
+ * first one it contains — the case of `use:mask` forwarded onto a component wrapper (FW-17). The
+ * tag check is by `tagName`, not `instanceof`, so it does not depend on a browser global being the
+ * one this element was constructed from.
+ */
+const resolveControl = (el: Element): HTMLInputElement | HTMLTextAreaElement => {
+  const tag: string = el.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA') return el as HTMLInputElement | HTMLTextAreaElement;
+  const inner: HTMLInputElement | HTMLTextAreaElement | null = el.querySelector<
+    HTMLInputElement | HTMLTextAreaElement
+  >('input, textarea');
+  if (!inner) {
+    throw new Error(
+      `mask: <${tag.toLowerCase()}> is not a text control and contains no <input>/<textarea> to bind to.`,
+    );
+  }
+  return inner;
 };
 
 /** Positional mode — see {@link compileMask}. */

@@ -477,3 +477,52 @@ test('numeric action: template and numeric together are a configuration error', 
   assert.equal(threw(() => mask(document.createElement('input'), { value, template: '999', numeric: {} })).includes('not both'), true);
   assert.equal(threw(() => mask(document.createElement('input'), { value })).includes('either'), true);
 });
+
+/* ─────────────────── binding through a wrapper (FW-17) ─────────────────── */
+
+/** A stand-in for `<Input>`: a wrapper whose editable control is a child, not the root. */
+function mountWrapped(spec: { value: Signal<string>; template?: string; numeric?: NumericMaskOptions }): {
+  wrapper: HTMLElement;
+  field: HTMLInputElement;
+  owner: Owner;
+} {
+  const wrapper: HTMLElement = document.createElement('div');
+  const prefix: HTMLElement = document.createElement('span');
+  prefix.textContent = '€';
+  const field: HTMLInputElement = document.createElement('input');
+  wrapper.append(prefix, field); // the control is not the first child, let alone the root
+  document.body.appendChild(wrapper);
+  const owner: Owner = createOwner();
+  runInOwner(owner, () => mask(wrapper, spec)); // use: forwards to the wrapper, as it does for a component
+  return { wrapper, field, owner };
+}
+
+test('wrapper: use:mask on a component root binds the inner input, not the wrapper (FW-17)', () => {
+  const value: Signal<string> = signal<string>('');
+  const { wrapper, field, owner } = mountWrapped({ value, template: PHONE });
+  type(field, '370', 3);
+  assert.equal(field.value, '(370) ___-____', 'the inner input is formatted');
+  assert.equal(wrapper.getAttribute('value'), null, 'the wrapper div is untouched');
+  assert.equal(value(), '370');
+  disposeOwner(owner);
+  wrapper.remove();
+});
+
+test('wrapper: the numeric mode also reaches the inner input (FW-17, the skill example)', () => {
+  const value: Signal<string> = signal<string>('');
+  const { wrapper, field, owner } = mountWrapped({
+    value,
+    numeric: { decimals: 2, decimalSeparator: ',', groupSeparator: '.' },
+  });
+  type(field, '1050', 4);
+  assert.equal(field.value, '10,50');
+  assert.equal(value(), '10.50');
+  disposeOwner(owner);
+  wrapper.remove();
+});
+
+test('wrapper: a wrapper with no text control is a misuse and throws, not a silent no-op (FW-17)', () => {
+  const value: Signal<string> = signal<string>('');
+  const div: HTMLElement = document.createElement('div');
+  assert.equal(threw(() => mask(div, { value, template: PHONE })).includes('no <input>/<textarea>'), true);
+});

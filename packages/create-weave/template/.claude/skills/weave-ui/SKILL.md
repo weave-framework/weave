@@ -76,11 +76,12 @@ Build interactive components on these instead of reinventing them: **Overlay** +
 
 ```html
 <Input use:mask={{ { value: phone, template: '(999) 999-9999' } }} />
-<Input use:mask={{ { value: price, template: '999999,99' } }}><span slot="suffix">€</span></Input>
+<Input use:mask={{ { value: iban, template: 'LT99 9999 9999 9999 9999' } }} />
 ```
 
 Template tokens: `9` digit · `a` letter · `*` either · `\` escapes the next character into a literal · anything else is a literal. Extend the alphabet with `tokens: { H: (ch) => /[0-9a-f]/i.test(ch) }`; redefining a builtin throws.
 
+- `use:mask` on a component binds the **inner** `<input>`/`<textarea>`, so `<Input use:mask>` works as written — the action lands on the wrapper and resolves the control within (a wrapper with no text control throws).
 - `value` is a **`Signal<string>`, not a `Field`**, and holds the **model** value — typed characters only (`3706001234`), never the display (`(370) 600-1234`).
 - **Do not put `use:control` on the same element.** The mask owns the value channel; `bindValue` would push the display value into the model. Bind the field's own `.value` signal here instead.
 - Completeness is a validator, not an entry rule: `field('', [matchesMask('(999) 999-9999')])`.

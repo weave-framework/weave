@@ -16,6 +16,20 @@
 
 ## Unreleased
 
+### Fixed — UI
+- **`use:mask` now works on `<Input>`, not just a bare `<input>`** ([FW-17](rfcs/0010-input-mask.md)).
+  `use:` on a component forwards to its root element; `<Input>`'s root is the `<div class="weave-input">`
+  wrapper, so the mask landed on the div. `mask.ts` cast `el` straight to `HTMLInputElement` and drove
+  `.selectionStart` / `.value` on it — `undefined` on a `<div>` — so the field simply never masked, with
+  no error. The skill's own `<Input use:mask>` example did not work.
+  - `mask` now **resolves the control**: when the element it is handed is not itself an `<input>` /
+    `<textarea>`, it binds the first one inside it. A wrapper containing neither is a misuse and **throws**,
+    rather than silently doing nothing. `<Input>` is untouched — the fix keeps `mask` the single place
+    that knows how to drive a text control.
+  - Covered by cdk tests (a hand-built wrapper) **and** an integration test that mounts a real `<Input>`
+    and forwards `use:mask` the way the compiler does — confirming Input's own `.value` binding and
+    `on:input` do not fight the mask. Both proven to fail against the pre-fix cast.
+
 ### Fixed — CLI
 - **A proxied long-lived stream no longer kills `weave dev`.** The dev proxy's `error` handler wrote a
   502 unconditionally. That is right when the backend was unreachable and nothing has been sent — and
