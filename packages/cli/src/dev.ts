@@ -150,11 +150,29 @@ function proxyRequest(req: IncomingMessage, res: ServerResponse, entry: string |
     (backendRes: IncomingMessage): void => {
       res.writeHead(backendRes.statusCode ?? 502, backendRes.headers);
       backendRes.pipe(res);
+      // A long-lived upstream (SSE, a chunked stream) can fail AFTER its headers arrived. Piping
+      // alone leaves that error unhandled, which takes the dev server down with it.
+      backendRes.on('error', (): void => {
+        res.destroy();
+      });
     }
   );
+  // `error` fires both before the upstream responds (unreachable backend) and after (a long-lived
+  // socket dropping). Only the first case can still be answered: once the head is out, writing a
+  // 502 throws ERR_HTTP_HEADERS_SENT from inside this handler, and an unhandled throw here kills
+  // the whole dev server — which is what a proxied SSE stream did on every reconnect.
   proxied.on('error', (err: Error): void => {
+    if (res.headersSent) {
+      res.destroy();
+      return;
+    }
     res.writeHead(502, { 'content-type': 'text/plain; charset=utf-8' });
     res.end(`weave dev proxy: could not reach ${rule.target} — ${err.message}`);
+  });
+  // The browser navigating away from an open stream must tear the upstream down too, or the
+  // backend accumulates sockets nobody is reading for as long as the dev server lives.
+  res.on('close', (): void => {
+    proxied.destroy();
   });
   req.pipe(proxied);
 }

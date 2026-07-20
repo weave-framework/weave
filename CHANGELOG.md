@@ -16,6 +16,24 @@
 
 ## Unreleased
 
+### Fixed — CLI
+- **A proxied long-lived stream no longer kills `weave dev`.** The dev proxy's `error` handler wrote a
+  502 unconditionally. That is right when the backend was unreachable and nothing has been sent — and
+  fatal for an SSE stream, whose head went out the moment the backend responded: when the upstream
+  socket later drops (the *normal* end of a long-lived stream, not an exception) the handler called
+  `res.writeHead` a second time, Node threw `ERR_HTTP_HEADERS_SENT` from inside an event handler, and
+  the unhandled throw took the whole dev server down. A notification stream reconnecting cost the
+  developer their UI server.
+  - The handler now distinguishes the two cases by `res.headersSent`, an upstream response that fails
+    after its headers is handled rather than left to throw, and a client navigating away destroys the
+    upstream request instead of leaving a socket nobody reads.
+  - Found via a real consumer, which had worked around it by bypassing the proxy for SSE — so the
+    proxied path stopped being exercised at all.
+  - Covered by `verify:dev-proxy`, which now also drives a stream that is RESET mid-flight. The first
+    version of that test used a clean `socket.destroy()` and **passed against the unfixed proxy**: a
+    clean close ends the piped response with no error event, so the error path never ran. It needed an
+    RST to be a test at all.
+
 ### Added — UI
 - **Input masking — `@weave-framework/ui/mask`** ([RFC 0010](rfcs/0010-input-mask.md)). A headless CDK
   primitive that formats a text input as the user types, against a template the caller writes:

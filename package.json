@@ -25,7 +25,7 @@
     "verify:resume": "node tools/verify-resume.mjs",
     "verify:router-ssr": "node packages/router/test/ssr.smoke.mjs",
     "verify:ui-ssr": "node packages/ui/test/ssr.smoke.mjs",
-    "verify:dev-proxy": "node tools/verify-dev-proxy.mjs",
+    "verify:dev-proxy": "node tools/verify-dev-proxy.mjs && node packages/cli/test/dev-proxy-stream.smoke.mjs",
     "verify:extend": "node tools/verify-extend.mjs",
     "verify:mcp": "node packages/mcp/test/stdio.smoke.mjs",
     "verify:prettier": "node packages/prettier-plugin/test/format.smoke.mjs",
