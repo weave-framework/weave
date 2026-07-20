@@ -6,9 +6,11 @@
 
 ## Summary
 
-A headless CDK primitive that formats a text input **as the user types**, against a
-caller-written template: `(999) 999-9999`. One mechanism, no locale involvement. Applied to the
-existing `<Input>` as a directive; no new component, and `<Input>` itself is untouched.
+A headless CDK primitive that formats a text input **as the user types**, in one of two modes: a
+caller-written positional template (`(999) 999-9999`) for anything with a fixed shape, and a
+numeric mode for amounts, which have no fixed width and fill from the right. No locale involvement
+in either. Applied to the existing `<Input>` as a directive; no new component, and `<Input>` itself
+is untouched.
 
 ## Motivation
 
@@ -35,27 +37,149 @@ not speculative.
 
 ## Design
 
-### One mode: a positional template, and nothing else
+### Two modes, because a number is not a string of positions
 
-A mask is a **string of characters matching a template**. That is the whole model.
+A mask is a **string of characters matching a template**. That is the whole model for anything with
+a fixed shape:
 
 ```html
-<Input use:mask={{ mask(phone, '(999) 999-9999') }} />
-<Input use:mask={{ mask(iban, 'LT99 9999 9999 9999 9999') }} />
-<Input use:mask={{ mask(price, '999999,99') }}><span slot="suffix">€</span></Input>
+<Input use:mask={{ { value: phone, template: '(999) 999-9999' } }} />
+<Input use:mask={{ { value: iban, template: 'LT99 9999 9999 9999 9999' } }} />
 ```
 
-**There is no numeric/currency mode, and no `Intl` involvement.** An earlier draft of this RFC
-proposed one, on the reasoning that grouping (`1 234 567,89`) cannot be spelled as a positional
-template. That reasoning is correct and the conclusion was still wrong: a currency **symbol** is
-not a formatting problem — `<Input>` already has `prefix`/`suffix` slots, so `€` is markup, not
-mask behaviour. Dropping the numeric mode removes a second mechanism, a `@weave-framework/i18n`
-dependency, and a locale-reactivity question, from a package that otherwise depends only on
-`@weave-framework/runtime`.
+An **amount of money is not such a thing**, and a second mode exists for it. See "Numeric mode"
+below for the design and "Why the first draft was wrong" for why this RFC once said otherwise.
 
-**What that costs, stated plainly:** no live thousands grouping while typing. A price is entered
-as `1234,56` with `€` in the suffix, not as `1 234,56 €`. Restoring grouping later is additive —
-nothing in the template design forecloses it.
+### Numeric mode
+
+Selected by passing a `numeric` spec instead of a `template`. The two are mutually exclusive;
+passing both **throws**, because there is no sensible merge of a fixed width and a variable one.
+
+```html
+<Input use:mask={{ { value: price, numeric: { decimals: 2, decimalSeparator: ',' } } }}>
+  <span slot="prefix">€</span>
+</Input>
+```
+
+```ts
+export interface NumericMaskOptions {
+  /** Digits after the separator. 2 = money; 0 = a plain grouped integer. Default 2. */
+  decimals?: number;
+  /** Decimal separator as shown. Default '.'. */
+  decimalSeparator?: string;
+  /** Thousands separator as shown; '' disables grouping. Default '' (no grouping). */
+  groupSeparator?: string;
+  /** Upper bound on integer digits; unset = unbounded. */
+  maxIntegerDigits?: number;
+}
+```
+
+#### Digits fill from the right
+
+This is the whole reason the mode exists. A positional template fills left-to-right, so its `9`
+count *is* the field width, fixed when the template is compiled. A number grows from the right and
+has no width. The two cannot be reconciled by any template string.
+
+Measured against the positional implementation, with `'999.99'`:
+
+| typed | display | model | |
+| --- | --- | --- | --- |
+| `123.58` | `123.58` | `12358` | correct only because the integer part is exactly 3 digits |
+| `234569871.36` | `234.56` | `23456` | **silently truncated, and reported `complete: true`** |
+| `1,50` into `999,99` | `150,__` | `150` | reads as one hundred fifty |
+| `00150` into `999,99` | `001,50` | `00150` | correct — at the cost of four leading zeros for one cent |
+
+Widening the template does not help: `999999999.99` renders a typed `123.58` as `12358____.__`,
+because those five digits land in the millions positions. There is no width that is right for an
+amount whose width is not known in advance.
+
+In numeric mode the keystrokes `1`, `0`, `5`, `0` read `0.01` → `0.10` → `1.05` → `10.50`. This
+behaviour is not optional and has no flag: a numeric mask that filled from the left would be the
+positional mode with extra steps.
+
+#### The model is a canonical decimal string
+
+**Decided, and this extends the value contract above:** in numeric mode the model is
+`"10.50"` — always a `.` as the decimal separator, never grouped, never carrying `prefix`/`suffix`.
+
+This is a deliberate widening of the contract, and it must be named rather than slipped in. In
+positional mode the model is *the characters the user supplied* — `'999.99'` yields `'12358'`,
+with the `.` stripped as the literal it is. In numeric mode the model is *the canonical value*, and
+its `.` is a character the user never typed. The mode does not transcribe keystrokes; it maintains
+a number.
+
+The reason is the consumer's, and it is the right one: an amount travels as a decimal string from a
+`DECIMAL(10,2)` column through the API and back, and is never a float. A model carrying the
+display's comma, grouping or currency symbol would have to be un-formatted at every call site — the
+exact class of bug this primitive exists to prevent.
+
+**Empty input yields an empty model (`''`), not `'0.00'`.** "No price set" and "free" are different
+states and must not collapse into one. This matches positional mode, where an empty model renders
+an empty input rather than a row of placeholders.
+
+**A programmatically-set model is canonicalised for display, truncating excess precision** —
+`'10.567'` with `decimals: 2` displays `10.56`, not `10.57`. Truncation over rounding because a mask
+is not an arithmetic layer: silently rounding a value the application computed would make the
+displayed amount disagree with the stored one. Callers that want rounding round before assigning.
+
+#### Formatting comes from props, never from the locale
+
+**Decided: separators are caller options, and the ambient locale is not read** — no
+`navigator.language`, no `Intl` default. In the consuming application the money format is a system
+setting an administrator picks, alongside date format and week start. A Dutch-formatted amount must
+stay Dutch-formatted for a user reading the interface in English; deriving it from the locale would
+make the displayed amount depend on the viewer rather than on the organisation.
+
+**Decided: grouping is implemented directly, not through `Intl.NumberFormat`.** `Intl` always takes
+a locale, so feeding it a fixed one and string-replacing its separators afterwards is a locale
+dependency wearing a disguise — and in some locales it emits non-ASCII digits, which a masked input
+must never do. Inserting a separator every three digits from the right is a few lines, fully
+deterministic, and keeps the "no locale involvement" property this RFC claims elsewhere.
+
+#### Behaviour
+
+- **Rejecting, not truncating.** With `maxIntegerDigits` set, a digit past the bound is refused and
+  the caret does not move — the same rule as a letter typed into a `9`. Silently dropping it is the
+  defect measured above, and it must not survive into the new mode.
+- **Caret.** Typing keeps the caret against the last typed digit as inserted separators shift the
+  text. Where positional mode counts data characters from the left, numeric mode counts them from
+  the right; that mirror is the entire caret rule.
+- **Deleting a separator deletes the digit before it.** A separator is not the user's character —
+  the same reasoning that already makes backspace step over literals.
+- **Paste.** `1 234,56`, `1,234.56` and `€1234.56` all extract to `1234.56`: digits are kept, the
+  last separator that is followed by exactly `decimals` digits is the decimal point, everything
+  else is discarded.
+- **`decimals: 0`** gives a grouped integer field, which also serves capacity and ticket counts.
+
+#### Completeness does not apply
+
+**Decided: `matchesMask` stays positional-only and numeric mode has no completeness notion.** With
+no fixed width there is nothing to be complete against — `1.50` is as finished as `1234.50`. Bounds
+on a numeric field are range checks (`>= 0.01`, `<= 999.99`), which are ordinary validators the
+caller already writes, not shape enforcement. Making `matchesMask` accept a numeric spec would have
+it return "Incomplete" for values that are simply small.
+
+### Why the first draft was wrong
+
+The first draft of this RFC cut the numeric mode, and the argument it used does not survive
+contact with the problem. It said a currency **symbol** is a `prefix`/`suffix` slot on `<Input>`
+rather than mask behaviour — which is true, and answers a question nobody was asking. The symbol
+was never the difficulty. Right-to-left filling and a separator that moves as you type are, and the
+draft recorded exactly that under "Drawbacks", as *"no live number grouping"*, while treating it as
+an acceptable cost.
+
+It was not acceptable. Measured on the shipped build, the positional workaround for money either
+truncates an amount silently (`234569871.36` → `234.56`, reported complete) or demands four leading
+zeros to enter one cent. The second objection — that a numeric mode would drag in
+`@weave-framework/i18n` and a locale-reactivity question — is answered by taking the separators as
+props and grouping directly, which is what "Formatting comes from props" specifies.
+
+What remains true from the original argument is the cost of **two mechanisms in one primitive**.
+That cost is accepted here rather than waved away: the modes share the `use:` action, the signal
+contract and the caret discipline, and differ in the formatting core alone.
+
+This amendment follows the same milestone-pull rule that created the RFC: it is written because the
+dogfooding consumer hit the limit in a real price field, not in anticipation of one.
 
 ### Wiring: the mask owns the value channel
 
@@ -63,8 +187,21 @@ nothing in the template design forecloses it.
 same element:
 
 ```ts
-mask(value: Signal<string>, template: string, options?: MaskOptions): (el: Element) => void
+export interface MaskSpec extends MaskOptions {
+  /** The caller's signal. Holds the **model** value, never the display. */
+  value: Signal<string>;
+  /** Positional mode. Mutually exclusive with `numeric`; passing both throws. */
+  template?: string;
+  /** Numeric mode. Mutually exclusive with `template`; passing both throws. */
+  numeric?: NumericMaskOptions;
+}
+
+mask(el: Element, spec: MaskSpec): void
 ```
+
+What the model *contains* differs by mode — typed characters in positional mode, a canonical
+decimal string in numeric mode (see "The model is a canonical decimal string"). What it never
+contains, in either mode, is the display.
 
 `use:control` binds through `bindValue` (`packages/runtime/src/dom.ts`), which writes
 `input.value = String(model)` in an effect and reads `input.value` back on every `input` event. A
@@ -182,11 +319,15 @@ having its own version number.
   reads as though `<Input>` gains the capability by default. It does not, and the subpath plus
   `sideEffects: false` is what makes that true rather than merely intended.
 - **A locale-aware numeric mode** (`currency('EUR')`, `number()`, `percent()`), formatting through
-  `Intl`. Carried in an earlier draft and cut. It answered a question nobody had: a currency symbol
-  is a `suffix` slot on an `<Input>` that already exists, not a mask concern. Keeping it would have
-  meant two mechanisms in one primitive and a `@weave-framework/i18n` edge in a package with one
-  dependency. What it would genuinely have bought — live thousands grouping — is recorded as a
-  drawback rather than pretended away.
+  `Intl`. Cut in the first draft, and the *locale-aware* half stays cut: the mode this RFC now
+  specifies takes its separators as props and never reads the ambient locale. What was wrongly cut
+  along with it — right-to-left filling — is restored; see "Why the first draft was wrong".
+- **Leaving money to the positional mode.** What the consumer would otherwise have shipped. Rejected
+  on measurement, not taste: `'999,99'` needs `00001` typed to enter one cent, and any amount wider
+  than its template is truncated without an error.
+- **An application-side "format on blur" wrapper.** Proposed and declined by the consumer itself.
+  The caret, paste and selection rules are precisely what this primitive already owns, and a second
+  weaker implementation beside it is how two behaviours drift apart.
 - **A real phone-number library.** `libphonenumber` is ~150 KB *and* a third-party runtime
   dependency, which rule #1 forbids outright. Consequence, stated plainly rather than hidden: a
   template mask enforces *shape*, not validity. `(999) 999-9999` cannot know that a Lithuanian
@@ -200,9 +341,11 @@ having its own version number.
   separator, IME, and mobile virtual keyboards (which report input events inconsistently) are all
   known-hard. The test suite has to cover them explicitly or the primitive ships broken in the ways
   users actually notice.
-- **No live number grouping.** A positional template groups from the left and a number groups from
-  the right, so `1 234 567` is not expressible. Accepted deliberately (see "One mode"); the escape
-  hatch is that adding it later is additive.
+- **Two mechanisms in one primitive.** The original draft's one real objection, now accepted rather
+  than dismissed: `template` and `numeric` are separate formatting cores behind one action. The
+  mitigation is that everything *outside* the core — the signal contract, the value/display split,
+  caret discipline, IME handling — is shared, and that the modes are mutually exclusive so no call
+  site has to reason about both at once.
 - **Size.** Additive to `@weave-framework/ui`, which is outside the 22 KB SPA-core budget — but
   `verify:size` still has to be re-run and the delta stated, not assumed harmless.
 - **Accessibility.** A formatted value read by a screen reader can be worse than a raw one (digits
@@ -210,7 +353,12 @@ having its own version number.
 
 ## Unresolved questions
 
-None. The four questions this RFC opened are settled — extensible alphabet · a partial value
+None. The four questions the first draft opened are settled — extensible alphabet · a partial value
 reaches the model · `matchesMask` ships · `_` placeholders in a single colour — and each is
 recorded at its own section above, with dimmed placeholders explicitly deferred rather than left
 open.
+
+The three the numeric-mode amendment opened are settled with it: the model is a **canonical decimal
+string**, not a keystroke transcript · **completeness does not apply** to a variable-width field, so
+`matchesMask` stays positional-only and range is a validator · the caret **counts digits from the
+right**, mirroring the positional rule. Each is recorded at its own section, and none is deferred.
