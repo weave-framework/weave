@@ -180,6 +180,139 @@ export function compileMask(template: string, options: MaskOptions = {}): Compil
   return { format, extract, caretAfter, size };
 }
 
+/* ─────────────────── numeric mode ─────────────────── */
+
+/**
+ * Numeric mode: an amount, not a shape. Selected by passing `numeric` instead of `template`.
+ *
+ * A positional template's `9` count *is* its width, fixed when the template is compiled, and it
+ * fills left-to-right. A number has no width and grows from the right, so no template string can
+ * express one: `'999.99'` truncates `234569871.36` to `234.56` and still reports it complete, and
+ * widening it to `'999999999.99'` renders a typed `123.58` as `12358____.__`. Hence a second core.
+ *
+ * Separators are taken from here and the ambient locale is never read — the displayed format is the
+ * organisation's setting, not the viewer's. Grouping is inserted directly rather than through
+ * `Intl.NumberFormat`, which always wants a locale and in some of them emits non-ASCII digits.
+ */
+export interface NumericMaskOptions {
+  /** Digits after the separator. 2 = money; 0 = a plain grouped integer. Default 2. */
+  decimals?: number;
+  /** Decimal separator as shown. Default `'.'`. */
+  decimalSeparator?: string;
+  /** Thousands separator as shown; `''` disables grouping. Default `''`. */
+  groupSeparator?: string;
+  /** Upper bound on integer digits; unset = unbounded. A digit past it is refused, never dropped. */
+  maxIntegerDigits?: number;
+}
+
+/**
+ * The numeric core. Its currency is a **digit string** — every digit the user has entered, with no
+ * separators — because that is the only representation in which "type a digit" is an append and
+ * "backspace" is a truncation, whichever way the display happens to be grouped.
+ */
+export interface CompiledNumericMask {
+  /** Pull the digits out of any string: a display value, a paste, or a canonical model. */
+  digitsOf(value: string): string;
+  /** Canonical model for a digit string: `'1050'` → `'10.50'`. Empty digits → `''`. */
+  toModel(digits: string): string;
+  /** Display for a digit string: `'1050'` → `'10,50'`. Empty digits → `''`. */
+  toDisplay(digits: string): string;
+  /** Digits for a model string: `'10.50'` → `'1050'`. Excess precision is truncated. */
+  fromModel(model: string): string;
+  /** True when `digits` would exceed `maxIntegerDigits`. */
+  overflows(digits: string): boolean;
+}
+
+const DIGITS_ONLY: RegExp = /\d/g;
+
+/** Compile numeric options into a reusable core. Pure and DOM-free, like {@link compileMask}. */
+export function compileNumericMask(options: NumericMaskOptions = {}): CompiledNumericMask {
+  const decimals: number = options.decimals ?? 2;
+  const decimalSeparator: string = options.decimalSeparator ?? '.';
+  const groupSeparator: string = options.groupSeparator ?? '';
+  const maxIntegerDigits: number | undefined = options.maxIntegerDigits;
+
+  if (!Number.isInteger(decimals) || decimals < 0) {
+    throw new Error(`mask: numeric.decimals must be a non-negative integer, got ${String(decimals)}.`);
+  }
+  if (decimals > 0 && decimalSeparator === '') {
+    throw new Error('mask: numeric.decimalSeparator cannot be empty while decimals > 0.');
+  }
+  if (groupSeparator !== '' && groupSeparator === decimalSeparator) {
+    throw new Error('mask: numeric.groupSeparator and decimalSeparator cannot be the same character.');
+  }
+
+  /**
+   * Trim leading zeros down to one integer digit — never past it. `'0'` must survive as `0.00`,
+   * because "no price set" (`''`) and "free" (`0.00`) are different states and stripping to
+   * emptiness would merge them.
+   */
+  const normalize = (digits: string): string => {
+    let d: string = digits;
+    while (d.length > decimals + 1 && d.startsWith('0')) d = d.slice(1);
+    return d;
+  };
+
+  const digitsOf = (value: string): string => normalize((value.match(DIGITS_ONLY) ?? []).join(''));
+
+  /** Split normalized digits into the integer and fraction halves the display and model share. */
+  const split = (digits: string): { int: string; frac: string } => {
+    const padded: string = digits.padStart(decimals + 1, '0');
+    return {
+      int: padded.slice(0, padded.length - decimals),
+      frac: decimals > 0 ? padded.slice(padded.length - decimals) : '',
+    };
+  };
+
+  const group = (int: string): string => {
+    if (groupSeparator === '') return int;
+    let out: string = '';
+    for (let i: number = 0; i < int.length; i++) {
+      if (i > 0 && (int.length - i) % 3 === 0) out += groupSeparator;
+      out += int[i];
+    }
+    return out;
+  };
+
+  const toModel = (digits: string): string => {
+    const d: string = normalize(digits);
+    if (d === '') return '';
+    const { int, frac } = split(d);
+    return decimals > 0 ? `${int}.${frac}` : int;
+  };
+
+  const toDisplay = (digits: string): string => {
+    const d: string = normalize(digits);
+    if (d === '') return '';
+    const { int, frac } = split(d);
+    return decimals > 0 ? `${group(int)}${decimalSeparator}${frac}` : group(int);
+  };
+
+  /**
+   * A model string is canonical (`'10.50'`), but a caller may hand over `'10.5'` or `'10.567'`.
+   * The fraction is padded or **truncated**, never rounded: a mask is not an arithmetic layer, and
+   * silently rounding a computed amount would make the field disagree with what was stored.
+   */
+  const fromModel = (model: string): string => {
+    if (model.trim() === '') return '';
+    const dot: number = model.indexOf('.');
+    const intPart: string = (dot < 0 ? model : model.slice(0, dot)).replace(/\D/g, '');
+    const fracRaw: string = dot < 0 ? '' : model.slice(dot + 1).replace(/\D/g, '');
+    if (intPart === '' && fracRaw === '') return '';
+    const frac: string = decimals > 0 ? fracRaw.slice(0, decimals).padEnd(decimals, '0') : '';
+    return normalize(`${intPart === '' ? '0' : intPart}${frac}`);
+  };
+
+  const overflows = (digits: string): boolean => {
+    if (maxIntegerDigits === undefined) return false;
+    const d: string = normalize(digits);
+    if (d === '') return false;
+    return split(d).int.length > maxIntegerDigits;
+  };
+
+  return { digitsOf, toModel, toDisplay, fromModel, overflows };
+}
+
 /**
  * A validator for `@weave-framework/forms` reporting an unfinished value. Deliberately a plain
  * `(value) => string | null` so `@weave-framework/ui` never imports `forms` — the caller passes
@@ -200,12 +333,21 @@ export function matchesMask(
   };
 }
 
-/** What `use:mask` is given. */
+/** What `use:mask` is given. Exactly one of `template` / `numeric` selects the mode. */
 export interface MaskSpec extends MaskOptions {
-  /** The caller's signal. Holds the **model** value — typed characters only, never the display. */
+  /**
+   * The caller's signal. Holds the **model** value, never the display.
+   *
+   * What the model *contains* differs by mode: in positional mode it is the characters the user
+   * supplied, with literals stripped (`'(999) 999-9999'` → `'3706001234'`); in numeric mode it is
+   * the canonical decimal string (`'10.50'`), whose `.` the user never typed. The mode does not
+   * transcribe keystrokes — it maintains a number.
+   */
   value: Signal<string>;
-  /** The positional template, e.g. `'(999) 999-9999'`. */
-  template: string;
+  /** Positional mode: a template, e.g. `'(999) 999-9999'`. Mutually exclusive with `numeric`. */
+  template?: string;
+  /** Numeric mode: an amount. Mutually exclusive with `template`. */
+  numeric?: NumericMaskOptions;
 }
 
 /**
@@ -219,9 +361,27 @@ export interface MaskSpec extends MaskOptions {
  * position against, so an untouched form is not a wall of underscores.
  */
 export const mask = (el: Element, spec: MaskSpec): void => {
+  const hasTemplate: boolean = spec.template !== undefined;
+  const hasNumeric: boolean = spec.numeric !== undefined;
+  if (hasTemplate && hasNumeric) {
+    throw new Error(
+      'mask: pass either `template` or `numeric`, not both — there is no merge of a fixed width and a variable one.',
+    );
+  }
+  if (!hasTemplate && !hasNumeric) {
+    throw new Error('mask: pass either `template` (positional) or `numeric` (an amount).');
+  }
+  if (spec.numeric !== undefined) {
+    numericMask(el, spec.value, spec.numeric);
+    return;
+  }
+  positionalMask(el, spec.value, spec.template as string, spec);
+};
+
+/** Positional mode — see {@link compileMask}. */
+const positionalMask = (el: Element, value: Signal<string>, template: string, options: MaskOptions): void => {
   const input: HTMLInputElement = el as HTMLInputElement;
-  const compiled: CompiledMask = compileMask(spec.template, spec);
-  const value: Signal<string> = spec.value;
+  const compiled: CompiledMask = compileMask(template, options);
 
   let composing: boolean = false;
 
@@ -289,6 +449,117 @@ export const mask = (el: Element, spec: MaskSpec): void => {
     if (composing) return;
     const result: MaskResult = compiled.format(model);
     const shown: string = model === '' ? '' : result.display;
+    if (input.value !== shown) input.value = shown;
+  });
+};
+
+/** How many digits `s` contains. */
+const countDigits = (s: string): number => {
+  let n: number = 0;
+  for (const ch of s) if (ch >= '0' && ch <= '9') n++;
+  return n;
+};
+
+/**
+ * Numeric mode — see {@link compileNumericMask}.
+ *
+ * The caret rule is the mirror of the positional one: where a template counts data characters from
+ * the **left**, an amount counts digits from the **right**. That single inversion is what keeps the
+ * caret against the digit the user just typed while inserted group separators shift the text under
+ * it, and it is why a grouped field does not need any per-separator bookkeeping.
+ */
+const numericMask = (el: Element, value: Signal<string>, options: NumericMaskOptions): void => {
+  const input: HTMLInputElement = el as HTMLInputElement;
+  const compiled: CompiledNumericMask = compileNumericMask(options);
+
+  let composing: boolean = false;
+
+  /** Offset in `display` with exactly `digitsAfter` digits following it. */
+  const caretFromRight = (display: string, digitsAfter: number): number => {
+    let seen: number = 0;
+    for (let i: number = display.length; i > 0; i--) {
+      if (seen === digitsAfter) return i;
+      const ch: string = display[i - 1];
+      if (ch >= '0' && ch <= '9') seen++;
+    }
+    return 0;
+  };
+
+  /** Write `digits` to both the element and the signal, keeping `digitsAfter` digits after the caret. */
+  const apply = (digits: string, digitsAfter: number): void => {
+    const display: string = compiled.toDisplay(digits);
+    const model: string = compiled.toModel(digits);
+    input.value = display;
+    const caret: number = caretFromRight(display, digitsAfter);
+    input.setSelectionRange(caret, caret);
+    if (value() !== model) value.set(model);
+  };
+
+  /** Re-render from the signal, discarding whatever the element currently shows. */
+  const revert = (digitsAfter: number): void => {
+    const digits: string = compiled.fromModel(value());
+    const display: string = compiled.toDisplay(digits);
+    input.value = display;
+    const caret: number = caretFromRight(display, digitsAfter);
+    input.setSelectionRange(caret, caret);
+  };
+
+  const onInput = (): void => {
+    if (composing) return; // leave the IME alone until it commits
+    const caret: number = input.selectionStart ?? input.value.length;
+    const digitsAfter: number = countDigits(input.value.slice(caret));
+    const digits: string = compiled.digitsOf(input.value);
+    // Past `maxIntegerDigits` the digit is refused, not dropped: dropping it silently is exactly
+    // the defect the positional mode has with an over-long amount.
+    if (compiled.overflows(digits)) {
+      revert(digitsAfter);
+      return;
+    }
+    apply(digits, digitsAfter);
+  };
+
+  /**
+   * Backspace deletes the digit before the caret, however many separators sit in between — a group
+   * separator is not the user's character, so removing it would have to be undone anyway.
+   */
+  const onBeforeInput = (ev: Event): void => {
+    const e: InputEvent = ev as InputEvent;
+    if (e.inputType !== 'deleteContentBackward') return;
+    const start: number = input.selectionStart ?? 0;
+    const end: number = input.selectionEnd ?? 0;
+    if (start !== end) return; // a real selection deletes exactly what is selected
+    e.preventDefault();
+    const digitsAfter: number = countDigits(input.value.slice(start));
+    const digits: string = compiled.digitsOf(input.value);
+    const at: number = digits.length - digitsAfter - 1;
+    if (at < 0) return; // nothing of the user's own before the caret
+    apply(digits.slice(0, at) + digits.slice(at + 1), digitsAfter);
+  };
+
+  const onCompositionStart = (): void => {
+    composing = true;
+  };
+  const onCompositionEnd = (): void => {
+    composing = false;
+    onInput();
+  };
+
+  el.addEventListener('beforeinput', onBeforeInput);
+  el.addEventListener('input', onInput);
+  el.addEventListener('compositionstart', onCompositionStart);
+  el.addEventListener('compositionend', onCompositionEnd);
+
+  onDispose(() => {
+    el.removeEventListener('beforeinput', onBeforeInput);
+    el.removeEventListener('input', onInput);
+    el.removeEventListener('compositionstart', onCompositionStart);
+    el.removeEventListener('compositionend', onCompositionEnd);
+  });
+
+  effect(() => {
+    const model: string = value();
+    if (composing) return;
+    const shown: string = compiled.toDisplay(compiled.fromModel(model));
     if (input.value !== shown) input.value = shown;
   });
 };

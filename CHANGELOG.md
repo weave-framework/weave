@@ -48,10 +48,35 @@
     rejected character leaves the caret where it was, and an IME composition is left alone until it commits.
   - The mask **owns the element's value channel**, so it is not combined with `use:control` on the same
     element; bind the field's own signal instead.
-  - **No currency/number mode and no `Intl` involvement.** A currency symbol is a `prefix`/`suffix` slot on
-    `<Input>`, not mask behaviour. The cost, stated rather than hidden: no live thousands grouping — a price
-    is entered as `1234,56`. Adding grouping later is additive.
   - `<Input>` is unchanged, and `@weave-framework/ui` still depends only on `@weave-framework/runtime`.
+- **A numeric mask mode, for amounts** — `use:mask={{ { value: price, numeric: { decimals: 2,
+  decimalSeparator: ',', groupSeparator: '.' } } }}`. Digits fill from the **right**, so `1`,`0`,`5`,`0`
+  reads `0,01` → `0,10` → `1,05` → `10,50`, the integer part is unbounded, and grouping is inserted as
+  you type. `template` and `numeric` are mutually exclusive; passing both throws.
+  - **Why a second mode rather than a template.** A positional template's `9` count *is* its width, fixed
+    at compile time, and it fills left-to-right. Measured on the first release: `234569871.36` typed into
+    `'999.99'` became `234.56` **and reported `complete: true`**, and entering one cent into `'999,99'`
+    required typing `00001`. Widening the template makes it worse — `123.58` into `'999999999.99'` renders
+    `12358____.__`. No template width is right for a value whose width is not known in advance.
+  - **The model is a canonical decimal string** (`'10.50'`) — always a `.`, never grouped, never carrying
+    the prefix/suffix. This widens the value contract deliberately: in positional mode the model is the
+    characters the user supplied, while here its `.` is one the user never typed. An amount travels as a
+    decimal string end-to-end, so a model carrying the display's comma would have to be un-formatted at
+    every call site.
+  - **Empty stays empty** (`''`, not `'0.00'`) — "no price set" and "free" are different states. A typed
+    `0` is a value and yields `'0.00'`.
+  - **Separators are props; the ambient locale is never read** — no `navigator.language`, no `Intl`
+    default. The displayed format belongs to the organisation, not the viewer. Grouping is inserted
+    directly rather than through `Intl.NumberFormat`, which always wants a locale and in some of them
+    emits non-ASCII digits.
+  - `maxIntegerDigits` **refuses** a digit past the bound and leaves the caret alone rather than dropping
+    it — silent truncation is the defect above, and it does not survive into this mode. Excess precision
+    on a programmatic value is **truncated, not rounded** (`'10.567'` → `10.56`): a mask is not an
+    arithmetic layer.
+  - `decimals: 0` gives a grouped integer field. Completeness does not apply to a variable-width value, so
+    `matchesMask` stays positional-only and bounds are ordinary validators.
+  - Pulled by the dogfooding consumer's price field ([FW-16](rfcs/0010-input-mask.md)); RFC 0010 records
+    why its first draft cut this mode and why that argument does not survive contact with the problem.
 
 ## 2.0.1 — 2026-07-19
 
