@@ -17,6 +17,36 @@
 ## Unreleased
 
 ### Added — UI
+- **App-wide defaults for the date/time pickers** — `provideDateTimeDefaults()` from
+  `@weave-framework/ui` ([FW-19](docs/src/content/ui/datepicker.md)). `<Datepicker>`,
+  `<DateRangePicker>` and `<Timepicker>` were configured **per instance**: adapter, locale, first day
+  of week, display format, translated chrome, 12/24h, minute step. Every one of those is an
+  application decision, so a field that omitted any of them was wrong — a date in a format used
+  nowhere else, or English chrome inside a translated UI. In practice none of the props was optional,
+  and the only way to supply them all was a wrapper component per picker holding nothing but config.
+  - Provide once at the app root; each picker reads the context whenever its own prop is absent:
+
+    ```ts
+    provideDateTimeDefaults({
+      locale: () => locale(),                        // getters — a settings change flows through
+      firstDayOfWeek: () => weekStartIndex(),
+      displayFormat: () => ({ dateStyle: 'medium' }),
+      datepickerLabels: () => ({ prevMonth: t('datepicker.prevMonth'), clear: t('common.clear') }),
+      timepicker: () => ({ use24: timeFormat() === '24h', step: timeStep() }),
+    });
+    ```
+  - **Resolution is always instance prop → context → the component's built-in**, so a single field can
+    still opt out of any one default.
+  - **Getters, read at each use** rather than captured at setup, so a language or settings change
+    reaches a mounted field. A plain value is accepted and simply never changes. This made
+    `Timepicker`'s `use24`/`step` and both date pickers' `adapter` reactive — they were `const`s
+    resolved once at setup, so a settings change never reached an open field.
+  - **Labels merge shallowly** at each step: a partial object never blanks the keys it omits.
+  - **Fully backward compatible** — an app that provides nothing behaves exactly as before (Monday
+    start, English labels, runtime locale). Nothing about the calendar engine, overlay, keyboard or
+    ARIA changes.
+  - Deliberately **not** included: an ISO-string binding mode (`valueFormat: 'iso'`). The request
+    marked it a nice-to-have; the defaults context is what forced the wrappers to exist.
 - **`openDialog` / `openBottomSheet` can host a live component** ([FW-18](rfcs/0010-input-mask.md)).
   A region (`content` / `header` / `actions`) now accepts a `[Component, props?]` tuple — or the
   `component(Comp, props)` helper — and mounts it **under its own owner**, so the component's

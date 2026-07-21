@@ -52,6 +52,24 @@ stays unambiguous.
 Opening the panel with no value yet seeds the spinners from the current time, rounded to `step` and clamped into
 `min` / `max` — nothing is committed until you actually spin a column.
 
+## App-wide defaults
+
+12/24h and the minute step are usually a system setting, not a per-field choice. Set them once at the app root with
+`provideDateTimeDefaults` and every `<Timepicker>` below picks them up:
+
+```ts
+import { provideDateTimeDefaults } from '@weave-framework/ui';
+
+provideDateTimeDefaults({
+  locale: () => locale(),                                     // shared with the date pickers
+  timepicker: () => ({ use24: timeFormat() === '24h', step: timeStep(), clearLabel: t('common.clear') }),
+});
+```
+
+A `use24` / `step` / `clearLabel` prop on an individual field still wins, and an app that provides nothing behaves
+exactly as before. Because the values are read through getters, flipping the setting updates fields that are already
+mounted. See [Datepicker → App-wide defaults](/ui/datepicker) for the full contract.
+
 ## Binding & forms
 
 `value` + `onChange`, or a forms `control` (`Field<TimeValue>`) that marks `touched` on close and drives the error

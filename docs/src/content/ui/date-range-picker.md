@@ -105,6 +105,25 @@ from [@weave-framework/i18n](/reference/i18n):
 />
 ```
 
+## App-wide defaults
+
+`locale`, `displayFormat`, `firstDayOfWeek` and the chrome strings are application decisions. Provide them once at
+the app root and drop them from every call site — `<DateRangePicker>` reads the **same** context as `<Datepicker>`:
+
+```ts
+import { provideDateTimeDefaults } from '@weave-framework/ui';
+
+provideDateTimeDefaults({
+  locale: () => locale(),
+  firstDayOfWeek: () => weekStartIndex(),
+  datepickerLabels: () => ({ prevMonth: t('cal.prevMonth'), clear: t('common.clear') }),
+});
+```
+
+An instance prop still wins, labels merge shallowly over the English defaults, and providing nothing changes nothing.
+The `openCalendar` key is ignored here — this component has no open-calendar button. See
+[Datepicker → App-wide defaults](/ui/datepicker) for the full contract.
+
 ## Binding & forms
 
 The usual two dialects — `value` + `onChange`, or a forms `control` (`Field<DateRange>`) that marks `touched` on

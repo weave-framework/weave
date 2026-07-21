@@ -19,6 +19,7 @@ import { signal, effect, onDispose, type Signal } from '@weave-framework/runtime
 import { createOverlay, connectedPosition, type OverlayRef } from '../cdk/index.js';
 import { buildPositions, type MenuPosition } from '../shared/positions.js';
 import { activeIcons, type IconRegistry } from '../icon/icons.js';
+import { injectDateTimeDefaults, readDefault, type DateTimeDefaults, type TimepickerDefaults } from '../date-time-defaults.js';
 
 /** A time of day, 24-hour internally. */
 export interface TimeValue {
@@ -114,10 +115,19 @@ export function setup(props: TimepickerProps): TimepickerContext {
   const root: Signal<HTMLElement | null> = signal<HTMLElement | null>(null);
   const trigger: Signal<HTMLElement | null> = signal<HTMLElement | null>(null);
   const open: Signal<boolean> = signal<boolean>(false);
-  const step: number = props.step ?? 5;
+  // App-wide defaults (FW-19): instance prop → context default → built-in. Getters, not the consts
+  // these used to be, so a settings change (24h ↔ 12h, granularity) reaches a mounted field.
+  const defaults: DateTimeDefaults = injectDateTimeDefaults();
+  const timeDefaults = (): TimepickerDefaults => readDefault(defaults.timepicker) ?? {};
+  const locale = (): string | undefined => props.locale ?? readDefault(defaults.locale);
+  const step = (): number => props.step ?? timeDefaults().step ?? 5;
 
-  const resolved: Intl.ResolvedDateTimeFormatOptions = new Intl.DateTimeFormat(props.locale, { hour: 'numeric' }).resolvedOptions();
-  const use24: boolean = props.use24 ?? !resolved.hour12;
+  // 12/24h: unset everywhere → whatever the locale resolves to, as before.
+  const use24 = (): boolean => {
+    const explicit: boolean | undefined = props.use24 ?? timeDefaults().use24;
+    if (explicit != null) return explicit;
+    return !new Intl.DateTimeFormat(locale(), { hour: 'numeric' }).resolvedOptions().hour12;
+  };
 
   // Spinner arrows are lucide chevrons from the active icon registry (resolved once, with the
   // component's context in scope) — the same source `<Icon>` uses, not hand-drawn glyphs.
@@ -152,13 +162,13 @@ export function setup(props: TimepickerProps): TimepickerContext {
     else props.onChange?.(v);
   };
 
-  const displayHour = (t: TimeValue): number => (use24 ? t.hours : (t.hours % 12) || 12);
+  const displayHour = (t: TimeValue): number => (use24() ? t.hours : (t.hours % 12) || 12);
   const ampm = (t: TimeValue): 'AM' | 'PM' => (t.hours < 12 ? 'AM' : 'PM');
   const to24 = (dh: number, ap: 'AM' | 'PM'): number => (dh % 12) + (ap === 'PM' ? 12 : 0);
 
   const formatTime = (t: TimeValue): string => {
     const d: Date = new Date(2000, 0, 1, t.hours, t.minutes);
-    return new Intl.DateTimeFormat(props.locale, { hour: 'numeric', minute: '2-digit', hour12: !use24 }).format(d);
+    return new Intl.DateTimeFormat(locale(), { hour: 'numeric', minute: '2-digit', hour12: !use24() }).format(d);
   };
   const two = (n: number): string => String(n).padStart(2, '0');
 
@@ -166,21 +176,21 @@ export function setup(props: TimepickerProps): TimepickerContext {
   const setTime = (next: TimeValue): void => commit(next);
   const incHour = (): void => {
     const t: TimeValue = workingTime();
-    if (use24) setTime({ hours: (t.hours + 1) % 24, minutes: t.minutes });
+    if (use24()) setTime({ hours: (t.hours + 1) % 24, minutes: t.minutes });
     else setTime({ hours: to24((displayHour(t) % 12) + 1, ampm(t)), minutes: t.minutes });
   };
   const decHour = (): void => {
     const t: TimeValue = workingTime();
-    if (use24) setTime({ hours: (t.hours + 23) % 24, minutes: t.minutes });
+    if (use24()) setTime({ hours: (t.hours + 23) % 24, minutes: t.minutes });
     else setTime({ hours: to24(((displayHour(t) + 10) % 12) + 1, ampm(t)), minutes: t.minutes });
   };
   const incMinute = (): void => {
     const t: TimeValue = workingTime();
-    setTime({ hours: t.hours, minutes: (Math.floor(t.minutes / step) * step + step) % 60 });
+    setTime({ hours: t.hours, minutes: (Math.floor(t.minutes / step()) * step() + step()) % 60 });
   };
   const decMinute = (): void => {
     const t: TimeValue = workingTime();
-    setTime({ hours: t.hours, minutes: (Math.ceil(t.minutes / step) * step - step + 60) % 60 });
+    setTime({ hours: t.hours, minutes: (Math.ceil(t.minutes / step()) * step() - step() + 60) % 60 });
   };
   const toggleAmPm = (): void => {
     const t: TimeValue = workingTime();
@@ -206,8 +216,8 @@ export function setup(props: TimepickerProps): TimepickerContext {
     col.setAttribute('aria-label', kind === 'hour' ? 'Hour' : 'Minute');
     // APG spinbutton requires the value bounds. Hour range depends on 12/24h; minute is 0–59.
     if (kind === 'hour') {
-      col.setAttribute('aria-valuemin', use24 ? '0' : '1');
-      col.setAttribute('aria-valuemax', use24 ? '23' : '12');
+      col.setAttribute('aria-valuemin', use24() ? '0' : '1');
+      col.setAttribute('aria-valuemax', use24() ? '23' : '12');
     } else {
       col.setAttribute('aria-valuemin', '0');
       col.setAttribute('aria-valuemax', '59');
@@ -251,7 +261,7 @@ export function setup(props: TimepickerProps): TimepickerContext {
     minuteValueEl = minute.value;
     box.append(hourCol, colon, minuteCol);
 
-    if (!use24) {
+    if (!use24()) {
       ampmButton = document.createElement('button');
       ampmButton.type = 'button';
       ampmButton.className = 'weave-timepicker__ampm';
@@ -263,7 +273,7 @@ export function setup(props: TimepickerProps): TimepickerContext {
 
   function renderPanel(): void {
     const t: TimeValue = workingTime();
-    if (hourValueEl) hourValueEl.textContent = use24 ? two(displayHour(t)) : String(displayHour(t));
+    if (hourValueEl) hourValueEl.textContent = use24() ? two(displayHour(t)) : String(displayHour(t));
     if (minuteValueEl) minuteValueEl.textContent = two(t.minutes);
     if (hourCol) {
       hourCol.setAttribute('aria-valuenow', String(displayHour(t)));
@@ -281,7 +291,7 @@ export function setup(props: TimepickerProps): TimepickerContext {
 
   function nowSeed(): TimeValue {
     const n: Date = new Date();
-    return clampTime({ hours: n.getHours(), minutes: Math.round(n.getMinutes() / step) * step % 60 });
+    return clampTime({ hours: n.getHours(), minutes: Math.round(n.getMinutes() / step()) * step() % 60 });
   }
 
   function openPanel(): void {
@@ -372,7 +382,7 @@ export function setup(props: TimepickerProps): TimepickerContext {
     ariaRequired: (): 'true' | undefined => (props.required ? 'true' : undefined),
     ariaDisabled: (): 'true' | undefined => (isDisabled() ? 'true' : undefined),
     showClear: (): boolean => !!props.clearable && !isDisabled() && rawValue() != null,
-    clearLabel: (): string => props.clearLabel ?? 'Clear',
+    clearLabel: (): string => props.clearLabel ?? timeDefaults().clearLabel ?? 'Clear',
     onFieldClick,
     onTriggerKeydown,
     onClearClick,

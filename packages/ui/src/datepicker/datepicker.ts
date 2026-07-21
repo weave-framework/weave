@@ -24,8 +24,9 @@
  *   import Datepicker from '@weave-framework/ui/datepicker';
  *   <Datepicker control={{ form.controls.dob }} max={{ adapter.today() }} firstDayOfWeek={{ 1 }} />
  */
-import { signal, effect, onDispose, type Signal } from '@weave-framework/runtime';
+import { signal, effect, computed, onDispose, type Signal, type Computed } from '@weave-framework/runtime';
 import { createOverlay, connectedPosition, createDateAdapter, type OverlayRef, type DateAdapter } from '../cdk/index.js';
+import { injectDateTimeDefaults, readDefault, type DateTimeDefaults } from '../date-time-defaults.js';
 import { buildPositions, type MenuPosition } from '../shared/positions.js';
 import { createCalendarView, CALENDAR_LABEL_DEFAULTS, type CalendarView, type CalendarLabels } from '../shared/calendar-view.js';
 
@@ -163,21 +164,32 @@ export function setup(props: DatepickerProps): DatepickerContext {
   const open: Signal<boolean> = signal<boolean>(false);
   const editable = (): boolean => !!props.editable;
   const parseError: Signal<boolean> = signal<boolean>(false);
-  const adapter: DateAdapter = props.adapter ?? createDateAdapter({ locale: props.locale });
+  // App-wide defaults (FW-19). Every read below is instance prop → context default → built-in, so
+  // an app that provides nothing is unchanged and a single field can still override any one of them.
+  const defaults: DateTimeDefaults = injectDateTimeDefaults();
+  const locale = (): string | undefined => props.locale ?? readDefault(defaults.locale);
+  // A computed so a locale (or provided-adapter) change rebuilds it, without allocating an adapter
+  // on every format call.
+  const adapter: Computed<DateAdapter> = computed<DateAdapter>(
+    () => props.adapter ?? readDefault(defaults.adapter) ?? createDateAdapter({ locale: locale() }),
+  );
   // The element carrying combobox `aria-expanded` (the input in editable mode, else the field).
   const comboEl = (): HTMLElement | null => (editable() ? input() : trigger());
 
-  // The English label defaults, overlaid with any provided (reactive) `labels`.
+  // English defaults, then the app's translated chrome, then this instance's — each merged shallowly
+  // so a partial object never blanks the keys it omits.
   const labels = (): DatepickerLabels => ({
     ...CALENDAR_LABEL_DEFAULTS,
     clear: 'Clear',
     openCalendar: 'Open calendar',
+    ...readDefault(defaults.datepickerLabels),
     ...props.labels,
   });
 
-  // First day of the week: the prop wins, else Monday (1) — a component default, not the locale's.
+  // First day of the week: the prop wins, then the app default, else Monday (1) — a component
+  // default, not the locale's.
   const firstDay = (): number => {
-    const f: number | undefined = props.firstDayOfWeek;
+    const f: number | undefined = props.firstDayOfWeek ?? readDefault(defaults.firstDayOfWeek);
     return f == null ? 1 : (((f % 7) + 7) % 7);
   };
 
@@ -199,7 +211,9 @@ export function setup(props: DatepickerProps): DatepickerContext {
     calendar = createCalendarView({
       prefix: 'weave-datepicker',
       panelId,
-      adapter,
+      // The view is built per open, so it captures the adapter current at that moment; a locale
+      // change while the panel is shut is picked up the next time it opens.
+      adapter: adapter(),
       labels, // DatepickerLabels is a superset of CalendarLabels
       firstDay,
       min: (): Date | undefined => props.min,
@@ -207,15 +221,15 @@ export function setup(props: DatepickerProps): DatepickerContext {
       dateFilter: props.dateFilter,
       isSelected: (date: Date): boolean => {
         const v: Date | null = rawValue();
-        return !!v && adapter.isSameDay(date, v);
+        return !!v && adapter().isSameDay(date, v);
       },
       isYearSelected: (year: number): boolean => {
         const v: Date | null = rawValue();
-        return !!v && adapter.getYear(v) === year;
+        return !!v && adapter().getYear(v) === year;
       },
       isMonthSelected: (year: number, month: number): boolean => {
         const v: Date | null = rawValue();
-        return !!v && adapter.getYear(v) === year && adapter.getMonth(v) === month;
+        return !!v && adapter().getYear(v) === year && adapter().getMonth(v) === month;
       },
       onSelectDay: (date: Date): void => {
         commit(date);
@@ -230,7 +244,7 @@ export function setup(props: DatepickerProps): DatepickerContext {
     if (open() || isDisabled()) return;
     const t: HTMLElement = trigger() as HTMLElement;
     const sel: Date | null = rawValue();
-    const base: Date = adapter.clamp(sel ?? adapter.today(), props.min, props.max);
+    const base: Date = adapter().clamp(sel ?? adapter().today(), props.min, props.max);
     const cal: CalendarView = ensureCalendar();
     cal.reset(base); // every open starts on the day grid, anchored at the value
     overlay = createOverlay({
@@ -267,7 +281,8 @@ export function setup(props: DatepickerProps): DatepickerContext {
     }
   };
 
-  const formatValue = (v: Date): string => adapter.format(v, props.displayFormat ?? { dateStyle: 'medium' });
+  const formatValue = (v: Date): string =>
+    adapter().format(v, props.displayFormat ?? readDefault(defaults.displayFormat) ?? { dateStyle: 'medium' });
 
   // Parse the typed text via the adapter: valid → commit (clamped) + normalise the display;
   // empty → clear; unparseable → keep the text + flag a parse error (aria-invalid).
@@ -280,9 +295,9 @@ export function setup(props: DatepickerProps): DatepickerContext {
       commit(null);
       return;
     }
-    const parsed: Date | null = adapter.parse(text);
+    const parsed: Date | null = adapter().parse(text);
     if (parsed) {
-      const committed: Date = adapter.clamp(parsed, props.min, props.max);
+      const committed: Date = adapter().clamp(parsed, props.min, props.max);
       parseError.set(false);
       commit(committed);
       el.value = formatValue(committed);
@@ -399,8 +414,10 @@ export function setup(props: DatepickerProps): DatepickerContext {
     ariaRequired: (): 'true' | undefined => (props.required ? 'true' : undefined),
     ariaDisabled: (): 'true' | undefined => (isDisabled() ? 'true' : undefined),
     showClear: (): boolean => !!props.clearable && !isDisabled() && rawValue() != null,
-    clearLabel: (): string => props.labels?.clear ?? props.clearLabel ?? 'Clear',
-    openCalendarLabel: (): string => props.labels?.openCalendar ?? 'Open calendar',
+    // `labels()` already carries the merge (English → app defaults → this instance); `clearLabel` is
+    // the older single-string prop and still wins over an app default, but not over `labels.clear`.
+    clearLabel: (): string => props.labels?.clear ?? props.clearLabel ?? labels().clear,
+    openCalendarLabel: (): string => props.labels?.openCalendar ?? labels().openCalendar,
     onFieldClick,
     onTriggerKeydown,
     onInputKeydown,

@@ -24,8 +24,9 @@
  *   import DateRangePicker from '@weave-framework/ui/date-range-picker';
  *   <DateRangePicker control={{ form.controls.stay }} min={{ adapter.today() }} clearable={{ true }} />
  */
-import { signal, effect, untrack, onDispose, type Signal } from '@weave-framework/runtime';
+import { signal, effect, computed, untrack, onDispose, type Signal, type Computed } from '@weave-framework/runtime';
 import { createOverlay, connectedPosition, createDateAdapter, type OverlayRef, type DateAdapter } from '../cdk/index.js';
+import { injectDateTimeDefaults, readDefault, type DateTimeDefaults } from '../date-time-defaults.js';
 import { buildPositions, type MenuPosition } from '../shared/positions.js';
 import { createCalendarView, CALENDAR_LABEL_DEFAULTS, type CalendarView, type CalendarLabels } from '../shared/calendar-view.js';
 
@@ -141,24 +142,31 @@ export function setup(props: DateRangePickerProps): DateRangePickerContext {
   const root: Signal<HTMLElement | null> = signal<HTMLElement | null>(null);
   const trigger: Signal<HTMLElement | null> = signal<HTMLElement | null>(null);
   const open: Signal<boolean> = signal<boolean>(false);
-  const adapter: DateAdapter = props.adapter ?? createDateAdapter({ locale: props.locale });
+  // App-wide defaults (FW-19): instance prop → context default → built-in, at every read.
+  const defaults: DateTimeDefaults = injectDateTimeDefaults();
+  const locale = (): string | undefined => props.locale ?? readDefault(defaults.locale);
+  const adapter: Computed<DateAdapter> = computed<DateAdapter>(
+    () => props.adapter ?? readDefault(defaults.adapter) ?? createDateAdapter({ locale: locale() }),
+  );
 
   // While picking: the anchor (first click). Null = not mid-selection (field shows the value).
   const pendingStart: Signal<Date | null> = signal<Date | null>(null);
   // The hovered day while picking the end — drives the preview band.
   const hoverDate: Signal<Date | null> = signal<Date | null>(null);
 
-  // The English label defaults, overlaid with any provided (reactive) `labels`.
+  // English defaults, then the app's translated chrome, then this instance's — each merged shallowly
+  // so a partial object never blanks the keys it omits.
   const labels = (): DateRangePickerLabels => ({
     ...CALENDAR_LABEL_DEFAULTS,
     calendarLabel: 'Choose date range',
     clear: 'Clear',
+    ...readDefault(defaults.datepickerLabels),
     ...props.labels,
   });
 
-  // First day of the week: the prop wins, else Monday (1).
+  // First day of the week: the prop wins, then the app default, else Monday (1).
   const firstDay = (): number => {
-    const f: number | undefined = props.firstDayOfWeek;
+    const f: number | undefined = props.firstDayOfWeek ?? readDefault(defaults.firstDayOfWeek);
     return f == null ? 1 : (((f % 7) + 7) % 7);
   };
 
@@ -183,7 +191,7 @@ export function setup(props: DateRangePickerProps): DateRangePickerContext {
   /* ── day decoration: committed range band OR live preview while picking ── */
   const p: string = 'weave-date-range-picker';
   const between = (date: Date, lo: Date, hi: Date): boolean =>
-    adapter.compare(date, lo) > 0 && adapter.compare(date, hi) < 0;
+    adapter().compare(date, lo) > 0 && adapter().compare(date, hi) < 0;
 
   const decorateDay = (date: Date, btn: HTMLButtonElement): void => {
     const anchor: Date | null = pendingStart();
@@ -191,13 +199,13 @@ export function setup(props: DateRangePickerProps): DateRangePickerContext {
       // Mid-selection: preview from the anchor to the hovered day.
       const hov: Date | null = hoverDate();
       if (!hov) return; // just the anchor's --selected fill, no band yet
-      const lo: Date = adapter.compare(hov, anchor) < 0 ? hov : anchor;
-      const hi: Date = adapter.compare(hov, anchor) < 0 ? anchor : hov;
-      if (adapter.isSameDay(lo, hi)) return; // hovering the anchor itself
+      const lo: Date = adapter().compare(hov, anchor) < 0 ? hov : anchor;
+      const hi: Date = adapter().compare(hov, anchor) < 0 ? anchor : hov;
+      if (adapter().isSameDay(lo, hi)) return; // hovering the anchor itself
       if (between(date, lo, hi)) btn.classList.add(`${p}__cell--preview`);
-      if (adapter.isSameDay(date, lo)) btn.classList.add(`${p}__cell--preview-start`);
-      if (adapter.isSameDay(date, hi)) btn.classList.add(`${p}__cell--preview-end`);
-      if (adapter.isSameDay(date, hov)) btn.classList.add(`${p}__cell--preview-edge`);
+      if (adapter().isSameDay(date, lo)) btn.classList.add(`${p}__cell--preview-start`);
+      if (adapter().isSameDay(date, hi)) btn.classList.add(`${p}__cell--preview-end`);
+      if (adapter().isSameDay(date, hov)) btn.classList.add(`${p}__cell--preview-edge`);
       return;
     }
     // Committed range: the in-between band + rounded ends (the ends also carry --selected).
@@ -206,16 +214,16 @@ export function setup(props: DateRangePickerProps): DateRangePickerContext {
     const s: Date = v.start;
     const e: Date = v.end;
     if (between(date, s, e)) btn.classList.add(`${p}__cell--in-range`);
-    if (adapter.isSameDay(date, s)) btn.classList.add(`${p}__cell--range-start`);
-    if (adapter.isSameDay(date, e)) btn.classList.add(`${p}__cell--range-end`);
+    if (adapter().isSameDay(date, s)) btn.classList.add(`${p}__cell--range-start`);
+    if (adapter().isSameDay(date, e)) btn.classList.add(`${p}__cell--range-end`);
   };
 
   // Accent-fill endpoints: the anchor while picking, else both committed ends.
   const isSelected = (date: Date): boolean => {
     const anchor: Date | null = pendingStart();
-    if (anchor) return adapter.isSameDay(date, anchor);
+    if (anchor) return adapter().isSameDay(date, anchor);
     const v: DateRange | null = rawValue();
-    return !!v && ((!!v.start && adapter.isSameDay(date, v.start)) || (!!v.end && adapter.isSameDay(date, v.end)));
+    return !!v && ((!!v.start && adapter().isSameDay(date, v.start)) || (!!v.end && adapter().isSameDay(date, v.end)));
   };
 
   // The year/month grids mark the anchor's (or committed start's) period.
@@ -226,14 +234,14 @@ export function setup(props: DateRangePickerProps): DateRangePickerContext {
     if (!anchor) {
       // First click — start a fresh range at the anchor. Re-decorate in place (same month) so the
       // day cells keep their identity and the *second* click (a real mousedown+mouseup) still fires.
-      pendingStart.set(adapter.clone(date));
+      pendingStart.set(adapter().clone(date));
       hoverDate.set(null);
       calendar?.refreshDays();
       return;
     }
     // Second click — complete, ordering the two ends.
-    const start: Date = adapter.compare(date, anchor) < 0 ? adapter.clone(date) : anchor;
-    const end: Date = adapter.compare(date, anchor) < 0 ? anchor : adapter.clone(date);
+    const start: Date = adapter().compare(date, anchor) < 0 ? adapter().clone(date) : anchor;
+    const end: Date = adapter().compare(date, anchor) < 0 ? anchor : adapter().clone(date);
     pendingStart.set(null);
     hoverDate.set(null);
     commit({ start, end });
@@ -245,7 +253,8 @@ export function setup(props: DateRangePickerProps): DateRangePickerContext {
     calendar = createCalendarView({
       prefix: p,
       panelId,
-      adapter,
+      // Built per open, so it captures the adapter current at that moment.
+      adapter: adapter(),
       labels, // DateRangePickerLabels is a superset of CalendarLabels
       firstDay,
       min: (): Date | undefined => props.min,
@@ -254,17 +263,17 @@ export function setup(props: DateRangePickerProps): DateRangePickerContext {
       isSelected,
       isYearSelected: (year: number): boolean => {
         const r: Date | null = refDate();
-        return !!r && adapter.getYear(r) === year;
+        return !!r && adapter().getYear(r) === year;
       },
       isMonthSelected: (year: number, month: number): boolean => {
         const r: Date | null = refDate();
-        return !!r && adapter.getYear(r) === year && adapter.getMonth(r) === month;
+        return !!r && adapter().getYear(r) === year && adapter().getMonth(r) === month;
       },
       decorateDay,
       onSelectDay,
       onHoverDay: (date: Date): void => {
         if (!pendingStart()) return; // preview only while picking the end
-        hoverDate.set(adapter.clone(date));
+        hoverDate.set(adapter().clone(date));
         calendar?.refreshDays(); // in-place — never rebuild the grid under the pointer (breaks the click)
       },
       onHoverLeave: (): void => {
@@ -281,7 +290,7 @@ export function setup(props: DateRangePickerProps): DateRangePickerContext {
     if (open() || isDisabled()) return;
     const t: HTMLElement = trigger() as HTMLElement;
     const v: DateRange | null = rawValue();
-    const base: Date = adapter.clamp(v?.start ?? adapter.today(), props.min, props.max);
+    const base: Date = adapter().clamp(v?.start ?? adapter().today(), props.min, props.max);
     pendingStart.set(null); // every open starts a fresh selection
     hoverDate.set(null);
     const cal: CalendarView = ensureCalendar();
@@ -326,7 +335,8 @@ export function setup(props: DateRangePickerProps): DateRangePickerContext {
     commit(null);
   };
 
-  const formatValue = (v: Date): string => adapter.format(v, props.displayFormat ?? { dateStyle: 'medium' });
+  const formatValue = (v: Date): string =>
+    adapter().format(v, props.displayFormat ?? readDefault(defaults.displayFormat) ?? { dateStyle: 'medium' });
 
   // Re-render an open calendar when the EXTERNAL value changes. `render()` reads the pending /
   // hover signals (via decorateDay), so it must run untracked — otherwise this effect would also
@@ -383,7 +393,8 @@ export function setup(props: DateRangePickerProps): DateRangePickerContext {
     ariaRequired: (): 'true' | undefined => (props.required ? 'true' : undefined),
     ariaDisabled: (): 'true' | undefined => (isDisabled() ? 'true' : undefined),
     showClear: (): boolean => !!props.clearable && !isDisabled() && hasValue(),
-    clearLabel: (): string => props.labels?.clear ?? props.clearLabel ?? 'Clear',
+    // `labels()` already carries the merge (English → app defaults → this instance).
+    clearLabel: (): string => props.labels?.clear ?? props.clearLabel ?? labels().clear,
     onFieldClick,
     onTriggerKeydown,
     onClearClick,

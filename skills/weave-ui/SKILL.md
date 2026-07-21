@@ -109,7 +109,8 @@ Template tokens: `9` digit · `a` letter · `*` either · `\` escapes the next c
 
 - **Forms**: `use:control={{ field }}` on `@weave-framework/ui` inputs, or `bind:value` for plain two-way (weave-forms).
 - **Lists**: `<List>` with a `rowTemplate` `@snippet` (typed) + `CursorList` + `InfiniteScroll` for large/cursor-paged data (weave-data).
-- **Overlays**: prefer the built-in `Dialog`/`Menu`/`Snackbar` over hand-rolled portals.
+- **Overlays**: prefer the built-in `Dialog`/`Menu`/`Snackbar` over hand-rolled portals. `openDialog` hosts a live component — `content: component(Editor, props)` (or the `[Editor, props]` tuple) mounts it with an owner and disposes it on close; never hand-roll a mount/dispose adapter.
+- **Date/time pickers**: never repeat `locale`/`firstDayOfWeek`/`displayFormat`/`labels`/`use24`/`step` per field. Call `provideDateTimeDefaults({ … })` once at the app root (from `@weave-framework/ui`) — pass **getters** so a settings/language change flows through. Instance prop → context → built-in; wrapping a picker just to re-supply config is the anti-pattern this removes.
 - **Theme once** at the root via tokens; don't override component internals with `!important`.
 
 ## Gotchas

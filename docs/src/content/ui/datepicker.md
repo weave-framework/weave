@@ -97,6 +97,50 @@ be `t('…')` from [@weave-framework/i18n](/reference/i18n) and re-render on a l
 />
 ```
 
+## App-wide defaults
+
+Locale, date format, week start and translated chrome are **application** decisions, not per-field ones — a picker
+that omits any of them shows a date in a format used nowhere else, or English chrome inside a translated UI. So set
+them once at the app root instead of repeating them at every call site:
+
+```ts
+import { provideDateTimeDefaults } from '@weave-framework/ui';
+
+export function setup() {
+  provideDateTimeDefaults({
+    // everything may be a GETTER, so a settings or language change flows straight through
+    locale: () => locale(),
+    firstDayOfWeek: () => weekStartIndex(),
+    displayFormat: () => ({ dateStyle: 'medium' }),
+    datepickerLabels: () => ({
+      prevMonth: t('cal.prevMonth'), nextMonth: t('cal.nextMonth'),
+      chooseYear: t('cal.chooseYear'), clear: t('common.clear'), openCalendar: t('cal.open'),
+    }),
+    timepicker: () => ({ use24: timeFormat() === '24h', step: timeStep() }),
+  });
+}
+```
+
+Every picker below then needs nothing but its binding:
+
+```html
+<Datepicker value={{ from() }} onChange={{ setFrom }} />
+<DateRangePicker value={{ stay() }} onChange={{ setStay }} />
+<Timepicker value={{ start() }} onChange={{ setStart }} />
+```
+
+- **Resolution order is instance prop → context default → the component's built-in.** A single field can still
+  override any one default: `<Datepicker firstDayOfWeek={{ 0 }} />` wins over the context.
+- **Getters are read at each use**, not captured once, so a mounted field follows a live settings change. A plain
+  value works too and simply never changes.
+- **`datepickerLabels` merges shallowly** — over the English defaults, under the instance's `labels`. Passing three
+  of eight keys never blanks the other five. Both date pickers read the same set; `<DateRangePicker>` ignores
+  `openCalendar`, which it has no button for.
+- **Providing nothing changes nothing**: Monday start, English labels, runtime locale — exactly as before.
+
+`provideDateTimeDefaults` is called in any ancestor scope (normally the root component's `setup`) and reaches every
+picker mounted under it, including inside dialogs and lazily-loaded routes.
+
 ## Typeable field
 
 By default the field is a button that only opens the calendar. Set `editable={{ true }}` to swap in a typeable
