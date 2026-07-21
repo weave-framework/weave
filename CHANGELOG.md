@@ -17,6 +17,36 @@
 ## Unreleased
 
 ### Added — UI
+- **`infiniteScroll` — a load-more sentinel in the CDK** (`@weave-framework/ui/cdk`, FW-20). The scroll
+  family covered overlay strategies (`scroll`), windowing data you already have (`virtual-scroll`) and
+  resize/mutation signals (`observers`); *when to ask for the next page* was missing, and it is the
+  paging model every cursor-based list uses. Headless — no markup, spinner or empty state:
+
+  ```html
+  <div use:infiniteScroll={{ { hasMore: () => list.hasMore(),
+                               loading: () => list.loading(),
+                               onLoad:  () => list.loadMore() } }}></div>
+  ```
+  - **A short page chains.** `loading`'s **`true → false` edge** re-evaluates, so when a page too small
+    to fill the viewport arrives the next one is requested immediately. This is the bug hand-rolled
+    sentinels hit: the observer never re-fires because the sentinel never left the screen, and the list
+    stops after page 1 on a tall display.
+  - **Never overlaps** a request in flight, **idles** while `hasMore` is false and **re-arms** when it
+    flips back (a filter reset), **disconnects** on owner disposal, and **re-observes** through the
+    action's `update` when `root`/`rootMargin` change.
+  - Works in the viewport or inside any scroll container (`root`), with `rootMargin` (default `150px`)
+    deciding how early it fires. Composes with `virtualScroll` rather than competing: that one decides
+    what to *render*, this one when to *fetch*.
+  - Not included: the data-side helper. `cursorList()` over `resource` would belong in
+    `@weave-framework/data` and is a separate ask; this is the DOM half and stands alone.
+
+### Fixed — skills
+- **`weave-ui` and `weave-data` documented two components that do not exist.** Both taught
+  `InfiniteScroll`, and `weave-ui` also `CursorList`, as the way to build a cursor-paged list. Neither
+  has ever existed in the codebase, so an agent following either skill wrote against an API it could
+  not import — the same silent-drift failure class the skills sync gate was built for, except here the
+  source of truth itself was wrong. Both now point at `use:infiniteScroll` (above) and say plainly that
+  it is headless and composes with `virtualScroll`.
 - **App-wide defaults for the date/time pickers** — `provideDateTimeDefaults()` from
   `@weave-framework/ui` ([FW-19](docs/src/content/ui/datepicker.md)). `<Datepicker>`,
   `<DateRangePicker>` and `<Timepicker>` were configured **per instance**: adapter, locale, first day

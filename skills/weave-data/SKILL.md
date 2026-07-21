@@ -152,7 +152,7 @@ After a mutation, `refetch()` the affected resource (or write it directly with `
 - **Put every reactive input in the `source`** (search, pagination, route params) — never inside the fetcher. For search, make the `source` a `debounced` signal (weave-reactivity) to avoid a request per keystroke.
 - **Loading/error UI** via `@await`'s pending/`@catch` branches — don't hand-roll `if (loading())` ladders when `@await` reads cleaner.
 - **Errors**: catch `HttpError` and map `status` to a user message (403 → no-permission, 409 → conflict).
-- **Cursor/infinite lists**: accumulate pages in a signal; append on "load more"; a `<List>`/`InfiniteScroll` (weave-ui) consumes them.
+- **Cursor/infinite lists**: accumulate pages in a signal; append on "load more". The DOM half is `use:infiniteScroll` (`@weave-framework/ui/cdk`) on a sentinel after the rows — give it `hasMore`/`loading`/`onLoad` getters; its `loading` true→false edge is what chains the next page when one is too short to fill the viewport.
 
 ## Gotchas
 
