@@ -123,6 +123,95 @@ export function after(node: Node, n: number): Node {
   return x;
 }
 
+/**
+ * ADOPT side (Stage A) — a single sequential cursor over the marked server DOM.
+ *
+ * The historical adopt navigation addressed each dynamic node by an ABSOLUTE child index computed at build
+ * time (`child(_r, i, j)`), which every runtime-variable construct (a block, a nested component) breaks — so
+ * the compiler patched around it with dynamic-text index shifts, post-block `after()` rebasing, and a stack of
+ * `pbOff`/`nodeOverride` bookkeeping. This cursor replaces all of that: the server DOM is a linear stream of
+ * siblings, and the adopt walk mirrors the create walk one step at a time, in document order. A dynamic-text
+ * marker is consumed as the cursor reaches it (no shift table); a variable-length block is skipped by
+ * bracket-matching (no `after`/offset math); a post-block sibling is simply the next node after the skip.
+ *
+ * Positioned at a parent's first child; each op advances or descends exactly as the emit visits template nodes:
+ * - {@link here} — the node under the cursor, WITHOUT advancing (a binding on the current element).
+ * - {@link step} — advance to the next sibling (skip a static node / a `<!---->` placeholder).
+ * - {@link enter} / {@link exit} — descend into the current element's children / pop back and step past it.
+ * - {@link text} — the current reactive `{{ }}`: its `<!--$-->`,text,`<!---->` triple; returns the anchor
+ *   (what {@link adoptText} binds) and advances past all three.
+ * - {@link block} — the current control-flow block / nested component: its `[`…`]` region; returns
+ *   `[start, end]` and advances past `]` by bracket-matching (via {@link blockEndOf}).
+ *
+ * Resumable entry only — 0 bytes for a plain client SPA (invariant I3).
+ */
+export class AdoptCursor {
+  private cur: Node | null;
+  private readonly stack: Node[] = [];
+
+  constructor(parent: Node) {
+    this.cur = parent.firstChild;
+  }
+
+  /** The node under the cursor (a binding target on the current element). Does not advance. */
+  here(): Node {
+    if (!this.cur) throw new Error('adopt cursor: no node at the cursor (server/client DOM diverged).');
+    return this.cur;
+  }
+
+  /** Skip the current node (a static text/element or a `<!---->` placeholder) — advance to the next sibling. */
+  step(): this {
+    this.cur = this.here().nextSibling;
+    return this;
+  }
+
+  /** Descend into the current element: its children become the walk level; the cursor lands on its first child. */
+  enter(): this {
+    const el: Node = this.here();
+    this.stack.push(el);
+    this.cur = el.firstChild;
+    return this;
+  }
+
+  /** Pop back to the element we descended from and advance past it — resume the parent level after its subtree. */
+  exit(): this {
+    const el: Node | undefined = this.stack.pop();
+    if (!el) throw new Error('adopt cursor: exit() with no matching enter().');
+    this.cur = el.nextSibling;
+    return this;
+  }
+
+  /**
+   * The current reactive `{{ }}` binding: the server renders it as a `<!--$-->` marker, a text node, and a
+   * `<!---->` anchor. Return the ANCHOR (the node {@link adoptText} binds — it re-binds `anchor.previousSibling`)
+   * and advance the cursor past the whole triple.
+   */
+  text(): Comment {
+    const marker: Node = this.here(); // <!--$-->
+    const anchor: Node | null = marker.nextSibling && marker.nextSibling.nextSibling; // text, then anchor
+    if (!anchor || anchor.nodeType !== 8) {
+      throw new Error('adopt cursor: expected a dynamic-text triple (<!--$-->, text, <!---->) at the cursor.');
+    }
+    this.cur = anchor.nextSibling;
+    return anchor as Comment;
+  }
+
+  /**
+   * The current control-flow block or nested component: a `[`…`]` region around a runtime-variable number of
+   * server nodes. Return `[start, end]` (the caller island-replays or nested-resumes it) and advance the cursor
+   * past `]` — so the walk continues at the sibling after the block WITHOUT knowing its node count.
+   */
+  block(): [Comment, Comment] {
+    const start: Node = this.here();
+    if (start.nodeType !== 8 || (start as Comment).data !== BLOCK_START) {
+      throw new Error('adopt cursor: expected a block start marker "[" at the cursor.');
+    }
+    const end: Comment = blockEndOf(start as Comment);
+    this.cur = end.nextSibling;
+    return [start as Comment, end];
+  }
+}
+
 /** The shape the compiler attaches to a resumable component: its render's adopt variant, for nested resume. */
 interface AdoptableComponent {
   (props?: Record<string, unknown>, slots?: Record<string, () => Node>): Node;

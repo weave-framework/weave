@@ -1,6 +1,6 @@
 import { test, assert } from '../../../tools/harness.js';
 import { signal, root, type Signal } from '@weave-framework/runtime';
-import { bindTextResumable, adoptText, resetAdoptWarnings, DYN_TEXT, blockStart, blockEndOf, clearBlock } from '@weave-framework/runtime/adopt';
+import { bindTextResumable, adoptText, resetAdoptWarnings, DYN_TEXT, blockStart, blockEndOf, clearBlock, AdoptCursor } from '@weave-framework/runtime/adopt';
 import { ifBlock } from '@weave-framework/runtime/dom';
 
 /** Node types (avoid the Node global under the test bundler). */
@@ -195,4 +195,88 @@ test('E1.10: a first thunk returning the EXISTING nodes adopts them in place; a 
   which.set('fresh');
   assert.ok(!box.querySelector('#srv'), 'a swap removes the adopted nodes — ifBlock tracked them');
   assert.ok(box.querySelector('#fresh'), 'and renders the new branch');
+});
+
+// ── Stage A: AdoptCursor — the sequential walk that replaces absolute-index navigation ──────────────────
+
+test('AdoptCursor: step/here walk statics in order and here() does not advance', () => {
+  const p: HTMLElement = document.createElement('p');
+  const a: Text = document.createTextNode('a');
+  const b: Text = document.createTextNode('b');
+  const c: Text = document.createTextNode('c');
+  p.append(a, b, c);
+
+  const cur: AdoptCursor = new AdoptCursor(p);
+  assert.is(cur.here(), a, 'starts at the first child');
+  assert.is(cur.here(), a, 'here() does not advance — same node again');
+  cur.step();
+  assert.is(cur.here(), b, 'step() advances to the next sibling');
+  cur.step();
+  assert.is(cur.here(), c, 'and again');
+});
+
+test('AdoptCursor: text() returns the dynamic-text anchor and steps past the whole triple', () => {
+  // server HTML for `A {{ x }} B` inside a <p>: "A ", <!--$-->, "x", <!---->, " B"
+  const p: HTMLElement = document.createElement('p');
+  p.innerHTML = `A <!--${DYN_TEXT}-->x<!----> B`;
+  const staticA: Node = p.childNodes[0];
+  const marker: Node = p.childNodes[1];
+  const anchor: Node = p.childNodes[3];
+  const staticB: Node = p.childNodes[4];
+
+  const cur: AdoptCursor = new AdoptCursor(p);
+  assert.is(cur.here(), staticA, 'cursor at the leading static run');
+  cur.step();
+  assert.is(cur.here(), marker, 'then at the dynamic-text marker');
+  const got: Comment = cur.text();
+  assert.is(got, anchor, 'text() returns the <!----> anchor (what adoptText binds)');
+  assert.is(cur.here(), staticB, 'and the cursor stepped past marker+text+anchor to the trailing static');
+});
+
+test('AdoptCursor: enter/exit descend into an element and resume the parent level after it', () => {
+  // <div><span>{{ x }}</span>T</div>  →  span holds "<!--$-->x<!---->", then a static "T" after it
+  const div: HTMLElement = document.createElement('div');
+  div.innerHTML = `<span><!--${DYN_TEXT}-->x<!----></span>T`;
+  const span: Node = div.childNodes[0];
+  const tail: Node = div.childNodes[1];
+  const innerAnchor: Node = span.childNodes[2];
+
+  const cur: AdoptCursor = new AdoptCursor(div);
+  assert.is(cur.here(), span, 'at the <span>');
+  cur.enter();
+  assert.is(cur.here(), span.childNodes[0], 'entered — at the span\'s first child (the marker)');
+  const a: Comment = cur.text();
+  assert.is(a, innerAnchor, 'bound the inner dynamic text');
+  cur.exit();
+  assert.is(cur.here(), tail, 'exited past the <span> to its following sibling');
+});
+
+test('AdoptCursor: block() returns [start,end] and skips a runtime-variable region by bracket-matching', () => {
+  // a block region "[ ...content (with a NESTED block) ... ]" then a trailing static — the count is unknowable
+  const box: HTMLElement = document.createElement('div');
+  box.innerHTML = `<!--[-->x<!--[-->y<!--]-->z<!--]-->TAIL`;
+  // childNodes: 0:"[" 1:"x" 2:"[" 3:"y" 4:"]" 5:"z" 6:"]"(outer) 7:"TAIL"
+  const start: Node = box.childNodes[0];
+  const end: Node = box.childNodes[6]; // the OUTER "]" — the nested "[","]" pair must not fool the match
+  const tail: Node = box.childNodes[7];
+  assert.equal((start as Comment).data, '[', 'sanity: starts at "["');
+  assert.equal((end as Comment).data, ']', 'sanity: the outer "]" is childNodes[6]');
+
+  const cur: AdoptCursor = new AdoptCursor(box);
+  const [s, e]: [Comment, Comment] = cur.block();
+  assert.is(s, start, 'block() returns the "[" start');
+  assert.is(e, end, 'and the MATCHING outer "]" — bracket depth respected, nested pair skipped');
+  assert.is(cur.here(), tail, 'and the cursor advanced past "]" to the trailing static');
+});
+
+test('AdoptCursor: a mismatch (no node at the cursor) throws rather than binding the wrong node', () => {
+  const p: HTMLElement = document.createElement('p'); // empty
+  const cur: AdoptCursor = new AdoptCursor(p);
+  let threw: boolean = false;
+  try {
+    cur.here();
+  } catch {
+    threw = true;
+  }
+  assert.ok(threw, 'here() on an empty parent throws — a divergence is surfaced, not silently mis-bound');
 });
