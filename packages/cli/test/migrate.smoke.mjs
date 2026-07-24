@@ -127,6 +127,17 @@ ok(a.findEntryPoint(join(fx, 'plain-angular'))?.endsWith('main.ts'), 'findEntryP
 // nothing to find → null (recorded as "no entry — human, look", never guessed)
 ok(a.findEntryPoint(join(fx, 'not-angular')) === null, 'findEntryPoint: no entry found → null');
 
+// ── M2.2: parse the entry's imports (the first tree level), classified ──
+const entry = a.findEntryPoint(join(fx, 'nx-mono', 'apps', 'shop'));
+const imports = a.parseImports(entry);
+const byKind = (k) => imports.filter((i) => i.kind === k);
+ok(byKind('angular').some((i) => i.spec === '@angular/platform-browser'), 'parseImports: @angular/* → angular (source framework)');
+ok(byKind('third-party').some((i) => i.spec === 'lodash-es'), 'parseImports: a real package → third-party');
+const rel = byKind('relative');
+ok(rel.some((i) => i.spec === './app/app.component' && i.resolved?.endsWith('app.component.ts')), 'parseImports: a relative import resolves to its file');
+ok(rel.some((i) => i.spec === './app/lazy.routes'), 'parseImports: a dynamic import() (lazy route) is captured too');
+ok(imports.length === 4, `parseImports: found all four imports (got ${imports.length})`);
+
 rmSync(out, { force: true });
 rmSync(outA, { force: true });
 
