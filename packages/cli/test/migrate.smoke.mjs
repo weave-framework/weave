@@ -138,6 +138,36 @@ ok(rel.some((i) => i.spec === './app/app.component' && i.resolved?.endsWith('app
 ok(rel.some((i) => i.spec === './app/lazy.routes'), 'parseImports: a dynamic import() (lazy route) is captured too');
 ok(imports.length === 4, `parseImports: found all four imports (got ${imports.length})`);
 
+// ── M2.3: the downward walk — follow relative imports to the leaves ──
+const walk = a.walkDependencies(entry);
+ok(walk.files.some((f) => f.endsWith('main.ts')) && walk.files.some((f) => f.endsWith('app.component.ts')) && walk.files.some((f) => f.endsWith('lazy.routes.ts')),
+  'walkDependencies: reaches main → app.component + lazy.routes (down the tree)');
+ok(walk.angular.includes('@angular/platform-browser') && walk.angular.includes('@angular/core'), 'walkDependencies: collects @angular/* from anywhere in the tree');
+ok(walk.thirdParty.includes('lodash-es'), 'walkDependencies: collects third-party packages at the edges');
+ok(walk.cycles.length === 0, 'walkDependencies: no cycle in a clean tree');
+
+// a cycle a → b → a is REPORTED, not followed forever
+const cyc = mkdtempSync(join(tmpdir(), 'weave-migrate-cyc-'));
+try {
+  writeFileSync(join(cyc, 'a.ts'), "import './b';");
+  writeFileSync(join(cyc, 'b.ts'), "import './a';");
+  const w = a.walkDependencies(join(cyc, 'a.ts'));
+  ok(w.cycles.length === 1, `walkDependencies: a↔b cycle is reported once (got ${w.cycles.length})`);
+  ok(w.files.length === 2, 'walkDependencies: both files still walked (the cycle did not loop forever)');
+} finally {
+  rmSync(cyc, { recursive: true, force: true });
+}
+
+// an unresolved relative import is recorded (human, look), never guessed
+const miss = mkdtempSync(join(tmpdir(), 'weave-migrate-miss-'));
+try {
+  writeFileSync(join(miss, 'x.ts'), "import './does-not-exist';");
+  const w = a.walkDependencies(join(miss, 'x.ts'));
+  ok(w.unresolved.includes('./does-not-exist'), 'walkDependencies: an unresolvable relative import is recorded');
+} finally {
+  rmSync(miss, { recursive: true, force: true });
+}
+
 rmSync(out, { force: true });
 rmSync(outA, { force: true });
 

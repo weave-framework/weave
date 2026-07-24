@@ -137,3 +137,63 @@ export function parseImports(filePath: string): ImportRef[] {
   visit(sf);
   return out;
 }
+
+/* ──────────── M2.3 — the downward walk: follow relative imports to the leaves ──────────── */
+
+export interface DependencyWalk {
+  /** Every reachable `.ts` file, from the entry down (the migration's file set). */
+  files: string[];
+  /** Distinct `@angular/*` specifiers used anywhere in the tree — the translation surface. */
+  angular: string[];
+  /** Distinct third-party packages at the tree edges — each needs a keep/replace/rewrite decision. */
+  thirdParty: string[];
+  /** Circular-import chains found — REPORTED, not resolved ("used circularly — look"). */
+  cycles: string[][];
+  /** Relative imports that could not be resolved to a file — recorded, never guessed. */
+  unresolved: string[];
+}
+
+/**
+ * Walk the dependency tree DOWNWARD from `entryFile`: follow every `relative` import to its file, recursively,
+ * to the leaves. A `seen` set makes it a DAG (each file once — no re-analysis, no infinite loops). A back-edge
+ * to a file on the current path is a CYCLE: recorded and not followed. `@angular/*` and third-party specifiers
+ * are collected at the edges but never recursed into. This is the scoped, complete reachable set for the
+ * selection — exactly what it depends on, nothing it doesn't.
+ */
+export function walkDependencies(entryFile: string): DependencyWalk {
+  const files: Set<string> = new Set<string>();
+  const angular: Set<string> = new Set<string>();
+  const thirdParty: Set<string> = new Set<string>();
+  const unresolved: Set<string> = new Set<string>();
+  const cycles: string[][] = [];
+  const path: string[] = []; // the current walk path, for cycle detection
+
+  const visit = (file: string): void => {
+    if (files.has(file)) return; // already walked (a shared dep) — visit once
+    files.add(file);
+    path.push(file);
+    for (const imp of parseImports(file)) {
+      if (imp.kind === 'angular') {
+        angular.add(imp.spec);
+      } else if (imp.kind === 'third-party') {
+        thirdParty.add(imp.spec);
+      } else if (!imp.resolved) {
+        unresolved.add(imp.spec);
+      } else if (path.includes(imp.resolved)) {
+        cycles.push([...path.slice(path.indexOf(imp.resolved)), imp.resolved]); // a cycle — report, don't follow
+      } else {
+        visit(imp.resolved);
+      }
+    }
+    path.pop();
+  };
+  visit(entryFile);
+
+  return {
+    files: [...files],
+    angular: [...angular],
+    thirdParty: [...thirdParty],
+    cycles,
+    unresolved: [...unresolved],
+  };
+}
