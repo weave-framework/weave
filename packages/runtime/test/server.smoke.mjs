@@ -32,10 +32,10 @@ const entry = `
   import { resumableHandler, collectResumable } from '@weave-framework/runtime/resume';
   import { deserialize } from '@weave-framework/runtime/serialize';
   import { SNAPSHOT_ID, ROOT_ID, collectStates, registerState } from '@weave-framework/runtime/graph';
-  import { bindTextResumable, adoptText, blockStart, adoptIsland, blockEndOf, clearBlock, after, adoptComponent } from '@weave-framework/runtime/adopt';
+  import { bindTextResumable, adoptText, blockStart, blockEndOf, clearBlock, adoptComponent, AdoptCursor } from '@weave-framework/runtime/adopt';
   import { compileTemplate } from '@weave-framework/compiler';
   import { resource } from '@weave-framework/data';
-  export const rt = { ...dom, signal, computed, effect, root, onMount, resumableHandler, bindTextResumable, adoptText, blockStart, adoptIsland, blockEndOf, clearBlock, after, adoptComponent, registerState };
+  export const rt = { ...dom, signal, computed, effect, root, onMount, resumableHandler, bindTextResumable, adoptText, blockStart, blockEndOf, clearBlock, adoptComponent, registerState, AdoptCursor };
   export { renderToString, renderComponent, renderPage, renderDocument, compileTemplate, signal, dom, deserialize, SNAPSHOT_ID, ROOT_ID, collectResumable, resource };
 `;
 

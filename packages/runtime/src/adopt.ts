@@ -97,53 +97,12 @@ export function clearBlock(start: Comment, end: Comment): void {
   }
 }
 
-/**
- * ADOPT side (E1.2c-2): the island-replay entry for a control-flow block. Given the block's `[` start marker
- * (the adopt render navigates to it by computed index — `[` sits at the block anchor's template position),
- * clear the server-rendered content and return the `]` end anchor so the caller can re-run the block's normal
- * helper (`ifBlock`) against it — a fresh, fully REACTIVE branch. The static/text nodes AROUND the block stay
- * adopted in place; only the block subtree re-renders. After the clear, `]` is `start.nextSibling`.
- */
-export function adoptIsland(start: Comment): Comment {
-  const end: Comment = blockEndOf(start);
-  clearBlock(start, end);
-  return end;
-}
 
 /**
- * ADOPT side (E1.2c-4): the `n`-th following sibling of `node` — a small forward cursor. A node that sits
- * AFTER a block can't be reached by a build-time child index (the block's content is runtime-variable), but
- * the block's `]` end anchor is a stable reference and the nodes after it don't move across an island-replay,
- * so the adopt render walks `after(blockEnd, offset)` to reach a post-block binding. `n` counts raw sibling
- * steps (each static node = 1; a dynamic-text interp = 3 — its `$` marker, text, and anchor).
- */
-export function after(node: Node, n: number): Node {
-  let x: Node = node;
-  for (let i: number = 0; i < n; i++) x = x.nextSibling!;
-  return x;
-}
-
-/**
- * ADOPT side (Stage A) — a single sequential cursor over the marked server DOM.
- *
- * The historical adopt navigation addressed each dynamic node by an ABSOLUTE child index computed at build
- * time (`child(_r, i, j)`), which every runtime-variable construct (a block, a nested component) breaks — so
- * the compiler patched around it with dynamic-text index shifts, post-block `after()` rebasing, and a stack of
- * `pbOff`/`nodeOverride` bookkeeping. This cursor replaces all of that: the server DOM is a linear stream of
- * siblings, and the adopt walk mirrors the create walk one step at a time, in document order. A dynamic-text
- * marker is consumed as the cursor reaches it (no shift table); a variable-length block is skipped by
- * bracket-matching (no `after`/offset math); a post-block sibling is simply the next node after the skip.
- *
- * Positioned at a parent's first child; each op advances or descends exactly as the emit visits template nodes:
- * - {@link here} — the node under the cursor, WITHOUT advancing (a binding on the current element).
- * - {@link step} — advance to the next sibling (skip a static node / a `<!---->` placeholder).
- * - {@link enter} / {@link exit} — descend into the current element's children / pop back and step past it.
- * - {@link text} — the current reactive `{{ }}`: its `<!--$-->`,text,`<!---->` triple; returns the anchor
- *   (what {@link adoptText} binds) and advances past all three.
- * - {@link block} — the current control-flow block / nested component: its `[`…`]` region; returns
- *   `[start, end]` and advances past `]` by bracket-matching (via {@link blockEndOf}).
- *
- * Resumable entry only — 0 bytes for a plain client SPA (invariant I3).
+ * ADOPT side (Stage A) — one sequential cursor over the marked server DOM, mirroring the create walk in
+ * document order (replaces the old absolute-index navigation + dynamic-text shifts + post-block `after()`
+ * rebasing). Positioned at a parent's first child. Design + rationale: STAGE-A-PLAN.md. Resumable entry only —
+ * 0 bytes for a plain client SPA (invariant I3).
  */
 export class AdoptCursor {
   private cur: Node | null;
@@ -153,19 +112,19 @@ export class AdoptCursor {
     this.cur = parent.firstChild;
   }
 
-  /** The node under the cursor (a binding target on the current element). Does not advance. */
+  /** The node under the cursor (a binding target on the current element); does not advance. */
   here(): Node {
-    if (!this.cur) throw new Error('adopt cursor: no node at the cursor (server/client DOM diverged).');
+    if (!this.cur) throw new Error('adopt: cursor off DOM'); // divergence surfaced, not silent
     return this.cur;
   }
 
-  /** Skip the current node (a static text/element or a `<!---->` placeholder) — advance to the next sibling. */
-  step(): this {
-    this.cur = this.here().nextSibling;
+  /** Skip `n` server nodes (default 1) — statics / `<!---->` placeholders the walk does not bind. */
+  step(n: number = 1): this {
+    for (let i: number = 0; i < n; i++) this.cur = this.here().nextSibling;
     return this;
   }
 
-  /** Descend into the current element: its children become the walk level; the cursor lands on its first child. */
+  /** Descend into the current element — the cursor lands on its first child. */
   enter(): this {
     const el: Node = this.here();
     this.stack.push(el);
@@ -173,39 +132,29 @@ export class AdoptCursor {
     return this;
   }
 
-  /** Pop back to the element we descended from and advance past it — resume the parent level after its subtree. */
+  /** Pop back to the entered element and advance past it — resume the parent level after its subtree. */
   exit(): this {
     const el: Node | undefined = this.stack.pop();
-    if (!el) throw new Error('adopt cursor: exit() with no matching enter().');
+    if (!el) throw new Error('adopt: exit() unbalanced');
     this.cur = el.nextSibling;
     return this;
   }
 
-  /**
-   * The current reactive `{{ }}` binding: the server renders it as a `<!--$-->` marker, a text node, and a
-   * `<!---->` anchor. Return the ANCHOR (the node {@link adoptText} binds — it re-binds `anchor.previousSibling`)
-   * and advance the cursor past the whole triple.
-   */
+  /** The current `{{ }}`: its `<!--$-->`,text,`<!---->` triple. Returns the anchor ({@link adoptText} binds its
+   *  previousSibling) and advances past the triple. */
   text(): Comment {
     const marker: Node = this.here(); // <!--$-->
     const anchor: Node | null = marker.nextSibling && marker.nextSibling.nextSibling; // text, then anchor
-    if (!anchor || anchor.nodeType !== 8) {
-      throw new Error('adopt cursor: expected a dynamic-text triple (<!--$-->, text, <!---->) at the cursor.');
-    }
+    if (!anchor || anchor.nodeType !== 8) throw new Error('adopt: bad text node');
     this.cur = anchor.nextSibling;
     return anchor as Comment;
   }
 
-  /**
-   * The current control-flow block or nested component: a `[`…`]` region around a runtime-variable number of
-   * server nodes. Return `[start, end]` (the caller island-replays or nested-resumes it) and advance the cursor
-   * past `]` — so the walk continues at the sibling after the block WITHOUT knowing its node count.
-   */
+  /** The current block / nested component: its `[`…`]` region. Returns `[start, end]` and advances past `]`
+   *  (bracket-matched), so the walk continues after a runtime-variable block without knowing its node count. */
   block(): [Comment, Comment] {
     const start: Node = this.here();
-    if (start.nodeType !== 8 || (start as Comment).data !== BLOCK_START) {
-      throw new Error('adopt cursor: expected a block start marker "[" at the cursor.');
-    }
+    if (start.nodeType !== 8 || (start as Comment).data !== BLOCK_START) throw new Error('adopt: expected [');
     const end: Comment = blockEndOf(start as Comment);
     this.cur = end.nextSibling;
     return [start as Comment, end];

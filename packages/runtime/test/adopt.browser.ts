@@ -215,6 +215,17 @@ test('AdoptCursor: step/here walk statics in order and here() does not advance',
   assert.is(cur.here(), c, 'and again');
 });
 
+test('AdoptCursor: step(n) skips n siblings in one call', () => {
+  const p: HTMLElement = document.createElement('p');
+  const nodes: Text[] = ['a', 'b', 'c', 'd'].map((c) => document.createTextNode(c));
+  p.append(...nodes);
+  const cur: AdoptCursor = new AdoptCursor(p);
+  cur.step(3);
+  assert.is(cur.here(), nodes[3], 'step(3) advanced three siblings at once');
+  cur.step(0);
+  assert.is(cur.here(), nodes[3], 'step(0) is a no-op');
+});
+
 test('AdoptCursor: text() returns the dynamic-text anchor and steps past the whole triple', () => {
   // server HTML for `A {{ x }} B` inside a <p>: "A ", <!--$-->, "x", <!---->, " B"
   const p: HTMLElement = document.createElement('p');

@@ -177,7 +177,11 @@ export function setup(): { slug: Signal<string> } {
   // 8.75 KB gz against a measured 7.6 — ~15% headroom, the same margin verify:size runs (SPA core sits at
   // 20.9/22.0). A budget with 2× headroom catches nothing; this one has to bite before the number doubles.
   // Raise it only with a reason written down, exactly as verify:size demands.
-  const PAGE_BUDGET = 8_960;
+  // → 9216 (2026-07-24, Stage A): the resumed page grew ~0.9 KB when adopt navigation moved from compile-time
+  // index math into a runtime `AdoptCursor` (STAGE-A-PLAN.md) — the class now ships once per app. Removing the
+  // dead `after`/`adoptIsland` helpers clawed back ~0.2 KB (minified). A deliberate one-time step for the
+  // robustness win, NOT a trend: headroom stays ~2%, and this number must FALL when island chunking lands.
+  const PAGE_BUDGET = 9_216;
   ok(
     jsBytes + snapBytes <= PAGE_BUDGET,
     `a resumed page ships ${(jsBytes / 1024).toFixed(1)} KB gz JS + ${snapBytes} B snapshot ` +

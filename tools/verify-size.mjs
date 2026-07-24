@@ -53,7 +53,12 @@ const BUDGETS = [
   // must not blank a page over one binding — but it now warns once, because a mismatch means the adopt walk
   // disagreed with the server's DOM, and that is this subsystem's best-hidden failure. Note these entries
   // are plain `tsc` output: comments ship, so the "why" costs budget here. That is a deliberate trade.)
-  { label: 'runtime/adopt (E1.2a/c DOM adopt)', files: ['packages/runtime/dist/adopt.js'], budget: 4_864 },
+  // → 5248 (2026-07-24, Stage A: adopt navigation moved from compile-time absolute-index math (`child(_r,…)` +
+  // dynamic-text shifts + post-block `after()`/override) into a runtime `AdoptCursor` — a deliberate robustness
+  // refactor that consolidates all navigation into ONE sequential walk (STAGE-A-PLAN.md). The dead `after` +
+  // `adoptIsland` helpers were removed, which clawed most of it back; the net is the cursor class shipping once.
+  // A one-time step accepted knowingly, not a trend — headroom is deliberately tight so the next change budgets.)
+  { label: 'runtime/adopt (E1.2a/c DOM adopt)', files: ['packages/runtime/dist/adopt.js'], budget: 5_248 },
   // runtime/graph (E0.3/E1.2): resume entry — signal codec + snapshot/resume + resumePage (SSG client entry).
   // Budget raised 2048 → 2560 (E1.2 resumePage + SNAPSHOT_ID) → 3072 (E1.2c-6 per-instance state collection:
   // collectStates / registerState / ROOT_ID) → 3584 (E1.2c-6 resume states-map handling + ResumeApp.states)

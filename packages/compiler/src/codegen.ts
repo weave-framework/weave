@@ -487,82 +487,104 @@ function compileFragment(
   const stmts: string[] = [];
   const childDecls: string[] = [];
 
-  // E1.2b-2 — per-parent record of reactive-text child indices (in PRISTINE order). Each such interp inserts
-  // a marker + text node (2) before its anchor at render time, so in adopt mode a node's server index is its
-  // pristine index shifted by 2 for every dynamic-text sibling at or before it in the same parent.
-  const dynText: Map<string, number[]> = new Map<string, number[]>();
-  const recordDyn = (basePath: number[], idx: number): void => {
-    const k: string = basePath.join(',');
-    const arr: number[] | undefined = dynText.get(k);
-    if (arr) arr.push(idx);
-    else dynText.set(k, [idx]);
-  };
-  // Server child indices for `path`, levels [start, end) — the block-free adopt navigation. Each preceding
-  // dynamic-text sibling at a level adds 2 (its marker+text). `start > 0` computes only a SUFFIX, used when a
-  // post-block element rebases its subtree onto a cursor var (E1.2c-5) instead of the fragment root.
-  const adoptIndicesFrom = (path: number[], start: number): number[] => {
-    const out: number[] = [];
-    for (let level: number = start; level < path.length; level++) {
-      const parentKey: string = path.slice(0, level).join(',');
-      const idx: number = path[level];
-      const dyns: number[] | undefined = dynText.get(parentKey);
-      let shift: number = 0;
-      if (dyns) for (const d of dyns) if (d <= idx) shift += 2; // < shifts it; == is its own marker+text
-      out.push(idx + shift);
-    }
-    return out;
-  };
-
-  // Post-block subtree rebasing (E1.2c-5): pathKey → the cursor var holding that node (an element reached via
-  // `after(blockEnd, off)`) + its path length, so deeper nodeExpr calls navigate `child(<var>, …suffix)`.
-  const nodeOverride: Map<string, NodeOverride> = new Map();
-  const findOverride = (path: number[]): NodeOverride | null => {
-    for (let len: number = path.length; len >= 1; len--) {
-      const e: NodeOverride | undefined = nodeOverride.get(path.slice(0, len).join(','));
-      if (e) return e;
-    }
-    return null;
-  };
-
-  // E1.2c-4 post-block cursor state (adopt walk). `blockEndVar` is the var holding the most recent adoptable
-  // block's `]` end anchor (set by emitIf/emitFor). When emitChildren is past that block, it sets
-  // `curInterpBase`/`curInterpOff` so a following reactive interp binds via `after(], offset)` instead of an
-  // (unknowable) absolute child index.
-  let blockEndVar: string = '';
-  let curInterpBase: string | null = null;
-  let curInterpOff: number = 0;
-
-  // Resolve each dynamic node into a local BEFORE any binding runs: a binding
-  // inserts nodes, which would shift the child indices later `child()` lookups
-  // rely on. Capturing the (stable) node references up front avoids that.
+  // Node captures are emitted BEFORE any binding stmt: on the create path a binding inserts nodes, which would
+  // shift the child indices later `child()` lookups rely on, so the (stable) references are resolved up front.
+  // On the adopt path these `nodeDecls` are the sequential cursor walk (Stage A) instead — see emitCursorWalk.
   const nodeDecls: string[] = [];
-  const nodeVars: Map<string, string> = new Map<string, string>();
+  const nodeVars: Map<string, string> = new Map<string, string>(); // pathKey → the local holding that node
   let nodeVarN: number = 0;
+
+  // Stage A (adopt walk) — a single {@link AdoptCursor} captures every navigated node in document order; the
+  // old absolute-index navigation (`child(_r, …)` + dynamic-text shifts + post-block `after()`/override math)
+  // is gone. `blockEndVars[key]` holds a block/component's `]` end anchor from `_c.block()` (its island-replay
+  // reads it). In adopt mode nodeExpr just returns the pre-captured var — it emits no navigation of its own.
+  const blockEndVars: Map<string, string> = new Map<string, string>();
+  const CURSOR: string = '_ac'; // NOT `_c` — that is the function-mode components map (Gen.Comp)
+  let cursorReady: boolean = false;
+  const ensureCursor = (): void => {
+    if (cursorReady) return;
+    cursorReady = true;
+    nodeDecls.push(`const ${CURSOR} = new ${gen.Ha('AdoptCursor')}(_r);`);
+  };
+
   const nodeExpr = (path: number[]): string => {
     if (path.length === 0) return '_r';
     const key: string = path.join(',');
+    if (adopt) {
+      const captured: string | undefined = nodeVars.get(key);
+      if (!captured) throw new Error(`adopt: the cursor walk did not capture node [${key}] — emit bug.`);
+      return captured;
+    }
     let v: string | undefined = nodeVars.get(key);
     if (!v) {
-      // Post-block subtree (E1.2c-5): a prefix of `path` is a cursor var → navigate relative to it.
-      const ov: NodeOverride | null = adopt ? findOverride(path) : null;
-      if (ov) {
-        if (path.length === ov.prefixLen) {
-          nodeVars.set(key, ov.baseVar);
-          return ov.baseVar;
-        }
-        v = `_n${nodeVarN++}`;
-        nodeVars.set(key, v);
-        const suffix: number[] = adoptIndicesFrom(path, ov.prefixLen);
-        nodeDecls.push(`const ${v} = ${gen.H('child')}(${ov.baseVar}, ${suffix.join(', ')});`);
-        return v;
-      }
       v = `_n${nodeVarN++}`;
       nodeVars.set(key, v);
-      const idxPath: number[] = adopt ? adoptIndicesFrom(path, 0) : path; // adopt walks the SHIFTED server DOM
-      nodeDecls.push(`const ${v} = ${gen.H('child')}(_r, ${idxPath.join(', ')});`);
+      nodeDecls.push(`const ${v} = ${gen.H('child')}(_r, ${path.join(', ')});`);
     }
     return v;
   };
+
+  // Emit the sequential cursor program for one level (document order), capturing into nodeVars/blockEndVars
+  // every node a binding will reference. It does NOT descend into blocks / components / `<slot>`: those
+  // island-replay (their bodies are separate create-mode fns), so the cursor `block()`s over each — and because
+  // `block()` leaves the cursor right after `]`, a post-block sibling is just the next node, with no `after()`
+  // offset math. Fixed-length siblings between two captures batch into one `step(n)`.
+  function emitCursorWalk(children: TemplateNode[], basePath: number[]): void {
+    let dom: number = 0;
+    let pending: number = 0;
+    const flush = (): void => {
+      if (pending > 0) { nodeDecls.push(`${CURSOR}.step(${pending === 1 ? '' : pending});`); pending = 0; }
+    };
+    const captureBlock = (key: string): void => {
+      flush();
+      const s: string = `_s${nodeVarN++}`;
+      const e: string = `_e${nodeVarN++}`;
+      nodeDecls.push(`const [${s}, ${e}] = ${CURSOR}.block();`);
+      nodeVars.set(key, s);
+      blockEndVars.set(key, e);
+    };
+    for (const node of children) {
+      if (node.type === 'snippet') continue; // a declaration — no server node, and no path index (matches create)
+      const path: number[] = [...basePath, dom];
+      const key: string = path.join(',');
+      dom++;
+      switch (node.type) {
+        case 'text': pending += 1; break; // one server text node (parseTemplate coalesces adjacent runs)
+        case 'comment': break; // dropped at compile — no server node
+        case 'let': pending += 1; break; // its <!----> placeholder is one node
+        case 'interp': { // reactive only — a non-reactive interp is cannotAdopt, so no adopt fn is generated
+          flush();
+          const v: string = `_a${nodeVarN++}`;
+          nodeDecls.push(`const ${v} = ${CURSOR}.text();`);
+          nodeVars.set(key, v);
+          break;
+        }
+        case 'element': {
+          const el: ElementNode = node as ElementNode;
+          if (/^[A-Z]/.test(el.tag) || el.tag === 'slot') { captureBlock(key); break; } // component / <slot> → block()
+          const hasBinding: boolean = el.attrs.some((a) => a.type !== 'static');
+          const deep: boolean = el.children.some(hasDynamicDeep);
+          if (hasBinding) {
+            flush();
+            const v: string = `_n${nodeVarN++}`;
+            nodeDecls.push(`const ${v} = ${CURSOR}.here();`);
+            nodeVars.set(key, v);
+          }
+          if (deep) {
+            if (!hasBinding) flush();
+            nodeDecls.push(`${CURSOR}.enter();`);
+            emitCursorWalk(el.children, path);
+            nodeDecls.push(`${CURSOR}.exit();`); // exit() advances the cursor past the element
+          } else {
+            pending += 1; // here-only or pure-static element: one node to step past for the next sibling
+          }
+          break;
+        }
+        default: // if / for / switch / render / key → island-replay block
+          captureBlock(key);
+      }
+    }
+  }
 
   // A control-flow block anchor (E1.2c). Eager: a plain `<!---->`. Resumable: a `]` end anchor plus a runtime
   // `blockStart(anchor)` that inserts the `[` boundary marker before the block's content — so the client cursor
@@ -576,19 +598,17 @@ function compileFragment(
   }
 
   // Emit a control-flow block's replay. `mk(anchorVar)` builds the ifBlock/eachBlock call string from the
-  // anchor var. Create: the anchor is the block's own `<!---->` (nodeExpr). Adopt (island-replay): compute the
-  // `]` end anchor as a NODEDECL (`blockEndOf` on the intact server DOM — so a post-block cursor capture can
-  // reference it in the node-capture phase), clear the server island, then replay against `]`. `blockEndVar`
-  // is exposed to emitChildren as the post-block cursor base (E1.2c-4/5).
+  // anchor var. Create: the anchor is the block's own `<!---->` (nodeExpr). Adopt (island-replay): the cursor
+  // walk already captured the `[` start (nodeExpr) and the `]` end (blockEndVars) via `_c.block()` on the
+  // intact server DOM; clear the server island, then replay against `]` (a fresh, reactive branch).
   function emitBlockReplay(path: number[], mk: (anchorVar: string) => string): void {
     if (!adopt) {
       stmts.push(mk(nodeExpr(path)));
       return;
     }
-    const blk: string = nodeExpr(path);
-    const endVar: string = gen.fn('_e');
-    nodeDecls.push(`const ${endVar} = ${gen.Ha('blockEndOf')}(${blk});`);
-    blockEndVar = endVar;
+    const blk: string = nodeExpr(path); // the `[` start
+    const endVar: string | undefined = blockEndVars.get(path.join(','));
+    if (!endVar) throw new Error(`adopt: block [${path.join(',')}] was not captured by the cursor walk.`);
     stmts.push(`${gen.Ha('clearBlock')}(${blk}, ${endVar});`);
     stmts.push(mk(endVar));
   }
@@ -603,72 +623,31 @@ function compileFragment(
       cur = new Map(cur);
       for (const nm of snippetNames) cur.set(nm, { kind: 'local' });
     }
-    // E1.2c adoptability: a block inserts runtime-variable nodes, so at each level only ONE block is
-    // adopt-navigable. A following reactive interp is reachable via the E1.2c-4 post-block cursor; anything
-    // else needing indexed access after a block is not (yet). Tracked during the create walk.
+    // Adoptability (create walk): which fragments qualify for an adopt fn at all. The navigation itself is the
+    // cursor walk (emitCursorWalk) — this only DECIDES eligibility, so a construct with no server representation
+    // opts the fragment out (it client-renders on resume). `sawBlock` is kept for the `@let`-after-block gate.
     let sawBlock: boolean = false;
-    // E1.2c-4 adopt cursor: once past the level's adoptable block, a following reactive interp binds via
-    // `after(blockEnd, pbOff)`; pbOff accumulates the server-node count of the siblings between them.
-    let pbBase: string | null = null;
-    let pbOff: number = 0;
     for (const node of children) {
       if (node.type === 'let') {
         if (!adopt && sawBlock) gen.cannotAdopt('a `@let` after a control-flow block'); // not cursor-handled (rare)
         html += '<!---->'; // placeholder slot keeps child indices stable
         stmts.push(`const ${node.name} = ${gen.Hc('computed')}(() => (${rewrite(node.expr, cur).code}));`);
         cur = childScope(cur, { [node.name]: node.name });
-        if (adopt && pbBase) pbOff += 1; // the <!----> placeholder is one server node
         dom++;
         continue;
       }
       if (node.type === 'snippet') {
-        // E1.24 — no refusal: a `@snippet` is a DECLARATION. It compiles to a function and emits no node, so it
-        // cannot shift any index; the old "not cursor-handled" gate had nothing to handle.
-        emitSnippet(node, cur); // a declaration — no DOM position, no index consumed
+        // A `@snippet` is a DECLARATION: it compiles to a function and emits no node, so it consumes no index.
+        emitSnippet(node, cur);
         continue;
       }
-      if (!adopt) {
-        // Adoptability after a block. A block's rendered node count is runtime-variable, so NOTHING after it is
-        // reachable by an absolute child index — only through the post-block cursor. E1.23: everything a level
-        // can hold is now reachable — a reactive interp inline (E1.2c-4), an element's subtree rebased onto a
-        // cursor var (E1.2c-5), and a block or component via its own `[` anchor (E1.15). An element that holds
-        // its OWN block is fine too: once it is found via the cursor, the block inside it sits at a fixed index
-        // at ITS level, and that level runs this same tracker. (`@let`/`@snippet` returned above; text/comment
-        // need no navigation.) So no refusal belongs here any more — only the KIND check below.
-        if (isBlockNode(node)) {
-          // Only the KIND decides: a block island-replays (@if/@switch/@for) and a component nested-resumes, and
-          // E1.15 gave both a cursor, so a 2nd one per level is fine. A slot/w:element/@defer/@await/@key/@render
-          // has no adopt path at all, at any position.
-          if (!(isAdoptableBlock(node) || isComponentNode(node))) gen.cannotAdopt(`\`${describe(node)}\` cannot be adopted in place`);
-          sawBlock = true;
-        }
-      }
-      // Post-block cursor setup (adopt walk): a following interp binds via after(], off) inline; a following
-      // block-free element with dynamics is captured as a cursor var so its subtree rebases onto it (override).
-      curInterpBase = null;
-      if (adopt && pbBase) {
-        if (node.type === 'interp') {
-          curInterpBase = pbBase;
-          curInterpOff = pbOff;
-        } else if (
-          (node.type === 'element' && !isBlockNode(node) && hasDynamicDeep(node))
-          // E1.15 — a component or island block AFTER another one. Its `[` start marker sits at
-          // `after(prevEnd, off + 1)` exactly like a post-block element, so the same cursor var works: overriding
-          // its OWN path makes emitComponent/emitBlockReplay's `nodeExpr(path)` yield the cursor instead of an
-          // (unknowable) absolute child index. The decl runs before any stmt, i.e. on the intact server DOM.
-          || isComponentNode(node) || isAdoptableBlock(node)
-        ) {
-          const pv: string = gen.fn('_p');
-          nodeDecls.push(`const ${pv} = ${gen.Ha('after')}(${pbBase}, ${pbOff + 1});`);
-          nodeOverride.set([...basePath, dom].join(','), { baseVar: pv, prefixLen: basePath.length + 1 });
-        }
+      if (!adopt && isBlockNode(node)) {
+        // Only the KIND decides eligibility: a block island-replays (@if/@switch/@for) and a component
+        // nested-resumes; a slot adopts (E1.17). A `w:element`/@defer/@await has no adopt path at any position.
+        if (!(isAdoptableBlock(node) || isComponentNode(node))) gen.cannotAdopt(`\`${describe(node)}\` cannot be adopted in place`);
+        sawBlock = true;
       }
       emitNode(node, [...basePath, dom], cur, isHost);
-      if (adopt) {
-        // an island block AND a resumable child component both leave `blockEndVar` = their `]` → the cursor base
-        if (isAdoptableBlock(node) || isComponentNode(node)) { pbBase = blockEndVar; pbOff = 0; }
-        else if (pbBase) pbOff += node.type === 'interp' ? 3 : 1; // interp = $+text+anchor; else one node
-      }
       dom++;
     }
   }
@@ -710,19 +689,10 @@ function compileFragment(
         html += '<!---->';
         const { code, reactive } = rewrite(node.expr, sc);
         if (reactive) {
-          // Post-block (E1.2c-4): a reactive interp AFTER a block has no build-time index — walk from the
-          // block's `]` end anchor. `after(base, off+3)` is this interp's <!----> anchor (base=], then its
-          // $ marker, text, anchor). Emitted inline as a stmt (after the block's replay stmt defines `base`),
-          // so NO nodeDecl (which would run before `base` is bound) and no recordDyn (nothing indexes past it).
-          if (adopt && curInterpBase) {
-            stmts.push(`${gen.Ha('adoptText')}(${gen.Ha('after')}(${curInterpBase}, ${curInterpOff + 3}), () => (${code}));`);
-            return;
-          }
-          // Record this dynamic text's position BEFORE resolving its node expr, so its own marker+text (and
-          // any later sibling's adopt-index) are accounted for. The resumable target isolates it with a marker
-          // (bindTextResumable) so the client can adopt exactly it (adjacent static+dynamic text would merge);
-          // the adopt walk re-binds the EXISTING node via adoptText. Eager is byte-for-byte unchanged.
-          recordDyn(path.slice(0, -1), path[path.length - 1]);
+          // The resumable target isolates the dynamic text with a `<!--$-->` marker (bindTextResumable) so the
+          // client can adopt exactly it (an adjacent static+dynamic text run would otherwise merge); the adopt
+          // walk re-binds the EXISTING node via adoptText, whose anchor the cursor walk captured. Eager is
+          // byte-for-byte unchanged.
           const bind: string = adopt
             ? gen.Ha('adoptText')
             : gen.resumable
@@ -1042,12 +1012,10 @@ function compileFragment(
     const mountExpr: string = `${gen.Comp(node.tag)}(${propsObj}, ${slotsObj})`;
 
     // Adopt walk: resume the child in place (nested resume) — adoptComponent uses `Comp.adopt` + `states[cid]`,
-    // falling back to clear + re-mount (the `mountExpr` thunk) if the child isn't resumable. Capture the child's
-    // `]` end anchor as the post-component cursor base (a following sibling reaches over the child's subtree).
+    // falling back to clear + re-mount (the `mountExpr` thunk) if the child isn't resumable. The cursor walk
+    // already captured the child's `[` start (anchorVar) and `]` end and stepped past it, so a following sibling
+    // navigates from after `]` with no offset math; adoptComponent recomputes the end it needs internally.
     if (adopt && resumableChild) {
-      const endVar: string = gen.fn('_e');
-      nodeDecls.push(`const ${endVar} = ${gen.Ha('blockEndOf')}(${anchorVar});`);
-      blockEndVar = endVar;
       // The mount thunk takes the adopt target and passes it through as `$adopt` (E1.12). A COMPILED child
       // ignores it — it resumes from `states[cid]` instead. A hand-written one (`<RouterView>`) needs live
       // PROPS to adopt (its router), and props only exist inside this thunk — so this is the channel that
@@ -1280,6 +1248,16 @@ function compileFragment(
     emitBlockReplay(path, (a) => `${gen.H('eachBlock')}(${a}, () => ${list}, ${keyFn}, ${rowFn}${emptyArg})`);
   }
 
+  // Adopt walk (Stage A): emit the sequential cursor program FIRST, so nodeExpr resolves every navigated node to
+  // its pre-captured var during the binding walk below. `_r` is the single root element (its children are the
+  // level) or the multi-root mount container (its children are the roots) — either way the cursor starts at
+  // `_r.firstChild`, so both drive off `sole.children` / `top` with basePath `[]`.
+  if (adopt) {
+    ensureCursor();
+    if (singleRoot) emitCursorWalk(sole!.children, []);
+    else emitCursorWalk(top, []);
+  }
+
   // walk
   if (singleRoot) emitElement(sole!, [], scope, isHost);
   else emitChildren(top, [], scope, isHost);
@@ -1315,16 +1293,6 @@ function compileFragment(
   ];
   gen.fragmentDepth--;
   return `function ${name}(${param}) {\n${body.map((l) => '  ' + l).join('\n')}\n}`;
-}
-
-/**
- * E1.2c-5 — where a post-block subtree's adopt cursor lives: the var holding a node reached via
- * `after(blockEnd, off)`, plus the path length it covers, so deeper nodes navigate `child(<baseVar>, …suffix)`
- * instead of an absolute child index (which a runtime-variable block makes meaningless).
- */
-interface NodeOverride {
-  baseVar: string;
-  prefixLen: number;
 }
 
 /* ──────────── helpers ──────────── */

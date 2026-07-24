@@ -3,7 +3,7 @@ import { signal, computed, effect, root, type Signal, type Computed } from '@wea
 import * as dom from '@weave-framework/runtime/dom';
 import { resumeEvents, collectResumable, resumableHandler, handlerAttr, type ResumeHandler, type ResumeControl } from '@weave-framework/runtime/resume';
 import type { Wire } from '@weave-framework/runtime/serialize';
-import { bindTextResumable, adoptText, blockStart, adoptIsland, blockEndOf, clearBlock, after, adoptComponent } from '@weave-framework/runtime/adopt';
+import { bindTextResumable, adoptText, blockStart, blockEndOf, clearBlock, adoptComponent, AdoptCursor } from '@weave-framework/runtime/adopt';
 import { snapshot, resume, resumePage, SNAPSHOT_ID, collectStates, registerState, ROOT_ID, type AdoptFn, type ResumeApp } from '@weave-framework/runtime/graph';
 import { compileTemplate, compileComponent, type CompileResult } from '@weave-framework/compiler';
 
@@ -54,13 +54,12 @@ const rt: typeof dom & {
   bindTextResumable: typeof bindTextResumable;
   adoptText: typeof adoptText;
   blockStart: typeof blockStart;
-  adoptIsland: typeof adoptIsland;
   blockEndOf: typeof blockEndOf;
   clearBlock: typeof clearBlock;
-  after: typeof after;
   adoptComponent: typeof adoptComponent;
   registerState: typeof registerState;
-} = { ...dom, signal, computed, effect, root, resumableHandler, bindTextResumable, adoptText, blockStart, adoptIsland, blockEndOf, clearBlock, after, adoptComponent, registerState };
+  AdoptCursor: typeof AdoptCursor;
+} = { ...dom, signal, computed, effect, root, resumableHandler, bindTextResumable, adoptText, blockStart, blockEndOf, clearBlock, adoptComponent, registerState, AdoptCursor };
 
 /** Compile in the `resumable` target and hand back the bare `(ctx, slots) => Node` render fn. */
 function compileResumable(html: string, scope: string[] = []): (ctx: unknown, slots?: unknown) => Element {
@@ -303,27 +302,31 @@ test('E1.2b-2: a flat resumable module emits + exports an adopt(_r,…) fn — a
   assert.ok(code.includes('export { adopt }'), 'exports it');
   assert.ok(code.includes('adoptText('), 'adopt re-binds reactive text via adoptText');
   assert.ok(code.includes('from "@weave-framework/runtime/adopt"'), 'imports the adopt entry');
-  // The reactive-text anchor is pristine child 1 (after "Count: "); its own marker+text push it to server
-  // index 3, and adopt navigates that shifted position — NOT the pristine 1 the create render clones to.
+  // Stage A — the adopt fn is a sequential cursor walk: step past the static "Count: ", then bind the
+  // dynamic-text node the cursor reaches. No absolute child index (the old shifted `child(_r, 3)`).
   const adoptBody: string = code.slice(code.indexOf('function adopt(_r'));
-  assert.ok(/child\(_r, 3\)/.test(adoptBody), 'navigates the SHIFTED server index (pristine 1 + marker/text)');
+  assert.ok(/new .*AdoptCursor\(_r\)/.test(adoptBody), 'the walk drives a single AdoptCursor over the server root');
+  assert.ok(/\.step\(\)/.test(adoptBody), 'steps past the leading static "Count: "');
+  assert.ok(/\.text\(\)/.test(adoptBody), 'then binds the dynamic-text node it reaches');
+  assert.ok(!/child\(_r/.test(adoptBody), 'no absolute child-index navigation on the adopt path any more');
   assert.ok(!adoptBody.slice(0, adoptBody.indexOf('render.adopt')).includes('resumableHandler'),
     'adopt skips events — resume() re-arms them via the data-won markers (delegated dispatch)');
 });
 
-test('E1.2b-2: adopt indices compound — each preceding dynamic text shifts a sibling by 2, across nesting', () => {
-  // <p>{{a}}{{b}}</p>: a at pristine 0 → server 2 (own marker+text); b at pristine 1 → server 5 (a's 2 + own 2).
+test('E1.2b-2 / Stage A: the cursor walks adjacent dynamic text and descends per level', () => {
+  // <p>{{a}}{{b}}</p>: two adjacent reactive interps — the cursor binds each with text(), nothing between to step.
   const flat: CompileResult = compileTemplate('<p>{{ a() }}{{ b() }}</p>', { mode: 'module', scope: ['a', 'b'], resumable: true });
   const flatAdopt: string = flat.code.slice(flat.code.indexOf('function adopt(_r'));
-  assert.ok(/child\(_r, 2\)/.test(flatAdopt), 'first dynamic text → server index 2 (its own marker+text)');
-  assert.ok(/child\(_r, 5\)/.test(flatAdopt), 'second dynamic text → server index 5 (preceding 2 + its own 2)');
+  assert.equal((flatAdopt.match(/\.text\(\)/g) ?? []).length, 2, 'two adjacent dynamic texts → two text() captures');
+  assert.ok(!/\.step\(/.test(flatAdopt), 'adjacent — nothing to step between them');
+  assert.ok(!/child\(_r/.test(flatAdopt), 'no absolute index navigation');
 
-  // <div>{{a}}<p>{{b}}</p></div>: a → server 2; the <p> is shifted to server 3 by a's marker+text, and b
-  // inside <p> is at server 2 — so b's node is child(_r, 3, 2). Proves the shift applies per-level.
+  // <div>{{a}}<p>{{b}}</p></div>: a via text(), then ENTER the <p>, bind b, EXIT — one cursor level per element.
   const nested: CompileResult = compileTemplate('<div>{{ a() }}<p>{{ b() }}</p></div>', { mode: 'module', scope: ['a', 'b'], resumable: true });
   const nestedAdopt: string = nested.code.slice(nested.code.indexOf('function adopt(_r'));
-  assert.ok(/child\(_r, 2\)/.test(nestedAdopt), 'the div-level dynamic text is at server index 2');
-  assert.ok(/child\(_r, 3, 2\)/.test(nestedAdopt), 'the <p> shifted to 3 by the preceding text; its inner text at 2');
+  assert.ok(/\.text\(\)[\s\S]*\.enter\(\)[\s\S]*\.text\(\)[\s\S]*\.exit\(\)/.test(nestedAdopt),
+    'div-level text, then enter <p>, bind its text, exit');
+  assert.ok(!/child\(_r/.test(nestedAdopt), 'no absolute index navigation across levels');
 });
 
 test('E1.2b-2: a resumable fragment with a not-yet-adoptable construct emits NO adopt fn — falls back to CSR', () => {
@@ -368,14 +371,15 @@ test('E1.2c: the resumable module emits blockStart + a ] anchor; imports it from
 
 /* ──────────── E1.2c-2: @if island-replay adopt ──────────── */
 
-test('E1.2c-2: an adoptable @if emits an adopt fn (adoptIsland + ifBlock); non-adoptable positions do not', () => {
+test('E1.2c-2: an adoptable @if emits an adopt fn (cursor block() + clearBlock + ifBlock); non-adoptable positions do not', () => {
   // @if as the last indexed thing at its level → adoptable (island-replay)
   const ok: CompileResult = compileTemplate('<div><h1>{{ t() }}</h1>@if (show()) { <p>{{ b() }}</p> }</div>', {
     mode: 'module', scope: ['t', 'show', 'b'], resumable: true,
   });
   assert.ok(ok.code.includes('render.adopt'), 'an adoptably-positioned @if emits an adopt fn');
   const adoptBody: string = ok.code.slice(ok.code.indexOf('function adopt(_r'));
-  assert.ok(adoptBody.includes('blockEndOf(') && adoptBody.includes('clearBlock('), 'the adopt render clears the server island in place');
+  assert.ok(/\.block\(\)/.test(adoptBody) && adoptBody.includes('clearBlock('),
+    'the cursor bounds the block via .block() and clears the server island in place');
   assert.ok(adoptBody.includes('ifBlock('), 'then re-runs the normal ifBlock against the cleared island');
 
   // An element with a NESTED BLOCK after a block adopts since E1.23: it is found via the E1.2c-5 cursor, and
@@ -481,8 +485,9 @@ test('E1.2c-4: a reactive interp AFTER a block adopts via the cursor — emit sh
   });
   assert.ok(code.includes('render.adopt'), 'a leaf interp after a block is now adoptable');
   const adoptBody: string = code.slice(code.indexOf('function adopt(_r'));
-  assert.ok(/after\(_e\d+, 3\)/.test(adoptBody), 'the trailing interp binds via after(<blockEnd>, 3) — 3 = its $ + text + anchor');
-  assert.ok(/blockEndOf\(/.test(adoptBody) && /_e\d+ = /.test(adoptBody), 'the block captures its ] end anchor as the cursor base');
+  assert.ok(/\.block\(\)/.test(adoptBody), 'the block is bounded by the cursor (.block() leaves it positioned after ])');
+  assert.ok(/\.text\(\)/.test(adoptBody), 'the trailing interp binds via the cursor text() right after the block');
+  assert.ok(!/after\(/.test(adoptBody), 'no after()/offset math — the cursor is already past the block');
 });
 
 test('E1.2c-4: adopt resumes a block PLUS a trailing interp — the tail after the block updates in place', () => {
@@ -514,7 +519,7 @@ test('E1.2c-4: adopt resumes a block PLUS a trailing interp — the tail after t
   const app: ResumeApp = resume(div, { snapshot: wire, adopt });
   assert.equal(div.querySelector('h4')!.textContent, 'H', 'pre-block <h4> adopted');
 
-  // the tail (reached by after(], 3)) is reactive in place — the SAME node, re-bound
+  // the tail (reached by the cursor right after the block's ]) is reactive in place — the SAME node, re-bound
   (app.ctx.tail as Signal<string>).set('TAIL');
   assert.equal(tailNode.data, 'TAIL', 'the post-block interp updates the EXISTING node in place — cursor bound the right one');
 
@@ -537,8 +542,9 @@ test('E1.2c-5: an element with dynamics AFTER a block adopts — its subtree reb
   });
   assert.ok(code.includes('render.adopt'), 'a block-free element after a block is adoptable');
   const adoptBody: string = code.slice(code.indexOf('function adopt(_r'));
-  assert.ok(/_p\d+ = after\(_e\d+, 1\)/.test(adoptBody), 'the <footer> is captured via after(<blockEnd>, 1) as a cursor var');
-  assert.ok(/child\(_p\d+/.test(adoptBody), 'its <footer> subtree navigation rebases onto that cursor var');
+  assert.ok(/\.block\(\)[\s\S]*\.enter\(\)/.test(adoptBody), 'after bounding the block, the cursor enters the <footer> — no rebasing var');
+  assert.ok(/\.text\(\)/.test(adoptBody) && !/after\(/.test(adoptBody) && !/child\(/.test(adoptBody),
+    'the <footer> subtree is walked by the cursor (text/step), not by after()/child() index math');
 });
 
 test('E1.2c-5: adopt resumes a block PLUS a trailing element subtree — the element text is reactive in place', () => {
