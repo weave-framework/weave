@@ -4,7 +4,13 @@
  * `@angular/*` (the source framework — translated, never recursed into) and third-party packages (noted at the
  * edge). This file is the facts side only; the plan + conversion are later (M3/M4). Zero third-party deps.
  *
- * This slice (M2.1): find the selected unit's ENTRY point — where the walk begins.
+ * Facts gathered so far, entry-first: `findEntryPoint` (M2.1) → `parseImports` (M2.2) → `walkDependencies`
+ * (M2.3) → `classifyPackages` (M2.8) → `findComponents`/`analyzeComponents` (M2.4). Everything is STATIC and
+ * honest: a fact it can't read is absent or recorded, never guessed. Uses the injected TypeScript AST (`ts`).
+ *
+ * For a NEW source framework (React/Vue): the import walk is language-level and reused as-is; the parts that are
+ * framework-specific are the `angular` `ImportKind` (its translation surface) + the `AUTO_MAP` package list, and
+ * the `@Component`-shaped extraction here (a React module writes its own component reader). See RFC 0011.
  */
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -390,4 +396,166 @@ export function classifyPackages(specs: string[], workspaceRoot?: string): Packa
     byRoot.set(root, classifyPackage(root, kw));
   }
   return [...byRoot.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/* ──────────── M2.4 — components: what an `@Component` declares (the shape M3/M4 translate) ──────────── */
+
+/** The facts one Angular component declares — the surface that becomes a Weave component. */
+export interface ComponentFact {
+  /** Absolute path of the file it lives in. */
+  file: string;
+  /** The class name (`AppComponent`). */
+  className: string;
+  /** The CSS selector (`app-root`), or null if none is declared. */
+  selector: string | null;
+  /** `true`/`false` if the decorator states `standalone`; null when UNSTATED (the default shifted across Angular
+   *  versions — recorded honestly, never guessed). */
+  standalone: boolean | null;
+  /** Input names — `@Input()` properties AND signal inputs (`input()`, `input.required()`, `model()`). */
+  inputs: string[];
+  /** Output names — `@Output()` properties AND signal outputs (`output()`). */
+  outputs: string[];
+  /** True when the template is inline (`template:`); mutually exclusive with `templateUrl`. */
+  templateInline: boolean;
+  /** The external template path (`templateUrl:`), or null. */
+  templateUrl: string | null;
+  /** External style paths (`styleUrls` / `styleUrl`). */
+  styleUrls: string[];
+  /** Count of inline `styles:` entries (0 when none). */
+  inlineStyles: number;
+}
+
+/** The name of a decorator, whether written `@Foo` or `@Foo(...)`. Null if it isn't a plain named decorator. */
+function decoratorName(dec: ts.Decorator): string | null {
+  const e: ts.Expression = ts.isCallExpression(dec.expression) ? dec.expression.expression : dec.expression;
+  return ts.isIdentifier(e) ? e.text : null;
+}
+
+/** The decorators on a node, tolerant of the TS API (empty when the node can't carry any). */
+function decoratorsOf(node: ts.Node): readonly ts.Decorator[] {
+  return ts.canHaveDecorators(node) ? (ts.getDecorators(node) ?? []) : [];
+}
+
+/** A member's property name as plain text (`foo`, or `'foo'`), or null for computed/unnamed members. */
+function memberName(node: ts.ClassElement): string | null {
+  const n: ts.PropertyName | undefined = node.name;
+  if (!n) return null;
+  if (ts.isIdentifier(n) || ts.isStringLiteral(n)) return n.text;
+  return null;
+}
+
+/** Is this initializer a call to one of the given signal factories (`input`, `input.required`, `output`, `model`)? */
+function isSignalFactory(init: ts.Expression | undefined, names: string[]): boolean {
+  if (!init || !ts.isCallExpression(init)) return false;
+  const callee: ts.Expression = init.expression;
+  const head: ts.Expression = ts.isPropertyAccessExpression(callee) ? callee.expression : callee; // `input.required` → `input`
+  return ts.isIdentifier(head) && names.includes(head.text);
+}
+
+/** Read a string-valued property from a decorator's object literal (`selector`, `templateUrl`), or null. */
+function stringProp(obj: ts.ObjectLiteralExpression, key: string): string | null {
+  for (const p of obj.properties) {
+    if (ts.isPropertyAssignment(p) && p.name && ts.isIdentifier(p.name) && p.name.text === key) {
+      const v: ts.Expression = p.initializer;
+      if (ts.isStringLiteralLike(v)) return v.text;
+    }
+  }
+  return null;
+}
+
+/** Does the object literal have this property at all (for `template:` presence)? */
+function hasProp(obj: ts.ObjectLiteralExpression, key: string): boolean {
+  return obj.properties.some((p) => p.name !== undefined && ts.isIdentifier(p.name) && p.name.text === key);
+}
+
+/** Read a boolean-valued property (`standalone`), or null when it isn't a literal true/false. */
+function boolProp(obj: ts.ObjectLiteralExpression, key: string): boolean | null {
+  for (const p of obj.properties) {
+    if (ts.isPropertyAssignment(p) && p.name && ts.isIdentifier(p.name) && p.name.text === key) {
+      if (p.initializer.kind === ts.SyntaxKind.TrueKeyword) return true;
+      if (p.initializer.kind === ts.SyntaxKind.FalseKeyword) return false;
+    }
+  }
+  return null;
+}
+
+/** Read a string-array property (`styleUrls: [...]`), or a single-string one (`styleUrl: '...'`). */
+function stringArrayProp(obj: ts.ObjectLiteralExpression, arrayKey: string, singleKey: string): string[] {
+  const out: string[] = [];
+  for (const p of obj.properties) {
+    if (!ts.isPropertyAssignment(p) || !p.name || !ts.isIdentifier(p.name)) continue;
+    if (p.name.text === arrayKey && ts.isArrayLiteralExpression(p.initializer)) {
+      for (const el of p.initializer.elements) if (ts.isStringLiteralLike(el)) out.push(el.text);
+    } else if (p.name.text === singleKey && ts.isStringLiteralLike(p.initializer)) {
+      out.push(p.initializer.text);
+    }
+  }
+  return out;
+}
+
+/** Count entries of an array-valued property (`styles: ['...', '...']`), 0 if absent/not an array. */
+function arrayLen(obj: ts.ObjectLiteralExpression, key: string): number {
+  for (const p of obj.properties) {
+    if (ts.isPropertyAssignment(p) && p.name && ts.isIdentifier(p.name) && p.name.text === key && ts.isArrayLiteralExpression(p.initializer)) {
+      return p.initializer.elements.length;
+    }
+  }
+  return 0;
+}
+
+/**
+ * Parse one `.ts` file and return a fact record for every `@Component` class in it (a file may hold more than
+ * one). Reads the decorator's config object (selector / template / templateUrl / styles / standalone) and the
+ * class members for inputs & outputs — both the decorator form (`@Input()`/`@Output()`) and the signal form
+ * (`input()`, `input.required()`, `model()`, `output()`). Anything it cannot read is simply absent, never
+ * guessed. A file with no component yields `[]`.
+ */
+export function findComponents(filePath: string): ComponentFact[] {
+  let src: string;
+  try {
+    src = readFileSync(filePath, 'utf8');
+  } catch {
+    return [];
+  }
+  const sf: ts.SourceFile = ts.createSourceFile(filePath, src, ts.ScriptTarget.Latest, true);
+  const facts: ComponentFact[] = [];
+
+  const visit = (node: ts.Node): void => {
+    if (ts.isClassDeclaration(node)) {
+      const dec: ts.Decorator | undefined = decoratorsOf(node).find((d) => decoratorName(d) === 'Component');
+      if (dec && ts.isCallExpression(dec.expression) && dec.expression.arguments.length && ts.isObjectLiteralExpression(dec.expression.arguments[0])) {
+        const cfg: ts.ObjectLiteralExpression = dec.expression.arguments[0];
+        const inputs: string[] = [];
+        const outputs: string[] = [];
+        for (const member of node.members) {
+          const name: string | null = memberName(member);
+          if (!name) continue;
+          const decs: readonly ts.Decorator[] = decoratorsOf(member);
+          const init: ts.Expression | undefined = ts.isPropertyDeclaration(member) ? member.initializer : undefined;
+          if (decs.some((d) => decoratorName(d) === 'Input') || isSignalFactory(init, ['input', 'model'])) inputs.push(name);
+          if (decs.some((d) => decoratorName(d) === 'Output') || isSignalFactory(init, ['output'])) outputs.push(name);
+        }
+        facts.push({
+          file: filePath,
+          className: node.name?.text ?? '(anonymous)',
+          selector: stringProp(cfg, 'selector'),
+          standalone: boolProp(cfg, 'standalone'),
+          inputs,
+          outputs,
+          templateInline: hasProp(cfg, 'template'),
+          templateUrl: stringProp(cfg, 'templateUrl'),
+          styleUrls: stringArrayProp(cfg, 'styleUrls', 'styleUrl'),
+          inlineStyles: arrayLen(cfg, 'styles'),
+        });
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sf);
+  return facts;
+}
+
+/** Every component across a set of files (the walk's `files`), flattened. Unreadable files contribute nothing. */
+export function analyzeComponents(files: string[]): ComponentFact[] {
+  return files.flatMap((f) => findComponents(f));
 }

@@ -197,6 +197,33 @@ const plans = a.classifyPackages(['rxjs/operators', 'rxjs', 'lodash', 'some-obsc
 ok(plans.length === 3, `classifyPackages: rxjs + rxjs/operators dedupe to one (got ${plans.length} plans)`);
 ok(plans.filter((p) => p.decision === 'auto').length === 1 && plans.some((p) => p.decision === 'keep') && plans.some((p) => p.decision === 'try'), 'classifyPackages: the three buckets each appear');
 
+// ── M2.4: components — what an @Component declares (selector, inputs/outputs, template, styles) ──
+const comps = join(fx, 'components');
+const decs = a.findComponents(join(comps, 'decorator.component.ts'));
+ok(decs.length === 1, `findComponents: one @Component in the decorator fixture (got ${decs.length})`);
+const dc = decs[0];
+ok(dc.className === 'DecoratorComponent' && dc.selector === 'app-decorator', 'findComponents: reads className + selector');
+ok(dc.standalone === false, 'findComponents: standalone:false is read (not guessed)');
+ok(dc.inputs.includes('title') && dc.inputs.includes('count') && dc.inputs.length === 2, 'findComponents: @Input properties are collected');
+ok(dc.outputs.length === 1 && dc.outputs[0] === 'saved', 'findComponents: @Output properties are collected');
+ok(dc.templateInline === true && dc.templateUrl === null, 'findComponents: an inline template is flagged, no templateUrl');
+ok(dc.inlineStyles === 2 && dc.styleUrls.length === 0, 'findComponents: inline styles are counted (2)');
+
+const sigs = a.findComponents(join(comps, 'signal.component.ts'));
+const sc = sigs[0];
+ok(sc.standalone === true, 'findComponents: standalone:true is read');
+ok(sc.inputs.includes('name') && sc.inputs.includes('id') && sc.inputs.includes('size'), 'findComponents: signal inputs input()/input.required()/model() are collected');
+ok(sc.outputs.includes('changed'), 'findComponents: signal output() is collected');
+ok(sc.templateInline === false && sc.templateUrl === './signal.component.html', 'findComponents: an external templateUrl is captured');
+ok(sc.styleUrls.length === 2 && sc.inlineStyles === 0, 'findComponents: styleUrls are captured (2)');
+
+ok(a.findComponents(join(comps, 'service.ts')).length === 0, 'findComponents: a file with no @Component yields nothing (an @Injectable is not a component)');
+ok(a.findComponents(join(comps, 'does-not-exist.ts')).length === 0, 'findComponents: an unreadable file yields nothing (no throw)');
+
+// analyzeComponents flattens across a file set
+const all = a.analyzeComponents([join(comps, 'decorator.component.ts'), join(comps, 'signal.component.ts'), join(comps, 'service.ts')]);
+ok(all.length === 2, `analyzeComponents: two components across three files (got ${all.length})`);
+
 // ── the shared UI colour palette: wraps under FORCE_COLOR, no-ops under NO_COLOR (the clean-piped guarantee) ──
 // COLOR is decided at module-eval from env, so we bundle migrate-ui once and import it twice under different env
 // (a distinct ?query gives Node a fresh module instance, hence a fresh COLOR decision).

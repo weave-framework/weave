@@ -15,10 +15,12 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import {
+  analyzeComponents,
   classifyPackages,
   findEntryPoint,
   findWorkspaceRoot,
   walkDependencies,
+  type ComponentFact,
   type DependencyWalk,
   type PackagePlan,
 } from './migrate-analyze.js';
@@ -254,8 +256,16 @@ export async function runMigrate(): Promise<void> {
     const list = (xs: string[], n: number): string => (xs.length ? `${xs.slice(0, n).join(', ')}${xs.length > n ? ', …' : ''}` : '(none)');
     const num = (n: number): string => c.bold(String(n)); // counts stand out
 
+    const components: ComponentFact[] = analyzeComponents(walk.files);
+    const inputs: number = components.reduce((n, cf) => n + cf.inputs.length, 0);
+    const outputs: number = components.reduce((n, cf) => n + cf.outputs.length, 0);
+
     console.log(c.bold('Found:'));
     console.log(`  ${c.cyan('•')} ${num(walk.files.length)} source files`);
+    if (components.length) {
+      const io2: string = inputs || outputs ? c.dim(` (${inputs} input(s), ${outputs} output(s))`) : '';
+      console.log(`  ${c.green('•')} ${num(components.length)} component(s)${io2}: ${c.green(list(components.map((cf) => cf.selector ?? cf.className), 6))}`);
+    }
     console.log(`  ${c.magenta('•')} ${num(walk.angular.length)} @angular APIs used ${c.dim('(these become Weave)')}: ${c.magenta(list(walk.angular, 6))}`);
     if (walk.internal.length) {
       console.log(`  ${c.blue('•')} ${num(walk.internal.length)} of your own workspace lib(s) ${c.dim('(migrate each separately)')}: ${c.blue(list(walk.internal, 6))}`);
