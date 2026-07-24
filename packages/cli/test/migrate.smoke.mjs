@@ -263,6 +263,17 @@ ok(modRoutes.some((r) => r.path === 'dash' && r.component === 'DashComponent' &&
 ok(a.findRoutes(join(comps, 'decorator.component.ts')).length === 0, 'findRoutes: a component file has no routes');
 ok(a.analyzeRoutes([join(routesDir, 'app.routes.ts'), join(routesDir, 'module.routes.ts')]).length === 6, 'analyzeRoutes: flattens across files (5 + 1)');
 
+// ── M2.7: forms — reactive-forms primitives + control names, gated on an @angular/forms import ──
+const formsDir = join(fx, 'forms');
+const forms = a.findForms(join(formsDir, 'login.component.ts'));
+ok(forms.length === 1 && forms[0].className === 'LoginComponent', 'findForms: a forms file is found, with its class');
+ok(forms[0].primitives.includes('FormGroup') && forms[0].primitives.includes('FormBuilder'), 'findForms: imported @angular/forms primitives are listed');
+ok(forms[0].controls.includes('email') && forms[0].controls.includes('password'), 'findForms: new FormGroup({...}) control names are read');
+ok(forms[0].controls.includes('name') && forms[0].controls.includes('age'), 'findForms: fb.group({...}) control names are read');
+ok(a.findForms(join(formsDir, 'grouped.ts')).length === 0, 'findForms: a .group() call without @angular/forms is NOT a form (import is the gate)');
+ok(a.findForms(join(comps, 'decorator.component.ts')).length === 0, 'findForms: a plain component is not a form');
+ok(a.analyzeForms([join(formsDir, 'login.component.ts'), join(formsDir, 'grouped.ts')]).length === 1, 'analyzeForms: only the real forms file counts');
+
 // ── the shared UI colour palette: wraps under FORCE_COLOR, no-ops under NO_COLOR (the clean-piped guarantee) ──
 // COLOR is decided at module-eval from env, so we bundle migrate-ui once and import it twice under different env
 // (a distinct ?query gives Node a fresh module instance, hence a fresh COLOR decision).

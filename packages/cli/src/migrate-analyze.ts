@@ -794,3 +794,76 @@ export function findRoutes(filePath: string): RouteFact[] {
 export function analyzeRoutes(files: string[]): RouteFact[] {
   return files.flatMap((f) => findRoutes(f));
 }
+
+/* ──────────── M2.7 — forms: reactive-forms usage (→ @weave-framework/forms) ──────────── */
+
+/** Reactive-forms usage in one file — what becomes `@weave-framework/forms`. */
+export interface FormFact {
+  file: string;
+  /** The first class in the file (best-effort "where"), or null. */
+  className: string | null;
+  /** `@angular/forms` primitives the file imports (`FormGroup`, `FormControl`, `FormBuilder`, `FormArray`, …). */
+  primitives: string[];
+  /** Control names discovered from `new FormGroup({...})` / `fb.group({...})` object literals. */
+  controls: string[];
+}
+
+/** The named imports a file pulls from `@angular/forms` (`[]` when it imports nothing from there). */
+function angularFormsImports(sf: ts.SourceFile): string[] {
+  const names: string[] = [];
+  for (const stmt of sf.statements) {
+    if (!ts.isImportDeclaration(stmt) || !ts.isStringLiteral(stmt.moduleSpecifier) || stmt.moduleSpecifier.text !== '@angular/forms') continue;
+    const bindings: ts.NamedImportBindings | undefined = stmt.importClause?.namedBindings;
+    if (bindings && ts.isNamedImports(bindings)) for (const el of bindings.elements) names.push(el.name.text);
+  }
+  return names;
+}
+
+/** The keys of an object-literal argument (`new FormGroup({ name: …, email: … })` → `['name','email']`). */
+function objectKeys(obj: ts.ObjectLiteralExpression): string[] {
+  const keys: string[] = [];
+  for (const p of obj.properties) {
+    if ((ts.isPropertyAssignment(p) || ts.isShorthandPropertyAssignment(p)) && p.name) {
+      if (ts.isIdentifier(p.name) || ts.isStringLiteral(p.name)) keys.push(p.name.text);
+    }
+  }
+  return keys;
+}
+
+/**
+ * Parse one `.ts` file and, IF it uses `@angular/forms`, return a single fact describing its reactive-forms
+ * usage: which primitives it imports and the control names it declares (from `new FormGroup({...})` and
+ * `FormBuilder.group({...})` object literals). Files that don't import `@angular/forms` yield `[]` — the import
+ * is the gate, so unrelated `.group(...)` calls are never mistaken for a form.
+ */
+export function findForms(filePath: string): FormFact[] {
+  const sf: ts.SourceFile | null = parseFile(filePath);
+  if (!sf) return [];
+  const primitives: string[] = angularFormsImports(sf);
+  if (!primitives.length) return []; // not a forms file
+
+  const controls: string[] = [];
+  let className: string | null = null;
+  const visit = (node: ts.Node): void => {
+    if (ts.isClassDeclaration(node) && node.name && !className) className = node.name.text;
+    // new FormGroup({...}) / new FormRecord({...})
+    if (ts.isNewExpression(node) && ts.isIdentifier(node.expression) && (node.expression.text === 'FormGroup' || node.expression.text === 'FormRecord')) {
+      const arg: ts.Expression | undefined = node.arguments?.[0];
+      if (arg && ts.isObjectLiteralExpression(arg)) controls.push(...objectKeys(arg));
+    }
+    // fb.group({...}) — a FormBuilder call (the gate above guarantees this file really uses @angular/forms)
+    if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) && (node.expression.name.text === 'group' || node.expression.name.text === 'record')) {
+      const arg: ts.Expression | undefined = node.arguments[0];
+      if (arg && ts.isObjectLiteralExpression(arg)) controls.push(...objectKeys(arg));
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sf);
+
+  return [{ file: filePath, className, primitives, controls: [...new Set(controls)] }];
+}
+
+/** Every forms-using file in a set (the walk's `files`), flattened. Unreadable files contribute nothing. */
+export function analyzeForms(files: string[]): FormFact[] {
+  return files.flatMap((f) => findForms(f));
+}

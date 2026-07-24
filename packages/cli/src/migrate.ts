@@ -16,6 +16,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import {
   analyzeComponents,
+  analyzeForms,
   analyzeRoutes,
   analyzeServices,
   classifyPackages,
@@ -25,6 +26,7 @@ import {
   walkDependencies,
   type ComponentFact,
   type DependencyWalk,
+  type FormFact,
   type PackagePlan,
   type RouteFact,
   type ServiceFact,
@@ -283,6 +285,11 @@ export async function runMigrate(): Promise<void> {
       const lazy: number = routes.filter((r) => r.lazy).length;
       const meta: string = c.dim(` (${guarded} guarded, ${lazy} lazy)`);
       console.log(`  ${c.green('•')} ${num(routes.length)} route(s)${meta}`);
+    }
+    const forms: FormFact[] = analyzeForms(walk.files);
+    if (forms.length) {
+      const controls: number = forms.reduce((n, f) => n + f.controls.length, 0);
+      console.log(`  ${c.green('•')} ${num(forms.length)} reactive form(s)${c.dim(` (${controls} control(s))`)}`);
     }
     console.log(`  ${c.magenta('•')} ${num(walk.angular.length)} @angular APIs used ${c.dim('(these become Weave)')}: ${c.magenta(list(walk.angular, 6))}`);
     if (walk.internal.length) {
