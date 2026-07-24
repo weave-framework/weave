@@ -1,0 +1,1 @@
+{ "name": "mono", "devDependencies": { "@nx/angular": "^18.0.0" } }

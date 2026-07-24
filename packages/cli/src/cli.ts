@@ -190,8 +190,15 @@ export async function main(argv: string[]): Promise<void> {
     return;
   }
 
+  if (cmd === 'migrate') {
+    // Assisted migration into Weave (RFC 0011). Imported lazily so the migrate code doesn't bloat the CLI bundle.
+    const { runMigrate } = await import('./migrate.js');
+    await runMigrate();
+    return;
+  }
+
   console.error(
-    'usage: weave <build|dev|check|routes|mcp> [entry|paths…] [--config file] [--out dir] [--serve dir] [--port n] [--no-minify] [--eager] [--ssg]'
+    'usage: weave <build|dev|check|routes|mcp|migrate> [entry|paths…] [--config file] [--out dir] [--serve dir] [--port n] [--no-minify] [--eager] [--ssg]'
   );
   process.exit(1);
 }
