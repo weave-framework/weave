@@ -588,6 +588,43 @@ test('E1.2c-5: adopt resumes a block PLUS a trailing element subtree — the ele
   app.dispose();
 });
 
+test('Stage A / A4: a @let AFTER a block adopts — the block replays, the @let computed is reactive in place', () => {
+  // The old post-block cursor never handled a `@let` after a block, so the whole fragment fell back to CSR.
+  // The sequential cursor steps past the @let placeholder like any other node, so it adopts now.
+  const render: (ctx: unknown, slots?: unknown) => Element = compileResumable(
+    '<div>@if (show()) { <p>body</p> }@let dbl = n() * 2;<span>{{ dbl }}</span></div>',
+    ['show', 'n']
+  );
+  const adopt: AdoptFn | undefined = (render as { adopt?: AdoptFn }).adopt;
+  assert.equal(typeof adopt, 'function', 'a @let after a block no longer opts the fragment out of adopt (A4)');
+
+  // ── server ──
+  const show: Signal<boolean> = signal(true);
+  const n: Signal<number> = signal(5);
+  const serverNode: HTMLElement = render({ show, n }) as HTMLElement;
+  const wire: Wire = snapshot({ show, n });
+  const serverHtml: string = serverNode.outerHTML;
+  assert.ok(stripComments(serverHtml).includes('10'), 'server rendered the @let value (5 * 2) into the <span>');
+
+  // ── client ──
+  const container: HTMLElement = host();
+  container.innerHTML = serverHtml;
+  const div: HTMLElement = container.querySelector('div')!;
+  const span: HTMLElement = div.querySelector('span')!;
+  const spanText: Text = [...span.childNodes].find((c) => c.nodeType === 3) as Text; // <!--$-->10<!---->
+  assert.equal(spanText.data, '10', 'the span holds the server @let value, isolated by its marker');
+
+  const app: ResumeApp = resume(div, { snapshot: wire, adopt });
+  // the @let computed re-derives from `n` and updates the SAME text node in place — adopted, not re-rendered
+  (app.ctx.n as Signal<number>).set(7);
+  assert.equal(spanText.data, '14', 'the post-block @let binding is reactive in place (7 * 2)');
+  // the block before the @let still island-replays reactively
+  (app.ctx.show as Signal<boolean>).set(false);
+  assert.ok(!div.querySelector('p'), 'the @if before the @let toggles off');
+  assert.equal(spanText.data, '14', 'toggling the block does NOT disturb the post-block @let binding');
+  app.dispose();
+});
+
 /* ──────────── E1.2c-6a: multi-root fragments ──────────── */
 
 test('E1.2c-6a: a multi-root fragment is adoptable (was single-root only); a `use:` fragment still is not', () => {

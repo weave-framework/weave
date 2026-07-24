@@ -625,12 +625,11 @@ function compileFragment(
     }
     // Adoptability (create walk): which fragments qualify for an adopt fn at all. The navigation itself is the
     // cursor walk (emitCursorWalk) — this only DECIDES eligibility, so a construct with no server representation
-    // opts the fragment out (it client-renders on resume). `sawBlock` is kept for the `@let`-after-block gate.
-    let sawBlock: boolean = false;
+    // opts the fragment out (it client-renders on resume). Position no longer matters: the sequential cursor
+    // reaches a node after a block by stepping from the block's `]`, so `@let` (and anything else) is fine there.
     for (const node of children) {
       if (node.type === 'let') {
-        if (!adopt && sawBlock) gen.cannotAdopt('a `@let` after a control-flow block'); // not cursor-handled (rare)
-        html += '<!---->'; // placeholder slot keeps child indices stable
+        html += '<!---->'; // placeholder slot keeps child indices stable; the cursor steps past it (pending += 1)
         stmts.push(`const ${node.name} = ${gen.Hc('computed')}(() => (${rewrite(node.expr, cur).code}));`);
         cur = childScope(cur, { [node.name]: node.name });
         dom++;
@@ -645,7 +644,6 @@ function compileFragment(
         // Only the KIND decides eligibility: a block island-replays (@if/@switch/@for) and a component
         // nested-resumes; a slot adopts (E1.17). A `w:element`/@defer/@await has no adopt path at any position.
         if (!(isAdoptableBlock(node) || isComponentNode(node))) gen.cannotAdopt(`\`${describe(node)}\` cannot be adopted in place`);
-        sawBlock = true;
       }
       emitNode(node, [...basePath, dom], cur, isHost);
       dom++;
