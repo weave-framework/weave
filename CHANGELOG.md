@@ -167,6 +167,20 @@
   - Pulled by the dogfooding consumer's price field ([FW-16](rfcs/0010-input-mask.md)); RFC 0010 records
     why its first draft cut this mode and why that argument does not survive contact with the problem.
 
+### Changed — resume/adopt internals
+- **The adopt (resume) DOM navigation is now one sequential cursor walk.** It replaces the absolute
+  build-time child-index math — `child(_r, …)` plus dynamic-text index shifts and post-block
+  `after()`/offset rebasing — with an `AdoptCursor` that mirrors the render walk one node at a time
+  (`here`/`step`/`enter`/`exit`/`text`/`block`). A post-block sibling is reached by stepping from the block's
+  `]`, so position-dependent special cases are gone. **No public API or template-behaviour change; the eager
+  (non-resumable) output is byte-for-byte identical, and the client-only SPA is unaffected (0 bytes).** Two
+  observable effects, recorded honestly:
+  - A **`@let` after a control-flow block now resumes** instead of client-rendering the whole fragment — the
+    old navigation could not reach a binding past a block through a `@let`, so it fell back to CSR.
+  - A **resumed page carries ~0.9 KB more gzipped JS**: the navigation logic now lives in the runtime (shipped
+    once) rather than as compile-time index math. A deliberate one-time cost for the simpler, robust walk; it
+    should fall when per-island code-splitting lands.
+
 ## 2.0.1 — 2026-07-19
 
 ### Fixed — scaffold
