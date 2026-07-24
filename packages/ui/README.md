@@ -76,7 +76,7 @@ Prefer leaner CSS? Skip `all-styles()` and pull only what you use: `@use 'pkg:@w
 
 `@weave-framework/ui/cdk` is the headless layer the styled components are built on — behavior and state, zero styling. Use it directly when you're building your own components:
 
-overlays and portals · connected positioning · scroll strategies · focus trap and focus monitor · live announcer · typeahead/list key managers · resize and intersection observers as signals · breakpoint observer · clipboard · selection model · data sources · virtual scroll · drag & drop · date adapters.
+overlays and portals · connected positioning · scroll strategies · focus trap and focus monitor · live announcer · typeahead/list key managers · resize and intersection observers as signals · breakpoint observer · clipboard · selection model · data sources · virtual scroll · infinite-scroll sentinel · input masking · drag & drop · date adapters.
 
 Everything is in-house and zero-dep, RTL-aware, and honours `prefers-reduced-motion`.
 

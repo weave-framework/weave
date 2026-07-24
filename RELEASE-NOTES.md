@@ -3,6 +3,42 @@
 Human-readable highlights, one section per release — everything notable that landed since
 the previous one. For the granular, per-version log see [CHANGELOG.md](CHANGELOG.md).
 
+## 2.1.0 — 2026-07-24
+
+A feature release driven by real-app use, plus an internal refactor of the resume engine. Everything is
+backward-compatible — 2.x code keeps working.
+
+**Input masking (`use:mask`, `@weave-framework/ui/cdk`).** A headless CDK primitive that formats a text input
+as the user types — phone, card, date templates, and a **numeric mode for money** that fills from the right,
+groups thousands, and keeps a canonical decimal string as the value. Two fixes landed with it from the
+dogfooding app: `use:mask` now binds the inner control of `<Input>` (not its wrapper `<div>`), and the numeric
+mode exists because a positional template genuinely cannot carry an amount (RFC 0010 records why).
+
+**`openDialog` can host a live component.** Pass `[Component, props]` (or `component(C, p)`) and the dialog
+mounts it under an owner and disposes it on close — reactivity inside a dialog now works and the graph no
+longer leaks. `Node` / `string` / factory content is unchanged.
+
+**App-wide date/time picker defaults.** `provideDateTimeDefaults()` sets adapter, locale, first day of week,
+display format, translated chrome and 12/24h once on the owner tree, instead of repeating them on every
+`<Datepicker>` / `<DateRangePicker>` / `<Timepicker>`. Resolution is instance prop → context → built-in, and a
+settings change now reaches an already-mounted field.
+
+**`infiniteScroll` in the CDK.** A load-more sentinel (`use:infiniteScroll`) that requests the next page as the
+list nears the end — never overlapping a request in flight, re-arming when a filter resets, and chaining even
+when a page is too short to fill the viewport. Composes with `virtualScroll` (that decides what to render, this
+when to fetch).
+
+**Resume engine — the adopt navigation is now one cursor program (internal).** The client-side DOM adoption
+that makes a resumed page interactive without re-rendering was rebuilt around a single sequential `AdoptCursor`
+walk, replacing the old absolute build-time index math and its post-block special cases. No public API or
+template behaviour changed and the non-resumable output is byte-for-byte identical; a `@let` after a block now
+resumes instead of client-rendering, and a resumed page carries ~0.9 KB more JS (the navigation logic moved
+into the runtime — a deliberate one-time cost that should fall when per-island splitting lands). A plain
+client-only SPA is unaffected.
+
+**Also:** a proxied stream in `weave dev` could take the whole dev server down — fixed. The one open axios
+Dependabot alert (a transitive of the build tooling, never shipped) is closed via a scoped override.
+
 ## 2.0.1 — 2026-07-19
 
 A same-day fix to 2.0.0: `npm create weave` was still scaffolding projects onto 1.x.

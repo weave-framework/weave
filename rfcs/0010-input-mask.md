@@ -1,6 +1,6 @@
 # RFC 0010: Input masking (`use:mask`)
 
-- **Status:** Draft
+- **Status:** Implemented (2.1.0)
 - **Author(s):** Aidas Josas (@aidasjosas)
 - **Discussion:** —
 

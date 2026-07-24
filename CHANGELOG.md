@@ -14,7 +14,7 @@
 > already left it behind — Phase E ran 94 commits without a bump, and then released as one MINOR. The public
 > promise wins; the habit is retired.)*
 
-## Unreleased
+## 2.1.0 — 2026-07-24
 
 ### Added — UI
 - **`infiniteScroll` — a load-more sentinel in the CDK** (`@weave-framework/ui/cdk`, FW-20). The scroll
