@@ -1,6 +1,12 @@
 /**
- * `weave migrate` — assisted migration into Weave (RFC 0011). This module is the M1 slice: the command's front
- * door and the source-app path resolution. It does NOT analyze or convert yet (that is M2+).
+ * `weave migrate` — the ANGULAR source module (RFC 0011): the command's front door, source-app path resolution,
+ * the downward dependency analysis, and the package-decision step. The two layers it stands on are shared by
+ * EVERY source-framework module:
+ *   • ./migrate-ui      — colours (`c`) + interactive input (`inputManager`). Never print raw `\x1b[..m` here;
+ *                         use `c.*` so `NO_COLOR` and piped output are respected for free.
+ *   • ./migrate-analyze — the pure fact-gathering (entry point → import walk → package classification).
+ * A future `migrate-react.ts` / `migrate-vue.ts` mirrors THIS file: its own detection + a `runMigrate` branch,
+ * the same UI + analyzer underneath. That is the whole extension story — one file per source framework.
  *
  * The path resolution is the interesting part: a user may point at a plain Angular app OR at a monorepo root
  * (Nx) whose real app sits deeper in `apps/*`. So detection looks AT the path and, if needed, INSIDE it, and
@@ -8,7 +14,6 @@
  */
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { createInterface, emitKeypressEvents, type Interface } from 'node:readline';
 import {
   classifyPackages,
   findEntryPoint,
@@ -17,234 +22,9 @@ import {
   type DependencyWalk,
   type PackagePlan,
 } from './migrate-analyze.js';
+import { c, inputManager, type InputManager } from './migrate-ui.js';
 
-interface InputManager {
-  /** Free-text prompt (a path). Returns the trimmed line, or '' at EOF. */
-  askLine: (prompt: string) => Promise<string>;
-  /** A menu: arrow-key + Enter in a real terminal, number-typing under piped input or on any fallback. -1 = none. */
-  selectMenu: (title: string, options: string[]) => Promise<number>;
-  /** A checkbox list: ↑/↓ move, space toggles, `a` toggles all, Enter confirms. Returns the final checked mask.
-   *  Under piped input it prints the list and reads a line of numbers to toggle (blank = accept the defaults). */
-  multiSelect: (title: string, options: string[], checked: boolean[]) => Promise<boolean[]>;
-  /** True once stdin has ended AND its buffered lines are all consumed — the caller must stop asking. */
-  done: () => boolean;
-  close: () => void;
-}
-
-/**
- * Input over BOTH a real terminal and piped stdin. Text uses a buffered line-queue (`readline.question` drops a
- * line under piped input — the line event can fire before the next question registers its callback). A menu
- * navigates with the arrow keys + Enter in a TTY, and degrades to typing a number when piped or if raw mode is
- * unavailable — so a menu is never broken, only prettier in a real terminal.
- */
-function inputManager(): InputManager {
-  const rl: Interface = createInterface({ input: process.stdin, terminal: false });
-  const queue: string[] = [];
-  const waiters: Array<(line: string) => void> = [];
-  let closed: boolean = false;
-  // After a TTY arrow-select, the confirming Enter leaks into the resumed readline as one empty line — swallow it
-  // once so the next text prompt is not skipped (which showed the path prompt twice).
-  let swallowEmpty: boolean = false;
-  rl.on('line', (l: string) => {
-    const w: ((line: string) => void) | undefined = waiters.shift();
-    if (w) w(l);
-    else queue.push(l);
-  });
-  rl.on('close', () => {
-    closed = true;
-    for (const w of waiters.splice(0)) w('');
-  });
-
-  const rawRead = (): Promise<string | null> => {
-    const next: string | undefined = queue.shift();
-    if (next !== undefined) return Promise.resolve(next);
-    if (closed) return Promise.resolve(null); // EOF
-    return new Promise<string | null>((res) => waiters.push((l) => res(l)));
-  };
-
-  const askLine = async (prompt: string): Promise<string> => {
-    process.stdout.write(prompt);
-    let line: string | null = await rawRead();
-    if (swallowEmpty) {
-      swallowEmpty = false;
-      if (line === '') line = await rawRead(); // discard the Enter that confirmed an arrow-menu pick
-    }
-    return line === null ? '' : line.trim();
-  };
-
-  /** Fallback menu: print numbered options, read one line, parse the number (or the option text). */
-  const selectByNumber = async (title: string, options: string[]): Promise<number> => {
-    let out: string = `\n${title}\n`;
-    options.forEach((o, i) => (out += `  ${i + 1}) ${o}\n`));
-    const a: string = await askLine(`${out}> `);
-    const n: number = Number(a);
-    if (Number.isInteger(n) && n >= 1 && n <= options.length) return n - 1;
-    return options.findIndex((o) => o.toLowerCase() === a.toLowerCase());
-  };
-
-  /** Arrow-key menu (TTY only): highlight a row, ↑/↓ to move, Enter to pick. Any hiccup → number fallback. */
-  const selectByArrows = (title: string, options: string[]): Promise<number> =>
-    new Promise<number>((res, rej) => {
-      const stdin: NodeJS.ReadStream = process.stdin;
-      let idx: number = 0;
-      let top: number = 0; // first visible option (the window scrolls as idx moves past its edges)
-      const VIEW: number = Math.min(10, options.length);
-      const HEIGHT: number = 1 + VIEW + 1; // title + window rows + hint line — a constant, so redraw is exact
-      emitKeypressEvents(stdin);
-      const trunc = (s: string): string => {
-        const w: number = (process.stdout.columns ?? 80) - 4;
-        return s.length > w ? `…${s.slice(s.length - w + 1)}` : s; // left-truncate: keep the app name (path end)
-      };
-      const draw = (first: boolean): void => {
-        if (idx < top) top = idx;
-        else if (idx >= top + VIEW) top = idx - VIEW + 1;
-        if (!first) process.stdout.write(`\x1b[${HEIGHT}A`); // cursor up to redraw in place
-        process.stdout.write(`\x1b[2K${title}\n`);
-        for (let i: number = 0; i < VIEW; i++) {
-          const oi: number = top + i;
-          process.stdout.write(`\x1b[2K${oi === idx ? '\x1b[36m> ' : '  '}${trunc(options[oi])}\x1b[0m\n`);
-        }
-        const more: string[] = [];
-        if (top > 0) more.push(`↑${top} more`);
-        if (top + VIEW < options.length) more.push(`↓${options.length - top - VIEW} more`);
-        process.stdout.write(`\x1b[2K\x1b[2m${more.join('  ')}  (${idx + 1}/${options.length})\x1b[0m\n`);
-      };
-      const cleanup = (): void => {
-        stdin.removeListener('keypress', onKey);
-        if (stdin.isTTY) stdin.setRawMode(false);
-        rl.resume();
-      };
-      const onKey = (_s: string, key: { name?: string; ctrl?: boolean } | undefined): void => {
-        if (!key) return;
-        if (key.ctrl && key.name === 'c') {
-          cleanup();
-          process.exit(130);
-        }
-        if (key.name === 'up') idx = (idx - 1 + options.length) % options.length;
-        else if (key.name === 'down') idx = (idx + 1) % options.length;
-        else if (key.name === 'return' || key.name === 'enter') {
-          cleanup();
-          res(idx);
-          return;
-        } else return;
-        draw(false);
-      };
-      try {
-        rl.pause();
-        if (stdin.isTTY) stdin.setRawMode(true);
-        stdin.resume(); // keep the stream flowing + ref'd, else the event loop empties and Node exits before a keypress
-        stdin.on('keypress', onKey);
-        process.stdout.write('\n');
-        draw(true);
-      } catch (e) {
-        cleanup();
-        rej(e);
-      }
-    });
-
-  /** Fallback checkbox list: print with [x]/[ ], read one line of numbers to TOGGLE (blank = keep the defaults). */
-  const multiByNumber = async (title: string, options: string[], checked: boolean[]): Promise<boolean[]> => {
-    const mask: boolean[] = [...checked];
-    let out: string = `\n${title}\n`;
-    options.forEach((o, i) => (out += `  ${i + 1}) [${mask[i] ? 'x' : ' '}] ${o}\n`));
-    const a: string = await askLine(`${out}Numbers to toggle (comma-separated), or Enter to accept:\n> `);
-    for (const tok of a.split(/[\s,]+/).filter(Boolean)) {
-      const n: number = Number(tok);
-      if (Number.isInteger(n) && n >= 1 && n <= options.length) mask[n - 1] = !mask[n - 1];
-    }
-    return mask;
-  };
-
-  /** Arrow-key checkbox list (TTY only): ↑/↓ move, space toggles the row, `a` toggles all, Enter confirms. */
-  const multiByArrows = (title: string, options: string[], checked: boolean[]): Promise<boolean[]> =>
-    new Promise<boolean[]>((res, rej) => {
-      const stdin: NodeJS.ReadStream = process.stdin;
-      const mask: boolean[] = [...checked];
-      let idx: number = 0;
-      let top: number = 0;
-      const VIEW: number = Math.min(10, options.length);
-      const HEIGHT: number = 1 + VIEW + 1;
-      emitKeypressEvents(stdin);
-      const trunc = (s: string): string => {
-        const w: number = (process.stdout.columns ?? 80) - 8; // room for "> [x] "
-        return s.length > w ? `${s.slice(0, w - 1)}…` : s;
-      };
-      const draw = (first: boolean): void => {
-        if (idx < top) top = idx;
-        else if (idx >= top + VIEW) top = idx - VIEW + 1;
-        if (!first) process.stdout.write(`\x1b[${HEIGHT}A`);
-        process.stdout.write(`\x1b[2K${title}\n`);
-        for (let i: number = 0; i < VIEW; i++) {
-          const oi: number = top + i;
-          const box: string = mask[oi] ? '[x]' : '[ ]';
-          const cursor: string = oi === idx ? '\x1b[36m> ' : '  ';
-          process.stdout.write(`\x1b[2K${cursor}${box} ${trunc(options[oi])}\x1b[0m\n`);
-        }
-        process.stdout.write(`\x1b[2K\x1b[2mspace toggle · a all · Enter confirm  (${idx + 1}/${options.length})\x1b[0m\n`);
-      };
-      const cleanup = (): void => {
-        stdin.removeListener('keypress', onKey);
-        if (stdin.isTTY) stdin.setRawMode(false);
-        rl.resume();
-      };
-      const onKey = (s: string, key: { name?: string; ctrl?: boolean } | undefined): void => {
-        if (!key) return;
-        if (key.ctrl && key.name === 'c') {
-          cleanup();
-          process.exit(130);
-        }
-        if (key.name === 'up') idx = (idx - 1 + options.length) % options.length;
-        else if (key.name === 'down') idx = (idx + 1) % options.length;
-        else if (key.name === 'space' || s === ' ') mask[idx] = !mask[idx];
-        else if (key.name === 'a') {
-          const anyOff: boolean = mask.some((m) => !m);
-          for (let i: number = 0; i < mask.length; i++) mask[i] = anyOff; // all-on if any was off, else all-off
-        } else if (key.name === 'return' || key.name === 'enter') {
-          cleanup();
-          res(mask);
-          return;
-        } else return;
-        draw(false);
-      };
-      try {
-        rl.pause();
-        if (stdin.isTTY) stdin.setRawMode(true);
-        stdin.resume();
-        stdin.on('keypress', onKey);
-        process.stdout.write('\n');
-        draw(true);
-      } catch (e) {
-        cleanup();
-        rej(e);
-      }
-    });
-
-  return {
-    askLine,
-    async selectMenu(title: string, options: string[]): Promise<number> {
-      if (!process.stdin.isTTY) return selectByNumber(title, options);
-      try {
-        const picked: number = await selectByArrows(title, options);
-        swallowEmpty = true; // the confirming Enter will surface as one empty line — the next askLine drops it
-        return picked;
-      } catch {
-        return selectByNumber(title, options);
-      }
-    },
-    async multiSelect(title: string, options: string[], checked: boolean[]): Promise<boolean[]> {
-      if (!process.stdin.isTTY) return multiByNumber(title, options, checked);
-      try {
-        const mask: boolean[] = await multiByArrows(title, options, checked);
-        swallowEmpty = true; // the confirming Enter surfaces as one empty line — the next askLine drops it
-        return mask;
-      } catch {
-        return multiByNumber(title, options, checked);
-      }
-    },
-    done: () => closed && queue.length === 0,
-    close: () => rl.close(),
-  };
-}
+/* ──────────── detection: is there an Angular app here, and where? (Angular-specific — a React module replaces this) ──────────── */
 
 /** Does `dir` DIRECTLY contain an Angular app? `angular.json`, or a `package.json` that depends on `@angular/core`. */
 export function detectAngularAt(dir: string): boolean {
@@ -398,33 +178,41 @@ export function resolveAngularApp(input: string): Resolution {
   return pickFrom(findAngularApps(dir)); // fallback: units may live deeper
 }
 
-/* ──────────── the interactive command (thin shell over the pure functions above) ──────────── */
+/* ──────────── the interactive command (thin, COLOURED shell over the pure functions above) ──────────── */
 
 const SOURCES: string[] = ['Angular', 'React', 'Vue'];
 
 /** Above this many candidates a scrollable menu is worse than typing the exact path — so we ask for one instead. */
 const MENU_MAX: number = 10;
 
-/** `weave migrate` entry — pick a framework, resolve the source app path, confirm. Analysis/convert is M2+. */
+/**
+ * `weave migrate` entry — pick a framework, resolve the source path, analyse it, and choose what to try. Every
+ * line is coloured through `c` (the palette in ./migrate-ui), which no-ops when output isn't a terminal — so the
+ * same code prints a lively terminal session and a clean CI log. Analysis is M2; the plan + conversion are M3/M4.
+ */
 export async function runMigrate(): Promise<void> {
   const io: InputManager = inputManager();
   try {
-    // 1) framework — arrow-key menu (TTY) or numbered (piped)
+    console.log(`\n${c.bold(c.cyan('weave migrate'))}${c.dim(' — assisted migration into Weave')}`);
+
+    // 1) framework — arrow-key menu (TTY) or numbered (piped). Only Angular is wired up today.
     const fw: number = await io.selectMenu('Migrate from which framework?', SOURCES);
     if (fw < 0 && io.done()) return; // no input at all — nothing to do
     const source: string | undefined = SOURCES[fw];
     if (source !== 'Angular') {
-      console.log(source ? `${source} is coming soon. Only Angular is supported today.` : 'Unknown choice.');
+      console.log(source ? c.yellow(`\n${source} is coming soon. Only Angular is supported today.`) : c.red('\nUnknown choice.'));
       return;
     }
 
     // 2) path, with deep detection (an app, a library — a service/component migrates from inside one)
     let app: string | undefined;
     while (!app) {
-      const input: string = await io.askLine('\nPath to your Angular app or the piece to migrate (full path):\n> ');
+      const input: string = await io.askLine(
+        `\n${c.bold('Path to your Angular app or the piece to migrate')}${c.dim(' (full path):')}\n${c.cyan('> ')}`,
+      );
       if (!input) {
         if (io.done()) {
-          console.log('\nNo path given. Nothing to migrate.');
+          console.log(c.yellow('\nNo path given. Nothing to migrate.'));
           return;
         }
         continue;
@@ -434,70 +222,74 @@ export async function runMigrate(): Promise<void> {
         app = r.app;
       } else if (r.candidates && r.candidates.length > MENU_MAX) {
         // Too many to pick from a list — show a few so the user knows where they live, then ask for the exact one.
-        console.log(`\nFound ${r.candidates.length} Angular projects in there — too many to list. A few of them:`);
-        r.candidates.slice(0, 5).forEach((c) => console.log(`  ${c}`));
-        console.log('  …');
+        console.log(c.yellow(`\nFound ${r.candidates.length} Angular projects in there — too many to list.`) + c.dim(' A few of them:'));
+        r.candidates.slice(0, 5).forEach((cand) => console.log(c.dim(`  ${cand}`)));
+        console.log(c.dim('  …'));
         console.log('Type the exact path to what you want to migrate (an app, a library, or a service inside one):');
         continue; // the loop re-prompts; an exact path resolves straight to that one unit
       } else if (r.candidates && r.candidates.length) {
-        console.log('\nNo single unit right there. I looked inside and found these — pick one (or Ctrl-C to retype):');
-        const c: number = await io.selectMenu('Which one?', r.candidates);
-        if (c >= 0 && r.candidates[c]) app = r.candidates[c];
+        console.log(c.dim('\nNo single unit right there. I looked inside and found these — pick one (or Ctrl-C to retype):'));
+        const pick: number = await io.selectMenu('Which one?', r.candidates);
+        if (pick >= 0 && r.candidates[pick]) app = r.candidates[pick];
       } else {
-        console.log('No Angular app or project found here or inside. Type another path:');
+        console.log(c.yellow('No Angular app or project found here or inside.') + ' Type another path:');
       }
       if (!app && io.done()) {
-        console.log('\nNothing resolved. Nothing to migrate.');
+        console.log(c.yellow('\nNothing resolved. Nothing to migrate.'));
         return;
       }
     }
 
-    console.log(`\nUsing: ${app}`);
+    console.log(`\n${c.green('✓')} ${c.dim('Using:')} ${c.bold(app)}`);
 
     // 3) analyze — find the entry, walk the dependency tree DOWN to the leaves (M2)
     const entry: string | null = findEntryPoint(app);
     if (!entry) {
-      console.log("Couldn't find an entry file (main.ts / index.ts) — point at the unit's folder, or a specific file.");
+      console.log(c.red("\nCouldn't find an entry file (main.ts / index.ts)") + " — point at the unit's folder, or a specific file.");
       return;
     }
-    console.log(`Entry: ${entry}\nAnalyzing (following imports down to the leaves)...\n`);
+    console.log(c.dim(`${c.green('✓')} Entry: ${entry}`));
+    console.log(c.dim('Analyzing (following imports down to the leaves)…\n'));
     const walk: DependencyWalk = walkDependencies(entry);
     const list = (xs: string[], n: number): string => (xs.length ? `${xs.slice(0, n).join(', ')}${xs.length > n ? ', …' : ''}` : '(none)');
-    console.log('Found:');
-    console.log(`  ${walk.files.length} source files`);
-    console.log(`  ${walk.angular.length} @angular APIs used (these become Weave): ${list(walk.angular, 6)}`);
-    if (walk.internal.length) console.log(`  ${walk.internal.length} of your own workspace lib(s) you depend on (migrate each separately): ${list(walk.internal, 6)}`);
+    const num = (n: number): string => c.bold(String(n)); // counts stand out
+
+    console.log(c.bold('Found:'));
+    console.log(`  ${c.cyan('•')} ${num(walk.files.length)} source files`);
+    console.log(`  ${c.magenta('•')} ${num(walk.angular.length)} @angular APIs used ${c.dim('(these become Weave)')}: ${c.magenta(list(walk.angular, 6))}`);
+    if (walk.internal.length) {
+      console.log(`  ${c.blue('•')} ${num(walk.internal.length)} of your own workspace lib(s) ${c.dim('(migrate each separately)')}: ${c.blue(list(walk.internal, 6))}`);
+    }
     const plans: PackagePlan[] = classifyPackages(walk.thirdParty, findWorkspaceRoot(app));
-    console.log(`  ${plans.length} third-party package(s): ${list(plans.map((p) => p.name), 8)}`);
-    if (walk.cycles.length) console.log(`  ⚠ ${walk.cycles.length} circular-dependency chain(s) — will be flagged for you`);
-    if (walk.unresolved.length) console.log(`  ⚠ ${walk.unresolved.length} import(s) couldn't be resolved — human, look`);
+    console.log(`  ${c.yellow('•')} ${num(plans.length)} third-party package(s): ${list(plans.map((p) => p.name), 8)}`);
+    if (walk.cycles.length) console.log(`  ${c.yellow('⚠')} ${c.yellow(`${walk.cycles.length} circular-dependency chain(s) — will be flagged for you`)}`);
+    if (walk.unresolved.length) console.log(`  ${c.red('⚠')} ${c.red(`${walk.unresolved.length} import(s) couldn't be resolved — human, look`)}`);
 
     // 4) decide what to try migrating (M2.8). auto/try → a checkbox you confirm; keep → shown, never a checkbox.
     const attempt: string[] = await choosePackages(io, plans);
 
-    console.log(`\n${YELLOW}Note: this is assisted, not a 100% automatic migration. Everything you pick is a best`);
-    console.log(`effort — review each change, and expect some by-hand work.${RESET}`);
-    if (attempt.length) console.log(`\nWill attempt to migrate: ${attempt.join(', ')}`);
-    console.log('\n(the written plan + conversion come next — see RFC 0011)');
+    console.log(c.yellow('\nNote: this is assisted, not a 100% automatic migration. Everything you pick is a best'));
+    console.log(c.yellow('effort — review each change, and expect some by-hand work.'));
+    if (attempt.length) console.log(`\n${c.green('Will attempt to migrate:')} ${attempt.join(', ')}`);
+    console.log(c.dim('\n(the written plan + conversion come next — see RFC 0011)'));
   } finally {
     io.close();
   }
 }
 
-const YELLOW: string = '\x1b[33m';
-const RESET: string = '\x1b[0m';
-
 /**
  * Ask the user which third-party packages to attempt. `auto` (confident) + `try` (your call) become checkboxes —
  * `auto` pre-checked; `keep` packages have NO Weave role, so they are listed for information only (ticking one
- * would do nothing). Returns the package names the user chose to attempt.
+ * would do nothing). Returns the package names the user chose to attempt. Option labels stay PLAIN text (no
+ * embedded colour): the checkbox widget measures label width to truncate, and escape codes would throw that off —
+ * the widget supplies its own colour (green tick, cyan cursor).
  */
 async function choosePackages(io: InputManager, plans: PackagePlan[]): Promise<string[]> {
   const keep: PackagePlan[] = plans.filter((p) => p.decision === 'keep');
   const choose: PackagePlan[] = plans.filter((p) => p.decision !== 'keep');
   if (keep.length) {
-    console.log('\nKept as-is (no Weave equivalent — you keep using these):');
-    for (const p of keep) console.log(`  • ${p.name} — ${p.note}`);
+    console.log(c.gray('\nKept as-is (no Weave equivalent — you keep using these):'));
+    for (const p of keep) console.log(c.gray(`  • ${p.name} — ${p.note}`));
   }
   if (!choose.length) return [];
   const labels: string[] = choose.map((p) => `${p.name}  ${p.note}`);

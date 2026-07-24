@@ -197,8 +197,32 @@ const plans = a.classifyPackages(['rxjs/operators', 'rxjs', 'lodash', 'some-obsc
 ok(plans.length === 3, `classifyPackages: rxjs + rxjs/operators dedupe to one (got ${plans.length} plans)`);
 ok(plans.filter((p) => p.decision === 'auto').length === 1 && plans.some((p) => p.decision === 'keep') && plans.some((p) => p.decision === 'try'), 'classifyPackages: the three buckets each appear');
 
+// ── the shared UI colour palette: wraps under FORCE_COLOR, no-ops under NO_COLOR (the clean-piped guarantee) ──
+// COLOR is decided at module-eval from env, so we bundle migrate-ui once and import it twice under different env
+// (a distinct ?query gives Node a fresh module instance, hence a fresh COLOR decision).
+const outUi = join(repo, 'node_modules', '.weave-migrate-ui-smoke.mjs');
+await esbuild({
+  entryPoints: [join(repo, 'packages', 'cli', 'src', 'migrate-ui.ts')],
+  bundle: true,
+  format: 'esm',
+  platform: 'node',
+  packages: 'external',
+  outfile: outUi,
+});
+delete process.env.NO_COLOR;
+process.env.FORCE_COLOR = '1';
+const uiOn = await import(pathToFileURL(outUi).href + '?on');
+ok(uiOn.c.red('x').startsWith('\x1b[31m') && uiOn.c.red('x').endsWith('\x1b[39m'), 'colours: FORCE_COLOR wraps text in ANSI codes');
+ok(uiOn.c.green('hi').includes('hi'), 'colours: the wrapped text still contains the original');
+process.env.NO_COLOR = '1'; // NO_COLOR wins even with FORCE_COLOR set
+const uiOff = await import(pathToFileURL(outUi).href + '?off');
+ok(uiOff.c.red('x') === 'x', 'colours: NO_COLOR yields plain text — the clean piped-output guarantee');
+delete process.env.NO_COLOR;
+delete process.env.FORCE_COLOR;
+
 rmSync(out, { force: true });
 rmSync(outA, { force: true });
+rmSync(outUi, { force: true });
 
 if (failures) {
   console.error(`\n✗ ${failures} check(s) failed.`);

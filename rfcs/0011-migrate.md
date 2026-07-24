@@ -164,3 +164,20 @@ and records it in the plan. It never fills a gap with a silent guess.
   silent guesses.
 
 Later milestones add React and others behind the same `weave migrate` front door.
+
+## Authoring a new source-framework module (React, Vue, …)
+
+Every source framework is ONE module beside `migrate.ts`; the two layers under it are shared, so a new module
+writes only what is genuinely framework-specific. The pieces:
+
+| File | Role | Framework-specific? |
+| --- | --- | --- |
+| `migrate-ui.ts` | Colours (`c`) + interactive input (`inputManager`: `askLine` / `selectMenu` / `multiSelect`). | **No** — reuse as-is. Never print raw `\x1b[..m`; use `c.*` so `NO_COLOR` / `FORCE_COLOR` are honoured. |
+| `migrate-analyze.ts` | Pure facts: `findEntryPoint` → `parseImports` → `walkDependencies` → `classifyPackages`. | **Mostly no.** The import walk is language-level (TS/JS), so it's shared. Two knobs are framework-specific: the `ImportKind` that marks the *source framework* (`angular` today — a React module adds `react`, so `react`/`react-dom` are the translation surface, not "third-party"), and the confident `AUTO_MAP` entries (what maps first-party to Weave). |
+| `migrate-<fw>.ts` | The front door: detect the framework at/inside a path, resolve the unit, then drive analyze + the package choice. | **Yes** — this is the whole per-framework surface. Mirror `migrate.ts`: detection functions + a `runMigrate`-style flow. |
+| `cli.ts` | Registration. | Add the framework to the `SOURCES` list and branch to its module (today only `Angular` proceeds). |
+
+Rules that hold for every module (so migrations feel identical): all output goes through `c`; never guess —
+an unseen fact is a recorded `unknown`; the honesty note ("assisted, not a 100% automatic migration") is always
+shown; and every new pure function ships a smoke check that is mutation-proven to fail (see
+`packages/cli/test/migrate.smoke.mjs`).
