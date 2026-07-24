@@ -6,8 +6,8 @@
  *
  * This slice (M2.1): find the selected unit's ENTRY point — where the walk begins.
  */
-import { existsSync, readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { existsSync, readFileSync, statSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 import ts from 'typescript';
 
 /** Try `rel` under `unitDir`; if it doesn't resolve (a workspace-relative path), strip leading segments until it does. */
@@ -81,6 +81,7 @@ export function findEntryPoint(unitDir: string): string | null {
 /** How an import is treated by the downward walk. */
 export type ImportKind =
   | 'relative' // a file in this codebase — the walk follows it
+  | 'internal' // a workspace-internal library via a tsconfig path alias (`@myorg/foo`) — followed like relative
   | 'angular' // `@angular/*` — the SOURCE framework; translation input, never recursed into
   | 'third-party'; // a real external package — a tree-edge to note (keep / replace / rewrite later)
 
@@ -92,17 +93,95 @@ export interface ImportRef {
   resolved: string | null;
 }
 
-/** Resolve a relative import specifier to a file (`.ts`, `.tsx`, `/index.ts`, `.d.ts`), or null. */
-function resolveRelative(spec: string, fromFile: string): string | null {
-  const base: string = join(dirname(fromFile), spec);
-  for (const cand of [`${base}.ts`, `${base}.tsx`, join(base, 'index.ts'), `${base}.d.ts`]) {
-    if (existsSync(cand)) return cand;
+/** Try a base path as a file (`.ts`, `.tsx`, `/index.ts`, `.d.ts`, or exactly), returning the first that exists. */
+function fileFor(base: string): string | null {
+  for (const cand of [base, `${base}.ts`, `${base}.tsx`, join(base, 'index.ts'), `${base}.d.ts`]) {
+    try {
+      if (existsSync(cand) && statSync(cand).isFile()) return cand;
+    } catch {
+      /* skip */
+    }
   }
   return null;
 }
 
-function classifyImport(spec: string, fromFile: string): ImportRef {
+/** Resolve a relative import specifier to a file, or null. */
+function resolveRelative(spec: string, fromFile: string): string | null {
+  return fileFor(join(dirname(fromFile), spec));
+}
+
+/** A workspace's tsconfig path aliases — how a monorepo maps `@myorg/foo` to its own `libs/…` source. */
+export interface TsPaths {
+  baseUrl: string; // absolute
+  patterns: Array<{ prefix: string; wildcard: boolean; targets: string[] }>;
+}
+
+/** Walk up from `fromDir` to the workspace root (tsconfig.base.json / nx.json / angular.json). */
+export function findWorkspaceRoot(fromDir: string): string {
+  let dir: string = fromDir;
+  for (let i: number = 0; i < 25; i++) {
+    if (['tsconfig.base.json', 'nx.json', 'angular.json'].some((f) => existsSync(join(dir, f)))) return dir;
+    const parent: string = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return fromDir;
+}
+
+/** Read a workspace's tsconfig path aliases (via the TS config reader, which tolerates JSONC comments). */
+export function readTsPaths(root: string): TsPaths | null {
+  for (const f of ['tsconfig.base.json', 'tsconfig.json']) {
+    const p: string = join(root, f);
+    if (!existsSync(p)) continue;
+    const parsed: { config?: { compilerOptions?: { baseUrl?: string; paths?: Record<string, string[]> } } } = ts.readConfigFile(
+      p,
+      (fp) => {
+        try {
+          return readFileSync(fp, 'utf8');
+        } catch {
+          return undefined;
+        }
+      },
+    );
+    const co: { baseUrl?: string; paths?: Record<string, string[]> } = parsed.config?.compilerOptions ?? {};
+    const paths: Record<string, string[]> = co.paths ?? {};
+    const patterns: TsPaths['patterns'] = Object.entries(paths).map(([key, targets]) => ({
+      prefix: key.replace(/\*$/, ''),
+      wildcard: key.endsWith('*'),
+      targets,
+    }));
+    if (patterns.length) return { baseUrl: resolve(root, co.baseUrl ?? '.'), patterns };
+  }
+  return null;
+}
+
+/** Resolve a bare specifier through the workspace's tsconfig paths to an internal file, or null (not internal). */
+function resolveAlias(spec: string, tsPaths: TsPaths): string | null {
+  for (const pat of tsPaths.patterns) {
+    if (pat.wildcard) {
+      if (spec.startsWith(pat.prefix)) {
+        const rest: string = spec.slice(pat.prefix.length);
+        for (const t of pat.targets) {
+          const hit: string | null = fileFor(resolve(tsPaths.baseUrl, t.replace('*', rest)));
+          if (hit) return hit;
+        }
+      }
+    } else if (spec === pat.prefix) {
+      for (const t of pat.targets) {
+        const hit: string | null = fileFor(resolve(tsPaths.baseUrl, t));
+        if (hit) return hit;
+      }
+    }
+  }
+  return null;
+}
+
+function classifyImport(spec: string, fromFile: string, tsPaths: TsPaths | null): ImportRef {
   if (spec.startsWith('.')) return { spec, kind: 'relative', resolved: resolveRelative(spec, fromFile) };
+  if (tsPaths) {
+    const internal: string | null = resolveAlias(spec, tsPaths);
+    if (internal) return { spec, kind: 'internal', resolved: internal }; // a workspace lib — the code's own, followed
+  }
   if (spec === '@angular' || spec.startsWith('@angular/')) return { spec, kind: 'angular', resolved: null };
   return { spec, kind: 'third-party', resolved: null };
 }
@@ -112,12 +191,12 @@ function classifyImport(spec: string, fromFile: string): ImportRef {
  * (`export … from`), and dynamic `import('…')` (Angular lazy routes) — each classified relative / angular /
  * third-party. This is one level of the tree; the walk (M2.3) follows the `relative` ones to the leaves.
  */
-export function parseImports(filePath: string): ImportRef[] {
+export function parseImports(filePath: string, tsPaths: TsPaths | null = null): ImportRef[] {
   const src: string = readFileSync(filePath, 'utf8');
   const sf: ts.SourceFile = ts.createSourceFile(filePath, src, ts.ScriptTarget.Latest, true);
   const out: ImportRef[] = [];
   const add = (spec: string): void => {
-    out.push(classifyImport(spec, filePath));
+    out.push(classifyImport(spec, filePath, tsPaths));
   };
   const visit = (node: ts.Node): void => {
     if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) {
@@ -141,12 +220,14 @@ export function parseImports(filePath: string): ImportRef[] {
 /* ──────────── M2.3 — the downward walk: follow relative imports to the leaves ──────────── */
 
 export interface DependencyWalk {
-  /** Every reachable `.ts` file, from the entry down (the migration's file set). */
+  /** Every reachable `.ts` file, from the entry down — including workspace-internal libs (the migration's set). */
   files: string[];
   /** Distinct `@angular/*` specifiers used anywhere in the tree — the translation surface. */
   angular: string[];
   /** Distinct third-party packages at the tree edges — each needs a keep/replace/rewrite decision. */
   thirdParty: string[];
+  /** Distinct workspace-internal libraries reached (via tsconfig aliases) — the code's own, followed + migrated. */
+  internal: string[];
   /** Circular-import chains found — REPORTED, not resolved ("used circularly — look"). */
   cycles: string[][];
   /** Relative imports that could not be resolved to a file — recorded, never guessed. */
@@ -164,25 +245,31 @@ export function walkDependencies(entryFile: string): DependencyWalk {
   const files: Set<string> = new Set<string>();
   const angular: Set<string> = new Set<string>();
   const thirdParty: Set<string> = new Set<string>();
+  const internal: Set<string> = new Set<string>();
   const unresolved: Set<string> = new Set<string>();
   const cycles: string[][] = [];
   const path: string[] = []; // the current walk path, for cycle detection
+
+  // The workspace's tsconfig aliases — so `@myorg/foo` resolves to the code's own libs and is FOLLOWED, not
+  // mistaken for an external package.
+  const tsPaths: TsPaths | null = readTsPaths(findWorkspaceRoot(dirname(entryFile)));
 
   const visit = (file: string): void => {
     if (files.has(file)) return; // already walked (a shared dep) — visit once
     files.add(file);
     path.push(file);
-    for (const imp of parseImports(file)) {
+    for (const imp of parseImports(file, tsPaths)) {
+      if (imp.kind === 'internal') internal.add(imp.spec);
       if (imp.kind === 'angular') {
         angular.add(imp.spec);
       } else if (imp.kind === 'third-party') {
         thirdParty.add(imp.spec);
       } else if (!imp.resolved) {
-        unresolved.add(imp.spec);
+        unresolved.add(imp.spec); // relative or internal alias that pointed nowhere
       } else if (path.includes(imp.resolved)) {
         cycles.push([...path.slice(path.indexOf(imp.resolved)), imp.resolved]); // a cycle — report, don't follow
       } else {
-        visit(imp.resolved);
+        visit(imp.resolved); // relative AND internal are the code's own — follow both
       }
     }
     path.pop();
@@ -191,6 +278,7 @@ export function walkDependencies(entryFile: string): DependencyWalk {
 
   return {
     files: [...files],
+    internal: [...internal],
     angular: [...angular],
     thirdParty: [...thirdParty],
     cycles,

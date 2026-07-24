@@ -1,0 +1,9 @@
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@sps-interfaces": ["libs/sps-interfaces/src/index.ts"],
+      "@sps-interfaces/*": ["libs/sps-interfaces/src/*"]
+    }
+  }
+}

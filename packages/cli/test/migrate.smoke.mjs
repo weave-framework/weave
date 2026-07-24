@@ -143,8 +143,13 @@ const walk = a.walkDependencies(entry);
 ok(walk.files.some((f) => f.endsWith('main.ts')) && walk.files.some((f) => f.endsWith('app.component.ts')) && walk.files.some((f) => f.endsWith('lazy.routes.ts')),
   'walkDependencies: reaches main → app.component + lazy.routes (down the tree)');
 ok(walk.angular.includes('@angular/platform-browser') && walk.angular.includes('@angular/core'), 'walkDependencies: collects @angular/* from anywhere in the tree');
-ok(walk.thirdParty.includes('lodash-es'), 'walkDependencies: collects third-party packages at the edges');
+ok(walk.thirdParty.includes('lodash-es') && walk.thirdParty.includes('rxjs'), 'walkDependencies: collects real third-party packages (lodash-es, rxjs)');
 ok(walk.cycles.length === 0, 'walkDependencies: no cycle in a clean tree');
+
+// ── internal libraries (tsconfig path alias) are FOLLOWED, not mistaken for third-party ──
+ok(walk.internal.includes('@sps-interfaces'), 'walkDependencies: a workspace lib (@sps-interfaces via tsconfig paths) is INTERNAL');
+ok(!walk.thirdParty.includes('@sps-interfaces'), 'walkDependencies: the internal lib is NOT listed as third-party (the bug the user found)');
+ok(walk.files.some((f) => f.includes('sps-interfaces')), 'walkDependencies: the internal lib\'s file is followed into the tree (migrated too)');
 
 // a cycle a → b → a is REPORTED, not followed forever
 const cyc = mkdtempSync(join(tmpdir(), 'weave-migrate-cyc-'));

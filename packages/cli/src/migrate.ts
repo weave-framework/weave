@@ -369,6 +369,7 @@ export async function runMigrate(): Promise<void> {
     console.log('Found:');
     console.log(`  ${walk.files.length} source files`);
     console.log(`  ${walk.angular.length} @angular APIs used (these become Weave): ${list(walk.angular, 6)}`);
+    if (walk.internal.length) console.log(`  ${walk.internal.length} of your own workspace libs (migrated too): ${list(walk.internal, 6)}`);
     console.log(`  ${walk.thirdParty.length} third-party packages (keep / replace / rewrite): ${list(walk.thirdParty, 8)}`);
     if (walk.cycles.length) console.log(`  ⚠ ${walk.cycles.length} circular-dependency chain(s) — will be flagged for you`);
     if (walk.unresolved.length) console.log(`  ⚠ ${walk.unresolved.length} import(s) couldn't be resolved — human, look`);
