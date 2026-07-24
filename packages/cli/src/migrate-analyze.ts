@@ -686,3 +686,111 @@ export interface DiEdge {
 export function diGraph(services: ServiceFact[]): DiEdge[] {
   return services.flatMap((s) => s.injects.map((to) => ({ from: s.className, to })));
 }
+
+/* ──────────── M2.6 — routes + guards: the router config (→ @weave-framework/router) ──────────── */
+
+/** One route entry — what becomes a Weave route (guards → `beforeEach`, lazy → dynamic import). */
+export interface RouteFact {
+  /** The `path` segment (`''` default, `'**'` wildcard), or null when unstated. */
+  path: string | null;
+  /** The routed component's class name, or null (a redirect / lazy / layout-only route). */
+  component: string | null;
+  /** `redirectTo` target, or null. */
+  redirectTo: string | null;
+  /** `loadChildren` / `loadComponent` present — a lazy boundary. */
+  lazy: boolean;
+  /** Guard class names across `canActivate` / `canActivateChild` / `canDeactivate` / `canMatch`. */
+  guards: string[];
+}
+
+const GUARD_KEYS: string[] = ['canActivate', 'canActivateChild', 'canDeactivate', 'canMatch', 'canLoad'];
+
+/** An identifier-valued property's name (`component: Foo` → `Foo`), or null. */
+function identifierProp(obj: ts.ObjectLiteralExpression, key: string): string | null {
+  for (const p of obj.properties) {
+    if (ts.isPropertyAssignment(p) && p.name && ts.isIdentifier(p.name) && p.name.text === key && ts.isIdentifier(p.initializer)) {
+      return p.initializer.text;
+    }
+  }
+  return null;
+}
+
+/** Identifier names inside an array-valued property (`canActivate: [A, B]` → `['A','B']`). */
+function identifierArrayProp(obj: ts.ObjectLiteralExpression, key: string): string[] {
+  const out: string[] = [];
+  for (const p of obj.properties) {
+    if (ts.isPropertyAssignment(p) && p.name && ts.isIdentifier(p.name) && p.name.text === key && ts.isArrayLiteralExpression(p.initializer)) {
+      for (const el of p.initializer.elements) if (ts.isIdentifier(el)) out.push(el.text);
+    }
+  }
+  return out;
+}
+
+/** Turn one route object literal into a fact, then recurse into its `children`. */
+function routeFromObject(obj: ts.ObjectLiteralExpression, out: RouteFact[]): void {
+  const guards: string[] = GUARD_KEYS.flatMap((k) => identifierArrayProp(obj, k));
+  out.push({
+    path: stringProp(obj, 'path'),
+    component: identifierProp(obj, 'component'),
+    redirectTo: stringProp(obj, 'redirectTo'),
+    lazy: hasProp(obj, 'loadChildren') || hasProp(obj, 'loadComponent'),
+    guards,
+  });
+  for (const p of obj.properties) {
+    if (ts.isPropertyAssignment(p) && p.name && ts.isIdentifier(p.name) && p.name.text === 'children' && ts.isArrayLiteralExpression(p.initializer)) {
+      for (const el of p.initializer.elements) if (ts.isObjectLiteralExpression(el)) routeFromObject(el, out);
+    }
+  }
+}
+
+/** Every route object inside a routes array literal (flattening `children`). */
+function routesFromArray(arr: ts.ArrayLiteralExpression, out: RouteFact[]): void {
+  for (const el of arr.elements) if (ts.isObjectLiteralExpression(el)) routeFromObject(el, out);
+}
+
+/** Is this type node `Routes` or `Route[]` (a route-config annotation)? */
+function isRoutesType(type: ts.TypeNode | undefined): boolean {
+  if (!type) return false;
+  if (ts.isArrayTypeNode(type)) return typeRefName(type.elementType) === 'Route';
+  return typeRefName(type) === 'Routes';
+}
+
+/**
+ * Parse one `.ts` file and return every route it declares. Route arrays are found at their idiomatic anchors —
+ * `RouterModule.forRoot([...])` / `forChild([...])`, `provideRouter([...])`, and a `Routes`/`Route[]`-typed
+ * declaration (`const routes: Routes = [...]`). Nested `children` are flattened. Guards, lazy boundaries, and
+ * redirects are captured. A file with no routes yields `[]`.
+ */
+export function findRoutes(filePath: string): RouteFact[] {
+  const sf: ts.SourceFile | null = parseFile(filePath);
+  if (!sf) return [];
+  const out: RouteFact[] = [];
+
+  const visit = (node: ts.Node): void => {
+    // anchor 1 & 2: RouterModule.forRoot/forChild(...) and provideRouter(...)
+    if (ts.isCallExpression(node)) {
+      const callee: ts.Expression = node.expression;
+      const isRouterModule: boolean =
+        ts.isPropertyAccessExpression(callee) &&
+        ts.isIdentifier(callee.expression) &&
+        callee.expression.text === 'RouterModule' &&
+        (callee.name.text === 'forRoot' || callee.name.text === 'forChild');
+      const isProvideRouter: boolean = ts.isIdentifier(callee) && callee.text === 'provideRouter';
+      if ((isRouterModule || isProvideRouter) && node.arguments.length && ts.isArrayLiteralExpression(node.arguments[0])) {
+        routesFromArray(node.arguments[0], out);
+      }
+    }
+    // anchor 3: a `Routes`/`Route[]`-typed declaration
+    if (ts.isVariableDeclaration(node) && isRoutesType(node.type) && node.initializer && ts.isArrayLiteralExpression(node.initializer)) {
+      routesFromArray(node.initializer, out);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sf);
+  return out;
+}
+
+/** Every route across a set of files (the walk's `files`), flattened. Unreadable files contribute nothing. */
+export function analyzeRoutes(files: string[]): RouteFact[] {
+  return files.flatMap((f) => findRoutes(f));
+}

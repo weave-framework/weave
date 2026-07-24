@@ -247,6 +247,22 @@ const edges = a.diGraph(allSvc);
 ok(edges.some((e) => e.from === 'ApiService' && e.to === 'HttpClient'), 'diGraph: ApiService → HttpClient is an edge');
 ok(edges.some((e) => e.from === 'ApiService' && e.to === 'Logger'), 'diGraph: ApiService → Logger is an edge');
 
+// ── M2.6: routes + guards — Routes config, RouterModule.forRoot, guards, children, lazy, redirects ──
+const routesDir = join(fx, 'routes');
+const routes = a.findRoutes(join(routesDir, 'app.routes.ts'));
+ok(routes.length === 5, `findRoutes: 5 routes incl. the nested child (got ${routes.length})`);
+ok(routes.some((r) => r.path === '' && r.component === 'HomeComponent'), 'findRoutes: a plain path+component route');
+const admin = routes.find((r) => r.path === 'admin');
+ok(admin && admin.guards.includes('AuthGuard'), 'findRoutes: canActivate/canDeactivate guards are captured');
+ok(routes.some((r) => r.path === 'users' && r.component === 'HomeComponent'), 'findRoutes: a nested child route is flattened in');
+ok(routes.some((r) => r.path === 'lazy' && r.lazy === true), 'findRoutes: a loadComponent route is marked lazy');
+ok(routes.some((r) => r.path === '**' && r.redirectTo === ''), 'findRoutes: a wildcard redirect is captured');
+
+const modRoutes = a.findRoutes(join(routesDir, 'module.routes.ts'));
+ok(modRoutes.some((r) => r.path === 'dash' && r.component === 'DashComponent' && r.guards.includes('RoleGuard')), 'findRoutes: RouterModule.forRoot([...]) config is read');
+ok(a.findRoutes(join(comps, 'decorator.component.ts')).length === 0, 'findRoutes: a component file has no routes');
+ok(a.analyzeRoutes([join(routesDir, 'app.routes.ts'), join(routesDir, 'module.routes.ts')]).length === 6, 'analyzeRoutes: flattens across files (5 + 1)');
+
 // ── the shared UI colour palette: wraps under FORCE_COLOR, no-ops under NO_COLOR (the clean-piped guarantee) ──
 // COLOR is decided at module-eval from env, so we bundle migrate-ui once and import it twice under different env
 // (a distinct ?query gives Node a fresh module instance, hence a fresh COLOR decision).
