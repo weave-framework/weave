@@ -109,8 +109,16 @@ Over the map + the code, the reasoning layer produces `migration-plan.md` and dr
 - For each piece: **what it does** and **how it becomes Weave** (the mapping table below).
 - **Easy (auto) vs hard (needs a human)**, and *why*.
 - **Risky spots** and the "if this / if not" cases worth a human's eyes.
-- **Per third-party package**: keep (framework-neutral), replace with a Weave/built-in equal, or rewrite
-  (Angular-specific).
+- **Per third-party package** — one of three, decided honestly (only a short confident list is automatic):
+  - **auto** — Weave has a first-party equal we're sure about (`rxjs` → reactivity, `@ngx-translate` → i18n).
+    Pre-selected, but you still confirm — nothing is silently rewritten.
+  - **try** — no confident mapping, but it might translate. Offered as a checkbox you tick (or don't).
+  - **keep** — a pure library with no Weave role (`d3`, `lodash`). Shown for information, never a checkbox —
+    you keep using it as-is. (Distinguished by a known-library list + the package's own keywords, with any
+    framework-role keyword pulling a package back into **try**.)
+  Subpaths collapse to their package root (`rxjs/operators` → one `rxjs` decision). A workspace-internal lib
+  reached via a tsconfig path alias is NOT a third-party package — it's your own code, noted as its own
+  migration unit. The tool always states plainly that this is assisted, **not a 100% automatic** migration.
 
 This split matches how the project already works: **the tool measures facts; the AI reasons over facts to write
 the plan.** Not magic — facts plus judgement.

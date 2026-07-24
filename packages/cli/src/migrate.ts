@@ -9,13 +9,23 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { createInterface, emitKeypressEvents, type Interface } from 'node:readline';
-import { findEntryPoint, walkDependencies, type DependencyWalk } from './migrate-analyze.js';
+import {
+  classifyPackages,
+  findEntryPoint,
+  findWorkspaceRoot,
+  walkDependencies,
+  type DependencyWalk,
+  type PackagePlan,
+} from './migrate-analyze.js';
 
 interface InputManager {
   /** Free-text prompt (a path). Returns the trimmed line, or '' at EOF. */
   askLine: (prompt: string) => Promise<string>;
   /** A menu: arrow-key + Enter in a real terminal, number-typing under piped input or on any fallback. -1 = none. */
   selectMenu: (title: string, options: string[]) => Promise<number>;
+  /** A checkbox list: ↑/↓ move, space toggles, `a` toggles all, Enter confirms. Returns the final checked mask.
+   *  Under piped input it prints the list and reads a line of numbers to toggle (blank = accept the defaults). */
+  multiSelect: (title: string, options: string[], checked: boolean[]) => Promise<boolean[]>;
   /** True once stdin has ended AND its buffered lines are all consumed — the caller must stop asking. */
   done: () => boolean;
   close: () => void;
@@ -132,6 +142,83 @@ function inputManager(): InputManager {
       }
     });
 
+  /** Fallback checkbox list: print with [x]/[ ], read one line of numbers to TOGGLE (blank = keep the defaults). */
+  const multiByNumber = async (title: string, options: string[], checked: boolean[]): Promise<boolean[]> => {
+    const mask: boolean[] = [...checked];
+    let out: string = `\n${title}\n`;
+    options.forEach((o, i) => (out += `  ${i + 1}) [${mask[i] ? 'x' : ' '}] ${o}\n`));
+    const a: string = await askLine(`${out}Numbers to toggle (comma-separated), or Enter to accept:\n> `);
+    for (const tok of a.split(/[\s,]+/).filter(Boolean)) {
+      const n: number = Number(tok);
+      if (Number.isInteger(n) && n >= 1 && n <= options.length) mask[n - 1] = !mask[n - 1];
+    }
+    return mask;
+  };
+
+  /** Arrow-key checkbox list (TTY only): ↑/↓ move, space toggles the row, `a` toggles all, Enter confirms. */
+  const multiByArrows = (title: string, options: string[], checked: boolean[]): Promise<boolean[]> =>
+    new Promise<boolean[]>((res, rej) => {
+      const stdin: NodeJS.ReadStream = process.stdin;
+      const mask: boolean[] = [...checked];
+      let idx: number = 0;
+      let top: number = 0;
+      const VIEW: number = Math.min(10, options.length);
+      const HEIGHT: number = 1 + VIEW + 1;
+      emitKeypressEvents(stdin);
+      const trunc = (s: string): string => {
+        const w: number = (process.stdout.columns ?? 80) - 8; // room for "> [x] "
+        return s.length > w ? `${s.slice(0, w - 1)}…` : s;
+      };
+      const draw = (first: boolean): void => {
+        if (idx < top) top = idx;
+        else if (idx >= top + VIEW) top = idx - VIEW + 1;
+        if (!first) process.stdout.write(`\x1b[${HEIGHT}A`);
+        process.stdout.write(`\x1b[2K${title}\n`);
+        for (let i: number = 0; i < VIEW; i++) {
+          const oi: number = top + i;
+          const box: string = mask[oi] ? '[x]' : '[ ]';
+          const cursor: string = oi === idx ? '\x1b[36m> ' : '  ';
+          process.stdout.write(`\x1b[2K${cursor}${box} ${trunc(options[oi])}\x1b[0m\n`);
+        }
+        process.stdout.write(`\x1b[2K\x1b[2mspace toggle · a all · Enter confirm  (${idx + 1}/${options.length})\x1b[0m\n`);
+      };
+      const cleanup = (): void => {
+        stdin.removeListener('keypress', onKey);
+        if (stdin.isTTY) stdin.setRawMode(false);
+        rl.resume();
+      };
+      const onKey = (s: string, key: { name?: string; ctrl?: boolean } | undefined): void => {
+        if (!key) return;
+        if (key.ctrl && key.name === 'c') {
+          cleanup();
+          process.exit(130);
+        }
+        if (key.name === 'up') idx = (idx - 1 + options.length) % options.length;
+        else if (key.name === 'down') idx = (idx + 1) % options.length;
+        else if (key.name === 'space' || s === ' ') mask[idx] = !mask[idx];
+        else if (key.name === 'a') {
+          const anyOff: boolean = mask.some((m) => !m);
+          for (let i: number = 0; i < mask.length; i++) mask[i] = anyOff; // all-on if any was off, else all-off
+        } else if (key.name === 'return' || key.name === 'enter') {
+          cleanup();
+          res(mask);
+          return;
+        } else return;
+        draw(false);
+      };
+      try {
+        rl.pause();
+        if (stdin.isTTY) stdin.setRawMode(true);
+        stdin.resume();
+        stdin.on('keypress', onKey);
+        process.stdout.write('\n');
+        draw(true);
+      } catch (e) {
+        cleanup();
+        rej(e);
+      }
+    });
+
   return {
     askLine,
     async selectMenu(title: string, options: string[]): Promise<number> {
@@ -142,6 +229,16 @@ function inputManager(): InputManager {
         return picked;
       } catch {
         return selectByNumber(title, options);
+      }
+    },
+    async multiSelect(title: string, options: string[], checked: boolean[]): Promise<boolean[]> {
+      if (!process.stdin.isTTY) return multiByNumber(title, options, checked);
+      try {
+        const mask: boolean[] = await multiByArrows(title, options, checked);
+        swallowEmpty = true; // the confirming Enter surfaces as one empty line — the next askLine drops it
+        return mask;
+      } catch {
+        return multiByNumber(title, options, checked);
       }
     },
     done: () => closed && queue.length === 0,
@@ -370,11 +467,41 @@ export async function runMigrate(): Promise<void> {
     console.log(`  ${walk.files.length} source files`);
     console.log(`  ${walk.angular.length} @angular APIs used (these become Weave): ${list(walk.angular, 6)}`);
     if (walk.internal.length) console.log(`  ${walk.internal.length} of your own workspace lib(s) you depend on (migrate each separately): ${list(walk.internal, 6)}`);
-    console.log(`  ${walk.thirdParty.length} third-party packages (keep / replace / rewrite): ${list(walk.thirdParty, 8)}`);
+    const plans: PackagePlan[] = classifyPackages(walk.thirdParty, findWorkspaceRoot(app));
+    console.log(`  ${plans.length} third-party package(s): ${list(plans.map((p) => p.name), 8)}`);
     if (walk.cycles.length) console.log(`  ⚠ ${walk.cycles.length} circular-dependency chain(s) — will be flagged for you`);
     if (walk.unresolved.length) console.log(`  ⚠ ${walk.unresolved.length} import(s) couldn't be resolved — human, look`);
+
+    // 4) decide what to try migrating (M2.8). auto/try → a checkbox you confirm; keep → shown, never a checkbox.
+    const attempt: string[] = await choosePackages(io, plans);
+
+    console.log(`\n${YELLOW}Note: this is assisted, not a 100% automatic migration. Everything you pick is a best`);
+    console.log(`effort — review each change, and expect some by-hand work.${RESET}`);
+    if (attempt.length) console.log(`\nWill attempt to migrate: ${attempt.join(', ')}`);
     console.log('\n(the written plan + conversion come next — see RFC 0011)');
   } finally {
     io.close();
   }
+}
+
+const YELLOW: string = '\x1b[33m';
+const RESET: string = '\x1b[0m';
+
+/**
+ * Ask the user which third-party packages to attempt. `auto` (confident) + `try` (your call) become checkboxes —
+ * `auto` pre-checked; `keep` packages have NO Weave role, so they are listed for information only (ticking one
+ * would do nothing). Returns the package names the user chose to attempt.
+ */
+async function choosePackages(io: InputManager, plans: PackagePlan[]): Promise<string[]> {
+  const keep: PackagePlan[] = plans.filter((p) => p.decision === 'keep');
+  const choose: PackagePlan[] = plans.filter((p) => p.decision !== 'keep');
+  if (keep.length) {
+    console.log('\nKept as-is (no Weave equivalent — you keep using these):');
+    for (const p of keep) console.log(`  • ${p.name} — ${p.note}`);
+  }
+  if (!choose.length) return [];
+  const labels: string[] = choose.map((p) => `${p.name}  ${p.note}`);
+  const preChecked: boolean[] = choose.map((p) => p.decision === 'auto'); // confident ones start ticked
+  const mask: boolean[] = await io.multiSelect('Which packages should I try to migrate? (space to toggle)', labels, preChecked);
+  return choose.filter((_, i) => mask[i]).map((p) => p.name);
 }

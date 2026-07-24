@@ -289,3 +289,105 @@ export function walkDependencies(entryFile: string): DependencyWalk {
     unresolved: [...unresolved],
   };
 }
+
+/* ──────────── M2.8 — classify third-party packages: what can migrate, what stays ──────────── */
+
+/**
+ * What we advise for a third-party package the code depends on:
+ * - `auto`  — Weave has a first-party equivalent we're confident about (rxjs → reactivity). Pre-selected, but
+ *             the user still confirms; nothing is silently rewritten.
+ * - `try`   — no confident mapping, but it MIGHT translate — the user decides whether to attempt it (a checkbox).
+ * - `keep`  — a pure library with no Weave role (d3, lodash): migrating it makes no sense, so it is kept as-is
+ *             (shown for information, never a checkbox — ticking it would do nothing).
+ */
+export type PackageDecision = 'auto' | 'try' | 'keep';
+
+export interface PackagePlan {
+  /** The package root (a subpath like `rxjs/operators` collapses to `rxjs`). */
+  name: string;
+  decision: PackageDecision;
+  /** `auto`: what it becomes. `keep`: why it stays. `try`: an honest "not sure". */
+  note: string;
+}
+
+/** Collapse a specifier to its installable package root: `rxjs/operators` → `rxjs`, `@ngx/a/b` → `@ngx/a`. */
+export function rootPackage(spec: string): string {
+  const parts: string[] = spec.split('/');
+  return spec.startsWith('@') ? parts.slice(0, 2).join('/') : parts[0];
+}
+
+/** The small, CONFIDENT list: a third-party package Weave replaces first-party. Kept deliberately short + honest. */
+const AUTO_MAP: Array<{ test: (p: string) => boolean; becomes: string }> = [
+  { test: (p) => p === 'rxjs', becomes: 'Weave reactivity — signal / computed / effect' },
+  { test: (p) => p.startsWith('@ngx-translate'), becomes: '@weave-framework/i18n' },
+];
+
+/** Pure libraries with NO Weave equivalent — migrating them is pointless, so they are KEPT (no checkbox). */
+const KEEP_NAMES: Set<string> = new Set<string>([
+  'lodash', 'lodash-es', 'underscore', 'ramda', 'immer', 'immutable',
+  'd3', 'three', 'chart.js', 'echarts', 'plotly.js', 'konva', 'pixi.js', 'cytoscape',
+  'moment', 'moment-timezone', 'dayjs', 'date-fns', 'luxon',
+  'uuid', 'nanoid', 'crypto-js', 'bignumber.js', 'decimal.js', 'mathjs',
+  'marked', 'dompurify', 'highlight.js', 'prismjs', 'pdfjs-dist', 'xlsx', 'papaparse', 'jszip', 'file-saver',
+]);
+
+/** Keyword signals (from a package's own `package.json`) that it is a pure library → keep. */
+const KEEP_KEYWORDS: string[] = [
+  'visualization', 'dataviz', 'chart', 'charting', 'graph', 'plot', 'svg', 'canvas', 'webgl', '3d',
+  'animation', 'easing', 'geometry', 'math', 'matrix', 'date', 'time', 'calendar', 'uuid', 'hash',
+  'crypto', 'encryption', 'utility', 'utilities', 'functional', 'immutable', 'parser', 'markdown',
+  'pdf', 'spreadsheet', 'excel', 'csv', 'zip', 'compression', 'sanitize', 'sanitizer',
+];
+
+/** Keyword signals that a package plays a framework role (state/http/forms/…) → it might migrate → `try`. */
+const FRAMEWORKY_KEYWORDS: string[] = [
+  'angular', 'react', 'vue', 'state', 'store', 'reactive', 'rxjs', 'observable', 'http', 'fetch',
+  'ajax', 'rest', 'graphql', 'form', 'forms', 'validation', 'router', 'routing', 'i18n',
+  'translation', 'localization', 'component', 'components', 'directive',
+];
+
+/**
+ * Classify ONE package by its name and (optionally) its own `package.json` keywords. Honest by construction:
+ * only the short confident list is `auto`; only clearly-pure libraries are `keep`; everything else is `try` — the
+ * user's call. Framework-role keywords pull a package OUT of keep (it might translate), so e.g. an "http-utility"
+ * lands in `try`, not `keep`.
+ */
+export function classifyPackage(name: string, keywords: string[] = []): PackagePlan {
+  const root: string = rootPackage(name);
+  for (const a of AUTO_MAP) if (a.test(root)) return { name: root, decision: 'auto', note: `→ ${a.becomes}` };
+  const kw: string[] = keywords.map((k) => k.toLowerCase());
+  const frameworky: boolean = kw.some((k) => FRAMEWORKY_KEYWORDS.includes(k));
+  if (!frameworky) {
+    if (KEEP_NAMES.has(root) || root.startsWith('d3-') || kw.some((k) => KEEP_KEYWORDS.includes(k))) {
+      return { name: root, decision: 'keep', note: 'no Weave equivalent — kept as-is' };
+    }
+  }
+  return { name: root, decision: 'try', note: 'not sure — you decide whether to attempt it' };
+}
+
+/** Best-effort: a package's own `keywords` from `<workspaceRoot>/node_modules/<name>/package.json` ([] if absent). */
+function packageKeywords(root: string, name: string): string[] {
+  const pkg: string = join(root, 'node_modules', ...name.split('/'), 'package.json');
+  try {
+    const j: { keywords?: unknown } = JSON.parse(readFileSync(pkg, 'utf8'));
+    return Array.isArray(j.keywords) ? j.keywords.filter((k): k is string => typeof k === 'string') : [];
+  } catch {
+    return []; // not installed / unreadable — name heuristics still apply
+  }
+}
+
+/**
+ * Classify every third-party specifier, collapsing subpaths to their package root and de-duplicating (so
+ * `rxjs` + `rxjs/operators` is ONE decision). `workspaceRoot`, when given, lets each package's own keywords
+ * sharpen the guess. Returns one plan per distinct package, stable-sorted by name.
+ */
+export function classifyPackages(specs: string[], workspaceRoot?: string): PackagePlan[] {
+  const byRoot: Map<string, PackagePlan> = new Map<string, PackagePlan>();
+  for (const spec of specs) {
+    const root: string = rootPackage(spec);
+    if (byRoot.has(root)) continue;
+    const kw: string[] = workspaceRoot ? packageKeywords(workspaceRoot, root) : [];
+    byRoot.set(root, classifyPackage(root, kw));
+  }
+  return [...byRoot.values()].sort((a, b) => a.name.localeCompare(b.name));
+}

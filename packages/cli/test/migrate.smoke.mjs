@@ -174,6 +174,29 @@ try {
   rmSync(miss, { recursive: true, force: true });
 }
 
+// ── M2.8: classify third-party packages — auto (confident) / try (your call) / keep (no Weave role) ──
+// a subpath collapses to its installable package root (one decision for rxjs + rxjs/operators)
+ok(a.rootPackage('rxjs/operators') === 'rxjs', 'rootPackage: a subpath collapses to the package root');
+ok(a.rootPackage('@ngx-translate/core') === '@ngx-translate/core', 'rootPackage: a scoped package keeps @scope/name');
+// the confident list → auto, with what it becomes
+ok(a.classifyPackage('rxjs').decision === 'auto', 'classifyPackage: rxjs → auto (Weave reactivity)');
+ok(a.classifyPackage('rxjs/operators').decision === 'auto', 'classifyPackage: rxjs/operators collapses to rxjs → auto');
+ok(a.classifyPackage('@ngx-translate/core').decision === 'auto' && a.classifyPackage('@ngx-translate/core').note.includes('i18n'), 'classifyPackage: @ngx-translate → auto (@weave-framework/i18n)');
+// famous pure libraries → keep, by NAME even with no keywords (no node_modules needed)
+ok(a.classifyPackage('d3').decision === 'keep', 'classifyPackage: d3 → keep (no Weave equivalent)');
+ok(a.classifyPackage('d3-scale').decision === 'keep', 'classifyPackage: d3-scale (d3-* family) → keep');
+ok(a.classifyPackage('lodash').decision === 'keep', 'classifyPackage: lodash → keep');
+// unknown package, no keywords → try (honest: the user decides)
+ok(a.classifyPackage('some-obscure-pkg').decision === 'try', 'classifyPackage: an unknown package → try (your call)');
+// keywords sharpen the guess: a charting keyword → keep; a framework-role keyword pulls it back to try
+ok(a.classifyPackage('mystery-viz', ['visualization', 'chart']).decision === 'keep', 'classifyPackage: charting keywords → keep');
+ok(a.classifyPackage('mystery-http', ['http', 'rest']).decision === 'try', 'classifyPackage: a framework-role keyword (http) → try, not keep');
+ok(a.classifyPackage('mystery-both', ['chart', 'state']).decision === 'try', 'classifyPackage: a framework keyword overrides a keep keyword → try');
+// classifyPackages: collapses + dedupes rxjs + rxjs/operators into ONE decision, sorted
+const plans = a.classifyPackages(['rxjs/operators', 'rxjs', 'lodash', 'some-obscure-pkg']);
+ok(plans.length === 3, `classifyPackages: rxjs + rxjs/operators dedupe to one (got ${plans.length} plans)`);
+ok(plans.filter((p) => p.decision === 'auto').length === 1 && plans.some((p) => p.decision === 'keep') && plans.some((p) => p.decision === 'try'), 'classifyPackages: the three buckets each appear');
+
 rmSync(out, { force: true });
 rmSync(outA, { force: true });
 
