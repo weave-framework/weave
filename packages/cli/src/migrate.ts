@@ -16,13 +16,16 @@ import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import {
   analyzeComponents,
+  analyzeServices,
   classifyPackages,
+  diGraph,
   findEntryPoint,
   findWorkspaceRoot,
   walkDependencies,
   type ComponentFact,
   type DependencyWalk,
   type PackagePlan,
+  type ServiceFact,
 } from './migrate-analyze.js';
 import { c, inputManager, type InputManager } from './migrate-ui.js';
 
@@ -265,6 +268,12 @@ export async function runMigrate(): Promise<void> {
     if (components.length) {
       const io2: string = inputs || outputs ? c.dim(` (${inputs} input(s), ${outputs} output(s))`) : '';
       console.log(`  ${c.green('•')} ${num(components.length)} component(s)${io2}: ${c.green(list(components.map((cf) => cf.selector ?? cf.className), 6))}`);
+    }
+    const services: ServiceFact[] = analyzeServices(walk.files);
+    if (services.length) {
+      const provided: number = services.filter((s) => s.providedIn).length;
+      const meta: string = c.dim(` (${provided} provided, ${diGraph(services).length} DI edge(s))`);
+      console.log(`  ${c.green('•')} ${num(services.length)} service(s)${meta}: ${c.green(list(services.map((s) => s.className), 6))}`);
     }
     console.log(`  ${c.magenta('•')} ${num(walk.angular.length)} @angular APIs used ${c.dim('(these become Weave)')}: ${c.magenta(list(walk.angular, 6))}`);
     if (walk.internal.length) {

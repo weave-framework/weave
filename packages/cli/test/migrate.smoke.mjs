@@ -224,6 +224,29 @@ ok(a.findComponents(join(comps, 'does-not-exist.ts')).length === 0, 'findCompone
 const all = a.analyzeComponents([join(comps, 'decorator.component.ts'), join(comps, 'signal.component.ts'), join(comps, 'service.ts')]);
 ok(all.length === 2, `analyzeComponents: two components across three files (got ${all.length})`);
 
+// ── M2.5: services + injection — @Injectable providedIn, public methods, DI edges ──
+const svcs = join(fx, 'services');
+const api = a.findServices(join(svcs, 'api.service.ts'));
+ok(api.length === 1 && api[0].className === 'ApiService', 'findServices: the @Injectable class is found');
+ok(api[0].providedIn === 'root', 'findServices: providedIn:"root" is read');
+ok(api[0].methods.includes('get') && api[0].methods.includes('post'), 'findServices: public methods are collected');
+ok(!api[0].methods.includes('buildHeaders'), 'findServices: a private method is NOT a public method');
+ok(api[0].injects.includes('HttpClient'), 'findServices: a constructor-injected type is a DI edge');
+ok(api[0].injects.includes('Logger'), 'findServices: an inject() call is a DI edge too');
+
+const scoped = a.findServices(join(svcs, 'scoped.service.ts'));
+ok(scoped[0].providedIn === null, 'findServices: no providedIn → null (not guessed)');
+ok(a.findComponents(join(svcs, 'api.service.ts')).length === 0, 'findServices/findComponents: a service is not a component');
+ok(a.findServices(join(comps, 'decorator.component.ts')).length === 0, 'findServices: a @Component is not a service');
+ok(a.findServices(join(svcs, 'nope.ts')).length === 0, 'findServices: an unreadable file yields nothing');
+
+// analyzeServices flattens; diGraph turns injects into who→what edges
+const allSvc = a.analyzeServices([join(svcs, 'api.service.ts'), join(svcs, 'scoped.service.ts')]);
+ok(allSvc.length === 2, `analyzeServices: two services (got ${allSvc.length})`);
+const edges = a.diGraph(allSvc);
+ok(edges.some((e) => e.from === 'ApiService' && e.to === 'HttpClient'), 'diGraph: ApiService → HttpClient is an edge');
+ok(edges.some((e) => e.from === 'ApiService' && e.to === 'Logger'), 'diGraph: ApiService → Logger is an edge');
+
 // ── the shared UI colour palette: wraps under FORCE_COLOR, no-ops under NO_COLOR (the clean-piped guarantee) ──
 // COLOR is decided at module-eval from env, so we bundle migrate-ui once and import it twice under different env
 // (a distinct ?query gives Node a fresh module instance, hence a fresh COLOR decision).

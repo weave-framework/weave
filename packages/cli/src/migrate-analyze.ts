@@ -559,3 +559,130 @@ export function findComponents(filePath: string): ComponentFact[] {
 export function analyzeComponents(files: string[]): ComponentFact[] {
   return files.flatMap((f) => findComponents(f));
 }
+
+/** Read + parse a `.ts` file to a SourceFile (parents set, for `getText`), or null when unreadable. */
+function parseFile(filePath: string): ts.SourceFile | null {
+  try {
+    return ts.createSourceFile(filePath, readFileSync(filePath, 'utf8'), ts.ScriptTarget.Latest, true);
+  } catch {
+    return null;
+  }
+}
+
+/* ──────────── M2.5 — services + injection: what an `@Injectable` provides and depends on ──────────── */
+
+/** The facts one Angular service declares — what becomes a Weave `store()` / `provide`. */
+export interface ServiceFact {
+  file: string;
+  className: string;
+  /** `providedIn` value: `'root'` / `'platform'` / `'any'`, a module identifier's name, or null (needs a provider). */
+  providedIn: string | null;
+  /** Public method names (constructor and private/protected members excluded). */
+  methods: string[];
+  /** What it injects — constructor parameter types AND `inject(X)` calls. The raw edges for the DI graph (M2.5). */
+  injects: string[];
+}
+
+/** True for a member the outside world can call — a method with no `private`/`protected` modifier. */
+function isPublicMethod(member: ts.ClassElement): boolean {
+  if (!ts.isMethodDeclaration(member)) return false;
+  const mods: readonly ts.ModifierLike[] = ts.canHaveModifiers(member) ? (ts.getModifiers(member) ?? []) : [];
+  return !mods.some((m) => m.kind === ts.SyntaxKind.PrivateKeyword || m.kind === ts.SyntaxKind.ProtectedKeyword);
+}
+
+/** The rightmost name of a type reference (`a.b.Foo` → `Foo`), or null when the type isn't a plain reference. */
+function typeRefName(type: ts.TypeNode | undefined): string | null {
+  if (!type || !ts.isTypeReferenceNode(type)) return null;
+  const n: ts.EntityName = type.typeName;
+  return ts.isQualifiedName(n) ? n.right.text : n.text;
+}
+
+/** The `providedIn` of an `@Injectable({...})`: a string literal's text, or an identifier's name, or null. */
+function providedInOf(cfg: ts.ObjectLiteralExpression): string | null {
+  for (const p of cfg.properties) {
+    if (ts.isPropertyAssignment(p) && p.name && ts.isIdentifier(p.name) && p.name.text === 'providedIn') {
+      if (ts.isStringLiteralLike(p.initializer)) return p.initializer.text;
+      if (ts.isIdentifier(p.initializer)) return p.initializer.text;
+    }
+  }
+  return null;
+}
+
+/** Every `inject(X)` call inside a node subtree → the injected identifier names (signal-era DI). */
+function injectCalls(root: ts.Node): string[] {
+  const found: string[] = [];
+  const visit = (n: ts.Node): void => {
+    if (ts.isCallExpression(n) && ts.isIdentifier(n.expression) && n.expression.text === 'inject' && n.arguments.length && ts.isIdentifier(n.arguments[0])) {
+      found.push((n.arguments[0] as ts.Identifier).text);
+    }
+    ts.forEachChild(n, visit);
+  };
+  visit(root);
+  return found;
+}
+
+/**
+ * Parse one `.ts` file and return a fact record for every `@Injectable` class in it: its `providedIn`, its public
+ * methods, and what it injects (constructor parameter types + `inject()` calls — the DI edges). A file with no
+ * service yields `[]`; an unreadable file yields `[]`.
+ */
+export function findServices(filePath: string): ServiceFact[] {
+  const sf: ts.SourceFile | null = parseFile(filePath);
+  if (!sf) return [];
+  const facts: ServiceFact[] = [];
+
+  const visit = (node: ts.Node): void => {
+    if (ts.isClassDeclaration(node)) {
+      const dec: ts.Decorator | undefined = decoratorsOf(node).find((d) => decoratorName(d) === 'Injectable');
+      if (dec) {
+        const arg: ts.Expression | undefined = ts.isCallExpression(dec.expression) ? dec.expression.arguments[0] : undefined;
+        const cfg: ts.ObjectLiteralExpression | null = arg && ts.isObjectLiteralExpression(arg) ? arg : null;
+        const methods: string[] = [];
+        const injects: string[] = [];
+        for (const member of node.members) {
+          if (isPublicMethod(member)) {
+            const name: string | null = memberName(member);
+            if (name) methods.push(name);
+          }
+          if (ts.isConstructorDeclaration(member)) {
+            for (const param of member.parameters) {
+              const t: string | null = typeRefName(param.type);
+              if (t) injects.push(t);
+            }
+          }
+        }
+        injects.push(...injectCalls(node)); // `inject(Foo)` in field initializers / constructor body
+        facts.push({
+          file: filePath,
+          className: node.name?.text ?? '(anonymous)',
+          providedIn: cfg ? providedInOf(cfg) : null,
+          methods,
+          injects: [...new Set(injects)], // one edge per distinct dependency
+        });
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sf);
+  return facts;
+}
+
+/** Every service across a set of files (the walk's `files`), flattened. Unreadable files contribute nothing. */
+export function analyzeServices(files: string[]): ServiceFact[] {
+  return files.flatMap((f) => findServices(f));
+}
+
+/** A DI edge: `from` (a component/service class) injects `to` (a dependency type name). */
+export interface DiEdge {
+  from: string;
+  to: string;
+}
+
+/**
+ * The DI graph as flat edges — who injects what — built from the services' `injects`. (Components inject too;
+ * their edges join here once component injection is read. Kept as plain edges so M3 can order the conversion
+ * bottom-up: a leaf that injects nothing converts first.)
+ */
+export function diGraph(services: ServiceFact[]): DiEdge[] {
+  return services.flatMap((s) => s.injects.map((to) => ({ from: s.className, to })));
+}
