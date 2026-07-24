@@ -143,6 +143,8 @@ jobs:
         run: pnpm verify:prettier
       - name: MCP server
         run: pnpm verify:mcp
+      - name: migrate
+        run: pnpm verify:migrate
       - name: Nx plugin
         run: pnpm verify:nx
       - name: TypeScript plugin

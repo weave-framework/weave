@@ -155,8 +155,10 @@ and records it in the plan. It never fills a gap with a silent guess.
 - **M1 — the command + deep path detection.** `weave migrate` exists, asks the framework (Angular only), takes an
   absolute path, detects Angular at/inside it (Nx `apps/*`), suggests or re-asks. Tested against fixture trees.
   No analysis yet.
-- **M2 — the analyzer (facts map).** Build the dependency/call/DI graphs, component/service/route inventory, and
-  the third-party-package usage map. Output raw facts (JSON) — no conversion.
+- **M2 — the analyzer (facts map).** ✅ DONE. The downward dependency walk, component/service/route/form
+  inventory, DI + best-effort call graph, per-method branch shapes, and the third-party-package classification +
+  usage map. `weave migrate` prints a coloured summary and writes the whole thing to
+  `<unit>/.weave-migrate/facts.json` — raw facts, no conversion. Anything unreadable is recorded, never guessed.
 - **M3 — `migration-plan.md` generation** from the facts map (its shape designed first).
 - **M4 — convert the mechanical majority** (templates, component skeletons, simple bindings), with the CLI
   choice/TODO flow.
