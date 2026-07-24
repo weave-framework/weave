@@ -146,10 +146,11 @@ ok(walk.angular.includes('@angular/platform-browser') && walk.angular.includes('
 ok(walk.thirdParty.includes('lodash-es') && walk.thirdParty.includes('rxjs'), 'walkDependencies: collects real third-party packages (lodash-es, rxjs)');
 ok(walk.cycles.length === 0, 'walkDependencies: no cycle in a clean tree');
 
-// ── internal libraries (tsconfig path alias) are FOLLOWED, not mistaken for third-party ──
+// ── internal libraries (tsconfig path alias) are NOTED as their own migration unit, not followed (following
+//    a barrel's `export *` dragged in the whole lib — 214 files from one `import { IBreadcrumb }`) ──
 ok(walk.internal.includes('@sps-interfaces'), 'walkDependencies: a workspace lib (@sps-interfaces via tsconfig paths) is INTERNAL');
-ok(!walk.thirdParty.includes('@sps-interfaces'), 'walkDependencies: the internal lib is NOT listed as third-party (the bug the user found)');
-ok(walk.files.some((f) => f.includes('sps-interfaces')), 'walkDependencies: the internal lib\'s file is followed into the tree (migrated too)');
+ok(!walk.thirdParty.includes('@sps-interfaces'), 'walkDependencies: the internal lib is NOT listed as third-party');
+ok(!walk.files.some((f) => f.includes('sps-interfaces')), 'walkDependencies: the internal lib is NOT expanded into the file set (noted as an edge — it migrates separately)');
 
 // a cycle a → b → a is REPORTED, not followed forever
 const cyc = mkdtempSync(join(tmpdir(), 'weave-migrate-cyc-'));

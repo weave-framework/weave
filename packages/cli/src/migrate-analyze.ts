@@ -81,7 +81,7 @@ export function findEntryPoint(unitDir: string): string | null {
 /** How an import is treated by the downward walk. */
 export type ImportKind =
   | 'relative' // a file in this codebase — the walk follows it
-  | 'internal' // a workspace-internal library via a tsconfig path alias (`@myorg/foo`) — followed like relative
+  | 'internal' // a workspace-internal library via a tsconfig path alias (`@myorg/foo`) — NOTED as a dependency edge, not followed (it's its own migration unit)
   | 'angular' // `@angular/*` — the SOURCE framework; translation input, never recursed into
   | 'third-party'; // a real external package — a tree-edge to note (keep / replace / rewrite later)
 
@@ -180,7 +180,7 @@ function classifyImport(spec: string, fromFile: string, tsPaths: TsPaths | null)
   if (spec.startsWith('.')) return { spec, kind: 'relative', resolved: resolveRelative(spec, fromFile) };
   if (tsPaths) {
     const internal: string | null = resolveAlias(spec, tsPaths);
-    if (internal) return { spec, kind: 'internal', resolved: internal }; // a workspace lib — the code's own, followed
+    if (internal) return { spec, kind: 'internal', resolved: internal }; // a workspace lib — the code's own, noted as an edge (not followed)
   }
   if (spec === '@angular' || spec.startsWith('@angular/')) return { spec, kind: 'angular', resolved: null };
   return { spec, kind: 'third-party', resolved: null };
@@ -220,13 +220,14 @@ export function parseImports(filePath: string, tsPaths: TsPaths | null = null): 
 /* ──────────── M2.3 — the downward walk: follow relative imports to the leaves ──────────── */
 
 export interface DependencyWalk {
-  /** Every reachable `.ts` file, from the entry down — including workspace-internal libs (the migration's set). */
+  /** The selected unit's OWN `.ts` files, from the entry down its relative imports — what gets migrated here. */
   files: string[];
   /** Distinct `@angular/*` specifiers used anywhere in the tree — the translation surface. */
   angular: string[];
   /** Distinct third-party packages at the tree edges — each needs a keep/replace/rewrite decision. */
   thirdParty: string[];
-  /** Distinct workspace-internal libraries reached (via tsconfig aliases) — the code's own, followed + migrated. */
+  /** Distinct workspace-internal libs it DEPENDS ON (via tsconfig aliases) — noted, not expanded here (each is
+   *  its own migration unit; following them would drag a barrel's whole `export *` in). */
   internal: string[];
   /** Circular-import chains found — REPORTED, not resolved ("used circularly — look"). */
   cycles: string[][];
@@ -259,17 +260,20 @@ export function walkDependencies(entryFile: string): DependencyWalk {
     files.add(file);
     path.push(file);
     for (const imp of parseImports(file, tsPaths)) {
-      if (imp.kind === 'internal') internal.add(imp.spec);
+      if (imp.kind === 'internal') {
+        internal.add(imp.spec); // a workspace lib is a DEPENDENCY EDGE — noted, not expanded (it's its own unit
+        continue; //             to migrate separately). Following it dragged a barrel's whole `export *` in.
+      }
       if (imp.kind === 'angular') {
         angular.add(imp.spec);
       } else if (imp.kind === 'third-party') {
         thirdParty.add(imp.spec);
       } else if (!imp.resolved) {
-        unresolved.add(imp.spec); // relative or internal alias that pointed nowhere
+        unresolved.add(imp.spec);
       } else if (path.includes(imp.resolved)) {
         cycles.push([...path.slice(path.indexOf(imp.resolved)), imp.resolved]); // a cycle — report, don't follow
       } else {
-        visit(imp.resolved); // relative AND internal are the code's own — follow both
+        visit(imp.resolved); // only RELATIVE imports (the selected unit's own files) are followed
       }
     }
     path.pop();
