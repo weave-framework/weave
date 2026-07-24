@@ -1,1 +1,1 @@
-{ "name": "shop", "projectType": "application", "targets": { "build": { "executor": "@angular-devkit/build-angular:browser" } } }
+{ "name": "shop", "projectType": "application", "targets": { "build": { "executor": "@angular-devkit/build-angular:browser", "options": { "main": "apps/shop/src/main.ts" } } } }

@@ -37,6 +37,18 @@ await esbuild({
 });
 const m = await import(pathToFileURL(out).href);
 
+// Bundle the analyzer module too (M2).
+const outA = join(repo, 'node_modules', '.weave-migrate-analyze-smoke.mjs');
+await esbuild({
+  entryPoints: [join(repo, 'packages', 'cli', 'src', 'migrate-analyze.ts')],
+  bundle: true,
+  format: 'esm',
+  platform: 'node',
+  packages: 'external',
+  outfile: outA,
+});
+const a = await import(pathToFileURL(outA).href);
+
 // detectAngularAt — direct signals
 ok(m.detectAngularAt(join(fx, 'plain-angular')), 'detectAngularAt: a plain Angular app (angular.json + @angular/core) is detected');
 ok(!m.detectAngularAt(join(fx, 'not-angular')), 'detectAngularAt: a React folder is NOT detected');
@@ -105,10 +117,21 @@ try {
   rmSync(big, { recursive: true, force: true });
 }
 
+// ── M2.1: find the selected unit's ENTRY point (where the dependency walk begins) ──
+// an app: the build target's `main` (project.json declares "apps/shop/src/main.ts", workspace-relative)
+ok(a.findEntryPoint(join(fx, 'nx-mono', 'apps', 'shop'))?.endsWith('main.ts'), 'findEntryPoint: an app resolves its build `main` (src/main.ts)');
+// a library: its public entry (src/index.ts)
+ok(a.findEntryPoint(join(fx, 'nx-mono', 'libs', 'ui'))?.endsWith('index.ts'), 'findEntryPoint: a library resolves its public entry (src/index.ts)');
+// a plain Angular app: src/main.ts by convention
+ok(a.findEntryPoint(join(fx, 'plain-angular'))?.endsWith('main.ts'), 'findEntryPoint: a plain app resolves src/main.ts');
+// nothing to find → null (recorded as "no entry — human, look", never guessed)
+ok(a.findEntryPoint(join(fx, 'not-angular')) === null, 'findEntryPoint: no entry found → null');
+
 rmSync(out, { force: true });
+rmSync(outA, { force: true });
 
 if (failures) {
   console.error(`\n✗ ${failures} check(s) failed.`);
   process.exit(1);
 }
-console.log('\n✓ weave migrate M1 — path resolution works (plain app, Nx deep-detect, none, single-auto).');
+console.log('\n✓ weave migrate M1 + M2.1 — path resolution + entry-point discovery.');
