@@ -867,3 +867,95 @@ export function findForms(filePath: string): FormFact[] {
 export function analyzeForms(files: string[]): FormFact[] {
   return files.flatMap((f) => findForms(f));
 }
+
+/* ──────────── M2.9 — call graph (best-effort): who calls what, through injected fields ──────────── */
+
+/** A static method-call edge. `dynamic` marks a call whose receiver type couldn't be resolved (human, look). */
+export interface CallEdge {
+  /** `ClassName.method` — the method the call is made FROM. */
+  from: string;
+  /** `DepType.method` (through an injected field), `ClassName.method` (a `this.x()` self-call), or `?.method`. */
+  to: string;
+  /** True when the receiver's type is unknown — the edge target is a guess-free `?` (never invented). */
+  dynamic: boolean;
+}
+
+/** A class's field → injected-type map: constructor parameter-properties + `inject()`/typed field declarations. */
+function fieldTypes(node: ts.ClassDeclaration): Map<string, string> {
+  const map: Map<string, string> = new Map<string, string>();
+  for (const member of node.members) {
+    if (ts.isConstructorDeclaration(member)) {
+      for (const param of member.parameters) {
+        const hasModifier: boolean = (ts.canHaveModifiers(param) ? (ts.getModifiers(param) ?? []) : []).length > 0; // a parameter property (private/readonly/…) becomes a field
+        const t: string | null = typeRefName(param.type);
+        if (hasModifier && t && ts.isIdentifier(param.name)) map.set(param.name.text, t);
+      }
+    }
+    if (ts.isPropertyDeclaration(member) && ts.isIdentifier(member.name)) {
+      const injected: ts.Expression | undefined =
+        member.initializer && ts.isCallExpression(member.initializer) && ts.isIdentifier(member.initializer.expression) && member.initializer.expression.text === 'inject'
+          ? member.initializer.arguments[0]
+          : undefined;
+      if (injected && ts.isIdentifier(injected)) map.set(member.name.text, injected.text); // x = inject(Foo)
+      else {
+        const t: string | null = typeRefName(member.type);
+        if (t) map.set(member.name.text, t); // x: Foo
+      }
+    }
+  }
+  return map;
+}
+
+/** The call target of `<receiver>.<name>()`, resolved through `this.field` types; null when it's not a method call we track. */
+function resolveTarget(call: ts.CallExpression, cls: string, fields: Map<string, string>): { to: string; dynamic: boolean } | null {
+  if (!ts.isPropertyAccessExpression(call.expression)) return null;
+  const recv: ts.Expression = call.expression.expression;
+  const method: string = call.expression.name.text;
+  if (recv.kind === ts.SyntaxKind.ThisKeyword) return { to: `${cls}.${method}`, dynamic: false }; // this.method()
+  if (ts.isPropertyAccessExpression(recv) && recv.expression.kind === ts.SyntaxKind.ThisKeyword) {
+    const type: string | undefined = fields.get(recv.name.text); // this.field.method()
+    return type ? { to: `${type}.${method}`, dynamic: false } : { to: `?.${method}`, dynamic: true };
+  }
+  return null; // a free function or an external chain — not part of the component/service call graph
+}
+
+/**
+ * Best-effort static call graph for one file: for each method of each class, the calls it makes to `this.method()`
+ * (self) and `this.injectedField.method()` (resolved through the field's declared type). A call whose receiver
+ * type can't be resolved is emitted with `dynamic: true` and a `?` target — surfaced, never guessed. Free
+ * functions and external chains are out of scope (this graph is about component/service wiring).
+ */
+export function findCalls(filePath: string): CallEdge[] {
+  const sf: ts.SourceFile | null = parseFile(filePath);
+  if (!sf) return [];
+  const edges: CallEdge[] = [];
+
+  const visitClass = (node: ts.ClassDeclaration): void => {
+    const cls: string = node.name?.text ?? '(anonymous)';
+    const fields: Map<string, string> = fieldTypes(node);
+    for (const member of node.members) {
+      if (!ts.isMethodDeclaration(member) || !member.body) continue;
+      const from: string = `${cls}.${memberName(member) ?? '(anonymous)'}`;
+      const walkBody = (n: ts.Node): void => {
+        if (ts.isCallExpression(n)) {
+          const t: { to: string; dynamic: boolean } | null = resolveTarget(n, cls, fields);
+          if (t) edges.push({ from, to: t.to, dynamic: t.dynamic });
+        }
+        ts.forEachChild(n, walkBody);
+      };
+      walkBody(member.body);
+    }
+  };
+
+  const visit = (node: ts.Node): void => {
+    if (ts.isClassDeclaration(node)) visitClass(node);
+    ts.forEachChild(node, visit);
+  };
+  visit(sf);
+  return edges;
+}
+
+/** The call graph across a set of files (the walk's `files`), flattened. Unreadable files contribute nothing. */
+export function analyzeCalls(files: string[]): CallEdge[] {
+  return files.flatMap((f) => findCalls(f));
+}

@@ -274,6 +274,17 @@ ok(a.findForms(join(formsDir, 'grouped.ts')).length === 0, 'findForms: a .group(
 ok(a.findForms(join(comps, 'decorator.component.ts')).length === 0, 'findForms: a plain component is not a form');
 ok(a.analyzeForms([join(formsDir, 'login.component.ts'), join(formsDir, 'grouped.ts')]).length === 1, 'analyzeForms: only the real forms file counts');
 
+// ── M2.9: call graph (best-effort) — self-calls, resolved-via-injected-field calls, dynamic (unknown) receivers ──
+const callsDir = join(fx, 'calls');
+const edges2 = a.findCalls(join(callsDir, 'widget.component.ts'));
+ok(edges2.some((e) => e.from === 'WidgetComponent.load' && e.to === 'WidgetComponent.refresh' && !e.dynamic), 'findCalls: a this.method() self-call edge');
+ok(edges2.some((e) => e.to === 'ApiService.get' && !e.dynamic), 'findCalls: a call through an inject() field resolves to the dep type');
+ok(edges2.some((e) => e.to === 'HelperService.format' && !e.dynamic), 'findCalls: a call through a constructor field resolves to the dep type');
+const dyn = edges2.find((e) => e.to === '?.doIt');
+ok(dyn && dyn.dynamic === true, 'findCalls: a call through an unresolved field is flagged dynamic (?, never guessed)');
+ok(a.findCalls(join(comps, 'service.ts')).length === 0, 'findCalls: a class with no tracked calls yields no edges');
+ok(a.analyzeCalls([join(callsDir, 'widget.component.ts')]).length === edges2.length, 'analyzeCalls: flattens across files');
+
 // ── the shared UI colour palette: wraps under FORCE_COLOR, no-ops under NO_COLOR (the clean-piped guarantee) ──
 // COLOR is decided at module-eval from env, so we bundle migrate-ui once and import it twice under different env
 // (a distinct ?query gives Node a fresh module instance, hence a fresh COLOR decision).
