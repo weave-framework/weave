@@ -14,6 +14,16 @@ overrides:
   # never shipped runtime code, but the alert is on the tracked lockfile. Scope the override to the
   # vulnerable range so any other range resolves normally; 1.16→1.18 is a minor bump nx accepts.
   'axios@>=1.15.2 <1.18.0': '>=1.18.0'
+  # fast-uri 3.1.3 (an ajv transitive, pulled through the nx/@nx/devkit build toolchain) is in the 3.x
+  # vulnerable range of GHSA-v2hh-gcrm-f6hx (>= 3.0.0, <= 3.1.3; patched 3.1.4 — the advisory also has 2.x
+  # and 4.x ranges we don't hit). Build-tool transitive, never shipped runtime code, but the alert is on the
+  # tracked lockfile. Pin to the 3.x patch line (`<4`) so ajv, which expects `fast-uri@^3`, is not forced onto
+  # a major it never asked for; 3.1.3→3.1.4 is a patch.
+  'fast-uri@>=3.0.0 <=3.1.3': '>=3.1.4 <4'
+  # brace-expansion 5.0.6 is in GHSA-3jxr-9vmj-r5cp's range (>= 3.0.0, < 5.0.7; a ReDoS; patched 5.0.7).
+  # Another dev/build-tooling transitive. Scope to the vulnerable range so the unaffected 2.x copy in the
+  # tree resolves normally.
+  'brace-expansion@>=3.0.0 <5.0.7': '>=5.0.7'
 
 # esbuild ships a platform binary via a postinstall script. This environment's
 # pnpm requires explicit per-package build approval.
