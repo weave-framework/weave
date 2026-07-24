@@ -9,6 +9,7 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { createInterface, emitKeypressEvents, type Interface } from 'node:readline';
+import { findEntryPoint, walkDependencies, type DependencyWalk } from './migrate-analyze.js';
 
 interface InputManager {
   /** Free-text prompt (a path). Returns the trimmed line, or '' at EOF. */
@@ -355,7 +356,23 @@ export async function runMigrate(): Promise<void> {
     }
 
     console.log(`\nUsing: ${app}`);
-    console.log('(analysis + conversion come next — see RFC 0011)');
+
+    // 3) analyze — find the entry, walk the dependency tree DOWN to the leaves (M2)
+    const entry: string | null = findEntryPoint(app);
+    if (!entry) {
+      console.log("Couldn't find an entry file (main.ts / index.ts) — point at the unit's folder, or a specific file.");
+      return;
+    }
+    console.log(`Entry: ${entry}\nAnalyzing (following imports down to the leaves)...\n`);
+    const walk: DependencyWalk = walkDependencies(entry);
+    const list = (xs: string[], n: number): string => (xs.length ? `${xs.slice(0, n).join(', ')}${xs.length > n ? ', …' : ''}` : '(none)');
+    console.log('Found:');
+    console.log(`  ${walk.files.length} source files`);
+    console.log(`  ${walk.angular.length} @angular APIs used (these become Weave): ${list(walk.angular, 6)}`);
+    console.log(`  ${walk.thirdParty.length} third-party packages (keep / replace / rewrite): ${list(walk.thirdParty, 8)}`);
+    if (walk.cycles.length) console.log(`  ⚠ ${walk.cycles.length} circular-dependency chain(s) — will be flagged for you`);
+    if (walk.unresolved.length) console.log(`  ⚠ ${walk.unresolved.length} import(s) couldn't be resolved — human, look`);
+    console.log('\n(the written plan + conversion come next — see RFC 0011)');
   } finally {
     io.close();
   }
