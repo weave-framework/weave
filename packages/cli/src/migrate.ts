@@ -14,23 +14,7 @@
  */
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import {
-  analyzeComponents,
-  analyzeForms,
-  analyzeRoutes,
-  analyzeServices,
-  classifyPackages,
-  diGraph,
-  findEntryPoint,
-  findWorkspaceRoot,
-  walkDependencies,
-  type ComponentFact,
-  type DependencyWalk,
-  type FormFact,
-  type PackagePlan,
-  type RouteFact,
-  type ServiceFact,
-} from './migrate-analyze.js';
+import { assembleFacts, writeFacts, type MigrationFacts, type PackagePlan } from './migrate-analyze.js';
 import { c, inputManager, type InputManager } from './migrate-ui.js';
 
 /* ──────────── detection: is there an Angular app here, and where? (Angular-specific — a React module replaces this) ──────────── */
@@ -251,62 +235,65 @@ export async function runMigrate(): Promise<void> {
 
     console.log(`\n${c.green('✓')} ${c.dim('Using:')} ${c.bold(app)}`);
 
-    // 3) analyze — find the entry, walk the dependency tree DOWN to the leaves (M2)
-    const entry: string | null = findEntryPoint(app);
-    if (!entry) {
+    // 3) analyze — assemble the WHOLE facts map for this unit in one pass (M2). The summary below and the written
+    //    facts.json are two views of this single object.
+    console.log(c.dim('Analyzing (following imports down to the leaves)…\n'));
+    const facts: MigrationFacts = assembleFacts(app);
+    if (!facts.entry) {
       console.log(c.red("\nCouldn't find an entry file (main.ts / index.ts)") + " — point at the unit's folder, or a specific file.");
       return;
     }
-    console.log(c.dim(`${c.green('✓')} Entry: ${entry}`));
-    console.log(c.dim('Analyzing (following imports down to the leaves)…\n'));
-    const walk: DependencyWalk = walkDependencies(entry);
+    console.log(c.dim(`${c.green('✓')} Entry: ${facts.entry}`));
+
     const list = (xs: string[], n: number): string => (xs.length ? `${xs.slice(0, n).join(', ')}${xs.length > n ? ', …' : ''}` : '(none)');
     const num = (n: number): string => c.bold(String(n)); // counts stand out
-
-    const components: ComponentFact[] = analyzeComponents(walk.files);
-    const inputs: number = components.reduce((n, cf) => n + cf.inputs.length, 0);
-    const outputs: number = components.reduce((n, cf) => n + cf.outputs.length, 0);
+    const sum = (ns: number[]): number => ns.reduce((a, b) => a + b, 0);
 
     console.log(c.bold('Found:'));
-    console.log(`  ${c.cyan('•')} ${num(walk.files.length)} source files`);
-    if (components.length) {
-      const io2: string = inputs || outputs ? c.dim(` (${inputs} input(s), ${outputs} output(s))`) : '';
-      console.log(`  ${c.green('•')} ${num(components.length)} component(s)${io2}: ${c.green(list(components.map((cf) => cf.selector ?? cf.className), 6))}`);
+    console.log(`  ${c.cyan('•')} ${num(facts.files.length)} source files`);
+    if (facts.components.length) {
+      const io2: number = sum(facts.components.map((cf) => cf.inputs.length + cf.outputs.length));
+      const meta: string = io2 ? c.dim(` (${sum(facts.components.map((cf) => cf.inputs.length))} input(s), ${sum(facts.components.map((cf) => cf.outputs.length))} output(s))`) : '';
+      console.log(`  ${c.green('•')} ${num(facts.components.length)} component(s)${meta}: ${c.green(list(facts.components.map((cf) => cf.selector ?? cf.className), 6))}`);
     }
-    const services: ServiceFact[] = analyzeServices(walk.files);
-    if (services.length) {
-      const provided: number = services.filter((s) => s.providedIn).length;
-      const meta: string = c.dim(` (${provided} provided, ${diGraph(services).length} DI edge(s))`);
-      console.log(`  ${c.green('•')} ${num(services.length)} service(s)${meta}: ${c.green(list(services.map((s) => s.className), 6))}`);
+    if (facts.services.length) {
+      const provided: number = facts.services.filter((s) => s.providedIn).length;
+      const meta: string = c.dim(` (${provided} provided, ${facts.di.length} DI edge(s))`);
+      console.log(`  ${c.green('•')} ${num(facts.services.length)} service(s)${meta}: ${c.green(list(facts.services.map((s) => s.className), 6))}`);
     }
-    const routes: RouteFact[] = analyzeRoutes(walk.files);
-    if (routes.length) {
-      const guarded: number = routes.filter((r) => r.guards.length).length;
-      const lazy: number = routes.filter((r) => r.lazy).length;
-      const meta: string = c.dim(` (${guarded} guarded, ${lazy} lazy)`);
-      console.log(`  ${c.green('•')} ${num(routes.length)} route(s)${meta}`);
+    if (facts.routes.length) {
+      const guarded: number = facts.routes.filter((r) => r.guards.length).length;
+      const lazy: number = facts.routes.filter((r) => r.lazy).length;
+      console.log(`  ${c.green('•')} ${num(facts.routes.length)} route(s)${c.dim(` (${guarded} guarded, ${lazy} lazy)`)}`);
     }
-    const forms: FormFact[] = analyzeForms(walk.files);
-    if (forms.length) {
-      const controls: number = forms.reduce((n, f) => n + f.controls.length, 0);
-      console.log(`  ${c.green('•')} ${num(forms.length)} reactive form(s)${c.dim(` (${controls} control(s))`)}`);
+    if (facts.forms.length) {
+      console.log(`  ${c.green('•')} ${num(facts.forms.length)} reactive form(s)${c.dim(` (${sum(facts.forms.map((f) => f.controls.length))} control(s))`)}`);
     }
-    console.log(`  ${c.magenta('•')} ${num(walk.angular.length)} @angular APIs used ${c.dim('(these become Weave)')}: ${c.magenta(list(walk.angular, 6))}`);
-    if (walk.internal.length) {
-      console.log(`  ${c.blue('•')} ${num(walk.internal.length)} of your own workspace lib(s) ${c.dim('(migrate each separately)')}: ${c.blue(list(walk.internal, 6))}`);
+    console.log(`  ${c.magenta('•')} ${num(facts.angular.length)} @angular APIs used ${c.dim('(these become Weave)')}: ${c.magenta(list(facts.angular, 6))}`);
+    if (facts.internal.length) {
+      console.log(`  ${c.blue('•')} ${num(facts.internal.length)} of your own workspace lib(s) ${c.dim('(migrate each separately)')}: ${c.blue(list(facts.internal, 6))}`);
     }
-    const plans: PackagePlan[] = classifyPackages(walk.thirdParty, findWorkspaceRoot(app));
-    console.log(`  ${c.yellow('•')} ${num(plans.length)} third-party package(s): ${list(plans.map((p) => p.name), 8)}`);
-    if (walk.cycles.length) console.log(`  ${c.yellow('⚠')} ${c.yellow(`${walk.cycles.length} circular-dependency chain(s) — will be flagged for you`)}`);
-    if (walk.unresolved.length) console.log(`  ${c.red('⚠')} ${c.red(`${walk.unresolved.length} import(s) couldn't be resolved — human, look`)}`);
+    console.log(`  ${c.yellow('•')} ${num(facts.packages.length)} third-party package(s): ${list(facts.packages.map((p) => p.name), 8)}`);
+
+    const dynamicCalls: number = facts.calls.filter((e) => e.dynamic).length;
+    if (facts.calls.length || facts.branches.length) {
+      console.log(c.dim(`  · ${facts.calls.length} call edge(s), ${facts.branches.length} branching method(s)`));
+    }
+    if (dynamicCalls) console.log(`  ${c.yellow('⚠')} ${c.yellow(`${dynamicCalls} call(s) through an unknown type — human, look`)}`);
+    if (facts.cycles.length) console.log(`  ${c.yellow('⚠')} ${c.yellow(`${facts.cycles.length} circular-dependency chain(s) — will be flagged for you`)}`);
+    if (facts.unresolved.length) console.log(`  ${c.red('⚠')} ${c.red(`${facts.unresolved.length} import(s) couldn't be resolved — human, look`)}`);
 
     // 4) decide what to try migrating (M2.8). auto/try → a checkbox you confirm; keep → shown, never a checkbox.
-    const attempt: string[] = await choosePackages(io, plans);
+    const attempt: string[] = await choosePackages(io, facts.packages);
 
     console.log(c.yellow('\nNote: this is assisted, not a 100% automatic migration. Everything you pick is a best'));
     console.log(c.yellow('effort — review each change, and expect some by-hand work.'));
     if (attempt.length) console.log(`\n${c.green('Will attempt to migrate:')} ${attempt.join(', ')}`);
-    console.log(c.dim('\n(the written plan + conversion come next — see RFC 0011)'));
+
+    // 5) write the facts map — the plan (M3) + conversion (M4) read this, and you can inspect it now.
+    const factsPath: string = writeFacts(app, facts);
+    console.log(`\n${c.green('✓')} ${c.dim('Wrote the full analysis to')} ${c.bold(factsPath)}`);
+    console.log(c.dim('(the written plan + conversion come next — see RFC 0011)'));
   } finally {
     io.close();
   }

@@ -12,7 +12,7 @@
  * framework-specific are the `angular` `ImportKind` (its translation surface) + the `AUTO_MAP` package list, and
  * the `@Component`-shaped extraction here (a React module writes its own component reader). See RFC 0011.
  */
-import { existsSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import ts from 'typescript';
 
@@ -958,4 +958,165 @@ export function findCalls(filePath: string): CallEdge[] {
 /** The call graph across a set of files (the walk's `files`), flattened. Unreadable files contribute nothing. */
 export function analyzeCalls(files: string[]): CallEdge[] {
   return files.flatMap((f) => findCalls(f));
+}
+
+/* ──────────── M2.10 — branch capture (best-effort): the if/else/ternary shape per method ──────────── */
+
+/** The branching shape of one method — the "if this / if not" cases M3 must preserve. */
+export interface BranchFact {
+  /** `ClassName.method`. */
+  method: string;
+  /** `if` statements. */
+  ifs: number;
+  /** `else` / `else if` branches (any `if` with an else clause). */
+  elses: number;
+  /** `? :` conditional expressions. */
+  ternaries: number;
+  /** `switch` statements. */
+  switches: number;
+}
+
+/**
+ * For each method of each class, count its branch points — `if`, `else`, ternary, `switch`. Not a semantic model,
+ * a SHAPE: enough for M3 to see which methods carry conditional logic (and how much) so their branches are
+ * preserved, not flattened. Methods with no branches are omitted (nothing to preserve).
+ */
+export function findBranches(filePath: string): BranchFact[] {
+  const sf: ts.SourceFile | null = parseFile(filePath);
+  if (!sf) return [];
+  const facts: BranchFact[] = [];
+
+  const visitClass = (node: ts.ClassDeclaration): void => {
+    const cls: string = node.name?.text ?? '(anonymous)';
+    for (const member of node.members) {
+      if (!ts.isMethodDeclaration(member) || !member.body) continue;
+      let ifs: number = 0;
+      let elses: number = 0;
+      let ternaries: number = 0;
+      let switches: number = 0;
+      const count = (n: ts.Node): void => {
+        if (ts.isIfStatement(n)) {
+          ifs++;
+          if (n.elseStatement) elses++;
+        } else if (ts.isConditionalExpression(n)) ternaries++;
+        else if (ts.isSwitchStatement(n)) switches++;
+        ts.forEachChild(n, count);
+      };
+      count(member.body);
+      if (ifs || elses || ternaries || switches) {
+        facts.push({ method: `${cls}.${memberName(member) ?? '(anonymous)'}`, ifs, elses, ternaries, switches });
+      }
+    }
+  };
+
+  const visit = (node: ts.Node): void => {
+    if (ts.isClassDeclaration(node)) visitClass(node);
+    ts.forEachChild(node, visit);
+  };
+  visit(sf);
+  return facts;
+}
+
+/** Branch shapes across a set of files (the walk's `files`), flattened. Unreadable files contribute nothing. */
+export function analyzeBranches(files: string[]): BranchFact[] {
+  return files.flatMap((f) => findBranches(f));
+}
+
+/* ──────────── M2.8 (map half) + M2.11 — the package-usage map, and the whole facts map ──────────── */
+
+/** Where a third-party package is used: the files that import it, and how many. */
+export interface PackageUsage {
+  name: string;
+  sites: string[];
+  count: number;
+}
+
+/**
+ * Cross the walked files with their imports: for each third-party package (collapsed to its root), the files that
+ * import it and the count. This is the "where used / how many sites" half of the package map (M2.8) — first-class,
+ * because a decision to replace a package needs to know its blast radius.
+ */
+export function packageUsage(files: string[], tsPaths: TsPaths | null): PackageUsage[] {
+  const byPkg: Map<string, Set<string>> = new Map<string, Set<string>>();
+  for (const file of files) {
+    for (const imp of parseImports(file, tsPaths)) {
+      if (imp.kind !== 'third-party') continue;
+      const root: string = rootPackage(imp.spec);
+      if (!byPkg.has(root)) byPkg.set(root, new Set<string>());
+      byPkg.get(root)?.add(file);
+    }
+  }
+  return [...byPkg.entries()]
+    .map(([name, sites]) => ({ name, sites: [...sites], count: sites.size }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/** The complete facts map for one migration unit — everything the analyzer measured (M2). Plain JSON, no logic. */
+export interface MigrationFacts {
+  /** The analyzed unit's directory. */
+  unit: string;
+  /** The entry file the walk began at, or null (recorded — never guessed). */
+  entry: string | null;
+  files: string[];
+  angular: string[];
+  internal: string[];
+  packages: PackagePlan[];
+  packageUsage: PackageUsage[];
+  components: ComponentFact[];
+  services: ServiceFact[];
+  di: DiEdge[];
+  routes: RouteFact[];
+  forms: FormFact[];
+  calls: CallEdge[];
+  branches: BranchFact[];
+  /** Circular-import chains — reported, not resolved. */
+  cycles: string[][];
+  /** Imports that could not be resolved — recorded, never guessed. */
+  unresolved: string[];
+}
+
+/**
+ * Run the whole M2 analysis for one unit and return the assembled facts. Single source of truth: the command
+ * renders its summary from this, and `writeFacts` serialises the same object. When no entry is found, everything
+ * is empty and `entry` is null (honest, not a crash).
+ */
+export function assembleFacts(unitDir: string): MigrationFacts {
+  const entry: string | null = findEntryPoint(unitDir);
+  const empty: MigrationFacts = {
+    unit: unitDir, entry: null, files: [], angular: [], internal: [], packages: [], packageUsage: [],
+    components: [], services: [], di: [], routes: [], forms: [], calls: [], branches: [], cycles: [], unresolved: [],
+  };
+  if (!entry) return empty;
+
+  const walk: DependencyWalk = walkDependencies(entry);
+  const workspaceRoot: string = findWorkspaceRoot(unitDir);
+  const tsPaths: TsPaths | null = readTsPaths(workspaceRoot);
+  const services: ServiceFact[] = analyzeServices(walk.files);
+  return {
+    unit: unitDir,
+    entry,
+    files: walk.files,
+    angular: walk.angular,
+    internal: walk.internal,
+    packages: classifyPackages(walk.thirdParty, workspaceRoot),
+    packageUsage: packageUsage(walk.files, tsPaths),
+    components: analyzeComponents(walk.files),
+    services,
+    di: diGraph(services),
+    routes: analyzeRoutes(walk.files),
+    forms: analyzeForms(walk.files),
+    calls: analyzeCalls(walk.files),
+    branches: analyzeBranches(walk.files),
+    cycles: walk.cycles,
+    unresolved: walk.unresolved,
+  };
+}
+
+/** Serialise the facts map to `<unit>/.weave-migrate/facts.json` and return the file path written. */
+export function writeFacts(unitDir: string, facts: MigrationFacts): string {
+  const dir: string = join(unitDir, '.weave-migrate');
+  mkdirSync(dir, { recursive: true });
+  const out: string = join(dir, 'facts.json');
+  writeFileSync(out, `${JSON.stringify(facts, null, 2)}\n`, 'utf8');
+  return out;
 }

@@ -44,3 +44,6 @@ Thumbs.db
 
 # transient esbuild bundle from the cli styles-assets smoke
 packages/cli/test/.smoke-*/
+
+# `weave migrate` analysis output (written into the target app)
+.weave-migrate/

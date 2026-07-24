@@ -10,7 +10,7 @@
 import { build as esbuild } from 'esbuild';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -284,6 +284,41 @@ const dyn = edges2.find((e) => e.to === '?.doIt');
 ok(dyn && dyn.dynamic === true, 'findCalls: a call through an unresolved field is flagged dynamic (?, never guessed)');
 ok(a.findCalls(join(comps, 'service.ts')).length === 0, 'findCalls: a class with no tracked calls yields no edges');
 ok(a.analyzeCalls([join(callsDir, 'widget.component.ts')]).length === edges2.length, 'analyzeCalls: flattens across files');
+
+// ── M2.10: branch capture (best-effort) — the if/else/ternary/switch shape per method ──
+const branchesDir = join(fx, 'branches');
+const branches = a.findBranches(join(branchesDir, 'logic.ts'));
+ok(branches.length === 1 && branches[0].method === 'Logic.decide', 'findBranches: only the branching method is recorded (noop omitted)');
+const b0 = branches[0];
+ok(b0.ifs === 2 && b0.elses === 1, `findBranches: if/else counted (ifs=${b0.ifs}, elses=${b0.elses})`);
+ok(b0.ternaries === 1 && b0.switches === 1, `findBranches: ternary + switch counted (ternaries=${b0.ternaries}, switches=${b0.switches})`);
+ok(a.analyzeBranches([join(branchesDir, 'logic.ts')]).length === 1, 'analyzeBranches: flattens across files');
+
+// ── M2.8 (map half) + M2.11: package-usage map, the whole facts map, and writing facts.json ──
+const shop = join(fx, 'nx-mono', 'apps', 'shop');
+const facts = a.assembleFacts(shop);
+ok(facts.entry?.endsWith('main.ts'), 'assembleFacts: entry resolves to the unit main');
+ok(facts.components.length === 2 && facts.services.length === 1, 'assembleFacts: components + services gathered');
+ok(facts.routes.length === 1 && facts.forms.length === 1, 'assembleFacts: routes + forms gathered');
+ok(facts.packages.some((p) => p.name === 'rxjs' && p.decision === 'auto'), 'assembleFacts: package decisions carried in');
+ok(facts.packageUsage.some((u) => u.name === 'rxjs' && u.count >= 1 && u.sites.some((s) => s.endsWith('app.component.ts'))), 'packageUsage: rxjs maps to the file that imports it');
+ok(facts.packageUsage.some((u) => u.name === 'lodash-es'), 'packageUsage: every third-party package has a usage row');
+ok(!facts.packageUsage.some((u) => u.name === '@sps-interfaces' || u.name.startsWith('@angular')), 'packageUsage: internal + @angular are NOT usage rows (third-party only)');
+ok(!facts.internal.some((i) => false) && facts.internal.includes('@sps-interfaces'), 'assembleFacts: internal libs listed, not expanded');
+
+// a unit with no entry → empty, entry null (honest, not a crash)
+const emptyFacts = a.assembleFacts(join(fx, 'not-angular'));
+ok(emptyFacts.entry === null && emptyFacts.files.length === 0, 'assembleFacts: no entry → empty facts, entry null');
+
+// writeFacts serialises valid JSON to <unit>/.weave-migrate/facts.json
+const factsPath = a.writeFacts(shop, facts);
+try {
+  ok(factsPath.endsWith('facts.json') && factsPath.includes('.weave-migrate'), 'writeFacts: writes .weave-migrate/facts.json');
+  const round = JSON.parse(readFileSync(factsPath, 'utf8'));
+  ok(round.components.length === 2 && round.unit === shop, 'writeFacts: the written JSON round-trips the facts');
+} finally {
+  rmSync(join(shop, '.weave-migrate'), { recursive: true, force: true });
+}
 
 // ── the shared UI colour palette: wraps under FORCE_COLOR, no-ops under NO_COLOR (the clean-piped guarantee) ──
 // COLOR is decided at module-eval from env, so we bundle migrate-ui once and import it twice under different env
