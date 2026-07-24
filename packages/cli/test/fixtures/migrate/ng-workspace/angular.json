@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "projects": {
+    "app1": { "projectType": "application", "root": "projects/app1" },
+    "app2": { "projectType": "application", "root": "projects/app2" },
+    "mylib": { "projectType": "library", "root": "projects/mylib" }
+  }
+}

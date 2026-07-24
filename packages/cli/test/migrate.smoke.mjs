@@ -61,6 +61,13 @@ ok(!nxRes.app && nxRes.candidates?.length === 2, 'resolve: an Nx root offers its
 ok(m.resolveAngularApp(join(fx, 'not-angular')).none === true, 'resolve: a non-Angular folder resolves to none');
 ok(m.resolveAngularApp(join(fx, 'does-not-exist')).none === true, 'resolve: a missing path resolves to none');
 
+// a multi-project Angular CLI workspace (angular.json lists several apps) → offer the apps, not the root
+const wsProjects = m.readAngularProjects(join(fx, 'ng-workspace')).filter((p) => p.type === 'application');
+ok(wsProjects.length === 2, `readAngularProjects: two application projects (got ${wsProjects.length})`);
+const wsRes = m.resolveAngularApp(join(fx, 'ng-workspace'));
+ok(!wsRes.app && wsRes.candidates?.length === 2, 'resolve: a multi-project angular.json offers its apps (NOT the workspace root)');
+ok(wsRes.candidates?.every((c) => c.includes('projects')), 'resolve: the candidates are the project roots (projects/app1, projects/app2)');
+
 // a monorepo with exactly ONE Angular app auto-resolves (no pick needed)
 const single = mkdtempSync(join(tmpdir(), 'weave-migrate-'));
 try {
