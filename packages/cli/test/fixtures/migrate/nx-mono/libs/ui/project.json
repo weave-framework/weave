@@ -1,0 +1,1 @@
+{ "name": "ui", "projectType": "library", "targets": { "build": { "executor": "@nx/angular:package" } } }

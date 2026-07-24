@@ -46,27 +46,34 @@ ok(!m.detectAngularAt(join(fx, 'nx-mono')), 'detectAngularAt: an Nx root has no 
 ok(m.looksLikeMonorepo(join(fx, 'nx-mono')), 'looksLikeMonorepo: an Nx root (nx.json + apps/) is a monorepo');
 ok(!m.looksLikeMonorepo(join(fx, 'plain-angular')), 'looksLikeMonorepo: a plain app is not a monorepo');
 
-// isNxAngularProject
-ok(m.isNxAngularProject(join(fx, 'nx-mono', 'apps', 'shop')), 'isNxAngularProject: an Angular-target project.json is an Angular app');
+// isNxAngularProject — any Angular UNIT (application OR library — both migratable)
+ok(m.isNxAngularProject(join(fx, 'nx-mono', 'apps', 'shop')), 'isNxAngularProject: an Angular application is a unit');
+ok(m.isNxAngularProject(join(fx, 'nx-mono', 'libs', 'ui')), 'isNxAngularProject: an Angular LIBRARY is a unit too (not filtered out)');
 
-// findAngularApps — deep search
-const apps = m.findAngularApps(join(fx, 'nx-mono')).sort();
-ok(apps.length === 2, `findAngularApps: found both apps inside the Nx root (got ${apps.length})`);
-ok(apps.some((a) => a.endsWith('shop')) && apps.some((a) => a.endsWith('admin')), 'findAngularApps: the two are apps/shop and apps/admin');
+// findAngularApps — deep search finds every unit (apps AND libs); a service/component migrates from inside one
+const units = m.findAngularApps(join(fx, 'nx-mono')).sort();
+ok(units.length === 3, `findAngularApps: found all three units — 2 apps + 1 lib (got ${units.length})`);
+ok(units.some((a) => a.endsWith('shop')) && units.some((a) => a.endsWith('admin')), 'findAngularApps: includes apps/shop and apps/admin');
+ok(units.some((a) => a.includes('libs')), 'findAngularApps: includes the library too (libs are migratable)');
 
 // resolveAngularApp — the whole resolution
 ok(m.resolveAngularApp(join(fx, 'plain-angular')).app?.endsWith('plain-angular'), 'resolve: a plain app path resolves to itself');
 const nxRes = m.resolveAngularApp(join(fx, 'nx-mono'));
-ok(!nxRes.app && nxRes.candidates?.length === 2, 'resolve: an Nx root offers its inner apps as candidates (not the root)');
+ok(!nxRes.app && nxRes.candidates?.length === 3, 'resolve: an Nx root offers all its units as candidates (not the root)');
 ok(m.resolveAngularApp(join(fx, 'not-angular')).none === true, 'resolve: a non-Angular folder resolves to none');
 ok(m.resolveAngularApp(join(fx, 'does-not-exist')).none === true, 'resolve: a missing path resolves to none');
 
-// a multi-project Angular CLI workspace (angular.json lists several apps) → offer the apps, not the root
-const wsProjects = m.readAngularProjects(join(fx, 'ng-workspace')).filter((p) => p.type === 'application');
-ok(wsProjects.length === 2, `readAngularProjects: two application projects (got ${wsProjects.length})`);
+// a directly-typed path to ONE Nx project (project.json, no angular.json) resolves to itself — pointing straight
+// at a single service/library inside a big workspace
+ok(m.resolveAngularApp(join(fx, 'nx-mono', 'apps', 'shop')).app?.endsWith('shop'), 'resolve: a direct path to an Nx app (project.json) resolves to itself');
+ok(m.resolveAngularApp(join(fx, 'nx-mono', 'libs', 'ui')).app?.endsWith('ui'), 'resolve: a direct path to an Nx library (project.json) resolves to itself');
+
+// a multi-project Angular CLI workspace (angular.json lists apps + libs) → offer them ALL, not the root
+const wsProjects = m.readAngularProjects(join(fx, 'ng-workspace'));
+ok(wsProjects.length === 3, `readAngularProjects: all three projects (2 apps + 1 lib) (got ${wsProjects.length})`);
 const wsRes = m.resolveAngularApp(join(fx, 'ng-workspace'));
-ok(!wsRes.app && wsRes.candidates?.length === 2, 'resolve: a multi-project angular.json offers its apps (NOT the workspace root)');
-ok(wsRes.candidates?.every((c) => c.includes('projects')), 'resolve: the candidates are the project roots (projects/app1, projects/app2)');
+ok(!wsRes.app && wsRes.candidates?.length === 3, 'resolve: a multi-project angular.json offers all its units (NOT the workspace root)');
+ok(wsRes.candidates?.every((c) => c.includes('projects')), 'resolve: the candidates are the project roots (projects/*)');
 
 // a monorepo with exactly ONE Angular app auto-resolves (no pick needed)
 const single = mkdtempSync(join(tmpdir(), 'weave-migrate-'));
@@ -80,6 +87,22 @@ try {
   ok(r.app?.endsWith('only'), 'resolve: an Nx root with a SINGLE Angular app auto-resolves it (no pick)');
 } finally {
   rmSync(single, { recursive: true, force: true });
+}
+
+// a big workspace (> 10 units) resolves to MANY candidates → the command asks for an exact path, not a menu
+const big = mkdtempSync(join(tmpdir(), 'weave-migrate-big-'));
+try {
+  const { mkdirSync } = await import('node:fs');
+  writeFileSync(join(big, 'nx.json'), '{}');
+  for (let i = 0; i < 12; i++) {
+    const d = join(big, 'libs', `lib${i}`);
+    mkdirSync(d, { recursive: true });
+    writeFileSync(join(d, 'project.json'), '{"projectType":"library","targets":{"build":{"executor":"@nx/angular:package"}}}');
+  }
+  const r = m.resolveAngularApp(big);
+  ok((r.candidates?.length ?? 0) > 10, `resolve: a >10-unit workspace returns many candidates (got ${r.candidates?.length}) → the command asks for an exact path`);
+} finally {
+  rmSync(big, { recursive: true, force: true });
 }
 
 rmSync(out, { force: true });
