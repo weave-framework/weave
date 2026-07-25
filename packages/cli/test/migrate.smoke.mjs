@@ -49,6 +49,18 @@ await esbuild({
 });
 const a = await import(pathToFileURL(outA).href);
 
+// Bundle the plan writer too (M3).
+const outP = join(repo, 'node_modules', '.weave-migrate-plan-smoke.mjs');
+await esbuild({
+  entryPoints: [join(repo, 'packages', 'cli', 'src', 'migrate-plan.ts')],
+  bundle: true,
+  format: 'esm',
+  platform: 'node',
+  packages: 'external',
+  outfile: outP,
+});
+const pl = await import(pathToFileURL(outP).href);
+
 // detectAngularAt — direct signals
 ok(m.detectAngularAt(join(fx, 'plain-angular')), 'detectAngularAt: a plain Angular app (angular.json + @angular/core) is detected');
 ok(!m.detectAngularAt(join(fx, 'not-angular')), 'detectAngularAt: a React folder is NOT detected');
@@ -320,6 +332,40 @@ try {
   rmSync(join(shop, '.weave-migrate'), { recursive: true, force: true });
 }
 
+// ── M3: the plan writer — convert order, per-piece effort, and the "can't see clearly" section ──
+// A COMPONENT injects too: its edge must put the injected service EARLIER in the convert order (a real bug —
+// with only service edges in the graph, AppComponent was ordered before the UserService it injects).
+ok(facts.di.some((e) => e.from === 'AppComponent' && e.to === 'UserService'), 'diGraph: a component→service injection is an edge (components inject too)');
+const order = pl.convertOrder(facts);
+ok(order.indexOf('UserService') < order.indexOf('AppComponent'), 'convertOrder: an injected service converts BEFORE the component that injects it');
+ok(order.length === 3, `convertOrder: every class is ordered (got ${order.length})`);
+
+const items = pl.planItems(facts);
+ok(items.some((i) => i.kind === 'form' && i.effort === 'needs-you'), 'planItems: a reactive form needs you (validators rarely map 1:1)');
+ok(items.some((i) => i.kind === 'component' && i.name === 'app-root' && i.effort === 'needs-you' && i.note.includes('RxJS')), 'planItems: a component using RxJS needs you');
+ok(items.some((i) => i.kind === 'service' && i.name === 'UserService' && i.effort === 'auto' && i.note.includes('store()')), "planItems: a providedIn:'root' service maps to store() mechanically");
+ok(items.some((i) => i.kind === 'package' && i.name === 'lodash-es' && i.note.includes('Kept as-is')), 'planItems: a keep package is no work');
+
+// the Angular → Weave mapping is honest about what it does not know
+ok(pl.angularBecomes('@angular/forms').includes('@weave-framework/forms'), 'angularBecomes: @angular/forms → the forms package');
+ok(pl.angularBecomes('@angular/some-unknown-thing').includes('needs you'), 'angularBecomes: an unmapped @angular entry says needs-you (never invented)');
+
+const md = pl.renderPlan(facts);
+for (const section of ['# Migration plan', '## Summary', '## Convert in this order', '## Third-party packages', '## Components', '## Services', '## Routes', '## Forms', "## Can't see clearly"]) {
+  ok(md.includes(section), `renderPlan: has the "${section.replace(/^#+ /, '')}" section`);
+}
+ok(md.includes('not a 100% automatic'), 'renderPlan: states plainly that this is not a 100% automatic migration');
+ok(md.includes('@sps-interfaces') && md.includes('migrate') , 'renderPlan: your own workspace libs are listed as separate migrations');
+ok(md.includes('Nothing was hidden'), 'renderPlan: a clean analysis says so in "can\'t see clearly"');
+
+// a unit WITH blind spots surfaces every one of them
+const blindFacts = { ...facts, cycles: [['/x/a.ts', '/x/b.ts', '/x/a.ts']], unresolved: ['./missing'], calls: [{ from: 'A.m', to: '?.go', dynamic: true }] };
+const blindMd = pl.renderPlan(blindFacts);
+ok(blindMd.includes('Circular import'), "renderPlan: a cycle is reported in \"can't see clearly\"");
+ok(blindMd.includes('./missing'), 'renderPlan: an unresolved import is reported');
+ok(blindMd.includes('Dynamic call'), 'renderPlan: a dynamic call is reported');
+ok(!blindMd.includes('Nothing was hidden'), 'renderPlan: with blind spots, it does NOT claim nothing was hidden');
+
 // ── the shared UI colour palette: wraps under FORCE_COLOR, no-ops under NO_COLOR (the clean-piped guarantee) ──
 // COLOR is decided at module-eval from env, so we bundle migrate-ui once and import it twice under different env
 // (a distinct ?query gives Node a fresh module instance, hence a fresh COLOR decision).
@@ -345,6 +391,7 @@ delete process.env.FORCE_COLOR;
 
 rmSync(out, { force: true });
 rmSync(outA, { force: true });
+rmSync(outP, { force: true });
 rmSync(outUi, { force: true });
 
 if (failures) {

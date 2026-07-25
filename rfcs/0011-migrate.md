@@ -140,9 +140,24 @@ the plan.** Not magic — facts plus judgement.
 
 ## `migration-plan.md` (the written output)
 
-The heart of the tool. Its exact internal shape is the **next open design item** (to be filled in). It is written
-BEFORE any conversion, so the user reads it and there are no surprises, and it records every TODO the conversion
-leaves behind.
+The heart of the tool, written to the unit's root **before** anything is converted, so the user reads it and there
+are no surprises. (The raw measurements go to `.weave-migrate/facts.json` beside it — machine detail; the plan is
+for a human.) Its sections, in the order a reader needs them:
+
+| Section | What it holds |
+| --- | --- |
+| **Summary** | Counts (files, components, services, routes, forms, packages, your own libs) and the two numbers that matter: how many pieces convert **mechanically** vs how many **need you**. |
+| **Your own libraries** | Workspace libs this unit depends on — each is its own migration, run separately. |
+| **What the Angular pieces become** | Each `@angular/*` entry point → its Weave equivalent. An unmapped one says *needs you*; it is never invented. |
+| **Convert in this order** | Bottom-up from the DI graph — nothing converts before what it depends on. Cycle members are appended and reported, never silently broken. |
+| **Third-party packages** | Package · decision (auto / try / keep) · note, including how many files use it (the blast radius of replacing it). |
+| **Services / Components / Routes / Forms** | One row per piece: its name, **auto** or **needs you**, and the plan — what it becomes, and for a *needs-you* piece, what the decision actually is. |
+| **Can't see clearly** | First-class: every circular import, unresolved import, and dynamic call, each with why it couldn't be read. A clean analysis says so explicitly. |
+
+What makes a piece *needs you* rather than *auto*: it uses RxJS (its reactivity has to be rethought as signals),
+it is a reactive form (validators and async checks rarely map one-to-one), or it is a guarded route (a guard's
+logic must be re-expressed as `beforeEach`). Everything else — a `providedIn:'root'` service → `store()`, inputs →
+props, outputs → `on:`, a plain route — is mechanical.
 
 ## Honesty / limits
 
@@ -159,7 +174,8 @@ and records it in the plan. It never fills a gap with a silent guess.
   inventory, DI + best-effort call graph, per-method branch shapes, and the third-party-package classification +
   usage map. `weave migrate` prints a coloured summary and writes the whole thing to
   `<unit>/.weave-migrate/facts.json` — raw facts, no conversion. Anything unreadable is recorded, never guessed.
-- **M3 — `migration-plan.md` generation** from the facts map (its shape designed first).
+- **M3 — `migration-plan.md` generation** from the facts map. ✅ Shipped: the sections above, effort per piece,
+  bottom-up convert order, and the "can't see clearly" section, written to the unit's root.
 - **M4 — convert the mechanical majority** (templates, component skeletons, simple bindings), with the CLI
   choice/TODO flow.
 - **M5 — the hard parts assisted** (RxJS→signals suggestions, DI, forms) — surfaced as choices/TODOs, never
@@ -176,7 +192,8 @@ writes only what is genuinely framework-specific. The pieces:
 | --- | --- | --- |
 | `migrate-ui.ts` | Colours (`c`) + interactive input (`inputManager`: `askLine` / `selectMenu` / `multiSelect`). | **No** — reuse as-is. Never print raw `\x1b[..m`; use `c.*` so `NO_COLOR` / `FORCE_COLOR` are honoured. |
 | `migrate-analyze.ts` | Pure facts: `findEntryPoint` → `parseImports` → `walkDependencies` → `classifyPackages`. | **Mostly no.** The import walk is language-level (TS/JS), so it's shared. Two knobs are framework-specific: the `ImportKind` that marks the *source framework* (`angular` today — a React module adds `react`, so `react`/`react-dom` are the translation surface, not "third-party"), and the confident `AUTO_MAP` entries (what maps first-party to Weave). |
-| `migrate-<fw>.ts` | The front door: detect the framework at/inside a path, resolve the unit, then drive analyze + the package choice. | **Yes** — this is the whole per-framework surface. Mirror `migrate.ts`: detection functions + a `runMigrate`-style flow. |
+| `migrate-plan.ts` | Reasons over the facts → `migration-plan.md`: effort per piece (auto / needs-you), bottom-up convert order, and the "can't see clearly" section. Pure (facts in, markdown out). | **Mostly no.** The structure, effort rules and ordering are shared; the one framework-specific part is the `ANGULAR_MAP` table (what each source-framework entry point becomes) — a React module supplies its own and reuses everything else. |
+| `migrate-<fw>.ts` | The front door: detect the framework at/inside a path, resolve the unit, then drive analyze + the package choice + the plan. | **Yes** — this is the whole per-framework surface. Mirror `migrate.ts`: detection functions + a `runMigrate`-style flow. |
 | `cli.ts` | Registration. | Add the framework to the `SOURCES` list and branch to its module (today only `Angular` proceeds). |
 
 Rules that hold for every module (so migrations feel identical): all output goes through `c`; never guess —

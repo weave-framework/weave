@@ -423,6 +423,9 @@ export interface ComponentFact {
   styleUrls: string[];
   /** Count of inline `styles:` entries (0 when none). */
   inlineStyles: number;
+  /** What it injects — constructor parameter types AND `inject(X)` calls. Components are DI graph nodes too, and
+   *  a component→service edge is what makes the convert order correct (the service converts first). */
+  injects: string[];
 }
 
 /** The name of a decorator, whether written `@Foo` or `@Foo(...)`. Null if it isn't a plain named decorator. */
@@ -546,6 +549,7 @@ export function findComponents(filePath: string): ComponentFact[] {
           templateUrl: stringProp(cfg, 'templateUrl'),
           styleUrls: stringArrayProp(cfg, 'styleUrls', 'styleUrl'),
           inlineStyles: arrayLen(cfg, 'styles'),
+          injects: classInjects(node),
         });
       }
     }
@@ -608,6 +612,24 @@ function providedInOf(cfg: ts.ObjectLiteralExpression): string | null {
   return null;
 }
 
+/**
+ * Everything a class injects: constructor parameter types AND `inject(X)` calls. Shared by components and
+ * services — both inject, and both are nodes in the DI graph. De-duplicated (one edge per dependency).
+ */
+function classInjects(node: ts.ClassDeclaration): string[] {
+  const injects: string[] = [];
+  for (const member of node.members) {
+    if (ts.isConstructorDeclaration(member)) {
+      for (const param of member.parameters) {
+        const t: string | null = typeRefName(param.type);
+        if (t) injects.push(t);
+      }
+    }
+  }
+  injects.push(...injectCalls(node)); // `inject(Foo)` in field initializers / constructor body
+  return [...new Set(injects)];
+}
+
 /** Every `inject(X)` call inside a node subtree → the injected identifier names (signal-era DI). */
 function injectCalls(root: ts.Node): string[] {
   const found: string[] = [];
@@ -638,26 +660,18 @@ export function findServices(filePath: string): ServiceFact[] {
         const arg: ts.Expression | undefined = ts.isCallExpression(dec.expression) ? dec.expression.arguments[0] : undefined;
         const cfg: ts.ObjectLiteralExpression | null = arg && ts.isObjectLiteralExpression(arg) ? arg : null;
         const methods: string[] = [];
-        const injects: string[] = [];
         for (const member of node.members) {
           if (isPublicMethod(member)) {
             const name: string | null = memberName(member);
             if (name) methods.push(name);
           }
-          if (ts.isConstructorDeclaration(member)) {
-            for (const param of member.parameters) {
-              const t: string | null = typeRefName(param.type);
-              if (t) injects.push(t);
-            }
-          }
         }
-        injects.push(...injectCalls(node)); // `inject(Foo)` in field initializers / constructor body
         facts.push({
           file: filePath,
           className: node.name?.text ?? '(anonymous)',
           providedIn: cfg ? providedInOf(cfg) : null,
           methods,
-          injects: [...new Set(injects)], // one edge per distinct dependency
+          injects: classInjects(node),
         });
       }
     }
@@ -678,13 +692,19 @@ export interface DiEdge {
   to: string;
 }
 
+/** Anything that can inject — both components and services do, and both feed the DI graph. */
+export interface Injector {
+  className: string;
+  injects: string[];
+}
+
 /**
- * The DI graph as flat edges — who injects what — built from the services' `injects`. (Components inject too;
- * their edges join here once component injection is read. Kept as plain edges so M3 can order the conversion
- * bottom-up: a leaf that injects nothing converts first.)
+ * The DI graph as flat edges — who injects what. Pass BOTH services and components: a component injecting a
+ * service is exactly the edge that makes the convert order correct (the service must be converted first). Kept
+ * as plain edges so M3 can order bottom-up: a leaf that injects nothing converts first.
  */
-export function diGraph(services: ServiceFact[]): DiEdge[] {
-  return services.flatMap((s) => s.injects.map((to) => ({ from: s.className, to })));
+export function diGraph(injectors: Injector[]): DiEdge[] {
+  return injectors.flatMap((s) => s.injects.map((to) => ({ from: s.className, to })));
 }
 
 /* ──────────── M2.6 — routes + guards: the router config (→ @weave-framework/router) ──────────── */
@@ -1092,6 +1112,7 @@ export function assembleFacts(unitDir: string): MigrationFacts {
   const workspaceRoot: string = findWorkspaceRoot(unitDir);
   const tsPaths: TsPaths | null = readTsPaths(workspaceRoot);
   const services: ServiceFact[] = analyzeServices(walk.files);
+  const components: ComponentFact[] = analyzeComponents(walk.files);
   return {
     unit: unitDir,
     entry,
@@ -1100,9 +1121,9 @@ export function assembleFacts(unitDir: string): MigrationFacts {
     internal: walk.internal,
     packages: classifyPackages(walk.thirdParty, workspaceRoot),
     packageUsage: packageUsage(walk.files, tsPaths),
-    components: analyzeComponents(walk.files),
+    components,
     services,
-    di: diGraph(services),
+    di: diGraph([...services, ...components]), // components inject too — that edge fixes the convert order
     routes: analyzeRoutes(walk.files),
     forms: analyzeForms(walk.files),
     calls: analyzeCalls(walk.files),

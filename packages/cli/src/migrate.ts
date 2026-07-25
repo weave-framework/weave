@@ -15,6 +15,7 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { assembleFacts, writeFacts, type MigrationFacts, type PackagePlan } from './migrate-analyze.js';
+import { planItems, renderPlan, writePlan, type PlanItem } from './migrate-plan.js';
 import { c, inputManager, type InputManager } from './migrate-ui.js';
 
 /* ──────────── detection: is there an Angular app here, and where? (Angular-specific — a React module replaces this) ──────────── */
@@ -290,10 +291,19 @@ export async function runMigrate(): Promise<void> {
     console.log(c.yellow('effort — review each change, and expect some by-hand work.'));
     if (attempt.length) console.log(`\n${c.green('Will attempt to migrate:')} ${attempt.join(', ')}`);
 
-    // 5) write the facts map — the plan (M3) + conversion (M4) read this, and you can inspect it now.
+    // 5) write the facts map — the raw measurements, which the plan and the conversion (M4) both read.
     const factsPath: string = writeFacts(app, facts);
     console.log(`\n${c.green('✓')} ${c.dim('Wrote the full analysis to')} ${c.bold(factsPath)}`);
-    console.log(c.dim('(the written plan + conversion come next — see RFC 0011)'));
+
+    // 6) write the plan (M3) — read this BEFORE anything is converted, so there are no surprises.
+    const planPath: string = writePlan(app, renderPlan(facts));
+    const items: PlanItem[] = planItems(facts);
+    const needs: number = items.filter((i) => i.effort === 'needs-you').length;
+    console.log(`${c.green('✓')} ${c.dim('Wrote your migration plan to')} ${c.bold(planPath)}`);
+    console.log(
+      `  ${c.dim(`${items.length - needs} piece(s) convert mechanically;`)} ${needs ? c.yellow(`${needs} need(s) you`) : c.green('nothing needs you')}${c.dim(' — the plan says which, and why.')}`,
+    );
+    console.log(c.dim('\n(reading the plan is the next step; the conversion itself comes next — see RFC 0011)'));
   } finally {
     io.close();
   }
