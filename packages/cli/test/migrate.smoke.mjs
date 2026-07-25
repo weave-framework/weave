@@ -486,6 +486,12 @@ ok(scopedDraft.ts.includes('export function createScopedService()'), 'convertSer
 ok(cv.rxjsSuggestions(['BehaviorSubject'])[0].includes('signal'), 'rxjsSuggestions: BehaviorSubject → signal');
 ok(cv.rxjsSuggestions(['takeUntilDestroyed'])[0].includes('onDispose'), 'rxjsSuggestions: takeUntilDestroyed → onDispose');
 ok(cv.rxjsSuggestions(['weirdOperator'])[0].includes('no recorded equivalent'), 'rxjsSuggestions: an unknown operator is named honestly, never invented');
+// Operators that are really COLLECTION work must give the plain-JS one-liner, not a shrug: a real service's
+// `mergeMap(xs => xs) → distinct(x => x.text) → toArray()` chain is just an array de-duplication.
+for (const [op, expect] of [['distinct', 'new Map'], ['toArray', 'already have the array'], ['concat', '...a, ...b'], ['first', 'await']]) {
+  const hint = cv.rxjsSuggestions([op])[0];
+  ok(hint.includes(expect) && !hint.includes('no recorded equivalent'), `rxjsSuggestions: ${op} gives its plain-JS equivalent, not a shrug`);
+}
 ok(cv.convertService(rootSvc, []).ts.includes('used RxJS') === false, 'convertService: no RxJS imports → no RxJS advice at all');
 ok(cv.convertService(rootSvc, ['debounceTime']).ts.includes('debounced'), 'convertService: RxJS advice appears only for the names the file uses');
 ok(cv.storeHookName('BreadcrumbsPathService') === 'useBreadcrumbsPath', 'storeHookName: Service suffix dropped, use-prefixed');
