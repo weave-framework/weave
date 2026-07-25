@@ -428,6 +428,11 @@ export interface ComponentFact {
   /** What it injects — constructor parameter types AND `inject(X)` calls. Components are DI graph nodes too, and
    *  a component→service edge is what makes the convert order correct (the service converts first). */
   injects: string[];
+  /** EVERY member of the component class — its state and behaviour. A component's class body is the bulk of what
+   *  a migration has to move; it used to be summarised as a one-line TODO and otherwise dropped. */
+  members: ClassMember[];
+  /** The class body verbatim — the reference for the "nothing was lost" check. */
+  classBody: string;
 }
 
 /** The name of a decorator, whether written `@Foo` or `@Foo(...)`. Null if it isn't a plain named decorator. */
@@ -554,6 +559,8 @@ export function findComponents(filePath: string): ComponentFact[] {
           styleUrls: stringArrayProp(cfg, 'styleUrls', 'styleUrl'),
           inlineStyles: arrayLen(cfg, 'styles'),
           injects: classInjects(node),
+          members: classMembers(node, sf),
+          classBody: classBodyText(node, sf),
         });
       }
     }
@@ -591,6 +598,12 @@ export interface ServiceFact {
    *  conversion is edited in place — dropping them forced the reader back to the Angular file for every method,
    *  and silently threw away a signature that was mechanical to keep. */
   methodSources: Record<string, { params: string; body: string }>;
+  /** EVERY member — public and private, fields, methods and the constructor. The public-only lists above answer
+   *  "what is this service's surface?"; this answers "what code is there?", which is what a migration must move. */
+  members: ClassMember[];
+  /** The class body verbatim. The safety net behind `members`: whatever the structured pass fails to place, this
+   *  still holds, so a "nothing was lost" check has something absolute to compare against. */
+  classBody: string;
   /** Public FIELD names. A service's API is often a field, not a method — counting only methods reads as "0 public
    *  API" for a service whose whole surface is an exposed signal. */
   fields: string[];
@@ -625,20 +638,93 @@ function isSignalField(member: ts.PropertyDeclaration): boolean {
   return t !== null && SIGNAL_TYPES.includes(t);
 }
 
-/**
- * One method's parameter list as written and its body, verbatim from the source. Both are carried into the
- * generated draft: the parameters keep the signature (mechanical to preserve, and silently lost otherwise), and
- * the body is what the human actually has to port — having it in place beats sending them back to the original.
- */
-function methodSource(member: ts.MethodDeclaration, sf: ts.SourceFile): { params: string; body: string } {
-  const params: string = member.parameters.map((p) => p.getText(sf)).join(', ');
-  const raw: string = member.body ? member.body.getText(sf) : '';
-  // Strip the outer braces and the common leading indentation, so the body reads naturally when re-indented.
+/** Strip a block's outer braces and its common leading indentation, so it reads naturally when re-indented. */
+function dedentBlock(raw: string): string {
   const inner: string = raw.replace(/^\s*\{/, '').replace(/\}\s*$/, '');
   const lines: string[] = inner.split('\n').filter((l, i, all) => !(l.trim() === '' && (i === 0 || i === all.length - 1)));
   const indents: number[] = lines.filter((l) => l.trim()).map((l) => (l.match(/^[\t ]*/)?.[0].length ?? 0));
   const strip: number = indents.length ? Math.min(...indents) : 0;
-  return { params, body: lines.map((l) => l.slice(strip)).join('\n') };
+  return lines.map((l) => l.slice(strip)).join('\n');
+}
+
+/**
+ * One member of a converted class — field, method, or the constructor — captured whole.
+ *
+ * EVERY member is captured, public and private alike. An earlier version recorded only the public ones, so a
+ * service whose real work lived in its constructor and a private helper analysed as having nothing at all, and
+ * the draft silently dropped years of logic. A migration MOVES code and adapts it; it never discards it.
+ */
+export interface ClassMember {
+  kind: 'field' | 'method' | 'constructor';
+  /** `(constructor)` for the constructor. */
+  name: string;
+  /** False for `private`/`protected` — in a Weave store/context these become locals that are not returned. */
+  isPublic: boolean;
+  /** Methods + constructor: the parameter list as written. */
+  params: string;
+  /** Methods + constructor: the body, dedented. */
+  body: string;
+  /** Fields: the initializer as written (`inject(Router)`, `signal([])`, …). */
+  initializer: string;
+  /** Fields: whether it already holds a signal (those map to Weave signals one-to-one). */
+  isSignal: boolean;
+  /** The member's ENTIRE original source, signature included. The draft carries this verbatim (commented) so the
+   *  reader sees exactly what was there — and so "was anything lost?" is answerable by plain text comparison. */
+  text: string;
+}
+
+/** The class body verbatim (members only, braces stripped) — the absolute reference for "was anything lost?". */
+function classBodyText(node: ts.ClassDeclaration, sf: ts.SourceFile): string {
+  return dedentBlock(node.members.map((m) => m.getText(sf)).join('\n'));
+}
+
+/** Capture every member of a class — nothing filtered out, so nothing can be silently lost downstream. */
+function classMembers(node: ts.ClassDeclaration, sf: ts.SourceFile): ClassMember[] {
+  const out: ClassMember[] = [];
+  // The member's own source, dedented. Wrapped in braces first so `dedentBlock` sees a block to strip.
+  const own = (m: ts.ClassElement): string => dedentBlock(`{\n${m.getText(sf)}\n}`);
+  for (const member of node.members) {
+    const isPublic: boolean = !isNonPublic(member);
+    if (ts.isConstructorDeclaration(member)) {
+      out.push({
+        kind: 'constructor',
+        name: '(constructor)',
+        isPublic: true,
+        params: member.parameters.map((p) => p.getText(sf)).join(', '),
+        body: member.body ? dedentBlock(member.body.getText(sf)) : '',
+        initializer: '',
+        isSignal: false,
+        text: own(member),
+      });
+      continue;
+    }
+    const name: string | null = memberName(member);
+    if (!name) continue;
+    if (ts.isMethodDeclaration(member)) {
+      out.push({
+        kind: 'method',
+        name,
+        isPublic,
+        params: member.parameters.map((p) => p.getText(sf)).join(', '),
+        body: member.body ? dedentBlock(member.body.getText(sf)) : '',
+        initializer: '',
+        isSignal: false,
+        text: own(member),
+      });
+    } else if (ts.isPropertyDeclaration(member)) {
+      out.push({
+        kind: 'field',
+        name,
+        isPublic,
+        params: '',
+        body: '',
+        initializer: member.initializer ? member.initializer.getText(sf) : '',
+        isSignal: isSignalField(member),
+        text: own(member),
+      });
+    }
+  }
+  return out;
 }
 
 /** True for a member the outside world can call — a method with no `private`/`protected` modifier. */
@@ -720,8 +806,9 @@ export function findServices(filePath: string): ServiceFact[] {
           const name: string | null = memberName(member);
           if (!name) continue;
           if (isPublicMethod(member)) {
+            const md: ts.MethodDeclaration = member as ts.MethodDeclaration;
             methods.push(name);
-            methodSources[name] = methodSource(member as ts.MethodDeclaration, sf);
+            methodSources[name] = { params: md.parameters.map((p) => p.getText(sf)).join(', '), body: md.body ? dedentBlock(md.body.getText(sf)) : '' };
           } else if (isPublicField(member)) {
             fields.push(name);
             if (ts.isPropertyDeclaration(member) && isSignalField(member)) signals.push(name);
@@ -733,6 +820,8 @@ export function findServices(filePath: string): ServiceFact[] {
           providedIn: cfg ? providedInOf(cfg) : null,
           methods,
           methodSources,
+          members: classMembers(node, sf),
+          classBody: classBodyText(node, sf),
           fields,
           signals,
           injects: classInjects(node),

@@ -13,7 +13,7 @@
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve, sep } from 'node:path';
-import { importedNamesFrom, type ComponentFact, type FormFact, type MigrationFacts, type RouteFact, type ServiceFact } from './migrate-analyze.js';
+import { importedNamesFrom, type ClassMember, type ComponentFact, type FormFact, type MigrationFacts, type RouteFact, type ServiceFact } from './migrate-analyze.js';
 
 /* ──────────── a minimal HTML scanner (in-house: Angular syntax is not valid HTML to most parsers) ──────────── */
 
@@ -486,15 +486,29 @@ export function convertComponent(fact: ComponentFact, templateHtml: string, opts
 
   const body: string[] = [];
   body.push(`// Converted from ${fact.className} (${fact.file}).`);
-  body.push('// TODO(weave migrate): move the class body here — fields become signals, methods become plain');
-  body.push('// functions. Props are reactive getters: read `props.x` live, never destructure them.');
+  body.push('// Props are reactive getters: read `props.x` live, never destructure them.');
   if (fact.injects.length) {
     body.push(`// TODO(weave migrate): this component injected ${fact.injects.join(', ')} —`);
     body.push('// a singleton service becomes a `store()`, a scoped one `provide`/`inject` (see the plan).');
   }
+  // The class body is the bulk of a component — carried across member by member, never summarised away.
+  const inputSet: Set<string> = new Set<string>(fact.inputs);
+  const outputSet: Set<string> = new Set<string>(fact.outputs);
+  const isProp = (mem: ClassMember): boolean => mem.kind === 'field' && (inputSet.has(mem.name) || outputSet.has(mem.name));
+  const carried: ClassMember[] = (fact.members ?? []).filter((mem) => !isProp(mem));
+  // An @Input/@Output field IS migrated — into the props type above — but its original declaration would then be
+  // the one thing with no trace left, so it is shown here. Nothing from the class goes unaccounted for.
+  const asProps: ClassMember[] = (fact.members ?? []).filter(isProp);
+  if (asProps.length) {
+    body.push('');
+    body.push('// ── these became props (see the signature above) ──');
+    for (const mem of asProps) for (const line of (mem.text ?? '').split('\n')) body.push(`// ${line}`);
+  }
+  body.push(...draftMembers(carried, fact.className).lines);
 
   // A reactive form becomes a `form({ … })` in setup(); the template binds its leaves with `use:control`.
   const imports: string[] = [];
+  if (carried.some((mem) => mem.kind === 'field')) imports.push("import { signal } from '@weave-framework/runtime';");
   if (formFact) {
     imports.push("import { field, form } from '@weave-framework/forms';");
     body.push('');
@@ -694,6 +708,71 @@ export function storeHookName(className: string): string {
   return `use${base.charAt(0).toUpperCase()}${base.slice(1)}`;
 }
 
+/**
+ * Draft EVERY member of a converted class — public and private, fields, methods, and the constructor.
+ *
+ * The rule this encodes: **a migration moves code and adapts it; it never discards it.** So each member keeps its
+ * name and signature (mechanical) and carries its original body across, commented. Commented rather than live
+ * because the body still says `this.` and names Angular types, and a draft that does not compile is a worse
+ * starting point than one that does — but every line is THERE, in place, instead of in a file you have to open
+ * alongside. Private members become plain locals: in a `store()` factory, "private" simply means "not returned".
+ */
+/** Angular lifecycle hooks that have a direct Weave equivalent. Named, so they don't read as ordinary methods. */
+const LIFECYCLE_HOOKS: Record<string, string> = {
+  ngOnInit: '`onMount(() => …)`, or just the `setup()` body (it runs once, on creation)',
+  ngAfterViewInit: '`onMount(() => …)` — the DOM exists by then',
+  ngAfterContentInit: '`onMount(() => …)`',
+  ngOnDestroy: '`onDispose(() => …)`',
+  ngOnChanges: 'nothing — props are reactive getters; derive with `computed`, react with `watch`',
+  ngDoCheck: 'nothing — Weave tracks dependencies itself; there is no change-detection pass to hook',
+  ngAfterViewChecked: 'nothing — no change-detection pass exists to run after',
+  ngAfterContentChecked: 'nothing — same reason',
+};
+
+function draftMembers(members: ClassMember[], className: string): { lines: string[]; publicNames: string[] } {
+  const out: string[] = [];
+  // The returned surface is built from what was ACTUALLY declared here, never from a separate list — otherwise
+  // the generated `return { … }` can name a binding that does not exist, which the compile gate catches as
+  // "No value exists in scope for the shorthand property".
+  const publicNames: string[] = [];
+  const commented = (text: string | undefined, pad: string = '  '): string[] => (text ?? '').split('\n').map((l) => `${pad}// ${l}`);
+
+  for (const mem of members) {
+    if (mem.kind === 'constructor') {
+      if (!mem.body.trim()) continue;
+      out.push('');
+      out.push(tsTodo(`the constructor ran this on creation — in a store the factory body IS the constructor,`));
+      out.push('//   so port it right here (an ongoing subscription becomes an `effect`/`watch`).');
+      out.push(`// ── original ${className} constructor ──`);
+      out.push(...commented(mem.text, ''));
+      continue;
+    }
+    if (mem.kind === 'field') {
+      const vis: string = mem.isPublic ? '' : ' // was private — a local, not returned';
+      const note: string = mem.isSignal ? ' // already a signal in Angular — a 1:1 move' : '';
+      out.push(`const ${mem.name} = signal<unknown>(undefined);${vis}${note}`);
+      out.push(...commented(mem.text, '')); // the original declaration, verbatim — initial value and type included
+      if (mem.isPublic) publicNames.push(mem.name);
+      continue;
+    }
+    out.push('');
+    const hook: string | undefined = LIFECYCLE_HOOKS[mem.name];
+    if (hook) {
+      // An Angular lifecycle hook has a real Weave equivalent — name it instead of leaving a nameless function.
+      out.push(`${tsTodo(`\`${mem.name}\` is a lifecycle hook → ${hook}`)}`);
+    }
+    out.push(`const ${mem.name} = (${mem.params}): void => {${mem.isPublic ? '' : ' // was private — a local, not returned'}`);
+    out.push(`  ${tsTodo('port this — fields are signals now (`x.set(v)`), and `this.` is gone.')}`);
+    if ((mem.text ?? '').trim()) {
+      out.push(`  // ── original ${className}.${mem.name}() ──`);
+      out.push(...commented(mem.text)); // the WHOLE original member, signature included — nothing paraphrased
+    }
+    out.push('};');
+    if (mem.isPublic) publicNames.push(mem.name);
+  }
+  return { lines: out, publicNames };
+}
+
 /** `BreadcrumbsPathService` → `breadcrumbs-path` (its file name in the target app). */
 export function serviceBaseName(className: string): string {
   return className
@@ -723,26 +802,14 @@ export function convertService(fact: ServiceFact, rxjsNames: string[] = []): { b
     body.push(tsTodo(`this service injected ${fact.injects.join(', ')} — call each one's store hook here,`));
     body.push('//   e.g. `const other = useOther();`, or `inject(OtherContext)` for a scoped one.');
   }
-  for (const f of fact.fields) {
-    const wasSignal: boolean = fact.signals.includes(f);
-    body.push(`const ${f} = signal<unknown>(undefined);${wasSignal ? ' // already a signal in Angular — a 1:1 move' : ` ${tsTodo(`was a plain field; set its real initial value`)}`}`);
-  }
-  for (const m of fact.methods) {
-    // Keep the SIGNATURE (mechanical) and bring the ORIGINAL body across, commented. Commented rather than
-    // verbatim because the body still says `this.x` and Angular types: pasting it live would not compile, and a
-    // draft that does not compile is a worse starting point than one that does. But deleting it — as this used
-    // to — sent the reader back to the Angular file for every single method.
-    const src: { params: string; body: string } | undefined = fact.methodSources?.[m];
-    body.push(`const ${m} = (${src?.params ?? ''}): void => {`);
-    body.push(`  ${tsTodo(`port this — fields are signals now (\`x.set(v)\`), and \`this.\` is gone.`)}`);
-    if (src?.body.trim()) {
-      body.push(`  // ── original ${fact.className}.${m}() ──`);
-      for (const line of src.body.split('\n')) body.push(`  // ${line}`);
-    }
-    body.push('};');
-  }
-  const surface: string[] = [...fact.fields, ...fact.methods];
-  body.push(`return { ${surface.join(', ')} };`);
+  const drafted: { lines: string[]; publicNames: string[] } = draftMembers(fact.members ?? [], fact.className);
+  body.push(...drafted.lines);
+  body.push('');
+  body.push(
+    drafted.publicNames.length
+      ? `return { ${drafted.publicNames.join(', ')} };`
+      : `return {}; ${tsTodo('nothing was public — check what callers actually used')}`,
+  );
 
   const hints: string[] = rxjsSuggestions(rxjsNames);
   const hintBlock: string[] = hints.length ? ['', tsTodo('this service used RxJS. In Weave:'), ...hints.map((h) => `//   ${h}`)] : [];

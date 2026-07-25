@@ -485,7 +485,13 @@ ok(pair.html.includes('@if (task) {'), 'convertComponent: the template is conver
 ok(cv.pascalCase('app-task-card') === 'AppTaskCard', 'pascalCase: a selector becomes a component name');
 
 // ── M5: the hard parts DRAFTED — service → store()/context, RxJS → targeted suggestions ──
-const rootSvc = { file: 'x/user.service.ts', className: 'UserService', providedIn: 'root', methods: ['logout'], fields: ['user'], signals: ['user'], injects: ['Router'] };
+const rootSvc = {
+  file: 'x/user.service.ts', className: 'UserService', providedIn: 'root', methods: ['logout'], fields: ['user'], signals: ['user'], injects: ['Router'],
+  members: [
+    { kind: 'field', name: 'user', isPublic: true, params: '', body: '', initializer: 'signal(null)', isSignal: true },
+    { kind: 'method', name: 'logout', isPublic: true, params: '', body: 'this.user.set(null);', initializer: '', isSignal: false },
+  ],
+};
 const rootDraft = cv.convertService(rootSvc);
 ok(rootDraft.ts.includes("import { store } from '@weave-framework/store'"), 'convertService: a root service imports store');
 ok(rootDraft.ts.includes('export const useUser = store(() => {'), 'convertService: providedIn:root → a store() with a useX hook');
@@ -501,13 +507,16 @@ const bodySvc = a.findServices(join(svcs, 'with-body.service.ts'))[0];
 ok(bodySvc.methodSources.apply.body.includes('this.count = n;'), "findServices: the method's original body is captured");
 const bodyDraft = cv.convertService(bodySvc);
 ok(bodyDraft.ts.includes('const apply = (n: number): void => {'), 'convertService: the drafted function keeps the original signature');
-ok(bodyDraft.ts.includes('// this.count = n;'), 'convertService: the original body is carried across, commented (so the draft still compiles)');
+ok(/\/\/\s+this\.count = n;/.test(bodyDraft.ts), 'convertService: the original body is carried across, commented (so the draft still compiles)');
 ok(bodyDraft.ts.includes('original WithBodyService.apply()'), 'convertService: the carried body is labelled with where it came from');
 ok(rootDraft.ts.includes('return { user, logout };'), 'convertService: the returned object is the service surface');
 ok(rootDraft.ts.includes('injected Router'), 'convertService: injected dependencies are flagged for wiring');
 ok(rootDraft.baseName === 'user', `serviceBaseName: UserService → user (got ${rootDraft.baseName})`);
 
-const scopedSvc = { file: 'x/scoped.service.ts', className: 'ScopedService', providedIn: null, methods: ['doThing'], fields: [], signals: [], injects: [] };
+const scopedSvc = {
+  file: 'x/scoped.service.ts', className: 'ScopedService', providedIn: null, methods: ['doThing'], fields: [], signals: [], injects: [],
+  members: [{ kind: 'method', name: 'doThing', isPublic: true, params: '', body: '', initializer: '', isSignal: false }],
+};
 const scopedDraft = cv.convertService(scopedSvc);
 ok(scopedDraft.ts.includes('createContext') && scopedDraft.ts.includes('ScopedContext'), 'convertService: a service with NO providedIn becomes a context, not a global store');
 ok(!scopedDraft.ts.includes('store('), 'convertService: a scoped service is NOT turned into a global store');
@@ -574,6 +583,44 @@ ok(guardsTs.includes('nav.from.startsWith') && guardsTs.includes("'/edit'"), 'co
 ok(guardsTs.includes('GLOBAL'), 'convertGuards: the draft states plainly that beforeEach is global, unlike a per-route Angular guard');
 ok(guardsTs.includes('return () => off.forEach'), 'convertGuards: the unregister functions are returned for cleanup');
 ok(cv.convertGuards([{ path: 'x', guards: [], guardsByKind: {} }]) === null, 'convertGuards: no guards → no module at all');
+
+// ── THE rule: a migration MOVES code and adapts it; it never discards it. ──
+// Every member is carried — public AND private, fields, methods, and the constructor. Before this, only PUBLIC
+// members were even analysed, so a service whose real work lived in its constructor and a private helper came out
+// as an empty shell and years of logic vanished with no trace that anything had been there.
+const fullSvc = a.findServices(join(svcs, 'full.service.ts'))[0];
+ok(fullSvc.members.some((mm) => mm.kind === 'constructor'), 'findServices: the constructor is captured');
+ok(fullSvc.members.some((mm) => mm.name === 'hiddenHelper' && !mm.isPublic), 'findServices: a PRIVATE method is captured (it used to be invisible)');
+ok(fullSvc.members.some((mm) => mm.kind === 'field' && mm.name === 'secret' && !mm.isPublic), 'findServices: a private field is captured');
+
+const fullDraft = cv.convertService(fullSvc).ts;
+ok(fullDraft.includes('hiddenHelper'), 'convertService: a private method is drafted too (as a local, not returned)');
+ok(fullDraft.includes('not returned'), 'convertService: private members are marked as locals rather than surface');
+ok(fullDraft.includes('original FullService constructor'), 'convertService: the constructor body is carried across');
+ok(/return \{[^}]*visible[^}]*\}/.test(fullDraft) && !/return \{[^}]*hiddenHelper[^}]*\}/.test(fullDraft), 'convertService: only public members are returned; private ones stay local');
+
+// The absolute check: EVERY non-empty line of the original class body must appear somewhere in the draft.
+const lostLines = fullSvc.classBody
+  .split('\n')
+  .map((l) => l.trim())
+  .filter((l) => l && l !== '}' && l !== '{')
+  .filter((l) => !fullDraft.includes(l));
+ok(lostLines.length === 0, `NOTHING IS LOST: every line of the original class survives into the draft (lost: ${lostLines.slice(0, 3).join(' | ') || 'none'})`);
+
+// The same guarantee for COMPONENTS, including the @Input fields that become props: they are migrated into the
+// props type, so their original declaration would otherwise be the one thing with no trace left.
+const cmpFacts = a.analyzeComponents([join(comps, 'decorator.component.ts')]);
+const cmpDraft = cv.convertComponent(cmpFacts[0], '<p></p>', {}).ts;
+const cmpLost = cmpFacts[0].classBody
+  .split('\n')
+  .map((l) => l.trim())
+  .filter((l) => l && l !== '}' && l !== '{')
+  .filter((l) => !cmpDraft.includes(l));
+ok(cmpLost.length === 0, `NOTHING IS LOST (component): every line survives, @Input fields included (lost: ${cmpLost.join(' | ') || 'none'})`);
+ok(cmpDraft.includes('became props'), 'convertComponent: the fields that turned into props are shown, not silently absorbed');
+
+// Angular lifecycle hooks are named, not left as anonymous methods.
+ok(fullDraft.includes('lifecycle hook') && fullDraft.includes('onDispose'), 'convertService: ngOnDestroy is identified as a lifecycle hook with its Weave equivalent');
 
 // The decisive gate for a code GENERATOR: does what it emits actually COMPILE against the real Weave packages?
 // Every assertion above checks the shape of a string; this one checks the thing is usable. It type-checks both
