@@ -492,10 +492,36 @@ for (const [op, expect] of [['distinct', 'new Map'], ['toArray', 'already have t
   const hint = cv.rxjsSuggestions([op])[0];
   ok(hint.includes(expect) && !hint.includes('no recorded equivalent'), `rxjsSuggestions: ${op} gives its plain-JS equivalent, not a shrug`);
 }
-// Coverage: every RxJS name a real Angular app is likely to import should have an answer, not a shrug.
-const COMMON_RXJS = ['BehaviorSubject', 'ReplaySubject', 'Subject', 'Observable', 'combineLatest', 'forkJoin', 'map', 'filter', 'debounceTime', 'distinctUntilChanged', 'switchMap', 'mergeMap', 'takeUntilDestroyed', 'subscribe', 'firstValueFrom', 'of', 'tap', 'concat', 'distinct', 'toArray', 'first', 'from', 'take', 'startWith', 'catchError', 'finalize', 'concatMap', 'exhaustMap', 'withLatestFrom', 'shareReplay', 'share', 'delay', 'retry', 'throwError', 'interval', 'timer', 'fromEvent', 'scan', 'reduce', 'pairwise', 'skip', 'takeUntil', 'takeWhile', 'defaultIfEmpty', 'iif', 'merge', 'zip', 'race', 'auditTime', 'throttleTime', 'lastValueFrom', 'EMPTY', 'NEVER', 'Subscription', 'pipe', 'asyncScheduler'];
-const uncovered = COMMON_RXJS.filter((n) => cv.rxjsSuggestions([n])[0].includes('no recorded equivalent'));
-ok(uncovered.length === 0, `rxjsSuggestions: every common RxJS name has an answer (uncovered: ${uncovered.join(', ') || 'none'})`);
+// Coverage over the WHOLE RxJS 7 surface, by category — an Angular app can import any of these, and a shrug
+// is the least useful answer the tool can give. (Measured, not assumed: this list started at 56/129 covered.)
+const RXJS_SURFACE = [
+  // creation
+  'ajax', 'bindCallback', 'bindNodeCallback', 'defer', 'empty', 'from', 'fromEvent', 'fromEventPattern', 'generate', 'interval', 'of', 'range', 'throwError', 'timer', 'iif',
+  // join creation
+  'combineLatest', 'concat', 'forkJoin', 'merge', 'partition', 'race', 'zip',
+  // transformation
+  'buffer', 'bufferCount', 'bufferTime', 'bufferToggle', 'bufferWhen', 'concatMap', 'concatMapTo', 'exhaust', 'exhaustMap', 'expand', 'groupBy', 'map', 'mapTo', 'mergeMap', 'mergeMapTo', 'mergeScan', 'pairwise', 'pluck', 'scan', 'switchScan', 'switchMap', 'switchMapTo', 'window', 'windowCount', 'windowTime', 'windowToggle', 'windowWhen',
+  // filtering
+  'audit', 'auditTime', 'debounce', 'debounceTime', 'distinct', 'distinctUntilChanged', 'distinctUntilKeyChanged', 'elementAt', 'filter', 'first', 'ignoreElements', 'last', 'sample', 'sampleTime', 'single', 'skip', 'skipLast', 'skipUntil', 'skipWhile', 'take', 'takeLast', 'takeUntil', 'takeWhile', 'throttle', 'throttleTime',
+  // join operators
+  'combineLatestAll', 'concatAll', 'exhaustAll', 'mergeAll', 'startWith', 'withLatestFrom',
+  // multicasting
+  'multicast', 'publish', 'publishBehavior', 'publishLast', 'publishReplay', 'share', 'shareReplay', 'connectable',
+  // errors
+  'catchError', 'retry', 'retryWhen',
+  // utility
+  'tap', 'delay', 'delayWhen', 'dematerialize', 'materialize', 'observeOn', 'subscribeOn', 'timeInterval', 'timestamp', 'timeout', 'timeoutWith', 'toArray', 'finalize',
+  // conditional + mathematical
+  'defaultIfEmpty', 'every', 'find', 'findIndex', 'isEmpty', 'sequenceEqual', 'count', 'max', 'min', 'reduce',
+  // types + plumbing
+  'Observable', 'Subject', 'BehaviorSubject', 'ReplaySubject', 'AsyncSubject', 'Subscription', 'firstValueFrom', 'lastValueFrom', 'EMPTY', 'NEVER', 'pipe', 'asyncScheduler', 'subscribe', 'takeUntilDestroyed', 'animationFrames',
+];
+const uncovered = RXJS_SURFACE.filter((n) => cv.rxjsSuggestions([n])[0].includes('no recorded equivalent'));
+ok(uncovered.length === 0, `rxjsSuggestions: all ${RXJS_SURFACE.length} RxJS names have an answer (uncovered: ${uncovered.join(', ') || 'none'})`);
+// The array-method mappings must name the actual method, not hand-wave.
+for (const [op, expect] of [['every', 'xs.every'], ['find', 'xs.find'], ['count', 'xs.length'], ['max', 'Math.max'], ['last', 'xs.at(-1)'], ['pluck', 'computed']]) {
+  ok(cv.rxjsSuggestions([op])[0].includes(expect), `rxjsSuggestions: ${op} names its concrete equivalent (${expect})`);
+}
 // `pairwise` claims `watch` gives the previous value — that must be TRUE of the real runtime API, not wishful.
 ok(/export function watch<T>\([\s\S]*?prev: T | undefined| undefined\| undefined/.test(readFileSync(join(repo, 'packages', 'runtime', 'src', 'extras.ts'), 'utf8')), 'the advice for pairwise is real: runtime `watch` really passes the previous value');
 // Weave has `debounced` but NO throttle — the advice must not invent one.
