@@ -50,6 +50,7 @@ const ANGULAR_MAP: Array<{ match: (spec: string) => boolean; becomes: string }> 
   { match: (s) => s === '@angular/forms', becomes: '`@weave-framework/forms` — `field` / `form` / `group` / `validators`' },
   { match: (s) => s === '@angular/router', becomes: '`@weave-framework/router` — `route()` / `<RouterView>` / `beforeEach`' },
   { match: (s) => s === '@angular/platform-browser', becomes: 'the Weave bootstrap (`mount`) — no direct equal needed' },
+  { match: (s) => s === '@angular/core/rxjs-interop', becomes: '`fromObservable`/`toObservable`; `takeUntilDestroyed` → the owner\'s `onDispose` cleanup' },
   { match: (s) => s.startsWith('@angular/animations'), becomes: 'template transitions (`transition:`) — **needs you**' },
 ];
 
@@ -90,11 +91,16 @@ function componentItem(cf: ComponentFact, hard: Set<string>, branches: BranchFac
 function serviceItem(sf: ServiceFact, hard: Set<string>): PlanItem {
   const target: string = sf.providedIn === 'root' ? '`store()` (a singleton)' : '`provide`/`inject` (scoped — it has no `providedIn`)';
   const deps: string = sf.injects.length ? ` Injects ${sf.injects.join(', ')}.` : '';
-  const methods: string = `${sf.methods.length} public method(s)`;
+  // A service's surface is methods AND fields — several real services expose only a signal, which would read as
+  // "0 public API" if methods were counted alone. Signals are called out: they map to Weave signals one-to-one.
+  const surface: string[] = [`${sf.methods.length} public method(s)`];
+  if (sf.fields.length) surface.push(`${sf.fields.length} public field(s)`);
+  if (sf.signals.length) surface.push(`${sf.signals.length} already a signal (${sf.signals.join(', ')}) → maps 1:1 to a Weave signal`);
+  const api: string = surface.join(', ');
   if (hard.has(sf.file)) {
-    return { kind: 'service', name: sf.className, effort: 'needs-you', note: `→ ${target}. ${methods}.${deps} Uses RxJS — streams become signals/\`resource\`; review each.` };
+    return { kind: 'service', name: sf.className, effort: 'needs-you', note: `→ ${target}. ${api}.${deps} Uses RxJS — streams become signals/\`resource\`; review each.` };
   }
-  return { kind: 'service', name: sf.className, effort: 'auto', note: `→ ${target}. ${methods}.${deps}` };
+  return { kind: 'service', name: sf.className, effort: 'auto', note: `→ ${target}. ${api}.${deps}` };
 }
 
 /** A guarded route needs a `beforeEach` decision; a plain one is mechanical. */

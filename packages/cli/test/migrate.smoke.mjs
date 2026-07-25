@@ -248,6 +248,13 @@ ok(api[0].injects.includes('Logger'), 'findServices: an inject() call is a DI ed
 
 const scoped = a.findServices(join(svcs, 'scoped.service.ts'));
 ok(scoped[0].providedIn === null, 'findServices: no providedIn → null (not guessed)');
+// a service whose API is a FIELD, not a method — counting only methods read as "0 public API" (found on real code)
+ok(scoped[0].fields.includes('state') && scoped[0].fields.includes('label'), 'findServices: public FIELDS are part of the surface');
+ok(!scoped[0].fields.includes('hidden'), 'findServices: a private field is not public surface');
+// each detection path must stand ALONE: `items` has only an initializer, `declared` has only a type annotation
+ok(scoped[0].signals.includes('items'), 'findServices: a signal field is detected by its signal() initializer alone');
+ok(scoped[0].signals.includes('declared'), 'findServices: a signal field is detected by its Signal<T> type alone');
+ok(!scoped[0].signals.includes('label'), 'findServices: a plain public field is not counted as a signal');
 ok(a.findComponents(join(svcs, 'api.service.ts')).length === 0, 'findServices/findComponents: a service is not a component');
 ok(a.findServices(join(comps, 'decorator.component.ts')).length === 0, 'findServices: a @Component is not a service');
 ok(a.findServices(join(svcs, 'nope.ts')).length === 0, 'findServices: an unreadable file yields nothing');

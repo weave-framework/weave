@@ -583,15 +583,44 @@ export interface ServiceFact {
   providedIn: string | null;
   /** Public method names (constructor and private/protected members excluded). */
   methods: string[];
+  /** Public FIELD names. A service's API is often a field, not a method — counting only methods reads as "0 public
+   *  API" for a service whose whole surface is an exposed signal. */
+  fields: string[];
+  /** The subset of `fields` that hold a signal (`signal()`/`computed()`/`toSignal()`, or a `Signal`/`WritableSignal`
+   *  type). These map to Weave signals ONE-TO-ONE — the most mechanical win in the whole migration. */
+  signals: string[];
   /** What it injects — constructor parameter types AND `inject(X)` calls. The raw edges for the DI graph (M2.5). */
   injects: string[];
+}
+
+/** Does this member carry a `private`/`protected` modifier (i.e. not part of the outside surface)? */
+function isNonPublic(member: ts.ClassElement): boolean {
+  const mods: readonly ts.ModifierLike[] = ts.canHaveModifiers(member) ? (ts.getModifiers(member) ?? []) : [];
+  return mods.some((m) => m.kind === ts.SyntaxKind.PrivateKeyword || m.kind === ts.SyntaxKind.ProtectedKeyword);
+}
+
+/** True for a public FIELD — a property declaration with no `private`/`protected`. */
+function isPublicField(member: ts.ClassElement): boolean {
+  return ts.isPropertyDeclaration(member) && !isNonPublic(member);
+}
+
+/** The signal factories whose result is a reactive value that maps 1:1 to a Weave signal. */
+const SIGNAL_FACTORIES: string[] = ['signal', 'computed', 'linkedSignal', 'toSignal', 'input', 'model', 'output'];
+
+/** Signal-typed annotations (`x: WritableSignal<T>`) — the other way a signal field announces itself. */
+const SIGNAL_TYPES: string[] = ['Signal', 'WritableSignal', 'InputSignal', 'ModelSignal', 'OutputEmitterRef'];
+
+/** Is this property a signal — by its initializer (`signal(…)`) or by its declared type (`WritableSignal<T>`)? */
+function isSignalField(member: ts.PropertyDeclaration): boolean {
+  if (isSignalFactory(member.initializer, SIGNAL_FACTORIES)) return true;
+  const t: string | null = typeRefName(member.type);
+  return t !== null && SIGNAL_TYPES.includes(t);
 }
 
 /** True for a member the outside world can call — a method with no `private`/`protected` modifier. */
 function isPublicMethod(member: ts.ClassElement): boolean {
   if (!ts.isMethodDeclaration(member)) return false;
-  const mods: readonly ts.ModifierLike[] = ts.canHaveModifiers(member) ? (ts.getModifiers(member) ?? []) : [];
-  return !mods.some((m) => m.kind === ts.SyntaxKind.PrivateKeyword || m.kind === ts.SyntaxKind.ProtectedKeyword);
+  return !isNonPublic(member);
 }
 
 /** The rightmost name of a type reference (`a.b.Foo` → `Foo`), or null when the type isn't a plain reference. */
@@ -660,10 +689,15 @@ export function findServices(filePath: string): ServiceFact[] {
         const arg: ts.Expression | undefined = ts.isCallExpression(dec.expression) ? dec.expression.arguments[0] : undefined;
         const cfg: ts.ObjectLiteralExpression | null = arg && ts.isObjectLiteralExpression(arg) ? arg : null;
         const methods: string[] = [];
+        const fields: string[] = [];
+        const signals: string[] = [];
         for (const member of node.members) {
-          if (isPublicMethod(member)) {
-            const name: string | null = memberName(member);
-            if (name) methods.push(name);
+          const name: string | null = memberName(member);
+          if (!name) continue;
+          if (isPublicMethod(member)) methods.push(name);
+          else if (isPublicField(member)) {
+            fields.push(name);
+            if (ts.isPropertyDeclaration(member) && isSignalField(member)) signals.push(name);
           }
         }
         facts.push({
@@ -671,6 +705,8 @@ export function findServices(filePath: string): ServiceFact[] {
           className: node.name?.text ?? '(anonymous)',
           providedIn: cfg ? providedInOf(cfg) : null,
           methods,
+          fields,
+          signals,
           injects: classInjects(node),
         });
       }
