@@ -13,8 +13,9 @@
  * suggests what it found. Zero third-party deps — Node built-ins only.
  */
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { join, relative, resolve } from 'node:path';
 import { assembleFacts, writeFacts, type MigrationFacts, type PackagePlan } from './migrate-analyze.js';
+import { applyWrites, planWrites, type WriteItem } from './migrate-convert.js';
 import { planItems, renderPlan, writePlan, type PlanItem } from './migrate-plan.js';
 import { c, inputManager, type InputManager } from './migrate-ui.js';
 
@@ -351,10 +352,44 @@ export async function runMigrate(): Promise<void> {
     console.log(
       `  ${c.dim(`${items.length - needs} piece(s) convert mechanically;`)} ${needs ? c.yellow(`${needs} need(s) you`) : c.green('nothing needs you')}${c.dim(' — the plan says which, and why.')}`,
     );
-    console.log(c.dim('\n(reading the plan is the next step; the conversion itself comes next — see RFC 0011)'));
+    // 7) convert (M4) — always opt-in, and never overwriting anything that is already there.
+    await convertStep(io, facts, target.dir, planPath);
   } finally {
     io.close();
   }
+}
+
+/**
+ * The conversion step: show exactly what would be written, ask, and only then write. Two rules make this safe to
+ * run against an app you already have — it is opt-in (a plain yes/no, defaulting to NO), and a path that already
+ * exists is never overwritten, only reported. Nothing here is a surprise: the file list is printed first.
+ */
+async function convertStep(io: InputManager, facts: MigrationFacts, targetDir: string, planPath: string): Promise<void> {
+  const items: WriteItem[] = planWrites(facts, targetDir);
+  if (!items.length) {
+    console.log(c.dim('\nNothing to convert yet — no components were found in this unit.'));
+    return;
+  }
+  const fresh: WriteItem[] = items.filter((i) => i.status === 'write');
+  const blocked: WriteItem[] = items.filter((i) => i.status === 'skip-exists');
+
+  console.log(`\n${c.bold('Convert now?')} ${c.dim(`This would create ${fresh.length} file(s) under`)} ${c.bold(join(targetDir, 'src'))}${c.dim(':')}`);
+  for (const i of fresh.slice(0, 10)) console.log(`  ${c.green('+')} ${relative(targetDir, i.path)}`);
+  if (fresh.length > 10) console.log(c.dim(`  … and ${fresh.length - 10} more`));
+  for (const i of blocked) console.log(`  ${c.yellow('•')} ${c.yellow(`${relative(targetDir, i.path)} — already exists, will NOT be touched`)}`);
+
+  console.log(c.dim(`\nThe converted code is a starting point: read ${relative(targetDir, planPath)} and the`));
+  console.log(c.dim('TODO(weave migrate) comments — the pieces marked "needs you" are not done automatically.'));
+
+  const answer: string = await io.askLine(`\n${c.bold('Write these files?')} ${c.dim('[y/N]')} ${c.cyan('> ')}`);
+  if (!/^y(es)?$/i.test(answer.trim())) {
+    console.log(c.dim('\nNothing written. The plan and the analysis are still there when you want them.'));
+    return;
+  }
+  const { written, skipped } = applyWrites(items);
+  console.log(`\n${c.green('✓')} ${c.dim('Wrote')} ${c.bold(String(written.length))} ${c.dim('file(s).')}`);
+  if (skipped.length) console.log(`${c.yellow('•')} ${c.yellow(`${skipped.length} left untouched because a file was already there.`)}`);
+  console.log(c.dim('Now run `weave check` in this app and work through the TODOs.'));
 }
 
 /**

@@ -417,6 +417,8 @@ export interface ComponentFact {
   outputs: string[];
   /** True when the template is inline (`template:`); mutually exclusive with `templateUrl`. */
   templateInline: boolean;
+  /** The INLINE template's text when there is one — the converter needs the markup, not just the flag. */
+  templateText: string | null;
   /** The external template path (`templateUrl:`), or null. */
   templateUrl: string | null;
   /** External style paths (`styleUrls` / `styleUrl`). */
@@ -546,6 +548,8 @@ export function findComponents(filePath: string): ComponentFact[] {
           inputs,
           outputs,
           templateInline: hasProp(cfg, 'template'),
+          // `stringProp` also reads a backtick template literal (the usual way an inline template is written).
+          templateText: stringProp(cfg, 'template'),
           templateUrl: stringProp(cfg, 'templateUrl'),
           styleUrls: stringArrayProp(cfg, 'styleUrls', 'styleUrl'),
           inlineStyles: arrayLen(cfg, 'styles'),

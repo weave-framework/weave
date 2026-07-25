@@ -8,7 +8,7 @@
  * Run: `node packages/cli/test/migrate.smoke.mjs` (wired as `pnpm verify:migrate`).
  */
 import { build as esbuild } from 'esbuild';
-import { dirname, join } from 'node:path';
+import { dirname, join, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { mkdtempSync, writeFileSync, readFileSync, readdirSync, existsSync, rmSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
@@ -453,6 +453,8 @@ const aliasHeader = alias.split('\n').find((l) => l.startsWith('@for')) ?? '';
 ok(aliasHeader === '@for (c of list(); track c) {}', `convertTemplate: @for's \`let x = $last\` alias is dropped from the header (got ${aliasHeader})`);
 ok(alias.includes('TODO(weave migrate)') && alias.includes('rename'), 'convertTemplate: the dropped alias is flagged so its uses get renamed to $last');
 
+ok(conv('<router-outlet></router-outlet>').includes('<RouterView>'), 'convertTemplate: <router-outlet> → <RouterView> (@weave-framework/router)');
+
 // the component pair
 const cfact = { file: 'x/task-card.component.ts', className: 'TaskCardComponent', selector: 'app-task-card', standalone: true, inputs: ['task'], outputs: ['remove'], templateInline: false, templateUrl: './t.html', styleUrls: [], inlineStyles: 0, injects: ['UserService'] };
 const pair = cv.convertComponent(cfact, '<h3 *ngIf="task">{{ task.title }}</h3>');
@@ -462,6 +464,37 @@ ok(pair.ts.includes('onRemove?:'), 'convertComponent: an @Output becomes an onX 
 ok(pair.ts.includes('UserService') && pair.ts.includes('TODO(weave migrate)'), 'convertComponent: injected services are flagged for the store()/provide decision');
 ok(pair.html.includes('@if (task) {'), 'convertComponent: the template is converted alongside');
 ok(cv.pascalCase('app-task-card') === 'AppTaskCard', 'pascalCase: a selector becomes a component name');
+
+// ── M4.9: writing the converted files into the target app — mirrored layout, NEVER overwriting ──
+const wdir = mkdtempSync(join(tmpdir(), 'weave-write-'));
+try {
+  const writes = cv.planWrites(facts, wdir);
+  ok(writes.length === facts.components.length * 2, `planWrites: a .ts + .html pair per component (got ${writes.length})`);
+  ok(writes.every((w) => w.path.includes(`${sep}src${sep}`)), 'planWrites: everything lands under the target app\'s src/');
+  ok(writes.some((w) => w.path.endsWith('app.ts')) && writes.some((w) => w.path.endsWith('app.html')), 'planWrites: app.component.ts becomes app.ts + app.html (the .component suffix is dropped)');
+  ok(writes.every((w) => w.status === 'write'), 'planWrites: into an empty app, every file is a fresh write');
+
+  const applied = cv.applyWrites(writes);
+  ok(applied.written.length === writes.length && applied.skipped.length === 0, 'applyWrites: writes them all into an empty app');
+  ok(existsSync(join(wdir, 'src', 'app', 'app.ts')), 'applyWrites: the file really lands at the mirrored path');
+  ok(readFileSync(join(wdir, 'src', 'app', 'app.ts'), 'utf8').includes('export function setup('), 'applyWrites: the .ts holds a Weave setup()');
+
+  // the SAFETY rule: running again must not clobber what is already there (the "existing app" case)
+  writeFileSync(join(wdir, 'src', 'app', 'app.ts'), 'MINE — do not touch');
+  const again = cv.planWrites(facts, wdir);
+  ok(again.some((w) => w.path.endsWith('app.ts') && w.status === 'skip-exists'), 'planWrites: an existing file is marked skip-exists, not write');
+  const applied2 = cv.applyWrites(again);
+  ok(applied2.skipped.length > 0, 'applyWrites: reports what it left alone');
+  ok(readFileSync(join(wdir, 'src', 'app', 'app.ts'), 'utf8') === 'MINE — do not touch', 'applyWrites: an existing file is NEVER overwritten');
+} finally {
+  rmSync(wdir, { recursive: true, force: true });
+}
+
+// a component's inline template text is a FACT the converter needs (not just the boolean flag)
+const inlineCmp = facts.components.find((cf) => cf.templateInline);
+ok(inlineCmp && typeof inlineCmp.templateText === 'string', 'ComponentFact: an inline template carries its TEXT, so the converter can convert it');
+ok(cv.readComponentTemplate({ ...inlineCmp, templateText: '<p>hi</p>' }) === '<p>hi</p>', 'readComponentTemplate: an inline template is returned as-is');
+ok(cv.readComponentTemplate({ file: join(shop, 'x.ts'), templateText: null, templateUrl: './nope.html' }) === null, 'readComponentTemplate: an unreadable templateUrl → null (never a fake empty template)');
 
 // ── the TARGET: you run `weave migrate` from inside the Weave app you migrate INTO; the source is only read ──
 const tgt = mkdtempSync(join(tmpdir(), 'weave-target-'));

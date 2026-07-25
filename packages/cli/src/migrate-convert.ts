@@ -11,7 +11,9 @@
  *
  * Zero third-party deps — an in-house scanner, no HTML parser pulled in (RULE #1).
  */
-import type { ComponentFact } from './migrate-analyze.js';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join, relative, resolve, sep } from 'node:path';
+import type { ComponentFact, MigrationFacts } from './migrate-analyze.js';
 
 /* ──────────── a minimal HTML scanner (in-house: Angular syntax is not valid HTML to most parsers) ──────────── */
 
@@ -386,9 +388,14 @@ export function convertBlockSyntax(text: string): ConvertedExpr {
   return { expr, todos };
 }
 
+/** Angular built-in elements with a confident Weave equivalent (a user's own selectors come via `opts`). */
+const BUILTIN_TAGS: Record<string, string> = {
+  'router-outlet': 'RouterView', // @weave-framework/router renders the matched route here
+};
+
 /** Render one element (its own tag + attributes + children), without its structural wrapper. */
 function renderElement(node: ElementNode, opts: ConvertOptions): string {
-  const mapped: string | undefined = opts.components?.[node.tag];
+  const mapped: string | undefined = opts.components?.[node.tag] ?? BUILTIN_TAGS[node.tag];
   const tag: string = mapped ?? node.tag;
 
   // A [ngSwitch] parent groups its *ngSwitchCase children into one @switch block.
@@ -482,4 +489,104 @@ export function convertComponent(fact: ComponentFact, templateHtml: string, opts
   ].join('\n');
 
   return { baseName, ts, html: convertTemplate(templateHtml, opts) };
+}
+
+/* ──────────── M4.9 — writing the converted files into the TARGET Weave app ──────────── */
+
+/**
+ * One file the conversion wants to produce. `status` is decided BEFORE anything touches disk, so the command can
+ * show the user exactly what will happen and nothing is a surprise.
+ */
+export interface WriteItem {
+  /** Absolute path in the target Weave app. */
+  path: string;
+  content: string;
+  /** `write` — new file. `skip-exists` — something is already there, so we do NOT touch it. */
+  status: 'write' | 'skip-exists';
+}
+
+/**
+ * Read a component's Angular template: the inline `template:` text when it has one, else the `templateUrl` file
+ * resolved beside the component. Returns null when neither can be read — the caller records that honestly rather
+ * than emitting an empty template that looks like a successful conversion.
+ */
+export function readComponentTemplate(fact: ComponentFact): string | null {
+  if (fact.templateText !== null) return fact.templateText;
+  if (fact.templateUrl) {
+    const p: string = resolve(dirname(fact.file), fact.templateUrl);
+    try {
+      return readFileSync(p, 'utf8');
+    } catch {
+      return null; // the file moved or is unreadable — honestly unknown
+    }
+  }
+  return null;
+}
+
+/** The source unit's own `src/` root, so the target mirrors the layout the user already knows. */
+function relativeUnderSrc(file: string, unitDir: string): string {
+  const rel: string = relative(unitDir, file);
+  const parts: string[] = rel.split(/[\\/]/);
+  const srcAt: number = parts.indexOf('src');
+  return (srcAt === -1 ? parts : parts.slice(srcAt + 1)).join(sep);
+}
+
+/** `breadcrumbs.component.ts` → `breadcrumbs` — the Angular suffixes a Weave file does not carry. */
+function weaveBaseName(fileName: string): string {
+  return fileName.replace(/\.ts$/, '').replace(/\.(component|page|view)$/, '');
+}
+
+/** The selector → component-name map, so converted templates reference each other as Weave components. */
+export function componentNameMap(facts: MigrationFacts): Record<string, string> {
+  const map: Record<string, string> = {};
+  for (const cf of facts.components) {
+    if (cf.selector) map[cf.selector] = cf.className.replace(/Component$/, '');
+  }
+  return map;
+}
+
+/**
+ * Plan every file the conversion would write into `targetDir`, WITHOUT touching disk. Each component becomes a
+ * `<name>.ts` + `<name>.html` pair under the target's `src/`, mirroring the source's own layout beneath its
+ * `src/`. A path that already exists is marked `skip-exists` and never overwritten — that is the whole safety
+ * story for migrating into an app you already have.
+ */
+export function planWrites(facts: MigrationFacts, targetDir: string): WriteItem[] {
+  const items: WriteItem[] = [];
+  const opts: ConvertOptions = { components: componentNameMap(facts) };
+  for (const cf of facts.components) {
+    const rel: string = relativeUnderSrc(cf.file, facts.unit);
+    const dir: string = dirname(rel) === '.' ? '' : dirname(rel);
+    const base: string = weaveBaseName(rel.split(/[\\/]/).pop() ?? cf.className);
+    const html: string | null = readComponentTemplate(cf);
+    const pair: ConvertedComponent = convertComponent(cf, html ?? '', opts);
+    const tsBody: string =
+      html === null
+        ? `${pair.ts}\n// TODO(weave migrate): the template could not be read (${cf.templateUrl ?? 'no template'}) — port it by hand.\n`
+        : pair.ts;
+    for (const [ext, content] of [
+      ['.ts', tsBody],
+      ['.html', html === null ? `${todo('the original template could not be read — port it by hand')}\n` : `${pair.html}\n`],
+    ] as Array<[string, string]>) {
+      const path: string = join(targetDir, 'src', dir, `${base}${ext}`);
+      items.push({ path, content, status: existsSync(path) ? 'skip-exists' : 'write' });
+    }
+  }
+  return items;
+}
+
+/** Write the planned items. Anything marked `skip-exists` is left untouched — an existing file is never clobbered. */
+export function applyWrites(items: WriteItem[]): { written: string[]; skipped: string[] } {
+  const written: string[] = [];
+  const skipped: string[] = [];
+  for (const item of items) {
+    if (item.status === 'skip-exists') {
+      skipped.push(item.path);
+      continue;
+    }
+    mkdirSync(dirname(item.path), { recursive: true });
+    writeFileSync(item.path, item.content, 'utf8');
+    written.push(item.path);
+  }
+  return { written, skipped };
 }
