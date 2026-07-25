@@ -587,6 +587,10 @@ export interface ServiceFact {
   providedIn: string | null;
   /** Public method names (constructor and private/protected members excluded). */
   methods: string[];
+  /** Per public method: its parameter list AS WRITTEN and its original body. Carried into the draft so the
+   *  conversion is edited in place — dropping them forced the reader back to the Angular file for every method,
+   *  and silently threw away a signature that was mechanical to keep. */
+  methodSources: Record<string, { params: string; body: string }>;
   /** Public FIELD names. A service's API is often a field, not a method — counting only methods reads as "0 public
    *  API" for a service whose whole surface is an exposed signal. */
   fields: string[];
@@ -619,6 +623,22 @@ function isSignalField(member: ts.PropertyDeclaration): boolean {
   if (isSignalFactory(member.initializer, SIGNAL_FACTORIES)) return true;
   const t: string | null = typeRefName(member.type);
   return t !== null && SIGNAL_TYPES.includes(t);
+}
+
+/**
+ * One method's parameter list as written and its body, verbatim from the source. Both are carried into the
+ * generated draft: the parameters keep the signature (mechanical to preserve, and silently lost otherwise), and
+ * the body is what the human actually has to port — having it in place beats sending them back to the original.
+ */
+function methodSource(member: ts.MethodDeclaration, sf: ts.SourceFile): { params: string; body: string } {
+  const params: string = member.parameters.map((p) => p.getText(sf)).join(', ');
+  const raw: string = member.body ? member.body.getText(sf) : '';
+  // Strip the outer braces and the common leading indentation, so the body reads naturally when re-indented.
+  const inner: string = raw.replace(/^\s*\{/, '').replace(/\}\s*$/, '');
+  const lines: string[] = inner.split('\n').filter((l, i, all) => !(l.trim() === '' && (i === 0 || i === all.length - 1)));
+  const indents: number[] = lines.filter((l) => l.trim()).map((l) => (l.match(/^[\t ]*/)?.[0].length ?? 0));
+  const strip: number = indents.length ? Math.min(...indents) : 0;
+  return { params, body: lines.map((l) => l.slice(strip)).join('\n') };
 }
 
 /** True for a member the outside world can call — a method with no `private`/`protected` modifier. */
@@ -693,13 +713,16 @@ export function findServices(filePath: string): ServiceFact[] {
         const arg: ts.Expression | undefined = ts.isCallExpression(dec.expression) ? dec.expression.arguments[0] : undefined;
         const cfg: ts.ObjectLiteralExpression | null = arg && ts.isObjectLiteralExpression(arg) ? arg : null;
         const methods: string[] = [];
+        const methodSources: Record<string, { params: string; body: string }> = {};
         const fields: string[] = [];
         const signals: string[] = [];
         for (const member of node.members) {
           const name: string | null = memberName(member);
           if (!name) continue;
-          if (isPublicMethod(member)) methods.push(name);
-          else if (isPublicField(member)) {
+          if (isPublicMethod(member)) {
+            methods.push(name);
+            methodSources[name] = methodSource(member as ts.MethodDeclaration, sf);
+          } else if (isPublicField(member)) {
             fields.push(name);
             if (ts.isPropertyDeclaration(member) && isSignalField(member)) signals.push(name);
           }
@@ -709,6 +732,7 @@ export function findServices(filePath: string): ServiceFact[] {
           className: node.name?.text ?? '(anonymous)',
           providedIn: cfg ? providedInOf(cfg) : null,
           methods,
+          methodSources,
           fields,
           signals,
           injects: classInjects(node),

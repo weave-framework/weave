@@ -490,7 +490,19 @@ const rootDraft = cv.convertService(rootSvc);
 ok(rootDraft.ts.includes("import { store } from '@weave-framework/store'"), 'convertService: a root service imports store');
 ok(rootDraft.ts.includes('export const useUser = store(() => {'), 'convertService: providedIn:root → a store() with a useX hook');
 ok(rootDraft.ts.includes('const user = signal<unknown>(undefined);') && rootDraft.ts.includes('1:1 move'), 'convertService: a field that was already a signal is a 1:1 move');
-ok(rootDraft.ts.includes('const logout = (): void => {') && rootDraft.ts.includes('port the body of UserService.logout()'), 'convertService: a method becomes a function with its body left as a TODO');
+ok(rootDraft.ts.includes('const logout = (): void => {'), 'convertService: a method becomes a function');
+
+// A method's SIGNATURE and its ORIGINAL BODY are carried across. Both used to be dropped: the draft emitted an
+// empty stub with no parameters, so porting meant reading the Angular file side by side for every method.
+const apiSvc = a.findServices(join(svcs, 'api.service.ts'))[0];
+ok(apiSvc.methodSources.get.params === 'url: string', `findServices: a method's parameter list is captured verbatim (got "${apiSvc.methodSources.get.params}")`);
+ok(apiSvc.methodSources.post.params.includes('body: unknown'), 'findServices: every parameter is captured, not just the first');
+const bodySvc = a.findServices(join(svcs, 'with-body.service.ts'))[0];
+ok(bodySvc.methodSources.apply.body.includes('this.count = n;'), "findServices: the method's original body is captured");
+const bodyDraft = cv.convertService(bodySvc);
+ok(bodyDraft.ts.includes('const apply = (n: number): void => {'), 'convertService: the drafted function keeps the original signature');
+ok(bodyDraft.ts.includes('// this.count = n;'), 'convertService: the original body is carried across, commented (so the draft still compiles)');
+ok(bodyDraft.ts.includes('original WithBodyService.apply()'), 'convertService: the carried body is labelled with where it came from');
 ok(rootDraft.ts.includes('return { user, logout };'), 'convertService: the returned object is the service surface');
 ok(rootDraft.ts.includes('injected Router'), 'convertService: injected dependencies are flagged for wiring');
 ok(rootDraft.baseName === 'user', `serviceBaseName: UserService → user (got ${rootDraft.baseName})`);

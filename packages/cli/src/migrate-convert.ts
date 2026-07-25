@@ -728,8 +728,17 @@ export function convertService(fact: ServiceFact, rxjsNames: string[] = []): { b
     body.push(`const ${f} = signal<unknown>(undefined);${wasSignal ? ' // already a signal in Angular — a 1:1 move' : ` ${tsTodo(`was a plain field; set its real initial value`)}`}`);
   }
   for (const m of fact.methods) {
-    body.push(`const ${m} = (): void => {`);
-    body.push(`  ${tsTodo(`port the body of ${fact.className}.${m}()`)}`);
+    // Keep the SIGNATURE (mechanical) and bring the ORIGINAL body across, commented. Commented rather than
+    // verbatim because the body still says `this.x` and Angular types: pasting it live would not compile, and a
+    // draft that does not compile is a worse starting point than one that does. But deleting it — as this used
+    // to — sent the reader back to the Angular file for every single method.
+    const src: { params: string; body: string } | undefined = fact.methodSources?.[m];
+    body.push(`const ${m} = (${src?.params ?? ''}): void => {`);
+    body.push(`  ${tsTodo(`port this — fields are signals now (\`x.set(v)\`), and \`this.\` is gone.`)}`);
+    if (src?.body.trim()) {
+      body.push(`  // ── original ${fact.className}.${m}() ──`);
+      for (const line of src.body.split('\n')) body.push(`  // ${line}`);
+    }
     body.push('};');
   }
   const surface: string[] = [...fact.fields, ...fact.methods];
