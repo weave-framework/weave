@@ -455,6 +455,25 @@ ok(alias.includes('TODO(weave migrate)') && alias.includes('rename'), 'convertTe
 
 ok(conv('<router-outlet></router-outlet>').includes('<RouterView>'), 'convertTemplate: <router-outlet> → <RouterView> (@weave-framework/router)');
 
+// Reactive-forms directives → use:control. ORDERING matters: each of these also matches a general rule
+// ((ngSubmit) looks like any event, [formControl] like any property binding), so they must be tried first —
+// they were dead code until moved above those rules.
+ok(conv('<input formControlName="email" />').includes('use:control={{ f.controls.email }}'), 'convertTemplate: formControlName → use:control on the group child');
+ok(conv('<input [formControl]="ctrl" />').includes('use:control={{ ctrl }}'), 'convertTemplate: [formControl] → use:control (NOT a .formControl property)');
+const fg = conv('<form [formGroup]="f"></form>');
+ok(!fg.includes('.formGroup') && fg.includes('TODO(weave migrate)'), 'convertTemplate: [formGroup] is dropped with a TODO (the group lives in setup)');
+const sub = conv('<form (ngSubmit)="save()"></form>');
+ok(sub.includes('on:submit|preventDefault={{ submit }}') && !sub.includes('($event) => save()'), 'convertTemplate: (ngSubmit) → the forms submit binding, not a generic event handler');
+
+// a component that uses reactive forms gets its form drafted into the same setup()
+const loginFact = { file: 'x/login.component.ts', className: 'LoginComponent', selector: 'app-login', standalone: true, inputs: [], outputs: [], templateInline: false, templateText: null, templateUrl: null, styleUrls: [], inlineStyles: 0, injects: [] };
+const formPair = cv.convertComponent(loginFact, '<form></form>', {}, { file: 'x', className: 'LoginComponent', primitives: ['FormGroup', 'FormControl'], controls: ['email', 'password'] });
+ok(formPair.ts.includes("import { field, form } from '@weave-framework/forms';"), 'convertComponent: a forms component imports the forms package');
+ok(formPair.ts.includes('const f = form({') && formPair.ts.includes("email: field('')") && formPair.ts.includes("password: field('')"), 'convertComponent: each control becomes a field in the form');
+ok(formPair.ts.includes('const submit = f.submit(async (values)'), 'convertComponent: a submit handler is drafted via f.submit');
+ok(formPair.ts.includes('exactly seven validators'), 'convertComponent: the draft names the validators Weave actually ships (so none get invented)');
+ok(!cv.convertComponent(loginFact, '<p></p>', {}).ts.includes('@weave-framework/forms'), 'convertComponent: a component with no form gets no forms import');
+
 // the component pair
 const cfact = { file: 'x/task-card.component.ts', className: 'TaskCardComponent', selector: 'app-task-card', standalone: true, inputs: ['task'], outputs: ['remove'], templateInline: false, templateUrl: './t.html', styleUrls: [], inlineStyles: 0, injects: ['UserService'] };
 const pair = cv.convertComponent(cfact, '<h3 *ngIf="task">{{ task.title }}</h3>');

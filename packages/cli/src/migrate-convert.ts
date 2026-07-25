@@ -13,7 +13,7 @@
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve, sep } from 'node:path';
-import { importedNamesFrom, type ComponentFact, type MigrationFacts, type ServiceFact } from './migrate-analyze.js';
+import { importedNamesFrom, type ComponentFact, type FormFact, type MigrationFacts, type ServiceFact } from './migrate-analyze.js';
 
 /* ──────────── a minimal HTML scanner (in-house: Angular syntax is not valid HTML to most parsers) ──────────── */
 
@@ -216,6 +216,19 @@ export function convertAttr(attr: Attr, tag: string): { out: string | null; todo
   const v: string = conv.expr;
   const exprTodos: string[] = conv.todos;
   const component: boolean = isComponentTag(tag);
+
+  // Reactive-forms directives FIRST — each of these also matches a general rule below (`(ngSubmit)` looks like any
+  // event, `[formControl]` like any property binding), so ordering is what makes them reachable at all.
+  if (name === 'formControlName') {
+    return { out: `use:control={{ f.controls.${raw} }}`, todo: `\`formControlName="${raw}"\` — check the form variable name; import \`control\` from \`@weave-framework/forms/dom\`` };
+  }
+  if (name === '[formControl]') return { out: `use:control={{ ${v} }}`, todos: exprTodos };
+  if (name === '[formGroup]' || name === 'formGroupName' || name === 'formArrayName') {
+    return { out: null, todo: `\`${name}\` — in Weave the group lives in setup() (\`form({ … })\`); the template binds only leaves, with \`use:control\`` };
+  }
+  if (name === '(ngSubmit)') {
+    return { out: 'on:submit|preventDefault={{ submit }}', todo: '`(ngSubmit)` → `f.submit(handler)` in setup(); it validates, reveals every error and focuses the first invalid control' };
+  }
 
   // (event)="statement" → on:event={{ ($event) => statement }}
   const evt: RegExpMatchArray | null = name.match(/^\((.+)\)$/);
@@ -462,7 +475,7 @@ export function baseNameFor(fact: ComponentFact): string {
  * body still needs moved by hand — the method bodies are NOT auto-translated (that is a judgement call, and a
  * wrong silent rewrite is worse than a marked one).
  */
-export function convertComponent(fact: ComponentFact, templateHtml: string, opts: ConvertOptions = {}): ConvertedComponent {
+export function convertComponent(fact: ComponentFact, templateHtml: string, opts: ConvertOptions = {}, formFact?: FormFact): ConvertedComponent {
   const baseName: string = baseNameFor(fact);
   const propLines: string[] = [
     ...fact.inputs.map((i) => `  ${i}: unknown;`),
@@ -480,10 +493,26 @@ export function convertComponent(fact: ComponentFact, templateHtml: string, opts
     body.push('// a singleton service becomes a `store()`, a scoped one `provide`/`inject` (see the plan).');
   }
 
+  // A reactive form becomes a `form({ … })` in setup(); the template binds its leaves with `use:control`.
+  const imports: string[] = [];
+  if (formFact) {
+    imports.push("import { field, form } from '@weave-framework/forms';");
+    body.push('');
+    body.push(tsTodo(`this component built a reactive form (${formFact.primitives.join(', ')}).`));
+    body.push('// Weave ships exactly seven validators — required, minLength, maxLength, pattern, email, min, max —');
+    body.push("// each a factory you CALL, passed as the second, positional argument: `field('', [validators.email()])`.");
+    body.push('const f = form({');
+    for (const ctrl of formFact.controls) body.push(`  ${ctrl}: field(''), ${tsTodo('initial value + validators')}`);
+    body.push('});');
+    body.push('const submit = f.submit(async (values) => {');
+    body.push(`  ${tsTodo('port the submit handler; submit() already validates and reveals errors')}`);
+    body.push('});');
+  }
+
   const ts: string = [
-    ...(usesProps ? [] : []),
+    ...(imports.length ? [...imports, ''] : []),
     `export function setup(${usesProps ? `props: ${propsType}` : ''}) {`,
-    ...body.map((l) => `  ${l}`),
+    ...body.map((l) => (l ? `  ${l}` : l)),
     '}',
     '',
   ].join('\n');
@@ -809,7 +838,9 @@ export function planWrites(facts: MigrationFacts, targetDir: string): WriteItem[
     const dir: string = dirname(rel) === '.' ? '' : dirname(rel);
     const base: string = weaveBaseName(rel.split(/[\\/]/).pop() ?? cf.className);
     const html: string | null = readComponentTemplate(cf);
-    const pair: ConvertedComponent = convertComponent(cf, html ?? '', opts);
+    // A component that also uses reactive forms gets its `form({ … })` drafted into the same setup().
+    const formFact: FormFact | undefined = facts.forms.find((ff) => ff.file === cf.file);
+    const pair: ConvertedComponent = convertComponent(cf, html ?? '', opts, formFact);
     const tsBody: string =
       html === null
         ? `${pair.ts}\n// TODO(weave migrate): the template could not be read (${cf.templateUrl ?? 'no template'}) — port it by hand.\n`
