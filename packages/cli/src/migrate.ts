@@ -172,6 +172,45 @@ export function resolveAngularApp(input: string): Resolution {
   return pickFrom(findAngularApps(dir)); // fallback: units may live deeper
 }
 
+/* ──────────── the TARGET: the Weave app the migration writes INTO ──────────── */
+
+/**
+ * The migration's destination. You run `weave migrate` **from inside the Weave app you are migrating into** —
+ * usually a fresh empty one created for this, sometimes an app you already have. So the target is simply the
+ * current directory, and everything written (the plan, the facts, and later the converted code) lands there.
+ * The SOURCE Angular app is only ever READ — it is never written to, so your other repo stays clean.
+ */
+export interface Target {
+  /** Absolute path of the Weave app being migrated into (the directory you ran the command from). */
+  dir: string;
+  /** True when this really looks like a Weave app (`weave.config.*`, or a `@weave-framework/*` dependency). */
+  isWeave: boolean;
+}
+
+/** Does `dir` look like a Weave app? A `weave.config.*`, or a `package.json` depending on `@weave-framework/*`. */
+export function looksLikeWeaveApp(dir: string): boolean {
+  for (const f of ['weave.config.ts', 'weave.config.js', 'weave.config.mjs']) {
+    if (existsSync(join(dir, f))) return true;
+  }
+  const pkg: string = join(dir, 'package.json');
+  if (existsSync(pkg)) {
+    try {
+      const j: { dependencies?: Record<string, string>; devDependencies?: Record<string, string> } = JSON.parse(readFileSync(pkg, 'utf8'));
+      const deps: Record<string, string> = { ...j.dependencies, ...j.devDependencies };
+      if (Object.keys(deps).some((d) => d.startsWith('@weave-framework/'))) return true;
+    } catch {
+      /* a malformed package.json is not a Weave signal */
+    }
+  }
+  return false;
+}
+
+/** Resolve the migration target — the directory the command was run from. */
+export function resolveTarget(cwd: string = process.cwd()): Target {
+  const dir: string = resolve(cwd);
+  return { dir, isWeave: looksLikeWeaveApp(dir) };
+}
+
 /* ──────────── the interactive command (thin, COLOURED shell over the pure functions above) ──────────── */
 
 const SOURCES: string[] = ['Angular', 'React', 'Vue'];
@@ -188,6 +227,14 @@ export async function runMigrate(): Promise<void> {
   const io: InputManager = inputManager();
   try {
     console.log(`\n${c.bold(c.cyan('weave migrate'))}${c.dim(' — assisted migration into Weave')}`);
+
+    // 0) the TARGET — this Weave app. Everything is written HERE; the source app is only ever read.
+    const target: Target = resolveTarget();
+    console.log(`${c.dim('Migrating into:')} ${c.bold(target.dir)}`);
+    if (!target.isWeave) {
+      console.log(c.yellow("This doesn't look like a Weave app (no weave.config.* and no @weave-framework/* dependency)."));
+      console.log(c.dim('Run `weave migrate` from inside the Weave app you want the code to land in. Continuing anyway.'));
+    }
 
     // 1) framework — arrow-key menu (TTY) or numbered (piped). Only Angular is wired up today.
     const fw: number = await io.selectMenu('Migrate from which framework?', SOURCES);
@@ -292,11 +339,12 @@ export async function runMigrate(): Promise<void> {
     if (attempt.length) console.log(`\n${c.green('Will attempt to migrate:')} ${attempt.join(', ')}`);
 
     // 5) write the facts map — the raw measurements, which the plan and the conversion (M4) both read.
-    const factsPath: string = writeFacts(app, facts);
+    //    Written into THIS Weave app (the target), never into the Angular app: your source repo stays clean.
+    const factsPath: string = writeFacts(target.dir, facts);
     console.log(`\n${c.green('✓')} ${c.dim('Wrote the full analysis to')} ${c.bold(factsPath)}`);
 
     // 6) write the plan (M3) — read this BEFORE anything is converted, so there are no surprises.
-    const planPath: string = writePlan(app, renderPlan(facts));
+    const planPath: string = writePlan(target.dir, renderPlan(facts));
     const items: PlanItem[] = planItems(facts);
     const needs: number = items.filter((i) => i.effort === 'needs-you').length;
     console.log(`${c.green('✓')} ${c.dim('Wrote your migration plan to')} ${c.bold(planPath)}`);

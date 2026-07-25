@@ -292,11 +292,13 @@ export function renderPlan(facts: MigrationFacts): string {
 }
 
 /**
- * Write the rendered plan to `<unit>/migration-plan.md` and return the path. It sits at the unit's ROOT (not
- * inside `.weave-migrate/`) on purpose: the facts map is machine detail, the plan is for a human to open.
+ * Write the rendered plan to `<targetApp>/migration-plan.md` and return the path. `targetApp` is the WEAVE app
+ * being migrated into (the directory `weave migrate` ran from) — never the source Angular app, which is only ever
+ * read. It sits at the root (not inside `.weave-migrate/`) on purpose: the facts map is machine detail, the plan
+ * is for a human to open.
  */
-export function writePlan(unitDir: string, markdown: string): string {
-  const out: string = join(unitDir, 'migration-plan.md');
+export function writePlan(targetApp: string, markdown: string): string {
+  const out: string = join(targetApp, 'migration-plan.md');
   writeFileSync(out, markdown, 'utf8');
   return out;
 }

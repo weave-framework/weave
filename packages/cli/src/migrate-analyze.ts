@@ -1169,9 +1169,12 @@ export function assembleFacts(unitDir: string): MigrationFacts {
   };
 }
 
-/** Serialise the facts map to `<unit>/.weave-migrate/facts.json` and return the file path written. */
-export function writeFacts(unitDir: string, facts: MigrationFacts): string {
-  const dir: string = join(unitDir, '.weave-migrate');
+/**
+ * Serialise the facts map to `<targetApp>/.weave-migrate/facts.json` and return the path written. `targetApp` is
+ * the WEAVE app being migrated into — the source Angular app is only ever read, never written to.
+ */
+export function writeFacts(targetApp: string, facts: MigrationFacts): string {
+  const dir: string = join(targetApp, '.weave-migrate');
   mkdirSync(dir, { recursive: true });
   const out: string = join(dir, 'facts.json');
   writeFileSync(out, `${JSON.stringify(facts, null, 2)}\n`, 'utf8');

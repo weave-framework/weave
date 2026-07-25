@@ -10,7 +10,8 @@
 import { build as esbuild } from 'esbuild';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, readFileSync, readdirSync, existsSync, rmSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -372,6 +373,42 @@ ok(blindMd.includes('Circular import'), "renderPlan: a cycle is reported in \"ca
 ok(blindMd.includes('./missing'), 'renderPlan: an unresolved import is reported');
 ok(blindMd.includes('Dynamic call'), 'renderPlan: a dynamic call is reported');
 ok(!blindMd.includes('Nothing was hidden'), 'renderPlan: with blind spots, it does NOT claim nothing was hidden');
+
+// ── the TARGET: you run `weave migrate` from inside the Weave app you migrate INTO; the source is only read ──
+const tgt = mkdtempSync(join(tmpdir(), 'weave-target-'));
+try {
+  ok(m.resolveTarget(tgt).isWeave === false, 'resolveTarget: a plain folder is not a Weave app');
+  writeFileSync(join(tgt, 'package.json'), '{"dependencies":{"@weave-framework/runtime":"^2.0.0"}}');
+  ok(m.looksLikeWeaveApp(tgt), 'looksLikeWeaveApp: a @weave-framework/* dependency marks a Weave app');
+  const t = m.resolveTarget(tgt);
+  ok(t.isWeave === true && t.dir === tgt, 'resolveTarget: resolves to the given directory, flagged as Weave');
+
+  // END-TO-END, because this is the guarantee that matters: run the real command with cwd = the target app and
+  // assert WHERE it wrote. (Calling writeFacts(tgt) directly would prove nothing — the risk is the COMMAND
+  // passing the source app instead of the target, which only a real run can catch.)
+  const srcBefore = readdirSync(shop).sort().join(',');
+  execFileSync(process.execPath, [join(repo, 'packages', 'cli', 'bin', 'weave.mjs'), 'migrate'], {
+    cwd: tgt,
+    input: `1\n${shop}\n\n`,
+    encoding: 'utf8',
+    stdio: ['pipe', 'pipe', 'pipe'],
+  });
+  ok(existsSync(join(tgt, '.weave-migrate', 'facts.json')), 'weave migrate: facts.json lands in the TARGET app (cwd)');
+  ok(existsSync(join(tgt, 'migration-plan.md')), 'weave migrate: migration-plan.md lands in the TARGET app (cwd)');
+  ok(!existsSync(join(shop, 'migration-plan.md')) && !existsSync(join(shop, '.weave-migrate')), 'weave migrate: writes NOTHING into the source Angular app');
+  ok(readdirSync(shop).sort().join(',') === srcBefore, 'weave migrate: the source app\'s contents are unchanged (it is only read)');
+} finally {
+  rmSync(tgt, { recursive: true, force: true });
+}
+
+// a weave.config.* also marks a Weave app
+const tgt2 = mkdtempSync(join(tmpdir(), 'weave-target2-'));
+try {
+  writeFileSync(join(tgt2, 'weave.config.ts'), 'export default {};');
+  ok(m.looksLikeWeaveApp(tgt2), 'looksLikeWeaveApp: a weave.config.ts marks a Weave app');
+} finally {
+  rmSync(tgt2, { recursive: true, force: true });
+}
 
 // ── the shared UI colour palette: wraps under FORCE_COLOR, no-ops under NO_COLOR (the clean-piped guarantee) ──
 // COLOR is decided at module-eval from env, so we bundle migrate-ui once and import it twice under different env
