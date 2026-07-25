@@ -62,6 +62,18 @@ await esbuild({
 });
 const pl = await import(pathToFileURL(outP).href);
 
+// Bundle the converter too (M4).
+const outC = join(repo, 'node_modules', '.weave-migrate-convert-smoke.mjs');
+await esbuild({
+  entryPoints: [join(repo, 'packages', 'cli', 'src', 'migrate-convert.ts')],
+  bundle: true,
+  format: 'esm',
+  platform: 'node',
+  packages: 'external',
+  outfile: outC,
+});
+const cv = await import(pathToFileURL(outC).href);
+
 // detectAngularAt — direct signals
 ok(m.detectAngularAt(join(fx, 'plain-angular')), 'detectAngularAt: a plain Angular app (angular.json + @angular/core) is detected');
 ok(!m.detectAngularAt(join(fx, 'not-angular')), 'detectAngularAt: a React folder is NOT detected');
@@ -374,6 +386,83 @@ ok(blindMd.includes('./missing'), 'renderPlan: an unresolved import is reported'
 ok(blindMd.includes('Dynamic call'), 'renderPlan: a dynamic call is reported');
 ok(!blindMd.includes('Nothing was hidden'), 'renderPlan: with blind spots, it does NOT claim nothing was hidden');
 
+// ── M4: the converter — Angular template → Weave template, and @Component → a setup()+html pair ──
+const conv = (html, opts) => cv.convertTemplate(html, opts);
+
+// interpolation is already the same in both
+ok(conv('<h1>{{ title }}</h1>') === '<h1>{{ title }}</h1>', 'convertTemplate: {{ }} interpolation passes through');
+
+// structural directives become Weave blocks
+const ifOut = conv('<div *ngIf="user">hi</div>');
+ok(ifOut.includes('@if (user) {') && ifOut.includes('<div>hi</div>'), 'convertTemplate: *ngIf → @if block wrapping the element');
+const forOut = conv('<li *ngFor="let t of todos">{{ t.name }}</li>');
+ok(forOut.includes('@for (t of todos; track t) {'), 'convertTemplate: *ngFor → @for with a track expression');
+ok(conv('<li *ngFor="let t of todos; trackBy: byId">x</li>').includes('TODO(weave migrate)'), 'convertTemplate: trackBy is flagged (Weave tracks an expression, not a fn)');
+const sw = conv('<div [ngSwitch]="s"><p *ngSwitchCase="\'a\'">A</p><p *ngSwitchDefault>D</p></div>');
+ok(sw.includes('@switch (s) {') && sw.includes("@case ('a') {") && sw.includes('@default {'), 'convertTemplate: [ngSwitch]/*ngSwitchCase/*ngSwitchDefault → @switch/@case/@default');
+
+// bindings
+ok(conv('<input [value]="v" />').includes('.value={{ v }}'), 'convertTemplate: [prop] on a DOM element → .prop');
+ok(conv('<app-card [item]="i"></app-card>', { components: { 'app-card': 'Card' } }).includes('<Card item={{ i }}>'), 'convertTemplate: a known selector becomes a Weave component, and its [prop] becomes a plain prop');
+ok(conv('<div [class.on]="a"></div>').includes('class:on={{ a }}'), 'convertTemplate: [class.x] → class:x');
+ok(conv('<div [style.color]="c"></div>').includes('style:color={{ c }}'), 'convertTemplate: [style.x] → style:x');
+ok(conv('<div [attr.aria-label]="l"></div>').includes('aria-label={{ l }}'), 'convertTemplate: [attr.x] → an attribute binding');
+ok(conv('<button (click)="save()"></button>').includes('on:click={{ ($event) => save() }}'), 'convertTemplate: (event)="stmt" → on:event with an arrow (Weave wants a function)');
+ok(conv('<button (click)="pick($event)"></button>').includes('($event) => pick($event)'), 'convertTemplate: an $event-using statement still works after wrapping');
+const model = conv('<input [(ngModel)]="name" />');
+ok(model.includes('bind:value={{ name }}') && model.includes('TODO(weave migrate)'), 'convertTemplate: [(ngModel)] → bind:value, flagged because the target must be a signal');
+
+// things with NO faithful equivalent are flagged, never invented
+const ngClass = conv('<div [ngClass]="m"></div>');
+ok(ngClass.includes('TODO(weave migrate)') && !ngClass.includes('class:m'), 'convertTemplate: [ngClass] is flagged, NOT invented into a class: binding');
+ok(conv('<div #box></div>').includes('TODO(weave migrate)'), 'convertTemplate: a #ref is flagged (Weave uses ref={{ … }} held in setup)');
+ok(conv('<ng-template><p>x</p></ng-template>').includes('TODO(weave migrate)'), 'convertTemplate: <ng-template> is flagged (a @snippet is a human call)');
+
+// projection + grouping
+ok(conv('<ng-content></ng-content>') === '<slot />', 'convertTemplate: <ng-content> → <slot />');
+ok(conv('<ng-content select="[header]"></ng-content>').includes('<slot name="header" />'), 'convertTemplate: a selected <ng-content> → a named slot');
+ok(conv('<ng-container *ngIf="a"><p>x</p></ng-container>').includes('@if (a) {') && !conv('<ng-container><p>x</p></ng-container>').includes('ng-container'), 'convertTemplate: <ng-container> disappears (Weave blocks already group)');
+
+// malformed markup must not throw — a migration has to survive real-world templates
+let survived = true;
+try { conv('<div><p>unclosed'); conv('</stray>'); } catch { survived = false; }
+ok(survived, 'convertTemplate: malformed markup is recovered, never thrown on');
+
+// pipes: Weave has none. `| translate` is the one confident mapping; every other pipe must be FLAGGED, because
+// passing it through would emit a template that only LOOKS converted (found on a real Angular library).
+ok(cv.convertExpr('x | translate').expr === 't(x)', 'convertExpr: | translate → t(x)');
+ok(cv.convertExpr('x | translate: p').expr === 't(x, p)', 'convertExpr: | translate with params → t(x, params)');
+ok(cv.convertExpr('a || b').expr === 'a || b' && cv.convertExpr('a || b').todos.length === 0, 'convertExpr: the || operator is NOT mistaken for a pipe');
+ok(cv.convertExpr("x | date:'short'").todos.length === 1, 'convertExpr: an unmapped pipe is flagged, not silently dropped');
+ok(cv.convertExpr('obs | async').todos.some((t) => t.includes('()')), 'convertExpr: | async is flagged (a Weave signal is read with ())');
+const tr = conv('<span>{{ crumb.text | translate }}</span>');
+ok(tr.includes('{{ t(crumb.text) }}'), 'convertTemplate: a pipe inside text interpolation is converted');
+const dt = conv('<span>{{ d | date }}</span>');
+ok(dt.includes('TODO(weave migrate)'), 'convertTemplate: an unmapped pipe in text is flagged (never left looking converted)');
+ok(conv('<span [innerHTML]="c.text | translate"></span>').includes('.innerHTML={{ t(c.text) }}'), 'convertTemplate: a pipe inside a binding is converted too');
+
+// routerLink is a DIRECTIVE — `.routerLink` would be a silently broken invention
+const rl = conv('<a [routerLink]="c.path">x</a>');
+ok(!rl.includes('.routerLink') && rl.includes('href={{ c.path }}') && rl.includes('Link'), 'convertTemplate: [routerLink] → href + a TODO pointing at <Link>, never .routerLink');
+
+// Angular's MODERN block syntax is already Weave's — it passes through, only the alias form differs
+const modern = conv('@if (a()) {\n  <p>{{ x }}</p>\n}');
+ok(modern.includes('@if (a()) {') && modern.includes('<p>{{ x }}</p>'), 'convertTemplate: Angular @if blocks pass through (the syntax is already Weave)');
+const alias = conv('@for (c of list(); track c; let last = $last) {}');
+const aliasHeader = alias.split('\n').find((l) => l.startsWith('@for')) ?? '';
+ok(aliasHeader === '@for (c of list(); track c) {}', `convertTemplate: @for's \`let x = $last\` alias is dropped from the header (got ${aliasHeader})`);
+ok(alias.includes('TODO(weave migrate)') && alias.includes('rename'), 'convertTemplate: the dropped alias is flagged so its uses get renamed to $last');
+
+// the component pair
+const cfact = { file: 'x/task-card.component.ts', className: 'TaskCardComponent', selector: 'app-task-card', standalone: true, inputs: ['task'], outputs: ['remove'], templateInline: false, templateUrl: './t.html', styleUrls: [], inlineStyles: 0, injects: ['UserService'] };
+const pair = cv.convertComponent(cfact, '<h3 *ngIf="task">{{ task.title }}</h3>');
+ok(pair.baseName === 'task-card', `convertComponent: base name from the selector (got ${pair.baseName})`);
+ok(pair.ts.includes('export function setup(') && pair.ts.includes('task: unknown'), 'convertComponent: a setup() with the @Input as a prop');
+ok(pair.ts.includes('onRemove?:'), 'convertComponent: an @Output becomes an onX callback prop');
+ok(pair.ts.includes('UserService') && pair.ts.includes('TODO(weave migrate)'), 'convertComponent: injected services are flagged for the store()/provide decision');
+ok(pair.html.includes('@if (task) {'), 'convertComponent: the template is converted alongside');
+ok(cv.pascalCase('app-task-card') === 'AppTaskCard', 'pascalCase: a selector becomes a component name');
+
 // ── the TARGET: you run `weave migrate` from inside the Weave app you migrate INTO; the source is only read ──
 const tgt = mkdtempSync(join(tmpdir(), 'weave-target-'));
 try {
@@ -436,6 +525,7 @@ delete process.env.FORCE_COLOR;
 rmSync(out, { force: true });
 rmSync(outA, { force: true });
 rmSync(outP, { force: true });
+rmSync(outC, { force: true });
 rmSync(outUi, { force: true });
 
 if (failures) {
