@@ -13,7 +13,7 @@
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve, sep } from 'node:path';
-import type { ComponentFact, MigrationFacts } from './migrate-analyze.js';
+import { importedNamesFrom, type ComponentFact, type MigrationFacts, type ServiceFact } from './migrate-analyze.js';
 
 /* ──────────── a minimal HTML scanner (in-house: Angular syntax is not valid HTML to most parsers) ──────────── */
 
@@ -491,6 +491,128 @@ export function convertComponent(fact: ComponentFact, templateHtml: string, opts
   return { baseName, ts, html: convertTemplate(templateHtml, opts) };
 }
 
+/* ──────────── M5 — the hard parts, DRAFTED (never silently rewritten) ──────────── */
+
+/** A TODO inside generated TypeScript (the `.ts` counterpart of `todo()`, which emits an HTML comment). */
+export function tsTodo(what: string): string {
+  return `// TODO(weave migrate): ${what}`;
+}
+
+/**
+ * RxJS → Weave suggestions. Weave is signal-native, so most streams have a natural equivalent — but the rewrite
+ * is a judgement call every time, so these are printed as guidance beside the drafted code, never applied.
+ */
+const RXJS_HINTS: Record<string, string> = {
+  BehaviorSubject: 'a `signal(initial)` — it already holds a current value',
+  ReplaySubject: 'a `signal` (plus history in an array if the replay really matters)',
+  Subject: 'a plain callback prop or a `signal` — Weave has no multicast primitive',
+  Observable: 'a `signal` for state, or a `resource` when it is an async fetch',
+  combineLatest: 'a `computed(() => …)` over the source signals',
+  forkJoin: '`Promise.all` inside a `resource`',
+  map: 'a `computed(() => …)`',
+  filter: 'a `computed` that returns the previous value (or a `watch` guard)',
+  debounceTime: '`debounced(signal, ms)` from the runtime extras',
+  distinctUntilChanged: 'nothing — a signal already skips equal values',
+  switchMap: 'a `resource` keyed on the signal it switches over',
+  mergeMap: 'a `resource`, or an explicit loop of awaited calls',
+  takeUntilDestroyed: '`onDispose(() => …)` — the owner scope handles teardown',
+  subscribe: 'an `effect(() => …)`, or `watch` when you need the previous value',
+  firstValueFrom: 'just `await` the promise',
+  of: 'a plain value — no wrapper needed',
+  tap: 'a plain statement inside the `computed`/`effect`',
+};
+
+/** Suggestions for the RxJS names a file actually uses. Unknown operators are named honestly, not invented. */
+export function rxjsSuggestions(names: string[]): string[] {
+  const out: string[] = [];
+  for (const n of [...new Set(names)].sort()) {
+    out.push(RXJS_HINTS[n] ? `\`${n}\` → ${RXJS_HINTS[n]}` : `\`${n}\` → no recorded equivalent; decide per use`);
+  }
+  return out;
+}
+
+/** `BreadcrumbsPathService` → `useBreadcrumbsPath` (the store hook name Weave code reads). */
+export function storeHookName(className: string): string {
+  const base: string = className.replace(/Service$/, '').replace(/Store$/, '');
+  return `use${base.charAt(0).toUpperCase()}${base.slice(1)}`;
+}
+
+/** `BreadcrumbsPathService` → `breadcrumbs-path` (its file name in the target app). */
+export function serviceBaseName(className: string): string {
+  return className
+    .replace(/Service$/, '')
+    .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
+    .toLowerCase();
+}
+
+/**
+ * Draft a Weave module for one Angular service. A `providedIn:'root'` singleton becomes a `store()`; anything
+ * else becomes a context (`createContext` + a factory to `provide`), because a scoped service is per-subtree.
+ *
+ * What is DRAFTED vs left alone: the shape is real — fields become signals, methods become functions, the
+ * returned object is the service's surface, and injected dependencies are wired to their store hooks. The method
+ * BODIES are not translated; each carries a TODO. That line is deliberate: the shape is mechanical, the logic is
+ * a judgement call, and a plausible-but-wrong body is worse than an obvious hole.
+ */
+export function convertService(fact: ServiceFact, rxjsNames: string[] = []): { baseName: string; ts: string } {
+  const singleton: boolean = fact.providedIn === 'root';
+  const lines: string[] = [];
+  const imports: string[] = ["import { signal } from '@weave-framework/runtime';"];
+  if (singleton) imports.push("import { store } from '@weave-framework/store';");
+  else imports.push("import { createContext } from '@weave-framework/runtime';");
+
+  const body: string[] = [];
+  if (fact.injects.length) {
+    body.push(tsTodo(`this service injected ${fact.injects.join(', ')} — call each one's store hook here,`));
+    body.push('//   e.g. `const other = useOther();`, or `inject(OtherContext)` for a scoped one.');
+  }
+  for (const f of fact.fields) {
+    const wasSignal: boolean = fact.signals.includes(f);
+    body.push(`const ${f} = signal<unknown>(undefined);${wasSignal ? ' // already a signal in Angular — a 1:1 move' : ` ${tsTodo(`was a plain field; set its real initial value`)}`}`);
+  }
+  for (const m of fact.methods) {
+    body.push(`const ${m} = (): void => {`);
+    body.push(`  ${tsTodo(`port the body of ${fact.className}.${m}()`)}`);
+    body.push('};');
+  }
+  const surface: string[] = [...fact.fields, ...fact.methods];
+  body.push(`return { ${surface.join(', ')} };`);
+
+  const hints: string[] = rxjsSuggestions(rxjsNames);
+  const hintBlock: string[] = hints.length ? ['', tsTodo('this service used RxJS. In Weave:'), ...hints.map((h) => `//   ${h}`)] : [];
+
+  if (singleton) {
+    lines.push(
+      ...imports,
+      '',
+      `// Converted from ${fact.className} (${fact.file}).`,
+      `// It was \`providedIn: 'root'\` — a single instance for the whole app — so it becomes a store.`,
+      ...hintBlock,
+      `export const ${storeHookName(fact.className)} = store(() => {`,
+      ...body.map((l) => `  ${l}`),
+      '});',
+      '',
+    );
+  } else {
+    const ctx: string = `${fact.className.replace(/Service$/, '')}Context`;
+    lines.push(
+      ...imports,
+      '',
+      `// Converted from ${fact.className} (${fact.file}).`,
+      '// It had no `providedIn`, so it was provided per-injector — in Weave that is a CONTEXT: an ancestor calls',
+      `// \`provide(${ctx}, create${fact.className}())\` and any descendant \`inject(${ctx})\`.`,
+      ...hintBlock,
+      `export function create${fact.className}() {`,
+      ...body.map((l) => `  ${l}`),
+      '}',
+      '',
+      `export const ${ctx} = createContext<ReturnType<typeof create${fact.className}>>();`,
+      '',
+    );
+  }
+  return { baseName: serviceBaseName(fact.className), ts: lines.join('\n') };
+}
+
 /* ──────────── M4.9 — writing the converted files into the TARGET Weave app ──────────── */
 
 /**
@@ -571,6 +693,14 @@ export function planWrites(facts: MigrationFacts, targetDir: string): WriteItem[
       const path: string = join(targetDir, 'src', dir, `${base}${ext}`);
       items.push({ path, content, status: existsSync(path) ? 'skip-exists' : 'write' });
     }
+  }
+  // Services (M5): a `providedIn:'root'` one becomes a store, anything else a context — drafted, not guessed.
+  for (const sf of facts.services) {
+    const rel: string = relativeUnderSrc(sf.file, facts.unit);
+    const dir: string = dirname(rel) === '.' ? '' : dirname(rel);
+    const draft: { baseName: string; ts: string } = convertService(sf, importedNamesFrom(sf.file, 'rxjs'));
+    const path: string = join(targetDir, 'src', dir, `${draft.baseName}.ts`);
+    items.push({ path, content: draft.ts, status: existsSync(path) ? 'skip-exists' : 'write' });
   }
   return items;
 }

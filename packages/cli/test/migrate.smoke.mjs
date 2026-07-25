@@ -465,11 +465,71 @@ ok(pair.ts.includes('UserService') && pair.ts.includes('TODO(weave migrate)'), '
 ok(pair.html.includes('@if (task) {'), 'convertComponent: the template is converted alongside');
 ok(cv.pascalCase('app-task-card') === 'AppTaskCard', 'pascalCase: a selector becomes a component name');
 
+// ── M5: the hard parts DRAFTED — service → store()/context, RxJS → targeted suggestions ──
+const rootSvc = { file: 'x/user.service.ts', className: 'UserService', providedIn: 'root', methods: ['logout'], fields: ['user'], signals: ['user'], injects: ['Router'] };
+const rootDraft = cv.convertService(rootSvc);
+ok(rootDraft.ts.includes("import { store } from '@weave-framework/store'"), 'convertService: a root service imports store');
+ok(rootDraft.ts.includes('export const useUser = store(() => {'), 'convertService: providedIn:root → a store() with a useX hook');
+ok(rootDraft.ts.includes('const user = signal<unknown>(undefined);') && rootDraft.ts.includes('1:1 move'), 'convertService: a field that was already a signal is a 1:1 move');
+ok(rootDraft.ts.includes('const logout = (): void => {') && rootDraft.ts.includes('port the body of UserService.logout()'), 'convertService: a method becomes a function with its body left as a TODO');
+ok(rootDraft.ts.includes('return { user, logout };'), 'convertService: the returned object is the service surface');
+ok(rootDraft.ts.includes('injected Router'), 'convertService: injected dependencies are flagged for wiring');
+ok(rootDraft.baseName === 'user', `serviceBaseName: UserService → user (got ${rootDraft.baseName})`);
+
+const scopedSvc = { file: 'x/scoped.service.ts', className: 'ScopedService', providedIn: null, methods: ['doThing'], fields: [], signals: [], injects: [] };
+const scopedDraft = cv.convertService(scopedSvc);
+ok(scopedDraft.ts.includes('createContext') && scopedDraft.ts.includes('ScopedContext'), 'convertService: a service with NO providedIn becomes a context, not a global store');
+ok(!scopedDraft.ts.includes('store('), 'convertService: a scoped service is NOT turned into a global store');
+ok(scopedDraft.ts.includes('export function createScopedService()'), 'convertService: the context gets a factory to provide');
+
+// RxJS guidance is TARGETED at what the file actually imports, and honest about what it does not know
+ok(cv.rxjsSuggestions(['BehaviorSubject'])[0].includes('signal'), 'rxjsSuggestions: BehaviorSubject → signal');
+ok(cv.rxjsSuggestions(['takeUntilDestroyed'])[0].includes('onDispose'), 'rxjsSuggestions: takeUntilDestroyed → onDispose');
+ok(cv.rxjsSuggestions(['weirdOperator'])[0].includes('no recorded equivalent'), 'rxjsSuggestions: an unknown operator is named honestly, never invented');
+ok(cv.convertService(rootSvc, []).ts.includes('used RxJS') === false, 'convertService: no RxJS imports → no RxJS advice at all');
+ok(cv.convertService(rootSvc, ['debounceTime']).ts.includes('debounced'), 'convertService: RxJS advice appears only for the names the file uses');
+ok(cv.storeHookName('BreadcrumbsPathService') === 'useBreadcrumbsPath', 'storeHookName: Service suffix dropped, use-prefixed');
+
+// The decisive gate for a code GENERATOR: does what it emits actually COMPILE against the real Weave packages?
+// Every assertion above checks the shape of a string; this one checks the thing is usable. It type-checks both
+// drafts (store + context) with strict TS, resolving @weave-framework/* to the workspace sources.
+const genDir = mkdtempSync(join(tmpdir(), 'weave-gen-'));
+try {
+  writeFileSync(join(genDir, 'root.ts'), cv.convertService(rootSvc).ts);
+  writeFileSync(join(genDir, 'scoped.ts'), cv.convertService(scopedSvc).ts);
+  writeFileSync(
+    join(genDir, 'tsconfig.json'),
+    JSON.stringify({
+      compilerOptions: {
+        strict: true, noEmit: true, module: 'esnext', moduleResolution: 'bundler', target: 'es2022', skipLibCheck: true,
+        baseUrl: repo,
+        paths: {
+          '@weave-framework/runtime': ['packages/runtime/src/index.ts'],
+          '@weave-framework/store': ['packages/store/src/index.ts'],
+        },
+      },
+      include: ['*.ts'],
+    }),
+  );
+  let tscOut = '';
+  let compiled = true;
+  try {
+    execFileSync(process.execPath, [join(repo, 'node_modules', 'typescript', 'bin', 'tsc'), '-p', join(genDir, 'tsconfig.json')], { encoding: 'utf8' });
+  } catch (e) {
+    compiled = false;
+    tscOut = String(e.stdout ?? e.message).split('\n').slice(0, 3).join(' ');
+  }
+  ok(compiled, `generated code COMPILES against the real @weave-framework packages${compiled ? '' : ` — ${tscOut}`}`);
+} finally {
+  rmSync(genDir, { recursive: true, force: true });
+}
+
 // ── M4.9: writing the converted files into the target app — mirrored layout, NEVER overwriting ──
 const wdir = mkdtempSync(join(tmpdir(), 'weave-write-'));
 try {
   const writes = cv.planWrites(facts, wdir);
-  ok(writes.length === facts.components.length * 2, `planWrites: a .ts + .html pair per component (got ${writes.length})`);
+  ok(writes.length === facts.components.length * 2 + facts.services.length, `planWrites: a .ts+.html pair per component, plus one .ts per service (got ${writes.length})`);
+  ok(writes.some((w) => w.path.endsWith('user.ts')), 'planWrites: the service is drafted alongside the components (user.service.ts → user.ts)');
   ok(writes.every((w) => w.path.includes(`${sep}src${sep}`)), 'planWrites: everything lands under the target app\'s src/');
   ok(writes.some((w) => w.path.endsWith('app.ts')) && writes.some((w) => w.path.endsWith('app.html')), 'planWrites: app.component.ts becomes app.ts + app.html (the .component suffix is dropped)');
   ok(writes.every((w) => w.status === 'write'), 'planWrites: into an empty app, every file is a fresh write');

@@ -868,15 +868,30 @@ export interface FormFact {
   controls: string[];
 }
 
-/** The named imports a file pulls from `@angular/forms` (`[]` when it imports nothing from there). */
-function angularFormsImports(sf: ts.SourceFile): string[] {
+/** The named imports a source file pulls from every module whose specifier satisfies `matches`. */
+function namedImports(sf: ts.SourceFile, matches: (spec: string) => boolean): string[] {
   const names: string[] = [];
   for (const stmt of sf.statements) {
-    if (!ts.isImportDeclaration(stmt) || !ts.isStringLiteral(stmt.moduleSpecifier) || stmt.moduleSpecifier.text !== '@angular/forms') continue;
+    if (!ts.isImportDeclaration(stmt) || !ts.isStringLiteral(stmt.moduleSpecifier) || !matches(stmt.moduleSpecifier.text)) continue;
     const bindings: ts.NamedImportBindings | undefined = stmt.importClause?.namedBindings;
     if (bindings && ts.isNamedImports(bindings)) for (const el of bindings.elements) names.push(el.name.text);
   }
   return names;
+}
+
+/** The named imports a file pulls from `@angular/forms` (`[]` when it imports nothing from there). */
+function angularFormsImports(sf: ts.SourceFile): string[] {
+  return namedImports(sf, (s) => s === '@angular/forms');
+}
+
+/**
+ * The names a file imports from one package root (`rxjs` also covers `rxjs/operators`). Used to give a converted
+ * service RxJS-specific guidance based on what it ACTUALLY uses, rather than a generic wall of advice.
+ */
+export function importedNamesFrom(filePath: string, packageRoot: string): string[] {
+  const sf: ts.SourceFile | null = parseFile(filePath);
+  if (!sf) return [];
+  return namedImports(sf, (s) => s === packageRoot || s.startsWith(`${packageRoot}/`));
 }
 
 /** The keys of an object-literal argument (`new FormGroup({ name: …, email: … })` → `['name','email']`). */
