@@ -549,6 +549,20 @@ ok(cv.convertService(rootSvc, []).ts.includes('used RxJS') === false, 'convertSe
 ok(cv.convertService(rootSvc, ['debounceTime']).ts.includes('debounced'), 'convertService: RxJS advice appears only for the names the file uses');
 ok(cv.storeHookName('BreadcrumbsPathService') === 'useBreadcrumbsPath', 'storeHookName: Service suffix dropped, use-prefixed');
 
+// ── M5.5: route guards → beforeEach. NOT one-to-one: an Angular guard is per-route, beforeEach is GLOBAL, so
+//    each drafted guard checks the paths it used to protect — entry guards on nav.to, canDeactivate on nav.from.
+const guardRoutes = [
+  { path: 'admin', component: 'A', redirectTo: null, lazy: false, guards: ['AuthGuard'], guardsByKind: { canActivate: ['AuthGuard'] } },
+  { path: 'edit', component: 'E', redirectTo: null, lazy: false, guards: ['DirtyGuard'], guardsByKind: { canDeactivate: ['DirtyGuard'] } },
+];
+const guardsTs = cv.convertGuards(guardRoutes);
+ok(guardsTs.includes("import { beforeEach } from '@weave-framework/router';"), 'convertGuards: imports beforeEach from the router package');
+ok(guardsTs.includes('nav.to.startsWith') && guardsTs.includes("'/admin'"), 'convertGuards: an entry guard (canActivate) checks nav.to against the paths it protected');
+ok(guardsTs.includes('nav.from.startsWith') && guardsTs.includes("'/edit'"), 'convertGuards: a canDeactivate guard checks nav.from (leaving), not nav.to');
+ok(guardsTs.includes('GLOBAL'), 'convertGuards: the draft states plainly that beforeEach is global, unlike a per-route Angular guard');
+ok(guardsTs.includes('return () => off.forEach'), 'convertGuards: the unregister functions are returned for cleanup');
+ok(cv.convertGuards([{ path: 'x', guards: [], guardsByKind: {} }]) === null, 'convertGuards: no guards → no module at all');
+
 // The decisive gate for a code GENERATOR: does what it emits actually COMPILE against the real Weave packages?
 // Every assertion above checks the shape of a string; this one checks the thing is usable. It type-checks both
 // drafts (store + context) with strict TS, resolving @weave-framework/* to the workspace sources.
@@ -556,6 +570,8 @@ const genDir = mkdtempSync(join(tmpdir(), 'weave-gen-'));
 try {
   writeFileSync(join(genDir, 'root.ts'), cv.convertService(rootSvc).ts);
   writeFileSync(join(genDir, 'scoped.ts'), cv.convertService(scopedSvc).ts);
+  writeFileSync(join(genDir, 'guards.ts'), guardsTs);
+  writeFileSync(join(genDir, 'login.ts'), formPair.ts);
   writeFileSync(
     join(genDir, 'tsconfig.json'),
     JSON.stringify({
@@ -565,6 +581,8 @@ try {
         paths: {
           '@weave-framework/runtime': ['packages/runtime/src/index.ts'],
           '@weave-framework/store': ['packages/store/src/index.ts'],
+          '@weave-framework/router': ['packages/router/src/index.ts'],
+          '@weave-framework/forms': ['packages/forms/src/index.ts'],
         },
       },
       include: ['*.ts'],

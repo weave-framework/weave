@@ -761,6 +761,9 @@ export interface RouteFact {
   lazy: boolean;
   /** Guard class names across `canActivate` / `canActivateChild` / `canDeactivate` / `canMatch`. */
   guards: string[];
+  /** The same names kept per Angular guard key. The kind decides the Weave translation: an ENTRY guard checks
+   *  `nav.to`, a LEAVE guard (`canDeactivate`) checks `nav.from` — flattening them would lose that. */
+  guardsByKind: Record<string, string[]>;
 }
 
 const GUARD_KEYS: string[] = ['canActivate', 'canActivateChild', 'canDeactivate', 'canMatch', 'canLoad'];
@@ -788,8 +791,14 @@ function identifierArrayProp(obj: ts.ObjectLiteralExpression, key: string): stri
 
 /** Turn one route object literal into a fact, then recurse into its `children`. */
 function routeFromObject(obj: ts.ObjectLiteralExpression, out: RouteFact[]): void {
-  const guards: string[] = GUARD_KEYS.flatMap((k) => identifierArrayProp(obj, k));
+  const guardsByKind: Record<string, string[]> = {};
+  for (const k of GUARD_KEYS) {
+    const found: string[] = identifierArrayProp(obj, k);
+    if (found.length) guardsByKind[k] = found;
+  }
+  const guards: string[] = GUARD_KEYS.flatMap((k) => guardsByKind[k] ?? []);
   out.push({
+    guardsByKind,
     path: stringProp(obj, 'path'),
     component: identifierProp(obj, 'component'),
     redirectTo: stringProp(obj, 'redirectTo'),

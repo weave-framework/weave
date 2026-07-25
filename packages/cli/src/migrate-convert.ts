@@ -13,7 +13,7 @@
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve, sep } from 'node:path';
-import { importedNamesFrom, type ComponentFact, type FormFact, type MigrationFacts, type ServiceFact } from './migrate-analyze.js';
+import { importedNamesFrom, type ComponentFact, type FormFact, type MigrationFacts, type RouteFact, type ServiceFact } from './migrate-analyze.js';
 
 /* ──────────── a minimal HTML scanner (in-house: Angular syntax is not valid HTML to most parsers) ──────────── */
 
@@ -770,6 +770,66 @@ export function convertService(fact: ServiceFact, rxjsNames: string[] = []): { b
   return { baseName: serviceBaseName(fact.className), ts: lines.join('\n') };
 }
 
+/* ──────────── M5.5 — route guards → `beforeEach` ──────────── */
+
+/** Angular guard keys that gate ENTERING a route; `canDeactivate` gates LEAVING one. */
+const ENTRY_GUARD_KEYS: string[] = ['canActivate', 'canActivateChild', 'canMatch', 'canLoad'];
+
+/**
+ * Draft a Weave guards module from the routes' guards, or null when there are none.
+ *
+ * The honest caveat this draft states up front: the mapping is NOT one-to-one. An Angular guard is attached to a
+ * ROUTE, so it runs only for that route. Weave's `beforeEach` is GLOBAL — it runs before every navigation — so
+ * each drafted guard checks `nav.to` (entry) or `nav.from` (leave) against the paths it used to protect. The
+ * paths are filled in from the analysis; the decision logic stays a TODO.
+ */
+export function convertGuards(routes: RouteFact[]): string | null {
+  // guard name → { kinds it was used as, paths it protected }
+  const byGuard: Map<string, { kinds: Set<string>; paths: Set<string> }> = new Map();
+  for (const r of routes) {
+    for (const [kind, names] of Object.entries(r.guardsByKind ?? {})) {
+      for (const n of names) {
+        if (!byGuard.has(n)) byGuard.set(n, { kinds: new Set<string>(), paths: new Set<string>() });
+        const e: { kinds: Set<string>; paths: Set<string> } | undefined = byGuard.get(n);
+        e?.kinds.add(kind);
+        e?.paths.add(r.path === '' ? '/' : `/${r.path ?? ''}`);
+      }
+    }
+  }
+  if (!byGuard.size) return null;
+
+  const lines: string[] = [
+    "import { beforeEach } from '@weave-framework/router';",
+    '',
+    '// Converted from the Angular route guards.',
+    '//',
+    '// NOT a one-to-one mapping, so read this: an Angular guard is attached to a ROUTE and runs only for that',
+    "// route. Weave's `beforeEach` is GLOBAL — it runs before EVERY navigation — so each guard below checks the",
+    '// paths it used to protect itself. Returning `false` cancels the navigation; the first `false` wins.',
+    '//',
+    '// `beforeEach` returns an unregister function — keep it and call it on cleanup so a guard lives only as long',
+    '// as whatever registered it.',
+    '',
+    'export function registerGuards(): () => void {',
+    '  const off: Array<() => void> = [',
+  ];
+  for (const [name, { kinds, paths }] of byGuard) {
+    const leaveOnly: boolean = [...kinds].every((k) => !ENTRY_GUARD_KEYS.includes(k));
+    const axis: string = leaveOnly ? 'from' : 'to';
+    const pathList: string = [...paths].map((p) => `'${p}'`).join(', ');
+    lines.push(
+      `    // ${name} — was ${[...kinds].join(' + ')} on: ${[...paths].join(', ')}`,
+      '    beforeEach((nav) => {',
+      `      if (![${pathList}].some((p) => nav.${axis}.startsWith(p))) return true; // not a route ${name} guarded`,
+      `      ${tsTodo(`port ${name}.${[...kinds][0]}() — return false to cancel the navigation`)}`,
+      '      return true;',
+      '    }),',
+    );
+  }
+  lines.push('  ];', '  return () => off.forEach((stop) => stop());', '}', '');
+  return lines.join('\n');
+}
+
 /* ──────────── M4.9 — writing the converted files into the TARGET Weave app ──────────── */
 
 /**
@@ -860,6 +920,12 @@ export function planWrites(facts: MigrationFacts, targetDir: string): WriteItem[
     const draft: { baseName: string; ts: string } = convertService(sf, importedNamesFrom(sf.file, 'rxjs'));
     const path: string = join(targetDir, 'src', dir, `${draft.baseName}.ts`);
     items.push({ path, content: draft.ts, status: existsSync(path) ? 'skip-exists' : 'write' });
+  }
+  // Route guards (M5.5) — one module, because Weave's `beforeEach` is global rather than per-route.
+  const guards: string | null = convertGuards(facts.routes);
+  if (guards) {
+    const path: string = join(targetDir, 'src', 'guards.ts');
+    items.push({ path, content: guards, status: existsSync(path) ? 'skip-exists' : 'write' });
   }
   return items;
 }
