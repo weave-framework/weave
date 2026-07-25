@@ -492,6 +492,14 @@ for (const [op, expect] of [['distinct', 'new Map'], ['toArray', 'already have t
   const hint = cv.rxjsSuggestions([op])[0];
   ok(hint.includes(expect) && !hint.includes('no recorded equivalent'), `rxjsSuggestions: ${op} gives its plain-JS equivalent, not a shrug`);
 }
+// Coverage: every RxJS name a real Angular app is likely to import should have an answer, not a shrug.
+const COMMON_RXJS = ['BehaviorSubject', 'ReplaySubject', 'Subject', 'Observable', 'combineLatest', 'forkJoin', 'map', 'filter', 'debounceTime', 'distinctUntilChanged', 'switchMap', 'mergeMap', 'takeUntilDestroyed', 'subscribe', 'firstValueFrom', 'of', 'tap', 'concat', 'distinct', 'toArray', 'first', 'from', 'take', 'startWith', 'catchError', 'finalize', 'concatMap', 'exhaustMap', 'withLatestFrom', 'shareReplay', 'share', 'delay', 'retry', 'throwError', 'interval', 'timer', 'fromEvent', 'scan', 'reduce', 'pairwise', 'skip', 'takeUntil', 'takeWhile', 'defaultIfEmpty', 'iif', 'merge', 'zip', 'race', 'auditTime', 'throttleTime', 'lastValueFrom', 'EMPTY', 'NEVER', 'Subscription', 'pipe', 'asyncScheduler'];
+const uncovered = COMMON_RXJS.filter((n) => cv.rxjsSuggestions([n])[0].includes('no recorded equivalent'));
+ok(uncovered.length === 0, `rxjsSuggestions: every common RxJS name has an answer (uncovered: ${uncovered.join(', ') || 'none'})`);
+// `pairwise` claims `watch` gives the previous value — that must be TRUE of the real runtime API, not wishful.
+ok(/export function watch<T>\([\s\S]*?prev: T | undefined| undefined\| undefined/.test(readFileSync(join(repo, 'packages', 'runtime', 'src', 'extras.ts'), 'utf8')), 'the advice for pairwise is real: runtime `watch` really passes the previous value');
+// Weave has `debounced` but NO throttle — the advice must not invent one.
+ok(!cv.rxjsSuggestions(['throttleTime'])[0].includes('throttled('), 'rxjsSuggestions: throttleTime does NOT invent a `throttled()` API that Weave lacks');
 ok(cv.convertService(rootSvc, []).ts.includes('used RxJS') === false, 'convertService: no RxJS imports → no RxJS advice at all');
 ok(cv.convertService(rootSvc, ['debounceTime']).ts.includes('debounced'), 'convertService: RxJS advice appears only for the names the file uses');
 ok(cv.storeHookName('BreadcrumbsPathService') === 'useBreadcrumbsPath', 'storeHookName: Service suffix dropped, use-prefixed');
