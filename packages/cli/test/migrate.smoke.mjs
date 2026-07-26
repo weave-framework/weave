@@ -841,6 +841,34 @@ const mixedTpl = conv('<div class="a-{{ x | uppercase }}-b"></div>');
 ok(!mixedTpl.includes('{{ x'), 'convertTemplate: nothing is left rendering `{{ … }}` as literal attribute text');
 ok(compilesAsWeave(mixedTpl) === '', `the converted mixed attribute COMPILES${compilesAsWeave(mixedTpl) ? ` — ${compilesAsWeave(mixedTpl)}` : ''}`);
 
+// ── a service THIS RUN converts is not "unknown" ──
+// "`X.y()` has no recorded Weave equivalent — migrate X first" was printed for a class being migrated in the
+// same run: work already happening, about a call already correct. And the field itself came out as a COMMENT,
+// so every call through it named nothing.
+const svcDir2 = join(fx, 'services');
+const pairSvcs = ['crumbs.service.ts', 'crumbs-path.service.ts'].flatMap((n) => a.findServices(join(svcDir2, n)));
+const migMap = cv.migratedServices(pairSvcs);
+ok(migMap.get('CrumbsService')?.name === 'useCrumbs' && migMap.get('CrumbsService')?.kind === 'store', "migratedServices: a providedIn:'root' service is reached through its store hook");
+const consumer = cv.convertService(pairSvcs[1], [], migMap).ts;
+ok(!consumer.includes('no recorded Weave equivalent'), 'translateBody: a call into a service being migrated alongside is NOT reported as unknown');
+ok(consumer.includes('const _CrumbsService = useCrumbs();'), 'draftMembers: the injected field becomes a real binding — a comment left every call through it undefined');
+ok(consumer.includes("import { useCrumbs } from './crumbs.service';"), "carriedImportsFor: the import is repointed to what the converted file EXPORTS, not the class name it no longer has");
+ok(consumer.includes('_CrumbsService.crumbsSig()'), 'translateBody: the call itself is unchanged — it was already right');
+ok(!consumer.includes('this service injected CrumbsService'), 'convertService: a dependency reached three lines below is not also asked for');
+// The constructor's body was the ONE body never translated.
+const navSvc = a.findServices(join(svcDir2, 'nav.service.ts'))[0];
+const navTs = cv.convertService(navSvc).ts;
+ok(navTs.includes('onDispose(afterEach(() => {'), 'rewriteRouterEvents: a NavigationEnd subscription becomes afterEach, with onDispose for the takeUntilDestroyed');
+ok(navTs.includes('loaded.set(true);') && navTs.includes('doChanges();'), "draftMembers: the CONSTRUCTOR body is translated like every other body — it was the only one that was not");
+ok(navTs.includes("import { afterEach, navigate }") || navTs.includes("afterEach") && /from '@weave-framework\/router'/.test(navTs), 'serviceImportsFor: `Router.events` is a PROPERTY, so its imports need finding another way');
+ok((navTs.match(/from '@weave-framework\/runtime'/g) ?? []).length === 1, 'mergeImportLines: one import line per module, however many pieces of the draft asked for something');
+// The RxJS chain is gone, so its import is dead — and it names a package the target app has no reason to have.
+ok(!navTs.includes("from 'rxjs/operators'"), 'pruneImports: an import the translation made dead is dropped, not carried into an app that does not depend on it');
+ok(navTs.includes('filter((event)'), 'pruneImports: the original still travels as a comment — a name surviving only THERE is not a use');
+ok(cv.pruneImports(["import { a } from 'x';"], 'const q = a;').length === 1, 'pruneImports: an import something actually uses is kept');
+ok(cv.pruneImports(["import { a } from 'x';"], '// const q = a;').length === 0, 'pruneImports: a name only in a comment does not keep its import');
+ok(cv.pruneImports(["import './side-effect.css';"], '').length === 1, 'pruneImports: a side-effect import is kept — it is there for what it DOES, not for a name');
+
 // ── ACCESS: what is USED but cannot be looked inside ──
 // A method calls a method calls a method. Following every workspace lib turned ONE imported type into 214 files;
 // following none migrates a service the app leans on as a name and nothing else. So each is asked for by name.
@@ -1133,6 +1161,10 @@ try {
   // field signal that carries its initial value, and an onMount subscription with its cleanup.
   writeFileSync(join(genDir, 'host.ts'), hostPair.ts);
   writeFileSync(join(genDir, 'directive.ts'), dirTs);
+  // The constructor + router-events draft, and a service reaching another service this run converts.
+  writeFileSync(join(genDir, 'nav.ts'), navTs);
+  writeFileSync(join(genDir, 'crumbs.ts'), cv.convertService(pairSvcs[0], [], migMap).ts);
+  writeFileSync(join(genDir, 'crumbs-path.ts'), consumer.replace("from './crumbs.service'", "from './crumbs'"));
   writeFileSync(
     join(genDir, 'tsconfig.json'),
     JSON.stringify({

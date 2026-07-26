@@ -398,6 +398,8 @@ export interface ConvertOptions {
   /** The class members the template reads that became SIGNALS (fields, getters). An Angular template reads them
    *  bare; a Weave template must CALL them, or `{{ label }}` renders the function instead of its value. */
   signals?: string[];
+  /** Services this migration converts, so a call into one is not reported as unknown. */
+  migrated?: Map<string, MigratedService>;
   /** The component's host bindings and listeners, already in Weave form. Angular applies these to the element that
    *  carries the component's selector; Weave has no such element, so its template's single root element is where
    *  they belong. */
@@ -1062,10 +1064,18 @@ export function signalInputDefault(mem: ClassMember | undefined): string {
  * specifiers repointed at where those files now land. Dropping them, as the drafts used to, left the translated
  * body calling helpers that were never imported.
  */
-export function carriedImportsFor(file: string): string[] {
+export function carriedImportsFor(file: string, migrated?: Map<string, MigratedService>): string[] {
   return sourceImports(file)
     .filter((i) => !i.spec.startsWith('@angular/') && i.spec !== '@angular')
-    .map((i) => (i.spec.startsWith('.') ? i.text.replace(i.spec, repointSpecifier(i.spec)) : i.text));
+    .map((i) => {
+      let text: string = i.spec.startsWith('.') ? i.text.replace(i.spec, repointSpecifier(i.spec)) : i.text;
+      // A converted service no longer exports its class name — it exports a store hook or a context. Carrying the
+      // import unchanged left the file importing something the converted file does not export.
+      for (const [cls, m] of migrated ?? []) {
+        text = text.replace(new RegExp(`(?<![\\w$])${cls}(?![\\w$])`), m.name);
+      }
+      return text;
+    });
 }
 
 /** `TaskCardComponent` → `task-card`; falls back from the selector when there is one. */
@@ -1133,7 +1143,7 @@ export function convertComponent(fact: ComponentFact, templateHtml: string, opts
     body.push('// ── these became props (see the signature above) ──');
     for (const mem of asProps) for (const line of (mem.text ?? '').split('\n')) body.push(`// ${line}`);
   }
-  const ctx: TranslateCtx = translateCtx(fact.members ?? [], fact.inputs);
+  const ctx: TranslateCtx = translateCtx(fact.members ?? [], fact.inputs, 'props', opts.migrated);
   // The shims the translated calls name. Without them the file calls functions that do not exist.
   const adapters: string[] = adaptersFor(fact.members ?? [], fact.inputs);
   if (adapters.length) {
@@ -1164,6 +1174,8 @@ export function convertComponent(fact: ComponentFact, templateHtml: string, opts
       ...(carried.some((mem) => mem.kind === 'field' && !ctx.injected.has(mem.name)) ? ['signal'] : []),
       ...(carried.some((mem) => mem.kind === 'getter') ? ['computed'] : []),
       ...host.runtimeNeeds,
+      // Reaching a scoped service that this migration converted is `inject(XContext)`.
+      ...([...ctx.injected.values()].some((sv) => opts.migrated?.get(sv)?.kind === 'context') ? ['inject'] : []),
     ]),
   ];
   if (runtimeNeeds.length) imports.push(`import { ${runtimeNeeds.join(', ')} } from '@weave-framework/runtime';`);
@@ -1172,7 +1184,7 @@ export function convertComponent(fact: ComponentFact, templateHtml: string, opts
   // The translated body keeps calling what the original called — `size` from lodash, a type from a workspace lib
   // — so those imports travel with it. `@angular/*` is dropped: that is the framework being migrated away from,
   // and the plan says what each entry point becomes. Relative specifiers are repointed at the renamed outputs.
-  imports.push(...carriedImportsFor(fact.file));
+  imports.push(...carriedImportsFor(fact.file, opts.migrated));
   // A service call the translation replaced brings its own import (`Router.navigate` → `navigate`).
   imports.push(...serviceImportsFor(fact.members ?? [], fact.inputs));
   if (formFact) {
@@ -1201,8 +1213,9 @@ export function convertComponent(fact: ComponentFact, templateHtml: string, opts
       ]
     : [];
 
-  const ts: string = [
-    ...(imports.length ? [...imports, ''] : []),
+  // Everything AFTER the imports, assembled first: an import is dead only if nothing in the whole file uses it,
+  // and `propDefaults` / the `setup` wrapper are part of the file too.
+  const tail: string[] = [
     ...defaultsBlock,
     `export function setup(${usesProps ? `props: ${propsType}` : ''}) {`,
     // Split first: a drafted entry can be a whole multi-line block, and prefixing the ENTRY only indented its
@@ -1210,11 +1223,16 @@ export function convertComponent(fact: ComponentFact, templateHtml: string, opts
     ...body.flatMap((l) => l.split('\n')).map((l) => (l ? `  ${l}` : l)),
     '}',
     '',
-  ].join('\n');
-
+  ];
   // Everything the class held that became a signal — the template has to call it now.
   const signals: string[] = [...ctx.fields, ...ctx.getters, ...ctx.signals];
-  return { baseName, ts, html: convertTemplate(templateHtml, { ...opts, props: [...fact.inputs, ...fact.outputs], signals, host }) };
+  const html: string = convertTemplate(templateHtml, { ...opts, props: [...fact.inputs, ...fact.outputs], signals, host });
+
+  // An import is dead only if NEITHER the module nor its template uses it — a `<Card>` import is named in the
+  // markup and nowhere else, so pruning against the module alone would have deleted it.
+  const kept: string[] = pruneImports(imports, `${tail.join('\n')}\n${html}`);
+  const ts: string = [...(kept.length ? [...mergeImportLines(kept), ''] : []), ...tail].join('\n');
+  return { baseName, ts, html };
 }
 
 /* ──────────── M5 — the hard parts, DRAFTED (never silently rewritten) ──────────── */
@@ -1456,6 +1474,31 @@ export interface TranslateCtx {
   /** The name that IS the element, when there is one. A `use:` action is handed the element directly, which is
    *  exactly what `ElementRef` provided — so `this.el.nativeElement` is that name, not a property of it. */
   elementRef?: string;
+  /** Services THIS MIGRATION converted, by class name, and how the converted file exposes them. A call into one
+   *  of these is not unknown — it is the thing being migrated alongside, so it must not be reported as having
+   *  "no recorded Weave equivalent". */
+  migrated?: Map<string, MigratedService>;
+}
+
+/** How a converted service is reached from another file. */
+export interface MigratedService {
+  /** `providedIn:'root'` → a `store()` hook (`useBreadcrumbs`); otherwise a context (`BreadcrumbsContext`). */
+  kind: 'store' | 'context';
+  /** The name the converted file exports. */
+  name: string;
+}
+
+/** The services this migration converts, and what each becomes — the map `translateCtx` needs to stop guessing. */
+export function migratedServices(services: ServiceFact[]): Map<string, MigratedService> {
+  const out: Map<string, MigratedService> = new Map<string, MigratedService>();
+  for (const s of services) {
+    const singleton: boolean = s.providedIn === 'root' || s.providedIn === 'platform' || s.providedIn === 'any';
+    out.set(
+      s.className,
+      singleton ? { kind: 'store', name: storeHookName(s.className) } : { kind: 'context', name: `${s.className.replace(/Service$/, '')}Context` },
+    );
+  }
+  return out;
 }
 
 /**
@@ -1503,7 +1546,7 @@ const SERVICE_METHODS: Record<string, Record<string, { call: string; from: strin
 };
 
 /** Build the translation context from a class's members and its inputs. */
-export function translateCtx(members: ClassMember[], inputs: string[], propsRef: string = 'props'): TranslateCtx {
+export function translateCtx(members: ClassMember[], inputs: string[], propsRef: string = 'props', migrated?: Map<string, MigratedService>): TranslateCtx {
   const inputSet: Set<string> = new Set<string>(inputs);
   // A field holding `inject(X)` is a dependency, not state — it must not be turned into a signal.
   const injected: Map<string, string> = new Map<string, string>();
@@ -1537,6 +1580,7 @@ export function translateCtx(members: ClassMember[], inputs: string[], propsRef:
     injected,
     signals: new Set<string>(members.filter((m) => m.kind === 'field' && m.isSignal).map((m) => m.name)),
     propsRef,
+    migrated,
   };
 }
 
@@ -1700,6 +1744,64 @@ export function unwrapSyncThen(code: string, names: string[], todos: string[]): 
   return out;
 }
 
+/**
+ * `router.events.pipe(filter(e => e instanceof NavigationEnd), takeUntilDestroyed()).subscribe(cb)`
+ *   → `onDispose(afterEach(cb));`
+ *
+ * Weave's `afterEach` runs after every completed navigation and returns its own unsubscribe, so the two
+ * operators in that chain are not dropped — they are what `afterEach` already IS: the `filter` is inherent
+ * (it only fires on completion) and `takeUntilDestroyed` is the returned unsubscribe handed to `onDispose`.
+ * Any other event type, any other operator, and the callback's parameter are reported instead of assumed.
+ */
+export function rewriteRouterEvents(code: string, ctx: TranslateCtx, todos: string[]): string {
+  let out: string = code;
+  for (let guard: number = 0; guard < 20; guard++) {
+    const re: RegExp = /\bthis\.([A-Za-z_$][\w$]*)\.events\b/g;
+    let m: RegExpExecArray | null = null;
+    let changed: boolean = false;
+    while ((m = re.exec(out)) !== null) {
+      if (ctx.injected.get(m[1]) !== 'Router') continue;
+      let i: number = m.index + m[0].length;
+      let pipeArgs: string = '';
+      const pipe: RegExpMatchArray | null = out.slice(i).match(/^\s*\.pipe\s*\(/);
+      if (pipe) {
+        const open: number = i + pipe[0].length - 1;
+        const close: number = matchParen(out, open);
+        if (close < 0) break;
+        pipeArgs = out.slice(open + 1, close);
+        i = close + 1;
+      }
+      const sub: RegExpMatchArray | null = out.slice(i).match(/^\s*\.subscribe\s*\(/);
+      if (!sub) {
+        todos.push("`Router.events` is a stream Weave has no counterpart for — its navigation hook is `afterEach(nav => …)`, which runs after every completed navigation");
+        continue;
+      }
+      const sOpen: number = i + sub[0].length - 1;
+      const sClose: number = matchParen(out, sOpen);
+      if (sClose < 0) break;
+      const cb: string = out.slice(sOpen + 1, sClose).trim();
+
+      const evt: RegExpMatchArray | null = pipeArgs.match(/instanceof\s+(Navigation[A-Za-z]*)/);
+      if (evt && evt[1] !== 'NavigationEnd') {
+        todos.push(`this subscribed to \`${evt[1]}\`, and Weave's \`afterEach\` only runs after a navigation COMPLETES — a start/cancel/error hook has no equivalent`);
+        continue;
+      }
+      // Everything the chain did beyond "after a completed navigation" has to be accounted for out loud.
+      const leftover: string[] = splitTopLevel(pipeArgs)
+        .map((op) => op.trim().replace(/\s*\([\s\S]*$/, ''))
+        .filter((op) => op && op !== 'filter' && op !== 'takeUntilDestroyed' && op !== 'takeUntil');
+      if (leftover.length) todos.push(`the navigation subscription also used ${leftover.join(', ')} — \`afterEach\` has no operators, so fold those into the callback`);
+      if (/^\(\s*[A-Za-z_$]/.test(cb)) todos.push("the navigation callback took the EVENT; `afterEach` hands it a `nav` ({ to, from }) instead — check what the body reads off it");
+
+      out = `${out.slice(0, m.index)}onDispose(afterEach(${cb}))${out.slice(sClose + 1)}`;
+      changed = true;
+      break;
+    }
+    if (!changed) break;
+  }
+  return out;
+}
+
 /** Run `fn` over the code parts of a snippet, never over its string literals. */
 function outsideStrings(code: string, fn: (part: string) => string): string {
   return code
@@ -1729,7 +1831,11 @@ export function translateBody(body: string, ctx: TranslateCtx, params: string = 
       .filter(Boolean),
   );
 
-  let code: string = outsideStrings(body, (part) =>
+  // The router-events chain FIRST: it reads `this._Router` without calling it, so the general rename below
+  // would turn it into a bare name and the shape would no longer be recognisable.
+  let code: string = rewriteRouterEvents(body, ctx, todos);
+
+  code = outsideStrings(code, (part) =>
     part
       // `this.<ElementRef>.nativeElement` IS the element. An action is handed it directly, which is the whole
       // reason Angular needed `ElementRef` — leaving `.nativeElement` on it referenced a property that is gone.
@@ -1744,6 +1850,9 @@ export function translateBody(body: string, ctx: TranslateCtx, params: string = 
         if (!service) return full;
         const mapped: { call: string; from: string } | undefined = SERVICE_METHODS[service]?.[method];
         if (mapped) return `${mapped.call}${generic ?? ''}(`;
+        // A service THIS migration is converting is not unknown. Telling the reader "migrate it first" about a
+        // class being migrated in the same run asked for work already happening, about a call already correct.
+        if (ctx.migrated?.has(service)) return `${field}.${method}${generic ?? ''}(`;
         todos.push(`\`${service}.${method}()\` has no recorded Weave equivalent — migrate ${service} first, then call it here`);
         return `${field}.${method}${generic ?? ''}(`;
       }),
@@ -1776,6 +1885,50 @@ export function translateBody(body: string, ctx: TranslateCtx, params: string = 
   return { code, todos };
 }
 
+/**
+ * Drop carried imports nothing in the draft uses any more. A translated body no longer calls what it replaced —
+ * the RxJS chain that became `afterEach` left `import { filter } from 'rxjs/operators'` behind, an import of a
+ * package the target app has no reason to depend on, for a name that is gone.
+ */
+export function pruneImports(lines: string[], body: string): string[] {
+  // Comments do not USE anything. The original body travels beside every rewrite as a comment, so a name that
+  // only survives there — `filter`, from the RxJS chain that became `afterEach` — kept its import alive.
+  const code: string = body.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+  return lines.filter((line) => {
+    const named: RegExpMatchArray | null = line.match(/^import\s*(?:(\w+)\s*,?\s*)?(?:\{([^}]*)\})?\s*from/);
+    if (!named) return true; // a side-effect import — it is there for what it DOES, not for a name
+    const names: string[] = [named[1] ?? '', ...(named[2] ?? '').split(',')]
+      .map((n) => n.trim().replace(/^type\s+/, '').split(/\s+as\s+/).pop()?.trim() ?? '')
+      .filter(Boolean);
+    if (!names.length) return true;
+    return names.some((n) => new RegExp(`(?<![\\w$])${n}(?![\\w$])`).test(code));
+  });
+}
+
+/**
+ * Fold import lines that name the same module into one. The pieces of a draft each ask for what they need
+ * without knowing what the others asked for, so `signal` and `onDispose` arrived as two separate lines from
+ * `@weave-framework/runtime`. Only plain named imports are merged; anything else is passed through untouched.
+ */
+export function mergeImportLines(lines: string[]): string[] {
+  const named: Map<string, Set<string>> = new Map<string, Set<string>>();
+  const order: string[] = [];
+  const other: string[] = [];
+  for (const line of lines) {
+    const m: RegExpMatchArray | null = line.match(/^import\s*\{([^}]*)\}\s*from\s*'([^']+)';$/);
+    if (!m) {
+      if (!other.includes(line)) other.push(line);
+      continue;
+    }
+    if (!named.has(m[2])) {
+      named.set(m[2], new Set<string>());
+      order.push(m[2]);
+    }
+    for (const n of m[1].split(',').map((s) => s.trim()).filter(Boolean)) named.get(m[2])?.add(n);
+  }
+  return [...order.map((from) => `import { ${[...(named.get(from) ?? [])].sort().join(', ')} } from '${from}';`), ...other];
+}
+
 /** The imports for the Weave functions that replaced injected-service calls in a class's bodies. */
 export function serviceImportsFor(members: ClassMember[], inputs: string[]): string[] {
   const ctx: TranslateCtx = translateCtx(members, inputs);
@@ -1791,6 +1944,14 @@ export function serviceImportsFor(members: ClassMember[], inputs: string[]): str
     for (const imp of ADAPTERS[mapped.adapter ?? '']?.imports ?? []) for (const n of imp.names) add(imp.from, n);
     if (!mapped.from) continue; // replaced by something already in scope (the local data client)
     add(mapped.from, mapped.call);
+  }
+  // `Router.events` is a PROPERTY, not a call, so the loop above cannot see it — and the code it turns into
+  // names two functions that would otherwise be undefined.
+  const bodies: string = members.map((m) => m.body ?? '').join('\n');
+  for (const [field, service] of ctx.injected) {
+    if (service !== 'Router' || !new RegExp(`\\bthis\\.${field}\\.events\\b`).test(bodies)) continue;
+    add('@weave-framework/router', 'afterEach');
+    add('@weave-framework/runtime', 'onDispose');
   }
   return [...needed.entries()].map(([from, names]) => `import { ${[...names].sort().join(', ')} } from '${from}';`);
 }
@@ -1886,8 +2047,13 @@ function draftMembers(members: ClassMember[], className: string, ctx?: Translate
       if (!mem.body.trim() && !mem.params.trim()) continue;
       out.push('');
       if (mem.body.trim()) {
-        out.push(tsTodo(`the constructor ran this on creation — in a store the factory body IS the constructor,`));
-        out.push('//   so port it right here (an ongoing subscription becomes an `effect`/`watch`).');
+        // The constructor's body is the ONE body that was never translated — it came out as a TODO over a
+        // commented original while every other member was rewritten. It is not a different kind of code: what
+        // ran on creation runs here, because this scope IS the constructor.
+        out.push('// What the constructor ran on creation. This scope IS the constructor, so it runs here.');
+        const ctor: { code: string; todos: string[] } = translateBody(mem.body, cx, mem.params);
+        for (const t of ctor.todos) out.push(tsTodo(t));
+        out.push(...ctor.code.split('\n'));
       }
       out.push(`// ── original ${className} constructor ──`);
       out.push(...commented(mem.text, ''));
@@ -1900,8 +2066,16 @@ function draftMembers(members: ClassMember[], className: string, ctx?: Translate
       const service: string | undefined = cx.injected.get(mem.name);
       if (service) {
         out.push('');
-        out.push(`// \`${mem.name}\` held ${service}. Its calls above were rewritten to Weave's equivalents, so there is`);
-        out.push('// nothing to hold here; anything still calling it needs a decision.');
+        // A service this migration converted still has to be REACHED. Its calls were left naming this field, so
+        // without a binding the field was a comment and every call through it was undefined.
+        const m: MigratedService | undefined = cx.migrated?.get(service);
+        if (m) {
+          out.push(`// \`${service}\` is migrated alongside this file; this is how it is reached here.`);
+          out.push(m.kind === 'store' ? `const ${mem.name} = ${m.name}();` : `const ${mem.name} = inject(${m.name});`);
+        } else {
+          out.push(`// \`${mem.name}\` held ${service}. Its calls above were rewritten to Weave's equivalents, so there is`);
+          out.push('// nothing to hold here; anything still calling it needs a decision.');
+        }
         out.push(...commented(mem.text, ''));
         continue;
       }
@@ -1972,7 +2146,7 @@ export function serviceBaseName(className: string): string {
  * BODIES are not translated; each carries a TODO. That line is deliberate: the shape is mechanical, the logic is
  * a judgement call, and a plausible-but-wrong body is worse than an obvious hole.
  */
-export function convertService(fact: ServiceFact, rxjsNames: string[] = []): { baseName: string; ts: string } {
+export function convertService(fact: ServiceFact, rxjsNames: string[] = [], migrated?: Map<string, MigratedService>): { baseName: string; ts: string } {
   const singleton: boolean = fact.providedIn === 'root';
   const lines: string[] = [];
   // Same rule as components: import what the drafted body actually uses (a getter becomes a `computed`).
@@ -1983,7 +2157,8 @@ export function convertService(fact: ServiceFact, rxjsNames: string[] = []): { b
 
   const body: string[] = [];
   // Only the dependencies still UNANSWERED — one whose calls were rewritten needs nothing from the reader.
-  const unanswered: string[] = fact.injects.filter((dep) => !SERVICE_METHODS[dep]);
+  // A dependency that is MIGRATED is reached three lines below; asking for it again is asking twice.
+  const unanswered: string[] = fact.injects.filter((dep) => !SERVICE_METHODS[dep] && !migrated?.has(dep));
   if (unanswered.length) {
     body.push(tsTodo(`this service injected ${unanswered.join(', ')} — call each one's store hook here,`));
     body.push('//   e.g. `const other = useOther();`, or `inject(OtherContext)` for a scoped one.');
@@ -1993,7 +2168,7 @@ export function convertService(fact: ServiceFact, rxjsNames: string[] = []): { b
   }
   const svcAdapters: string[] = adaptersFor(fact.members ?? [], []);
   if (svcAdapters.length) body.push(...svcAdapters);
-  const drafted: { lines: string[]; publicNames: string[] } = draftMembers(fact.members ?? [], fact.className, translateCtx(fact.members ?? [], []));
+  const drafted: { lines: string[]; publicNames: string[] } = draftMembers(fact.members ?? [], fact.className, translateCtx(fact.members ?? [], [], 'props', migrated));
   body.push(...drafted.lines);
   body.push('');
   body.push(
@@ -2015,36 +2190,36 @@ export function convertService(fact: ServiceFact, rxjsNames: string[] = []): { b
   // What the rewritten calls and their shims need. A component already did this; a service did not, so its
   // draft named `navigate` and `NavigateOptions` without importing either.
   imports.push(...serviceImportsFor(fact.members ?? [], []));
+  // A service's own imports were never carried — only a component's were. So a draft that calls a helper, a
+  // type, or a service migrated beside it named all three without importing any of them.
+  imports.push(...carriedImportsFor(fact.file, migrated));
 
-  if (singleton) {
-    lines.push(
-      ...imports,
-      '',
-      `// Converted from ${fact.className} (${fact.file}).`,
-      `// It was \`providedIn: 'root'\` — a single instance for the whole app — so it becomes a store.`,
-      ...hintBlock,
-      `export const ${storeHookName(fact.className)} = store(() => {`,
-      ...body.map((l) => `  ${l}`),
-      '});',
-      '',
-    );
-  } else {
-    const ctx: string = `${fact.className.replace(/Service$/, '')}Context`;
-    lines.push(
-      ...imports,
-      '',
-      `// Converted from ${fact.className} (${fact.file}).`,
-      '// It had no `providedIn`, so it was provided per-injector — in Weave that is a CONTEXT: an ancestor calls',
-      `// \`provide(${ctx}, create${fact.className}())\` and any descendant \`inject(${ctx})\`.`,
-      ...hintBlock,
-      `export function create${fact.className}() {`,
-      ...body.map((l) => `  ${l}`),
-      '}',
-      '',
-      `export const ${ctx} = createContext<ReturnType<typeof create${fact.className}>>();`,
-      '',
-    );
-  }
+  // The tail is assembled first, then the imports pruned against it: `store` / `createContext` live in the
+  // WRAPPER, not in the body, so pruning against the body alone dropped the very imports the file is built on.
+  const ctxName: string = `${fact.className.replace(/Service$/, '')}Context`;
+  const tail: string[] = singleton
+    ? [
+        `// Converted from ${fact.className} (${fact.file}).`,
+        `// It was \`providedIn: 'root'\` — a single instance for the whole app — so it becomes a store.`,
+        ...hintBlock,
+        `export const ${storeHookName(fact.className)} = store(() => {`,
+        ...body.map((l) => `  ${l}`),
+        '});',
+        '',
+      ]
+    : [
+        `// Converted from ${fact.className} (${fact.file}).`,
+        '// It had no `providedIn`, so it was provided per-injector — in Weave that is a CONTEXT: an ancestor calls',
+        `// \`provide(${ctxName}, create${fact.className}())\` and any descendant \`inject(${ctxName})\`.`,
+        ...hintBlock,
+        `export function create${fact.className}() {`,
+        ...body.map((l) => `  ${l}`),
+        '}',
+        '',
+        `export const ${ctxName} = createContext<ReturnType<typeof create${fact.className}>>();`,
+        '',
+      ];
+  lines.push(...mergeImportLines(pruneImports(imports, tail.join('\n'))), '', ...tail);
   return { baseName: serviceBaseName(fact.className), ts: lines.join('\n') };
 }
 
@@ -2469,7 +2644,9 @@ export function componentNameMap(facts: MigrationFacts): Record<string, string> 
  */
 export function planWrites(facts: MigrationFacts, targetDir: string): WriteItem[] {
   const items: WriteItem[] = [];
-  const opts: ConvertOptions = { components: componentNameMap(facts) };
+  // What this run converts, so a call from one converted file into another is not reported as unknown.
+  const migrated: Map<string, MigratedService> = migratedServices(facts.services);
+  const opts: ConvertOptions = { components: componentNameMap(facts), migrated };
   for (const cf of facts.components) {
     const rel: string = outputPathFor(cf.file, facts);
     const dir: string = dirname(rel) === '.' ? '' : dirname(rel);
@@ -2505,7 +2682,7 @@ export function planWrites(facts: MigrationFacts, targetDir: string): WriteItem[
     const rel: string = outputPathFor(sf.file, facts);
     const dir: string = dirname(rel) === '.' ? '' : dirname(rel);
     const base: string = (rel.split(/[\\/]/).pop() ?? '').replace(/\.ts$/, '');
-    const draft: { baseName: string; ts: string } = convertService(sf, importedNamesFrom(sf.file, 'rxjs'));
+    const draft: { baseName: string; ts: string } = convertService(sf, importedNamesFrom(sf.file, 'rxjs'), migrated);
     const path: string = join(targetDir, 'src', dir, `${base || draft.baseName}.ts`);
     items.push({ path, content: draft.ts, status: existsSync(path) ? 'skip-exists' : 'write' });
   }

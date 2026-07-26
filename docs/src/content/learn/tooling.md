@@ -163,6 +163,9 @@ comment rather than guessed at.
 | `@HostBinding` / `@HostListener` / `host: { … }` | `class:` / `style:` / `on:` on the template's root element |
 | `@HostListener('window:…')` | an `onMount` subscription, with its removal as the cleanup |
 | `@Injectable({providedIn:'root'})` | `store()` |
+| a constructor body | the setup/factory body — that scope *is* the constructor |
+| `router.events` + `NavigationEnd` | `onDispose(afterEach(cb))` |
+| one migrated service calling another | the store hook / context, wired and imported |
 | `@Injectable()` (scoped) | `createContext` + `provide`/`inject` |
 | `@Pipe` | a plain function — `{{ x \| shorten }}` becomes `{{ shorten(x) }}` |
 | `@Directive` | a `use:` action — host bindings become `effect`s on the element, listeners are added *and removed* |

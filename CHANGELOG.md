@@ -38,6 +38,23 @@
   Weave equivalent is left in place with a `TODO(weave migrate)` comment instead of being guessed at, and a
   method's original body travels with it as comments beside the new signature rather than being discarded.
 
+  **A service this run converts is not "unknown".** A call into one used to print *"has no recorded Weave
+  equivalent — migrate it first"* about a class being migrated in the same run: work already happening, about a
+  call already correct. The converter knows what it is converting now — the injected field becomes a real
+  binding (`const svc = useBreadcrumbs()`, or `inject(XContext)` for a scoped one), the import is repointed to
+  what the converted file actually *exports*, and a service's own imports are carried at all, which they were not.
+
+  **The constructor's body is translated**, like every other body. It was the one that was not: it came out as a
+  TODO over a commented original while every other member was rewritten. In a store the factory body *is* the
+  constructor, so what ran on creation runs there. `router.events.pipe(filter(e => e instanceof NavigationEnd),
+  takeUntilDestroyed()).subscribe(cb)` becomes `onDispose(afterEach(cb))` — both operators are what `afterEach`
+  already is. Any other event type, any other operator, and a callback parameter are reported, not assumed.
+
+  **Dead imports are dropped.** A translated body no longer calls what it replaced, so the RxJS chain that became
+  `afterEach` left `import { filter } from 'rxjs/operators'` behind — a dependency the target app has no reason
+  to take on, for a name that is gone. A name surviving only inside the carried original is not a use; an import
+  the *template* needs is.
+
   **The host element migrates too.** `@HostBinding`, `@HostListener` and the decorator's own `host: { … }` map all
   describe the element Angular put the component's selector on; Weave has no such element, so they land on the
   template's single root: `class.x` → `class:x`, `style.width.px` → `style:width` with the unit kept, `attr.role`
