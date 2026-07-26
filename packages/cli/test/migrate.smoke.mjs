@@ -802,6 +802,51 @@ ok(cmpDraft.includes('became props'), 'convertComponent: the fields that turned 
 // Angular lifecycle hooks are named, not left as anonymous methods.
 ok(fullDraft.includes('lifecycle hook') && fullDraft.includes('onDispose'), 'convertService: ngOnDestroy is identified as a lifecycle hook with its Weave equivalent');
 
+// ── ACCESS: what is USED but cannot be looked inside ──
+// A method calls a method calls a method. Following every workspace lib turned ONE imported type into 214 files;
+// following none migrates a service the app leans on as a name and nothing else. So each is asked for by name.
+const shopFacts = a.assembleFacts(join(fx, 'nx-mono', 'apps', 'shop'));
+const reach = a.outOfReach(shopFacts);
+const lib = reach.find((r) => r.name === '@sps-interfaces');
+ok(lib?.kind === 'lib', 'outOfReach: a workspace library reached through a tsconfig alias is an item to ask about');
+ok(lib?.uses.includes('User'), 'outOfReach: it names what is actually USED from the lib — the reason to go in, and the stake');
+ok(lib?.path?.includes('sps-interfaces'), 'outOfReach: the workspace already says where the lib lives, so the question is permission, not a path');
+ok(lib?.neededBy.some((f) => f.endsWith('app.component.ts')), 'outOfReach: it names the files that need it');
+const missingClass = reach.find((r) => r.name === 'AnalyticsService');
+ok(missingClass?.kind === 'class' && missingClass.path === null, 'outOfReach: an injected class with no definition here is a gap, and only the user knows where it is');
+ok(!reach.some((r) => r.name === 'Router'), "outOfReach: Angular's own injectables are NOT gaps — they have a recorded answer, and asking where Router lives is nonsense");
+
+// Granting access folds the unit in, and coverage is recomputed over the COMBINED source — keeping the old
+// coverage would report a percentage of a smaller source than the one actually being migrated.
+const uiFacts = a.assembleFacts(join(fx, 'nx-mono', 'libs', 'ui'));
+const merged = a.mergeFacts(shopFacts, uiFacts);
+ok(merged.files.length === new Set([...shopFacts.files, ...uiFacts.files]).size, 'mergeFacts: the file lists join, de-duplicated');
+ok(uiFacts.coverage.total > 0, 'the lib fixture actually declares something — otherwise the merge gate below can never fail');
+ok(merged.coverage.total === shopFacts.coverage.total + uiFacts.coverage.total, 'mergeFacts: coverage is recomputed over the combined inventory, not carried over');
+ok(merged.granted?.includes(uiFacts.unit), 'mergeFacts: the unit that was opened up is recorded');
+ok(a.mergeFacts(shopFacts, shopFacts).components.length === shopFacts.components.length, 'mergeFacts: merging a unit twice does not double-count it');
+// A path may point at a file, at `src/`, or at the project folder — all three mean the same unit. Stopping at the
+// parent folder made `libs/x/src/index.ts` a unit called `src`, whose output then landed in `src/src/`.
+ok(m.unitRootFor(join(fx, 'nx-mono', 'libs', 'sps-interfaces', 'src', 'index.ts')).endsWith('sps-interfaces'), 'unitRootFor: a FILE climbs to the project it belongs to, never stopping at `src`');
+ok(m.unitRootFor(join(fx, 'nx-mono', 'libs', 'ui', 'src')).endsWith(`libs${sep}ui`), 'unitRootFor: `src/` climbs to the project marked by its project.json');
+ok(m.unitRootFor(join(fx, 'nx-mono', 'libs', 'ui')).endsWith(`libs${sep}ui`), 'unitRootFor: the project folder itself resolves to itself');
+// ng-packagr puts a package.json inside `src/` for a secondary entry point — a project MARKER on a folder that
+// is not a project. Without the guard the unit is called `src`, and its output lands in `src/src/`.
+ok(m.unitRootFor(join(fx, 'nx-mono', 'libs', 'secondary', 'src', 'index.ts')).endsWith('secondary'), 'unitRootFor: a package.json inside `src/` does not make `src` a unit');
+
+// A granted unit's files are NOT under the base unit, and mirroring them against it made
+// `libs/x/src/index.ts` land on `src/index.ts` — two sources, one output, one of them silently lost.
+const mergedWrites = cv.planWrites(merged, join(tmpdir(), 'weave-merge-out'));
+const mergedPaths = mergedWrites.map((w) => w.path);
+ok(mergedPaths.length === new Set(mergedPaths).size, `planWrites: a merged unit never writes two sources to one path (dupes: ${mergedPaths.filter((p, i) => mergedPaths.indexOf(p) !== i).join(', ') || 'none'})`);
+ok(mergedWrites.some((w) => w.path.includes(`${sep}ui${sep}`)), "planWrites: a granted unit's output lands under its own folder, not merged into the app's tree");
+ok(mergedWrites.every((w) => !w.path.includes('..')), 'planWrites: nothing escapes the target directory, however far outside the unit its source lived');
+
+// The plan says which happened: "you chose not to show me this" is not the same answer as "it was not there".
+const declinedPlan = pl.renderPlan({ ...shopFacts, declined: ['@sps-interfaces'], granted: ['/libs/ui'] });
+ok(declinedPlan.includes('Left closed') && declinedPlan.includes('@sps-interfaces'), 'renderPlan: a declined unit is recorded as a CHOICE, not as a gap in the analysis');
+ok(declinedPlan.includes('Opened up on request') && declinedPlan.includes('/libs/ui'), 'renderPlan: a granted unit is recorded too');
+
 // ── pipes → functions, directives → use: actions, styles → the sibling stylesheet ──
 const pipesDir = join(fx, 'pipes');
 const pipe = a.findPipes(join(pipesDir, 'shorten.pipe.ts'))[0];

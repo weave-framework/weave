@@ -2108,6 +2108,27 @@ export function readComponentTemplate(fact: ComponentFact): string | null {
 }
 
 /** The source unit's own `src/` root, so the target mirrors the layout the user already knows. */
+/**
+ * The unit a file belongs to. Once access has been granted to another unit, its files are NOT under `facts.unit`
+ * — and mirroring them against it produced `../../../libs/x/src/index.ts`, whose `src/`-relative tail is
+ * `index.ts`, landing exactly on top of the app's own `src/index.ts`. Two sources, one output, one of them lost.
+ */
+function unitOf(file: string, facts: MigrationFacts): { dir: string; prefix: string } {
+  for (const g of facts.granted ?? []) {
+    // A granted unit is a PROJECT folder — `unitRootFor` guarantees that, and is where the rule lives. Repeating
+    // the `src`/`lib` guard here would be a second copy of it that nothing can reach, and so nothing can test.
+    if (!relative(g, file).startsWith('..')) return { dir: g, prefix: g.split(/[\\/]/).filter(Boolean).pop() ?? 'lib' };
+  }
+  return { dir: facts.unit, prefix: '' };
+}
+
+/** Where a file lands, mirroring its source layout — under its own folder when it came from a granted unit. */
+function outputPathFor(file: string, facts: MigrationFacts): string {
+  const { dir, prefix } = unitOf(file, facts);
+  const rel: string = relativeUnderSrc(file, dir);
+  return prefix ? join(prefix, rel) : rel;
+}
+
 function relativeUnderSrc(file: string, unitDir: string): string {
   const rel: string = relative(unitDir, file);
   const parts: string[] = rel.split(/[\\/]/);
@@ -2228,7 +2249,7 @@ export function planWrites(facts: MigrationFacts, targetDir: string): WriteItem[
   const items: WriteItem[] = [];
   const opts: ConvertOptions = { components: componentNameMap(facts) };
   for (const cf of facts.components) {
-    const rel: string = relativeUnderSrc(cf.file, facts.unit);
+    const rel: string = outputPathFor(cf.file, facts);
     const dir: string = dirname(rel) === '.' ? '' : dirname(rel);
     const base: string = weaveBaseName(rel.split(/[\\/]/).pop() ?? cf.className);
     const html: string | null = readComponentTemplate(cf);
@@ -2259,7 +2280,7 @@ export function planWrites(facts: MigrationFacts, targetDir: string): WriteItem[
   // `breadcrumbs.component.ts` and `BreadcrumbsService` (in `breadcrumbs.service.ts`) both want `breadcrumbs.ts`,
   // and the second silently overwrote the first.
   for (const sf of facts.services) {
-    const rel: string = relativeUnderSrc(sf.file, facts.unit);
+    const rel: string = outputPathFor(sf.file, facts);
     const dir: string = dirname(rel) === '.' ? '' : dirname(rel);
     const base: string = (rel.split(/[\\/]/).pop() ?? '').replace(/\.ts$/, '');
     const draft: { baseName: string; ts: string } = convertService(sf, importedNamesFrom(sf.file, 'rxjs'));
@@ -2268,14 +2289,14 @@ export function planWrites(facts: MigrationFacts, targetDir: string): WriteItem[
   }
   // Pipes → functions, directives → `use:` actions. Both are real conversions, not carries.
   for (const pf of facts.pipes ?? []) {
-    const rel: string = relativeUnderSrc(pf.file, facts.unit);
+    const rel: string = outputPathFor(pf.file, facts);
     const dir: string = dirname(rel) === '.' ? '' : dirname(rel);
     const base: string = (rel.split(/[\\/]/).pop() ?? '').replace(/\.ts$/, '');
     const path: string = join(targetDir, 'src', dir, `${base}.ts`);
     items.push({ path, content: convertPipe(pf).ts, status: existsSync(path) ? 'skip-exists' : 'write' });
   }
   for (const df of facts.directives ?? []) {
-    const rel: string = relativeUnderSrc(df.file, facts.unit);
+    const rel: string = outputPathFor(df.file, facts);
     const dir: string = dirname(rel) === '.' ? '' : dirname(rel);
     const base: string = (rel.split(/[\\/]/).pop() ?? '').replace(/\.ts$/, '');
     const path: string = join(targetDir, 'src', dir, `${base}.ts`);
@@ -2284,7 +2305,7 @@ export function planWrites(facts: MigrationFacts, targetDir: string): WriteItem[
 
   // NgModules: not code in Weave, but a wiring note that records what only the module knew.
   for (const nm of facts.ngModules ?? []) {
-    const rel: string = relativeUnderSrc(nm.file, facts.unit);
+    const rel: string = outputPathFor(nm.file, facts);
     const dir: string = dirname(rel) === '.' ? '' : dirname(rel);
     const base: string = (rel.split(/[\\/]/).pop() ?? '').replace(/\.ts$/, '');
     const path: string = join(targetDir, 'src', dir, `${base}.ts`);
@@ -2310,7 +2331,7 @@ export function planWrites(facts: MigrationFacts, targetDir: string): WriteItem[
   ]);
   for (const file of facts.files) {
     if (covered.has(file)) continue;
-    const rel: string = relativeUnderSrc(file, facts.unit);
+    const rel: string = outputPathFor(file, facts);
     const dir: string = dirname(rel) === '.' ? '' : dirname(rel);
     const base: string = (rel.split(/[\\/]/).pop() ?? '').replace(/\.ts$/, '');
     const carried: string | null = carryFile(file, facts);

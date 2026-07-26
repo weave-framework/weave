@@ -1,0 +1,1 @@
+{ "name": "secondary", "projectType": "library", "targets": { "build": { "executor": "@nx/js:tsc" } } }

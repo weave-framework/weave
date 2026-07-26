@@ -46,6 +46,17 @@
   template has no single root there is no honest place for any of it, so the whole set is reported rather than
   attached to an arbitrary element.
 
+  **It asks for what it cannot see.** A method calls a method calls a method, and some of those live in a
+  workspace library reached through a `tsconfig` alias, or in an injected class with no definition in this unit.
+  Neither default is right: following every library turns one imported type into hundreds of files, following
+  none migrates a service the app leans on as a name and nothing else. So each is asked for by name, with what
+  is at stake shown — grant it and the analysis goes in, folds the unit in, recomputes coverage over the combined
+  source, and asks again, because opening one thing reveals the next; refuse and its calls arrive as TODOs with
+  the original code beside them. **Both answers are recorded in the plan**, because "you chose not to show me
+  this" and "this wasn't there" are different answers. A granted unit's output lands under its own folder, so it
+  cannot land on top of the app's own files. Angular's own injectables are never asked about — they have a
+  recorded answer, and asking where `Router` lives is nonsense.
+
   **A `@Directive` converts too, rather than arriving commented out.** Its fields and getters become signals and
   computeds, its `@Input`s become the action's one argument — held in a signal, so `update` re-running the
   bindings actually works — and its host declarations become real work on the element the action is handed:

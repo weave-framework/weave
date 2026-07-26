@@ -14,7 +14,7 @@
  */
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
-import { assembleFacts, writeFacts, type Coverage, type MigrationFacts, type PackagePlan } from './migrate-analyze.js';
+import { assembleFacts, mergeFacts, outOfReach, writeFacts, type Coverage, type MigrationFacts, type PackagePlan, type Reach } from './migrate-analyze.js';
 import {
   applyWrites,
   detectPackageManager,
@@ -361,8 +361,13 @@ export async function runMigrate(): Promise<void> {
       console.log(`  ${c.yellow('⚠')} ${c.yellow(`${cov.emptyFiles.length} file(s) produce NOTHING`)}${c.dim(': ')}${c.dim(list(cov.emptyFiles.map((f) => f.split(/[\\/]/).pop() ?? f), 5))}`);
     }
 
+    // 3c) ACCESS — a method calls a method calls a method, and some of those live where this walk never went.
+    //      Each one is asked for by name, with what is at stake shown; granting it goes deeper, refusing is
+    //      recorded so the plan can say "you chose not to show me this" rather than pretending it wasn't there.
+    const reached: MigrationFacts = await accessStep(io, facts);
+
     // 4) decide what to try migrating (M2.8). auto/try → a checkbox you confirm; keep → shown, never a checkbox.
-    const attempt: string[] = await choosePackages(io, facts.packages);
+    const attempt: string[] = await choosePackages(io, reached.packages);
 
     console.log(c.yellow('\nNote: this is assisted, not a 100% automatic migration. Everything you pick is a best'));
     console.log(c.yellow('effort — review each change, and expect some by-hand work.'));
@@ -370,22 +375,135 @@ export async function runMigrate(): Promise<void> {
 
     // 5) write the facts map — the raw measurements, which the plan and the conversion (M4) both read.
     //    Written into THIS Weave app (the target), never into the Angular app: your source repo stays clean.
-    const factsPath: string = writeFacts(target.dir, facts);
+    const factsPath: string = writeFacts(target.dir, reached);
     console.log(`\n${c.green('✓')} ${c.dim('Wrote the full analysis to')} ${c.bold(factsPath)}`);
 
     // 6) write the plan (M3) — read this BEFORE anything is converted, so there are no surprises.
-    const planPath: string = writePlan(target.dir, renderPlan(facts));
-    const items: PlanItem[] = planItems(facts);
+    const planPath: string = writePlan(target.dir, renderPlan(reached));
+    const items: PlanItem[] = planItems(reached);
     const needs: number = items.filter((i) => i.effort === 'needs-you').length;
     console.log(`${c.green('✓')} ${c.dim('Wrote your migration plan to')} ${c.bold(planPath)}`);
     console.log(
       `  ${c.dim(`${items.length - needs} piece(s) convert mechanically;`)} ${needs ? c.yellow(`${needs} need(s) you`) : c.green('nothing needs you')}${c.dim(' — the plan says which, and why.')}`,
     );
     // 7) convert (M4) — always opt-in, and never overwriting anything that is already there.
-    await convertStep(io, facts, target.dir, planPath);
+    await convertStep(io, reached, target.dir, planPath);
   } finally {
     io.close();
   }
+}
+
+/**
+ * The project a path belongs to. A user may point at a file, at `src/`, or at the project folder; all three mean
+ * the same unit. Climbs until it finds a project marker (`project.json` / `package.json` / `angular.json`), never
+ * past the filesystem root, and never treats `src` or `lib` as a unit of its own — that named a "library" `src`,
+ * whose output then landed in `src/src/`.
+ */
+export function unitRootFor(input: string): string {
+  let dir: string = existsSync(input) && statSync(input).isDirectory() ? resolve(input) : resolve(input, '..');
+  for (let up: number = 0; up < 6; up++) {
+    const base: string = dir.split(/[\\/]/).filter(Boolean).pop() ?? '';
+    const marked: boolean = ['project.json', 'package.json', 'angular.json', 'ng-package.json'].some((f) => existsSync(join(dir, f)));
+    if (marked && base !== 'src' && base !== 'lib') return dir;
+    if (base !== 'src' && base !== 'lib' && existsSync(join(dir, 'src'))) return dir;
+    const parent: string = resolve(dir, '..');
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return dir;
+}
+
+/** One out-of-reach item, as a line the user can act on. */
+function reachLabel(g: Reach): string {
+  if (g.kind === 'lib') {
+    const uses: string = g.uses.length ? c.dim(` — used for ${g.uses.slice(0, 6).join(', ')}${g.uses.length > 6 ? ', …' : ''}`) : '';
+    return `${c.blue(g.name)} ${c.dim('(your workspace library)')}${uses}`;
+  }
+  if (g.kind === 'class') {
+    return `${c.magenta(g.name)} ${c.dim(`(injected by ${g.neededBy.length} file(s) — I don't have its class)`)}`;
+  }
+  return `${c.red(g.name)} ${c.dim("(an import that didn't resolve)")}`;
+}
+
+/**
+ * ACCESS — the step that makes the analysis go all the way down. A method calls a method calls a method, and some
+ * of those live in a workspace library this walk deliberately did not expand, or in a class it never saw at all.
+ *
+ * Both defaults are wrong on their own: following every workspace library turned ONE imported type into 214
+ * files, and following none means a service the app leans on migrates as a name and nothing else. So each one is
+ * asked for by name, with what is at stake shown. Granting it re-runs the whole analysis over that unit and folds
+ * the result in — and then asks again, because opening one thing reveals the next. Refusing is RECORDED: "you
+ * chose not to show me this" and "this wasn't there" are different answers, and the plan says which happened.
+ */
+async function accessStep(io: InputManager, facts: MigrationFacts): Promise<MigrationFacts> {
+  let out: MigrationFacts = facts;
+  const asked: Set<string> = new Set<string>();
+  const declined: string[] = [];
+  let intro: boolean = false;
+
+  // Loop, not a single pass: a granted unit brings its OWN dependencies, and those are the `ccc` behind the `bbb`.
+  for (let round: number = 0; round < 10; round++) {
+    const gaps: Reach[] = outOfReach(out).filter((g) => !asked.has(`${g.kind}:${g.name}`));
+    if (!gaps.length) break;
+
+    if (!intro) {
+      intro = true;
+      console.log(`\n${c.bold('These are USED here, but I cannot look inside them:')}`);
+      console.log(c.dim('Open one up and I follow it down and migrate what I can. Leave it closed and its calls'));
+      console.log(c.dim('arrive as TODOs with the original code beside them — your choice, either way recorded.'));
+    }
+
+    for (const g of gaps) {
+      asked.add(`${g.kind}:${g.name}`);
+      console.log(`\n  ${c.yellow('•')} ${reachLabel(g)}`);
+      for (const f of g.neededBy.slice(0, 3)) console.log(`    ${c.dim(f)}`);
+      if (g.neededBy.length > 3) console.log(`    ${c.dim(`… and ${g.neededBy.length - 3} more`)}`);
+
+      if (io.done()) {
+        declined.push(g.name);
+        continue;
+      }
+      let path: string | undefined;
+      if (g.path) {
+        // The workspace already says where this lives — so the question is permission, not a path.
+        console.log(`    ${c.dim('I can reach it at:')} ${c.bold(g.path)}`);
+        const yes: string = (await io.askLine(`    ${c.bold('Migrate it too?')} ${c.dim('[y/N]')} ${c.cyan('> ')}`)).trim().toLowerCase();
+        if (yes === 'y' || yes === 'yes') path = g.path;
+      } else {
+        const typed: string = (await io.askLine(`    ${c.bold('Path to it')}${c.dim(' (Enter to skip):')} ${c.cyan('> ')}`)).trim();
+        if (typed) path = typed.replace(/^["']|["']$/g, '');
+      }
+      if (!path) {
+        console.log(`    ${c.dim('Skipped — its calls will arrive as TODOs.')}`);
+        declined.push(g.name);
+        continue;
+      }
+
+      // Analysis works on the UNIT, so a file path climbs to the project it belongs to. Stopping at the parent
+      // folder made `libs/x/src/index.ts` a "unit" called `src`, and its output landed in `src/src/`.
+      const unit: string = unitRootFor(path);
+      const extra: MigrationFacts = assembleFacts(unit);
+      if (!extra.entry) {
+        console.log(`    ${c.yellow("Couldn't find an entry file there")} ${c.dim('— nothing read. Treating it as skipped.')}`);
+        declined.push(g.name);
+        continue;
+      }
+      const joined: MigrationFacts = mergeFacts(out, extra);
+      // It is no longer an un-followed edge, so it must stop being listed as "migrate this one separately".
+      out = { ...joined, internal: joined.internal.filter((i) => i !== g.name) };
+      console.log(
+        `    ${c.green('✓')} ${c.dim('Read')} ${c.bold(String(extra.files.length))} ${c.dim('file(s):')} ` +
+          `${c.green(String(extra.components.length))} component(s), ${c.green(String(extra.services.length))} service(s), ` +
+          `${c.green(String(extra.pipes.length + extra.directives.length))} pipe(s)/directive(s)`,
+      );
+    }
+  }
+
+  out = { ...out, declined: [...(out.declined ?? []), ...declined] };
+  if (declined.length) {
+    console.log(`\n${c.dim('Left closed:')} ${declined.join(', ')}${c.dim(' — recorded in the plan, so it is clear these were a choice.')}`);
+  }
+  return out;
 }
 
 /**

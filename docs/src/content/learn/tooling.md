@@ -181,7 +181,32 @@ comment rather than guessed at.
 Third-party packages are sorted into three groups — ones Weave replaces (`rxjs`, `@ngx-translate`), ones you
 choose to attempt, and ones with no Weave role (`lodash`, `d3`) that you simply keep. You tick the ones to try.
 
-Your own workspace libraries are noted as separate migrations rather than pulled in: run `weave migrate` on each.
+### It asks for what it cannot see
+
+A method calls a method calls a method, and some of those live somewhere the walk never went — a workspace
+library reached through a `tsconfig` alias, or an injected class with no definition in this unit. Neither default
+is right on its own: following every library turns one imported type into hundreds of files, and following none
+migrates a service your app leans on as a name and nothing else.
+
+So each one is **asked for by name**, with what is at stake shown:
+
+~~~text
+These are USED here, but I cannot look inside them:
+
+  • @sps-interfaces (your workspace library) — used for User, IBreadcrumb
+    I can reach it at: /repo/libs/sps-interfaces
+    Migrate it too? [y/N] >
+
+  • AnalyticsService (injected by 3 file(s) — I don't have its class)
+    Path to it (Enter to skip): >
+~~~
+
+Say yes and it analyses that unit too, folds the result in, recomputes coverage over the combined source — and
+then asks again, because opening one thing reveals the next. Say no and its calls arrive as `TODO(weave migrate)`
+with the original code beside them. **Either answer is recorded in the plan**: *you chose not to show me this*
+and *this wasn't there* are different answers, and only one of them is the tool's fault.
+
+A granted unit's output lands under its own folder (`src/sps-interfaces/…`), so it never collides with your app's.
 
 > **This is assisted, not automatic.** Method and getter bodies *are* translated — `this.x` is a rename with a
 > known target, not a judgement call — and the original travels beside the result as a comment so every rewrite

@@ -162,7 +162,7 @@ export function readTsPaths(root: string): TsPaths | null {
 }
 
 /** Resolve a bare specifier through the workspace's tsconfig paths to an internal file, or null (not internal). */
-function resolveAlias(spec: string, tsPaths: TsPaths): string | null {
+export function resolveAlias(spec: string, tsPaths: TsPaths): string | null {
   for (const pat of tsPaths.patterns) {
     if (pat.wildcard) {
       if (spec.startsWith(pat.prefix)) {
@@ -1733,6 +1733,114 @@ export interface MigrationFacts {
   inventory: Decl[];
   /** The headline: how much of the source this tool actually converts, and exactly what it does not. */
   coverage: Coverage;
+  /** Units the user opened up when asked — each one was analysed and folded in. */
+  granted?: string[];
+  /** What the user was asked for and declined. Recorded, because "not migrated" and "you chose not to show me
+   *  this" are different answers, and only one of them is the tool's fault. */
+  declined?: string[];
+}
+
+/* ──────────── what is USED but cannot be looked inside ──────────── */
+
+/**
+ * Angular's own injectables. These are not "out of reach" — they have a recorded Weave answer (or an honest note
+ * saying they have none), and asking the user where `Router` lives would be nonsense.
+ */
+const ANGULAR_INJECTABLES: Set<string> = new Set<string>([
+  'Router', 'ActivatedRoute', 'ActivatedRouteSnapshot', 'RouterStateSnapshot', 'HttpClient', 'HttpBackend', 'ElementRef',
+  'Renderer2', 'ChangeDetectorRef', 'NgZone', 'ApplicationRef', 'Injector', 'ViewContainerRef', 'TemplateRef',
+  'DOCUMENT', 'PLATFORM_ID', 'LOCALE_ID', 'DestroyRef', 'Location', 'Title', 'Meta', 'FormBuilder', 'TranslateService',
+]);
+
+/** One thing the migration would have to look inside, and cannot. */
+export interface Reach {
+  /** `lib` — a workspace library reached through a tsconfig alias. `class` — an injected type with no definition
+   *  in this unit. `import` — a specifier that did not resolve at all. */
+  kind: 'lib' | 'class' | 'import';
+  /** The alias, class name, or specifier. */
+  name: string;
+  /** Where it already resolves on disk, when the workspace says so. `null` means only the user knows. */
+  path: string | null;
+  /** The names this unit actually uses from it — the reason to go in, and the measure of how much is at stake. */
+  uses: string[];
+  /** The files that need it. */
+  neededBy: string[];
+}
+
+/**
+ * Everything the migration can see is USED but cannot read: a workspace library (noted as an edge, deliberately
+ * not expanded), an injected class defined somewhere this walk never went, and an import that did not resolve.
+ *
+ * This exists so the choice is the user's. Following every workspace lib by default turned one imported type into
+ * 214 files; never following one means a service the app depends on is migrated as a name and nothing else. So it
+ * is asked, per item, with the names at stake shown — and a refusal is recorded, not silently treated as absence.
+ */
+export function outOfReach(facts: MigrationFacts): Reach[] {
+  const out: Reach[] = [];
+  const tsPaths: TsPaths | null = readTsPaths(findWorkspaceRoot(facts.unit));
+
+  for (const spec of facts.internal) {
+    const uses: Set<string> = new Set<string>();
+    const neededBy: string[] = [];
+    for (const f of facts.files) {
+      const names: string[] = importedNamesFrom(f, spec);
+      if (!names.length) continue;
+      neededBy.push(f);
+      for (const n of names) uses.add(n);
+    }
+    out.push({ kind: 'lib', name: spec, path: tsPaths ? resolveAlias(spec, tsPaths) : null, uses: [...uses], neededBy });
+  }
+
+  // An injected type with no class in this unit. Its methods are what the bodies CALL, so without it every one of
+  // those calls is a guess — which is exactly where the converter has to stop and say so.
+  const known: Set<string> = new Set<string>([...facts.services.map((s) => s.className), ...facts.components.map((cf) => cf.className), ...facts.directives.map((d) => d.className), ...facts.pipes.map((p) => p.className)]);
+  const byClass: Map<string, string[]> = new Map<string, string[]>();
+  for (const holder of [...facts.services, ...facts.components]) {
+    for (const dep of holder.injects) {
+      if (known.has(dep) || ANGULAR_INJECTABLES.has(dep)) continue;
+      if (!byClass.has(dep)) byClass.set(dep, []);
+      byClass.get(dep)?.push(holder.file);
+    }
+  }
+  for (const [name, files] of byClass) out.push({ kind: 'class', name, path: null, uses: [], neededBy: [...new Set(files)] });
+
+  for (const spec of facts.unresolved) out.push({ kind: 'import', name: spec, path: null, uses: [], neededBy: [] });
+  return out;
+}
+
+/**
+ * Fold a granted unit's facts into the migration. Everything is concatenated and de-duplicated by the identity
+ * that matters (a file path, a class name), and coverage is recomputed over the combined inventory — a merge that
+ * kept the old coverage would report a percentage of a smaller source than the one actually being migrated.
+ */
+export function mergeFacts(base: MigrationFacts, extra: MigrationFacts): MigrationFacts {
+  const uniq = <T,>(xs: T[], key: (x: T) => string): T[] => [...new Map(xs.map((x) => [key(x), x])).values()];
+  const decls: Decl[] = uniq([...base.inventory, ...extra.inventory], (d) => `${d.file}:${d.name}`);
+  return {
+    ...base,
+    files: [...new Set([...base.files, ...extra.files])],
+    angular: [...new Set([...base.angular, ...extra.angular])],
+    internal: [...new Set([...base.internal, ...extra.internal])],
+    packages: uniq([...base.packages, ...extra.packages], (p) => p.name),
+    packageUsage: [...base.packageUsage, ...extra.packageUsage],
+    components: uniq([...base.components, ...extra.components], (x) => `${x.file}:${x.className}`),
+    services: uniq([...base.services, ...extra.services], (x) => `${x.file}:${x.className}`),
+    di: [...base.di, ...extra.di],
+    routes: [...base.routes, ...extra.routes],
+    forms: [...base.forms, ...extra.forms],
+    calls: [...base.calls, ...extra.calls],
+    branches: [...base.branches, ...extra.branches],
+    cycles: [...base.cycles, ...extra.cycles],
+    unresolved: [...new Set([...base.unresolved, ...extra.unresolved])],
+    ngModules: uniq([...base.ngModules, ...extra.ngModules], (x) => `${x.file}:${x.className}`),
+    tokens: uniq([...base.tokens, ...extra.tokens], (x) => `${x.file}:${x.name}`),
+    pipes: uniq([...base.pipes, ...extra.pipes], (x) => `${x.file}:${x.className}`),
+    directives: uniq([...base.directives, ...extra.directives], (x) => `${x.file}:${x.className}`),
+    inventory: decls,
+    coverage: coverage(decls),
+    granted: [...(base.granted ?? []), extra.unit],
+    declined: base.declined ?? [],
+  };
 }
 
 /**

@@ -278,6 +278,23 @@ export function renderPlan(facts: MigrationFacts): string {
     out.push('');
   }
 
+  // Access is the user's decision, and both answers matter. A granted unit was followed all the way down; a
+  // declined one is NOT the same as "there was nothing there", and the difference has to survive into the plan.
+  if (facts.granted?.length) {
+    out.push('\n### Opened up on request\n');
+    out.push('You gave access to these, so the analysis went into them and migrated what it could:\n');
+    for (const g of facts.granted) out.push(`- \`${g}\``);
+    out.push('');
+  }
+  if (facts.declined?.length) {
+    out.push('\n### Left closed\n');
+    out.push('These are USED by the code being migrated, and were left closed when asked. That is a choice, not a');
+    out.push('gap in the analysis — calls into them arrive as `TODO(weave migrate)` with the original code beside');
+    out.push('them. Re-run `weave migrate` and give a path to open any of them:\n');
+    for (const d of facts.declined) out.push(`- \`${d}\``);
+    out.push('');
+  }
+
   out.push('\n## What the Angular pieces become\n');
   out.push(table(['Angular', '→ Weave'], facts.angular.map((s) => [cell(`\`${s}\``), cell(angularBecomes(s))])));
 
