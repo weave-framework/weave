@@ -56,6 +56,12 @@
   code naming a class that does not come across; and a dependency declared as a **constructor parameter** was
   never declared at all, so every call through it named nothing.
 
+  **A route resolver becomes a route `loader`.** It carries no decorator, so it used to fall through as
+  "plain TypeScript, carried as-is" — a file full of `ActivatedRouteSnapshot` moved unchanged, under a banner
+  saying most of it already works. It does not work: nothing in Weave will ever call it. And that banner is
+  fixed generally — a carried file that still imports from `@angular` now says NOT CONVERTED, because claiming
+  otherwise about the framework being migrated away from is what makes a reader skip the file.
+
   **A big unit migrates a section at a time.** Past about twenty files the write prompt offers the top-level
   folders as sections rather than one list nobody reads. The mapping spans the whole unit either way — section
   two knows what section one renamed — and what a chosen section needs from one left behind is named outright,

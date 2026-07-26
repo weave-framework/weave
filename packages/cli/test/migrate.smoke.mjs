@@ -950,6 +950,33 @@ ok(vf.collisions([{ path: 'x/a.ts' }, { path: 'x/b.ts' }]).length === 0, 'collis
 const shopFacts = a.assembleFacts(join(fx, 'nx-mono', 'apps', 'shop'));
 const reach = a.outOfReach(shopFacts);
 
+// ── route RESOLVERS → a route `loader` ──
+// A resolver carries no decorator, so it fell through as "plain TypeScript, carried as-is": a file full of
+// `ActivatedRouteSnapshot` moved unchanged, under a banner saying most of it already works. It does not work —
+// nothing in Weave will ever call it.
+const resFile = join(fx, 'routes', 'crumbs.resolver.ts');
+const resolvers = a.findResolvers(resFile);
+ok(resolvers.length === 1 && resolvers[0].className === 'CrumbsResolver', 'findResolvers: a class with a `resolve(route)` method is a route resolver, decorator or not');
+ok(!resolvers.some((r) => r.className === 'PromiseLike'), "findResolvers: a no-argument `resolve()` is somebody else's method, not Angular's contract");
+const resInv = a.inventory([resFile]);
+ok(resInv.find((d) => d.name === 'CrumbsResolver')?.kind === 'resolver', 'inventory: a resolver is its own kind, not the `class` bucket');
+ok(resInv.find((d) => d.name === 'CrumbsResolver')?.handled === true, 'coverage: and it counts as CONVERTED — it has a Weave counterpart, so calling it carried was over-reporting the gap');
+const resTs = cv.convertResolver(resolvers[0]).ts;
+ok(resTs.includes('export function loadCrumbs('), 'convertResolver: it becomes a loader function named after the resolver');
+ok(resTs.includes('useLoaderData()') && resTs.includes('loader: loadCrumbs'), 'convertResolver: and says how to attach it and how the component reads it');
+ok(resTs.includes('route.routeConfig.path'), 'convertResolver: the original body travels beside it — Angular hands a SNAPSHOT, a loader gets { params, query, signal }');
+ok(resTs.includes('helper(): number'), 'convertResolver: the rest of the class is carried too');
+// Recognising it is not enough — it has to reach the output, and NOT also be carried as a raw copy.
+const resFacts = { unit: join(fx, 'routes'), entry: resFile, files: [resFile], angular: [], internal: [], packages: [], packageUsage: [], components: [], services: [], di: [], routes: [], forms: [], calls: [], branches: [], cycles: [], unresolved: [], ngModules: [], tokens: [], pipes: [], directives: [], resolvers, inventory: [], coverage: { total: 0, handled: 0, carried: 0, gaps: [], emptyFiles: [] } };
+const resWrites = cv.planWrites(resFacts, join(tmpdir(), 'weave-resolver-out'));
+ok(resWrites.some((w) => w.content.includes('export function loadCrumbs(')), 'planWrites: a recognised resolver actually produces its loader file');
+ok(resWrites.filter((w) => w.path.endsWith('crumbs.resolver.ts')).length === 1, 'planWrites: and it is not ALSO carried as a raw copy — one source, one output');
+
+// The banner on a CARRIED file must not claim it works when it still imports Angular.
+const carriedAngular = cv.carryFile(resFile, { packages: [], components: [], services: [] });
+ok(carriedAngular.includes('NOT CONVERTED') && carriedAngular.includes('does NOT work in Weave'), 'carryFile: a carried file that still imports @angular says so — "most of it already works" was false about the framework being left');
+ok(!cv.carryFile(join(fx, 'routes', 'plain-helper.ts'), { packages: [], components: [], services: [] })?.includes('NOT CONVERTED'), 'carryFile: a file with no Angular imports keeps the plain banner');
+
 // ── THE SYMBOL TABLE: one place that knows what everything became ──
 // A component becomes a DEFAULT export while its importers went on naming the class; a service becomes
 // `useX` while its importer asked for `XService`; a pipe becomes a function its consumer is told does not

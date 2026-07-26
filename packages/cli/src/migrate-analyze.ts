@@ -1085,6 +1085,57 @@ export function findPipes(filePath: string): PipeFact[] {
   return out;
 }
 
+/**
+ * An Angular ROUTE RESOLVER — a class with a `resolve(route, …)` method, fetching a route's data before it
+ * renders. It usually carries no decorator, so it was classified as "plain TypeScript, carried as-is" and moved
+ * unchanged: a file full of `ActivatedRouteSnapshot` that will never run in Weave, under a banner saying most of
+ * it already works. Weave's counterpart is a route `loader`, read with `useLoaderData()`.
+ */
+export interface ResolverFact {
+  file: string;
+  className: string;
+  /** The `resolve` method's parameter list and body, as written. */
+  params: string;
+  body: string;
+  /** Every member, so nothing is lost when the class is more than its `resolve`. */
+  members: ClassMember[];
+  classBody: string;
+}
+
+/** Every route-resolver class in a file: one with a `resolve` method, decorated or not. */
+export function findResolvers(filePath: string): ResolverFact[] {
+  const sf: ts.SourceFile | null = parseFile(filePath);
+  if (!sf) return [];
+  const out: ResolverFact[] = [];
+  const visit = (node: ts.Node): void => {
+    if (ts.isClassDeclaration(node)) {
+      // A `@Component`/`@Directive`/`@Pipe` is something else entirely, whatever methods it happens to have.
+      const decorated: boolean = decoratorsOf(node).some((d) => ['Component', 'Directive', 'Pipe', 'NgModule'].includes(decoratorName(d) ?? ''));
+      const members: ClassMember[] = classMembers(node, sf);
+      const resolve: ClassMember | undefined = members.find((m) => m.kind === 'method' && m.name === 'resolve');
+      // The Angular contract is `resolve(route, state?)`; a no-argument `resolve()` is somebody else's method.
+      if (!decorated && resolve && resolve.params.trim()) {
+        out.push({
+          file: filePath,
+          className: node.name?.text ?? '(anonymous)',
+          params: resolve.params,
+          body: resolve.body,
+          members,
+          classBody: classBodyText(node, sf),
+        });
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sf);
+  return out;
+}
+
+/** Every route resolver across a set of files. */
+export function analyzeResolvers(files: string[]): ResolverFact[] {
+  return files.flatMap((f) => findResolvers(f));
+}
+
 /** Every `@Directive` class in a file. */
 export function findDirectives(filePath: string): DirectiveFact[] {
   const sf: ts.SourceFile | null = parseFile(filePath);
@@ -1522,6 +1573,7 @@ export type DeclKind =
   | 'service'
   | 'pipe'
   | 'directive'
+  | 'resolver'
   | 'ngmodule'
   | 'class'
   | 'function'
@@ -1547,7 +1599,7 @@ export interface Decl {
 }
 
 /** What the converter can currently emit. Everything else is reported as a gap, by construction. */
-const HANDLED_KINDS: Set<DeclKind> = new Set<DeclKind>(['component', 'service', 'pipe', 'directive']);
+const HANDLED_KINDS: Set<DeclKind> = new Set<DeclKind>(['component', 'service', 'pipe', 'directive', 'resolver']);
 
 /** Why a given kind is not handled yet — written once, so the report is specific rather than a shrug. */
 const UNHANDLED_NOTES: Record<string, string> = {
@@ -1620,8 +1672,15 @@ export function inventory(files: string[]): Decl[] {
           note: converted ? '' : (UNHANDLED_NOTES[kind] ?? 'not converted yet'),
         });
       };
-      if (ts.isClassDeclaration(stmt)) add(stmt.name?.text ?? '(anonymous class)', decoratedAs(stmt) ?? 'class');
-      else if (ts.isFunctionDeclaration(stmt)) add(stmt.name?.text ?? '(anonymous function)', 'function');
+      // A route RESOLVER carries no decorator, so it used to land in the `class` bucket and be counted as plain
+      // TypeScript carried across. It is an Angular construct with a Weave counterpart, and is counted as one.
+      if (ts.isClassDeclaration(stmt)) {
+        const resolver: boolean =
+          decoratedAs(stmt) === null &&
+          stmt.members.some((m) => ts.isMethodDeclaration(m) && memberName(m) === 'resolve' && m.parameters.length > 0);
+        add(stmt.name?.text ?? '(anonymous class)', decoratedAs(stmt) ?? (resolver ? 'resolver' : 'class'));
+      }
+      if (ts.isFunctionDeclaration(stmt)) add(stmt.name?.text ?? '(anonymous function)', 'function');
       else if (ts.isInterfaceDeclaration(stmt)) add(stmt.name.text, 'interface');
       else if (ts.isTypeAliasDeclaration(stmt)) add(stmt.name.text, 'type');
       else if (ts.isEnumDeclaration(stmt)) add(stmt.name.text, 'enum');
@@ -1729,6 +1788,8 @@ export interface MigrationFacts {
   pipes: PipeFact[];
   /** `@Directive` classes — in Weave a `use:` action. */
   directives: DirectiveFact[];
+  /** Route-resolver classes — in Weave a route `loader`. Carried as plain TypeScript before, which they are not. */
+  resolvers: ResolverFact[];
   /** EVERY top-level declaration found, marked handled or not. */
   inventory: Decl[];
   /** The headline: how much of the source this tool actually converts, and exactly what it does not. */
@@ -1836,6 +1897,7 @@ export function mergeFacts(base: MigrationFacts, extra: MigrationFacts): Migrati
     tokens: uniq([...base.tokens, ...extra.tokens], (x) => `${x.file}:${x.name}`),
     pipes: uniq([...base.pipes, ...extra.pipes], (x) => `${x.file}:${x.className}`),
     directives: uniq([...base.directives, ...extra.directives], (x) => `${x.file}:${x.className}`),
+    resolvers: uniq([...(base.resolvers ?? []), ...(extra.resolvers ?? [])], (x) => `${x.file}:${x.className}`),
     inventory: decls,
     coverage: coverage(decls),
     granted: [...(base.granted ?? []), extra.unit],
@@ -1901,7 +1963,7 @@ export function assembleFacts(unitDir: string, only?: string[]): MigrationFacts 
   const empty: MigrationFacts = {
     unit: unitDir, entry: null, files: [], angular: [], internal: [], packages: [], packageUsage: [],
     components: [], services: [], di: [], routes: [], forms: [], calls: [], branches: [], cycles: [], unresolved: [],
-    ngModules: [], tokens: [], pipes: [], directives: [],
+    ngModules: [], tokens: [], pipes: [], directives: [], resolvers: [],
     inventory: [], coverage: { total: 0, handled: 0, carried: 0, gaps: [], emptyFiles: [] },
   };
   if (!entry) return empty;
@@ -1933,6 +1995,7 @@ export function assembleFacts(unitDir: string, only?: string[]): MigrationFacts 
     tokens: analyzeTokens(walk.files),
     pipes: analyzePipes(walk.files),
     directives: analyzeDirectives(walk.files),
+    resolvers: analyzeResolvers(walk.files),
     inventory: decls,
     coverage: coverage(decls),
   };

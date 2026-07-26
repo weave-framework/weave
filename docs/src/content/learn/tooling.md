@@ -216,6 +216,7 @@ comment rather than guessed at.
 | `<ng-content>` / `<router-outlet>` | `<slot>` / `<RouterView>` |
 | reactive forms | `@weave-framework/forms` |
 | route guards | `beforeEach` |
+| a route resolver | a route `loader`, read with `useLoaderData()` |
 | `HttpClient` | `@weave-framework/data` — `resource` for reads, `action` for writes |
 | `InjectionToken` | `createContext` |
 | RxJS | signals — with a per-operator note for every operator your code imports |

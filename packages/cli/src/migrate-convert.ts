@@ -28,6 +28,7 @@ import {
   type MigrationFacts,
   type NgModuleFact,
   type PipeFact,
+  type ResolverFact,
   type TokenFact,
   type RouteFact,
   type ServiceFact,
@@ -2534,6 +2535,50 @@ export function convertDirective(fact: DirectiveFact): { baseName: string; ts: s
   return { baseName: fnName.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase(), ts: lines.join('\n') };
 }
 
+/* ──────────── route resolvers → a route `loader` ──────────── */
+
+/**
+ * An Angular route RESOLVER becomes a Weave route `loader` — data fetched when the route renders, read by the
+ * component with `useLoaderData()`.
+ *
+ * It carries no decorator, so it used to fall through as "plain TypeScript, carried as-is": a file full of
+ * `ActivatedRouteSnapshot` moved unchanged, under a banner saying most of it already works. It does not work —
+ * nothing in Weave will ever call it.
+ *
+ * The BODY is not rewritten. Angular hands a resolver the route's snapshot (`route.data`, `routeConfig`, url
+ * segments); Weave hands a loader `{ params, query, signal }`. Those are different objects, not different
+ * spellings, so the shape is drafted and the original travels beside it.
+ */
+export function convertResolver(fact: ResolverFact): { baseName: string; ts: string } {
+  const fnName: string = `load${fact.className.replace(/Resolver$/, '')}`;
+  const lines: string[] = [
+    `// Converted from ${fact.className} (${fact.file}).`,
+    '//',
+    "// An Angular route resolver is a Weave route LOADER: attach it to the route, and the component reads it",
+    `// with \`useLoaderData()\`. Wire it as \`route('/path', { component: X, loader: ${fnName} })\`.`,
+    '//',
+    tsTodo("Angular handed `resolve` the route SNAPSHOT — `route.data`, `routeConfig`, url segments. A loader"),
+    '//   gets `{ params, query, signal }` instead: different objects, not a different spelling. What the body',
+    "//   read off the snapshot is the one thing only you can map. `signal` aborts a run the router supersedes.",
+    '',
+    `export function ${fnName}(ctx: { params: Record<string, string>; query: URLSearchParams; signal: AbortSignal }): unknown {`,
+    `  ${tsTodo('port the body — the original is below, unchanged.')}`,
+    '  return undefined;',
+    '}',
+    '',
+    `// ── original ${fact.className}.resolve(${fact.params}) ──`,
+    ...(fact.body || '').split('\n').map((l) => `// ${l}`),
+  ];
+  // Anything else the class held travels too — a resolver often has helpers beside its `resolve`.
+  const rest: ClassMember[] = fact.members.filter((m) => m.name !== 'resolve');
+  if (rest.length) {
+    lines.push('', `// ── the rest of ${fact.className}, carried over ──`);
+    for (const m of rest) for (const l of (m.text ?? '').split('\n')) lines.push(`// ${l}`);
+  }
+  lines.push('');
+  return { baseName: fnName.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase(), ts: lines.join('\n') };
+}
+
 /* ──────────── NgModules → a wiring note, InjectionTokens → contexts ──────────── */
 
 /**
@@ -2777,14 +2822,21 @@ export function carryFile(file: string, facts: MigrationFacts): string | null {
   const repointed: string = src.replace(/(from\s*['"])(\.[^'"]+)(['"])/g, (_m, head: string, spec: string, tail: string) => `${head}${repointSpecifier(spec)}${tail}`);
 
   const angularImports: string[] = importedNamesFrom(file, '@angular');
-  const header: string[] = [
-    `// Carried over from ${file} by \`weave migrate\`.`,
-    '// This file had no @Component/@Injectable, so it is kept as-is — most of it is plain TypeScript that already',
-    '// works. Check the imports and anything Angular-specific below.',
-  ];
-  if (angularImports.length) {
-    header.push(tsTodo(`it imports from @angular (${[...new Set(angularImports)].slice(0, 6).join(', ')}) — replace those with their Weave equivalents (see migration-plan.md).`));
-  }
+  // A carried file with `@angular` imports does NOT "already work" — it is Angular code in a Weave app, and it
+  // will not run. Saying otherwise about the very framework being migrated away from is the kind of soothing
+  // banner that makes a reader skip the file.
+  const header: string[] = angularImports.length
+    ? [
+        `// Carried over from ${file} by \`weave migrate\`.`,
+        '// NOT CONVERTED — this file has no @Component/@Injectable, so it was moved unchanged. It still imports',
+        '// from @angular, which means it does NOT work in Weave as it stands.',
+        tsTodo(`it imports from @angular (${[...new Set(angularImports)].slice(0, 6).join(', ')}) — replace those with their Weave equivalents (see migration-plan.md).`),
+      ]
+    : [
+        `// Carried over from ${file} by \`weave migrate\`.`,
+        '// This file had no @Component/@Injectable, so it is kept as-is — plain TypeScript that already works.',
+        '// Check anything framework-specific below.',
+      ];
   if (facts.packages.some((p) => p.decision === 'auto' && importedNamesFrom(file, p.name).length)) {
     header.push(tsTodo('it uses a package you chose to migrate — check the plan for what it becomes.'));
   }
@@ -2892,6 +2944,11 @@ export function planWrites(facts: MigrationFacts, targetDir: string): WriteItem[
     const path: string = join(targetDir, 'src', dir, `${base}.ts`);
     items.push({ path, content: convertDirective(df).ts, status: existsSync(path) ? 'skip-exists' : 'write' });
   }
+  // Route resolvers → a route `loader`. They carry no decorator, so they used to be carried as plain TypeScript.
+  for (const rf of facts.resolvers ?? []) {
+    const path: string = outputFileFor(rf.file, facts, targetDir);
+    items.push({ path, content: convertResolver(rf).ts, status: existsSync(path) ? 'skip-exists' : 'write' });
+  }
 
   // NgModules: not code in Weave, but a wiring note that records what only the module knew.
   for (const nm of facts.ngModules ?? []) {
@@ -2918,6 +2975,7 @@ export function planWrites(facts: MigrationFacts, targetDir: string): WriteItem[
     ...(facts.pipes ?? []).map((pf) => pf.file),
     ...(facts.directives ?? []).map((df) => df.file),
     ...(facts.ngModules ?? []).map((nm) => nm.file),
+    ...(facts.resolvers ?? []).map((rf) => rf.file),
   ]);
   for (const file of facts.files) {
     if (covered.has(file)) continue;
