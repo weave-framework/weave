@@ -482,7 +482,9 @@ async function accessStep(io: InputManager, facts: MigrationFacts): Promise<Migr
       // Analysis works on the UNIT, so a file path climbs to the project it belongs to. Stopping at the parent
       // folder made `libs/x/src/index.ts` a "unit" called `src`, and its output landed in `src/src/`.
       const unit: string = unitRootFor(path);
-      const extra: MigrationFacts = assembleFacts(unit);
+      // Only what is USED from it. A library's entry is a barrel, so analysing one whole migrated 200 interfaces
+      // to satisfy an import of one — the complaint that started this, arriving back through the door I opened.
+      const extra: MigrationFacts = assembleFacts(unit, g.uses);
       if (!extra.entry) {
         console.log(`    ${c.yellow("Couldn't find an entry file there")} ${c.dim('— nothing read. Treating it as skipped.')}`);
         declined.push(g.name);

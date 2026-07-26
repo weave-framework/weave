@@ -1843,12 +1843,60 @@ export function mergeFacts(base: MigrationFacts, extra: MigrationFacts): Migrati
   };
 }
 
+/** The top-level names a file EXPORTS (`export interface X`, `export enum X`, `export const X`, `export class X`). */
+export function exportedNames(filePath: string): string[] {
+  const sf: ts.SourceFile | null = parseFile(filePath);
+  if (!sf) return [];
+  const out: string[] = [];
+  for (const st of sf.statements) {
+    const exported: boolean = ts.canHaveModifiers(st) && (ts.getModifiers(st) ?? []).some((m) => m.kind === ts.SyntaxKind.ExportKeyword);
+    if (!exported) continue;
+    if (ts.isVariableStatement(st)) {
+      for (const d of st.declarationList.declarations) if (ts.isIdentifier(d.name)) out.push(d.name.text);
+    } else if (
+      (ts.isInterfaceDeclaration(st) || ts.isEnumDeclaration(st) || ts.isClassDeclaration(st) || ts.isFunctionDeclaration(st) || ts.isTypeAliasDeclaration(st)) &&
+      st.name
+    ) {
+      out.push(st.name.text);
+    }
+  }
+  return out;
+}
+
+/**
+ * Restrict a walk to what a given set of NAMES actually reaches. A library's entry is a barrel, and a barrel
+ * re-exports everything — so walking one from its entry pulls the whole library in. Importing `IBreadcrumb` from
+ * a lib of 200 interfaces has to migrate one interface, not two hundred: the files that DECLARE the wanted names
+ * become the roots, and the walk runs from those.
+ */
+function narrowTo(walk: DependencyWalk, names: string[]): DependencyWalk {
+  const roots: string[] = walk.files.filter((f) => exportedNames(f).some((n) => names.includes(n)));
+  if (!roots.length) return walk; // nothing here declares them — say so by leaving the walk whole, not empty
+  const merged: DependencyWalk = { files: [], angular: [], thirdParty: [], internal: [], cycles: [], unresolved: [] };
+  const union = (key: 'files' | 'angular' | 'thirdParty' | 'internal' | 'unresolved', xs: string[]): void => {
+    merged[key] = [...new Set([...merged[key], ...xs])];
+  };
+  for (const root of roots) {
+    const sub: DependencyWalk = walkDependencies(root);
+    union('files', sub.files);
+    union('angular', sub.angular);
+    union('thirdParty', sub.thirdParty);
+    union('internal', sub.internal);
+    union('unresolved', sub.unresolved);
+    merged.cycles.push(...sub.cycles);
+  }
+  return merged;
+}
+
 /**
  * Run the whole M2 analysis for one unit and return the assembled facts. Single source of truth: the command
  * renders its summary from this, and `writeFacts` serialises the same object. When no entry is found, everything
  * is empty and `entry` is null (honest, not a crash).
+ *
+ * `only` narrows the unit to the names actually wanted from it — see `narrowTo`. Without it a library is taken
+ * whole, which is right when the user pointed AT that library and wrong when they merely import one type from it.
  */
-export function assembleFacts(unitDir: string): MigrationFacts {
+export function assembleFacts(unitDir: string, only?: string[]): MigrationFacts {
   const entry: string | null = findEntryPoint(unitDir);
   const empty: MigrationFacts = {
     unit: unitDir, entry: null, files: [], angular: [], internal: [], packages: [], packageUsage: [],
@@ -1858,7 +1906,7 @@ export function assembleFacts(unitDir: string): MigrationFacts {
   };
   if (!entry) return empty;
 
-  const walk: DependencyWalk = walkDependencies(entry);
+  const walk: DependencyWalk = only?.length ? narrowTo(walkDependencies(entry), only) : walkDependencies(entry);
   const workspaceRoot: string = findWorkspaceRoot(unitDir);
   const tsPaths: TsPaths | null = readTsPaths(workspaceRoot);
   const services: ServiceFact[] = analyzeServices(walk.files);

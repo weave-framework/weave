@@ -207,6 +207,10 @@ then asks again, because opening one thing reveals the next. Say no and its call
 with the original code beside them. **Either answer is recorded in the plan**: *you chose not to show me this*
 and *this wasn't there* are different answers, and only one of them is the tool's fault.
 
+Yes means **what you use**, not the whole library. A library entry is a barrel, so walking one from its entry
+reaches every file in it — importing one interface would migrate all two hundred. The files that *declare* the
+names you actually import are the roots, and only what they reach comes across.
+
 A granted unit's output lands under its own folder (`src/sps-interfaces/…`), so it never collides with your app's.
 
 > **This is assisted, not automatic.** Method and getter bodies *are* translated — `this.x` is a rename with a

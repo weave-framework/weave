@@ -831,6 +831,16 @@ ok(cmpDraft.includes('became props'), 'convertComponent: the fields that turned 
 // Angular lifecycle hooks are named, not left as anonymous methods.
 ok(fullDraft.includes('lifecycle hook') && fullDraft.includes('onDispose'), 'convertService: ngOnDestroy is identified as a lifecycle hook with its Weave equivalent');
 
+// Weave has NO interpolation inside an attribute value — its dynamic form is the WHOLE value or nothing. A mixed
+// value passed through rendered the braces onto the element as literal text: visible in a browser, invisible to
+// every string assertion, which is how it survived.
+ok(cv.convertAttr({ name: 'class', value: 'logo-{{ svg.name }}-svg' }, 'div').out === 'class={{ "logo-" + (svg.name) + "-svg" }}', 'convertAttr: a MIXED attribute value becomes one expression, not text with braces in it');
+ok(cv.convertAttr({ name: 'title', value: '{{ x }}' }, 'div').out === 'title={{ (x) }}', 'convertAttr: a wholly-interpolated attribute is the expression alone');
+ok(cv.convertAttr({ name: 'class', value: 'plain' }, 'div').out === 'class="plain"', 'convertAttr: an attribute with no interpolation is left exactly as it was');
+const mixedTpl = conv('<div class="a-{{ x | uppercase }}-b"></div>');
+ok(!mixedTpl.includes('{{ x'), 'convertTemplate: nothing is left rendering `{{ … }}` as literal attribute text');
+ok(compilesAsWeave(mixedTpl) === '', `the converted mixed attribute COMPILES${compilesAsWeave(mixedTpl) ? ` — ${compilesAsWeave(mixedTpl)}` : ''}`);
+
 // ── ACCESS: what is USED but cannot be looked inside ──
 // A method calls a method calls a method. Following every workspace lib turned ONE imported type into 214 files;
 // following none migrates a service the app leans on as a name and nothing else. So each is asked for by name.
@@ -844,6 +854,20 @@ ok(lib?.neededBy.some((f) => f.endsWith('app.component.ts')), 'outOfReach: it na
 const missingClass = reach.find((r) => r.name === 'AnalyticsService');
 ok(missingClass?.kind === 'class' && missingClass.path === null, 'outOfReach: an injected class with no definition here is a gap, and only the user knows where it is');
 ok(!reach.some((r) => r.name === 'Router'), "outOfReach: Angular's own injectables are NOT gaps — they have a recorded answer, and asking where Router lives is nonsense");
+
+// GRANTING ACCESS IS NOT "TAKE THE WHOLE LIBRARY". A library's entry is a barrel of `export *`, so analysing one
+// from its entry reaches every file in it — importing ONE interface migrated two hundred. What is wanted is what
+// is USED, and the files that DECLARE those names are the roots to walk from.
+const ifaceDir = join(fx, 'nx-mono', 'libs', 'sps-interfaces');
+const whole = a.assembleFacts(ifaceDir);
+const narrowed = a.assembleFacts(ifaceDir, ['User']);
+ok(whole.files.length > 3, `the lib fixture really is a barrel over several files (got ${whole.files.length}) — otherwise narrowing cannot be tested`);
+ok(narrowed.files.length < whole.files.length, `assembleFacts(only): a used name pulls in less than the whole library (${narrowed.files.length} vs ${whole.files.length})`);
+ok(narrowed.files.every((f) => !/(order|invoice|address|payment|shipment)\.ts$/.test(f)), 'assembleFacts(only): the files nothing asked for are not migrated at all');
+ok(narrowed.files.some((f) => f.endsWith(`user.ts`)), 'assembleFacts(only): the file DECLARING the wanted name is');
+ok(a.exportedNames(join(ifaceDir, 'src', 'lib', 'user.ts')).includes('User'), 'exportedNames: a top-level exported interface is found');
+// An unknown name means "I could not locate it here" — the honest answer is the whole unit, not an empty one.
+ok(a.assembleFacts(ifaceDir, ['NoSuchType']).files.length === whole.files.length, 'assembleFacts(only): a name that is nowhere in the unit falls back to the whole unit, never to nothing');
 
 // Granting access folds the unit in, and coverage is recomputed over the COMBINED source — keeping the old
 // coverage would report a percentage of a smaller source than the one actually being migrated.

@@ -46,6 +46,16 @@
   template has no single root there is no honest place for any of it, so the whole set is reported rather than
   attached to an arbitrary element.
 
+  **Granting access is not "take the whole library".** A library entry is a barrel of `export *`, so analysing
+  one from its entry reaches every file in it — an import of ONE interface migrated two hundred, which is the
+  complaint this whole feature was built to answer, arriving back through the door it opened. The files that
+  DECLARE the wanted names are the roots now, and the walk runs from those. A name found nowhere in the unit
+  falls back to the whole unit, never to nothing.
+
+  **A mixed attribute value becomes one expression.** Angular interpolates inside an attribute; Weave does not —
+  its dynamic form is the whole value or nothing. `class="logo-{{ name }}-svg"` was passed through and rendered
+  the braces onto the element as literal text: visible in a browser, invisible to every string assertion.
+
   **It asks for what it cannot see.** A method calls a method calls a method, and some of those live in a
   workspace library reached through a `tsconfig` alias, or in an injected class with no definition in this unit.
   Neither default is right: following every library turns one imported type into hundreds of files, following

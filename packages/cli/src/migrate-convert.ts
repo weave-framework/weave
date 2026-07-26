@@ -231,6 +231,31 @@ export function convertInterpolations(text: string): ConvertedExpr {
   return { expr, todos };
 }
 
+/**
+ * An attribute value that MIXES text and interpolation — `class="logo-{{ name }}-svg"` — as one expression.
+ *
+ * Angular interpolates inside an attribute value; Weave does not. Its dynamic form is `attr={{ expr }}`, the
+ * whole value or nothing, so a mixed value passed through unchanged rendered the braces as literal text: the
+ * element came out with `class="logo-{{ svg.name }}-svg"` written on it. Visible in a browser, invisible to
+ * every string assertion — which is how it survived.
+ */
+export function attrInterpolation(value: string): ConvertedExpr {
+  const todos: string[] = [];
+  const parts: string[] = [];
+  let last: number = 0;
+  const re: RegExp = /\{\{([\s\S]*?)\}\}/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(value)) !== null) {
+    if (m.index > last) parts.push(JSON.stringify(value.slice(last, m.index)));
+    const conv: ConvertedExpr = convertExpr(m[1].trim());
+    todos.push(...conv.todos);
+    parts.push(`(${conv.expr})`);
+    last = m.index + m[0].length;
+  }
+  if (last < value.length) parts.push(JSON.stringify(value.slice(last)));
+  return { expr: parts.join(' + '), todos };
+}
+
 /** `on:click="save()"` needs a FUNCTION in Weave, while Angular writes a statement — so wrap it in an arrow. */
 function eventBinding(event: string, statement: string): string {
   // `$event` is a valid JS identifier, so naming the arrow's parameter `$event` makes Angular's statement work
@@ -320,10 +345,12 @@ export function convertAttr(attr: Attr, tag: string): { out: string | null; todo
     return { out: `href="${raw}"`, todo: 'routerLink → use `<Link href="…">` from @weave-framework/router for client-side navigation' };
   }
 
-  // A plain attribute passes through, but any {{ }} inside it is still an Angular expression.
+  // A plain attribute. Weave has NO interpolation inside an attribute value, so one that contains `{{ }}` has to
+  // become a single expression — leaving it as text rendered the braces onto the element.
   if (value === null) return { out: name };
-  const inAttr: ConvertedExpr = convertInterpolations(value);
-  return { out: `${name}="${inAttr.expr}"`, todos: inAttr.todos };
+  if (!value.includes('{{')) return { out: `${name}="${value}"` };
+  const inAttr: ConvertedExpr = attrInterpolation(value);
+  return { out: `${name}={{ ${inAttr.expr} }}`, todos: inAttr.todos };
 }
 
 /* ──────────── structural directives → Weave blocks ──────────── */
