@@ -489,14 +489,53 @@ ok(formPair.ts.includes('exactly seven validators'), 'convertComponent: the draf
 ok(!cv.convertComponent(loginFact, '<p></p>', {}).ts.includes('@weave-framework/forms'), 'convertComponent: a component with no form gets no forms import');
 
 // the component pair
-const cfact = { file: 'x/task-card.component.ts', className: 'TaskCardComponent', selector: 'app-task-card', standalone: true, inputs: ['task'], outputs: ['remove'], templateInline: false, templateUrl: './t.html', styleUrls: [], inlineStyles: 0, injects: ['UserService'] };
+const cfact = { file: 'x/task-card.component.ts', className: 'TaskCardComponent', selector: 'app-task-card', standalone: true, inputs: ['task'], outputs: ['remove'], templateInline: false, templateUrl: './t.html', styleUrls: [], inlineStyles: 0, injects: ['UserService'], members: [] };
 const pair = cv.convertComponent(cfact, '<h3 *ngIf="task">{{ task.title }}</h3>');
 ok(pair.baseName === 'task-card', `convertComponent: base name from the selector (got ${pair.baseName})`);
 ok(pair.ts.includes('export function setup(') && pair.ts.includes('task: unknown'), 'convertComponent: a setup() with the @Input as a prop');
 ok(pair.ts.includes('onRemove?:'), 'convertComponent: an @Output becomes an onX callback prop');
 ok(pair.ts.includes('UserService') && pair.ts.includes('TODO(weave migrate)'), 'convertComponent: injected services are flagged for the store()/provide decision');
-ok(pair.html.includes('@if (task) {'), 'convertComponent: the template is converted alongside');
+// An Angular template reads an @Input by its bare name; a Weave one reads it off `props`. Left bare, the binding
+// does not resolve and the component renders nothing — found on a real migrated component.
+ok(pair.html.includes('@if (props.task) {'), 'convertComponent: a template reference to an @Input becomes props.x');
+ok(cv.qualifyProps('flowLabel', ['flowLabel']) === 'props.flowLabel', 'qualifyProps: a bare prop name is qualified');
+ok(cv.qualifyProps('svg?.name', ['svg']) === 'props.svg?.name', 'qualifyProps: an optional chain on a prop still qualifies');
+ok(cv.qualifyProps('x.color', ['color']) === 'x.color', 'qualifyProps: a PROPERTY of something else is left alone');
+ok(cv.qualifyProps("'color'", ['color']) === "'color'", 'qualifyProps: a string literal is never rewritten');
+ok(cv.qualifyProps('colorful', ['color']) === 'colorful', 'qualifyProps: a longer identifier starting with a prop name is untouched');
+ok(cv.qualifyProps('a', []) === 'a', 'qualifyProps: no props → nothing changes');
+// A snippet parameter is a LOCAL, not a prop, even when the names collide.
+const shadow = conv('<ng-template #row let-color><b>{{ color }}</b></ng-template>', { props: ['color'] });
+ok(shadow.includes('{{ color }}'), 'convertTemplate: a snippet parameter shadows a prop and is NOT qualified');
 ok(cv.pascalCase('app-task-card') === 'AppTaskCard', 'pascalCase: a selector becomes a component name');
+
+// ── an @Input states a TYPE and a DEFAULT; both used to be discarded, and getters vanished entirely ──
+const typedFact = a.findComponents(join(comps, 'typed.component.ts'))[0];
+ok(typedFact.members.some((m) => m.kind === 'getter' && m.name === 'hasColor'), 'findComponents: a getter is captured (nothing captured accessors before)');
+ok(typedFact.members.find((m) => m.name === 'color')?.type === 'string', "findComponents: an @Input's declared TYPE is captured");
+ok(typedFact.members.find((m) => m.name === 'color')?.initializer === "'sps-default'", "findComponents: an @Input's DEFAULT is captured");
+
+const typedTs = cv.convertComponent(typedFact, '<b>{{ label }}</b>', {}).ts;
+ok(typedTs.includes('color?: string;') && typedTs.includes('enabled?: boolean;') && typedTs.includes('items?: string[];'), 'convertComponent: the props signature carries the declared types, not `unknown`');
+ok(typedTs.includes('required: number;') && !typedTs.includes('required?:'), 'convertComponent: an @Input with no default stays REQUIRED for the parent');
+ok(typedTs.includes('export const propDefaults = {') && typedTs.includes("color: 'sps-default',") && typedTs.includes('enabled: true,'), 'convertComponent: the declared defaults become propDefaults — Weave\'s own mechanism for exactly this');
+// Scoped to the propDefaults BLOCK: `label:` also appears in the props type below it, so a whole-file search
+// would pass no matter what the block contained.
+const defaultsBlock = typedTs.slice(typedTs.indexOf('propDefaults = {'), typedTs.indexOf('};', typedTs.indexOf('propDefaults = {')));
+ok(!defaultsBlock.includes('label:'), 'convertComponent: a `= null` default is not carried — a missing prop already reads as absent');
+ok(typedTs.includes('const hasColor = computed(') && typedTs.includes('get hasColor()'), 'convertComponent: a getter becomes a computed, with its original beside it');
+// Imports follow what the body uses: this component's fields are all @Inputs (so no `signal`), but it has a
+// getter (so `computed`). Neither a missing nor a dead import.
+ok(typedTs.includes("import { computed } from '@weave-framework/runtime';"), 'convertComponent: computed is imported for the getter, and signal is not imported when nothing needs it');
+// The whole-class guarantee still holds with accessors in play.
+const typedLost = typedFact.classBody.split('\n').map((l) => l.trim()).filter((l) => l && l !== '}' && l !== '{').filter((l) => !typedTs.includes(l));
+ok(typedLost.length === 0, `NOTHING IS LOST (accessors): every line survives (lost: ${typedLost.join(' | ') || 'none'})`);
+
+// signal-input defaults live inside the call
+ok(cv.signalInputDefault({ initializer: "input('')" }) === "''", 'signalInputDefault: input(x) defaults to x');
+ok(cv.signalInputDefault({ initializer: 'input.required<number>()' }) === '', 'signalInputDefault: input.required has no default by definition');
+ok(cv.signalInputDefault({ initializer: 'input(5, { alias: "n" })' }) === '5', 'signalInputDefault: the options bag is not mistaken for the default');
+ok(cv.signalInputDefault({ initializer: 'null' }) === '', 'signalInputDefault: an explicit null is not a default worth carrying');
 
 // ── M5: the hard parts DRAFTED — service → store()/context, RxJS → targeted suggestions ──
 const rootSvc = {

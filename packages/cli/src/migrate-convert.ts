@@ -171,6 +171,26 @@ function splitPipes(expr: string): string[] {
  * and every OTHER pipe is left in place with a TODO. That matters: leaving `{{ x | date }}` untouched would emit
  * a template that merely LOOKS converted while being invalid Weave.
  */
+/**
+ * Prefix a component's own prop names with `props.` in a template expression.
+ *
+ * Angular reads an `@Input` by its bare name; Weave reads it off the `props` object the setup receives. A name
+ * left bare simply does not resolve, so the component renders nothing — this is what makes the difference
+ * between a template that works and one that merely looks converted.
+ *
+ * Only whole-word identifiers are touched, and never one already preceded by a dot (`x.color` is a property of
+ * `x`, not the prop) or sitting inside a string literal.
+ */
+export function qualifyProps(expr: string, props: string[]): string {
+  if (!props.length) return expr;
+  const names: string = props.map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+  // Split on string literals so their contents are never rewritten, then rewrite only the code between them.
+  return expr
+    .split(/('[^']*'|"[^"]*"|`[^`]*`)/g)
+    .map((part, i) => (i % 2 === 1 ? part : part.replace(new RegExp(`(^|[^.\\w$])(${names})\\b`, 'g'), '$1props.$2')))
+    .join('');
+}
+
 export function convertExpr(expr: string): ConvertedExpr {
   const parts: string[] = splitPipes(expr);
   if (parts.length === 1) return { expr: expr.trim(), todos: [] };
@@ -330,6 +350,10 @@ export interface ConvertOptions {
   /** Filled in by `convertTemplate` from a first pass over the tree — the `<ng-template>`s and their parameters,
    *  so an `*ngTemplateOutlet` can be rendered as `@render (name(args))` with the arguments in the right order. */
   snippets?: Record<string, SnippetDef>;
+  /** The component's prop names. An Angular template reads an `@Input` by its bare name; a Weave template reads
+   *  it off `props`. Without this the converted template names bindings that do not exist, and the component
+   *  renders nothing — so it is the difference between output that works and output that only looks right. */
+  props?: string[];
 }
 
 /** One `<ng-template #name let-a let-b="key">` turned into a Weave `@snippet name(a, b)`. */
@@ -629,7 +653,20 @@ export function convertTemplate(html: string, opts: ConvertOptions = {}): string
   // First pass: find the <ng-template>s, so an outlet appearing BEFORE its template still resolves.
   const snippets: Record<string, SnippetDef> = { ...opts.snippets };
   collectSnippets(tree, snippets);
-  return renderNodes(tree, { ...opts, snippets });
+  const out: string = renderNodes(tree, { ...opts, snippets });
+  // Last pass: an Angular template reads an @Input by its bare name, a Weave one reads it off `props`. Done here
+  // rather than per-expression so every place a name can appear — interpolations, bindings, block headers — is
+  // covered by one rule. Snippet parameters are locals, so they are excluded.
+  const locals: Set<string> = new Set<string>(Object.values(snippets).flatMap((s) => s.params.map((p) => p.name)));
+  const props: string[] = (opts.props ?? []).filter((p) => !locals.has(p));
+  return props.length ? qualifyTemplateExpressions(out, props) : out;
+}
+
+/** Apply `qualifyProps` to every expression in a rendered Weave template: `{{ … }}` and `@block ( … )` headers. */
+function qualifyTemplateExpressions(text: string, props: string[]): string {
+  return text
+    .replace(/\{\{([^}]*)\}\}/g, (_m, inner: string) => `{{ ${qualifyProps(inner.trim(), props)} }}`)
+    .replace(/^(\s*@(?:if|for|switch|case|render)\s*\()([^)]*)\)/gm, (_m, head: string, inner: string) => `${head}${qualifyProps(inner, props)})`);
 }
 
 /* ──────────── the component pair: `foo.ts` (setup) + `foo.html` (template) ──────────── */
@@ -642,6 +679,22 @@ export interface ConvertedComponent {
   ts: string;
   /** The Weave template source. */
   html: string;
+}
+
+/**
+ * A field's default value as written — including the signal-input forms, where the default sits inside the call:
+ * `name = input('')` defaults to `''`, while `input.required<T>()` has none by design. `null`/`undefined` are
+ * treated as "no default", since declaring them adds nothing a missing prop does not already do.
+ */
+export function signalInputDefault(mem: ClassMember | undefined): string {
+  const init: string = (mem?.initializer ?? '').trim();
+  if (!init) return '';
+  const call: RegExpMatchArray | null = init.match(/^(?:input|model)\s*(?:<[^>]*>)?\s*\((.*)\)$/s);
+  if (init.startsWith('input.required')) return ''; // required by definition — no default exists
+  const value: string = call ? call[1].trim() : init;
+  // A signal input's second argument is its options bag, not a default — keep only the first argument.
+  const first: string = call ? value.split(/,(?![^([{]*[)\]}])/)[0].trim() : value;
+  return first === 'null' || first === 'undefined' || first === '' ? '' : first;
 }
 
 /** `TaskCardComponent` → `task-card`; falls back from the selector when there is one. */
@@ -661,12 +714,20 @@ export function baseNameFor(fact: ComponentFact): string {
  */
 export function convertComponent(fact: ComponentFact, templateHtml: string, opts: ConvertOptions = {}, formFact?: FormFact): ConvertedComponent {
   const baseName: string = baseNameFor(fact);
+  // An `@Input() color: string = 'sps-default'` states BOTH a type and a default. Emitting `color: unknown` threw
+  // away two facts the source spelled out — so the type is carried into the props signature, and the default into
+  // `propDefaults`, which is exactly the mechanism Weave provides for it.
+  const inputInfo: Array<{ name: string; type: string; def: string }> = fact.inputs.map((name) => {
+    const mem: ClassMember | undefined = (fact.members ?? []).find((m) => m.name === name && m.kind === 'field');
+    return { name, type: mem?.type ?? '', def: signalInputDefault(mem) };
+  });
   const propLines: string[] = [
-    ...fact.inputs.map((i) => `  ${i}: unknown;`),
+    ...inputInfo.map((i) => `  ${i.name}${i.def ? '?' : ''}: ${i.type || 'unknown'};`),
     ...fact.outputs.map((o) => `  on${o.charAt(0).toUpperCase()}${o.slice(1)}?: (value: unknown) => void;`),
   ];
   const propsType: string = propLines.length ? `{\n${propLines.join('\n')}\n}` : 'Record<string, never>';
   const usesProps: boolean = propLines.length > 0;
+  const defaults: Array<{ name: string; def: string }> = inputInfo.filter((i) => i.def).map((i) => ({ name: i.name, def: i.def }));
 
   const body: string[] = [];
   body.push(`// Converted from ${fact.className} (${fact.file}).`);
@@ -692,7 +753,12 @@ export function convertComponent(fact: ComponentFact, templateHtml: string, opts
 
   // A reactive form becomes a `form({ … })` in setup(); the template binds its leaves with `use:control`.
   const imports: string[] = [];
-  if (carried.some((mem) => mem.kind === 'field')) imports.push("import { signal } from '@weave-framework/runtime';");
+  // Import exactly what the drafted body uses: fields become `signal`, getters become `computed`.
+  const runtimeNeeds: string[] = [
+    ...(carried.some((mem) => mem.kind === 'field') ? ['signal'] : []),
+    ...(carried.some((mem) => mem.kind === 'getter') ? ['computed'] : []),
+  ];
+  if (runtimeNeeds.length) imports.push(`import { ${runtimeNeeds.join(', ')} } from '@weave-framework/runtime';`);
   // A template that used Angular Material now names Weave UI components — which have to be imported to exist.
   imports.push(...uiImportsFor(templateHtml));
   if (formFact) {
@@ -709,15 +775,28 @@ export function convertComponent(fact: ComponentFact, templateHtml: string, opts
     body.push('});');
   }
 
+  // `propDefaults` is Weave's own mechanism for exactly what `@Input() x = 'v'` expressed: a prop the parent may
+  // omit, which then reads this value. Defaulted props also become optional for the parent, as they were.
+  const defaultsBlock: string[] = defaults.length
+    ? [
+        `// The defaults your @Input()s declared. A prop the parent omits reads these; one it passes wins.`,
+        'export const propDefaults = {',
+        ...defaults.map((d) => `  ${d.name}: ${d.def},`),
+        '};',
+        '',
+      ]
+    : [];
+
   const ts: string = [
     ...(imports.length ? [...imports, ''] : []),
+    ...defaultsBlock,
     `export function setup(${usesProps ? `props: ${propsType}` : ''}) {`,
     ...body.map((l) => (l ? `  ${l}` : l)),
     '}',
     '',
   ].join('\n');
 
-  return { baseName, ts, html: convertTemplate(templateHtml, opts) };
+  return { baseName, ts, html: convertTemplate(templateHtml, { ...opts, props: [...fact.inputs, ...fact.outputs] }) };
 }
 
 /* ──────────── M5 — the hard parts, DRAFTED (never silently rewritten) ──────────── */
@@ -973,6 +1052,21 @@ function draftMembers(members: ClassMember[], className: string): { lines: strin
       if (mem.isPublic) publicNames.push(mem.name);
       continue;
     }
+    if (mem.kind === 'getter' || mem.kind === 'setter') {
+      // A getter is a DERIVED value — Weave's is `computed`. A setter has no direct equal: it is an action that
+      // writes, so it becomes a plain function. Both used to vanish entirely.
+      out.push('');
+      out.push(
+        mem.kind === 'getter'
+          ? `${tsTodo(`\`get ${mem.name}()\` is a derived value → \`const ${mem.name} = computed(() => …)\``)}`
+          : `${tsTodo(`\`set ${mem.name}()\` → a plain function that writes the signal`)}`,
+      );
+      out.push(`const ${mem.name} = ${mem.kind === 'getter' ? 'computed(() => undefined)' : `(${mem.params}): void => {}`};${mem.isPublic ? '' : ' // was private — a local, not returned'}`);
+      out.push(`  // ── original ${className}.${mem.name} ──`);
+      out.push(...commented(mem.text));
+      if (mem.isPublic) publicNames.push(mem.name);
+      continue;
+    }
     out.push('');
     const hook: string | undefined = LIFECYCLE_HOOKS[mem.name];
     if (hook) {
@@ -1011,7 +1105,9 @@ export function serviceBaseName(className: string): string {
 export function convertService(fact: ServiceFact, rxjsNames: string[] = []): { baseName: string; ts: string } {
   const singleton: boolean = fact.providedIn === 'root';
   const lines: string[] = [];
-  const imports: string[] = ["import { signal } from '@weave-framework/runtime';"];
+  // Same rule as components: import what the drafted body actually uses (a getter becomes a `computed`).
+  const svcNeeds: string[] = ['signal', ...((fact.members ?? []).some((m) => m.kind === 'getter') ? ['computed'] : [])];
+  const imports: string[] = [`import { ${svcNeeds.join(', ')} } from '@weave-framework/runtime';`];
   if (singleton) imports.push("import { store } from '@weave-framework/store';");
   else imports.push("import { createContext } from '@weave-framework/runtime';");
 

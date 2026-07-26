@@ -663,7 +663,7 @@ function dedentBlock(raw: string): string {
  * the draft silently dropped years of logic. A migration MOVES code and adapts it; it never discards it.
  */
 export interface ClassMember {
-  kind: 'field' | 'method' | 'constructor';
+  kind: 'field' | 'method' | 'constructor' | 'getter' | 'setter';
   /** `(constructor)` for the constructor. */
   name: string;
   /** False for `private`/`protected` — in a Weave store/context these become locals that are not returned. */
@@ -672,8 +672,12 @@ export interface ClassMember {
   params: string;
   /** Methods + constructor: the body, dedented. */
   body: string;
-  /** Fields: the initializer as written (`inject(Router)`, `signal([])`, …). */
+  /** Fields: the initializer as written (`inject(Router)`, `signal([])`, …) — a field's DEFAULT VALUE. */
   initializer: string;
+  /** The declared type as written (`string`, `IBreadcrumb[]`), or '' when there is none. Together with
+   *  `initializer` this is the whole of `@Input() color: string = 'sps-default'` — dropping either threw away
+   *  data the source stated explicitly. */
+  type: string;
   /** Fields: whether it already holds a signal (those map to Weave signals one-to-one). */
   isSignal: boolean;
   /** The member's ENTIRE original source, signature included. The draft carries this verbatim (commented) so the
@@ -701,6 +705,7 @@ function classMembers(node: ts.ClassDeclaration, sf: ts.SourceFile): ClassMember
         params: member.parameters.map((p) => p.getText(sf)).join(', '),
         body: member.body ? dedentBlock(member.body.getText(sf)) : '',
         initializer: '',
+        type: '',
         isSignal: false,
         text: own(member),
       });
@@ -716,6 +721,7 @@ function classMembers(node: ts.ClassDeclaration, sf: ts.SourceFile): ClassMember
         params: member.parameters.map((p) => p.getText(sf)).join(', '),
         body: member.body ? dedentBlock(member.body.getText(sf)) : '',
         initializer: '',
+        type: member.type ? member.type.getText(sf) : '',
         isSignal: false,
         text: own(member),
       });
@@ -727,7 +733,22 @@ function classMembers(node: ts.ClassDeclaration, sf: ts.SourceFile): ClassMember
         params: '',
         body: '',
         initializer: member.initializer ? member.initializer.getText(sf) : '',
+        type: member.type ? member.type.getText(sf) : '',
         isSignal: isSignalField(member),
+        text: own(member),
+      });
+    } else if (ts.isGetAccessorDeclaration(member) || ts.isSetAccessorDeclaration(member)) {
+      // Accessors were captured by NOTHING before: a component with five `get` members came out with all five
+      // silently gone. A getter is a derived value — in Weave a `computed` — so it must survive the move.
+      out.push({
+        kind: ts.isGetAccessorDeclaration(member) ? 'getter' : 'setter',
+        name,
+        isPublic,
+        params: member.parameters.map((p) => p.getText(sf)).join(', '),
+        body: member.body ? dedentBlock(member.body.getText(sf)) : '',
+        initializer: '',
+        type: ts.isGetAccessorDeclaration(member) && member.type ? member.type.getText(sf) : '',
+        isSignal: false,
         text: own(member),
       });
     }
