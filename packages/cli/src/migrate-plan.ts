@@ -225,14 +225,18 @@ export function renderPlan(facts: MigrationFacts): string {
 
   // Coverage comes FIRST, before any encouraging counts. Every gap in this tool so far was found by a person
   // asking "are we done?", never by the tool volunteering it — so it now volunteers it, at the top.
-  const cov: Coverage = facts.coverage ?? { total: 0, handled: 0, gaps: [], emptyFiles: [] };
+  const cov: Coverage = facts.coverage ?? { total: 0, handled: 0, carried: 0, gaps: [], emptyFiles: [] };
   const pct: number = cov.total ? Math.round((cov.handled / cov.total) * 100) : 0;
   out.push('## What this tool converts — and what it does not\n');
-  out.push(`It converts **${cov.handled} of ${cov.total}** top-level declarations (**${pct}%**). The rest is listed here so nothing is a surprise later.\n`);
+  out.push(
+    `It converts **${cov.handled} of ${cov.total}** top-level declarations to Weave (**${pct}%**). ` +
+      `The other **${cov.carried}** are carried into your app unchanged — the code is there, but it is still Angular ` +
+      'and porting it is yours. Nothing is dropped; the difference between *converted* and *carried* is spelled out below.\n',
+  );
   if (cov.gaps.length) {
     out.push(
       table(
-        ['Not converted', 'Count', 'What to do'],
+        ['Carried, not converted', 'Count', 'What to do'],
         cov.gaps.map((g) => [cell(g.kind), String(g.count), cell(`${g.note} — ${g.names.slice(0, 6).join(', ')}${g.names.length > 6 ? ', …' : ''}`)]),
       ),
     );

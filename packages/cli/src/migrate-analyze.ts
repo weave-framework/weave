@@ -1245,9 +1245,12 @@ export interface Decl {
   name: string;
   kind: DeclKind;
   exported: boolean;
-  /** True when the converter emits output for this declaration today. */
+  /** True when this is genuinely CONVERTED to Weave (a component or a service becoming a store/context). */
   handled: boolean;
-  /** For an unhandled declaration: what would have to happen. Never blank — silence is what caused this. */
+  /** True when the code reaches the output at all. A carried file is moved verbatim and still needs hand work —
+   *  counting it as converted would be the same over-claiming that hid the earlier gaps. */
+  carried: boolean;
+  /** For anything not converted: what would have to happen. Never blank — silence is what caused this. */
   note: string;
 }
 
@@ -1310,13 +1313,17 @@ export function inventory(files: string[]): Decl[] {
     if (!sf) continue;
     for (const stmt of sf.statements) {
       const add = (name: string, kind: DeclKind): void => {
+        const converted: boolean = HANDLED_KINDS.has(kind);
         out.push({
           file,
           name,
           kind,
           exported: isExported(stmt),
-          handled: HANDLED_KINDS.has(kind),
-          note: HANDLED_KINDS.has(kind) ? '' : (UNHANDLED_NOTES[kind] ?? 'not handled yet'),
+          handled: converted,
+          // Everything reaches the output now — a file with no @Component/@Injectable is carried whole — but
+          // carried is NOT converted, and the report keeps the two apart on purpose.
+          carried: true,
+          note: converted ? '' : (UNHANDLED_NOTES[kind] ?? 'not converted yet'),
         });
       };
       if (ts.isClassDeclaration(stmt)) add(stmt.name?.text ?? '(anonymous class)', decoratedAs(stmt) ?? 'class');
@@ -1337,7 +1344,10 @@ export function inventory(files: string[]): Decl[] {
 /** The coverage headline: how much of what was found is actually converted. */
 export interface Coverage {
   total: number;
+  /** Genuinely converted to Weave. */
   handled: number;
+  /** Reaches the output but is still Angular code you have to port — moved, not translated. */
+  carried: number;
   /** Unhandled declarations grouped by kind, most numerous first. */
   gaps: Array<{ kind: DeclKind; count: number; note: string; names: string[] }>;
   /** Files that contribute NOTHING to the output — the loudest signal that something is missing. */
@@ -1350,7 +1360,9 @@ export function coverage(decls: Decl[]): Coverage {
   const perFile: Map<string, { total: number; handled: number }> = new Map();
   for (const d of decls) {
     const f: { total: number; handled: number } = perFile.get(d.file) ?? { total: 0, handled: 0 };
-    perFile.set(d.file, { total: f.total + 1, handled: f.handled + (d.handled ? 1 : 0) });
+    // "Empty" now means the file reaches the output in no form at all — with carrying in place that should be
+    // zero, and the check stays so a future writer change cannot quietly reintroduce a dropped file.
+    perFile.set(d.file, { total: f.total + 1, handled: f.handled + (d.carried ? 1 : 0) });
     if (d.handled) continue;
     const e: { count: number; note: string; names: string[] } = byKind.get(d.kind) ?? { count: 0, note: d.note, names: [] };
     byKind.set(d.kind, { count: e.count + 1, note: e.note, names: [...e.names, d.name] });
@@ -1358,6 +1370,7 @@ export function coverage(decls: Decl[]): Coverage {
   return {
     total: decls.length,
     handled: decls.filter((d) => d.handled).length,
+    carried: decls.filter((d) => d.carried && !d.handled).length,
     gaps: [...byKind.entries()].map(([kind, v]) => ({ kind, ...v })).sort((a, b) => b.count - a.count),
     emptyFiles: [...perFile.entries()].filter(([, v]) => v.handled === 0).map(([f]) => f),
   };
@@ -1430,7 +1443,7 @@ export function assembleFacts(unitDir: string): MigrationFacts {
   const empty: MigrationFacts = {
     unit: unitDir, entry: null, files: [], angular: [], internal: [], packages: [], packageUsage: [],
     components: [], services: [], di: [], routes: [], forms: [], calls: [], branches: [], cycles: [], unresolved: [],
-    inventory: [], coverage: { total: 0, handled: 0, gaps: [], emptyFiles: [] },
+    inventory: [], coverage: { total: 0, handled: 0, carried: 0, gaps: [], emptyFiles: [] },
   };
   if (!entry) return empty;
 

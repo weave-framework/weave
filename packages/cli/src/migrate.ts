@@ -336,9 +336,12 @@ export async function runMigrate(): Promise<void> {
     //     because every gap found so far was found by a human asking, not by the tool admitting it.
     const cov: Coverage = facts.coverage;
     const pct: number = cov.total ? Math.round((cov.handled / cov.total) * 100) : 0;
-    console.log(`\n${c.bold('Converted by this tool:')} ${c.bold(`${cov.handled}/${cov.total}`)} ${c.dim('declarations')} (${pct}%)`);
+    console.log(`\n${c.bold('Converted to Weave:')} ${c.bold(`${cov.handled}/${cov.total}`)} ${c.dim('declarations')} (${pct}%)`);
+    if (cov.carried) {
+      console.log(`${c.dim('Carried over as-is:')} ${c.bold(String(cov.carried))} ${c.dim('— moved into your app, still Angular, yours to port')}`);
+    }
     if (cov.gaps.length) {
-      console.log(c.yellow('NOT converted — you port these by hand:'));
+      console.log(c.yellow('Not converted — carried, but you port these by hand:'));
       for (const g of cov.gaps) {
         console.log(`  ${c.yellow('•')} ${c.bold(String(g.count))} ${g.kind}${g.count > 1 ? 's' : ''}: ${c.dim(list(g.names, 5))}`);
         console.log(`    ${c.dim(g.note)}`);

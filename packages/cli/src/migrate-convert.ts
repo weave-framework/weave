@@ -951,6 +951,44 @@ function weaveBaseName(fileName: string): string {
   return fileName.replace(/\.ts$/, '').replace(/\.(component|page|view)$/, '');
 }
 
+/** A component's source file loses its `.component` suffix on the way out, so imports pointing at it must too. */
+function repointSpecifier(spec: string): string {
+  return spec.replace(/\.component$/, '').replace(/\.component(['"])/, '$1');
+}
+
+/**
+ * Carry a file that the converter has no specific rule for — a barrel, a helper module, a plain class, a model.
+ *
+ * These are usually already valid TypeScript, so the file is kept WHOLE rather than summarised: the only edits
+ * are repointing relative imports at renamed outputs, and a header saying what to check. Producing nothing for
+ * them, as this used to, meant a migration silently dropped half a library — including the entry point its
+ * consumers import. Returns null only when the file cannot be read.
+ */
+export function carryFile(file: string, facts: MigrationFacts): string | null {
+  let src: string;
+  try {
+    src = readFileSync(file, 'utf8');
+  } catch {
+    return null;
+  }
+  // Repoint relative import/export specifiers whose target is a component (its `.component` suffix is dropped).
+  const repointed: string = src.replace(/(from\s*['"])(\.[^'"]+)(['"])/g, (_m, head: string, spec: string, tail: string) => `${head}${repointSpecifier(spec)}${tail}`);
+
+  const angularImports: string[] = importedNamesFrom(file, '@angular');
+  const header: string[] = [
+    `// Carried over from ${file} by \`weave migrate\`.`,
+    '// This file had no @Component/@Injectable, so it is kept as-is — most of it is plain TypeScript that already',
+    '// works. Check the imports and anything Angular-specific below.',
+  ];
+  if (angularImports.length) {
+    header.push(tsTodo(`it imports from @angular (${[...new Set(angularImports)].slice(0, 6).join(', ')}) — replace those with their Weave equivalents (see migration-plan.md).`));
+  }
+  if (facts.packages.some((p) => p.decision === 'auto' && importedNamesFrom(file, p.name).length)) {
+    header.push(tsTodo('it uses a package you chose to migrate — check the plan for what it becomes.'));
+  }
+  return `${header.join('\n')}\n\n${repointed}`;
+}
+
 /** The selector → component-name map, so converted templates reference each other as Weave components. */
 export function componentNameMap(facts: MigrationFacts): Record<string, string> {
   const map: Record<string, string> = {};
@@ -990,12 +1028,31 @@ export function planWrites(facts: MigrationFacts, targetDir: string): WriteItem[
     }
   }
   // Services (M5): a `providedIn:'root'` one becomes a store, anything else a context — drafted, not guessed.
+  // The file NAME mirrors the source file, not the class: deriving it from the class name made
+  // `breadcrumbs.component.ts` and `BreadcrumbsService` (in `breadcrumbs.service.ts`) both want `breadcrumbs.ts`,
+  // and the second silently overwrote the first.
   for (const sf of facts.services) {
     const rel: string = relativeUnderSrc(sf.file, facts.unit);
     const dir: string = dirname(rel) === '.' ? '' : dirname(rel);
+    const base: string = (rel.split(/[\\/]/).pop() ?? '').replace(/\.ts$/, '');
     const draft: { baseName: string; ts: string } = convertService(sf, importedNamesFrom(sf.file, 'rxjs'));
-    const path: string = join(targetDir, 'src', dir, `${draft.baseName}.ts`);
+    const path: string = join(targetDir, 'src', dir, `${base || draft.baseName}.ts`);
     items.push({ path, content: draft.ts, status: existsSync(path) ? 'skip-exists' : 'write' });
+  }
+  // EVERY REMAINING FILE. A file with no @Component/@Injectable — a barrel, a helper module, a resolver, a model
+  // — used to produce nothing at all, silently: on a real library that was half the files, including the
+  // `index.ts` its consumers import. Most such files are already valid TypeScript, so they are carried across
+  // whole, with their relative imports repointed at the renamed outputs.
+  const covered: Set<string> = new Set<string>([...facts.components.map((cf) => cf.file), ...facts.services.map((sf) => sf.file)]);
+  for (const file of facts.files) {
+    if (covered.has(file)) continue;
+    const rel: string = relativeUnderSrc(file, facts.unit);
+    const dir: string = dirname(rel) === '.' ? '' : dirname(rel);
+    const base: string = (rel.split(/[\\/]/).pop() ?? '').replace(/\.ts$/, '');
+    const carried: string | null = carryFile(file, facts);
+    if (carried === null) continue;
+    const path: string = join(targetDir, 'src', dir, `${base}.ts`);
+    items.push({ path, content: carried, status: existsSync(path) ? 'skip-exists' : 'write' });
   }
   // Route guards (M5.5) — one module, because Weave's `beforeEach` is global rather than per-route.
   const guards: string | null = convertGuards(facts.routes);

@@ -634,7 +634,9 @@ ok(inv.filter((d) => !d.handled).every((d) => d.note.trim().length > 0), 'invent
 const cov = a.coverage(inv);
 ok(cov.total === inv.length && cov.handled < cov.total, `coverage: reports a real fraction, not 100% (got ${cov.handled}/${cov.total})`);
 ok(cov.gaps.length > 0 && cov.gaps.every((g) => g.count > 0 && g.names.length > 0), 'coverage: each gap is counted AND names the declarations');
-ok(cov.emptyFiles.some((ff) => ff.endsWith('grouped.ts')), 'coverage: a file that produces no output at all is called out by name');
+// `emptyFiles` names files nothing is produced from. `inventory()` alone cannot know what the writer emits, so
+// here it flags them; the end-to-end check further down asserts the real pipeline leaves that list empty.
+ok(Array.isArray(cov.emptyFiles), 'coverage: reports which files contribute nothing, by name');
 
 // The anti-lie check: anything marked `handled` must actually produce a written file. A kind can only be added
 // to HANDLED_KINDS once the writer really emits for it — otherwise coverage would over-report.
@@ -644,6 +646,49 @@ const handledDecls = covFacts.inventory.filter((d) => d.handled);
 ok(handledDecls.length > 0 && writtenFiles.size > 0, 'coverage: the fixture has handled declarations and produced writes');
 const claimedButUnwritten = handledDecls.filter((d) => ![...writtenFiles].some((w) => w.includes(d.file.split(/[\\/]/).pop().replace(/\.component\.ts$|\.service\.ts$|\.ts$/, ''))));
 ok(claimedButUnwritten.length === 0, `coverage does not LIE: every declaration marked handled really produces output (claimed-but-unwritten: ${claimedButUnwritten.map((d) => d.name).join(', ') || 'none'})`);
+
+// ── EVERY walked file must reach the output, and no two may fight over the same path. ──
+// A file with no @Component/@Injectable used to produce nothing at all: on a real library that was half of them,
+// including the index.ts consumers import. And service paths were derived from the CLASS name while component
+// paths came from the FILE, so `breadcrumbs.component.ts` and `BreadcrumbsService` both wrote `breadcrumbs.ts`
+// and the second silently overwrote the first.
+const covWrites = cv.planWrites(covFacts, '/tmp/cov2');
+const covPaths = covWrites.map((w) => w.path);
+ok(covPaths.length === new Set(covPaths).size, `planWrites: no two outputs claim the same path (dupes: ${covPaths.filter((p, i) => covPaths.indexOf(p) !== i).join(', ') || 'none'})`);
+
+// The collision needs a component and a service SHARING a base name — `x.component.ts` + `x.service.ts` — which
+// is how a real library is laid out. Without such a pair the uniqueness check above passes vacuously.
+const collide = mkdtempSync(join(tmpdir(), 'weave-collide-'));
+try {
+  const { mkdirSync } = await import('node:fs');
+  mkdirSync(join(collide, 'src'), { recursive: true });
+  writeFileSync(join(collide, 'src', 'index.ts'), "import { WidgetComponent } from './widget.component';\nimport { WidgetService } from './widget.service';\nexport { WidgetComponent, WidgetService };\n");
+  writeFileSync(join(collide, 'src', 'widget.component.ts'), "import { Component } from '@angular/core';\n@Component({ selector: 'app-widget', template: '' })\nexport class WidgetComponent {}\n");
+  writeFileSync(join(collide, 'src', 'widget.service.ts'), "import { Injectable } from '@angular/core';\n@Injectable({ providedIn: 'root' })\nexport class WidgetService { go(): void {} }\n");
+  const cf = a.assembleFacts(collide);
+  const ps = cv.planWrites(cf, join(collide, 'out')).map((w) => w.path);
+  const dupes = ps.filter((p, i) => ps.indexOf(p) !== i);
+  ok(dupes.length === 0, `planWrites: widget.component.ts and widget.service.ts do NOT collide (dupes: ${[...new Set(dupes)].map((p) => p.split(/[\\/]/).pop()).join(', ') || 'none'})`);
+} finally {
+  rmSync(collide, { recursive: true, force: true });
+}
+const producedFrom = new Set(covWrites.map((w) => (w.path.split(/[\\/]/).pop() ?? '').replace(/\.(ts|html)$/, '')));
+const missingFiles = covFacts.files.filter((ff) => {
+  const base = (ff.split(/[\\/]/).pop() ?? '').replace(/\.ts$/, '').replace(/\.component$/, '');
+  return !producedFrom.has(base);
+});
+ok(missingFiles.length === 0, `EVERY FILE REACHES THE OUTPUT: no walked file produces nothing (missing: ${missingFiles.map((f) => f.split(/[\\/]/).pop()).join(', ') || 'none'})`);
+ok(covFacts.coverage.emptyFiles.length === 0, 'coverage: with carrying in place, no file contributes nothing');
+
+// A carried file keeps its code, is labelled, and has its imports repointed at renamed outputs.
+const carried = cv.carryFile(join(fx, 'forms', 'grouped.ts'), covFacts);
+ok(carried.includes('Carried over from') && carried.includes('chart.group'), 'carryFile: the original code is kept whole, under a header saying it was carried');
+const barrel = cv.carryFile(join(fx, 'nx-mono', 'apps', 'shop', 'src', 'app', 'lazy.routes.ts'), covFacts);
+ok(!/from\s*['"][^'"]*\.component['"]/.test(barrel), 'carryFile: relative imports are repointed at the renamed component outputs');
+
+// CARRIED IS NOT CONVERTED — the report must keep them apart rather than claiming a flattering 100%.
+ok(covFacts.coverage.handled < covFacts.coverage.total, 'coverage: carrying a file does NOT count as converting it');
+ok(covFacts.coverage.carried > 0 && covFacts.coverage.handled + covFacts.coverage.carried === covFacts.coverage.total, 'coverage: converted + carried accounts for everything, with no third silent category');
 
 // The decisive gate for a code GENERATOR: does what it emits actually COMPILE against the real Weave packages?
 // Every assertion above checks the shape of a string; this one checks the thing is usable. It type-checks both
@@ -687,8 +732,10 @@ try {
 const wdir = mkdtempSync(join(tmpdir(), 'weave-write-'));
 try {
   const writes = cv.planWrites(facts, wdir);
-  ok(writes.length === facts.components.length * 2 + facts.services.length, `planWrites: a .ts+.html pair per component, plus one .ts per service (got ${writes.length})`);
-  ok(writes.some((w) => w.path.endsWith('user.ts')), 'planWrites: the service is drafted alongside the components (user.service.ts → user.ts)');
+  // A .ts+.html pair per component, one .ts per service, and one per remaining file — every file reaches output.
+  const carriedCount = facts.files.length - facts.components.length - facts.services.length;
+  ok(writes.length === facts.components.length * 2 + facts.services.length + carriedCount, `planWrites: a pair per component, one per service, one per carried file (got ${writes.length})`);
+  ok(writes.some((w) => w.path.endsWith('user.service.ts')), 'planWrites: a service keeps its own file name (deriving it from the class collided with the component)');
   ok(writes.every((w) => w.path.includes(`${sep}src${sep}`)), 'planWrites: everything lands under the target app\'s src/');
   ok(writes.some((w) => w.path.endsWith('app.ts')) && writes.some((w) => w.path.endsWith('app.html')), 'planWrites: app.component.ts becomes app.ts + app.html (the .component suffix is dropped)');
   ok(writes.every((w) => w.status === 'write'), 'planWrites: into an empty app, every file is a fresh write');
