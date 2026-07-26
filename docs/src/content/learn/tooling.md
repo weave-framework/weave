@@ -185,6 +185,19 @@ comment rather than guessed at.
 Third-party packages are sorted into three groups — ones Weave replaces (`rxjs`, `@ngx-translate`), ones you
 choose to attempt, and ones with no Weave role (`lodash`, `d3`) that you simply keep. You tick the ones to try.
 
+Before writing, it also names the packages the **converted** code still imports:
+
+~~~text
+Your converted code still imports these — they stay dependencies of your app:
+  • lodash — no Weave equivalent — kept as-is
+  • rxjs   — Weave replaces this: what is left is what could not be translated without guessing
+~~~
+
+That second line is the honest half of a real limitation. Weave is signal-native and has no place for an
+`Observable` — a value that changes over time is a `signal`, a one-shot fetch is a `resource`. But a `pipe(…)`
+chain is not a rename, so the migration tells you what each operator becomes and leaves the code naming `rxjs`
+rather than guessing at a rewrite. Every remaining use is a decision, and now you can find them all.
+
 ### It asks for what it cannot see
 
 A method calls a method calls a method, and some of those live somewhere the walk never went — a workspace

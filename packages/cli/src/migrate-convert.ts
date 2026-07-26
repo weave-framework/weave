@@ -2480,6 +2480,28 @@ export interface WriteItem {
 }
 
 /**
+ * Third-party packages the WRITTEN code still imports — the dependencies this migration hands your app.
+ *
+ * The plan says `rxjs` is replaced by Weave's reactivity, and then the converted files import it anyway, because
+ * a stream is not something to rewrite by guess. Both halves are defensible; saying only the first one is not.
+ * A package the output still names is a package the app now depends on, and that has to be visible.
+ */
+export function carriedPackages(items: WriteItem[]): string[] {
+  const out: Set<string> = new Set<string>();
+  for (const it of items) {
+    if (!/\.(ts|tsx)$/.test(it.path)) continue;
+    // Comments carry the ORIGINAL beside every rewrite; an import named only there is not a dependency.
+    const code: string = it.content.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+    for (const m of code.matchAll(/\bfrom\s*'([^']+)'/g)) {
+      const spec: string = m[1];
+      if (spec.startsWith('.') || spec.startsWith('@weave-framework/')) continue;
+      out.add(spec.startsWith('@') ? spec.split('/').slice(0, 2).join('/') : spec.split('/')[0]);
+    }
+  }
+  return [...out].sort();
+}
+
+/**
  * Read a component's Angular template: the inline `template:` text when it has one, else the `templateUrl` file
  * resolved beside the component. Returns null when neither can be read — the caller records that honestly rather
  * than emitting an empty template that looks like a successful conversion.

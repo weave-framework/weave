@@ -841,6 +841,19 @@ const mixedTpl = conv('<div class="a-{{ x | uppercase }}-b"></div>');
 ok(!mixedTpl.includes('{{ x'), 'convertTemplate: nothing is left rendering `{{ … }}` as literal attribute text');
 ok(compilesAsWeave(mixedTpl) === '', `the converted mixed attribute COMPILES${compilesAsWeave(mixedTpl) ? ` — ${compilesAsWeave(mixedTpl)}` : ''}`);
 
+// The plan says `rxjs` is REPLACED by Weave's reactivity, and then the converted files import it anyway — a
+// stream is not something to rewrite by guess. Both halves are defensible; saying only the first one is not, so
+// the dependencies the migration hands your app are named.
+const carriedPkgs = cv.carriedPackages([
+  { path: 'a.ts', status: 'write', content: "import { Observable } from 'rxjs';\nimport { map } from 'rxjs/operators';\nimport x from '@weave-framework/ui/card';\nimport { y } from './local';\nconst o: Observable<number> = x;" },
+  { path: 'b.html', status: 'write', content: "import { nope } from 'not-a-dep';" },
+]);
+ok(carriedPkgs.includes('rxjs'), 'carriedPackages: a third-party package the OUTPUT still imports is named');
+ok(carriedPkgs.filter((p) => p === 'rxjs').length === 1, 'carriedPackages: `rxjs` and `rxjs/operators` are one dependency, not two');
+ok(!carriedPkgs.some((p) => p.startsWith('@weave-framework')), 'carriedPackages: Weave packages are reported by the install line, not here');
+ok(!carriedPkgs.includes('not-a-dep'), 'carriedPackages: a template is not TypeScript — its text is not scanned for imports');
+ok(cv.carriedPackages([{ path: 'c.ts', status: 'write', content: "// import { old } from 'rxjs';" }]).length === 0, 'carriedPackages: the ORIGINAL carried as a comment beside a rewrite is not a dependency');
+
 // ── a service THIS RUN converts is not "unknown" ──
 // "`X.y()` has no recorded Weave equivalent — migrate X first" was printed for a class being migrated in the
 // same run: work already happening, about a call already correct. And the field itself came out as a COMMENT,

@@ -38,6 +38,12 @@
   Weave equivalent is left in place with a `TODO(weave migrate)` comment instead of being guessed at, and a
   method's original body travels with it as comments beside the new signature rather than being discarded.
 
+  **The dependencies the migration hands your app are named.** The plan says `rxjs` is replaced by Weave's
+  reactivity, and then the converted files import it anyway — because a `pipe(…)` chain is not a rename, and a
+  guessed rewrite is worse than an honest one left standing. Both halves are defensible; saying only the first
+  was not. Before writing, every third-party package the *converted* output still imports is listed, with
+  `rxjs` marked for what it is: what could not be translated without guessing.
+
   **A service this run converts is not "unknown".** A call into one used to print *"has no recorded Weave
   equivalent — migrate it first"* about a class being migrated in the same run: work already happening, about a
   call already correct. The converter knows what it is converting now — the injected field becomes a real

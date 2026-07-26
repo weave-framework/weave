@@ -17,6 +17,7 @@ import { join, relative, resolve } from 'node:path';
 import { assembleFacts, mergeFacts, outOfReach, writeFacts, type Coverage, type MigrationFacts, type PackagePlan, type Reach } from './migrate-analyze.js';
 import {
   applyWrites,
+  carriedPackages,
   detectPackageManager,
   installCommand,
   installedWeavePackages,
@@ -535,6 +536,23 @@ async function convertStep(io: InputManager, facts: MigrationFacts, targetDir: s
     // `npm i x` does, and running npm inside a pnpm project rewrites node_modules behind pnpm's back.
     console.log(`\n${c.yellow('This code needs packages your app does not have yet:')}`);
     console.log(`  ${c.bold(installCommand(detectPackageManager(targetDir), missing))}`);
+  }
+
+  // The dependencies this migration HANDS your app. The plan says `rxjs` is replaced by Weave's reactivity, and
+  // then the converted files import it anyway, because a stream is not something to rewrite by guess. Both
+  // halves are defensible; saying only the first one is not.
+  const carried: string[] = carriedPackages(items);
+  if (carried.length) {
+    console.log(`\n${c.bold('Your converted code still imports these — they stay dependencies of your app:')}`);
+    for (const name of carried) {
+      const plan: PackagePlan | undefined = facts.packages.find((p) => p.name === name);
+      const note: string =
+        plan?.decision === 'auto'
+          ? c.yellow('Weave replaces this — what is left is what could not be translated without guessing')
+          : c.dim(plan?.note ?? 'no Weave role — kept as-is');
+      console.log(`  ${c.yellow('•')} ${c.bold(name)} ${c.dim('—')} ${note}`);
+    }
+    console.log(c.dim('  Grep the written files for each one: every remaining use is a decision the tool would not make for you.'));
   }
 
   console.log(c.dim(`\nThe converted code is a starting point: read ${relative(targetDir, planPath)} and the`));
