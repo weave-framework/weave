@@ -1,7 +1,7 @@
 {
   "name": "@weave-framework/cli",
   "version": "2.1.0",
-  "description": "Weave CLI — `weave build`, `weave dev` (watch + live-reload), `weave check`, `weave routes`.",
+  "description": "Weave CLI — `weave build`, `weave dev` (watch + live-reload), `weave check`, `weave routes`, `weave migrate`.",
   "type": "module",
   "bin": {
     "weave": "./bin/weave.mjs"

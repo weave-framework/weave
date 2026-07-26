@@ -1,6 +1,6 @@
 # RFC 0011: `weave migrate` — assisted migration into Weave
 
-- **Status:** Draft
+- **Status:** Implemented (Angular; React/Vue are still the "coming soon" branch)
 - **Author(s):** Aidas Josas (@aidasjosas)
 - **Discussion:** —
 

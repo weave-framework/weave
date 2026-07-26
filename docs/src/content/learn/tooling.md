@@ -32,6 +32,7 @@ The config is auto-discovered in the current working directory. `--config <path>
 | `weave build` | One-shot production bundle into `dist/` (or `outDir`) |
 | `weave check` | Static type-check of your templates and components |
 | `weave routes` | Generate the file-based route module from a pages dir |
+| `weave migrate` | Assisted migration of an existing Angular app into this one (see [below](#migrating-an-existing-app-weave-migrate)) |
 | `weave mcp` | Start the MCP server over stdio (see [below](#ai-editor-integration-mcp)) |
 
 Below, each command's flags are spelled out in full. Where a flag only matters in one pipeline, the table says so.
@@ -108,6 +109,74 @@ weave routes src/pages          # different pages dir
 weave routes src/pages --out src/router/routes.gen.ts
 weave routes src/pages --eager  # inline, no per-route chunks
 ~~~
+
+## Migrating an existing app: weave migrate
+
+`weave migrate` helps move an existing **Angular** app into Weave. Run it **from inside the Weave app you want the
+code to land in** — usually an empty one you created for the purpose, though migrating into an app you already
+have works too. It asks which framework you are coming from, then for the path to the app, library, or single
+piece you want to move.
+
+~~~bash
+npm create weave my-app     # the app you are migrating INTO
+cd my-app
+weave migrate               # then answer two questions
+~~~
+
+**Your source project is only ever read.** Everything is written into the Weave app you ran the command from, and
+an existing file is **never** overwritten — a path that already has something there is reported and left alone.
+Writing is opt-in: the exact file list is printed first, and the prompt defaults to *no*.
+
+### What you get
+
+| Written to | What it is |
+|---|---|
+| `migration-plan.md` | The plan, for you to read **before** converting: what converts mechanically, what needs a decision, and in what order. |
+| `.weave-migrate/facts.json` | The raw measurements the plan was built from. |
+| `src/…` | The converted code, mirroring your source layout. |
+
+### It tells you what it cannot do
+
+Before writing anything, it reports how much of your source it actually converts:
+
+~~~text
+Converted to Weave: 4/16 declarations (25%)
+Carried over as-is: 12 — moved into your app, still Angular, yours to port
+~~~
+
+*Converted* means real Weave code. *Carried* means the file was moved unchanged because it is usually valid
+TypeScript already — the code is there, but porting it is yours. Nothing is dropped, and the plan lists every
+piece in each group. Anything with no faithful Weave equivalent is left in place with a `TODO(weave migrate)`
+comment rather than guessed at.
+
+### What it converts
+
+| Angular | → Weave |
+|---|---|
+| `@Component` | a `setup()` function + a sibling template |
+| `@Injectable({providedIn:'root'})` | `store()` |
+| `@Injectable()` (scoped) | `createContext` + `provide`/`inject` |
+| `@Pipe` | a plain function — `{{ x \| shorten }}` becomes `{{ shorten(x) }}` |
+| `@Directive` | a `use:` action |
+| `*ngIf` / `*ngFor` / `*ngSwitch` | `@if` / `@for` / `@switch` |
+| `[prop]` / `(event)` / `[(ngModel)]` | `.prop` / `on:` / `bind:value` |
+| `<ng-template #x>` / `*ngTemplateOutlet` | `@snippet x()` / `@render (x())` |
+| `<ng-content>` / `<router-outlet>` | `<slot>` / `<RouterView>` |
+| reactive forms | `@weave-framework/forms` |
+| route guards | `beforeEach` |
+| `HttpClient` | `@weave-framework/data` — `resource` for reads, `action` for writes |
+| `InjectionToken` | `createContext` |
+| RxJS | signals — with a per-operator note for every operator your code imports |
+| `@NgModule` | nothing: Weave has no modules. A note records what it declared, provided and exported. |
+
+Third-party packages are sorted into three groups — ones Weave replaces (`rxjs`, `@ngx-translate`), ones you
+choose to attempt, and ones with no Weave role (`lodash`, `d3`) that you simply keep. You tick the ones to try.
+
+Your own workspace libraries are noted as separate migrations rather than pulled in: run `weave migrate` on each.
+
+> **This is assisted, not automatic.** Method bodies are carried across as comments beside their new signatures,
+> not translated — the shape is mechanical, the logic is a judgement call. Read the plan, then work through the
+> TODOs.
 
 ## weave.config.ts
 

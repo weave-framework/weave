@@ -1,6 +1,6 @@
 # @weave-framework/cli
 
-The Weave CLI — `weave build` (add `--ssg` for static generation), `weave dev` (watch + live-reload), `weave check`, `weave routes`, `weave mcp`.
+The Weave CLI — `weave build` (add `--ssg` for static generation), `weave dev` (watch + live-reload), `weave check`, `weave routes`, `weave migrate`, `weave mcp`.
 
 Part of **[Weave](https://weaveframework.dev/)** — a fine-grained reactive, signal-native UI framework: no Virtual DOM, zero third-party runtime dependencies.
 
@@ -16,10 +16,11 @@ npm install -D @weave-framework/cli
 | `weave dev` | Dev server: watch, rebuild, live-reload. |
 | `weave check` | Type-check the project, templates included. |
 | `weave routes` | Regenerate the file-based route module from `routesDir`. |
+| `weave migrate` | Assisted migration of an existing Angular app into this one. Reads your source project, writes a plan, then the converted code. |
 | `weave mcp` | Start the Weave MCP server over stdio, for MCP-capable AI editors. |
 
 ```
-usage: weave <build|dev|check|routes|mcp> [entry|paths…] [--config file] [--out dir]
+usage: weave <build|dev|check|routes|migrate|mcp> [entry|paths…] [--config file] [--out dir]
              [--serve dir] [--port n] [--no-minify] [--eager] [--ssg]
 ```
 

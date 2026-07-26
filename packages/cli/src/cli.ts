@@ -1,4 +1,4 @@
-/** Weave CLI entry — `weave build` / `weave dev` / `weave check` / `weave routes`. */
+/** Weave CLI entry — `weave build` / `weave dev` / `weave check` / `weave routes` / `weave migrate`. */
 
 import { build, buildSsg } from './build.js';
 import { dev } from './dev.js';

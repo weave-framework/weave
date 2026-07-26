@@ -14,6 +14,30 @@
 > already left it behind — Phase E ran 94 commits without a bump, and then released as one MINOR. The public
 > promise wins; the habit is retired.)*
 
+## Unreleased
+
+### Added — CLI
+- **`weave migrate` — assisted migration of an Angular app into Weave** ([RFC 0011](rfcs/0011-migrate.md)). Run it
+  from inside the Weave app you are migrating **into**; it asks for the source path, analyses it, writes a
+  `migration-plan.md` you read *before* anything changes, and then — only if you say yes — writes the converted
+  code into `src/`. Your Angular project is **only ever read**, and an existing file in the target is **never**
+  overwritten.
+
+  What it converts: `@Component` → `setup()` + a sibling template · `@Injectable({providedIn:'root'})` → `store()`
+  and a scoped one → `createContext`+`provide`/`inject` · `@Pipe` → a plain function · `@Directive` → a `use:`
+  action · `*ngIf`/`*ngFor`/`*ngSwitch` → `@if`/`@for`/`@switch` · `[prop]`/`(event)`/`[(ngModel)]` →
+  `.prop`/`on:`/`bind:value` · `<ng-template>`/`*ngTemplateOutlet` → `@snippet`/`@render` (arguments ordered by
+  the snippet's parameters, not the context's keys) · `<ng-content>`/`<router-outlet>` → `<slot>`/`<RouterView>` ·
+  reactive forms → `@weave-framework/forms` · route guards → `beforeEach` (an entry guard tests `nav.to`, a
+  `canDeactivate` tests `nav.from`) · `HttpClient` → `@weave-framework/data` · `InjectionToken` → `createContext`
+  · RxJS → signals, with a note for every one of the 129 operators a file might import. An `@NgModule` becomes no
+  code — Weave has no modules — but a note records what it declared, provided and exported.
+
+  **It reports what it cannot do.** Every run prints how much of the source is genuinely converted versus merely
+  carried across unchanged, names every declaration in each group, and says why. Anything without a faithful
+  Weave equivalent is left in place with a `TODO(weave migrate)` comment instead of being guessed at, and a
+  method's original body travels with it as comments beside the new signature rather than being discarded.
+
 ## 2.1.0 — 2026-07-24
 
 ### Added — UI
