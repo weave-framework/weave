@@ -118,10 +118,14 @@ have works too. It asks which framework you are coming from, then for the path t
 piece you want to move.
 
 ~~~bash
-npm create weave my-app     # the app you are migrating INTO
+npm create weave my-app     # the app you are migrating INTO (pnpm/yarn/bun work too)
 cd my-app
 weave migrate               # then answer two questions
 ~~~
+
+If the converted code needs a package your app does not have — `@weave-framework/ui` is the usual one, since the
+scaffold does not install it — the command prints the exact install line **for your package manager**, detected
+from your `packageManager` field or lockfile (`pnpm add …`, `yarn add …`, `bun add …`, `npm i …`).
 
 **Your source project is only ever read.** Everything is written into the Weave app you ran the command from, and
 an existing file is **never** overwritten — a path that already has something there is reported and left alone.

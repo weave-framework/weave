@@ -52,6 +52,10 @@ const ANGULAR_MAP: Array<{ match: (spec: string) => boolean; becomes: string }> 
   { match: (s) => s === '@angular/router', becomes: '`@weave-framework/router` — `route()` / `<RouterView>` / `beforeEach`' },
   { match: (s) => s === '@angular/platform-browser', becomes: 'the Weave bootstrap (`mount`) — no direct equal needed' },
   { match: (s) => s === '@angular/core/rxjs-interop', becomes: '`fromObservable`/`toObservable`; `takeUntilDestroyed` → the owner\'s `onDispose` cleanup' },
+  // Weave HAS a UI library covering the same ground, so these are real mappings — but `@weave-framework/ui` is
+  // not part of the scaffold, so it has to be installed (the command says so when a migration needs it).
+  { match: (s) => s.startsWith('@angular/material'), becomes: '`@weave-framework/ui` — the same component set (`<Button>`, `<Card>`, `<FormField>`, …). **Install it:** `npm i @weave-framework/ui`' },
+  { match: (s) => s.startsWith('@angular/cdk'), becomes: '`@weave-framework/ui/cdk` — the same headless primitives (overlay, focus, portal, key managers, virtual scroll, drag-drop)' },
   { match: (s) => s.startsWith('@angular/animations'), becomes: 'template transitions (`transition:`) — **needs you**' },
 ];
 

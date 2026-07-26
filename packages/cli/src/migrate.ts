@@ -15,7 +15,15 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import { assembleFacts, writeFacts, type Coverage, type MigrationFacts, type PackagePlan } from './migrate-analyze.js';
-import { applyWrites, planWrites, type WriteItem } from './migrate-convert.js';
+import {
+  applyWrites,
+  detectPackageManager,
+  installCommand,
+  installedWeavePackages,
+  planWrites,
+  requiredWeavePackages,
+  type WriteItem,
+} from './migrate-convert.js';
 import { planItems, renderPlan, writePlan, type PlanItem } from './migrate-plan.js';
 import { c, inputManager, type InputManager } from './migrate-ui.js';
 
@@ -396,6 +404,16 @@ async function convertStep(io: InputManager, facts: MigrationFacts, targetDir: s
   for (const i of fresh.slice(0, 10)) console.log(`  ${c.green('+')} ${relative(targetDir, i.path)}`);
   if (fresh.length > 10) console.log(c.dim(`  … and ${fresh.length - 10} more`));
   for (const i of blocked) console.log(`  ${c.yellow('•')} ${c.yellow(`${relative(targetDir, i.path)} — already exists, will NOT be touched`)}`);
+
+  // Packages the generated code imports that this app does not have. The scaffold ships runtime/router/store/
+  // forms/i18n/data but NOT ui — so migrating off Angular Material writes imports nothing can resolve.
+  const missing: string[] = requiredWeavePackages(items).filter((p) => !installedWeavePackages(targetDir).includes(p));
+  if (missing.length) {
+    // The install command follows THIS app's package manager: `pnpm i x` does not add a dependency the way
+    // `npm i x` does, and running npm inside a pnpm project rewrites node_modules behind pnpm's back.
+    console.log(`\n${c.yellow('This code needs packages your app does not have yet:')}`);
+    console.log(`  ${c.bold(installCommand(detectPackageManager(targetDir), missing))}`);
+  }
 
   console.log(c.dim(`\nThe converted code is a starting point: read ${relative(targetDir, planPath)} and the`));
   console.log(c.dim('TODO(weave migrate) comments — the pieces marked "needs you" are not done automatically.'));

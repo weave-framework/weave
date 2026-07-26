@@ -661,6 +661,49 @@ ok(styleOut.length === 1 && styleOut[0].name === 'decorator.css', 'componentStyl
 ok(styleOut[0].content.includes('h1 { color: red }'), 'componentStyles: the inline CSS itself is carried, not just its count');
 ok(cv.componentStyles({ file: 'x.ts', className: 'X', styleUrls: ['./missing.scss'], styleTexts: [] }, 'x').length === 0, 'componentStyles: an unreadable stylesheet yields nothing (never an invented empty file)');
 
+// ── Angular Material → @weave-framework/ui. These tags used to pass through as dead markup: a converted app
+//    rendered a literal <mat-card> that did nothing at all, silently.
+const matHtml = '<mat-card><mat-form-field><input matInput [(ngModel)]="name"></mat-form-field><mat-checkbox [checked]="ok">Agree</mat-checkbox><button mat-raised-button (click)="go()" matTooltip="Send">Go</button></mat-card>';
+const matOut = conv(matHtml);
+ok(matOut.includes('<Card>') && !matOut.includes('<mat-card>'), 'convertTemplate: <mat-card> becomes <Card>, not dead markup');
+ok(matOut.includes('<FormField>') && matOut.includes('<Input '), 'convertTemplate: <mat-form-field> and matInput map to their Weave UI components');
+ok(matOut.includes('<Button ') && !matOut.includes('mat-raised-button'), 'convertTemplate: a Material ATTRIBUTE decides the tag, and the marker attribute itself disappears');
+ok(matOut.includes('<Checkbox checked={{ ok }}>'), 'convertTemplate: a bound prop on a mapped component is a plain prop, not .prop');
+// Things whose Weave equivalent is a FUNCTION must NOT be renamed into a tag or an attribute.
+ok(matOut.includes('use:tooltip') && matOut.includes('TODO(weave migrate)'), 'convertTemplate: matTooltip is flagged as a use: action rather than invented as an attribute');
+ok(conv('<mat-dialog></mat-dialog>').includes('openDialog'), 'convertTemplate: <mat-dialog> points at openDialog — a dialog is opened, not placed in markup');
+// The components have to be imported to exist.
+const uiImports = cv.uiImportsFor(matHtml);
+ok(uiImports.includes("import Card from '@weave-framework/ui/card';") && uiImports.includes("import Input from '@weave-framework/ui/input';"), 'uiImportsFor: the needed Weave UI imports are derived from the template');
+ok(cv.uiImportsFor('<div>plain</div>').length === 0, 'uiImportsFor: a template using no Material needs no UI imports');
+ok(cv.convertComponent(loginFact, matHtml, {}).ts.includes("from '@weave-framework/ui/card'"), 'convertComponent: those imports land in the generated component file');
+
+// The target app may not HAVE the packages the generated code imports — the scaffold ships no @weave-framework/ui.
+const needs = cv.requiredWeavePackages([{ path: 'x.ts', content: "import Card from '@weave-framework/ui/card';\nimport { store } from '@weave-framework/store';", status: 'write' }]);
+ok(needs.includes('@weave-framework/ui') && needs.includes('@weave-framework/store'), 'requiredWeavePackages: subpath imports collapse to the package that must be installed');
+ok(cv.installedWeavePackages(join(fx, 'not-angular')).length === 0, 'installedWeavePackages: an app with no Weave deps reports none');
+
+// The install line must follow THIS app's package manager. `pnpm i x` does not add a dependency the way
+// `npm i x` does, and running npm inside a pnpm project rewrites node_modules behind pnpm's back.
+const pmDir = mkdtempSync(join(tmpdir(), 'weave-pm-'));
+try {
+  writeFileSync(join(pmDir, 'package.json'), '{}');
+  ok(cv.detectPackageManager(pmDir) === 'npm', 'detectPackageManager: nothing to go on → npm');
+  writeFileSync(join(pmDir, 'pnpm-lock.yaml'), '');
+  ok(cv.detectPackageManager(pmDir) === 'pnpm', 'detectPackageManager: a pnpm lockfile → pnpm');
+  writeFileSync(join(pmDir, 'yarn.lock'), '');
+  ok(cv.detectPackageManager(pmDir) === 'pnpm', 'detectPackageManager: pnpm wins over a stray yarn.lock (checked in order)');
+  // An explicit `packageManager` field is a declaration of intent — it outranks any lockfile lying around.
+  writeFileSync(join(pmDir, 'package.json'), '{"packageManager":"yarn@4.1.0"}');
+  ok(cv.detectPackageManager(pmDir) === 'yarn', 'detectPackageManager: the packageManager field outranks the lockfiles');
+} finally {
+  rmSync(pmDir, { recursive: true, force: true });
+}
+ok(cv.installCommand('npm', ['@weave-framework/ui']) === 'npm i @weave-framework/ui', 'installCommand: npm uses `i`');
+ok(cv.installCommand('pnpm', ['@weave-framework/ui']) === 'pnpm add @weave-framework/ui', 'installCommand: pnpm uses `add`, NOT `i`');
+ok(cv.installCommand('yarn', ['a', 'b']) === 'yarn add a b', 'installCommand: yarn uses `add` and takes several packages');
+ok(cv.installCommand('bun', ['a']) === 'bun add a', 'installCommand: bun uses `add`');
+
 // ── HttpClient → @weave-framework/data: a real client line, plus guidance naming the verbs actually called ──
 const httpSvc = a.findServices(join(svcs, 'http.service.ts'))[0];
 ok(httpSvc.injects.includes('HttpClient'), 'findServices: the injected HttpClient is seen');

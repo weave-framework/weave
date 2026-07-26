@@ -506,9 +506,82 @@ const BUILTIN_TAGS: Record<string, string> = {
   'router-outlet': 'RouterView', // @weave-framework/router renders the matched route here
 };
 
+/**
+ * Angular Material tags → `@weave-framework/ui` components. Weave's UI library covers the same ground, so these
+ * are real mappings rather than guesses — but the component still has to be IMPORTED, and `@weave-framework/ui`
+ * is not part of the scaffold, so `uiImportsFor` reports what to add.
+ *
+ * Left out on purpose: anything whose Weave equivalent is a FUNCTION rather than a tag (`<mat-dialog>` →
+ * `openDialog`, `<mat-snack-bar>` → `snackbar`). Renaming those to a component would be wrong, so they are
+ * flagged instead.
+ */
+const MATERIAL_TAGS: Record<string, { tag: string; from: string }> = {
+  'mat-card': { tag: 'Card', from: 'card' },
+  'mat-form-field': { tag: 'FormField', from: 'form-field' },
+  'mat-checkbox': { tag: 'Checkbox', from: 'checkbox' },
+  'mat-select': { tag: 'Select', from: 'select' },
+  'mat-icon': { tag: 'Icon', from: 'icon' },
+  'mat-toolbar': { tag: 'Toolbar', from: 'toolbar' },
+  'mat-tab-group': { tag: 'Tabs', from: 'tabs' },
+  'mat-list': { tag: 'List', from: 'list' },
+  'mat-table': { tag: 'Table', from: 'table' },
+  'mat-tree': { tag: 'Tree', from: 'tree' },
+  'mat-menu': { tag: 'Menu', from: 'menu' },
+  'mat-paginator': { tag: 'Paginator', from: 'paginator' },
+  'mat-progress-bar': { tag: 'ProgressBar', from: 'progress-bar' },
+  'mat-spinner': { tag: 'ProgressSpinner', from: 'progress-spinner' },
+  'mat-progress-spinner': { tag: 'ProgressSpinner', from: 'progress-spinner' },
+  'mat-slide-toggle': { tag: 'SlideToggle', from: 'slide-toggle' },
+  'mat-slider': { tag: 'Slider', from: 'slider' },
+  'mat-chip': { tag: 'Chip', from: 'chips' },
+  'mat-radio-button': { tag: 'Radio', from: 'radio' },
+  'mat-button-toggle': { tag: 'ButtonToggle', from: 'button-toggle' },
+  'mat-autocomplete': { tag: 'Autocomplete', from: 'autocomplete' },
+  'mat-badge': { tag: 'Badge', from: 'badge' },
+  'mat-datepicker': { tag: 'Datepicker', from: 'datepicker' },
+  'mat-grid-list': { tag: 'GridList', from: 'grid-list' },
+  'mat-sidenav': { tag: 'Sidenav', from: 'sidenav' },
+  'mat-stepper': { tag: 'Stepper', from: 'stepper' },
+  'mat-expansion-panel': { tag: 'Expansion', from: 'expansion' },
+};
+
+/** Material ATTRIBUTES that turn a plain element into a component (`<button mat-raised-button>` → `<Button>`). */
+const MATERIAL_ATTRS: Record<string, { tag: string; from: string }> = {
+  'mat-button': { tag: 'Button', from: 'button' },
+  'mat-raised-button': { tag: 'Button', from: 'button' },
+  'mat-flat-button': { tag: 'Button', from: 'button' },
+  'mat-stroked-button': { tag: 'Button', from: 'button' },
+  'mat-icon-button': { tag: 'Button', from: 'button' },
+  'mat-fab': { tag: 'Button', from: 'button' },
+  'mat-mini-fab': { tag: 'Button', from: 'button' },
+  matInput: { tag: 'Input', from: 'input' },
+};
+
+/** Material pieces whose Weave equivalent is a FUNCTION, not a tag — renaming them would be wrong. */
+const MATERIAL_FUNCTIONS: Record<string, string> = {
+  matTooltip: '`tooltip` is a `use:` action — `use:tooltip={{ () => text }}` from `@weave-framework/ui/tooltip`',
+  'mat-dialog': '`openDialog(...)` from `@weave-framework/ui/dialog` — a dialog is opened, not placed in markup',
+  'mat-snack-bar': '`snackbar(...)` from `@weave-framework/ui/snackbar` — called, not placed in markup',
+};
+
+/** The `@weave-framework/ui` import lines a converted template needs, derived from the Material it used. */
+export function uiImportsFor(templateHtml: string): string[] {
+  const needed: Map<string, string> = new Map();
+  for (const [matTag, def] of Object.entries(MATERIAL_TAGS)) {
+    if (new RegExp(`<${matTag}[\\s>/]`).test(templateHtml)) needed.set(def.tag, def.from);
+  }
+  for (const [attr, def] of Object.entries(MATERIAL_ATTRS)) {
+    if (new RegExp(`[\\s"']${attr}[\\s=>"']`).test(templateHtml)) needed.set(def.tag, def.from);
+  }
+  return [...needed.entries()].sort().map(([tag, from]) => `import ${tag} from '@weave-framework/ui/${from}';`);
+}
+
 /** Render one element (its own tag + attributes + children), without its structural wrapper. */
 function renderElement(node: ElementNode, opts: ConvertOptions): string {
-  const mapped: string | undefined = opts.components?.[node.tag] ?? BUILTIN_TAGS[node.tag];
+  // A Material ATTRIBUTE can decide the tag: `<button mat-raised-button>` is a `<Button>`, and the marker
+  // attribute itself disappears (it was never a real attribute, only Angular's way of selecting a directive).
+  const attrDriven: { tag: string; from: string } | undefined = node.attrs.map((a) => MATERIAL_ATTRS[a.name]).find(Boolean);
+  const mapped: string | undefined = opts.components?.[node.tag] ?? BUILTIN_TAGS[node.tag] ?? MATERIAL_TAGS[node.tag]?.tag ?? attrDriven?.tag;
   const tag: string = mapped ?? node.tag;
 
   // A [ngSwitch] parent groups its *ngSwitchCase children into one @switch block.
@@ -516,11 +589,18 @@ function renderElement(node: ElementNode, opts: ConvertOptions): string {
   const parts: string[] = [];
   const todos: string[] = [];
   for (const a of node.attrs) {
+    if (MATERIAL_ATTRS[a.name]) continue; // the marker that selected the component — it is the tag now
+    const fn: string | undefined = MATERIAL_FUNCTIONS[a.name] ?? MATERIAL_FUNCTIONS[node.tag];
+    if (fn) {
+      todos.push(todo(`\`${a.name}\` → ${fn}`));
+      continue;
+    }
     const { out, todo: t, todos: more } = convertAttr(a, tag);
     if (out) parts.push(out);
     if (t) todos.push(todo(t));
     for (const m of more ?? []) todos.push(todo(m));
   }
+  if (MATERIAL_FUNCTIONS[node.tag]) todos.push(todo(`\`<${node.tag}>\` → ${MATERIAL_FUNCTIONS[node.tag]}`));
 
   let childText: string;
   if (switchAttr) {
@@ -613,6 +693,8 @@ export function convertComponent(fact: ComponentFact, templateHtml: string, opts
   // A reactive form becomes a `form({ … })` in setup(); the template binds its leaves with `use:control`.
   const imports: string[] = [];
   if (carried.some((mem) => mem.kind === 'field')) imports.push("import { signal } from '@weave-framework/runtime';");
+  // A template that used Angular Material now names Weave UI components — which have to be imported to exist.
+  imports.push(...uiImportsFor(templateHtml));
   if (formFact) {
     imports.push("import { field, form } from '@weave-framework/forms';");
     body.push('');
@@ -1415,6 +1497,65 @@ export function planWrites(facts: MigrationFacts, targetDir: string): WriteItem[
     items.push({ path, content: guards, status: existsSync(path) ? 'skip-exists' : 'write' });
   }
   return items;
+}
+
+/**
+ * The `@weave-framework/*` packages the generated code actually imports.
+ *
+ * This matters because the converted code is written into an app that may not have them. The scaffold installs
+ * runtime/router/store/forms/i18n/data, but NOT `@weave-framework/ui` — so a migration off Angular Material
+ * writes imports the target cannot resolve. Reporting it beats a wall of "Cannot find module" at first build.
+ */
+export function requiredWeavePackages(items: WriteItem[]): string[] {
+  const found: Set<string> = new Set<string>();
+  const re: RegExp = /from\s+['"](@weave-framework\/[a-z-]+)(?:\/[a-z-]+)?['"]/g;
+  for (const item of items) {
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(item.content)) !== null) found.add(m[1]);
+  }
+  return [...found].sort();
+}
+
+/** The package managers a Weave app might be using. */
+export type PackageManager = 'npm' | 'pnpm' | 'yarn' | 'bun';
+
+/**
+ * Which package manager this app uses. Checked in order of how strongly each signal states intent:
+ * `packageManager` in package.json (corepack — an explicit declaration) beats a lockfile, which beats the
+ * npm default. It matters because the commands are NOT interchangeable: `pnpm i lodash` does not add a
+ * dependency the way `npm i lodash` does — `pnpm add` is the equivalent — and running npm inside a pnpm
+ * project rewrites node_modules into a layout pnpm did not intend.
+ */
+export function detectPackageManager(appDir: string): PackageManager {
+  try {
+    const pm: unknown = (JSON.parse(readFileSync(join(appDir, 'package.json'), 'utf8')) as { packageManager?: unknown }).packageManager;
+    if (typeof pm === 'string') {
+      const name: string = pm.split('@')[0].trim();
+      if (name === 'pnpm' || name === 'yarn' || name === 'bun' || name === 'npm') return name;
+    }
+  } catch {
+    /* no or unreadable package.json — fall through to the lockfiles */
+  }
+  if (existsSync(join(appDir, 'pnpm-lock.yaml'))) return 'pnpm';
+  if (existsSync(join(appDir, 'yarn.lock'))) return 'yarn';
+  if (existsSync(join(appDir, 'bun.lockb')) || existsSync(join(appDir, 'bun.lock'))) return 'bun';
+  return 'npm'; // package-lock.json, or nothing to go on
+}
+
+/** The command that adds dependencies with the given manager — each has its own verb. */
+export function installCommand(pm: PackageManager, packages: string[]): string {
+  const verb: string = pm === 'npm' ? 'i' : 'add';
+  return `${pm} ${verb} ${packages.join(' ')}`;
+}
+
+/** The `@weave-framework/*` packages a `package.json` already depends on. */
+export function installedWeavePackages(appDir: string): string[] {
+  try {
+    const j: { dependencies?: Record<string, string>; devDependencies?: Record<string, string> } = JSON.parse(readFileSync(join(appDir, 'package.json'), 'utf8'));
+    return Object.keys({ ...j.dependencies, ...j.devDependencies }).filter((d) => d.startsWith('@weave-framework/'));
+  } catch {
+    return [];
+  }
 }
 
 /** Write the planned items. Anything marked `skip-exists` is left untouched — an existing file is never clobbered. */
