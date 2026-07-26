@@ -72,6 +72,26 @@ export interface InputManager {
  * navigates with the arrow keys + Enter in a TTY, and degrades to typing a number when piped or if raw mode is
  * unavailable — so a menu is never broken, only prettier in a real terminal.
  */
+/**
+ * Strip ANSI escape sequences and control characters from a typed line, then trim it.
+ *
+ * Terminal input is not always the clean text it looks like: raw mode (used by the arrow menus) can leave the
+ * `\r` of a confirming Enter, or trailing bytes of an arrow key's `\x1b[A` sequence, in the stream. Those arrive
+ * as a "line" that is invisible but not empty — and an invisible non-empty line was being taken for a typed path.
+ */
+export function sanitize(line: string): string {
+  return line
+    .replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, '') // CSI sequences (arrow keys, cursor moves)
+    .replace(/\x1b[@-Z\\-_]/g, '') // two-character escape sequences
+    .replace(/[\x00-\x08\x0b-\x1f\x7f]/g, '') // control characters, tab/newline excluded above
+    .trim();
+}
+
+/** True when a line carries nothing a human typed, once control characters are stripped. */
+function isBlank(line: string | null): boolean {
+  return line === null || sanitize(line) === '';
+}
+
 export function inputManager(): InputManager {
   const rl: Interface = createInterface({ input: process.stdin, terminal: false });
   const queue: string[] = [];
@@ -102,9 +122,13 @@ export function inputManager(): InputManager {
     let line: string | null = await rawRead();
     if (swallowEmpty) {
       swallowEmpty = false;
-      if (line === '') line = await rawRead(); // discard the Enter that confirmed an arrow-menu pick
+      // The confirming keypress leaks into the resumed readline. It is NOT always a clean empty line: raw mode
+      // can hand back the `\r` of the Enter, or leftover bytes of an arrow key's escape sequence, and a line
+      // made only of those looked like a typed path — which is why picking a framework used to answer the next
+      // question with a bogus one. Anything that is empty ONCE control characters are stripped is discarded.
+      if (isBlank(line)) line = await rawRead();
     }
-    return line === null ? '' : line.trim();
+    return line === null ? '' : sanitize(line);
   };
 
   /** Fallback menu: print numbered options, read one line, parse the number (or the option text). */

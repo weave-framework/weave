@@ -282,7 +282,9 @@ export async function runMigrate(): Promise<void> {
         const pick: number = await io.selectMenu('Which one?', r.candidates);
         if (pick >= 0 && r.candidates[pick]) app = r.candidates[pick];
       } else {
-        console.log(c.yellow('No Angular app or project found here or inside.') + ' Type another path:');
+        // Name the path that was tried. Without it, a stray character leaking in from the framework menu looked
+        // exactly like a mistyped path, and the message gave no way to tell the two apart.
+        console.log(c.yellow(`No Angular app or project found at "${input}".`) + ' Type another path:');
       }
       if (!app && io.done()) {
         console.log(c.yellow('\nNothing resolved. Nothing to migrate.'));

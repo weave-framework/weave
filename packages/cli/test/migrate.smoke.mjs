@@ -961,6 +961,16 @@ ok(uiOn.c.green('hi').includes('hi'), 'colours: the wrapped text still contains 
 process.env.NO_COLOR = '1'; // NO_COLOR wins even with FORCE_COLOR set
 const uiOff = await import(pathToFileURL(outUi).href + '?off');
 ok(uiOff.c.red('x') === 'x', 'colours: NO_COLOR yields plain text — the clean piped-output guarantee');
+
+// ── input sanitising: raw mode leaks control bytes that LOOK like a typed line ──
+// Reported live twice: picking a framework from the arrow menu answered the NEXT question by itself, with
+// "No Angular app found". The confirming keypress leaked into readline as a line that was invisible but NOT
+// empty, so the empty-line guard missed it and it was taken for a typed path.
+ok(uiOn.sanitize('\x1b[A') === '', 'sanitize: an arrow-key escape sequence is not a typed path');
+ok(uiOn.sanitize('\r') === '' && uiOn.sanitize('\x00\x07') === '', 'sanitize: a stray carriage return or control byte is not a typed path');
+ok(uiOn.sanitize('  D:/apps/shop  ') === 'D:/apps/shop', 'sanitize: a real path is trimmed and otherwise untouched');
+ok(uiOn.sanitize('\x1b[2KC:/_WORK/thing') === 'C:/_WORK/thing', 'sanitize: a path with a leaked escape prefix still resolves to the path');
+ok(uiOn.sanitize('C:/Program Files/app') === 'C:/Program Files/app', 'sanitize: spaces inside a path are preserved');
 delete process.env.NO_COLOR;
 delete process.env.FORCE_COLOR;
 
