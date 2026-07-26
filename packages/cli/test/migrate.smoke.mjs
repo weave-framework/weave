@@ -10,7 +10,7 @@
 import { build as esbuild } from 'esbuild';
 import { dirname, join, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { mkdtempSync, writeFileSync, readFileSync, readdirSync, existsSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, rmSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 
@@ -86,6 +86,18 @@ await esbuild({
   outfile: outW,
 });
 const wc = await import(pathToFileURL(outW).href);
+
+// Bundle the output verifier (the whole-result check that the per-file pipeline cannot do).
+const outV = join(repo, 'node_modules', '.weave-migrate-verify-smoke.mjs');
+await esbuild({
+  entryPoints: [join(repo, 'packages', 'cli', 'src', 'migrate-verify.ts')],
+  bundle: true,
+  format: 'esm',
+  platform: 'node',
+  packages: 'external',
+  outfile: outV,
+});
+const vf = await import(pathToFileURL(outV).href);
 /** Does Weave's compiler accept this converted template? Returns the error message, or '' when it compiles. */
 const compilesAsWeave = (html) => {
   // A TODO comment is guidance for the reader, not markup — and an unresolved TODO is not a compiler error.
@@ -881,6 +893,41 @@ ok(navTs.includes('filter((event)'), 'pruneImports: the original still travels a
 ok(cv.pruneImports(["import { a } from 'x';"], 'const q = a;').length === 1, 'pruneImports: an import something actually uses is kept');
 ok(cv.pruneImports(["import { a } from 'x';"], '// const q = a;').length === 0, 'pruneImports: a name only in a comment does not keep its import');
 ok(cv.pruneImports(["import './side-effect.css';"], '').length === 1, 'pruneImports: a side-effect import is kept — it is there for what it DOES, not for a name');
+
+// ── VERIFY THE ASSEMBLED OUTPUT: does what we are about to write hold together? ──
+// Every other check looks at one declaration at a time. This type-checks the planned files as ONE program, so a
+// rename that landed in one file and not in its importer is a line on screen instead of something found later.
+const vTarget = mkdtempSync(join(tmpdir(), 'weave-verify-'));
+try {
+  const good = [{ path: join(vTarget, 'src', 'a.ts'), status: 'write', content: 'export const a: number = 1;\n' },
+                { path: join(vTarget, 'src', 'b.ts'), status: 'write', content: "import { a } from './a';\nexport const b: number = a + 1;\n" }];
+  ok(vf.verifyOutput(good, vTarget).length === 0, 'verifyOutput: code that holds together reports nothing');
+  // The disease itself: one file renamed, its importer not.
+  const renamed = [{ path: join(vTarget, 'src', 'a.ts'), status: 'write', content: 'export const useA = (): number => 1;\n' },
+                   { path: join(vTarget, 'src', 'b.ts'), status: 'write', content: "import { A } from './a';\nexport const b = A;\n" }];
+  const found = vf.verifyOutput(renamed, vTarget);
+  ok(found.some((p) => p.kind === 'defect' && /no exported member/.test(p.message)), 'verifyOutput: an import naming what the converted file no longer exports IS a defect — the exact cross-file failure per-file conversion cannot see');
+  // A file already ON DISK, with an error of its own, that a planned file imports. The program must include it
+  // — otherwise the import cannot be checked — but its errors are the app's, not this migration's.
+  mkdirSync(join(vTarget, 'src'), { recursive: true });
+  writeFileSync(join(vTarget, 'src', 'existing.ts'), 'export const bad: number = "not a number";\n');
+  const mixed = vf.verifyOutput([{ path: join(vTarget, 'src', 'uses.ts'), status: 'write', content: "import { bad } from './existing';\nexport const q: string = bad;\n" }], vTarget);
+  ok(mixed.some((p) => p.file.endsWith('uses.ts')), 'verifyOutput: the planned file\'s own error is reported');
+  ok(mixed.every((p) => !p.file.endsWith('existing.ts')), "verifyOutput: an error in a file that was already there is the app's business, not this migration's");
+  // A module the app lacks is an install, not a defect — the conversion is not wrong for naming what the source named.
+  const dep = [{ path: join(vTarget, 'src', 'c.ts'), status: 'write', content: "import { x } from 'not-installed-anywhere';\nexport const c = x;\n" }];
+  const depProbs = vf.verifyOutput(dep, vTarget);
+  ok(depProbs.some((p) => p.kind === 'missing-dependency' && p.module === 'not-installed-anywhere'), 'verifyOutput: an uninstalled module is reported as a DEPENDENCY, not as broken code');
+  ok(!depProbs.some((p) => p.kind === 'defect'), 'verifyOutput: and it is not ALSO counted as a defect — only one of the two is the tool\'s fault');
+  // A file that is only planned, never written, must not be checked.
+  ok(vf.verifyOutput([{ path: join(vTarget, 'src', 'd.ts'), status: 'skip-exists', content: 'this is not typescript at all' }], vTarget).length === 0, 'verifyOutput: a file that will NOT be written is not checked — it is not what the app gets');
+} finally {
+  rmSync(vTarget, { recursive: true, force: true });
+}
+// Two planned files on ONE path: applyWrites writes in order, so the second replaces the first and the
+// migration reports both as written while one is not there.
+ok(vf.collisions([{ path: 'x/a.ts' }, { path: 'x/a.ts' }, { path: 'x/b.ts' }]).length === 1, 'collisions: two sources landing on one path is an accounting error, found without a compiler');
+ok(vf.collisions([{ path: 'x/a.ts' }, { path: 'x/b.ts' }]).length === 0, 'collisions: distinct paths are not a collision');
 
 // ── ACCESS: what is USED but cannot be looked inside ──
 // A method calls a method calls a method. Following every workspace lib turned ONE imported type into 214 files;

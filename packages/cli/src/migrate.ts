@@ -26,6 +26,7 @@ import {
   type WriteItem,
 } from './migrate-convert.js';
 import { planItems, renderPlan, writePlan, type PlanItem } from './migrate-plan.js';
+import { collisions, hasInstalledDeps, verifyOutput, type OutputProblem } from './migrate-verify.js';
 import { c, inputManager, type InputManager } from './migrate-ui.js';
 
 /* ──────────── detection: is there an Angular app here, and where? (Angular-specific — a React module replaces this) ──────────── */
@@ -553,6 +554,35 @@ async function convertStep(io: InputManager, facts: MigrationFacts, targetDir: s
       console.log(`  ${c.yellow('•')} ${c.bold(name)} ${c.dim('—')} ${note}`);
     }
     console.log(c.dim('  Grep the written files for each one: every remaining use is a decision the tool would not make for you.'));
+  }
+
+  // Does what we are about to write HOLD TOGETHER? Everything above looked at one declaration at a time; this
+  // type-checks the planned files as one program, so a rename that landed in one file and not in its importer
+  // is a line on screen instead of something you find later.
+  const dupes: Array<{ path: string; count: number }> = collisions(items);
+  for (const d of dupes) {
+    console.log(`\n${c.red('✖')} ${c.red(`${d.count} files would be written to ${relative(targetDir, d.path)}`)}${c.dim(' — the last one wins and the others vanish.')}`);
+  }
+  if (hasInstalledDeps(targetDir)) {
+    const problems: OutputProblem[] = verifyOutput(items, targetDir);
+    const defects: OutputProblem[] = problems.filter((p) => p.kind === 'defect');
+    const missingDeps: string[] = [...new Set(problems.filter((p) => p.kind === 'missing-dependency').map((p) => p.module ?? ''))].filter(Boolean);
+    if (!problems.length) {
+      console.log(`\n${c.green('✓')} ${c.dim('The converted code type-checks as a whole.')}`);
+    } else {
+      if (missingDeps.length) {
+        console.log(`\n${c.yellow('These are imported but not installed here:')} ${missingDeps.join(', ')}`);
+        console.log(c.dim('  Nothing is wrong with the conversion — it names what your source named.'));
+      }
+      if (defects.length) {
+        const files: number = new Set(defects.map((p) => p.file)).size;
+        console.log(`\n${c.red(`${defects.length} problem(s) in the converted code itself`)}${c.dim(`, across ${files} file(s) — this is what still needs a hand:`)}`);
+        for (const p of defects.slice(0, 12)) console.log(`  ${c.red('•')} ${c.bold(`${p.file}:${p.line}`)} ${c.dim(p.message)}`);
+        if (defects.length > 12) console.log(c.dim(`  … and ${defects.length - 12} more`));
+      }
+    }
+  } else {
+    console.log(c.dim('\n(Skipping the type-check of the output: this app has no node_modules yet, so nothing would resolve.)'));
   }
 
   console.log(c.dim(`\nThe converted code is a starting point: read ${relative(targetDir, planPath)} and the`));

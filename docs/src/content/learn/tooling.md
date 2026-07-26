@@ -139,6 +139,22 @@ Writing is opt-in: the exact file list is printed first, and the prompt defaults
 | `.weave-migrate/facts.json` | The raw measurements the plan was built from. |
 | `src/…` | The converted code, mirroring your source layout. |
 
+### It checks the result before writing it
+
+Converting happens one declaration at a time, so nothing in that pipeline can see whether the *result* holds
+together. Before the write prompt, the planned files are type-checked **as one program** against your app's real
+dependencies:
+
+~~~text
+3 problem(s) in the converted code itself, across 2 file(s) — this is what still needs a hand:
+  • src/main.ts:7            Module './app/app' has no exported member 'AppComponent'
+  • src/app/user.service.ts:24  Cannot find name 'analytics'
+~~~
+
+A module your app simply does not have is listed separately — that is an install, not a broken conversion. And
+two files planned for one path is reported outright: the second would overwrite the first, and the migration
+would report both as written.
+
 ### It tells you what it cannot do
 
 Before writing anything, it reports how much of your source it actually converts:

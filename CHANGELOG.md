@@ -38,6 +38,15 @@
   Weave equivalent is left in place with a `TODO(weave migrate)` comment instead of being guessed at, and a
   method's original body travels with it as comments beside the new signature rather than being discarded.
 
+  **The output is verified as a WHOLE, before a byte is written.** Every other check in the tool looks at one
+  declaration at a time — the converter walks components, then services, then pipes, each in isolation, and the
+  writer puts bytes on disk. Nothing ever looked at the result. So a rename that landed in one file and not in
+  its importer, or two sources arriving at one output path, shipped silently and turned up later as *"you
+  migrated one place and left rubbish in another"*. The planned files are now type-checked **together**, in
+  memory, against the target app's real `node_modules`, and the two causes are told apart because only one is
+  the tool's fault: a module the app does not have is an install; anything else is a defect in the conversion.
+  Two files planned for one path is reported without a compiler at all.
+
   **The dependencies the migration hands your app are named.** The plan says `rxjs` is replaced by Weave's
   reactivity, and then the converted files import it anyway — because a `pipe(…)` chain is not a rename, and a
   guessed rewrite is worse than an honest one left standing. Both halves are defensible; saying only the first
