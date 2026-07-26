@@ -1393,7 +1393,12 @@ function relativeUnderSrc(file: string, unitDir: string): string {
   const rel: string = relative(unitDir, file);
   const parts: string[] = rel.split(/[\\/]/);
   const srcAt: number = parts.indexOf('src');
-  return (srcAt === -1 ? parts : parts.slice(srcAt + 1)).join(sep);
+  const under: string[] = srcAt === -1 ? parts : parts.slice(srcAt + 1);
+  // Drop a leading `lib/` too. It is not part of anyone's design: `ng-packagr` requires an Angular LIBRARY to
+  // put its sources in `src/lib/`, so the folder is packaging plumbing that means nothing in a Weave app. It is
+  // a wrapper around everything in the unit, so removing it keeps every relative import between these files
+  // intact; `repointSpecifier` fixes the barrel that referred to it by name.
+  return (under[0] === 'lib' ? under.slice(1) : under).join(sep);
 }
 
 /** `breadcrumbs.component.ts` → `breadcrumbs` — the Angular suffixes a Weave file does not carry. */
@@ -1439,9 +1444,17 @@ export function componentStyles(fact: ComponentFact, baseName: string): Array<{ 
   return out;
 }
 
-/** A component's source file loses its `.component` suffix on the way out, so imports pointing at it must too. */
+/**
+ * Repoint a relative import at where its target actually lands. Two things move a file on the way out: a
+ * component loses its `.component` suffix, and the Angular-library `lib/` wrapper is dropped — so a barrel that
+ * said `./lib/logo/logo.component` has to say `./logo/logo`.
+ */
 function repointSpecifier(spec: string): string {
-  return spec.replace(/\.component$/, '').replace(/\.component(['"])/, '$1');
+  return spec
+    .replace(/^\.\/lib\//, './')
+    .replace(/^\.\.\/lib\//, '../')
+    .replace(/\/lib\//, '/')
+    .replace(/\.component$/, '');
 }
 
 /**

@@ -918,6 +918,24 @@ try {
   const carriedCount = facts.files.length - facts.components.length - facts.services.length;
   ok(writes.length === facts.components.length * 2 + facts.services.length + carriedCount, `planWrites: a pair per component, one per service, one per carried file (got ${writes.length})`);
   ok(writes.some((w) => w.path.endsWith('user.service.ts')), 'planWrites: a service keeps its own file name (deriving it from the class collided with the component)');
+  // `src/lib/` is ng-packagr plumbing an Angular LIBRARY is required to have. It means nothing in a Weave app,
+  // and mirroring it put every migrated component under a folder that exists for no reason.
+  const libUnit = mkdtempSync(join(tmpdir(), 'weave-lib-'));
+  try {
+    const { mkdirSync } = await import('node:fs');
+    mkdirSync(join(libUnit, 'src', 'lib', 'logo'), { recursive: true });
+    writeFileSync(join(libUnit, 'src', 'index.ts'), "export * from './lib/logo/logo.component';\n");
+    writeFileSync(join(libUnit, 'src', 'lib', 'logo', 'logo.component.ts'), "import { Component } from '@angular/core';\n@Component({ selector: 'sps-logo', template: '' })\nexport class LogoComponent {}\n");
+    const libFacts = a.assembleFacts(libUnit);
+    const libPaths = cv.planWrites(libFacts, 'OUT').map((w) => w.path);
+    ok(libPaths.some((p) => p.endsWith(join('src', 'logo', 'logo.ts'))), `planWrites: the ng-packagr lib/ wrapper is dropped (got ${libPaths.map((p) => p.split('OUT')[1]).join(', ')})`);
+    ok(!libPaths.some((p) => p.includes(`${sep}lib${sep}`)), 'planWrites: nothing lands under a lib/ folder any more');
+    // Dropping a folder is only safe if the imports that named it are repointed with it.
+    const carriedBarrel = cv.carryFile(join(libUnit, 'src', 'index.ts'), libFacts);
+    ok(carriedBarrel.includes("export * from './logo/logo';"), 'carryFile: a barrel that pointed into lib/ is repointed, and loses the .component suffix too');
+  } finally {
+    rmSync(libUnit, { recursive: true, force: true });
+  }
   ok(writes.every((w) => w.path.includes(`${sep}src${sep}`)), 'planWrites: everything lands under the target app\'s src/');
   ok(writes.some((w) => w.path.endsWith('app.ts')) && writes.some((w) => w.path.endsWith('app.html')), 'planWrites: app.component.ts becomes app.ts + app.html (the .component suffix is dropped)');
   ok(writes.every((w) => w.status === 'write'), 'planWrites: into an empty app, every file is a fresh write');
