@@ -20,7 +20,9 @@ import {
   type DirectiveFact,
   type FormFact,
   type MigrationFacts,
+  type NgModuleFact,
   type PipeFact,
+  type TokenFact,
   type RouteFact,
   type ServiceFact,
 } from './migrate-analyze.js';
@@ -984,6 +986,63 @@ export function convertDirective(fact: DirectiveFact): { baseName: string; ts: s
   return { baseName: fnName.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase(), ts: lines.join('\n') };
 }
 
+/* ──────────── NgModules → a wiring note, InjectionTokens → contexts ──────────── */
+
+/**
+ * An `@NgModule` has no Weave counterpart — imports are per-file and there is no module graph — so it is NOT
+ * turned into code. What it is turned into is the one thing it uniquely knew: what belonged together, what was
+ * PROVIDED (each provider is a scoped service that now needs `provide`/`inject`), and what the module re-exported
+ * as its public surface. Deleting it would throw that away; pretending to convert it would invent structure.
+ */
+export function convertNgModule(fact: NgModuleFact): string {
+  const lines: string[] = [
+    `// ${fact.className} — carried over from ${fact.file}.`,
+    '//',
+    '// Weave has NO modules: a file imports what it uses, and that is the whole story. So there is nothing here',
+    '// to translate into code — but this module knew things nothing else records, and they are listed below.',
+    '',
+  ];
+  const section = (title: string, items: string[], note: string): void => {
+    if (!items.length) return;
+    lines.push(`// ${title}`);
+    for (const i of items) lines.push(`//   - ${i}`);
+    lines.push(`//   ${note}`);
+    lines.push('');
+  };
+  section('declarations — these belonged to this module:', fact.declarations, 'each is its own file now; import it where it is used.');
+  section('providers — each is a SCOPED service:', fact.providers, 'in Weave: `provide(XContext, createX())` in an ancestor, `inject(XContext)` below it.');
+  section('exports — this was the module\'s public surface:', fact.exports, 're-export these from your entry file instead.');
+  section('imports — what this module pulled in:', fact.imports, 'a RouterModule.forRoot/forChild becomes your route config; the rest are plain imports.');
+  if (fact.bootstrap.length) section('bootstrap:', fact.bootstrap, 'this is the app root — in Weave it is the `mount()` call in main.ts.');
+  lines.push(tsTodo('once the pieces above are wired, this file can be deleted.'));
+  lines.push('');
+  return lines.join('\n');
+}
+
+/**
+ * An `InjectionToken` injected a value rather than a class. Weave's equivalent is a CONTEXT — `createContext<T>()`
+ * provided by an ancestor and read with `inject`. The mapping is direct, so this one really is converted.
+ */
+export function convertTokens(tokens: TokenFact[]): string | null {
+  if (!tokens.length) return null;
+  const lines: string[] = [
+    "import { createContext } from '@weave-framework/runtime';",
+    '',
+    '// Converted from Angular InjectionToken(s).',
+    '// A token injected a VALUE; Weave does that with a context: an ancestor calls `provide(X, value)` and any',
+    '// descendant reads `inject(X)`. Same idea, no token registry.',
+    '',
+  ];
+  for (const t of tokens) {
+    if (t.description) lines.push(`// ${t.name} — was \`new InjectionToken('${t.description}')\` in ${t.file}`);
+    else lines.push(`// ${t.name} — from ${t.file}`);
+    lines.push(`${tsTodo(`give this its real type instead of \`unknown\``)}`);
+    lines.push(`export const ${t.name} = createContext<unknown>();`);
+    lines.push('');
+  }
+  return lines.join('\n');
+}
+
 /* ──────────── M4.9 — writing the converted files into the TARGET Weave app ──────────── */
 
 /**
@@ -1178,6 +1237,21 @@ export function planWrites(facts: MigrationFacts, targetDir: string): WriteItem[
     items.push({ path, content: convertDirective(df).ts, status: existsSync(path) ? 'skip-exists' : 'write' });
   }
 
+  // NgModules: not code in Weave, but a wiring note that records what only the module knew.
+  for (const nm of facts.ngModules ?? []) {
+    const rel: string = relativeUnderSrc(nm.file, facts.unit);
+    const dir: string = dirname(rel) === '.' ? '' : dirname(rel);
+    const base: string = (rel.split(/[\\/]/).pop() ?? '').replace(/\.ts$/, '');
+    const path: string = join(targetDir, 'src', dir, `${base}.ts`);
+    items.push({ path, content: convertNgModule(nm), status: existsSync(path) ? 'skip-exists' : 'write' });
+  }
+  // InjectionTokens → one contexts module (a token is a value-injection, which is exactly what a context is).
+  const tokensTs: string | null = convertTokens(facts.tokens ?? []);
+  if (tokensTs) {
+    const path: string = join(targetDir, 'src', 'contexts.ts');
+    items.push({ path, content: tokensTs, status: existsSync(path) ? 'skip-exists' : 'write' });
+  }
+
   // EVERY REMAINING FILE. A file with no @Component/@Injectable — a barrel, a helper module, a resolver, a model
   // — used to produce nothing at all, silently: on a real library that was half the files, including the
   // `index.ts` its consumers import. Most such files are already valid TypeScript, so they are carried across
@@ -1187,6 +1261,7 @@ export function planWrites(facts: MigrationFacts, targetDir: string): WriteItem[
     ...facts.services.map((sf) => sf.file),
     ...(facts.pipes ?? []).map((pf) => pf.file),
     ...(facts.directives ?? []).map((df) => df.file),
+    ...(facts.ngModules ?? []).map((nm) => nm.file),
   ]);
   for (const file of facts.files) {
     if (covered.has(file)) continue;

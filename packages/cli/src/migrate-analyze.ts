@@ -868,6 +868,108 @@ export function diGraph(injectors: Injector[]): DiEdge[] {
   return injectors.flatMap((s) => s.injects.map((to) => ({ from: s.className, to })));
 }
 
+/* ──────────── NgModules + injection tokens ──────────── */
+
+/**
+ * An Angular `@NgModule`. Weave has no modules — imports are per-file — but the module still carries facts
+ * nothing else does: which pieces belong together, what it PROVIDED (scoped services that must become
+ * `provide`/`inject`), and what it re-exported as its public surface.
+ */
+export interface NgModuleFact {
+  file: string;
+  className: string;
+  declarations: string[];
+  imports: string[];
+  exports: string[];
+  providers: string[];
+  bootstrap: string[];
+}
+
+/** An `InjectionToken` — Angular's way to inject a non-class value. In Weave that is a context. */
+export interface TokenFact {
+  file: string;
+  /** The const it was assigned to. */
+  name: string;
+  /** The token's debug description, when given. */
+  description: string | null;
+}
+
+/** Identifier names inside an array-valued property of an object literal, flattened one level. */
+function identifierList(obj: ts.ObjectLiteralExpression, key: string): string[] {
+  const out: string[] = [];
+  for (const p of obj.properties) {
+    if (!ts.isPropertyAssignment(p) || !p.name || !ts.isIdentifier(p.name) || p.name.text !== key) continue;
+    if (!ts.isArrayLiteralExpression(p.initializer)) continue;
+    for (const el of p.initializer.elements) {
+      if (ts.isIdentifier(el)) out.push(el.text);
+      else if (ts.isCallExpression(el) && ts.isPropertyAccessExpression(el.expression) && ts.isIdentifier(el.expression.expression)) {
+        out.push(`${el.expression.expression.text}.${el.expression.name.text}()`); // RouterModule.forRoot(...)
+      } else if (ts.isObjectLiteralExpression(el)) {
+        const provide: string | null = identifierProp(el, 'provide') ?? stringProp(el, 'provide');
+        out.push(provide ? `{ provide: ${provide} }` : '{ … }'); // a provider object
+      }
+    }
+  }
+  return out;
+}
+
+/** Every `@NgModule` in a file. */
+export function findNgModules(filePath: string): NgModuleFact[] {
+  const sf: ts.SourceFile | null = parseFile(filePath);
+  if (!sf) return [];
+  const out: NgModuleFact[] = [];
+  const visit = (node: ts.Node): void => {
+    if (ts.isClassDeclaration(node)) {
+      const dec: ts.Decorator | undefined = decoratorsOf(node).find((d) => decoratorName(d) === 'NgModule');
+      if (dec) {
+        const arg: ts.Expression | undefined = ts.isCallExpression(dec.expression) ? dec.expression.arguments[0] : undefined;
+        const cfg: ts.ObjectLiteralExpression | null = arg && ts.isObjectLiteralExpression(arg) ? arg : null;
+        out.push({
+          file: filePath,
+          className: node.name?.text ?? '(anonymous)',
+          declarations: cfg ? identifierList(cfg, 'declarations') : [],
+          imports: cfg ? identifierList(cfg, 'imports') : [],
+          exports: cfg ? identifierList(cfg, 'exports') : [],
+          providers: cfg ? identifierList(cfg, 'providers') : [],
+          bootstrap: cfg ? identifierList(cfg, 'bootstrap') : [],
+        });
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sf);
+  return out;
+}
+
+/** Every `new InjectionToken(...)` assigned to a const in a file. */
+export function findTokens(filePath: string): TokenFact[] {
+  const sf: ts.SourceFile | null = parseFile(filePath);
+  if (!sf) return [];
+  const out: TokenFact[] = [];
+  const visit = (node: ts.Node): void => {
+    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer && ts.isNewExpression(node.initializer)) {
+      const callee: ts.LeftHandSideExpression = node.initializer.expression;
+      if (ts.isIdentifier(callee) && callee.text === 'InjectionToken') {
+        const first: ts.Expression | undefined = node.initializer.arguments?.[0];
+        out.push({ file: filePath, name: node.name.text, description: first && ts.isStringLiteralLike(first) ? first.text : null });
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sf);
+  return out;
+}
+
+/** NgModules across a file set. */
+export function analyzeNgModules(files: string[]): NgModuleFact[] {
+  return files.flatMap((f) => findNgModules(f));
+}
+
+/** Injection tokens across a file set. */
+export function analyzeTokens(files: string[]): TokenFact[] {
+  return files.flatMap((f) => findTokens(f));
+}
+
 /* ──────────── pipes + directives: the two decorated kinds nothing read until now ──────────── */
 
 /** An Angular `@Pipe` — in Weave a pipe is simply a function (or a `computed`), so this maps cleanly. */
@@ -1370,7 +1472,9 @@ const HANDLED_KINDS: Set<DeclKind> = new Set<DeclKind>(['component', 'service', 
 const UNHANDLED_NOTES: Record<string, string> = {
   pipe: 'an Angular @Pipe class — in Weave a pipe is just a function (or a `computed`); the class is not converted yet',
   directive: 'an Angular @Directive — the Weave equivalent is a `use:` action; not converted yet',
-  ngmodule: 'an @NgModule — Weave has no modules (imports are per-file); its declarations/providers are not read yet',
+  // Read and written out as a wiring note, but deliberately NOT counted as converted: it becomes no Weave code,
+  // because Weave has no modules. Counting a note as a conversion would be exactly the over-claiming to avoid.
+  ngmodule: 'an @NgModule — Weave has no modules, so it becomes no code; a note listing its declarations, providers and exports is written beside it',
   class: 'a plain class (a resolver, a model, a helper) — copied nowhere yet; most are valid TypeScript already',
   function: 'a plain exported function — usually valid TypeScript as-is, but nothing is written for it yet',
   const: 'a plain exported constant — usually valid as-is, but nothing is written for it yet',
@@ -1536,6 +1640,10 @@ export interface MigrationFacts {
   cycles: string[][];
   /** Imports that could not be resolved — recorded, never guessed. */
   unresolved: string[];
+  /** `@NgModule` classes — Weave has none, but they say what belonged together and what was provided. */
+  ngModules: NgModuleFact[];
+  /** `InjectionToken` consts — in Weave a context. */
+  tokens: TokenFact[];
   /** `@Pipe` classes — in Weave a pipe is a function. */
   pipes: PipeFact[];
   /** `@Directive` classes — in Weave a `use:` action. */
@@ -1556,7 +1664,7 @@ export function assembleFacts(unitDir: string): MigrationFacts {
   const empty: MigrationFacts = {
     unit: unitDir, entry: null, files: [], angular: [], internal: [], packages: [], packageUsage: [],
     components: [], services: [], di: [], routes: [], forms: [], calls: [], branches: [], cycles: [], unresolved: [],
-    pipes: [], directives: [],
+    ngModules: [], tokens: [], pipes: [], directives: [],
     inventory: [], coverage: { total: 0, handled: 0, carried: 0, gaps: [], emptyFiles: [] },
   };
   if (!entry) return empty;
@@ -1584,6 +1692,8 @@ export function assembleFacts(unitDir: string): MigrationFacts {
     branches: analyzeBranches(walk.files),
     cycles: walk.cycles,
     unresolved: walk.unresolved,
+    ngModules: analyzeNgModules(walk.files),
+    tokens: analyzeTokens(walk.files),
     pipes: analyzePipes(walk.files),
     directives: analyzeDirectives(walk.files),
     inventory: decls,

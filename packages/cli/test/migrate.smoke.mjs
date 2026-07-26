@@ -647,6 +647,28 @@ ok(styleOut.length === 1 && styleOut[0].name === 'decorator.css', 'componentStyl
 ok(styleOut[0].content.includes('h1 { color: red }'), 'componentStyles: the inline CSS itself is carried, not just its count');
 ok(cv.componentStyles({ file: 'x.ts', className: 'X', styleUrls: ['./missing.scss'], styleTexts: [] }, 'x').length === 0, 'componentStyles: an unreadable stylesheet yields nothing (never an invented empty file)');
 
+// ── NgModules → a wiring note (NOT code, and NOT counted as converted); InjectionToken → a context ──
+const modFile = join(routesDir, 'module.routes.ts');
+const mods = a.findNgModules(modFile);
+ok(mods.length === 1 && mods[0].className === 'AppRoutingModule', 'findNgModules: the @NgModule class is found');
+ok(mods[0].imports.some((i) => i.includes('RouterModule.forRoot')), 'findNgModules: a RouterModule.forRoot(...) import is recorded as such');
+
+const modTs = cv.convertNgModule({ file: 'x.ts', className: 'AppModule', declarations: ['AppComponent'], imports: ['CommonModule'], exports: ['AppComponent'], providers: ['ConfigService'], bootstrap: ['AppComponent'] });
+ok(modTs.includes('Weave has NO modules'), 'convertNgModule: it says plainly there is nothing to translate');
+ok(modTs.includes('ConfigService') && modTs.includes('provide('), 'convertNgModule: each provider is named with what it becomes (provide/inject)');
+ok(modTs.includes('declarations') && modTs.includes('AppComponent'), 'convertNgModule: the declarations are recorded — only the module knew them');
+ok(modTs.includes('mount()'), 'convertNgModule: a bootstrap module points at the Weave mount call');
+// An NgModule becomes no Weave code, so it must NOT be counted as converted.
+const modInv = a.inventory([modFile]).find((d) => d.kind === 'ngmodule');
+ok(modInv && !modInv.handled && modInv.note.includes('no code'), 'coverage: an @NgModule is NOT counted as converted — a note is not a conversion');
+
+const tokFile = join(pipesDir, 'tokens.ts');
+const toks = a.findTokens(tokFile);
+ok(toks.length === 1 && toks[0].name === 'APP_CONFIG' && toks[0].description === 'app.config', 'findTokens: an InjectionToken const and its description are read');
+const tokTs = cv.convertTokens(toks);
+ok(tokTs.includes('createContext') && tokTs.includes('export const APP_CONFIG'), 'convertTokens: a token becomes a context');
+ok(cv.convertTokens([]) === null, 'convertTokens: no tokens → no file at all');
+
 // ── COVERAGE: the tool must measure itself against the SOURCE, not against its own feature list. ──
 // Every gap so far was found by a person asking "are we done?", never by the tool admitting it. These checks
 // make silence impossible: anything the converter does not emit has to show up as a counted, explained gap.
