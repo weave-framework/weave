@@ -139,6 +139,17 @@ Writing is opt-in: the exact file list is printed first, and the prompt defaults
 | `.weave-migrate/facts.json` | The raw measurements the plan was built from. |
 | `src/…` | The converted code, mirroring your source layout. |
 
+### It knows what everything became
+
+Converting happens one declaration at a time, but the *mapping* is built once for the whole unit before any file
+is finished: which class became which export, in which file, as a default or a name. Every generated file's
+imports are then resolved against that one table — so a component that became a default export is imported as
+one, a service that became `useUser` is imported under that name, and no written file can name something that no
+longer exists.
+
+It models **structure**, not intent: it knows `ShortenPipe` is now the function `shorten`; it does not know what
+an `Observable` in that file ought to become, and does not pretend to.
+
 ### It checks the result before writing it
 
 Converting happens one declaration at a time, so nothing in that pipeline can see whether the *result* holds

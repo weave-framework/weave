@@ -38,6 +38,24 @@
   Weave equivalent is left in place with a `TODO(weave migrate)` comment instead of being guessed at, and a
   method's original body travels with it as comments beside the new signature rather than being discarded.
 
+  **There is now a MODEL of the migration, not a pipeline of independent rewrites.** The mapping from every
+  source declaration to what it becomes — new name, new file, whether it is a default export — is built **once,
+  for the whole unit, before any file is finished**, and every emitted file's imports are resolved against it in
+  a single pass. A component becomes a default export while its importers went on naming the class; a service
+  becomes `useX` while its importer asked for `XService`; a pipe becomes a function its own consumer is told
+  does not exist. Those were three patches for one problem. Now one place knows what everything became, and
+  nothing written can name something that no longer exists.
+
+  What the model deliberately does **not** cover is intent. It knows `ShortenPipe` is the function `shorten` in
+  `pipes/shorten.ts`. It does not know what an `Observable` in that file ought to become — structure is knowable
+  and is modelled exhaustively; meaning is a decision and stays with the reader.
+
+  Three defects fell out of measuring the result rather than the parts: a member named `form` **shadowed** the
+  `form` imported from `@weave-framework/forms`, so the drafted `form({ … })` called the signal (reported ten
+  lines away as "Expected 0 arguments, but got 1"); a field built from `new FormGroup(…)` was carried as live
+  code naming a class that does not come across; and a dependency declared as a **constructor parameter** was
+  never declared at all, so every call through it named nothing.
+
   **The output is verified as a WHOLE, before a byte is written.** Every other check in the tool looks at one
   declaration at a time — the converter walks components, then services, then pipes, each in isolation, and the
   writer puts bytes on disk. Nothing ever looked at the result. So a rename that landed in one file and not in

@@ -44,17 +44,39 @@ function norm(p: string): string {
  * at their real target paths, so relative imports between them resolve exactly as they will once written, and
  * `node_modules` resolution finds the app's actual dependencies rather than this CLI's.
  */
-function hostOver(planned: Map<string, string>, options: ts.CompilerOptions): ts.CompilerHost {
+/**
+ * A Weave COMPONENT module is `setup` + a sibling template; its `default` export is synthesised by the loader at
+ * build time (`defineComponent(render, setup)`), so plain TypeScript cannot see it. Without this, every parent
+ * importing a child — the documented way to use one — is reported as importing a default that does not exist.
+ *
+ * Appended, never inserted, so every line number above still points where it did. Modelling the contract stops
+ * there on purpose: whether the PROPS a parent passes are right is `weave check`'s job, not this one's.
+ */
+const WEAVE_DEFAULT: string =
+  '\ndeclare const __weaveDefault: (props?: Record<string, unknown>, slots?: Record<string, () => unknown>) => unknown;\nexport default __weaveDefault;\n';
+
+function hostOver(planned: Map<string, string>, templates: Set<string>, options: ts.CompilerOptions): ts.CompilerHost {
   const base: ts.CompilerHost = ts.createCompilerHost(options, true);
   const readPlanned = (p: string): string | undefined => planned.get(norm(p));
+  /** The text a file should be CHECKED as — its own, plus the loader's default export when it is a component. */
+  const textFor = (p: string, raw: string): string => {
+    const stem: string = norm(p).replace(/\.tsx?$/, '');
+    // The sibling may be planned OR already on disk: migrating into an app that has components of its own must
+    // not report every one of them as broken.
+    const hasTemplate: boolean = templates.has(stem) || base.fileExists(`${stem}.html`);
+    return hasTemplate && /export\s+(?:async\s+)?(?:function|const)\s+setup\b/.test(raw) ? raw + WEAVE_DEFAULT : raw;
+  };
   const host: ts.CompilerHost = {
     ...base,
     fileExists: (p: string): boolean => readPlanned(p) !== undefined || base.fileExists(p),
-    readFile: (p: string): string | undefined => readPlanned(p) ?? base.readFile(p),
+    readFile: (p: string): string | undefined => {
+      const raw: string | undefined = readPlanned(p) ?? base.readFile(p);
+      return raw === undefined ? undefined : textFor(p, raw);
+    },
     getSourceFile: (p: string, lang: ts.ScriptTarget | ts.CreateSourceFileOptions, onError?: (m: string) => void, shouldCreate?: boolean): ts.SourceFile | undefined => {
-      const text: string | undefined = readPlanned(p);
-      if (text === undefined) return base.getSourceFile(p, lang, onError, shouldCreate);
-      return ts.createSourceFile(p, text, lang, true);
+      const raw: string | undefined = readPlanned(p) ?? base.readFile(p);
+      if (raw === undefined) return base.getSourceFile(p, lang, onError, shouldCreate);
+      return ts.createSourceFile(p, textFor(p, raw), lang, true);
     },
     // Module resolution asks whether a DIRECTORY exists before it probes for files in it — and the planned
     // files live in folders that are not on disk yet, so every relative import between them failed to resolve
@@ -91,6 +113,7 @@ function hostOver(planned: Map<string, string>, options: ts.CompilerOptions): ts
  */
 export function verifyOutput(items: WriteItem[], targetDir: string): OutputProblem[] {
   const planned: Map<string, string> = new Map<string, string>();
+  const templates: Set<string> = new Set<string>(items.filter((i) => i.path.endsWith('.html')).map((i) => norm(i.path).replace(/\.html$/, '')));
   for (const it of items) {
     if (it.status !== 'write' || !/\.tsx?$/.test(it.path)) continue;
     planned.set(norm(it.path), it.content);
@@ -112,7 +135,7 @@ export function verifyOutput(items: WriteItem[], targetDir: string): OutputProbl
   const roots: string[] = [...planned.keys()];
   let program: ts.Program;
   try {
-    program = ts.createProgram(roots, options, hostOver(planned, options));
+    program = ts.createProgram(roots, options, hostOver(planned, templates, options));
   } catch {
     return []; // a broken toolchain is not a finding ABOUT THE OUTPUT — say nothing rather than something false
   }

@@ -934,6 +934,50 @@ ok(vf.collisions([{ path: 'x/a.ts' }, { path: 'x/b.ts' }]).length === 0, 'collis
 // following none migrates a service the app leans on as a name and nothing else. So each is asked for by name.
 const shopFacts = a.assembleFacts(join(fx, 'nx-mono', 'apps', 'shop'));
 const reach = a.outOfReach(shopFacts);
+
+// ── THE SYMBOL TABLE: one place that knows what everything became ──
+// A component becomes a DEFAULT export while its importers went on naming the class; a service becomes
+// `useX` while its importer asked for `XService`; a pipe becomes a function its consumer is told does not
+// exist. Three patches, one problem — the mapping is built once, for the whole unit, and every emitted file is
+// resolved against it in a single pass.
+const symTarget = join(tmpdir(), 'weave-symbols-out');
+const shopTable = cv.symbolTable(shopFacts, symTarget);
+ok(shopTable.get('AppComponent')?.isDefault === true, 'symbolTable: a component is the DEFAULT export — exactly what its importers did not know');
+ok(shopTable.get('UserService')?.to === 'useUser', 'symbolTable: a root service is reached through its store hook');
+ok(shopTable.get('AppComponent')?.file.endsWith(`app${sep}app.ts`), 'symbolTable: it points at the file the WRITER actually writes — computing the path twice is how it came to point elsewhere');
+const shopItems = cv.planWrites(shopFacts, symTarget);
+const mainTs = shopItems.find((w) => w.path.endsWith(`src${sep}main.ts`))?.content ?? '';
+ok(/import AppComponent from '\.\/app\/app';/.test(mainTs), 'resolveImports: a carried file importing a converted component gets a DEFAULT import at the right path');
+ok(!/\{\s*AppComponent\s*\}/.test(mainTs), 'resolveImports: and no longer names it as a named export the file does not have');
+// Only what the table KNOWS is touched.
+ok(mainTs.includes("from '@angular/platform-browser'"), 'resolveImports: an import the table knows nothing about passes through exactly as written');
+ok(cv.symbolCollisions(new Map([['A', { from: 'A', to: 'x', isDefault: false, file: 'f.ts', kind: 'pipe' }], ['B', { from: 'B', to: 'x', isDefault: false, file: 'f.ts', kind: 'pipe' }]])).length === 1, 'symbolCollisions: two source declarations landing on one exported name is named by SOURCE name, before anything is written');
+
+// A drafted local must not SHADOW something the file imports. A field literally called `form` shadowed `form`
+// from @weave-framework/forms, and the drafted `form({ … })` two lines later called the signal — reported as
+// "Expected 0 arguments, but got 1", ten lines from the cause.
+const shadowRenames = cv.localRenames([{ kind: 'field', name: 'form', isPublic: true, params: '', body: '', initializer: '', type: '', isSignal: false, text: '', decorators: [] }], ["import { field, form } from '@weave-framework/forms';"]);
+ok(shadowRenames.get('form') === 'ownForm', 'localRenames: a member colliding with an import is renamed — the member is what moves, the import is what the file needs');
+ok(cv.localRenames([{ kind: 'field', name: 'title', isPublic: true, params: '', body: '', initializer: '', type: '', isSignal: false, text: '', decorators: [] }], []).size === 0, 'localRenames: a name that collides with nothing is left alone');
+ok(cv.localRenames([{ kind: 'field', name: 'props', isPublic: true, params: '', body: '', initializer: '', type: '', isSignal: false, text: '', decorators: [] }], []).get('props') === 'ownProps', 'localRenames: a draft\'s OWN generated names count too — `props` is not importable but is very much taken');
+// The shadow, end to end: the login fixture's field is literally called `form`.
+const loginTs2 = shopItems.find((w) => w.path.endsWith(`app${sep}login.ts`))?.content ?? '';
+ok(loginTs2.includes('const ownForm ='), 'convertComponent: the colliding member is renamed in the OUTPUT, not just in a map');
+ok(loginTs2.includes("import { field, form } from '@weave-framework/forms';"), 'convertComponent: and the import it collided with is untouched, so the drafted form({ … }) still means the form');
+// A value built from Angular classes cannot be carried as live code: `@angular/*` imports do not come across.
+ok(!/=\s*signal\([^)]*new FormGroup/.test(loginTs2), 'signalDecl: `new FormGroup(…)` is NOT emitted as a live value — the class is not there to construct');
+ok(/const ownForm = signal<[^>]*\| undefined>\(undefined\);/.test(loginTs2), 'signalDecl: the declaration and its type survive; only the value it cannot build is dropped');
+ok(loginTs2.includes('which is Angular') && loginTs2.includes('give it its Weave value here'), 'signalDecl: and it says which Angular names it could not bring across');
+// A constructor PARAMETER-PROPERTY is not a class member, so the field branch never sees it.
+const userSvc2 = shopItems.find((w) => w.path.endsWith('user.service.ts'))?.content ?? '';
+ok(userSvc2.includes('const analytics = null as unknown as AnalyticsService;'), 'draftMembers: a dependency declared as a constructor parameter is DECLARED — a comment left every call through it naming nothing');
+ok(userSvc2.includes('was not migrated, so nothing provides this'), 'draftMembers: and the hole says so — `null` throws the moment it is used, which is the truth');
+ok(!/const router = null/.test(userSvc2), "draftMembers: a dependency whose calls WERE rewritten needs no such hole");
+// A symbol that lives in the file being resolved needs no import at all — it is right there.
+const selfSym = new Map([['Thing', { from: 'Thing', to: 'thing', isDefault: false, file: join('x', 'a.ts'), kind: 'pipe' }]]);
+ok(!cv.resolveImports("import { Thing } from './a';\nexport const q = Thing;", join('x', 'a.ts'), selfSym).includes('import'), 'resolveImports: a symbol that landed in THIS file is not imported into itself');
+ok(cv.resolveImports("import { Thing } from './a';\nexport const q = Thing;", join('x', 'b.ts'), selfSym).includes("import { thing as Thing } from './a';"), 'resolveImports: from another file it is imported under its new name, aliased so the use sites are untouched');
+
 const lib = reach.find((r) => r.name === '@sps-interfaces');
 ok(lib?.kind === 'lib', 'outOfReach: a workspace library reached through a tsconfig alias is an item to ask about');
 ok(lib?.uses.includes('User'), 'outOfReach: it names what is actually USED from the lib — the reason to go in, and the stake');

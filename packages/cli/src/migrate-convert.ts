@@ -13,6 +13,11 @@
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve, sep } from 'node:path';
+import { resolveImports, type WeaveSymbol } from './migrate-symbols.js';
+
+// Re-exported so the symbol model has ONE entry point: `symbolTable` is built here, and what it says about
+// collisions belongs beside it rather than a module away.
+export { resolveImports, symbolCollisions, type WeaveSymbol } from './migrate-symbols.js';
 import {
   importedNamesFrom,
   sourceImports,
@@ -1064,6 +1069,61 @@ export function signalInputDefault(mem: ClassMember | undefined): string {
  * specifiers repointed at where those files now land. Dropping them, as the drafts used to, left the translated
  * body calling helpers that were never imported.
  */
+/**
+ * Members whose name collides with something the generated file IMPORTS, and what to call them instead.
+ *
+ * A class field literally named `form` became `const form = signal(…)`, which SHADOWED the `form` imported from
+ * `@weave-framework/forms` — so the drafted `form({ … })` two lines later called the signal. It type-checked as
+ * "Expected 0 arguments, but got 1", ten lines from the cause. The member is the thing that moves, so the member
+ * is what gets renamed; the import is what the file needs to keep working.
+ */
+export function localRenames(members: ClassMember[], importLines: string[]): Map<string, string> {
+  // Everything a draft can put in scope: what it imports, and the locals it generates itself.
+  const taken: Set<string> = new Set<string>(DRAFT_LOCALS);
+  for (const line of importLines) {
+    const braces: RegExpMatchArray | null = line.match(/\{([\s\S]*)\}/);
+    for (const part of (braces?.[1] ?? '').split(',')) {
+      const name: string = part.trim().replace(/^type\s+/, '').split(/\s+as\s+/).pop()?.trim() ?? '';
+      if (name) taken.add(name);
+    }
+    const def: RegExpMatchArray | null = line.match(/^import\s+([A-Za-z_$][\w$]*)\s*(?:,|from)/);
+    if (def) taken.add(def[1]);
+  }
+  const out: Map<string, string> = new Map<string, string>();
+  for (const mem of members) {
+    if (!taken.has(mem.name)) continue;
+    out.set(mem.name, `own${mem.name.charAt(0).toUpperCase()}${mem.name.slice(1)}`);
+  }
+  return out;
+}
+
+/**
+ * Names a draft brings into scope on its own — the Weave APIs it can import and the bindings it writes. A class
+ * member with one of these names would shadow it, and the shadow shows up as a type error somewhere else.
+ */
+const DRAFT_LOCALS: string[] = [
+  'signal', 'computed', 'effect', 'watch', 'onMount', 'onDispose', 'inject', 'provide', 'createContext',
+  'store', 'field', 'form', 'validators', 'navigate', 'afterEach', 'beforeEach', 'createClient', 'resource',
+  'action', 'props', 'propDefaults', 'setup', 'routerNavigate', 'client', 'defaults', 'opts', 'el', 'arg',
+];
+
+/**
+ * The names a file imports from `@angular/*`. Those imports do not come across — Angular is what is being
+ * migrated away from — so any drafted code still naming one of them would reference something that is not there.
+ */
+export function angularImportedNames(file: string): Set<string> {
+  const out: Set<string> = new Set<string>();
+  for (const imp of sourceImports(file)) {
+    if (!imp.spec.startsWith('@angular')) continue;
+    const braces: RegExpMatchArray | null = imp.text.match(/\{([\s\S]*)\}/);
+    for (const part of (braces?.[1] ?? '').split(',')) {
+      const name: string = part.trim().replace(/^type\s+/, '').split(/\s+as\s+/)[0].trim();
+      if (name) out.add(name);
+    }
+  }
+  return out;
+}
+
 export function carriedImportsFor(file: string, migrated?: Map<string, MigratedService>): string[] {
   return sourceImports(file)
     .filter((i) => !i.spec.startsWith('@angular/') && i.spec !== '@angular')
@@ -1143,7 +1203,11 @@ export function convertComponent(fact: ComponentFact, templateHtml: string, opts
     body.push('// ── these became props (see the signature above) ──');
     for (const mem of asProps) for (const line of (mem.text ?? '').split('\n')) body.push(`// ${line}`);
   }
-  const ctx: TranslateCtx = translateCtx(fact.members ?? [], fact.inputs, 'props', opts.migrated);
+  const ctx: TranslateCtx = {
+    ...translateCtx(fact.members ?? [], fact.inputs, 'props', opts.migrated),
+    angularNames: angularImportedNames(fact.file),
+    rename: localRenames(fact.members ?? [], carriedImportsFor(fact.file, opts.migrated)),
+  };
   // The shims the translated calls name. Without them the file calls functions that do not exist.
   const adapters: string[] = adaptersFor(fact.members ?? [], fact.inputs);
   if (adapters.length) {
@@ -1474,6 +1538,12 @@ export interface TranslateCtx {
   /** The name that IS the element, when there is one. A `use:` action is handed the element directly, which is
    *  exactly what `ElementRef` provided — so `this.el.nativeElement` is that name, not a property of it. */
   elementRef?: string;
+  /** Members renamed because their name collided with something the file IMPORTS. A class field literally
+   *  called `form` shadowed `form` from @weave-framework/forms, and every call through it broke. */
+  rename?: Map<string, string>;
+  /** Names this file imports from `@angular/*`. Those imports are DROPPED — the framework is what is being
+   *  migrated away from — so anything still naming one of them cannot be emitted as live code. */
+  angularNames?: Set<string>;
   /** Services THIS MIGRATION converted, by class name, and how the converted file exposes them. A call into one
    *  of these is not unknown — it is the thing being migrated alongside, so it must not be reported as having
    *  "no recorded Weave equivalent". */
@@ -1639,7 +1709,7 @@ function rewriteFieldWrites(code: string, ctx: TranslateCtx, paramNames: Set<str
       const start: number = i + m[0].length;
       const end: number = statementEnd(code, start);
       if (paramNames.has(m[1])) todos.push(`\`${m[1]}\` is both a parameter and a signal here — rename one before this compiles`);
-      out += `${m[1]}.set(${code.slice(start, end).trim()})`;
+      out += `${ctx.rename?.get(m[1]) ?? m[1]}.set(${code.slice(start, end).trim()})`;
       i = end;
       continue;
     }
@@ -1869,12 +1939,13 @@ export function translateBody(body: string, ctx: TranslateCtx, params: string = 
   code = outsideStrings(code, (part) =>
     part
       // `this.method(` → `method(`
-      .replace(/\bthis\.([A-Za-z_$][\w$]*)\s*\(/g, (full, name: string) => (ctx.methods.has(name) ? `${name}(` : full))
+      .replace(/\bthis\.([A-Za-z_$][\w$]*)\s*\(/g, (full, name: string) => (ctx.methods.has(name) ? `${ctx.rename?.get(name) ?? name}(` : full))
       // remaining reads
       .replace(/\bthis\.([A-Za-z_$][\w$]*)/g, (full, name: string) => {
         if (ctx.inputs.has(name)) return `${ctx.propsRef ?? 'props'}.${name}`;
-        if (ctx.signals.has(name) || ctx.injected.has(name)) return name; // already a signal, or a dependency
-        if (ctx.getters.has(name) || ctx.fields.has(name)) return `${name}()`;
+        const local: string = ctx.rename?.get(name) ?? name;
+        if (ctx.signals.has(name) || ctx.injected.has(name)) return local; // already a signal, or a dependency
+        if (ctx.getters.has(name) || ctx.fields.has(name)) return `${local}()`;
         return full; // unresolved — reported below
       }),
   );
@@ -1986,10 +2057,21 @@ export function adaptersFor(members: ClassMember[], inputs: string[]): string[] 
 export function signalDecl(mem: ClassMember, ctx: TranslateCtx): { code: string; todos: string[] } {
   const init: string = (mem.initializer ?? '').trim();
   // A field that was ALREADY an Angular signal is already the right call — `signal(0)` reads the same in Weave.
-  // Wrapping it would produce `signal<T>(signal(0))`, a signal of a signal.
+  // Wrapping it would produce `signal<T>(signal(0))`, a signal of a signal. This comes FIRST: `signal` is an
+  // `@angular/core` import, so the check below would otherwise throw away a value that translates one-to-one.
   if (mem.isSignal && init) {
     const t: { code: string; todos: string[] } = translateBody(init, ctx);
     return { code: t.code.trim(), todos: t.todos };
+  }
+  // An initializer that CONSTRUCTS something Angular cannot be carried as live code: `@angular/*` imports are
+  // dropped (that is the framework being migrated away from), so `signal(new FormGroup({…}))` named a class
+  // that is not there. The value cannot survive; the declaration and its type can.
+  const angular: string[] = [...(ctx.angularNames ?? [])].filter((n) => new RegExp(`(?<![\\w$])${n}(?![\\w$])`).test(init));
+  if (angular.length) {
+    return {
+      code: `signal<${mem.type || 'unknown'} | undefined>(undefined)`,
+      todos: [`\`${mem.name}\` was built from ${angular.join(', ')}, which is Angular's and does not come across — give it its Weave value here`],
+    };
   }
   if (init) {
     const t: { code: string; todos: string[] } = translateBody(init, ctx);
@@ -2040,6 +2122,28 @@ function draftMembers(members: ClassMember[], className: string, ctx?: Translate
   const publicNames: string[] = [];
   const commented = (text: string | undefined, pad: string = '  '): string[] => (text ?? '').split('\n').map((l) => `${pad}// ${l}`);
 
+  // A dependency declared as a CONSTRUCTOR PARAMETER-PROPERTY is not a class member, so the field branch below
+  // never sees it — and the calls through it were left naming a binding nothing declared. Angular's most common
+  // injection form produced code referencing a name that was never there.
+  const fieldNames: Set<string> = new Set<string>(members.filter((m) => m.kind === 'field').map((m) => m.name));
+  for (const [name, service] of cx.injected) {
+    if (fieldNames.has(name) || SERVICE_METHODS[service]) continue; // a member, or one whose calls were rewritten
+    // `ElementRef` in a directive IS the element the action was handed — declaring it again shadowed the
+    // parameter with `null`, so the very thing the action exists to touch became nothing.
+    if (service === 'ElementRef' && cx.elementRef) continue;
+    const m: MigratedService | undefined = cx.migrated?.get(service);
+    out.push('');
+    if (m) {
+      out.push(`// \`${service}\` is migrated alongside this file; this is how it is reached here.`);
+      out.push(m.kind === 'store' ? `const ${name} = ${m.name}();` : `const ${name} = inject(${m.name});`);
+    } else {
+      out.push(tsTodo(`${service} was not migrated, so nothing provides this. The calls below compile and will`));
+      out.push('//   throw the moment they run — wire it up, or delete them.');
+      out.push(`const ${name} = null as unknown as ${service};`);
+    }
+  }
+
+  const localName = (n: string): string => cx.rename?.get(n) ?? n;
   for (const mem of members) {
     if (mem.kind === 'constructor') {
       // Even an EMPTY constructor is a declaration: `constructor(private router: Router) {}` is how the class
@@ -2072,9 +2176,16 @@ function draftMembers(members: ClassMember[], className: string, ctx?: Translate
         if (m) {
           out.push(`// \`${service}\` is migrated alongside this file; this is how it is reached here.`);
           out.push(m.kind === 'store' ? `const ${mem.name} = ${m.name}();` : `const ${mem.name} = inject(${m.name});`);
-        } else {
+        } else if (SERVICE_METHODS[service]) {
           out.push(`// \`${mem.name}\` held ${service}. Its calls above were rewritten to Weave's equivalents, so there is`);
           out.push('// nothing to hold here; anything still calling it needs a decision.');
+        } else {
+          // NOT migrated and NOT one Weave replaces — usually because access to it was left closed. Its calls
+          // were kept naming this field, so a bare comment left every one of them referencing nothing. The hole
+          // is declared instead: it compiles, it is impossible to miss, and `null` throws the moment it is used.
+          out.push(tsTodo(`${service} was not migrated, so nothing provides this. The calls below compile and will`));
+          out.push('//   throw the moment they run — wire it up, or delete them.');
+          out.push(`const ${mem.name} = null as unknown as ${mem.type || service};`);
         }
         out.push(...commented(mem.text, ''));
         continue;
@@ -2083,9 +2194,9 @@ function draftMembers(members: ClassMember[], className: string, ctx?: Translate
       const note: string = mem.isSignal ? ' // already a signal in Angular — a 1:1 move' : '';
       const decl: { code: string; todos: string[] } = signalDecl(mem, cx);
       for (const t of decl.todos) out.push(tsTodo(t));
-      out.push(`const ${mem.name} = ${decl.code};${vis}${note}`);
+      out.push(`const ${localName(mem.name)} = ${decl.code};${vis}${note}`);
       out.push(...commented(mem.text, '')); // the original declaration, verbatim — initial value and type included
-      if (mem.isPublic) publicNames.push(mem.name);
+      if (mem.isPublic) publicNames.push(localName(mem.name));
       continue;
     }
     if (mem.kind === 'getter' || mem.kind === 'setter') {
@@ -2096,17 +2207,17 @@ function draftMembers(members: ClassMember[], className: string, ctx?: Translate
       if (mem.kind === 'getter') {
         const g: { code: string; todos: string[] } = getterToComputed(mem.body, cx);
         for (const t of g.todos) out.push(tsTodo(t));
-        out.push(`const ${mem.name} = ${g.code};${vis}`);
+        out.push(`const ${localName(mem.name)} = ${g.code};${vis}`);
       } else {
         const s: { code: string; todos: string[] } = translateBody(mem.body, cx, mem.params);
         for (const t of s.todos) out.push(tsTodo(t));
-        out.push(`const ${mem.name} = (${mem.params})${returnAnnotation(mem, s.code)} => {${vis}`);
+        out.push(`const ${localName(mem.name)} = (${mem.params})${returnAnnotation(mem, s.code)} => {${vis}`);
         out.push(indent(s.code));
         out.push('};');
       }
       out.push(`// ── original ${className}.${mem.name} ──`);
       out.push(...commented(mem.text, ''));
-      if (mem.isPublic) publicNames.push(mem.name);
+      if (mem.isPublic) publicNames.push(localName(mem.name));
       continue;
     }
     out.push('');
@@ -2117,14 +2228,14 @@ function draftMembers(members: ClassMember[], className: string, ctx?: Translate
     }
     const m: { code: string; todos: string[] } = translateBody(mem.body, cx, mem.params);
     for (const t of m.todos) out.push(tsTodo(t));
-    out.push(`const ${mem.name} = (${mem.params})${returnAnnotation(mem, m.code)} => {${mem.isPublic ? '' : ' // was private — a local, not returned'}`);
+    out.push(`const ${localName(mem.name)} = (${mem.params})${returnAnnotation(mem, m.code)} => {${mem.isPublic ? '' : ' // was private — a local, not returned'}`);
     if (m.code.trim()) out.push(indent(m.code));
     out.push('};');
     if ((mem.text ?? '').trim()) {
       out.push(`// ── original ${className}.${mem.name}() ──`);
       out.push(...commented(mem.text, '')); // the WHOLE original, so nothing is lost and the rewrite is checkable
     }
-    if (mem.isPublic) publicNames.push(mem.name);
+    if (mem.isPublic) publicNames.push(localName(mem.name));
   }
   return { lines: out, publicNames };
 }
@@ -2168,7 +2279,11 @@ export function convertService(fact: ServiceFact, rxjsNames: string[] = [], migr
   }
   const svcAdapters: string[] = adaptersFor(fact.members ?? [], []);
   if (svcAdapters.length) body.push(...svcAdapters);
-  const drafted: { lines: string[]; publicNames: string[] } = draftMembers(fact.members ?? [], fact.className, translateCtx(fact.members ?? [], [], 'props', migrated));
+  const drafted: { lines: string[]; publicNames: string[] } = draftMembers(fact.members ?? [], fact.className, {
+    ...translateCtx(fact.members ?? [], [], 'props', migrated),
+    angularNames: angularImportedNames(fact.file),
+    rename: localRenames(fact.members ?? [], carriedImportsFor(fact.file, migrated)),
+  });
   body.push(...drafted.lines);
   body.push('');
   body.push(
@@ -2291,8 +2406,19 @@ export function convertGuards(routes: RouteFact[]): string | null {
  * carry straight over. A `pure: false` pipe is flagged, because it relied on a change-detection pass Weave has no
  * equivalent of.
  */
+/** The function a pipe becomes. Named once, so the symbol table and the converter cannot disagree. */
+export function pipeFunctionName(fact: PipeFact): string {
+  return fact.pipeName ?? fact.className.replace(/Pipe$/, '').replace(/^(.)/, (m) => m.toLowerCase());
+}
+
+/** The action a directive becomes — its attribute selector, else the de-suffixed class name. */
+export function directiveFunctionName(fact: DirectiveFact): string {
+  const attr: string = (fact.selector ?? '').replace(/^[|]$/g, '');
+  return attr || fact.className.replace(/Directive$/, '').replace(/^(.)/, (m) => m.toLowerCase());
+}
+
 export function convertPipe(fact: PipeFact): { baseName: string; ts: string } {
-  const fnName: string = fact.pipeName ?? fact.className.replace(/Pipe$/, '').replace(/^(.)/, (m) => m.toLowerCase());
+  const fnName: string = pipeFunctionName(fact);
   const lines: string[] = [
     `// Converted from ${fact.className} (${fact.file}).`,
     '// Weave has no pipes — a pipe is just a function, so `{{ x | ' + (fact.pipeName ?? 'pipe') + ' }}` becomes',
@@ -2535,6 +2661,22 @@ function unitOf(file: string, facts: MigrationFacts): { dir: string; prefix: str
 }
 
 /**
+ * The absolute path a source file's conversion lands at. ONE calculation, shared by the writer and the symbol
+ * table — computing it twice is how the table came to point at `./app/root` for a file written to `app/app.ts`,
+ * which is exactly the class of mismatch the table exists to remove.
+ *
+ * `component` strips the Angular suffix (`app.component.ts` → `app.ts`); everything else keeps its file name,
+ * because deriving it from the CLASS made `breadcrumbs.component.ts` and `BreadcrumbsService` both want
+ * `breadcrumbs.ts`, and the second silently overwrote the first.
+ */
+export function outputFileFor(sourceFile: string, facts: MigrationFacts, targetDir: string, component: boolean = false): string {
+  const rel: string = outputPathFor(sourceFile, facts);
+  const dir: string = dirname(rel) === '.' ? '' : dirname(rel);
+  const name: string = rel.split(/[\\/]/).pop() ?? '';
+  return join(targetDir, 'src', dir, `${component ? weaveBaseName(name) : name.replace(/\.ts$/, '')}.ts`);
+}
+
+/**
  * Where a file lands, mirroring its source layout — under its own folder when it came from a granted unit.
  *
  * `index.ts` at the root is special: a Weave app's HTML SHELL is `src/index.html`, and a `.ts` beside a `.html`
@@ -2664,8 +2806,35 @@ export function componentNameMap(facts: MigrationFacts): Record<string, string> 
  * `src/`. A path that already exists is marked `skip-exists` and never overwritten — that is the whole safety
  * story for migrating into an app you already have.
  */
+/**
+ * What every declaration in this unit BECOMES, built before any file is finished. One place knows the whole
+ * mapping, so nothing written can name something that no longer exists — see `migrate-symbols.ts` for why that
+ * is a model rather than another patch.
+ */
+export function symbolTable(facts: MigrationFacts, targetDir: string): Map<string, WeaveSymbol> {
+  const table: Map<string, WeaveSymbol> = new Map<string, WeaveSymbol>();
+  for (const cf of facts.components) {
+    // A component is the file's DEFAULT export — which is exactly what its importers did not know.
+    table.set(cf.className, { from: cf.className, to: cf.className, isDefault: true, file: outputFileFor(cf.file, facts, targetDir, true), kind: 'component' });
+  }
+  for (const sf of facts.services) {
+    const m: MigratedService | undefined = migratedServices([sf]).get(sf.className);
+    if (m) table.set(sf.className, { from: sf.className, to: m.name, isDefault: false, file: outputFileFor(sf.file, facts, targetDir), kind: 'service' });
+  }
+  for (const pf of facts.pipes ?? []) {
+    table.set(pf.className, { from: pf.className, to: pipeFunctionName(pf), isDefault: false, file: outputFileFor(pf.file, facts, targetDir), kind: 'pipe' });
+  }
+  for (const df of facts.directives ?? []) {
+    table.set(df.className, { from: df.className, to: directiveFunctionName(df), isDefault: false, file: outputFileFor(df.file, facts, targetDir), kind: 'directive' });
+  }
+  return table;
+}
+
 export function planWrites(facts: MigrationFacts, targetDir: string): WriteItem[] {
   const items: WriteItem[] = [];
+  // The whole-unit mapping, built FIRST: every emitted file is resolved against it at the end, so a rename that
+  // landed here cannot be missed over there.
+  const table: Map<string, WeaveSymbol> = symbolTable(facts, targetDir);
   // What this run converts, so a call from one converted file into another is not reported as unknown.
   const migrated: Map<string, MigratedService> = migratedServices(facts.services);
   const opts: ConvertOptions = { components: componentNameMap(facts), migrated };
@@ -2766,7 +2935,13 @@ export function planWrites(facts: MigrationFacts, targetDir: string): WriteItem[
     const path: string = join(targetDir, 'src', 'guards.ts');
     items.push({ path, content: guards, status: existsSync(path) ? 'skip-exists' : 'write' });
   }
-  return items;
+
+  // ONE resolve pass over the assembled output. Until here every file was produced in isolation and could only
+  // guess what the others became; now the whole mapping exists, so each file's imports are pointed at what
+  // actually landed. This is what stops "migrated here, still naming the old thing over there".
+  return items.map((it) =>
+    /\.tsx?$/.test(it.path) ? { ...it, content: resolveImports(it.content, it.path, table) } : it,
+  );
 }
 
 /**
