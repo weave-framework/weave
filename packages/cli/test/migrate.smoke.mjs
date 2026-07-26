@@ -416,7 +416,21 @@ ok(model.includes('bind:value={{ name }}') && model.includes('TODO(weave migrate
 const ngClass = conv('<div [ngClass]="m"></div>');
 ok(ngClass.includes('TODO(weave migrate)') && !ngClass.includes('class:m'), 'convertTemplate: [ngClass] is flagged, NOT invented into a class: binding');
 ok(conv('<div #box></div>').includes('TODO(weave migrate)'), 'convertTemplate: a #ref is flagged (Weave uses ref={{ … }} held in setup)');
-ok(conv('<ng-template><p>x</p></ng-template>').includes('TODO(weave migrate)'), 'convertTemplate: <ng-template> is flagged (a @snippet is a human call)');
+// <ng-template #ref let-x let-y="key"> → @snippet, and *ngTemplateOutlet → @render with ordered arguments.
+ok(conv('<ng-template><p>x</p></ng-template>').includes('TODO(weave migrate)'), 'convertTemplate: an UNNAMED <ng-template> is flagged (a @snippet needs a name to be rendered)');
+const snip = conv('<ng-template #row let-item let-last="last"><li>{{ item }}</li></ng-template>');
+ok(snip.includes('@snippet row(item, last) {') && snip.includes('<li>{{ item }}</li>'), 'convertTemplate: a named <ng-template> becomes @snippet with its let- bindings as parameters');
+// The context is written flag-FIRST while the snippet declares item first — so this fails if the arguments are
+// emitted in context order rather than parameter order. Written the other way round the check is vacuous.
+const outlet = conv('<ng-template #row let-item let-flag="flag"><li></li></ng-template><ng-container *ngTemplateOutlet="row; context: { flag: isOn(x, y), $implicit: user }"></ng-container>');
+ok(outlet.includes('@render (row(user, isOn(x, y)))'), `convertTemplate: *ngTemplateOutlet arguments follow the SNIPPET's parameter order, not the context's`);
+const partial = conv('<ng-template #row let-item let-flag="flag"><li></li></ng-template><ng-container *ngTemplateOutlet="row; context: { $implicit: u }"></ng-container>');
+ok(partial.includes('@render (row(u, undefined))') && partial.includes('TODO(weave migrate)'), 'convertTemplate: a context missing a parameter passes undefined AND says so');
+// An outlet whose template lives in another file cannot be resolved — flagged, never invented.
+ok(conv('<ng-container *ngTemplateOutlet="elsewhere"></ng-container>').includes('no <ng-template #elsewhere>'), 'convertTemplate: an unresolvable outlet is flagged by name');
+// The outlet may appear BEFORE its template — the collection pass runs first.
+ok(conv('<ng-container *ngTemplateOutlet="later; context: { $implicit: v }"></ng-container><ng-template #later let-a><b></b></ng-template>').includes('@render (later(v))'), 'convertTemplate: an outlet is resolved even when it precedes its <ng-template>');
+ok(cv.parseOutlet('tpl; context: { $implicit: a, k: f(1, 2) }').context.k === 'f(1, 2)', 'parseOutlet: a context value containing commas is not split apart');
 
 // projection + grouping
 ok(conv('<ng-content></ng-content>') === '<slot />', 'convertTemplate: <ng-content> → <slot />');

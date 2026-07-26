@@ -327,6 +327,77 @@ function indent(s: string, pad: string = '  '): string {
 export interface ConvertOptions {
   /** Angular selector (`app-task-card`) → Weave component name (`TaskCard`). Tags found here are PascalCased. */
   components?: Record<string, string>;
+  /** Filled in by `convertTemplate` from a first pass over the tree — the `<ng-template>`s and their parameters,
+   *  so an `*ngTemplateOutlet` can be rendered as `@render (name(args))` with the arguments in the right order. */
+  snippets?: Record<string, SnippetDef>;
+}
+
+/** One `<ng-template #name let-a let-b="key">` turned into a Weave `@snippet name(a, b)`. */
+export interface SnippetDef {
+  name: string;
+  /** Parameters in declaration order. `key` is the context property it came from (`$implicit` for a bare `let-x`). */
+  params: Array<{ name: string; key: string }>;
+}
+
+/** Read a `<ng-template>`'s reference name and `let-` bindings into a snippet definition. */
+export function snippetFromTemplate(attrs: Attr[]): SnippetDef | null {
+  const ref: Attr | undefined = attrs.find((att) => att.name.startsWith('#'));
+  if (!ref) return null;
+  const params: Array<{ name: string; key: string }> = [];
+  for (const att of attrs) {
+    if (!att.name.startsWith('let-')) continue;
+    const local: string = att.name.slice(4);
+    // `let-crumb` binds the context's `$implicit`; `let-last="last"` binds the named key.
+    params.push({ name: local, key: att.value ? att.value : '$implicit' });
+  }
+  return { name: ref.name.slice(1), params };
+}
+
+/** Collect every `<ng-template #ref>` in a tree, so outlets can be rendered against them. */
+function collectSnippets(nodes: Node[], into: Record<string, SnippetDef>): void {
+  for (const n of nodes) {
+    if (n.kind !== 'element') continue;
+    if (n.tag === 'ng-template') {
+      const def: SnippetDef | null = snippetFromTemplate(n.attrs);
+      if (def) into[def.name] = def;
+    }
+    collectSnippets(n.children, into);
+  }
+}
+
+/** Split `tplName; context: { $implicit: a, key: b }` into the template name and its context entries. */
+export function parseOutlet(expr: string): { name: string; context: Record<string, string> } {
+  const semi: number = expr.indexOf(';');
+  const name: string = (semi === -1 ? expr : expr.slice(0, semi)).trim();
+  const context: Record<string, string> = {};
+  if (semi !== -1) {
+    const rest: string = expr.slice(semi + 1).trim();
+    const open: number = rest.indexOf('{');
+    const close: number = rest.lastIndexOf('}');
+    if (open !== -1 && close > open) {
+      // Split the object literal's top-level entries (a value may itself contain commas inside calls/objects).
+      const inner: string = rest.slice(open + 1, close);
+      let depth: number = 0;
+      let start: number = 0;
+      const parts: string[] = [];
+      for (let i: number = 0; i < inner.length; i++) {
+        const ch: string = inner[i];
+        if ('([{'.includes(ch)) depth++;
+        else if (')]}'.includes(ch)) depth--;
+        else if (ch === ',' && depth === 0) {
+          parts.push(inner.slice(start, i));
+          start = i + 1;
+        }
+      }
+      parts.push(inner.slice(start));
+      for (const p of parts) {
+        const colon: number = p.indexOf(':');
+        if (colon === -1) continue;
+        context[p.slice(0, colon).trim()] = p.slice(colon + 1).trim();
+      }
+    }
+  }
+  return { name, context };
 }
 
 /** `app-task-card` → `TaskCard` (used when a selector isn't in the supplied map but clearly names a component). */
@@ -366,9 +437,13 @@ function renderNode(node: Node, opts: ConvertOptions): string {
     const named: RegExpMatchArray | null = select.value.match(/^\[?([\w-]+)\]?$/);
     return named ? `<slot name="${named[1]}" />` : `${todo(`<ng-content select="${select.value}"> — Weave slots are named: <slot name="…" />`)}\n<slot />`;
   }
-  // <ng-template> has no direct equal — a @snippet is the closest, but naming/params are a human call.
+  // <ng-template #name let-a let-b="key"> → `@snippet name(a, b) { … }`. A template with no #ref cannot become a
+  // snippet (nothing could `@render` it), so it is flagged rather than given an invented name.
   if (node.tag === 'ng-template') {
-    return `${todo('<ng-template> — in Weave use a `@snippet name() { … }` and `@render (name())`')}\n${renderNodes(node.children, opts)}`;
+    const def: SnippetDef | null = snippetFromTemplate(node.attrs);
+    const body: string = renderNodes(node.children, opts);
+    if (!def) return `${todo('<ng-template> with no #ref — a Weave `@snippet` needs a name to be `@render`ed')}\n${body}`;
+    return `@snippet ${def.name}(${def.params.map((p) => p.name).join(', ')}) {\n${indent(body)}\n}`;
   }
 
   const structural: Attr | undefined = structuralOf(node.attrs);
@@ -392,6 +467,19 @@ function renderNode(node: Node, opts: ConvertOptions): string {
       return `@case (${expr}) {\n${indent(inner)}\n}`;
     case '*ngSwitchDefault':
       return `@default {\n${indent(inner)}\n}`;
+    case '*ngTemplateOutlet': {
+      // `tpl; context: { $implicit: a, key: b }` → `@render (tpl(a, b))`, arguments ordered by the snippet's own
+      // parameter list — the context is a bag of names, so only the snippet knows the order.
+      const { name, context } = parseOutlet(expr);
+      const def: SnippetDef | undefined = opts.snippets?.[name];
+      if (!def) {
+        return `${todo(`\`*ngTemplateOutlet="${expr}"\` — no <ng-template #${name}> was found in this file; render it with \`@render (${name}(…))\` once it exists`)}\n${inner}`;
+      }
+      const args: string = def.params.map((p) => context[p.key] ?? 'undefined').join(', ');
+      const missing: string[] = def.params.filter((p) => !(p.key in context)).map((p) => p.name);
+      const note: string = missing.length ? `${todo(`\`${name}\` expects ${missing.join(', ')}, which the context did not supply — passing \`undefined\``)}\n` : '';
+      return `${note}@render (${name}(${args}))`;
+    }
     default:
       return `${todo(`structural directive \`${structural.name}="${expr}"\` has no automatic mapping`)}\n${inner}`;
   }
@@ -457,7 +545,11 @@ function renderElement(node: ElementNode, opts: ConvertOptions): string {
  * is left with a `TODO(weave migrate)` comment rather than guessed at.
  */
 export function convertTemplate(html: string, opts: ConvertOptions = {}): string {
-  return renderNodes(parseTemplate(html), opts);
+  const tree: Node[] = parseTemplate(html);
+  // First pass: find the <ng-template>s, so an outlet appearing BEFORE its template still resolves.
+  const snippets: Record<string, SnippetDef> = { ...opts.snippets };
+  collectSnippets(tree, snippets);
+  return renderNodes(tree, { ...opts, snippets });
 }
 
 /* ──────────── the component pair: `foo.ts` (setup) + `foo.html` (template) ──────────── */
