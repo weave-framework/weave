@@ -622,6 +622,31 @@ ok(cmpDraft.includes('became props'), 'convertComponent: the fields that turned 
 // Angular lifecycle hooks are named, not left as anonymous methods.
 ok(fullDraft.includes('lifecycle hook') && fullDraft.includes('onDispose'), 'convertService: ngOnDestroy is identified as a lifecycle hook with its Weave equivalent');
 
+// ── pipes → functions, directives → use: actions, styles → the sibling stylesheet ──
+const pipesDir = join(fx, 'pipes');
+const pipe = a.findPipes(join(pipesDir, 'shorten.pipe.ts'))[0];
+ok(pipe.pipeName === 'shorten' && pipe.pure === false, 'findPipes: the pipe name and its `pure` flag are read');
+ok(pipe.transform.params.includes('max: number') && pipe.transform.body.includes('value.slice'), "findPipes: transform's signature and body are captured");
+const pipeTs = cv.convertPipe(pipe).ts;
+ok(pipeTs.includes('export function shorten(value: string, max: number = 10)'), 'convertPipe: the pipe becomes a plain function with transform\'s signature');
+ok(pipeTs.includes('{{ shorten(x) }}'), 'convertPipe: it says how the template call changes');
+ok(pipeTs.includes('pure: false') && pipeTs.includes('change-detection'), 'convertPipe: an impure pipe is flagged — Weave has no change-detection pass');
+ok(pipeTs.includes('helper'), 'convertPipe: the rest of the class is carried too');
+
+const dir = a.findDirectives(join(pipesDir, 'highlight.directive.ts'))[0];
+ok(dir.selector === '[appHighlight]' && dir.inputs.includes('colour'), 'findDirectives: the selector and @Input are read');
+const dirTs = cv.convertDirective(dir).ts;
+ok(dirTs.includes('export function appHighlight(el: HTMLElement'), 'convertDirective: the directive becomes a use: action taking the element');
+ok(dirTs.includes('use:appHighlight'), 'convertDirective: it says how to apply the action in a template');
+ok(dirTs.includes('onEnter'), 'convertDirective: the original members are carried');
+
+// Styles: Weave pairs a component with a SIBLING stylesheet. Inline styles used to be COUNTED and dropped.
+const styleFacts = { file: join(fx, 'components', 'decorator.component.ts'), className: 'DecoratorComponent', styleUrls: [], styleTexts: ['h1 { color: red }'] };
+const styleOut = cv.componentStyles(styleFacts, 'decorator');
+ok(styleOut.length === 1 && styleOut[0].name === 'decorator.css', 'componentStyles: inline styles are written to the sibling stylesheet');
+ok(styleOut[0].content.includes('h1 { color: red }'), 'componentStyles: the inline CSS itself is carried, not just its count');
+ok(cv.componentStyles({ file: 'x.ts', className: 'X', styleUrls: ['./missing.scss'], styleTexts: [] }, 'x').length === 0, 'componentStyles: an unreadable stylesheet yields nothing (never an invented empty file)');
+
 // ── COVERAGE: the tool must measure itself against the SOURCE, not against its own feature list. ──
 // Every gap so far was found by a person asking "are we done?", never by the tool admitting it. These checks
 // make silence impossible: anything the converter does not emit has to show up as a counted, explained gap.
@@ -689,6 +714,26 @@ ok(!/from\s*['"][^'"]*\.component['"]/.test(barrel), 'carryFile: relative import
 // CARRIED IS NOT CONVERTED — the report must keep them apart rather than claiming a flattering 100%.
 ok(covFacts.coverage.handled < covFacts.coverage.total, 'coverage: carrying a file does NOT count as converting it');
 ok(covFacts.coverage.carried > 0 && covFacts.coverage.handled + covFacts.coverage.carried === covFacts.coverage.total, 'coverage: converted + carried accounts for everything, with no third silent category');
+
+// The anti-lie check has to see a unit that CONTAINS a pipe and a directive — the shop fixture has neither, so
+// adding them to HANDLED_KINDS would otherwise be unverified there.
+const pd = mkdtempSync(join(tmpdir(), 'weave-pd-'));
+try {
+  const { mkdirSync, copyFileSync } = await import('node:fs');
+  mkdirSync(join(pd, 'src'), { recursive: true });
+  writeFileSync(join(pd, 'src', 'index.ts'), "export * from './shorten.pipe';\nexport * from './highlight.directive';\n");
+  copyFileSync(join(pipesDir, 'shorten.pipe.ts'), join(pd, 'src', 'shorten.pipe.ts'));
+  copyFileSync(join(pipesDir, 'highlight.directive.ts'), join(pd, 'src', 'highlight.directive.ts'));
+  const pdFacts = a.assembleFacts(pd);
+  ok(pdFacts.pipes.length === 1 && pdFacts.directives.length === 1, 'assembleFacts: pipes and directives are gathered');
+  const pdProduced = new Set(cv.planWrites(pdFacts, join(pd, 'out')).map((w) => (w.path.split(/[\\/]/).pop() ?? '').replace(/\.(ts|html|css|scss)$/, '')));
+  const pdLies = pdFacts.inventory
+    .filter((d) => d.handled)
+    .filter((d) => !pdProduced.has((d.file.split(/[\\/]/).pop() ?? '').replace(/\.ts$/, '')));
+  ok(pdLies.length === 0, `coverage does not LIE about pipes/directives: each really produces output (claimed-but-unwritten: ${pdLies.map((d) => d.name).join(', ') || 'none'})`);
+} finally {
+  rmSync(pd, { recursive: true, force: true });
+}
 
 // The decisive gate for a code GENERATOR: does what it emits actually COMPILE against the real Weave packages?
 // Every assertion above checks the shape of a string; this one checks the thing is usable. It type-checks both

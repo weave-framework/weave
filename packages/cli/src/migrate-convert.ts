@@ -13,7 +13,17 @@
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve, sep } from 'node:path';
-import { importedNamesFrom, type ClassMember, type ComponentFact, type FormFact, type MigrationFacts, type RouteFact, type ServiceFact } from './migrate-analyze.js';
+import {
+  importedNamesFrom,
+  type ClassMember,
+  type ComponentFact,
+  type DirectiveFact,
+  type FormFact,
+  type MigrationFacts,
+  type PipeFact,
+  type RouteFact,
+  type ServiceFact,
+} from './migrate-analyze.js';
 
 /* ──────────── a minimal HTML scanner (in-house: Angular syntax is not valid HTML to most parsers) ──────────── */
 
@@ -906,6 +916,74 @@ export function convertGuards(routes: RouteFact[]): string | null {
   return lines.join('\n');
 }
 
+/* ──────────── pipes → functions, directives → `use:` actions ──────────── */
+
+/**
+ * An Angular `@Pipe` becomes a plain FUNCTION in Weave — there is no pipe concept, `{{ x | myPipe }}` is written
+ * `{{ myPipe(x) }}`. That makes this one of the cleanest conversions available: `transform`'s signature and body
+ * carry straight over. A `pure: false` pipe is flagged, because it relied on a change-detection pass Weave has no
+ * equivalent of.
+ */
+export function convertPipe(fact: PipeFact): { baseName: string; ts: string } {
+  const fnName: string = fact.pipeName ?? fact.className.replace(/Pipe$/, '').replace(/^(.)/, (m) => m.toLowerCase());
+  const lines: string[] = [
+    `// Converted from ${fact.className} (${fact.file}).`,
+    '// Weave has no pipes — a pipe is just a function, so `{{ x | ' + (fact.pipeName ?? 'pipe') + ' }}` becomes',
+    `// \`{{ ${fnName}(x) }}\`. Use a \`computed\` when the result should be cached across reads.`,
+  ];
+  if (fact.pure === false) {
+    lines.push(tsTodo('this pipe was `pure: false` — it re-ran on every change-detection pass, which Weave has no'));
+    lines.push('//   equivalent of. Make the dependency explicit: read the signals it actually depends on.');
+  }
+  lines.push('');
+  lines.push(`export function ${fnName}(${fact.transform?.params ?? ''}): unknown {`);
+  lines.push(`  ${tsTodo(`port the body — \`this.\` is gone; the transform below is the original.`)}`);
+  if (fact.transform?.body.trim()) {
+    lines.push(`  // ── original ${fact.className}.transform() ──`);
+    for (const l of fact.transform.body.split('\n')) lines.push(`  // ${l}`);
+  }
+  lines.push('  return undefined;');
+  lines.push('}');
+  // Anything else the class held is carried too — a pipe may have helpers or injected deps.
+  const rest: ClassMember[] = fact.members.filter((m) => m.name !== 'transform');
+  if (rest.length) {
+    lines.push('');
+    lines.push(`// ── the rest of ${fact.className}, carried over ──`);
+    for (const m of rest) for (const l of (m.text ?? '').split('\n')) lines.push(`// ${l}`);
+  }
+  lines.push('');
+  return { baseName: fnName.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase(), ts: lines.join('\n') };
+}
+
+/**
+ * An Angular `@Directive` becomes a Weave `use:` ACTION — `(el, arg?) => cleanup | { update, destroy }`, applied
+ * as `use:name={{ arg }}`. The element is handed to you directly, which is what `ElementRef` used to provide.
+ */
+export function convertDirective(fact: DirectiveFact): { baseName: string; ts: string } {
+  const attr: string = (fact.selector ?? '').replace(/^\[|\]$/g, '');
+  const fnName: string = attr || fact.className.replace(/Directive$/, '').replace(/^(.)/, (m) => m.toLowerCase());
+  const lines: string[] = [
+    `// Converted from ${fact.className} (${fact.file}).`,
+    `// In Weave a directive is a \`use:\` ACTION: it receives the element, and returns its teardown.`,
+    `// Apply it as \`<div use:${fnName}={{ arg }}>\`${attr ? ` (was \`${fact.selector}\`)` : ''}.`,
+  ];
+  if (fact.inputs.length) {
+    lines.push(tsTodo(`it had @Input(s) ${fact.inputs.join(', ')} — an action takes ONE argument, so pass an object`));
+    lines.push('//   and read it in `update`, which re-runs when the argument changes.');
+  }
+  lines.push('');
+  lines.push(`export function ${fnName}(el: HTMLElement, arg?: unknown): { update?: (next: unknown) => void; destroy?: () => void } {`);
+  lines.push(`  ${tsTodo('port the directive here — its original members follow.')}`);
+  for (const m of fact.members) {
+    lines.push(`  // ── original ${fact.className}.${m.name} ──`);
+    for (const l of (m.text ?? '').split('\n')) lines.push(`  // ${l}`);
+  }
+  lines.push('  return {};');
+  lines.push('}');
+  lines.push('');
+  return { baseName: fnName.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase(), ts: lines.join('\n') };
+}
+
 /* ──────────── M4.9 — writing the converted files into the TARGET Weave app ──────────── */
 
 /**
@@ -949,6 +1027,44 @@ function relativeUnderSrc(file: string, unitDir: string): string {
 /** `breadcrumbs.component.ts` → `breadcrumbs` — the Angular suffixes a Weave file does not carry. */
 function weaveBaseName(fileName: string): string {
   return fileName.replace(/\.ts$/, '').replace(/\.(component|page|view)$/, '');
+}
+
+/**
+ * The stylesheet files one component contributes.
+ *
+ * Weave pairs a component with a SIBLING stylesheet, so the first source stylesheet is renamed to the component's
+ * base name and everything else keeps its own name plus a note (Weave takes one sibling; the rest need an
+ * explicit `export const styles = [...]`). Inline `styles:` are written out as that sibling — they were only ever
+ * counted before, so they vanished entirely.
+ */
+export function componentStyles(fact: ComponentFact, baseName: string): Array<{ name: string; content: string }> {
+  const out: Array<{ name: string; content: string }> = [];
+  const urls: string[] = fact.styleUrls ?? [];
+  urls.forEach((rel, i) => {
+    const from: string = resolve(dirname(fact.file), rel);
+    let css: string;
+    try {
+      css = readFileSync(from, 'utf8');
+    } catch {
+      return; // the stylesheet moved or is unreadable — nothing to carry, and nothing invented
+    }
+    const ext: string = (rel.match(/\.(s?css|sass|less)$/)?.[0] ?? '.css').toLowerCase();
+    const name: string = i === 0 ? `${baseName}${ext}` : (rel.split(/[\\/]/).pop() ?? `${baseName}-${i}${ext}`);
+    const header: string =
+      i === 0
+        ? `/* Carried over from ${rel} — a Weave component's stylesheet is its sibling, so this is named after the component. */\n`
+        : `/* Carried over from ${rel}. Weave takes ONE sibling stylesheet; import this one explicitly via \`export const styles = ['./${rel.split(/[\\/]/).pop()}']\`. */\n`;
+    out.push({ name, content: `${header}${css}` });
+  });
+  // Inline styles land in the sibling too (appended when a file-based one already claimed it).
+  const inline: string[] = fact.styleTexts ?? [];
+  if (inline.length) {
+    const body: string = `/* Inline \`styles:\` from ${fact.className}, moved to the sibling stylesheet Weave expects. */\n${inline.join('\n\n')}\n`;
+    const existing: { name: string; content: string } | undefined = out.find((o) => o.name.startsWith(`${baseName}.`));
+    if (existing) existing.content += `\n${body}`;
+    else out.push({ name: `${baseName}.css`, content: body });
+  }
+  return out;
 }
 
 /** A component's source file loses its `.component` suffix on the way out, so imports pointing at it must too. */
@@ -1026,6 +1142,13 @@ export function planWrites(facts: MigrationFacts, targetDir: string): WriteItem[
       const path: string = join(targetDir, 'src', dir, `${base}${ext}`);
       items.push({ path, content, status: existsSync(path) ? 'skip-exists' : 'write' });
     }
+    // STYLES. A Weave component's stylesheet is its sibling, so the first source stylesheet becomes
+    // `<base>.<ext>` and inline `styles:` are written out as that sibling too. Neither used to be carried at all:
+    // styleUrls were recorded as a fact and the files left behind, and inline styles were only ever COUNTED.
+    for (const item of componentStyles(cf, base)) {
+      const path: string = join(targetDir, 'src', dir, item.name);
+      items.push({ path, content: item.content, status: existsSync(path) ? 'skip-exists' : 'write' });
+    }
   }
   // Services (M5): a `providedIn:'root'` one becomes a store, anything else a context — drafted, not guessed.
   // The file NAME mirrors the source file, not the class: deriving it from the class name made
@@ -1039,11 +1162,32 @@ export function planWrites(facts: MigrationFacts, targetDir: string): WriteItem[
     const path: string = join(targetDir, 'src', dir, `${base || draft.baseName}.ts`);
     items.push({ path, content: draft.ts, status: existsSync(path) ? 'skip-exists' : 'write' });
   }
+  // Pipes → functions, directives → `use:` actions. Both are real conversions, not carries.
+  for (const pf of facts.pipes ?? []) {
+    const rel: string = relativeUnderSrc(pf.file, facts.unit);
+    const dir: string = dirname(rel) === '.' ? '' : dirname(rel);
+    const base: string = (rel.split(/[\\/]/).pop() ?? '').replace(/\.ts$/, '');
+    const path: string = join(targetDir, 'src', dir, `${base}.ts`);
+    items.push({ path, content: convertPipe(pf).ts, status: existsSync(path) ? 'skip-exists' : 'write' });
+  }
+  for (const df of facts.directives ?? []) {
+    const rel: string = relativeUnderSrc(df.file, facts.unit);
+    const dir: string = dirname(rel) === '.' ? '' : dirname(rel);
+    const base: string = (rel.split(/[\\/]/).pop() ?? '').replace(/\.ts$/, '');
+    const path: string = join(targetDir, 'src', dir, `${base}.ts`);
+    items.push({ path, content: convertDirective(df).ts, status: existsSync(path) ? 'skip-exists' : 'write' });
+  }
+
   // EVERY REMAINING FILE. A file with no @Component/@Injectable — a barrel, a helper module, a resolver, a model
   // — used to produce nothing at all, silently: on a real library that was half the files, including the
   // `index.ts` its consumers import. Most such files are already valid TypeScript, so they are carried across
   // whole, with their relative imports repointed at the renamed outputs.
-  const covered: Set<string> = new Set<string>([...facts.components.map((cf) => cf.file), ...facts.services.map((sf) => sf.file)]);
+  const covered: Set<string> = new Set<string>([
+    ...facts.components.map((cf) => cf.file),
+    ...facts.services.map((sf) => sf.file),
+    ...(facts.pipes ?? []).map((pf) => pf.file),
+    ...(facts.directives ?? []).map((df) => df.file),
+  ]);
   for (const file of facts.files) {
     if (covered.has(file)) continue;
     const rel: string = relativeUnderSrc(file, facts.unit);

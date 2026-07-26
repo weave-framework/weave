@@ -425,6 +425,9 @@ export interface ComponentFact {
   styleUrls: string[];
   /** Count of inline `styles:` entries (0 when none). */
   inlineStyles: number;
+  /** The inline `styles:` entries THEMSELVES. The count alone could not be written to a sibling stylesheet, so
+   *  inline styles were silently dropped — the same "recorded but not carried" gap as everything else. */
+  styleTexts: string[];
   /** What it injects — constructor parameter types AND `inject(X)` calls. Components are DI graph nodes too, and
    *  a component→service edge is what makes the convert order correct (the service converts first). */
   injects: string[];
@@ -503,14 +506,18 @@ function stringArrayProp(obj: ts.ObjectLiteralExpression, arrayKey: string, sing
   return out;
 }
 
-/** Count entries of an array-valued property (`styles: ['...', '...']`), 0 if absent/not an array. */
-function arrayLen(obj: ts.ObjectLiteralExpression, key: string): number {
+/** The string entries of an array-valued property (`styles: ['a', 'b']`), or a single string (`styles: 'a'`). */
+function stringEntries(obj: ts.ObjectLiteralExpression, key: string): string[] {
+  const out: string[] = [];
   for (const p of obj.properties) {
-    if (ts.isPropertyAssignment(p) && p.name && ts.isIdentifier(p.name) && p.name.text === key && ts.isArrayLiteralExpression(p.initializer)) {
-      return p.initializer.elements.length;
+    if (!ts.isPropertyAssignment(p) || !p.name || !ts.isIdentifier(p.name) || p.name.text !== key) continue;
+    if (ts.isArrayLiteralExpression(p.initializer)) {
+      for (const el of p.initializer.elements) if (ts.isStringLiteralLike(el)) out.push(el.text);
+    } else if (ts.isStringLiteralLike(p.initializer)) {
+      out.push(p.initializer.text);
     }
   }
-  return 0;
+  return out;
 }
 
 /**
@@ -557,7 +564,8 @@ export function findComponents(filePath: string): ComponentFact[] {
           templateText: stringProp(cfg, 'template'),
           templateUrl: stringProp(cfg, 'templateUrl'),
           styleUrls: stringArrayProp(cfg, 'styleUrls', 'styleUrl'),
-          inlineStyles: arrayLen(cfg, 'styles'),
+          inlineStyles: stringEntries(cfg, 'styles').length,
+          styleTexts: stringEntries(cfg, 'styles'),
           injects: classInjects(node),
           members: classMembers(node, sf),
           classBody: classBodyText(node, sf),
@@ -858,6 +866,107 @@ export interface Injector {
  */
 export function diGraph(injectors: Injector[]): DiEdge[] {
   return injectors.flatMap((s) => s.injects.map((to) => ({ from: s.className, to })));
+}
+
+/* ──────────── pipes + directives: the two decorated kinds nothing read until now ──────────── */
+
+/** An Angular `@Pipe` — in Weave a pipe is simply a function (or a `computed`), so this maps cleanly. */
+export interface PipeFact {
+  file: string;
+  className: string;
+  /** The `name:` the template used (`{{ x | myPipe }}`). */
+  pipeName: string | null;
+  /** `pure: false` means it re-ran on every change detection — worth flagging, Weave has no such pass. */
+  pure: boolean | null;
+  /** `transform`'s parameter list and body — the whole point of the pipe. */
+  transform: { params: string; body: string } | null;
+  members: ClassMember[];
+  classBody: string;
+}
+
+/** An Angular `@Directive` — the Weave equivalent is a `use:` action `(el, arg) => cleanup`. */
+export interface DirectiveFact {
+  file: string;
+  className: string;
+  /** The attribute selector (`[appHighlight]`). */
+  selector: string | null;
+  inputs: string[];
+  members: ClassMember[];
+  classBody: string;
+}
+
+/** Every `@Pipe` class in a file. */
+export function findPipes(filePath: string): PipeFact[] {
+  const sf: ts.SourceFile | null = parseFile(filePath);
+  if (!sf) return [];
+  const out: PipeFact[] = [];
+  const visit = (node: ts.Node): void => {
+    if (ts.isClassDeclaration(node)) {
+      const dec: ts.Decorator | undefined = decoratorsOf(node).find((d) => decoratorName(d) === 'Pipe');
+      if (dec) {
+        const arg: ts.Expression | undefined = ts.isCallExpression(dec.expression) ? dec.expression.arguments[0] : undefined;
+        const cfg: ts.ObjectLiteralExpression | null = arg && ts.isObjectLiteralExpression(arg) ? arg : null;
+        const members: ClassMember[] = classMembers(node, sf);
+        const t: ClassMember | undefined = members.find((m) => m.name === 'transform');
+        out.push({
+          file: filePath,
+          className: node.name?.text ?? '(anonymous)',
+          pipeName: cfg ? stringProp(cfg, 'name') : null,
+          pure: cfg ? boolProp(cfg, 'pure') : null,
+          transform: t ? { params: t.params, body: t.body } : null,
+          members,
+          classBody: classBodyText(node, sf),
+        });
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sf);
+  return out;
+}
+
+/** Every `@Directive` class in a file. */
+export function findDirectives(filePath: string): DirectiveFact[] {
+  const sf: ts.SourceFile | null = parseFile(filePath);
+  if (!sf) return [];
+  const out: DirectiveFact[] = [];
+  const visit = (node: ts.Node): void => {
+    if (ts.isClassDeclaration(node)) {
+      const dec: ts.Decorator | undefined = decoratorsOf(node).find((d) => decoratorName(d) === 'Directive');
+      if (dec) {
+        const arg: ts.Expression | undefined = ts.isCallExpression(dec.expression) ? dec.expression.arguments[0] : undefined;
+        const cfg: ts.ObjectLiteralExpression | null = arg && ts.isObjectLiteralExpression(arg) ? arg : null;
+        const inputs: string[] = [];
+        for (const member of node.members) {
+          const name: string | null = memberName(member);
+          if (!name) continue;
+          const init: ts.Expression | undefined = ts.isPropertyDeclaration(member) ? member.initializer : undefined;
+          if (decoratorsOf(member).some((d) => decoratorName(d) === 'Input') || isSignalFactory(init, ['input', 'model'])) inputs.push(name);
+        }
+        out.push({
+          file: filePath,
+          className: node.name?.text ?? '(anonymous)',
+          selector: cfg ? stringProp(cfg, 'selector') : null,
+          inputs,
+          members: classMembers(node, sf),
+          classBody: classBodyText(node, sf),
+        });
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sf);
+  return out;
+}
+
+/** Pipes across a file set. */
+export function analyzePipes(files: string[]): PipeFact[] {
+  return files.flatMap((f) => findPipes(f));
+}
+
+/** Directives across a file set. */
+export function analyzeDirectives(files: string[]): DirectiveFact[] {
+  return files.flatMap((f) => findDirectives(f));
 }
 
 /* ──────────── M2.6 — routes + guards: the router config (→ @weave-framework/router) ──────────── */
@@ -1255,7 +1364,7 @@ export interface Decl {
 }
 
 /** What the converter can currently emit. Everything else is reported as a gap, by construction. */
-const HANDLED_KINDS: Set<DeclKind> = new Set<DeclKind>(['component', 'service']);
+const HANDLED_KINDS: Set<DeclKind> = new Set<DeclKind>(['component', 'service', 'pipe', 'directive']);
 
 /** Why a given kind is not handled yet — written once, so the report is specific rather than a shrug. */
 const UNHANDLED_NOTES: Record<string, string> = {
@@ -1427,6 +1536,10 @@ export interface MigrationFacts {
   cycles: string[][];
   /** Imports that could not be resolved — recorded, never guessed. */
   unresolved: string[];
+  /** `@Pipe` classes — in Weave a pipe is a function. */
+  pipes: PipeFact[];
+  /** `@Directive` classes — in Weave a `use:` action. */
+  directives: DirectiveFact[];
   /** EVERY top-level declaration found, marked handled or not. */
   inventory: Decl[];
   /** The headline: how much of the source this tool actually converts, and exactly what it does not. */
@@ -1443,6 +1556,7 @@ export function assembleFacts(unitDir: string): MigrationFacts {
   const empty: MigrationFacts = {
     unit: unitDir, entry: null, files: [], angular: [], internal: [], packages: [], packageUsage: [],
     components: [], services: [], di: [], routes: [], forms: [], calls: [], branches: [], cycles: [], unresolved: [],
+    pipes: [], directives: [],
     inventory: [], coverage: { total: 0, handled: 0, carried: 0, gaps: [], emptyFiles: [] },
   };
   if (!entry) return empty;
@@ -1470,6 +1584,8 @@ export function assembleFacts(unitDir: string): MigrationFacts {
     branches: analyzeBranches(walk.files),
     cycles: walk.cycles,
     unresolved: walk.unresolved,
+    pipes: analyzePipes(walk.files),
+    directives: analyzeDirectives(walk.files),
     inventory: decls,
     coverage: coverage(decls),
   };
