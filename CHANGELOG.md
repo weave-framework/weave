@@ -52,6 +52,11 @@
   DECLARE the wanted names are the roots now, and the walk runs from those. A name found nowhere in the unit
   falls back to the whole unit, never to nothing.
 
+  **Nothing is written to `src/index.ts`.** That is where a Weave app keeps its HTML shell (`src/index.html`),
+  and a `.ts` beside a `.html` *is* a component — so carrying a library's barrel there turned the shell into a
+  component template, and `weave check` began reporting parse errors inside the doctype. The barrel is still
+  carried, under a name that collides with nothing.
+
   **A mixed attribute value becomes one expression.** Angular interpolates inside an attribute; Weave does not —
   its dynamic form is the whole value or nothing. `class="logo-{{ name }}-svg"` was passed through and rendered
   the braces onto the element as literal text: visible in a browser, invisible to every string assertion.

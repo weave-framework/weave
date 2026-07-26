@@ -894,6 +894,13 @@ const mergedPaths = mergedWrites.map((w) => w.path);
 ok(mergedPaths.length === new Set(mergedPaths).size, `planWrites: a merged unit never writes two sources to one path (dupes: ${mergedPaths.filter((p, i) => mergedPaths.indexOf(p) !== i).join(', ') || 'none'})`);
 ok(mergedWrites.some((w) => w.path.includes(`${sep}ui${sep}`)), "planWrites: a granted unit's output lands under its own folder, not merged into the app's tree");
 ok(mergedWrites.every((w) => !w.path.includes('..')), 'planWrites: nothing escapes the target directory, however far outside the unit its source lived');
+// `src/index.html` is a Weave app's HTML SHELL, and a `.ts` beside a `.html` IS a component. Carrying a library's
+// barrel to `src/index.ts` turned the shell into a component template — `weave check` began reporting errors
+// inside the `<!doctype html>`.
+const barrelWrites = cv.planWrites(whole, join(tmpdir(), 'weave-barrel-out'));
+ok(whole.files.some((f) => f.endsWith(`src${sep}index.ts`)), 'the lib fixture really has a root index.ts — otherwise the shell-collision gate cannot fail');
+ok(!barrelWrites.some((w) => w.path.endsWith(`src${sep}index.ts`)), 'planWrites: nothing is written to src/index.ts — it would pair with the app shell and make it a component');
+ok(barrelWrites.some((w) => w.path.endsWith('index.barrel.ts')), 'planWrites: the barrel is still carried, under a name that collides with nothing');
 
 // The plan says which happened: "you chose not to show me this" is not the same answer as "it was not there".
 const declinedPlan = pl.renderPlan({ ...shopFacts, declined: ['@sps-interfaces'], granted: ['/libs/ui'] });

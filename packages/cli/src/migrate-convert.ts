@@ -2337,11 +2337,18 @@ function unitOf(file: string, facts: MigrationFacts): { dir: string; prefix: str
   return { dir: facts.unit, prefix: '' };
 }
 
-/** Where a file lands, mirroring its source layout — under its own folder when it came from a granted unit. */
+/**
+ * Where a file lands, mirroring its source layout — under its own folder when it came from a granted unit.
+ *
+ * `index.ts` at the root is special: a Weave app's HTML SHELL is `src/index.html`, and a `.ts` beside a `.html`
+ * IS a component in Weave. So carrying a library's barrel to `src/index.ts` quietly turned the app's shell into
+ * a component template, and `weave check` started reporting errors inside the `<!doctype html>`.
+ */
 function outputPathFor(file: string, facts: MigrationFacts): string {
   const { dir, prefix } = unitOf(file, facts);
   const rel: string = relativeUnderSrc(file, dir);
-  return prefix ? join(prefix, rel) : rel;
+  const safe: string = rel === 'index.ts' ? 'index.barrel.ts' : rel;
+  return prefix ? join(prefix, safe) : safe;
 }
 
 function relativeUnderSrc(file: string, unitDir: string): string {
