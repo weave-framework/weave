@@ -509,6 +509,40 @@ const shadow = conv('<ng-template #row let-color><b>{{ color }}</b></ng-template
 ok(shadow.includes('{{ color }}'), 'convertTemplate: a snippet parameter shadows a prop and is NOT qualified');
 ok(cv.pascalCase('app-task-card') === 'AppTaskCard', 'pascalCase: a selector becomes a component name');
 
+// ── translating a body: `this.x` is a mechanical rename, not a judgement call ──
+// A getter returning `size(this.routerLink) > 0` came out as `computed(() => undefined)`: not incomplete but
+// WRONG — a host class that was always applied became one that never is. Bodies are translated now.
+const tctx = cv.translateCtx(
+  [
+    { kind: 'field', name: 'count', isSignal: false, initializer: '0', params: '', body: '', type: 'number', text: '', isPublic: true },
+    { kind: 'field', name: 'sig', isSignal: true, initializer: 'signal(0)', params: '', body: '', type: '', text: '', isPublic: true },
+    { kind: 'field', name: 'router', isSignal: false, initializer: 'inject(Router)', params: '', body: '', type: '', text: '', isPublic: false },
+    { kind: 'getter', name: 'ready', isSignal: false, initializer: '', params: '', body: 'return true;', type: '', text: '', isPublic: true },
+    { kind: 'method', name: 'refresh', isSignal: false, initializer: '', params: '', body: '', type: '', text: '', isPublic: true },
+  ],
+  ['label'],
+);
+ok(cv.translateBody('return this.label;', tctx).code === 'return props.label;', 'translateBody: an @Input is read off props');
+ok(cv.translateBody('return this.count;', tctx).code === 'return count();', 'translateBody: a plain field is read as a signal');
+ok(cv.translateBody('this.sig.set(1);', tctx).code === 'sig.set(1);', 'translateBody: a field that was ALREADY a signal is renamed bare — not sig().set(1)');
+ok(cv.translateBody('this.count = 5;', tctx).code === 'count.set(5);', 'translateBody: a field write becomes a signal write');
+ok(cv.translateBody('return this.ready;', tctx).code === 'return ready();', 'translateBody: a getter is read as a computed');
+ok(cv.translateBody('this.refresh();', tctx).code === 'refresh();', 'translateBody: a method call drops `this.`');
+ok(cv.translateBody('this.router.navigate(this.label);', tctx).code === 'navigate(props.label);', "translateBody: an injected Router's navigate becomes the router's navigate()");
+ok(cv.translateBody("return 'this.count';", tctx).code === "return 'this.count';", 'translateBody: a string literal is never rewritten');
+const unresolved = cv.translateBody('return this.mystery;', tctx);
+ok(unresolved.todos.some((t) => t.includes('mystery')), 'translateBody: a `this.` with no counterpart is REPORTED, not silently renamed');
+const shadowed = cv.translateBody('this.count = count;', tctx, 'count: number');
+ok(shadowed.todos.some((t) => t.includes('parameter')), 'translateBody: a parameter colliding with a signal name is flagged');
+
+// A getter becomes a computed that DOES what it did.
+ok(cv.getterToComputed('return true;', tctx).code === 'computed(() => true)', 'getterToComputed: `return true` becomes computed(() => true), not computed(() => undefined)');
+ok(cv.getterToComputed('return size(this.label) > 0;', tctx).code === 'computed(() => size(props.label) > 0)', 'getterToComputed: the real expression is carried, props and all');
+
+// The translated body keeps calling what the original called, so those imports must travel with it.
+const carriedImports = cv.carriedImportsFor(join(comps, 'typed.component.ts'));
+ok(!carriedImports.some((i) => i.includes('@angular/')), 'carriedImportsFor: @angular imports are dropped — that is the framework being left');
+
 // ── an @Input states a TYPE and a DEFAULT; both used to be discarded, and getters vanished entirely ──
 const typedFact = a.findComponents(join(comps, 'typed.component.ts'))[0];
 ok(typedFact.members.some((m) => m.kind === 'getter' && m.name === 'hasColor'), 'findComponents: a getter is captured (nothing captured accessors before)');

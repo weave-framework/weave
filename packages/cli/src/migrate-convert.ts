@@ -15,6 +15,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import {
   importedNamesFrom,
+  sourceImports,
   type ClassMember,
   type ComponentFact,
   type DirectiveFact,
@@ -697,6 +698,17 @@ export function signalInputDefault(mem: ClassMember | undefined): string {
   return first === 'null' || first === 'undefined' || first === '' ? '' : first;
 }
 
+/**
+ * The original file's imports that the converted code still needs: everything except `@angular/*`, with relative
+ * specifiers repointed at where those files now land. Dropping them, as the drafts used to, left the translated
+ * body calling helpers that were never imported.
+ */
+export function carriedImportsFor(file: string): string[] {
+  return sourceImports(file)
+    .filter((i) => !i.spec.startsWith('@angular/') && i.spec !== '@angular')
+    .map((i) => (i.spec.startsWith('.') ? i.text.replace(i.spec, repointSpecifier(i.spec)) : i.text));
+}
+
 /** `TaskCardComponent` → `task-card`; falls back from the selector when there is one. */
 export function baseNameFor(fact: ComponentFact): string {
   if (fact.selector) return fact.selector.replace(/^app-/, '');
@@ -749,7 +761,7 @@ export function convertComponent(fact: ComponentFact, templateHtml: string, opts
     body.push('// ── these became props (see the signature above) ──');
     for (const mem of asProps) for (const line of (mem.text ?? '').split('\n')) body.push(`// ${line}`);
   }
-  body.push(...draftMembers(carried, fact.className).lines);
+  body.push(...draftMembers(carried, fact.className, translateCtx(fact.members ?? [], fact.inputs)).lines);
 
   // A reactive form becomes a `form({ … })` in setup(); the template binds its leaves with `use:control`.
   const imports: string[] = [];
@@ -761,6 +773,12 @@ export function convertComponent(fact: ComponentFact, templateHtml: string, opts
   if (runtimeNeeds.length) imports.push(`import { ${runtimeNeeds.join(', ')} } from '@weave-framework/runtime';`);
   // A template that used Angular Material now names Weave UI components — which have to be imported to exist.
   imports.push(...uiImportsFor(templateHtml));
+  // The translated body keeps calling what the original called — `size` from lodash, a type from a workspace lib
+  // — so those imports travel with it. `@angular/*` is dropped: that is the framework being migrated away from,
+  // and the plan says what each entry point becomes. Relative specifiers are repointed at the renamed outputs.
+  imports.push(...carriedImportsFor(fact.file));
+  // A service call the translation replaced brings its own import (`Router.navigate` → `navigate`).
+  imports.push(...serviceImportsFor(fact.members ?? [], fact.inputs));
   if (formFact) {
     imports.push("import { field, form } from '@weave-framework/forms';");
     body.push('');
@@ -1014,6 +1032,161 @@ export function storeHookName(className: string): string {
  * starting point than one that does — but every line is THERE, in place, instead of in a file you have to open
  * alongside. Private members become plain locals: in a `store()` factory, "private" simply means "not returned".
  */
+/* ──────────── translating a method body: `this.x` is a mechanical rename, not a judgement call ──────────── */
+
+/** What the names inside a class body become, so `this.x` can be rewritten to the right thing. */
+export interface TranslateCtx {
+  /** `@Input` names → read as `props.x`. */
+  inputs: Set<string>;
+  /** Plain fields → signals, read as `x()` and written as `x.set(v)`. */
+  fields: Set<string>;
+  /** Getters → computeds, read as `x()`. */
+  getters: Set<string>;
+  /** Methods → plain functions, called as `x(…)`. */
+  methods: Set<string>;
+  /** Field name → the service it holds (`_Router` → `Router`). An injected service is NOT state: treating it as
+   *  a signal turned `this._Router.navigate(…)` into `_Router().navigate(…)`, which is simply wrong. */
+  injected: Map<string, string>;
+  /** Fields that were ALREADY signals in Angular. The original code already calls them to read (`x()`) and
+   *  writes with `x.set(v)`, so the name is renamed bare — adding a call would produce `x().set(v)`. */
+  signals: Set<string>;
+}
+
+/** Angular services whose Weave replacement is a plain function, and where it comes from. */
+const SERVICE_METHODS: Record<string, Record<string, { call: string; from: string }>> = {
+  Router: {
+    navigate: { call: 'navigate', from: '@weave-framework/router' },
+    navigateByUrl: { call: 'navigate', from: '@weave-framework/router' },
+  },
+  // The data client is emitted as a local `const client = createClient(…)`, so these need no import of their own.
+  HttpClient: {
+    get: { call: 'client.get', from: '' },
+    post: { call: 'client.post', from: '' },
+    put: { call: 'client.put', from: '' },
+    patch: { call: 'client.patch', from: '' },
+    delete: { call: 'client.delete', from: '' },
+    request: { call: 'client.request', from: '' },
+  },
+};
+
+/** Build the translation context from a class's members and its inputs. */
+export function translateCtx(members: ClassMember[], inputs: string[]): TranslateCtx {
+  const inputSet: Set<string> = new Set<string>(inputs);
+  // A field holding `inject(X)` is a dependency, not state — it must not be turned into a signal.
+  const injected: Map<string, string> = new Map<string, string>();
+  // A constructor PARAMETER-PROPERTY (`constructor(private http: HttpClient)`) is a field too — Angular's most
+  // common injection form. Missing it left `this.http` unresolved, which the compile gate caught as an
+  // undefined name in the generated file.
+  const ctor: ClassMember | undefined = members.find((m) => m.kind === 'constructor');
+  for (const p of (ctor?.params ?? '').split(',')) {
+    const m: RegExpMatchArray | null = p.trim().match(/^(?:private|public|protected|readonly)\s+(?:readonly\s+)?([A-Za-z_$][\w$]*)\s*:\s*([A-Za-z_$][\w$]*)/);
+    if (m) injected.set(m[1], m[2]);
+  }
+  for (const m of members) {
+    if (m.kind !== 'field') continue;
+    const call: RegExpMatchArray | null = (m.initializer ?? '').match(/^inject\s*\(\s*([A-Za-z_$][\w$]*)\s*\)/);
+    if (call) injected.set(m.name, call[1]);
+    else if (m.type && /^[A-Z]/.test(m.type) && !m.initializer) injected.set(m.name, m.type); // a ctor-injected field
+  }
+  return {
+    inputs: inputSet,
+    fields: new Set<string>(members.filter((m) => m.kind === 'field' && !inputSet.has(m.name) && !injected.has(m.name)).map((m) => m.name)),
+    getters: new Set<string>(members.filter((m) => m.kind === 'getter').map((m) => m.name)),
+    methods: new Set<string>(members.filter((m) => m.kind === 'method').map((m) => m.name)),
+    injected,
+    signals: new Set<string>(members.filter((m) => m.kind === 'field' && m.isSignal).map((m) => m.name)),
+  };
+}
+
+/** Run `fn` over the code parts of a snippet, never over its string literals. */
+function outsideStrings(code: string, fn: (part: string) => string): string {
+  return code
+    .split(/('(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|`(?:[^`\\]|\\.)*`)/g)
+    .map((part, i) => (i % 2 === 1 ? part : fn(part)))
+    .join('');
+}
+
+/**
+ * Translate a class body into its Weave form.
+ *
+ * `this.x` is not a judgement call — it is a rename with a known target: an `@Input` becomes `props.x`, a field
+ * becomes the signal `x()`, a getter becomes the computed `x()`, and a method is called as `x(…)`. Leaving these
+ * as commented-out originals, as this used to, produced a migration that renamed things and translated nothing:
+ * `get hasRoute() { return size(this.routerLink) > 0 }` came out as `computed(() => undefined)`, which is not
+ * incomplete but WRONG — it silently changed what the code does.
+ *
+ * Anything genuinely uncertain is still reported: an assignment whose target collides with a parameter name, and
+ * any `this.` that could not be resolved, both come back as TODOs rather than a confident rewrite.
+ */
+export function translateBody(body: string, ctx: TranslateCtx, params: string = ''): { code: string; todos: string[] } {
+  const todos: string[] = [];
+  const paramNames: Set<string> = new Set<string>(
+    params
+      .split(',')
+      .map((p) => p.trim().replace(/^(?:private|public|protected|readonly)\s+/, '').split(/[:=?]/)[0].trim())
+      .filter(Boolean),
+  );
+
+  let code: string = outsideStrings(body, (part) =>
+    part
+      // `this.<injected>.<method>(` → the Weave function that replaces it (`this._Router.navigate(` → `navigate(`).
+      // The generic argument list is optional but must be matched: `this.http.get<T>(…)` is the usual form, and
+      // skipping it sent the call down the plain-read path, leaving an undefined `http`.
+      .replace(/\bthis\.([A-Za-z_$][\w$]*)\.([A-Za-z_$][\w$]*)\s*(<[^()]*>)?\s*\(/g, (full, field: string, method: string, generic: string | undefined) => {
+        const service: string | undefined = ctx.injected.get(field);
+        if (!service) return full;
+        const mapped: { call: string; from: string } | undefined = SERVICE_METHODS[service]?.[method];
+        if (mapped) return `${mapped.call}${generic ?? ''}(`;
+        todos.push(`\`${service}.${method}()\` has no recorded Weave equivalent — migrate ${service} first, then call it here`);
+        return `${field}.${method}${generic ?? ''}(`;
+      })
+      // `this.x = <expr>;` → `x.set(<expr>);` — a field write becomes a signal write.
+      .replace(/\bthis\.([A-Za-z_$][\w$]*)\s*=(?!=)\s*([^;\n]+)/g, (full, name: string, rhs: string) => {
+        if (!ctx.fields.has(name)) return full; // an input or unknown target — left for the pass below
+        if (paramNames.has(name)) todos.push(`\`${name}\` is both a parameter and a signal here — rename one before this compiles`);
+        return `${name}.set(${rhs.trim()})`;
+      })
+      // `this.method(` → `method(`
+      .replace(/\bthis\.([A-Za-z_$][\w$]*)\s*\(/g, (full, name: string) => (ctx.methods.has(name) ? `${name}(` : full))
+      // remaining reads
+      .replace(/\bthis\.([A-Za-z_$][\w$]*)/g, (full, name: string) => {
+        if (ctx.inputs.has(name)) return `props.${name}`;
+        if (ctx.signals.has(name) || ctx.injected.has(name)) return name; // already a signal, or a dependency
+        if (ctx.getters.has(name) || ctx.fields.has(name)) return `${name}()`;
+        return full; // unresolved — reported below
+      }),
+  );
+
+  const leftovers: string[] = [...new Set((code.match(/\bthis\.[A-Za-z_$][\w$]*/g) ?? []).map((m) => m.slice(5)))];
+  for (const name of leftovers) todos.push(`\`this.${name}\` has no counterpart here — it was not a field, input, getter or method of this class`);
+  if (leftovers.length) code = outsideStrings(code, (p) => p.replace(/\bthis\./g, ''));
+  return { code, todos };
+}
+
+/** The imports for the Weave functions that replaced injected-service calls in a class's bodies. */
+export function serviceImportsFor(members: ClassMember[], inputs: string[]): string[] {
+  const ctx: TranslateCtx = translateCtx(members, inputs);
+  const needed: Map<string, Set<string>> = new Map<string, Set<string>>();
+  const bodies: string = members.map((m) => m.body ?? '').join('\n');
+  for (const [field, service] of ctx.injected) {
+    for (const [method, mapped] of Object.entries(SERVICE_METHODS[service] ?? {})) {
+      if (!mapped.from) continue; // replaced by something already in scope (the local data client)
+      if (!new RegExp(`\\bthis\\.${field}\\.${method}\\s*\\(`).test(bodies)) continue;
+      if (!needed.has(mapped.from)) needed.set(mapped.from, new Set<string>());
+      needed.get(mapped.from)?.add(mapped.call);
+    }
+  }
+  return [...needed.entries()].map(([from, calls]) => `import { ${[...calls].sort().join(', ')} } from '${from}';`);
+}
+
+/** A getter is a derived value: `computed(() => …)`. A single `return x;` collapses to the expression form. */
+export function getterToComputed(body: string, ctx: TranslateCtx): { code: string; todos: string[] } {
+  const t: { code: string; todos: string[] } = translateBody(body, ctx);
+  const single: RegExpMatchArray | null = t.code.trim().match(/^return\s+([\s\S]+?);?$/);
+  const inner: string = single && !/\breturn\b/.test(single[1]) ? single[1].trim() : `{\n${indent(t.code)}\n}`;
+  return { code: `computed(() => ${inner})`, todos: t.todos };
+}
+
 /** Angular lifecycle hooks that have a direct Weave equivalent. Named, so they don't read as ordinary methods. */
 const LIFECYCLE_HOOKS: Record<string, string> = {
   ngOnInit: '`onMount(() => …)`, or just the `setup()` body (it runs once, on creation)',
@@ -1026,8 +1199,9 @@ const LIFECYCLE_HOOKS: Record<string, string> = {
   ngAfterContentChecked: 'nothing — same reason',
 };
 
-function draftMembers(members: ClassMember[], className: string): { lines: string[]; publicNames: string[] } {
+function draftMembers(members: ClassMember[], className: string, ctx?: TranslateCtx): { lines: string[]; publicNames: string[] } {
   const out: string[] = [];
+  const cx: TranslateCtx = ctx ?? translateCtx(members, []);
   // The returned surface is built from what was ACTUALLY declared here, never from a separate list — otherwise
   // the generated `return { … }` can name a binding that does not exist, which the compile gate catches as
   // "No value exists in scope for the shorthand property".
@@ -1045,6 +1219,17 @@ function draftMembers(members: ClassMember[], className: string): { lines: strin
       continue;
     }
     if (mem.kind === 'field') {
+      // An injected dependency is not state. Its calls were rewritten to the functions that replace them, so the
+      // field itself has nothing left to hold — emitting `signal(undefined)` for it invented a variable that
+      // meant nothing and read as if the service were reactive state.
+      const service: string | undefined = cx.injected.get(mem.name);
+      if (service) {
+        out.push('');
+        out.push(`// \`${mem.name}\` held ${service}. Its calls above were rewritten to Weave's equivalents, so there is`);
+        out.push('// nothing to hold here; anything still calling it needs a decision.');
+        out.push(...commented(mem.text, ''));
+        continue;
+      }
       const vis: string = mem.isPublic ? '' : ' // was private — a local, not returned';
       const note: string = mem.isSignal ? ' // already a signal in Angular — a 1:1 move' : '';
       out.push(`const ${mem.name} = signal<unknown>(undefined);${vis}${note}`);
@@ -1056,14 +1241,20 @@ function draftMembers(members: ClassMember[], className: string): { lines: strin
       // A getter is a DERIVED value — Weave's is `computed`. A setter has no direct equal: it is an action that
       // writes, so it becomes a plain function. Both used to vanish entirely.
       out.push('');
-      out.push(
-        mem.kind === 'getter'
-          ? `${tsTodo(`\`get ${mem.name}()\` is a derived value → \`const ${mem.name} = computed(() => …)\``)}`
-          : `${tsTodo(`\`set ${mem.name}()\` → a plain function that writes the signal`)}`,
-      );
-      out.push(`const ${mem.name} = ${mem.kind === 'getter' ? 'computed(() => undefined)' : `(${mem.params}): void => {}`};${mem.isPublic ? '' : ' // was private — a local, not returned'}`);
-      out.push(`  // ── original ${className}.${mem.name} ──`);
-      out.push(...commented(mem.text));
+      const vis: string = mem.isPublic ? '' : ' // was private — a local, not returned';
+      if (mem.kind === 'getter') {
+        const g: { code: string; todos: string[] } = getterToComputed(mem.body, cx);
+        for (const t of g.todos) out.push(tsTodo(t));
+        out.push(`const ${mem.name} = ${g.code};${vis}`);
+      } else {
+        const s: { code: string; todos: string[] } = translateBody(mem.body, cx, mem.params);
+        for (const t of s.todos) out.push(tsTodo(t));
+        out.push(`const ${mem.name} = (${mem.params}): void => {${vis}`);
+        out.push(indent(s.code));
+        out.push('};');
+      }
+      out.push(`// ── original ${className}.${mem.name} ──`);
+      out.push(...commented(mem.text, ''));
       if (mem.isPublic) publicNames.push(mem.name);
       continue;
     }
@@ -1073,13 +1264,15 @@ function draftMembers(members: ClassMember[], className: string): { lines: strin
       // An Angular lifecycle hook has a real Weave equivalent — name it instead of leaving a nameless function.
       out.push(`${tsTodo(`\`${mem.name}\` is a lifecycle hook → ${hook}`)}`);
     }
+    const m: { code: string; todos: string[] } = translateBody(mem.body, cx, mem.params);
+    for (const t of m.todos) out.push(tsTodo(t));
     out.push(`const ${mem.name} = (${mem.params}): void => {${mem.isPublic ? '' : ' // was private — a local, not returned'}`);
-    out.push(`  ${tsTodo('port this — fields are signals now (`x.set(v)`), and `this.` is gone.')}`);
-    if ((mem.text ?? '').trim()) {
-      out.push(`  // ── original ${className}.${mem.name}() ──`);
-      out.push(...commented(mem.text)); // the WHOLE original member, signature included — nothing paraphrased
-    }
+    if (m.code.trim()) out.push(indent(m.code));
     out.push('};');
+    if ((mem.text ?? '').trim()) {
+      out.push(`// ── original ${className}.${mem.name}() ──`);
+      out.push(...commented(mem.text, '')); // the WHOLE original, so nothing is lost and the rewrite is checkable
+    }
     if (mem.isPublic) publicNames.push(mem.name);
   }
   return { lines: out, publicNames };
@@ -1119,7 +1312,7 @@ export function convertService(fact: ServiceFact, rxjsNames: string[] = []): { b
   if (fact.injects.includes('HttpClient')) {
     body.push(`const client = createClient({ baseUrl: '/api' }); ${tsTodo('set your real base URL + headers')}`);
   }
-  const drafted: { lines: string[]; publicNames: string[] } = draftMembers(fact.members ?? [], fact.className);
+  const drafted: { lines: string[]; publicNames: string[] } = draftMembers(fact.members ?? [], fact.className, translateCtx(fact.members ?? [], []));
   body.push(...drafted.lines);
   body.push('');
   body.push(

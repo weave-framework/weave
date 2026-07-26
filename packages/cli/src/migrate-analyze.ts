@@ -683,6 +683,9 @@ export interface ClassMember {
   /** The member's ENTIRE original source, signature included. The draft carries this verbatim (commented) so the
    *  reader sees exactly what was there — and so "was anything lost?" is answerable by plain text comparison. */
   text: string;
+  /** The member's decorators as written (`@HostBinding('class.sps-logo')`, `@Input()`). A host binding says the
+   *  member drives the element rather than the class, which is a different translation entirely. */
+  decorators: string[];
 }
 
 /** The class body verbatim (members only, braces stripped) — the absolute reference for "was anything lost?". */
@@ -708,6 +711,7 @@ function classMembers(node: ts.ClassDeclaration, sf: ts.SourceFile): ClassMember
         type: '',
         isSignal: false,
         text: own(member),
+        decorators: decoratorsOf(member).map((d) => d.getText(sf)),
       });
       continue;
     }
@@ -724,6 +728,7 @@ function classMembers(node: ts.ClassDeclaration, sf: ts.SourceFile): ClassMember
         type: member.type ? member.type.getText(sf) : '',
         isSignal: false,
         text: own(member),
+        decorators: decoratorsOf(member).map((d) => d.getText(sf)),
       });
     } else if (ts.isPropertyDeclaration(member)) {
       out.push({
@@ -736,6 +741,7 @@ function classMembers(node: ts.ClassDeclaration, sf: ts.SourceFile): ClassMember
         type: member.type ? member.type.getText(sf) : '',
         isSignal: isSignalField(member),
         text: own(member),
+        decorators: decoratorsOf(member).map((d) => d.getText(sf)),
       });
     } else if (ts.isGetAccessorDeclaration(member) || ts.isSetAccessorDeclaration(member)) {
       // Accessors were captured by NOTHING before: a component with five `get` members came out with all five
@@ -750,6 +756,7 @@ function classMembers(node: ts.ClassDeclaration, sf: ts.SourceFile): ClassMember
         type: ts.isGetAccessorDeclaration(member) && member.type ? member.type.getText(sf) : '',
         isSignal: false,
         text: own(member),
+        decorators: decoratorsOf(member).map((d) => d.getText(sf)),
       });
     }
   }
@@ -1236,6 +1243,24 @@ function namedImports(sf: ts.SourceFile, matches: (spec: string) => boolean): st
 /** The named imports a file pulls from `@angular/forms` (`[]` when it imports nothing from there). */
 function angularFormsImports(sf: ts.SourceFile): string[] {
   return namedImports(sf, (s) => s === '@angular/forms');
+}
+
+/**
+ * A file's import statements as WRITTEN, with the specifier separated out.
+ *
+ * The converted code keeps using what the original used — `size` from lodash, a type from a workspace lib — so
+ * those imports have to travel with it. Without them the translated body names things that do not exist, which
+ * is a compile error in every migrated file that used a helper.
+ */
+export function sourceImports(filePath: string): Array<{ text: string; spec: string }> {
+  const sf: ts.SourceFile | null = parseFile(filePath);
+  if (!sf) return [];
+  const out: Array<{ text: string; spec: string }> = [];
+  for (const stmt of sf.statements) {
+    if (!ts.isImportDeclaration(stmt) || !ts.isStringLiteral(stmt.moduleSpecifier)) continue;
+    out.push({ text: stmt.getText(sf), spec: stmt.moduleSpecifier.text });
+  }
+  return out;
 }
 
 /**
