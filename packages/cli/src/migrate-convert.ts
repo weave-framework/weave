@@ -238,6 +238,15 @@ function eventBinding(event: string, statement: string): string {
   return `on:${event}={{ ($event) => ${statement.trim()} }}`;
 }
 
+/**
+ * A CSS property name as `style.setProperty` needs it. Angular accepts `style.backgroundColor` and normalises it;
+ * Weave passes the name straight to `setProperty`, which only knows `background-color` — so a camelCase name set
+ * nothing at all, silently. A custom property (`--brand`) is already in the right form and is left alone.
+ */
+export function cssProp(name: string): string {
+  return name.startsWith('--') ? name : name.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase();
+}
+
 /** A tag is a Weave COMPONENT when it starts uppercase; on a component only props/`on:`/`use:`/`bind:` are legal. */
 function isComponentTag(tag: string): boolean {
   return /^[A-Z]/.test(tag);
@@ -284,7 +293,7 @@ export function convertAttr(attr: Attr, tag: string): { out: string | null; todo
   if (bound) {
     const target: string = bound[1];
     if (target.startsWith('class.')) return { out: `class:${target.slice(6)}={{ ${v} }}` };
-    if (target.startsWith('style.')) return { out: `style:${target.slice(6)}={{ ${v} }}` };
+    if (target.startsWith('style.')) return { out: `style:${cssProp(target.slice(6))}={{ ${v} }}` };
     if (target.startsWith('attr.')) return { out: `${target.slice(5)}={{ ${v} }}` };
     if (target === 'ngClass') return { out: null, todo: `[ngClass]="${v}" — Weave toggles one class at a time: \`class:name={{ expr }}\`` };
     if (target === 'ngStyle') return { out: null, todo: `[ngStyle]="${v}" — Weave sets one property at a time: \`style:prop={{ expr }}\`` };
@@ -786,8 +795,8 @@ export function hostTargetToAttr(target: string, expr: string): string {
     const dot: number = rest.indexOf('.');
     // `style.width.px` — Angular appends the unit itself. Weave has no unit shorthand, so it is appended in the
     // expression; dropping it would set `width: 240`, which is not a length and does nothing.
-    if (dot >= 0) return `style:${rest.slice(0, dot)}={{ (${expr}) + '${rest.slice(dot + 1)}' }}`;
-    return `style:${rest}={{ ${expr} }}`;
+    if (dot >= 0) return `style:${cssProp(rest.slice(0, dot))}={{ (${expr}) + '${rest.slice(dot + 1)}' }}`;
+    return `style:${cssProp(rest)}={{ ${expr} }}`;
   }
   if (target.startsWith('attr.')) return `${target.slice(5)}={{ ${expr} }}`;
   return `.${target}={{ ${expr} }}`; // a DOM property (`disabled`, `id`)
@@ -805,60 +814,60 @@ export function qualifyHostExpr(expr: string, ctx: TranslateCtx): string {
   return outsideStrings(expr.replace(/\bthis\./g, ''), (part) =>
     part.replace(/(\.)?\b([A-Za-z_$][\w$]*)\b(\s*\()?/g, (full: string, dot: string | undefined, name: string, call: string | undefined) => {
       if (dot || call || HOST_EXPR_KEYWORDS.has(name)) return full;
-      if (ctx.inputs.has(name)) return `props.${name}`;
+      if (ctx.inputs.has(name)) return `${ctx.propsRef ?? 'props'}.${name}`;
       if (ctx.getters.has(name) || ctx.fields.has(name) || ctx.signals.has(name)) return `${name}()`;
       return full;
     }),
   );
 }
 
-/** How a member is READ from the template: an input off `props`, anything else as the signal it became. */
+/** How a member is READ: an input off the props object, anything else as the signal it became. */
 function memberRead(name: string, ctx: TranslateCtx): string {
-  return ctx.inputs.has(name) ? `props.${name}` : `${name}()`;
+  return ctx.inputs.has(name) ? `${ctx.propsRef ?? 'props'}.${name}` : `${name}()`;
 }
 
-/** A global listener (`@HostListener('window:resize')`) is not an element binding — it is a subscription. */
-function globalListener(target: string, event: string, statement: string): string[] {
-  return [
-    'onMount(() => {',
-    `  const handler = ($event: Event): void => { ${statement}; };`,
-    `  ${target}.addEventListener('${event}', handler);`,
-    `  return () => ${target}.removeEventListener('${event}', handler);`,
-    '});',
-  ];
+/** One host declaration, before it is rendered as either a template attribute or DOM code against an element. */
+export interface HostDecls {
+  /** Reactive bindings: `class.x` / `style.width.px` / `attr.role` / a bare DOM property, and the expression. */
+  bindings: Array<{ target: string; expr: string }>;
+  /** Listeners on the element itself: the event spec as written, and the statement to run. */
+  events: Array<{ spec: string; statement: string }>;
+  /** Listeners on `window` / `document` / `body` — a subscription, not a binding. */
+  globals: Array<{ target: string; event: string; statement: string }>;
+  /** Static entries from `host: { class: 'x', role: 'img' }`. */
+  statics: Array<{ key: string; value: string }>;
+  todos: string[];
 }
 
 /**
- * Everything a class declares about its host element, in Weave form: the `@HostBinding`/`@HostListener` members
- * AND the decorator's own `host: { … }` map, which says the same things a different way.
+ * Everything a class declares about its host element: the `@HostBinding`/`@HostListener` members AND the
+ * decorator's own `host: { … }` map, which says the same things a different way. Read once, here, so a component
+ * (which renders them into its template) and a directive (which applies them to an element it is handed) cannot
+ * disagree about what the class said.
  */
-export function hostWiring(members: ClassMember[], hostMeta: Record<string, string>, ctx: TranslateCtx): HostWiring {
-  const out: HostWiring = emptyHost();
+export function hostDecls(members: ClassMember[], hostMeta: Record<string, string>, ctx: TranslateCtx): HostDecls {
+  const out: HostDecls = { bindings: [], events: [], globals: [], statics: [], todos: [] };
 
   const addListener = (spec: string, statement: string, origin: string): void => {
-    // `window:resize` / `document:click` — a target outside the element. Angular scopes the subscription to the
-    // component's life; `onMount` + the returned cleanup is exactly that.
     const colon: number = spec.indexOf(':');
     if (colon >= 0) {
       const target: string = spec.slice(0, colon);
       if (target === 'window' || target === 'document' || target === 'body') {
-        const on: string = target === 'body' ? 'document.body' : target;
-        out.setupLines.push(...globalListener(on, spec.slice(colon + 1), statement));
-        out.runtimeNeeds.push('onMount');
+        out.globals.push({ target: target === 'body' ? 'document.body' : target, event: spec.slice(colon + 1), statement });
         return;
       }
-      out.todos.push(`\`${origin}\` listens on \`${spec}\` — an unrecognised target; wire it by hand in setup()`);
+      out.todos.push(`\`${origin}\` listens on \`${spec}\` — an unrecognised target; wire it by hand`);
       return;
     }
     // `keydown.enter` — Angular's key filter. Weave's modifiers are DOM-level (`|preventDefault`), not key names,
     // so the filter has to become a check inside the handler rather than be silently dropped.
     const dot: number = spec.indexOf('.');
     if (dot >= 0) {
-      out.attrs.push(`on:${spec.slice(0, dot)}={{ ($event) => ${statement} }}`);
+      out.events.push({ spec: spec.slice(0, dot), statement });
       out.todos.push(`\`${origin}\` filtered on \`${spec}\` — Weave has no key modifier; guard inside the handler (\`if ($event.key !== 'Enter') return;\`)`);
       return;
     }
-    out.attrs.push(`on:${spec}={{ ($event) => ${statement} }}`);
+    out.events.push({ spec, statement });
   };
 
   for (const mem of members) {
@@ -866,7 +875,7 @@ export function hostWiring(members: ClassMember[], hostMeta: Record<string, stri
       const bind: string[] | null = decoratorArgs(dec, 'HostBinding');
       if (bind) {
         // `@HostBinding()` bare binds the property of the same name — the member name IS the target.
-        out.attrs.push(hostTargetToAttr(bind.length ? unquote(bind[0]) : mem.name, memberRead(mem.name, ctx)));
+        out.bindings.push({ target: bind.length ? unquote(bind[0]) : mem.name, expr: memberRead(mem.name, ctx) });
         continue;
       }
       const listen: string[] | null = decoratorArgs(dec, 'HostListener');
@@ -885,15 +894,81 @@ export function hostWiring(members: ClassMember[], hostMeta: Record<string, stri
       continue;
     }
     const bound: RegExpMatchArray | null = key.match(/^\[(.+)\]$/);
-    if (bound) {
-      out.attrs.push(hostTargetToAttr(bound[1], qualifyHostExpr(value, ctx)));
-      continue;
-    }
-    // A static entry. `class` merges into the root's own classes; anything else is a plain attribute.
-    if (key === 'class') out.classes.push(...value.split(/\s+/).filter(Boolean));
-    else out.attrs.push(`${key}="${value}"`);
+    if (bound) out.bindings.push({ target: bound[1], expr: qualifyHostExpr(value, ctx) });
+    else out.statics.push({ key, value });
   }
   return out;
+}
+
+/** The host declarations as a COMPONENT uses them: attributes for its template's root element. */
+export function hostWiring(members: ClassMember[], hostMeta: Record<string, string>, ctx: TranslateCtx): HostWiring {
+  const decls: HostDecls = hostDecls(members, hostMeta, ctx);
+  const out: HostWiring = emptyHost();
+  out.todos.push(...decls.todos);
+  for (const b of decls.bindings) out.attrs.push(hostTargetToAttr(b.target, b.expr));
+  for (const e of decls.events) out.attrs.push(`on:${e.spec}={{ ($event) => ${e.statement} }}`);
+  for (const s of decls.statics) {
+    // `class` merges into the root's own classes; anything else is a plain attribute.
+    if (s.key === 'class') out.classes.push(...s.value.split(/\s+/).filter(Boolean));
+    else out.attrs.push(`${s.key}="${s.value}"`);
+  }
+  for (const g of decls.globals) {
+    // Angular scopes the subscription to the component's life; `onMount` + the returned cleanup is exactly that.
+    out.setupLines.push(
+      'onMount(() => {',
+      `  const handler = ($event: Event): void => { ${g.statement}; };`,
+      `  ${g.target}.addEventListener('${g.event}', handler);`,
+      `  return () => ${g.target}.removeEventListener('${g.event}', handler);`,
+      '});',
+    );
+    out.runtimeNeeds.push('onMount');
+  }
+  return out;
+}
+
+/** One reactive binding as code against an element — the DIRECTIVE form of `hostTargetToAttr`. */
+function hostTargetToDom(target: string, expr: string): string {
+  // Always a BLOCK body: an expression-bodied arrow returns whatever the DOM call returns, and `classList.toggle`
+  // returns a boolean, which `effect` does not accept (it takes a cleanup or nothing).
+  const fx = (stmt: string): string => `effect(() => { ${stmt} });`;
+  if (target.startsWith('class.')) return fx(`el.classList.toggle('${target.slice(6)}', Boolean(${expr}));`);
+  if (target === 'class') return fx(`el.className = String(${expr} ?? '');`);
+  if (target.startsWith('style.')) {
+    const rest: string = target.slice(6);
+    const dot: number = rest.indexOf('.');
+    if (dot >= 0) return fx(`el.style.setProperty('${cssProp(rest.slice(0, dot))}', String(${expr}) + '${rest.slice(dot + 1)}');`);
+    return fx(`el.style.setProperty('${cssProp(rest)}', String(${expr} ?? ''));`);
+  }
+  if (target.startsWith('attr.')) return fx(`el.setAttribute('${target.slice(5)}', String(${expr} ?? ''));`);
+  return fx(`(el as unknown as Record<string, unknown>)['${target}'] = ${expr};`);
+}
+
+/**
+ * The host declarations as a DIRECTIVE uses them: statements against the element the action is handed. Returns
+ * the body lines, the cleanups the returned `destroy` must run, and the runtime imports they need.
+ */
+export function hostDomCode(decls: HostDecls): { lines: string[]; cleanups: string[]; runtimeNeeds: string[] } {
+  const lines: string[] = [];
+  const cleanups: string[] = [];
+  const runtimeNeeds: string[] = [];
+  for (const s of decls.statics) {
+    if (s.key === 'class') lines.push(`el.classList.add(${s.value.split(/\s+/).filter(Boolean).map((c) => `'${c}'`).join(', ')});`);
+    else lines.push(`el.setAttribute('${s.key}', '${s.value}');`);
+  }
+  if (decls.bindings.length) runtimeNeeds.push('effect');
+  for (const b of decls.bindings) lines.push(hostTargetToDom(b.target, b.expr));
+  // A listener needs a NAMED handler: an inline arrow cannot be removed, which is a leak the Angular version
+  // never had (Angular tore its host listeners down with the directive).
+  for (const [i, e] of [...decls.events, ...decls.globals.map((g) => ({ spec: g.event, statement: g.statement, on: g.target }))].entries()) {
+    const on: string = 'on' in e && typeof e.on === 'string' ? e.on : 'el';
+    const handler: string = `handler${i}`;
+    // Only take `$event` when the statement uses it — an unused parameter is lint noise in someone else's project.
+    const param: string = /\$event\b/.test(e.statement) ? '$event: Event' : '';
+    lines.push(`const ${handler} = (${param}): void => { ${e.statement}; };`);
+    lines.push(`${on}.addEventListener('${e.spec}', ${handler});`);
+    cleanups.push(`${on}.removeEventListener('${e.spec}', ${handler});`);
+  }
+  return { lines, cleanups, runtimeNeeds };
 }
 
 /**
@@ -1330,6 +1405,12 @@ export interface TranslateCtx {
   /** Fields that were ALREADY signals in Angular. The original code already calls them to read (`x()`) and
    *  writes with `x.set(v)`, so the name is renamed bare — adding a call would produce `x().set(v)`. */
   signals: Set<string>;
+  /** What an input is read off. A component's is `props`; a directive becomes a `use:` action whose single
+   *  argument carries them, so there it is `arg`. Defaults to `props`. */
+  propsRef?: string;
+  /** The name that IS the element, when there is one. A `use:` action is handed the element directly, which is
+   *  exactly what `ElementRef` provided — so `this.el.nativeElement` is that name, not a property of it. */
+  elementRef?: string;
 }
 
 /** Angular services whose Weave replacement is a plain function, and where it comes from. */
@@ -1350,7 +1431,7 @@ const SERVICE_METHODS: Record<string, Record<string, { call: string; from: strin
 };
 
 /** Build the translation context from a class's members and its inputs. */
-export function translateCtx(members: ClassMember[], inputs: string[]): TranslateCtx {
+export function translateCtx(members: ClassMember[], inputs: string[], propsRef: string = 'props'): TranslateCtx {
   const inputSet: Set<string> = new Set<string>(inputs);
   // A field holding `inject(X)` is a dependency, not state — it must not be turned into a signal.
   const injected: Map<string, string> = new Map<string, string>();
@@ -1383,6 +1464,7 @@ export function translateCtx(members: ClassMember[], inputs: string[]): Translat
     methods: new Set<string>(members.filter((m) => m.kind === 'method').map((m) => m.name)),
     injected,
     signals: new Set<string>(members.filter((m) => m.kind === 'field' && m.isSignal).map((m) => m.name)),
+    propsRef,
   };
 }
 
@@ -1482,6 +1564,11 @@ export function translateBody(body: string, ctx: TranslateCtx, params: string = 
 
   let code: string = outsideStrings(body, (part) =>
     part
+      // `this.<ElementRef>.nativeElement` IS the element. An action is handed it directly, which is the whole
+      // reason Angular needed `ElementRef` — leaving `.nativeElement` on it referenced a property that is gone.
+      .replace(/\bthis\.([A-Za-z_$][\w$]*)\.nativeElement\b/g, (full, field: string) =>
+        ctx.elementRef && ctx.injected.get(field) === 'ElementRef' ? ctx.elementRef : full,
+      )
       // `this.<injected>.<method>(` → the Weave function that replaces it (`this._Router.navigate(` → `navigate(`).
       // The generic argument list is optional but must be matched: `this.http.get<T>(…)` is the usual form, and
       // skipping it sent the call down the plain-read path, leaving an undefined `http`.
@@ -1505,7 +1592,7 @@ export function translateBody(body: string, ctx: TranslateCtx, params: string = 
       .replace(/\bthis\.([A-Za-z_$][\w$]*)\s*\(/g, (full, name: string) => (ctx.methods.has(name) ? `${name}(` : full))
       // remaining reads
       .replace(/\bthis\.([A-Za-z_$][\w$]*)/g, (full, name: string) => {
-        if (ctx.inputs.has(name)) return `props.${name}`;
+        if (ctx.inputs.has(name)) return `${ctx.propsRef ?? 'props'}.${name}`;
         if (ctx.signals.has(name) || ctx.injected.has(name)) return name; // already a signal, or a dependency
         if (ctx.getters.has(name) || ctx.fields.has(name)) return `${name}()`;
         return full; // unresolved — reported below
@@ -1857,18 +1944,75 @@ export function convertDirective(fact: DirectiveFact): { baseName: string; ts: s
     `// In Weave a directive is a \`use:\` ACTION: it receives the element, and returns its teardown.`,
     `// Apply it as \`<div use:${fnName}={{ arg }}>\`${attr ? ` (was \`${fact.selector}\`)` : ''}.`,
   ];
+  // A directive's @Inputs arrive as the action's single argument. `arg` is what the class called `this.<input>`.
+  const argType: string = fact.inputs.length
+    ? `{ ${fact.inputs.map((i) => `${i}?: ${(fact.members.find((m) => m.name === i && m.kind === 'field')?.type ?? 'unknown')}`).join('; ')} }`
+    : 'unknown';
   if (fact.inputs.length) {
-    lines.push(tsTodo(`it had @Input(s) ${fact.inputs.join(', ')} — an action takes ONE argument, so pass an object`));
-    lines.push('//   and read it in `update`, which re-runs when the argument changes.');
+    lines.push(`// Its @Input(s) — ${fact.inputs.join(', ')} — are the action's ONE argument: \`use:${fnName}={{ { ${fact.inputs[0]}: … } }}\`.`);
+    lines.push('// `update` re-runs when that argument changes, which is where the class read a changed @Input.');
   }
+
+  // A directive is host bindings and behaviour, and both were commented out wholesale — the same "renames things,
+  // translates nothing" the components had. The members are drafted, and the host declarations become real DOM
+  // work against the element the action is handed.
+  //
+  // The inputs are held in a SIGNAL: the action's argument is a plain value, so an effect reading `arg` directly
+  // would never re-run when `update` replaced it — the binding would apply once and then stop tracking.
+  const inputSet: Set<string> = new Set<string>(fact.inputs);
+  const hasInputs: boolean = fact.inputs.length > 0;
+  const ctx: TranslateCtx = { ...translateCtx(fact.members, fact.inputs, hasInputs ? 'opts()' : 'arg'), elementRef: 'el' };
+  const carried: ClassMember[] = fact.members.filter((m) => !(m.kind === 'field' && inputSet.has(m.name)));
+  const drafted: { lines: string[]; publicNames: string[] } = draftMembers(carried, fact.className, ctx);
+  const dom: { lines: string[]; cleanups: string[]; runtimeNeeds: string[] } = hostDomCode(hostDecls(fact.members, fact.hostMeta ?? {}, ctx));
+
+  const needs: string[] = [
+    ...new Set<string>([
+      ...(carried.some((m) => m.kind === 'field') || hasInputs ? ['signal'] : []),
+      ...(carried.some((m) => m.kind === 'getter') ? ['computed'] : []),
+      ...dom.runtimeNeeds,
+      ...(dom.cleanups.length ? ['onDispose'] : []),
+    ]),
+  ];
+  const body: string[] = [];
+  if (hasInputs) {
+    // The defaults the @Input declarations stated. Without them a defaulted input read as `undefined` until the
+    // caller passed one — which is not what the Angular directive did.
+    const defaults: Array<{ name: string; def: string }> = fact.inputs
+      .map((i) => ({ name: i, def: signalInputDefault(fact.members.find((m) => m.name === i && m.kind === 'field')) }))
+      .filter((d) => d.def);
+    body.push('// ── these became the action\'s argument (see the signature above) ──');
+    for (const mem of fact.members.filter((m) => m.kind === 'field' && inputSet.has(m.name))) {
+      for (const l of (mem.text ?? '').split('\n')) body.push(`// ${l}`);
+    }
+    body.push(`const defaults = { ${defaults.map((d) => `${d.name}: ${d.def}`).join(', ')} };`);
+    body.push('const opts = signal({ ...defaults, ...arg });');
+    body.push('');
+  }
+  body.push(...drafted.lines);
+  if (dom.lines.length) {
+    body.push('');
+    body.push('// ── the host element: what @HostBinding/@HostListener and `host: {}` applied to it ──');
+    body.push(...dom.lines);
+  }
+  body.push('');
+  const returned: string[] = [];
+  // A BLOCK body: `set` returns the new value, and an expression-bodied arrow declared `: void` cannot return it.
+  if (hasInputs) returned.push(`update: (next?: ${argType}): void => { opts.set({ ...defaults, ...next }); }`);
+  if (dom.cleanups.length) {
+    body.push('const destroy = (): void => {');
+    for (const c of dom.cleanups) body.push(`  ${c}`);
+    body.push('};');
+    body.push('onDispose(destroy);');
+    returned.push('destroy');
+  }
+  body.push(returned.length ? `return { ${returned.join(', ')} };` : 'return {};');
+
   lines.push('');
-  lines.push(`export function ${fnName}(el: HTMLElement, arg?: unknown): { update?: (next: unknown) => void; destroy?: () => void } {`);
-  lines.push(`  ${tsTodo('port the directive here — its original members follow.')}`);
-  for (const m of fact.members) {
-    lines.push(`  // ── original ${fact.className}.${m.name} ──`);
-    for (const l of (m.text ?? '').split('\n')) lines.push(`  // ${l}`);
-  }
-  lines.push('  return {};');
+  if (needs.length) lines.splice(0, 0, `import { ${needs.join(', ')} } from '@weave-framework/runtime';`, '');
+  lines.push(...carriedImportsFor(fact.file), ...serviceImportsFor(fact.members, fact.inputs));
+  lines.push(`export function ${fnName}(el: HTMLElement, arg?: ${argType}): { update?: (next?: ${argType}) => void; destroy?: () => void } {`);
+  lines.push(...body.flatMap((l) => l.split('\n')).map((l) => (l ? `  ${l}` : l)));
   lines.push('}');
   lines.push('');
   return { baseName: fnName.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase(), ts: lines.join('\n') };

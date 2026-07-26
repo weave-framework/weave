@@ -817,8 +817,25 @@ const dir = a.findDirectives(join(pipesDir, 'highlight.directive.ts'))[0];
 ok(dir.selector === '[appHighlight]' && dir.inputs.includes('colour'), 'findDirectives: the selector and @Input are read');
 const dirTs = cv.convertDirective(dir).ts;
 ok(dirTs.includes('export function appHighlight(el: HTMLElement'), 'convertDirective: the directive becomes a use: action taking the element');
+ok(dirTs.includes("const defaults = { colour: 'yellow' };") && dirTs.includes('const opts = signal({ ...defaults, ...arg });'), 'convertDirective: an @Input default is applied, and update() replaces the argument reactively');
 ok(dirTs.includes('use:appHighlight'), 'convertDirective: it says how to apply the action in a template');
 ok(dirTs.includes('onEnter'), 'convertDirective: the original members are carried');
+// A directive IS host bindings and behaviour, and both used to be commented out wholesale.
+ok(dirTs.includes('const active = signal<boolean>(false);'), 'convertDirective: its fields become signals holding what they held');
+ok(dirTs.includes('const isActive = computed(() => active());'), 'convertDirective: a @HostBinding getter is translated, not stubbed');
+ok(dirTs.includes("effect(() => { el.classList.toggle('is-active', Boolean(isActive())); });"), 'convertDirective: a host class binding becomes real work on the element it is handed');
+ok(dirTs.includes("el.classList.add('app-highlight');"), 'convertDirective: a static host class is applied to the element');
+// `setProperty` takes the name verbatim in Weave — Angular normalises it, so a camelCase name set NOTHING.
+ok(dirTs.includes("el.style.setProperty('outline-width', String(outlineWidth()) + 'px');"), 'convertDirective: a camelCase style name is kebab-cased, and the unit kept');
+ok(cv.cssProp('backgroundColor') === 'background-color', 'cssProp: camelCase becomes the CSS property name setProperty actually knows');
+ok(cv.cssProp('--brand') === '--brand', 'cssProp: a custom property is already in the right form and is left alone');
+ok(cv.convertAttr({ name: '[style.backgroundColor]', value: 'c' }, 'div').out === 'style:background-color={{ c }}', 'convertAttr: a template style binding is kebab-cased too — the same silent no-op');
+ok(dirTs.includes("effect(() => { el.setAttribute('data-colour', String(opts().colour ?? '')); });"), "convertDirective: a `host: {}` binding reads the argument through a SIGNAL — a plain value would never re-run the effect when update() replaced it");
+ok(dirTs.includes("el.addEventListener('mouseenter', handler0);"), 'convertDirective: a @HostListener becomes a real listener');
+ok(dirTs.includes("el.removeEventListener('mouseenter', handler0);") && dirTs.includes('onDispose(destroy)'), 'convertDirective: every listener is removed on teardown — a named handler, because an inline arrow cannot be removed');
+ok(dirTs.includes('el.style.background = opts().colour;'), 'convertDirective: `this.el.nativeElement` IS the element an action is handed — `.nativeElement` is gone');
+const dirLost = dir.classBody.split('\n').map((l) => l.trim()).filter((l) => l && l !== '}' && l !== '{').filter((l) => !dirTs.includes(l));
+ok(dirLost.length === 0, `NOTHING IS LOST (directive): every line survives (lost: ${dirLost.join(' | ') || 'none'})`);
 
 // Styles: Weave pairs a component with a SIBLING stylesheet. Inline styles used to be COUNTED and dropped.
 const styleFacts = { file: join(fx, 'components', 'decorator.component.ts'), className: 'DecoratorComponent', styleUrls: [], styleTexts: ['h1 { color: red }'] };
@@ -1010,6 +1027,7 @@ try {
   // The host component: the widest component draft there is — typed props with defaults, translated getters, a
   // field signal that carries its initial value, and an onMount subscription with its cleanup.
   writeFileSync(join(genDir, 'host.ts'), hostPair.ts);
+  writeFileSync(join(genDir, 'directive.ts'), dirTs);
   writeFileSync(
     join(genDir, 'tsconfig.json'),
     JSON.stringify({

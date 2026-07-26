@@ -46,6 +46,16 @@
   template has no single root there is no honest place for any of it, so the whole set is reported rather than
   attached to an arbitrary element.
 
+  **A `@Directive` converts too, rather than arriving commented out.** Its fields and getters become signals and
+  computeds, its `@Input`s become the action's one argument — held in a signal, so `update` re-running the
+  bindings actually works — and its host declarations become real work on the element the action is handed:
+  `effect`s for the bindings, `addEventListener` for the listeners, and a `destroy` that removes every one of
+  them. `this.el.nativeElement` becomes the element, since being handed it is what `ElementRef` was for.
+
+  A camelCase CSS name is kebab-cased wherever it appears — `[style.backgroundColor]` and
+  `@HostBinding('style.outlineWidth.px')` alike. Angular normalises the name; Weave passes it to `setProperty`,
+  which only knows `background-color`, so the binding compiled, ran, and set nothing.
+
   A field carries what it **held**: `count = 0` becomes `signal<number>(0)`, not `signal<unknown>(undefined)`. A
   template reading it calls it, since `{{ label }}` in Weave renders the function rather than its value. And a
   prop with a default is **not** optional in the `setup` signature — `propDefaults` guarantees it a value there;

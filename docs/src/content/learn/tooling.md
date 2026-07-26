@@ -165,7 +165,8 @@ comment rather than guessed at.
 | `@Injectable({providedIn:'root'})` | `store()` |
 | `@Injectable()` (scoped) | `createContext` + `provide`/`inject` |
 | `@Pipe` | a plain function — `{{ x \| shorten }}` becomes `{{ shorten(x) }}` |
-| `@Directive` | a `use:` action |
+| `@Directive` | a `use:` action — host bindings become `effect`s on the element, listeners are added *and removed* |
+| `ElementRef` | the element itself — an action is handed it, which is what `ElementRef` was for |
 | `*ngIf` / `*ngFor` / `*ngSwitch` | `@if` / `@for` / `@switch` |
 | `[prop]` / `(event)` / `[(ngModel)]` | `.prop` / `on:` / `bind:value` |
 | `<ng-template #x>` / `*ngTemplateOutlet` | `@snippet x()` / `@render (x())` |
