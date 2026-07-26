@@ -48,6 +48,10 @@ export interface ElementNode {
   tag: string;
   attrs: Attr[];
   children: Node[];
+  /** Weave attribute text attached by `convertTemplate` when this is the template's single ROOT element: the
+   *  component's host bindings land here, because Weave has no host element of its own. Already converted, so it
+   *  bypasses `convertAttr` entirely. */
+  hostAttrs?: string[];
 }
 
 /** Elements that never have children or a closing tag. */
@@ -355,6 +359,13 @@ export interface ConvertOptions {
    *  it off `props`. Without this the converted template names bindings that do not exist, and the component
    *  renders nothing — so it is the difference between output that works and output that only looks right. */
   props?: string[];
+  /** The class members the template reads that became SIGNALS (fields, getters). An Angular template reads them
+   *  bare; a Weave template must CALL them, or `{{ label }}` renders the function instead of its value. */
+  signals?: string[];
+  /** The component's host bindings and listeners, already in Weave form. Angular applies these to the element that
+   *  carries the component's selector; Weave has no such element, so its template's single root element is where
+   *  they belong. */
+  host?: HostWiring;
 }
 
 /** One `<ng-template #name let-a let-b="key">` turned into a Weave `@snippet name(a, b)`. */
@@ -626,6 +637,9 @@ function renderElement(node: ElementNode, opts: ConvertOptions): string {
     for (const m of more ?? []) todos.push(todo(m));
   }
   if (MATERIAL_FUNCTIONS[node.tag]) todos.push(todo(`\`<${node.tag}>\` → ${MATERIAL_FUNCTIONS[node.tag]}`));
+  // The host bindings, if this is the root. Appended AFTER the element's own attributes so a host binding wins the
+  // way Angular's does, and unconverted because they were built in Weave form already.
+  parts.push(...(node.hostAttrs ?? []));
 
   let childText: string;
   if (switchAttr) {
@@ -654,20 +668,263 @@ export function convertTemplate(html: string, opts: ConvertOptions = {}): string
   // First pass: find the <ng-template>s, so an outlet appearing BEFORE its template still resolves.
   const snippets: Record<string, SnippetDef> = { ...opts.snippets };
   collectSnippets(tree, snippets);
-  const out: string = renderNodes(tree, { ...opts, snippets });
+  const hostTodos: string[] = attachHost(tree, opts.host);
+  const out: string = (hostTodos.length ? `${hostTodos.map((t) => todo(t)).join('\n')}\n` : '') + renderNodes(tree, { ...opts, snippets });
   // Last pass: an Angular template reads an @Input by its bare name, a Weave one reads it off `props`. Done here
   // rather than per-expression so every place a name can appear — interpolations, bindings, block headers — is
   // covered by one rule. Snippet parameters are locals, so they are excluded.
   const locals: Set<string> = new Set<string>(Object.values(snippets).flatMap((s) => s.params.map((p) => p.name)));
   const props: string[] = (opts.props ?? []).filter((p) => !locals.has(p));
-  return props.length ? qualifyTemplateExpressions(out, props) : out;
+  const signals: string[] = (opts.signals ?? []).filter((s) => !locals.has(s) && !props.includes(s));
+  return props.length || signals.length ? qualifyTemplateExpressions(out, props, signals) : out;
 }
 
-/** Apply `qualifyProps` to every expression in a rendered Weave template: `{{ … }}` and `@block ( … )` headers. */
-function qualifyTemplateExpressions(text: string, props: string[]): string {
+/**
+ * A bare `name` that became a signal must be CALLED: `{{ label }}` in Angular reads the field, in Weave it reads
+ * the signal function itself and renders its source. Anything already being called, or reached through a dot, is
+ * left alone.
+ */
+export function qualifySignalReads(expr: string, signals: string[]): string {
+  if (!signals.length) return expr;
+  const set: Set<string> = new Set<string>(signals);
+  return outsideStrings(expr, (part) =>
+    part.replace(/(\.)?\b([A-Za-z_$][\w$]*)\b(\s*\()?/g, (full: string, dot: string | undefined, name: string, call: string | undefined) =>
+      !dot && !call && set.has(name) ? `${name}()` : full,
+    ),
+  );
+}
+
+/** Apply the name rules to every expression in a rendered Weave template: `{{ … }}` and `@block ( … )` headers. */
+function qualifyTemplateExpressions(text: string, props: string[], signals: string[]): string {
+  const fix = (inner: string): string => qualifySignalReads(qualifyProps(inner, props), signals);
   return text
-    .replace(/\{\{([^}]*)\}\}/g, (_m, inner: string) => `{{ ${qualifyProps(inner.trim(), props)} }}`)
-    .replace(/^(\s*@(?:if|for|switch|case|render)\s*\()([^)]*)\)/gm, (_m, head: string, inner: string) => `${head}${qualifyProps(inner, props)})`);
+    .replace(/\{\{([^}]*)\}\}/g, (_m, inner: string) => `{{ ${fix(inner.trim())} }}`)
+    .replace(/^(\s*@(?:if|for|switch|case|render)\s*\()([^)]*)\)/gm, (_m, head: string, inner: string) => `${head}${fix(inner)})`);
+}
+
+/* ──────────── the host element: `@HostBinding` / `@HostListener` / `host: { … }` ──────────── */
+
+/**
+ * What a component's host declarations become. Angular applies them to the element carrying the component's
+ * selector; Weave has no such element, so the template's single ROOT element is the faithful place for them.
+ *
+ * Before this existed, `@HostBinding('class.sps-logo') get classSpsLogo() { return true; }` converted to a
+ * `computed` that nothing read — so a class that was ALWAYS on the element became one that never is. The computed
+ * was right and the component was still broken, which is the worst of both.
+ */
+export interface HostWiring {
+  /** Weave attribute texts for the root element (`class:sps-logo={{ classSpsLogo() }}`), already converted. */
+  attrs: string[];
+  /** Static classes from `host: {'class': 'a b'}` — merged into the root's own `class`, never a second attribute. */
+  classes: string[];
+  /** Lines for `setup()`: a listener whose target is `window`/`document` is not an element binding at all. */
+  setupLines: string[];
+  /** Runtime imports those lines need (`onMount`). */
+  runtimeNeeds: string[];
+  todos: string[];
+}
+
+/** A fresh empty wiring. A shared constant would be a mutable object handed to every caller. */
+export function emptyHost(): HostWiring {
+  return { attrs: [], classes: [], setupLines: [], runtimeNeeds: [], todos: [] };
+}
+
+/** Split an argument list on its top-level commas (`'click', ['$event', 'x']` → two entries). */
+function splitTopLevel(src: string): string[] {
+  const out: string[] = [];
+  let depth: number = 0;
+  let quote: string = '';
+  let cur: string = '';
+  for (const ch of src) {
+    if (quote) {
+      cur += ch;
+      if (ch === quote) quote = '';
+      continue;
+    }
+    if (ch === '"' || ch === "'" || ch === '`') quote = ch;
+    else if ('([{'.includes(ch)) depth++;
+    else if (')]}'.includes(ch)) depth--;
+    else if (ch === ',' && depth === 0) {
+      out.push(cur.trim());
+      cur = '';
+      continue;
+    }
+    cur += ch;
+  }
+  if (cur.trim()) out.push(cur.trim());
+  return out;
+}
+
+/** `'click'` → `click`. Leaves an unquoted argument (a constant reference) alone. */
+function unquote(s: string): string {
+  const t: string = s.trim();
+  return /^(['"`]).*\1$/s.test(t) ? t.slice(1, -1) : t;
+}
+
+/**
+ * The raw arguments of `@Name(...)` on a decorator text, or null when this decorator is not the one asked for.
+ * An empty array means the decorator was written bare (`@HostBinding`), which is legal and means "use the member
+ * name as the target".
+ */
+export function decoratorArgs(text: string, name: string): string[] | null {
+  const t: string = text.trim();
+  if (!new RegExp(`^@${name}\\b`).test(t)) return null;
+  const open: number = t.indexOf('(');
+  if (open < 0) return [];
+  return splitTopLevel(t.slice(open + 1, t.lastIndexOf(')')));
+}
+
+/**
+ * One host binding target → the Weave attribute that expresses it. The same target grammar Angular uses on a
+ * `[binding]` in a template, so it maps the same way `convertAttr` maps those.
+ */
+export function hostTargetToAttr(target: string, expr: string): string {
+  if (target.startsWith('class.')) return `class:${target.slice(6)}={{ ${expr} }}`;
+  if (target === 'class') return `class={{ ${expr} }}`;
+  if (target.startsWith('style.')) {
+    const rest: string = target.slice(6);
+    const dot: number = rest.indexOf('.');
+    // `style.width.px` — Angular appends the unit itself. Weave has no unit shorthand, so it is appended in the
+    // expression; dropping it would set `width: 240`, which is not a length and does nothing.
+    if (dot >= 0) return `style:${rest.slice(0, dot)}={{ (${expr}) + '${rest.slice(dot + 1)}' }}`;
+    return `style:${rest}={{ ${expr} }}`;
+  }
+  if (target.startsWith('attr.')) return `${target.slice(5)}={{ ${expr} }}`;
+  return `.${target}={{ ${expr} }}`; // a DOM property (`disabled`, `id`)
+}
+
+/** Reserved words and template locals that are never class members. */
+const HOST_EXPR_KEYWORDS: Set<string> = new Set<string>(['true', 'false', 'null', 'undefined', 'this', '$event', 'new', 'typeof', 'in', 'of', 'void', 'window', 'document']);
+
+/**
+ * Qualify a host-metadata expression against the class. These are written like template expressions — bare member
+ * names, no `this.` — so the same reads apply: an input is `props.x`, a field or getter is the signal `x()`, and
+ * anything already being CALLED is left alone (it is a method, or a signal the author already read).
+ */
+export function qualifyHostExpr(expr: string, ctx: TranslateCtx): string {
+  return outsideStrings(expr.replace(/\bthis\./g, ''), (part) =>
+    part.replace(/(\.)?\b([A-Za-z_$][\w$]*)\b(\s*\()?/g, (full: string, dot: string | undefined, name: string, call: string | undefined) => {
+      if (dot || call || HOST_EXPR_KEYWORDS.has(name)) return full;
+      if (ctx.inputs.has(name)) return `props.${name}`;
+      if (ctx.getters.has(name) || ctx.fields.has(name) || ctx.signals.has(name)) return `${name}()`;
+      return full;
+    }),
+  );
+}
+
+/** How a member is READ from the template: an input off `props`, anything else as the signal it became. */
+function memberRead(name: string, ctx: TranslateCtx): string {
+  return ctx.inputs.has(name) ? `props.${name}` : `${name}()`;
+}
+
+/** A global listener (`@HostListener('window:resize')`) is not an element binding — it is a subscription. */
+function globalListener(target: string, event: string, statement: string): string[] {
+  return [
+    'onMount(() => {',
+    `  const handler = ($event: Event): void => { ${statement}; };`,
+    `  ${target}.addEventListener('${event}', handler);`,
+    `  return () => ${target}.removeEventListener('${event}', handler);`,
+    '});',
+  ];
+}
+
+/**
+ * Everything a class declares about its host element, in Weave form: the `@HostBinding`/`@HostListener` members
+ * AND the decorator's own `host: { … }` map, which says the same things a different way.
+ */
+export function hostWiring(members: ClassMember[], hostMeta: Record<string, string>, ctx: TranslateCtx): HostWiring {
+  const out: HostWiring = emptyHost();
+
+  const addListener = (spec: string, statement: string, origin: string): void => {
+    // `window:resize` / `document:click` — a target outside the element. Angular scopes the subscription to the
+    // component's life; `onMount` + the returned cleanup is exactly that.
+    const colon: number = spec.indexOf(':');
+    if (colon >= 0) {
+      const target: string = spec.slice(0, colon);
+      if (target === 'window' || target === 'document' || target === 'body') {
+        const on: string = target === 'body' ? 'document.body' : target;
+        out.setupLines.push(...globalListener(on, spec.slice(colon + 1), statement));
+        out.runtimeNeeds.push('onMount');
+        return;
+      }
+      out.todos.push(`\`${origin}\` listens on \`${spec}\` — an unrecognised target; wire it by hand in setup()`);
+      return;
+    }
+    // `keydown.enter` — Angular's key filter. Weave's modifiers are DOM-level (`|preventDefault`), not key names,
+    // so the filter has to become a check inside the handler rather than be silently dropped.
+    const dot: number = spec.indexOf('.');
+    if (dot >= 0) {
+      out.attrs.push(`on:${spec.slice(0, dot)}={{ ($event) => ${statement} }}`);
+      out.todos.push(`\`${origin}\` filtered on \`${spec}\` — Weave has no key modifier; guard inside the handler (\`if ($event.key !== 'Enter') return;\`)`);
+      return;
+    }
+    out.attrs.push(`on:${spec}={{ ($event) => ${statement} }}`);
+  };
+
+  for (const mem of members) {
+    for (const dec of mem.decorators ?? []) {
+      const bind: string[] | null = decoratorArgs(dec, 'HostBinding');
+      if (bind) {
+        // `@HostBinding()` bare binds the property of the same name — the member name IS the target.
+        out.attrs.push(hostTargetToAttr(bind.length ? unquote(bind[0]) : mem.name, memberRead(mem.name, ctx)));
+        continue;
+      }
+      const listen: string[] | null = decoratorArgs(dec, 'HostListener');
+      if (listen && listen.length) {
+        // The second argument names what Angular passes the method (`['$event']`, `['$event.target.value']`).
+        const args: string[] = splitTopLevel((listen[1] ?? '').replace(/^\[|\]$/g, '')).map(unquote);
+        addListener(unquote(listen[0]), `${mem.name}(${args.join(', ')})`, `@HostListener on ${mem.name}`);
+      }
+    }
+  }
+
+  for (const [key, value] of Object.entries(hostMeta)) {
+    const evt: RegExpMatchArray | null = key.match(/^\((.+)\)$/);
+    if (evt) {
+      addListener(evt[1], qualifyHostExpr(value, ctx), `host: {'${key}'}`);
+      continue;
+    }
+    const bound: RegExpMatchArray | null = key.match(/^\[(.+)\]$/);
+    if (bound) {
+      out.attrs.push(hostTargetToAttr(bound[1], qualifyHostExpr(value, ctx)));
+      continue;
+    }
+    // A static entry. `class` merges into the root's own classes; anything else is a plain attribute.
+    if (key === 'class') out.classes.push(...value.split(/\s+/).filter(Boolean));
+    else out.attrs.push(`${key}="${value}"`);
+  }
+  return out;
+}
+
+/**
+ * Put the host wiring on the template's single root element. When there is not exactly one, there is no honest
+ * place for it — Angular's host element always existed, and inventing a wrapper would change the DOM the
+ * component produces — so it is reported in full instead of quietly dropped.
+ */
+function attachHost(tree: Node[], host: HostWiring | undefined): string[] {
+  if (!host || (host.attrs.length === 0 && host.classes.length === 0)) return [];
+  const roots: ElementNode[] = tree.filter((n): n is ElementNode => n.kind === 'element' && n.tag !== 'ng-template');
+  const declared: string[] = [...host.classes.map((c) => `class="${c}"`), ...host.attrs];
+  if (roots.length !== 1) {
+    return [
+      `this component's host element carried ${declared.join(', ')} —`,
+      `Angular put those on its <selector> tag, but this template has ${roots.length} root elements, so there is no`,
+      'single element to move them to. Wrap the template in one element and put them there.',
+    ];
+  }
+  const root: ElementNode = roots[0];
+  root.hostAttrs = [...(root.hostAttrs ?? []), ...host.attrs];
+  if (host.classes.length) {
+    const existing: Attr | undefined = root.attrs.find((a) => a.name === 'class');
+    if (existing) existing.value = `${host.classes.join(' ')} ${existing.value ?? ''}`.trim();
+    else root.attrs.unshift({ name: 'class', value: host.classes.join(' ') });
+  }
+  // A conditional root is not a host element: Angular's existed unconditionally, this one comes and goes with the
+  // condition. The bindings still belong here, but the difference is real and has to be said.
+  if (structuralOf(root.attrs)) {
+    return ['the host bindings were moved onto the root element, which is CONDITIONAL here — Angular applied them to a host that always existed'];
+  }
+  return [];
 }
 
 /* ──────────── the component pair: `foo.ts` (setup) + `foo.html` (template) ──────────── */
@@ -733,8 +990,11 @@ export function convertComponent(fact: ComponentFact, templateHtml: string, opts
     const mem: ClassMember | undefined = (fact.members ?? []).find((m) => m.name === name && m.kind === 'field');
     return { name, type: mem?.type ?? '', def: signalInputDefault(mem) };
   });
+  // The declared type, as written, and NOT made optional: `propDefaults` guarantees a value inside `setup`, so
+  // `color?: string` would force a null check on something that is never null. Optionality is for the PARENT, and
+  // `propDefaults` is what states it — `weave check` reads it and stops demanding the prop.
   const propLines: string[] = [
-    ...inputInfo.map((i) => `  ${i.name}${i.def ? '?' : ''}: ${i.type || 'unknown'};`),
+    ...inputInfo.map((i) => `  ${i.name}: ${i.type || 'unknown'};`),
     ...fact.outputs.map((o) => `  on${o.charAt(0).toUpperCase()}${o.slice(1)}?: (value: unknown) => void;`),
   ];
   const propsType: string = propLines.length ? `{\n${propLines.join('\n')}\n}` : 'Record<string, never>';
@@ -761,14 +1021,30 @@ export function convertComponent(fact: ComponentFact, templateHtml: string, opts
     body.push('// ── these became props (see the signature above) ──');
     for (const mem of asProps) for (const line of (mem.text ?? '').split('\n')) body.push(`// ${line}`);
   }
-  body.push(...draftMembers(carried, fact.className, translateCtx(fact.members ?? [], fact.inputs)).lines);
+  const ctx: TranslateCtx = translateCtx(fact.members ?? [], fact.inputs);
+  body.push(...draftMembers(carried, fact.className, ctx).lines);
+
+  // The host element. Its members were drafted above (a @HostBinding getter is a computed like any other); what
+  // was missing was the other half — the template attribute that READS the computed. Without it the value was
+  // correct and applied to nothing.
+  const host: HostWiring = hostWiring(fact.members ?? [], fact.hostMeta ?? {}, ctx);
+  if (host.setupLines.length) {
+    body.push('');
+    body.push('// `@HostListener` on window/document — a subscription, not a binding. It is scoped to the');
+    body.push('// component: `onMount` returns the cleanup, which runs on dispose.');
+    body.push(...host.setupLines);
+  }
+  for (const t of host.todos) body.push(tsTodo(t));
 
   // A reactive form becomes a `form({ … })` in setup(); the template binds its leaves with `use:control`.
   const imports: string[] = [];
   // Import exactly what the drafted body uses: fields become `signal`, getters become `computed`.
   const runtimeNeeds: string[] = [
-    ...(carried.some((mem) => mem.kind === 'field') ? ['signal'] : []),
-    ...(carried.some((mem) => mem.kind === 'getter') ? ['computed'] : []),
+    ...new Set<string>([
+      ...(carried.some((mem) => mem.kind === 'field') ? ['signal'] : []),
+      ...(carried.some((mem) => mem.kind === 'getter') ? ['computed'] : []),
+      ...host.runtimeNeeds,
+    ]),
   ];
   if (runtimeNeeds.length) imports.push(`import { ${runtimeNeeds.join(', ')} } from '@weave-framework/runtime';`);
   // A template that used Angular Material now names Weave UI components — which have to be imported to exist.
@@ -809,12 +1085,16 @@ export function convertComponent(fact: ComponentFact, templateHtml: string, opts
     ...(imports.length ? [...imports, ''] : []),
     ...defaultsBlock,
     `export function setup(${usesProps ? `props: ${propsType}` : ''}) {`,
-    ...body.map((l) => (l ? `  ${l}` : l)),
+    // Split first: a drafted entry can be a whole multi-line block, and prefixing the ENTRY only indented its
+    // first line, leaving the rest hanging outside the function's indentation.
+    ...body.flatMap((l) => l.split('\n')).map((l) => (l ? `  ${l}` : l)),
     '}',
     '',
   ].join('\n');
 
-  return { baseName, ts, html: convertTemplate(templateHtml, { ...opts, props: [...fact.inputs, ...fact.outputs] }) };
+  // Everything the class held that became a signal — the template has to call it now.
+  const signals: string[] = [...ctx.fields, ...ctx.getters, ...ctx.signals];
+  return { baseName, ts, html: convertTemplate(templateHtml, { ...opts, props: [...fact.inputs, ...fact.outputs], signals, host }) };
 }
 
 /* ──────────── M5 — the hard parts, DRAFTED (never silently rewritten) ──────────── */
@@ -1077,16 +1357,24 @@ export function translateCtx(members: ClassMember[], inputs: string[]): Translat
   // A constructor PARAMETER-PROPERTY (`constructor(private http: HttpClient)`) is a field too — Angular's most
   // common injection form. Missing it left `this.http` unresolved, which the compile gate caught as an
   // undefined name in the generated file.
+  // EVERY constructor parameter is a DI token — in Angular that is what a constructor is for. Both spellings
+  // count: the parameter-property (`private http: HttpClient`) and the plain parameter the body assigns. Split on
+  // top-level commas so a decorated or generic parameter (`@Inject(T) x: Map<string, number>`) stays one entry.
   const ctor: ClassMember | undefined = members.find((m) => m.kind === 'constructor');
-  for (const p of (ctor?.params ?? '').split(',')) {
-    const m: RegExpMatchArray | null = p.trim().match(/^(?:private|public|protected|readonly)\s+(?:readonly\s+)?([A-Za-z_$][\w$]*)\s*:\s*([A-Za-z_$][\w$]*)/);
+  for (const p of splitTopLevel(ctor?.params ?? '')) {
+    const m: RegExpMatchArray | null = p
+      .trim()
+      .replace(/^(?:@[A-Za-z_$][\w$]*\s*(?:\([^)]*\))?\s*)+/, '')
+      .match(/^(?:(?:private|public|protected|readonly)\s+)*([A-Za-z_$][\w$]*)\s*:\s*([A-Za-z_$][\w$]*)/);
     if (m) injected.set(m[1], m[2]);
   }
   for (const m of members) {
     if (m.kind !== 'field') continue;
-    const call: RegExpMatchArray | null = (m.initializer ?? '').match(/^inject\s*\(\s*([A-Za-z_$][\w$]*)\s*\)/);
+    // Only an explicit `inject(X)` marks a FIELD as a dependency. Treating "declared type starts uppercase, no
+    // initializer" as injection swallowed ordinary state — `lastSeen: Date;` is not a service, and dropping it
+    // meant a field vanished from the output with a note saying its calls had been rewritten. They had not.
+    const call: RegExpMatchArray | null = (m.initializer ?? '').match(/^inject\s*(?:<[^>]*>)?\s*\(\s*([A-Za-z_$][\w$]*)/);
     if (call) injected.set(m.name, call[1]);
-    else if (m.type && /^[A-Z]/.test(m.type) && !m.initializer) injected.set(m.name, m.type); // a ctor-injected field
   }
   return {
     inputs: inputSet,
@@ -1096,6 +1384,71 @@ export function translateCtx(members: ClassMember[], inputs: string[]): Translat
     injected,
     signals: new Set<string>(members.filter((m) => m.kind === 'field' && m.isSignal).map((m) => m.name)),
   };
+}
+
+/**
+ * The end of the statement starting at `from`: the first `;` or newline at bracket depth 0, skipping strings.
+ * A regex cannot do this — `[^;\n]+` stops at the first string literal once the text has been split on quotes,
+ * which is how `this.label = on ? 'a' : 'b'` became `label.set(on ?)'a' : 'b'`.
+ */
+function statementEnd(code: string, from: number): number {
+  let depth: number = 0;
+  let quote: string = '';
+  for (let i: number = from; i < code.length; i++) {
+    const ch: string = code[i];
+    if (quote) {
+      if (ch === '\\') i++;
+      else if (ch === quote) quote = '';
+      continue;
+    }
+    if (ch === '"' || ch === "'" || ch === '`') quote = ch;
+    else if ('([{'.includes(ch)) depth++;
+    else if (')]}'.includes(ch)) {
+      if (depth === 0) return i; // the enclosing block closed — the statement ended with it
+      depth--;
+    } else if (depth === 0 && (ch === ';' || ch === '\n')) return i;
+  }
+  return code.length;
+}
+
+/**
+ * `this.<field> = <expr>` → `<field>.set(<expr>)`, scanning the WHOLE expression rather than matching it. The
+ * right-hand side can hold anything — a ternary over two string literals, an object, a call — and it has to
+ * arrive inside `.set(…)` intact.
+ */
+function rewriteFieldWrites(code: string, ctx: TranslateCtx, paramNames: Set<string>, todos: string[]): string {
+  let out: string = '';
+  let i: number = 0;
+  let quote: string = '';
+  while (i < code.length) {
+    const ch: string = code[i];
+    if (quote) {
+      out += ch;
+      if (ch === '\\') out += code[++i] ?? '';
+      else if (ch === quote) quote = '';
+      i++;
+      continue;
+    }
+    if (ch === '"' || ch === "'" || ch === '`') {
+      quote = ch;
+      out += ch;
+      i++;
+      continue;
+    }
+    // `=` but not `==`, `===`, `=>`, `>=`, `!=` — an assignment, not a comparison.
+    const m: RegExpExecArray | null = /^this\.([A-Za-z_$][\w$]*)\s*(?<![!<>=])=(?![=>])\s*/.exec(code.slice(i));
+    if (m && ctx.fields.has(m[1]) && !/[\w$.]/.test(code[i - 1] ?? '')) {
+      const start: number = i + m[0].length;
+      const end: number = statementEnd(code, start);
+      if (paramNames.has(m[1])) todos.push(`\`${m[1]}\` is both a parameter and a signal here — rename one before this compiles`);
+      out += `${m[1]}.set(${code.slice(start, end).trim()})`;
+      i = end;
+      continue;
+    }
+    out += ch;
+    i++;
+  }
+  return out;
 }
 
 /** Run `fn` over the code parts of a snippet, never over its string literals. */
@@ -1139,13 +1492,15 @@ export function translateBody(body: string, ctx: TranslateCtx, params: string = 
         if (mapped) return `${mapped.call}${generic ?? ''}(`;
         todos.push(`\`${service}.${method}()\` has no recorded Weave equivalent — migrate ${service} first, then call it here`);
         return `${field}.${method}${generic ?? ''}(`;
-      })
-      // `this.x = <expr>;` → `x.set(<expr>);` — a field write becomes a signal write.
-      .replace(/\bthis\.([A-Za-z_$][\w$]*)\s*=(?!=)\s*([^;\n]+)/g, (full, name: string, rhs: string) => {
-        if (!ctx.fields.has(name)) return full; // an input or unknown target — left for the pass below
-        if (paramNames.has(name)) todos.push(`\`${name}\` is both a parameter and a signal here — rename one before this compiles`);
-        return `${name}.set(${rhs.trim()})`;
-      })
+      }),
+  );
+
+  // A field write is scanned, not matched — its right-hand side may contain string literals, which the
+  // split-on-quotes pass above cannot see across.
+  code = rewriteFieldWrites(code, ctx, paramNames, todos);
+
+  code = outsideStrings(code, (part) =>
+    part
       // `this.method(` → `method(`
       .replace(/\bthis\.([A-Za-z_$][\w$]*)\s*\(/g, (full, name: string) => (ctx.methods.has(name) ? `${name}(` : full))
       // remaining reads
@@ -1179,6 +1534,27 @@ export function serviceImportsFor(members: ClassMember[], inputs: string[]): str
   return [...needed.entries()].map(([from, calls]) => `import { ${[...calls].sort().join(', ')} } from '${from}';`);
 }
 
+/**
+ * A field becomes a signal — holding what it HELD. `signal<unknown>(undefined)` threw away both facts the
+ * declaration stated: `@Input`s had this fixed already, plain fields had not, so `count = 0` started life as
+ * `undefined` and every read of it was wrong from the first frame.
+ */
+export function signalDecl(mem: ClassMember, ctx: TranslateCtx): { code: string; todos: string[] } {
+  const init: string = (mem.initializer ?? '').trim();
+  // A field that was ALREADY an Angular signal is already the right call — `signal(0)` reads the same in Weave.
+  // Wrapping it would produce `signal<T>(signal(0))`, a signal of a signal.
+  if (mem.isSignal && init) {
+    const t: { code: string; todos: string[] } = translateBody(init, ctx);
+    return { code: t.code.trim(), todos: t.todos };
+  }
+  if (init) {
+    const t: { code: string; todos: string[] } = translateBody(init, ctx);
+    return { code: `signal${mem.type ? `<${mem.type}>` : ''}(${t.code.trim()})`, todos: t.todos };
+  }
+  // No initial value: it started `undefined`, and the declared type says what it will hold once set.
+  return { code: `signal<${mem.type ? `${mem.type} | undefined` : 'unknown'}>(undefined)`, todos: [] };
+}
+
 /** A getter is a derived value: `computed(() => …)`. A single `return x;` collapses to the expression form. */
 export function getterToComputed(body: string, ctx: TranslateCtx): { code: string; todos: string[] } {
   const t: { code: string; todos: string[] } = translateBody(body, ctx);
@@ -1210,10 +1586,14 @@ function draftMembers(members: ClassMember[], className: string, ctx?: Translate
 
   for (const mem of members) {
     if (mem.kind === 'constructor') {
-      if (!mem.body.trim()) continue;
+      // Even an EMPTY constructor is a declaration: `constructor(private router: Router) {}` is how the class
+      // states its dependencies. Skipping it on an empty body dropped that line from the output entirely.
+      if (!mem.body.trim() && !mem.params.trim()) continue;
       out.push('');
-      out.push(tsTodo(`the constructor ran this on creation — in a store the factory body IS the constructor,`));
-      out.push('//   so port it right here (an ongoing subscription becomes an `effect`/`watch`).');
+      if (mem.body.trim()) {
+        out.push(tsTodo(`the constructor ran this on creation — in a store the factory body IS the constructor,`));
+        out.push('//   so port it right here (an ongoing subscription becomes an `effect`/`watch`).');
+      }
       out.push(`// ── original ${className} constructor ──`);
       out.push(...commented(mem.text, ''));
       continue;
@@ -1232,7 +1612,9 @@ function draftMembers(members: ClassMember[], className: string, ctx?: Translate
       }
       const vis: string = mem.isPublic ? '' : ' // was private — a local, not returned';
       const note: string = mem.isSignal ? ' // already a signal in Angular — a 1:1 move' : '';
-      out.push(`const ${mem.name} = signal<unknown>(undefined);${vis}${note}`);
+      const decl: { code: string; todos: string[] } = signalDecl(mem, cx);
+      for (const t of decl.todos) out.push(tsTodo(t));
+      out.push(`const ${mem.name} = ${decl.code};${vis}${note}`);
       out.push(...commented(mem.text, '')); // the original declaration, verbatim — initial value and type included
       if (mem.isPublic) publicNames.push(mem.name);
       continue;

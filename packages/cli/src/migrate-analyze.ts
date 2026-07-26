@@ -436,6 +436,11 @@ export interface ComponentFact {
   members: ClassMember[];
   /** The class body verbatim — the reference for the "nothing was lost" check. */
   classBody: string;
+  /** The decorator's `host: { … }` map, as written. The other half of host bindings — see `objectStringMap`. */
+  hostMeta: Record<string, string>;
+  /** The decorator's `imports: [ … ]` entries (a standalone component's dependencies), as written. Each one is a
+   *  thing the template can use, so a converted template that still names it needs an answer for where it went. */
+  declaredImports: string[];
 }
 
 /** The name of a decorator, whether written `@Foo` or `@Foo(...)`. Null if it isn't a plain named decorator. */
@@ -490,6 +495,27 @@ function boolProp(obj: ts.ObjectLiteralExpression, key: string): boolean | null 
     }
   }
   return null;
+}
+
+/**
+ * The `host: { … }` map of a `@Component`/`@Directive`, key and value as written: `{'class': 'sps-logo',
+ * '[class.active]': 'isActive', '(click)': 'onClick()'}`. This is the decorator-object twin of `@HostBinding` /
+ * `@HostListener` — the same host element, declared a different way — and it used to be read past entirely, so a
+ * component whose class and click handler were declared here migrated to markup that did neither.
+ */
+function objectStringMap(obj: ts.ObjectLiteralExpression, key: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const p of obj.properties) {
+    if (!ts.isPropertyAssignment(p) || !p.name || !ts.isIdentifier(p.name) || p.name.text !== key) continue;
+    if (!ts.isObjectLiteralExpression(p.initializer)) continue;
+    for (const entry of p.initializer.properties) {
+      if (!ts.isPropertyAssignment(entry) || !entry.name) continue;
+      // A host key is nearly always quoted (`'[class.x]'` is not a valid identifier), but `class: 'x'` is legal too.
+      const k: string | null = ts.isStringLiteralLike(entry.name) ? entry.name.text : ts.isIdentifier(entry.name) ? entry.name.text : null;
+      if (k && ts.isStringLiteralLike(entry.initializer)) out[k] = entry.initializer.text;
+    }
+  }
+  return out;
 }
 
 /** Read a string-array property (`styleUrls: [...]`), or a single-string one (`styleUrl: '...'`). */
@@ -569,6 +595,8 @@ export function findComponents(filePath: string): ComponentFact[] {
           injects: classInjects(node),
           members: classMembers(node, sf),
           classBody: classBodyText(node, sf),
+          hostMeta: objectStringMap(cfg, 'host'),
+          declaredImports: identifierArrayProp(cfg, 'imports'),
         });
       }
     }
@@ -1023,6 +1051,8 @@ export interface DirectiveFact {
   inputs: string[];
   members: ClassMember[];
   classBody: string;
+  /** The decorator's `host: { … }` map — a directive is host bindings and little else. */
+  hostMeta: Record<string, string>;
 }
 
 /** Every `@Pipe` class in a file. */
@@ -1080,6 +1110,7 @@ export function findDirectives(filePath: string): DirectiveFact[] {
           inputs,
           members: classMembers(node, sf),
           classBody: classBodyText(node, sf),
+          hostMeta: cfg ? objectStringMap(cfg, 'host') : {},
         });
       }
     }
@@ -1130,12 +1161,16 @@ function identifierProp(obj: ts.ObjectLiteralExpression, key: string): string | 
   return null;
 }
 
-/** Identifier names inside an array-valued property (`canActivate: [A, B]` → `['A','B']`). */
+/**
+ * The entries of an array-valued property, AS WRITTEN (`canActivate: [A, B]`, `imports: [RouterModule]`). Kept as
+ * source text rather than identifiers only, so an entry that is a call (`SomeModule.forRoot()`) is still recorded
+ * — reading past it made the list quietly shorter than the one in the file.
+ */
 function identifierArrayProp(obj: ts.ObjectLiteralExpression, key: string): string[] {
   const out: string[] = [];
   for (const p of obj.properties) {
     if (ts.isPropertyAssignment(p) && p.name && ts.isIdentifier(p.name) && p.name.text === key && ts.isArrayLiteralExpression(p.initializer)) {
-      for (const el of p.initializer.elements) if (ts.isIdentifier(el)) out.push(el.text);
+      for (const el of p.initializer.elements) out.push(el.getText(el.getSourceFile()));
     }
   }
   return out;

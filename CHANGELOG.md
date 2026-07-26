@@ -38,6 +38,19 @@
   Weave equivalent is left in place with a `TODO(weave migrate)` comment instead of being guessed at, and a
   method's original body travels with it as comments beside the new signature rather than being discarded.
 
+  **The host element migrates too.** `@HostBinding`, `@HostListener` and the decorator's own `host: { … }` map all
+  describe the element Angular put the component's selector on; Weave has no such element, so they land on the
+  template's single root: `class.x` → `class:x`, `style.width.px` → `style:width` with the unit kept, `attr.role`
+  → the attribute, a bare target → the DOM property, and a listener → `on:`. A `window:`/`document:` listener is
+  not an element binding at all — it becomes an `onMount` subscription with its removal as the cleanup. When the
+  template has no single root there is no honest place for any of it, so the whole set is reported rather than
+  attached to an arbitrary element.
+
+  A field carries what it **held**: `count = 0` becomes `signal<number>(0)`, not `signal<unknown>(undefined)`. A
+  template reading it calls it, since `{{ label }}` in Weave renders the function rather than its value. And a
+  prop with a default is **not** optional in the `setup` signature — `propDefaults` guarantees it a value there;
+  optionality is for the parent, which is what `propDefaults` already states.
+
 ## 2.1.0 — 2026-07-24
 
 ### Added — UI

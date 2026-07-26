@@ -158,6 +158,10 @@ comment rather than guessed at.
 | Angular | → Weave |
 |---|---|
 | `@Component` | a `setup()` function + a sibling template |
+| `@Input() color: string = 'x'` | a typed prop + an entry in `export const propDefaults` |
+| a field, a getter, a method | `signal(<its initial value>)`, `computed(…)`, a function — bodies translated, `this.` and all |
+| `@HostBinding` / `@HostListener` / `host: { … }` | `class:` / `style:` / `on:` on the template's root element |
+| `@HostListener('window:…')` | an `onMount` subscription, with its removal as the cleanup |
 | `@Injectable({providedIn:'root'})` | `store()` |
 | `@Injectable()` (scoped) | `createContext` + `provide`/`inject` |
 | `@Pipe` | a plain function — `{{ x \| shorten }}` becomes `{{ shorten(x) }}` |
@@ -178,9 +182,11 @@ choose to attempt, and ones with no Weave role (`lodash`, `d3`) that you simply 
 
 Your own workspace libraries are noted as separate migrations rather than pulled in: run `weave migrate` on each.
 
-> **This is assisted, not automatic.** Method bodies are carried across as comments beside their new signatures,
-> not translated — the shape is mechanical, the logic is a judgement call. Read the plan, then work through the
-> TODOs.
+> **This is assisted, not automatic.** Method and getter bodies *are* translated — `this.x` is a rename with a
+> known target, not a judgement call — and the original travels beside the result as a comment so every rewrite
+> is checkable. What is left to you is what the tool genuinely cannot know: an unmapped service call, a `this.`
+> with no counterpart in the class, an RxJS chain whose intent only you can name. Each one is a
+> `TODO(weave migrate)` with the reason. Read the plan, then work through them.
 
 ## weave.config.ts
 

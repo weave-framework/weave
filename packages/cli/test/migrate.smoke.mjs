@@ -74,6 +74,29 @@ await esbuild({
 });
 const cv = await import(pathToFileURL(outC).href);
 
+// Bundle Weave's OWN compiler: a converted template has to be one Weave can actually compile. Every `html`
+// assertion below checks the shape of a string; only this checks the thing is usable.
+const outW = join(repo, 'node_modules', '.weave-migrate-compiler-smoke.mjs');
+await esbuild({
+  entryPoints: [join(repo, 'packages', 'compiler', 'src', 'index.ts')],
+  bundle: true,
+  format: 'esm',
+  platform: 'node',
+  packages: 'external',
+  outfile: outW,
+});
+const wc = await import(pathToFileURL(outW).href);
+/** Does Weave's compiler accept this converted template? Returns the error message, or '' when it compiles. */
+const compilesAsWeave = (html) => {
+  // A TODO comment is guidance for the reader, not markup — and an unresolved TODO is not a compiler error.
+  try {
+    wc.compileTemplate(html);
+    return '';
+  } catch (e) {
+    return String(e?.message ?? e);
+  }
+};
+
 // detectAngularAt — direct signals
 ok(m.detectAngularAt(join(fx, 'plain-angular')), 'detectAngularAt: a plain Angular app (angular.json + @angular/core) is detected');
 ok(!m.detectAngularAt(join(fx, 'not-angular')), 'detectAngularAt: a React folder is NOT detected');
@@ -534,6 +557,18 @@ const unresolved = cv.translateBody('return this.mystery;', tctx);
 ok(unresolved.todos.some((t) => t.includes('mystery')), 'translateBody: a `this.` with no counterpart is REPORTED, not silently renamed');
 const shadowed = cv.translateBody('this.count = count;', tctx, 'count: number');
 ok(shadowed.todos.some((t) => t.includes('parameter')), 'translateBody: a parameter colliding with a signal name is flagged');
+// A right-hand side containing STRING LITERALS. The old rule matched with a regex over text already split on
+// quotes, so it could not see past the first one: `this.x = on ? 'a' : 'b'` came out as `x.set(on ?)'a' : 'b'`.
+ok(cv.translateBody("this.count = on ? 'a' : 'b';", tctx).code === "count.set(on ? 'a' : 'b');", 'translateBody: a field write carries its WHOLE right-hand side, string literals and all');
+ok(cv.translateBody('this.count = { a: 1, b: [2, 3] };', tctx).code === 'count.set({ a: 1, b: [2, 3] });', 'translateBody: an object/array right-hand side is not cut at its first brace');
+ok(cv.translateBody('if (this.count === 1) { return; }', tctx).code === 'if (count() === 1) { return; }', 'translateBody: `===` is a comparison, never mistaken for an assignment');
+ok(cv.translateBody('const f = () => this.count;', tctx).code === 'const f = () => count();', 'translateBody: `=>` is not an assignment either');
+
+// A template reads a field bare in Angular; in Weave it must CALL the signal, or it renders the function itself.
+ok(cv.qualifySignalReads('label', ['label']) === 'label()', 'qualifySignalReads: a bare signal name is called');
+ok(cv.qualifySignalReads('label()', ['label']) === 'label()', 'qualifySignalReads: an already-called signal is not called twice');
+ok(cv.qualifySignalReads('x.label', ['label']) === 'x.label', 'qualifySignalReads: a property of something else is left alone');
+ok(cv.qualifySignalReads("'label'", ['label']) === "'label'", 'qualifySignalReads: a string literal is never rewritten');
 
 // A getter becomes a computed that DOES what it did.
 ok(cv.getterToComputed('return true;', tctx).code === 'computed(() => true)', 'getterToComputed: `return true` becomes computed(() => true), not computed(() => undefined)');
@@ -550,8 +585,11 @@ ok(typedFact.members.find((m) => m.name === 'color')?.type === 'string', "findCo
 ok(typedFact.members.find((m) => m.name === 'color')?.initializer === "'sps-default'", "findComponents: an @Input's DEFAULT is captured");
 
 const typedTs = cv.convertComponent(typedFact, '<b>{{ label }}</b>', {}).ts;
-ok(typedTs.includes('color?: string;') && typedTs.includes('enabled?: boolean;') && typedTs.includes('items?: string[];'), 'convertComponent: the props signature carries the declared types, not `unknown`');
-ok(typedTs.includes('required: number;') && !typedTs.includes('required?:'), 'convertComponent: an @Input with no default stays REQUIRED for the parent');
+ok(typedTs.includes('color: string;') && typedTs.includes('enabled: boolean;') && typedTs.includes('items: string[];'), 'convertComponent: the props signature carries the declared types, not `unknown`');
+// A defaulted prop is NOT optional inside setup — propDefaults guarantees it a value there. Marking it `?` forced
+// a null check on something that is never null, which the compile gate rejected.
+ok(!typedTs.includes('color?:'), 'convertComponent: a defaulted prop is not made optional in the signature — propDefaults is what makes it optional for the PARENT');
+ok(typedTs.includes('required: number;'), 'convertComponent: an @Input with no default keeps its declared type');
 ok(typedTs.includes('export const propDefaults = {') && typedTs.includes("color: 'sps-default',") && typedTs.includes('enabled: true,'), 'convertComponent: the declared defaults become propDefaults — Weave\'s own mechanism for exactly this');
 // Scoped to the propDefaults BLOCK: `label:` also appears in the props type below it, so a whole-file search
 // would pass no matter what the block contained.
@@ -564,6 +602,61 @@ ok(typedTs.includes("import { computed } from '@weave-framework/runtime';"), 'co
 // The whole-class guarantee still holds with accessors in play.
 const typedLost = typedFact.classBody.split('\n').map((l) => l.trim()).filter((l) => l && l !== '}' && l !== '{').filter((l) => !typedTs.includes(l));
 ok(typedLost.length === 0, `NOTHING IS LOST (accessors): every line survives (lost: ${typedLost.join(' | ') || 'none'})`);
+
+// ── the HOST element: @HostBinding / @HostListener / host: { … } ──
+// A @HostBinding getter became a `computed` that NOTHING READ, so `class.sps-logo` — always applied in Angular —
+// became a class that is never applied. The computed was right and the component was still broken.
+const hostFact = a.findComponents(join(comps, 'host.component.ts'))[0];
+ok(hostFact.hostMeta.class === 'sps-block', 'findComponents: the decorator\'s `host: { class: … }` is read (it used to be read past entirely)');
+ok(hostFact.hostMeta['(mouseenter)'] === 'hover(true)', 'findComponents: a host listener declared in `host: {}` is read');
+ok(hostFact.declaredImports.includes('RouterModule'), 'findComponents: the decorator\'s `imports: []` is recorded');
+ok(hostFact.members.find((mem) => mem.name === 'classSpsLogo')?.decorators.some((d) => d.includes('HostBinding')), 'classMembers: a member\'s @HostBinding decorator is captured');
+
+const hostPair = cv.convertComponent(hostFact, '<div class="wrap"><span>{{ label }}</span></div>', {});
+ok(hostPair.html.includes('class:sps-logo={{ classSpsLogo() }}'), 'host: @HostBinding(class.x) becomes a class: on the root element — the computed is now READ');
+ok(hostPair.html.includes('class:cursor-pointer={{ classCursorPointer() }}'), 'host: every class binding lands, not just the first');
+ok(hostPair.html.includes("style:width={{ (widthPx()) + 'px' }}"), 'host: `style.width.px` keeps the UNIT — without it the value is not a length and does nothing');
+ok(hostPair.html.includes('aria-label={{ label() }}'), 'host: @HostBinding on a FIELD reads that field\'s signal');
+ok(hostPair.html.includes('role={{ props.role }}'), 'host: a `host: {}` binding resolves against the class — an @Input reads off props');
+ok(hostPair.html.includes('on:click={{ ($event) => onClick() }}'), 'host: @HostListener becomes an on: handler on the root — it used to be a function nothing called');
+ok(hostPair.html.includes('on:mouseenter={{ ($event) => hover(true) }}'), 'host: a listener declared in `host: {}` is wired too');
+// The static class MERGES: a second `class=` attribute on one element is not additive, it is a bug.
+ok(hostPair.html.includes('class="sps-block wrap"'), 'host: a static host class merges into the root\'s own class attribute');
+ok((hostPair.html.match(/\sclass="/g) ?? []).length === 1, 'host: exactly ONE class attribute on the root — never a duplicate that silently wins');
+// window:/document: is a subscription, not an element binding — and it must be UNsubscribed.
+ok(!hostPair.html.includes('resize'), 'host: a window: listener is NOT put on the element (it would listen to the wrong thing)');
+ok(hostPair.ts.includes("window.addEventListener('resize'") && hostPair.ts.includes("window.removeEventListener('resize'"), 'host: a window: listener becomes an onMount subscription WITH its cleanup');
+ok(hostPair.ts.includes('onMount') && /import \{[^}]*onMount[^}]*\} from '@weave-framework\/runtime'/.test(hostPair.ts), 'host: onMount is imported when the subscription needs it');
+// No single root: there is no honest place for host bindings, so it is REPORTED, never dropped.
+const multiRoot = cv.convertComponent(hostFact, '<b>one</b><i>two</i>', {});
+ok(multiRoot.html.includes('TODO(weave migrate)') && multiRoot.html.includes('root elements'), 'host: with no single root element the bindings are reported in full, not silently dropped');
+ok(!/<[bi][ >][^>]*class:sps-logo/.test(multiRoot.html), 'host: nothing is attached to an arbitrary element when there is no single root');
+// A field holds what it HELD.
+ok(hostPair.ts.includes("const label = signal<string>('the logo');"), 'signalDecl: a field keeps its declared type AND its initial value — signal<unknown>(undefined) was wrong from the first frame');
+ok(hostPair.ts.includes('const lastSeen = signal<Date | undefined>(undefined);'), 'signalDecl: an uninitialised field is a signal of `T | undefined`, and `lastSeen: Date` is STATE, not an injected service');
+ok(hostPair.ts.includes('const hasRoute = computed(() => props.routerLink.length > 0);'), 'host: the getter behind a host binding is translated, not stubbed');
+// Scoped to the SPAN: `aria-label={{ label() }}` from the host binding also contains that text, so a whole-file
+// search passed with the template rule switched off entirely.
+ok(hostPair.html.includes('<span>{{ label() }}</span>'), 'convertComponent: a template reading a FIELD calls its signal — `{{ label }}` would render the function');
+// A drafted block is multi-line; prefixing the ENTRY only indented its first line, so bodies hung outside setup().
+ok(hostPair.ts.includes('\n      navigate(props.routerLink);'), 'convertComponent: every line of a multi-line draft is indented inside setup(), not just its first');
+const hostLost = hostFact.classBody.split('\n').map((l) => l.trim()).filter((l) => l && l !== '}' && l !== '{').filter((l) => !hostPair.ts.includes(l));
+ok(hostLost.length === 0, `NOTHING IS LOST (host): every line survives (lost: ${hostLost.join(' | ') || 'none'})`);
+
+// The decisive gate for the TEMPLATE half: Weave's own compiler has to accept what the converter emits. The
+// detector is checked against known-bad markup first, so a gate that can never fail is not mistaken for a pass.
+ok(compilesAsWeave('@if (a) { <b>x</b>') !== '', 'the template compile gate really detects a broken template (an unclosed block)');
+for (const [name, html] of [['host', hostPair.html], ['multi-root', multiRoot.html], ['task-card', pair.html]]) {
+  const err = compilesAsWeave(html);
+  ok(err === '', `the converted ${name} template COMPILES with Weave's own compiler${err ? ` — ${err}` : ''}`);
+}
+
+// The decorator-call reader, on its own.
+ok(cv.decoratorArgs("@HostListener('click', ['$event'])", 'HostListener').length === 2, 'decoratorArgs: the argument list is split on TOP-LEVEL commas only (the array stays one argument)');
+ok(cv.decoratorArgs('@HostBinding', 'HostBinding').length === 0, 'decoratorArgs: a bare decorator yields an empty list, not null');
+ok(cv.decoratorArgs('@Input()', 'HostBinding') === null, 'decoratorArgs: a different decorator is not mistaken for this one');
+ok(cv.hostTargetToAttr('attr.role', 'x()') === 'role={{ x() }}', 'hostTargetToAttr: attr.* is a plain attribute');
+ok(cv.hostTargetToAttr('disabled', 'x()') === '.disabled={{ x() }}', 'hostTargetToAttr: a bare target is a DOM PROPERTY, not an attribute');
 
 // signal-input defaults live inside the call
 ok(cv.signalInputDefault({ initializer: "input('')" }) === "''", 'signalInputDefault: input(x) defaults to x');
@@ -582,7 +675,7 @@ const rootSvc = {
 const rootDraft = cv.convertService(rootSvc);
 ok(rootDraft.ts.includes("import { store } from '@weave-framework/store'"), 'convertService: a root service imports store');
 ok(rootDraft.ts.includes('export const useUser = store(() => {'), 'convertService: providedIn:root → a store() with a useX hook');
-ok(rootDraft.ts.includes('const user = signal<unknown>(undefined);') && rootDraft.ts.includes('1:1 move'), 'convertService: a field that was already a signal is a 1:1 move');
+ok(rootDraft.ts.includes('const user = signal(null);') && rootDraft.ts.includes('1:1 move'), 'convertService: a field that was already a signal is a 1:1 move — its initial value included, not re-wrapped');
 ok(rootDraft.ts.includes('const logout = (): void => {'), 'convertService: a method becomes a function');
 
 // A method's SIGNATURE and its ORIGINAL BODY are carried across. Both used to be dropped: the draft emitted an
@@ -914,6 +1007,9 @@ try {
   writeFileSync(join(genDir, 'http.ts'), httpTs);
   writeFileSync(join(genDir, 'pipe.ts'), pipeTs);
   writeFileSync(join(genDir, 'contexts.ts'), tokTs);
+  // The host component: the widest component draft there is — typed props with defaults, translated getters, a
+  // field signal that carries its initial value, and an onMount subscription with its cleanup.
+  writeFileSync(join(genDir, 'host.ts'), hostPair.ts);
   writeFileSync(
     join(genDir, 'tsconfig.json'),
     JSON.stringify({
