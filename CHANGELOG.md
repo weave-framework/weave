@@ -56,6 +56,11 @@
   code naming a class that does not come across; and a dependency declared as a **constructor parameter** was
   never declared at all, so every call through it named nothing.
 
+  **A big unit migrates a section at a time.** Past about twenty files the write prompt offers the top-level
+  folders as sections rather than one list nobody reads. The mapping spans the whole unit either way — section
+  two knows what section one renamed — and what a chosen section needs from one left behind is named outright,
+  because otherwise the code lands not resolving and the reason was a decision made three prompts earlier.
+
   **The output is verified as a WHOLE, before a byte is written.** Every other check in the tool looks at one
   declaration at a time — the converter walks components, then services, then pipes, each in isolation, and the
   writer puts bytes on disk. Nothing ever looked at the result. So a rename that landed in one file and not in

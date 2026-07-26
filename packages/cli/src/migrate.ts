@@ -18,16 +18,22 @@ import { assembleFacts, mergeFacts, outOfReach, writeFacts, type Coverage, type 
 import {
   applyWrites,
   carriedPackages,
+  danglingAcrossSections,
   detectPackageManager,
   installCommand,
   installedWeavePackages,
   planWrites,
   requiredWeavePackages,
+  sections,
+  symbolTable,
   type WriteItem,
 } from './migrate-convert.js';
 import { planItems, renderPlan, writePlan, type PlanItem } from './migrate-plan.js';
 import { collisions, hasInstalledDeps, verifyOutput, type OutputProblem } from './migrate-verify.js';
 import { c, inputManager, type InputManager } from './migrate-ui.js';
+
+/** Below this many files a section prompt is noise: you can read the list. Above it, the list IS the problem. */
+const SECTION_PROMPT_AT: number = 20;
 
 /* ──────────── detection: is there an Angular app here, and where? (Angular-specific — a React module replaces this) ──────────── */
 
@@ -521,8 +527,34 @@ async function convertStep(io: InputManager, facts: MigrationFacts, targetDir: s
     console.log(c.dim('\nNothing to convert yet — no components were found in this unit.'));
     return;
   }
-  const fresh: WriteItem[] = items.filter((i) => i.status === 'write');
+  let fresh: WriteItem[] = items.filter((i) => i.status === 'write');
   const blocked: WriteItem[] = items.filter((i) => i.status === 'skip-exists');
+
+  // SECTIONS. A big unit is not migrated in one sitting, and a list of two hundred files is not a thing anyone
+  // reviews. The mapping spans the whole unit either way, so section two knows what section one renamed — but
+  // what a chosen section NEEDS from one left behind has to be said, or the code lands not resolving and the
+  // reason was a decision made three prompts earlier.
+  const groups: Array<{ name: string; paths: string[] }> = sections(fresh.map((i) => i.path), join(targetDir, 'src'));
+  if (groups.length > 1 && fresh.length > SECTION_PROMPT_AT) {
+    console.log(`\n${c.bold(`${fresh.length} files across ${groups.length} sections.`)}${c.dim(' Migrate all of it, or a section at a time:')}`);
+    const labels: string[] = groups.map((g) => `${g.name}  ${c.dim(`(${g.paths.length} file(s))`)}`);
+    const picked: boolean[] = await io.multiSelect('Which sections?', labels, groups.map(() => true));
+    const keep: Set<string> = new Set<string>(groups.filter((_, i) => picked[i]).flatMap((g) => g.paths));
+    if (!keep.size) {
+      console.log(c.dim('\nNo sections chosen. Nothing written.'));
+      return;
+    }
+    fresh = fresh.filter((i) => keep.has(i.path));
+    const dangling: Array<{ file: string; needs: string; from: string }> = danglingAcrossSections(fresh, symbolTable(facts, targetDir));
+    if (dangling.length) {
+      console.log(`\n${c.yellow('What you chose depends on what you did not:')}`);
+      for (const d of dangling.slice(0, 8)) {
+        console.log(`  ${c.yellow('•')} ${relative(targetDir, d.file)} ${c.dim('needs')} ${c.bold(d.needs)} ${c.dim(`from ${relative(targetDir, d.from)}`)}`);
+      }
+      if (dangling.length > 8) console.log(c.dim(`  … and ${dangling.length - 8} more`));
+      console.log(c.dim('  Those imports will not resolve until you run the remaining sections. Nothing is lost — run again.'));
+    }
+  }
 
   console.log(`\n${c.bold('Convert now?')} ${c.dim(`This would create ${fresh.length} file(s) under`)} ${c.bold(join(targetDir, 'src'))}${c.dim(':')}`);
   for (const i of fresh.slice(0, 10)) console.log(`  ${c.green('+')} ${relative(targetDir, i.path)}`);
@@ -547,8 +579,11 @@ async function convertStep(io: InputManager, facts: MigrationFacts, targetDir: s
     console.log(`\n${c.bold('Your converted code still imports these — they stay dependencies of your app:')}`);
     for (const name of carried) {
       const plan: PackagePlan | undefined = facts.packages.find((p) => p.name === name);
-      const note: string =
-        plan?.decision === 'auto'
+      // An `@angular/*` package in the OUTPUT means something was carried, not converted — saying "no Weave
+      // role, kept as-is" about the framework being migrated away from reads as if that were the plan.
+      const note: string = name.startsWith('@angular')
+        ? c.yellow('still Angular — this comes from a file that was CARRIED, not converted')
+        : plan?.decision === 'auto'
           ? c.yellow('Weave replaces this — what is left is what could not be translated without guessing')
           : c.dim(plan?.note ?? 'no Weave role — kept as-is');
       console.log(`  ${c.yellow('•')} ${c.bold(name)} ${c.dim('—')} ${note}`);

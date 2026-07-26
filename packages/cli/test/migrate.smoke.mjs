@@ -894,6 +894,21 @@ ok(cv.pruneImports(["import { a } from 'x';"], 'const q = a;').length === 1, 'pr
 ok(cv.pruneImports(["import { a } from 'x';"], '// const q = a;').length === 0, 'pruneImports: a name only in a comment does not keep its import');
 ok(cv.pruneImports(["import './side-effect.css';"], '').length === 1, 'pruneImports: a side-effect import is kept — it is there for what it DOES, not for a name');
 
+// ── SECTIONS: a big unit is not migrated in one sitting ──
+// A list of two hundred files is not a thing anyone reviews. The table spans the WHOLE unit either way, so
+// section two knows what section one renamed — but what a chosen section NEEDS from one left behind has to be
+// said, or the code lands not resolving and the reason was a decision made three prompts earlier.
+const secRoot = join('t', 'src');
+const secs = cv.sections([join(secRoot, 'app', 'a.ts'), join(secRoot, 'app', 'b.ts'), join(secRoot, 'shared', 'c.ts'), join(secRoot, 'main.ts')], secRoot);
+ok(secs.length === 3, `sections: grouped by the top-level folder under src (got ${secs.map((s) => s.name).join(', ')})`);
+ok(secs.find((s) => s.name === 'app')?.paths.length === 2, 'sections: every file lands in exactly one section');
+ok(secs.some((s) => s.name === '(root)'), 'sections: a file directly under src is its own group, not silently dropped');
+const secTable = new Map([['UserService', { from: 'UserService', to: 'useUser', isDefault: false, file: join(secRoot, 'shared', 'user.ts'), kind: 'service' }]]);
+const chosen = [{ path: join(secRoot, 'app', 'a.ts'), content: "import { useUser } from '../shared/user';\nconst u = useUser();" }];
+const dang = cv.danglingAcrossSections(chosen, secTable);
+ok(dang.length === 1 && dang[0].needs === 'useUser', 'danglingAcrossSections: what a chosen file needs from a section left behind is named');
+ok(cv.danglingAcrossSections([...chosen, { path: join(secRoot, 'shared', 'user.ts'), content: 'export const useUser = () => 1;' }], secTable).length === 0, 'danglingAcrossSections: once the section it needs is chosen too, there is nothing to say');
+
 // ── VERIFY THE ASSEMBLED OUTPUT: does what we are about to write hold together? ──
 // Every other check looks at one declaration at a time. This type-checks the planned files as ONE program, so a
 // rename that landed in one file and not in its importer is a line on screen instead of something found later.

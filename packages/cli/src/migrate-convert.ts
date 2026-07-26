@@ -17,7 +17,7 @@ import { resolveImports, type WeaveSymbol } from './migrate-symbols.js';
 
 // Re-exported so the symbol model has ONE entry point: `symbolTable` is built here, and what it says about
 // collisions belongs beside it rather than a module away.
-export { resolveImports, symbolCollisions, type WeaveSymbol } from './migrate-symbols.js';
+export { danglingAcrossSections, resolveImports, sections, symbolCollisions, type WeaveSymbol } from './migrate-symbols.js';
 import {
   importedNamesFrom,
   sourceImports,

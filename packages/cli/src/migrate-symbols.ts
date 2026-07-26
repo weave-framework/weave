@@ -124,6 +124,48 @@ export function resolveImports(content: string, file: string, table: Map<string,
 }
 
 /**
+ * Split a plan into SECTIONS — the top-level folders under `src/`. A big unit is not migrated in one sitting,
+ * and a list of two hundred files is not a thing anyone reviews; a handful of named groups is.
+ *
+ * The table spans the WHOLE unit regardless of what is written, which is what keeps sections consistent: section
+ * two knows what section one renamed, whether or not section one has been written yet.
+ */
+export function sections(paths: string[], srcRoot: string): Array<{ name: string; paths: string[] }> {
+  const groups: Map<string, string[]> = new Map<string, string[]>();
+  for (const p of paths) {
+    const rel: string = relative(srcRoot, p).replace(/\\/g, '/');
+    const first: string = rel.includes('/') ? rel.slice(0, rel.indexOf('/')) : '(root)';
+    if (!groups.has(first)) groups.set(first, []);
+    groups.get(first)?.push(p);
+  }
+  return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([name, ps]) => ({ name, paths: ps }));
+}
+
+/**
+ * What a chosen set of files needs from files NOT chosen. Writing one section at a time is fine; writing one and
+ * being told nothing about the half of it that lives next door is not — the code would land not resolving, and
+ * the reason would be a decision the user made three prompts earlier.
+ */
+export function danglingAcrossSections(
+  chosen: Array<{ path: string; content: string }>,
+  table: Map<string, WeaveSymbol>,
+): Array<{ file: string; needs: string; from: string }> {
+  const written: Set<string> = new Set<string>(chosen.map((c) => c.path));
+  const out: Array<{ file: string; needs: string; from: string }> = [];
+  for (const item of chosen) {
+    if (!/\.tsx?$/.test(item.path)) continue;
+    for (const imp of parseImports(item.content)) {
+      for (const b of imp.named) {
+        const sym: WeaveSymbol | undefined = table.get(b.name) ?? [...table.values()].find((s) => s.to === b.name);
+        if (!sym || written.has(sym.file) || sym.file === item.path) continue;
+        out.push({ file: item.path, needs: sym.to, from: sym.file });
+      }
+    }
+  }
+  return out;
+}
+
+/**
  * Two source declarations that would land on the same exported name in the same file. `applyWrites` cannot see
  * it and the compiler would only say "duplicate identifier" after the fact — this says which two, by source
  * name, before anything is written.

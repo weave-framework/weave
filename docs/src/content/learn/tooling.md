@@ -150,6 +150,18 @@ longer exists.
 It models **structure**, not intent: it knows `ShortenPipe` is now the function `shorten`; it does not know what
 an `Observable` in that file ought to become, and does not pretend to.
 
+### Big units migrate a section at a time
+
+Past about twenty files it stops handing you one list and offers the top-level folders as **sections**, so you
+can take `shared/` first and `features/` next week. The mapping still spans the whole unit — section two knows
+what section one renamed — and what a chosen section needs from one you left behind is named outright:
+
+~~~text
+What you chose depends on what you did not:
+  • src/app/header.ts needs useUser from src/shared/user.ts
+  Those imports will not resolve until you run the remaining sections. Nothing is lost — run again.
+~~~
+
 ### It checks the result before writing it
 
 Converting happens one declaration at a time, so nothing in that pipeline can see whether the *result* holds
