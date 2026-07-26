@@ -14,7 +14,7 @@
  */
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
-import { assembleFacts, writeFacts, type MigrationFacts, type PackagePlan } from './migrate-analyze.js';
+import { assembleFacts, writeFacts, type Coverage, type MigrationFacts, type PackagePlan } from './migrate-analyze.js';
 import { applyWrites, planWrites, type WriteItem } from './migrate-convert.js';
 import { planItems, renderPlan, writePlan, type PlanItem } from './migrate-plan.js';
 import { c, inputManager, type InputManager } from './migrate-ui.js';
@@ -331,6 +331,22 @@ export async function runMigrate(): Promise<void> {
     if (dynamicCalls) console.log(`  ${c.yellow('⚠')} ${c.yellow(`${dynamicCalls} call(s) through an unknown type — human, look`)}`);
     if (facts.cycles.length) console.log(`  ${c.yellow('⚠')} ${c.yellow(`${facts.cycles.length} circular-dependency chain(s) — will be flagged for you`)}`);
     if (facts.unresolved.length) console.log(`  ${c.red('⚠')} ${c.red(`${facts.unresolved.length} import(s) couldn't be resolved — human, look`)}`);
+
+    // 3b) COVERAGE — what this tool does NOT convert, stated before anything is written. Printed unconditionally,
+    //     because every gap found so far was found by a human asking, not by the tool admitting it.
+    const cov: Coverage = facts.coverage;
+    const pct: number = cov.total ? Math.round((cov.handled / cov.total) * 100) : 0;
+    console.log(`\n${c.bold('Converted by this tool:')} ${c.bold(`${cov.handled}/${cov.total}`)} ${c.dim('declarations')} (${pct}%)`);
+    if (cov.gaps.length) {
+      console.log(c.yellow('NOT converted — you port these by hand:'));
+      for (const g of cov.gaps) {
+        console.log(`  ${c.yellow('•')} ${c.bold(String(g.count))} ${g.kind}${g.count > 1 ? 's' : ''}: ${c.dim(list(g.names, 5))}`);
+        console.log(`    ${c.dim(g.note)}`);
+      }
+    }
+    if (cov.emptyFiles.length) {
+      console.log(`  ${c.yellow('⚠')} ${c.yellow(`${cov.emptyFiles.length} file(s) produce NOTHING`)}${c.dim(': ')}${c.dim(list(cov.emptyFiles.map((f) => f.split(/[\\/]/).pop() ?? f), 5))}`);
+    }
 
     // 4) decide what to try migrating (M2.8). auto/try → a checkbox you confirm; keep → shown, never a checkbox.
     const attempt: string[] = await choosePackages(io, facts.packages);

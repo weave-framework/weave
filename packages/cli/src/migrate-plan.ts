@@ -18,6 +18,7 @@ import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type {
   BranchFact,
+  Coverage,
   ComponentFact,
   FormFact,
   MigrationFacts,
@@ -222,7 +223,29 @@ export function renderPlan(facts: MigrationFacts): string {
       "everything the tool could **not** see. Raw measurements live in `.weave-migrate/facts.json`.\n",
   );
 
-  out.push('## Summary\n');
+  // Coverage comes FIRST, before any encouraging counts. Every gap in this tool so far was found by a person
+  // asking "are we done?", never by the tool volunteering it — so it now volunteers it, at the top.
+  const cov: Coverage = facts.coverage ?? { total: 0, handled: 0, gaps: [], emptyFiles: [] };
+  const pct: number = cov.total ? Math.round((cov.handled / cov.total) * 100) : 0;
+  out.push('## What this tool converts — and what it does not\n');
+  out.push(`It converts **${cov.handled} of ${cov.total}** top-level declarations (**${pct}%**). The rest is listed here so nothing is a surprise later.\n`);
+  if (cov.gaps.length) {
+    out.push(
+      table(
+        ['Not converted', 'Count', 'What to do'],
+        cov.gaps.map((g) => [cell(g.kind), String(g.count), cell(`${g.note} — ${g.names.slice(0, 6).join(', ')}${g.names.length > 6 ? ', …' : ''}`)]),
+      ),
+    );
+  } else {
+    out.push('_Everything found is converted._\n');
+  }
+  if (cov.emptyFiles.length) {
+    out.push(`\n**${cov.emptyFiles.length} file(s) produce no output at all** — port these by hand:\n`);
+    for (const f of cov.emptyFiles) out.push(`- \`${f}\``);
+    out.push('');
+  }
+
+  out.push('\n## Summary\n');
   out.push(
     table(
       ['What', 'Count'],

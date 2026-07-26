@@ -622,6 +622,29 @@ ok(cmpDraft.includes('became props'), 'convertComponent: the fields that turned 
 // Angular lifecycle hooks are named, not left as anonymous methods.
 ok(fullDraft.includes('lifecycle hook') && fullDraft.includes('onDispose'), 'convertService: ngOnDestroy is identified as a lifecycle hook with its Weave equivalent');
 
+// ── COVERAGE: the tool must measure itself against the SOURCE, not against its own feature list. ──
+// Every gap so far was found by a person asking "are we done?", never by the tool admitting it. These checks
+// make silence impossible: anything the converter does not emit has to show up as a counted, explained gap.
+const inv = a.inventory([join(comps, 'decorator.component.ts'), join(svcs, 'api.service.ts'), join(fx, 'forms', 'grouped.ts')]);
+ok(inv.some((d) => d.kind === 'component' && d.handled), 'inventory: a @Component is listed as handled');
+ok(inv.some((d) => d.kind === 'service' && d.handled), 'inventory: an @Injectable is listed as handled');
+ok(inv.some((d) => d.kind === 'const' && !d.handled), 'inventory: a plain const is listed as NOT handled (it used to be invisible)');
+ok(inv.filter((d) => !d.handled).every((d) => d.note.trim().length > 0), 'inventory: every unhandled declaration says WHY — silence is what hid these gaps');
+
+const cov = a.coverage(inv);
+ok(cov.total === inv.length && cov.handled < cov.total, `coverage: reports a real fraction, not 100% (got ${cov.handled}/${cov.total})`);
+ok(cov.gaps.length > 0 && cov.gaps.every((g) => g.count > 0 && g.names.length > 0), 'coverage: each gap is counted AND names the declarations');
+ok(cov.emptyFiles.some((ff) => ff.endsWith('grouped.ts')), 'coverage: a file that produces no output at all is called out by name');
+
+// The anti-lie check: anything marked `handled` must actually produce a written file. A kind can only be added
+// to HANDLED_KINDS once the writer really emits for it — otherwise coverage would over-report.
+const covFacts = a.assembleFacts(shop);
+const writtenFiles = new Set(cv.planWrites(covFacts, '/tmp/cov').map((w) => w.path));
+const handledDecls = covFacts.inventory.filter((d) => d.handled);
+ok(handledDecls.length > 0 && writtenFiles.size > 0, 'coverage: the fixture has handled declarations and produced writes');
+const claimedButUnwritten = handledDecls.filter((d) => ![...writtenFiles].some((w) => w.includes(d.file.split(/[\\/]/).pop().replace(/\.component\.ts$|\.service\.ts$|\.ts$/, ''))));
+ok(claimedButUnwritten.length === 0, `coverage does not LIE: every declaration marked handled really produces output (claimed-but-unwritten: ${claimedButUnwritten.map((d) => d.name).join(', ') || 'none'})`);
+
 // The decisive gate for a code GENERATOR: does what it emits actually COMPILE against the real Weave packages?
 // Every assertion above checks the shape of a string; this one checks the thing is usable. It type-checks both
 // drafts (store + context) with strict TS, resolving @weave-framework/* to the workspace sources.

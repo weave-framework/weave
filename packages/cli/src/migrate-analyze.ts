@@ -1219,6 +1219,150 @@ export function analyzeBranches(files: string[]): BranchFact[] {
   return files.flatMap((f) => findBranches(f));
 }
 
+/* ──────────── COVERAGE — what is in the source, and what this tool actually does with it ──────────── */
+
+/**
+ * Every kind of top-level declaration a migration can meet. The point of naming them all is that the tool can
+ * then report what it does NOT handle, instead of quietly producing nothing for it.
+ */
+export type DeclKind =
+  | 'component'
+  | 'service'
+  | 'pipe'
+  | 'directive'
+  | 'ngmodule'
+  | 'class'
+  | 'function'
+  | 'const'
+  | 'interface'
+  | 'type'
+  | 'enum'
+  | 'reexport';
+
+/** One declaration found in the source, and whether the pipeline produces anything for it. */
+export interface Decl {
+  file: string;
+  name: string;
+  kind: DeclKind;
+  exported: boolean;
+  /** True when the converter emits output for this declaration today. */
+  handled: boolean;
+  /** For an unhandled declaration: what would have to happen. Never blank — silence is what caused this. */
+  note: string;
+}
+
+/** What the converter can currently emit. Everything else is reported as a gap, by construction. */
+const HANDLED_KINDS: Set<DeclKind> = new Set<DeclKind>(['component', 'service']);
+
+/** Why a given kind is not handled yet — written once, so the report is specific rather than a shrug. */
+const UNHANDLED_NOTES: Record<string, string> = {
+  pipe: 'an Angular @Pipe class — in Weave a pipe is just a function (or a `computed`); the class is not converted yet',
+  directive: 'an Angular @Directive — the Weave equivalent is a `use:` action; not converted yet',
+  ngmodule: 'an @NgModule — Weave has no modules (imports are per-file); its declarations/providers are not read yet',
+  class: 'a plain class (a resolver, a model, a helper) — copied nowhere yet; most are valid TypeScript already',
+  function: 'a plain exported function — usually valid TypeScript as-is, but nothing is written for it yet',
+  const: 'a plain exported constant — usually valid as-is, but nothing is written for it yet',
+  interface: 'a TypeScript interface — valid as-is, but nothing is written for it yet',
+  type: 'a TypeScript type alias — valid as-is, but nothing is written for it yet',
+  enum: 'a TypeScript enum — valid as-is, but nothing is written for it yet',
+  reexport: 'a re-export (a barrel like index.ts) — the public entry consumers import; not written yet',
+};
+
+/** The decorator kind on a class, if any: `@Component` / `@Injectable` / `@Pipe` / `@Directive` / `@NgModule`. */
+function decoratedAs(node: ts.ClassDeclaration): DeclKind | null {
+  for (const d of decoratorsOf(node)) {
+    switch (decoratorName(d)) {
+      case 'Component':
+        return 'component';
+      case 'Injectable':
+        return 'service';
+      case 'Pipe':
+        return 'pipe';
+      case 'Directive':
+        return 'directive';
+      case 'NgModule':
+        return 'ngmodule';
+      default:
+        break;
+    }
+  }
+  return null;
+}
+
+/** Is this statement exported? */
+function isExported(node: ts.Node): boolean {
+  const mods: readonly ts.ModifierLike[] = ts.canHaveModifiers(node) ? (ts.getModifiers(node) ?? []) : [];
+  return mods.some((m) => m.kind === ts.SyntaxKind.ExportKeyword);
+}
+
+/**
+ * List EVERY top-level declaration across the walked files, each marked handled or not.
+ *
+ * This exists because of a real failure: each milestone was gated on "does what I built work?", never on "is
+ * anything left unhandled?" — so the pipeline looked finished while whole files (a barrel, a resolver, a helper
+ * module, an NgModule) produced no output at all, silently. Coverage has to be measured against the SOURCE, not
+ * against the feature list.
+ */
+export function inventory(files: string[]): Decl[] {
+  const out: Decl[] = [];
+  for (const file of files) {
+    const sf: ts.SourceFile | null = parseFile(file);
+    if (!sf) continue;
+    for (const stmt of sf.statements) {
+      const add = (name: string, kind: DeclKind): void => {
+        out.push({
+          file,
+          name,
+          kind,
+          exported: isExported(stmt),
+          handled: HANDLED_KINDS.has(kind),
+          note: HANDLED_KINDS.has(kind) ? '' : (UNHANDLED_NOTES[kind] ?? 'not handled yet'),
+        });
+      };
+      if (ts.isClassDeclaration(stmt)) add(stmt.name?.text ?? '(anonymous class)', decoratedAs(stmt) ?? 'class');
+      else if (ts.isFunctionDeclaration(stmt)) add(stmt.name?.text ?? '(anonymous function)', 'function');
+      else if (ts.isInterfaceDeclaration(stmt)) add(stmt.name.text, 'interface');
+      else if (ts.isTypeAliasDeclaration(stmt)) add(stmt.name.text, 'type');
+      else if (ts.isEnumDeclaration(stmt)) add(stmt.name.text, 'enum');
+      else if (ts.isVariableStatement(stmt)) {
+        for (const d of stmt.declarationList.declarations) if (ts.isIdentifier(d.name)) add(d.name.text, 'const');
+      } else if (ts.isExportDeclaration(stmt)) {
+        add(stmt.moduleSpecifier && ts.isStringLiteral(stmt.moduleSpecifier) ? stmt.moduleSpecifier.text : '(re-export)', 'reexport');
+      }
+    }
+  }
+  return out;
+}
+
+/** The coverage headline: how much of what was found is actually converted. */
+export interface Coverage {
+  total: number;
+  handled: number;
+  /** Unhandled declarations grouped by kind, most numerous first. */
+  gaps: Array<{ kind: DeclKind; count: number; note: string; names: string[] }>;
+  /** Files that contribute NOTHING to the output — the loudest signal that something is missing. */
+  emptyFiles: string[];
+}
+
+/** Summarise an inventory into the coverage report the command and the plan both print. */
+export function coverage(decls: Decl[]): Coverage {
+  const byKind: Map<DeclKind, { count: number; note: string; names: string[] }> = new Map();
+  const perFile: Map<string, { total: number; handled: number }> = new Map();
+  for (const d of decls) {
+    const f: { total: number; handled: number } = perFile.get(d.file) ?? { total: 0, handled: 0 };
+    perFile.set(d.file, { total: f.total + 1, handled: f.handled + (d.handled ? 1 : 0) });
+    if (d.handled) continue;
+    const e: { count: number; note: string; names: string[] } = byKind.get(d.kind) ?? { count: 0, note: d.note, names: [] };
+    byKind.set(d.kind, { count: e.count + 1, note: e.note, names: [...e.names, d.name] });
+  }
+  return {
+    total: decls.length,
+    handled: decls.filter((d) => d.handled).length,
+    gaps: [...byKind.entries()].map(([kind, v]) => ({ kind, ...v })).sort((a, b) => b.count - a.count),
+    emptyFiles: [...perFile.entries()].filter(([, v]) => v.handled === 0).map(([f]) => f),
+  };
+}
+
 /* ──────────── M2.8 (map half) + M2.11 — the package-usage map, and the whole facts map ──────────── */
 
 /** Where a third-party package is used: the files that import it, and how many. */
@@ -1270,6 +1414,10 @@ export interface MigrationFacts {
   cycles: string[][];
   /** Imports that could not be resolved — recorded, never guessed. */
   unresolved: string[];
+  /** EVERY top-level declaration found, marked handled or not. */
+  inventory: Decl[];
+  /** The headline: how much of the source this tool actually converts, and exactly what it does not. */
+  coverage: Coverage;
 }
 
 /**
@@ -1282,6 +1430,7 @@ export function assembleFacts(unitDir: string): MigrationFacts {
   const empty: MigrationFacts = {
     unit: unitDir, entry: null, files: [], angular: [], internal: [], packages: [], packageUsage: [],
     components: [], services: [], di: [], routes: [], forms: [], calls: [], branches: [], cycles: [], unresolved: [],
+    inventory: [], coverage: { total: 0, handled: 0, gaps: [], emptyFiles: [] },
   };
   if (!entry) return empty;
 
@@ -1290,6 +1439,7 @@ export function assembleFacts(unitDir: string): MigrationFacts {
   const tsPaths: TsPaths | null = readTsPaths(workspaceRoot);
   const services: ServiceFact[] = analyzeServices(walk.files);
   const components: ComponentFact[] = analyzeComponents(walk.files);
+  const decls: Decl[] = inventory(walk.files);
   return {
     unit: unitDir,
     entry,
@@ -1307,6 +1457,8 @@ export function assembleFacts(unitDir: string): MigrationFacts {
     branches: analyzeBranches(walk.files),
     cycles: walk.cycles,
     unresolved: walk.unresolved,
+    inventory: decls,
+    coverage: coverage(decls),
   };
 }
 
