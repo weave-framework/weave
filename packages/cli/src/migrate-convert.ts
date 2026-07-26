@@ -806,6 +806,38 @@ export function rxjsSuggestions(names: string[]): string[] {
   return out;
 }
 
+/** The HTTP verbs a class body actually calls, so the guidance names them instead of listing all of them. */
+function httpVerbsUsed(members: ClassMember[]): string[] {
+  const body: string = members.map((m) => m.body ?? '').join('\n');
+  return ['get', 'post', 'put', 'patch', 'delete', 'request'].filter((v) => new RegExp(`\\.${v}\\s*[<(]`).test(body));
+}
+
+/**
+ * Guidance for a service that injected `HttpClient`. Angular returns an Observable per call; Weave splits the
+ * two jobs — `resource` for reads (it tracks loading/error and refetches when its source changes) and `action`
+ * for writes. `createClient` supplies the same base-URL/headers/interceptor layer `HttpClient` provided.
+ */
+function httpDraft(fact: ServiceFact): string[] {
+  const verbs: string[] = httpVerbsUsed(fact.members ?? []);
+  const reads: string[] = verbs.filter((v) => v === 'get' || v === 'request');
+  const writes: string[] = verbs.filter((v) => v !== 'get' && v !== 'request');
+  const out: string[] = [
+    '',
+    tsTodo('this service used HttpClient. In Weave that is `@weave-framework/data`:'),
+    '//   `const client = createClient({ baseUrl: "/api" })` replaces the HttpClient + interceptors layer,',
+    '//   and each call returns a PROMISE rather than an Observable — no `.subscribe()`, no `firstValueFrom`.',
+  ];
+  if (reads.length) {
+    out.push(`//   reads (${reads.join(', ')}) → \`resource(() => client.get<T>(path))\`, which tracks loading/error`);
+    out.push('//     and refetches when the signal it reads changes: `resource(() => id(), (v) => client.get(...))`.');
+  }
+  if (writes.length) {
+    out.push(`//   writes (${writes.join(', ')}) → \`action(async (input) => client.${writes[0]}<T>(path, input))\`.`);
+  }
+  if (!verbs.length) out.push('//   no HTTP verb was called directly here — check what it passes through.');
+  return out;
+}
+
 /** `BreadcrumbsPathService` → `useBreadcrumbsPath` (the store hook name Weave code reads). */
 export function storeHookName(className: string): string {
   const base: string = className.replace(/Service$/, '').replace(/Store$/, '');
@@ -906,6 +938,9 @@ export function convertService(fact: ServiceFact, rxjsNames: string[] = []): { b
     body.push(tsTodo(`this service injected ${fact.injects.join(', ')} — call each one's store hook here,`));
     body.push('//   e.g. `const other = useOther();`, or `inject(OtherContext)` for a scoped one.');
   }
+  if (fact.injects.includes('HttpClient')) {
+    body.push(`const client = createClient({ baseUrl: '/api' }); ${tsTodo('set your real base URL + headers')}`);
+  }
   const drafted: { lines: string[]; publicNames: string[] } = draftMembers(fact.members ?? [], fact.className);
   body.push(...drafted.lines);
   body.push('');
@@ -917,6 +952,14 @@ export function convertService(fact: ServiceFact, rxjsNames: string[] = []): { b
 
   const hints: string[] = rxjsSuggestions(rxjsNames);
   const hintBlock: string[] = hints.length ? ['', tsTodo('this service used RxJS. In Weave:'), ...hints.map((h) => `//   ${h}`)] : [];
+  // A service injecting HttpClient gets the data-package mapping, named to the verbs it actually calls.
+  // Only `createClient` is imported, because only it is actually used below — `resource`/`action` are named in
+  // the guidance and imported by the human when they write the call. A generated dead import is not a courtesy.
+  const usesHttp: boolean = fact.injects.includes('HttpClient');
+  if (usesHttp) {
+    imports.push("import { createClient } from '@weave-framework/data';");
+    hintBlock.push(...httpDraft(fact));
+  }
 
   if (singleton) {
     lines.push(

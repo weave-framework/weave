@@ -661,6 +661,21 @@ ok(styleOut.length === 1 && styleOut[0].name === 'decorator.css', 'componentStyl
 ok(styleOut[0].content.includes('h1 { color: red }'), 'componentStyles: the inline CSS itself is carried, not just its count');
 ok(cv.componentStyles({ file: 'x.ts', className: 'X', styleUrls: ['./missing.scss'], styleTexts: [] }, 'x').length === 0, 'componentStyles: an unreadable stylesheet yields nothing (never an invented empty file)');
 
+// ── HttpClient → @weave-framework/data: a real client line, plus guidance naming the verbs actually called ──
+const httpSvc = a.findServices(join(svcs, 'http.service.ts'))[0];
+ok(httpSvc.injects.includes('HttpClient'), 'findServices: the injected HttpClient is seen');
+const httpTs = cv.convertService(httpSvc).ts;
+ok(httpTs.includes("import { createClient } from '@weave-framework/data';"), 'convertService: an HttpClient service imports the data package');
+ok(httpTs.includes("const client = createClient({ baseUrl: '/api' })"), 'convertService: a real client is created, not just described');
+ok(!httpTs.includes('import { action') && !httpTs.includes('resource }'), 'convertService: resource/action are NOT imported — nothing generated uses them, and a dead import is not a courtesy');
+ok(httpTs.includes('reads (get)') && httpTs.includes('resource('), 'convertService: the guidance names the READ verbs the class actually calls');
+ok(httpTs.includes('writes (post, delete)') && httpTs.includes('action('), 'convertService: and the WRITE verbs, mapped to action()');
+// Word boundaries matter here: a naive substring check for "put" matches "input" in `action(async (input) => …)`.
+ok(!/\bput\b/.test(httpTs) && !/\bpatch\b/.test(httpTs), 'convertService: verbs the class never calls are not mentioned');
+ok(httpTs.includes('no `.subscribe()`'), 'convertService: it states the Observable→Promise change plainly');
+// a service with no HttpClient gets none of this
+ok(!cv.convertService(rootSvc).ts.includes('@weave-framework/data'), 'convertService: a service without HttpClient gets no data-package section');
+
 // ── NgModules → a wiring note (NOT code, and NOT counted as converted); InjectionToken → a context ──
 const modFile = join(routesDir, 'module.routes.ts');
 const mods = a.findNgModules(modFile);
@@ -780,6 +795,9 @@ try {
   writeFileSync(join(genDir, 'scoped.ts'), cv.convertService(scopedSvc).ts);
   writeFileSync(join(genDir, 'guards.ts'), guardsTs);
   writeFileSync(join(genDir, 'login.ts'), formPair.ts);
+  writeFileSync(join(genDir, 'http.ts'), httpTs);
+  writeFileSync(join(genDir, 'pipe.ts'), pipeTs);
+  writeFileSync(join(genDir, 'contexts.ts'), tokTs);
   writeFileSync(
     join(genDir, 'tsconfig.json'),
     JSON.stringify({
@@ -791,6 +809,7 @@ try {
           '@weave-framework/store': ['packages/store/src/index.ts'],
           '@weave-framework/router': ['packages/router/src/index.ts'],
           '@weave-framework/forms': ['packages/forms/src/index.ts'],
+          '@weave-framework/data': ['packages/data/src/index.ts'],
         },
       },
       include: ['*.ts'],
