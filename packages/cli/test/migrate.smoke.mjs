@@ -551,7 +551,7 @@ ok(cv.translateBody('this.sig.set(1);', tctx).code === 'sig.set(1);', 'translate
 ok(cv.translateBody('this.count = 5;', tctx).code === 'count.set(5);', 'translateBody: a field write becomes a signal write');
 ok(cv.translateBody('return this.ready;', tctx).code === 'return ready();', 'translateBody: a getter is read as a computed');
 ok(cv.translateBody('this.refresh();', tctx).code === 'refresh();', 'translateBody: a method call drops `this.`');
-ok(cv.translateBody('this.router.navigate(this.label);', tctx).code === 'navigate(props.label);', "translateBody: an injected Router's navigate becomes the router's navigate()");
+ok(cv.translateBody('this.router.navigate(this.label);', tctx).code === 'routerNavigate(props.label);', "translateBody: an injected Router's navigate becomes the shim that has Angular's shape");
 ok(cv.translateBody("return 'this.count';", tctx).code === "return 'this.count';", 'translateBody: a string literal is never rewritten');
 const unresolved = cv.translateBody('return this.mystery;', tctx);
 ok(unresolved.todos.some((t) => t.includes('mystery')), 'translateBody: a `this.` with no counterpart is REPORTED, not silently renamed');
@@ -635,11 +635,26 @@ ok(!/<[bi][ >][^>]*class:sps-logo/.test(multiRoot.html), 'host: nothing is attac
 ok(hostPair.ts.includes("const label = signal<string>('the logo');"), 'signalDecl: a field keeps its declared type AND its initial value — signal<unknown>(undefined) was wrong from the first frame');
 ok(hostPair.ts.includes('const lastSeen = signal<Date | undefined>(undefined);'), 'signalDecl: an uninitialised field is a signal of `T | undefined`, and `lastSeen: Date` is STATE, not an injected service');
 ok(hostPair.ts.includes('const hasRoute = computed(() => props.routerLink.length > 0);'), 'host: the getter behind a host binding is translated, not stubbed');
+// `: void` on every drafted function made a method ending in `return false;` a type error. The source either
+// declared a return type or said nothing and let TypeScript work it out — neither of those is `void`.
+ok(hostPair.ts.includes('const onClick = () => {'), 'returnAnnotation: an undeclared return type is INFERRED, not forced to void — the body returns a value');
+ok(hostPair.ts.includes('const hover = (on: boolean): void => {'), 'returnAnnotation: a body that returns nothing is still `: void`');
+ok(cv.returnAnnotation({ type: 'boolean' }, 'return true;') === ': boolean', 'returnAnnotation: a DECLARED return type is carried, never replaced');
+// Angular's Router.navigate takes an array of COMMANDS and returns a Promise; Weave's navigate takes a path and
+// returns nothing. Mapping them 1:1 read fine and compiled nowhere.
+ok(hostPair.ts.includes('const routerNavigate = async (commands: unknown'), 'adaptersFor: a shim is emitted where the Angular API and its Weave counterpart do not share a SHAPE');
+ok(hostPair.ts.includes("routerNavigate([props.routerLink, 'x']).then(() => {});"), 'adaptersFor: the call site is unchanged — the array and the .then() both still work');
+ok(hostPair.ts.includes("import { navigate, type NavigateOptions } from '@weave-framework/router';"), 'adaptersFor: the shim brings its own imports');
+// A dependency whose calls were REWRITTEN needs nothing from the reader; saying "make it a store()" contradicted
+// the `routerNavigate(…)` three lines below it and asked for work already done.
+ok(!hostPair.ts.includes('this component injected Router'), 'convertComponent: an ANSWERED dependency is not also listed as work still to do');
+ok(hostPair.ts.includes('imports: [RouterModule]'), "convertComponent: the decorator's `imports: []` is accounted for in the output, not just read");
+ok(!/import \{[^}]*\bsignal\b/.test(hostPair.ts.split('export function setup')[0]) || hostPair.ts.includes('= signal'), 'convertComponent: `signal` is imported only when something actually calls it');
 // Scoped to the SPAN: `aria-label={{ label() }}` from the host binding also contains that text, so a whole-file
 // search passed with the template rule switched off entirely.
 ok(hostPair.html.includes('<span>{{ label() }}</span>'), 'convertComponent: a template reading a FIELD calls its signal — `{{ label }}` would render the function');
 // A drafted block is multi-line; prefixing the ENTRY only indented its first line, so bodies hung outside setup().
-ok(hostPair.ts.includes('\n      navigate(props.routerLink);'), 'convertComponent: every line of a multi-line draft is indented inside setup(), not just its first');
+ok(hostPair.ts.includes("\n      routerNavigate([props.routerLink, 'x']).then(() => {});"), 'convertComponent: every line of a multi-line draft is indented inside setup(), not just its first');
 const hostLost = hostFact.classBody.split('\n').map((l) => l.trim()).filter((l) => l && l !== '}' && l !== '{').filter((l) => !hostPair.ts.includes(l));
 ok(hostLost.length === 0, `NOTHING IS LOST (host): every line survives (lost: ${hostLost.join(' | ') || 'none'})`);
 
@@ -668,8 +683,9 @@ ok(cv.signalInputDefault({ initializer: 'null' }) === '', 'signalInputDefault: a
 const rootSvc = {
   file: 'x/user.service.ts', className: 'UserService', providedIn: 'root', methods: ['logout'], fields: ['user'], signals: ['user'], injects: ['Router'],
   members: [
+    { kind: 'constructor', name: '(constructor)', isPublic: true, params: 'private router: Router', body: '', initializer: '', isSignal: false, text: 'constructor(private router: Router) {}' },
     { kind: 'field', name: 'user', isPublic: true, params: '', body: '', initializer: 'signal(null)', isSignal: true },
-    { kind: 'method', name: 'logout', isPublic: true, params: '', body: 'this.user.set(null);', initializer: '', isSignal: false },
+    { kind: 'method', name: 'logout', isPublic: true, params: '', body: "this.user.set(null);\nthis.router.navigate(['/login']);", initializer: '', isSignal: false },
   ],
 };
 const rootDraft = cv.convertService(rootSvc);
@@ -690,7 +706,7 @@ ok(bodyDraft.ts.includes('const apply = (n: number): void => {'), 'convertServic
 ok(/\/\/\s+this\.count = n;/.test(bodyDraft.ts), 'convertService: the original body is carried across, commented (so the draft still compiles)');
 ok(bodyDraft.ts.includes('original WithBodyService.apply()'), 'convertService: the carried body is labelled with where it came from');
 ok(rootDraft.ts.includes('return { user, logout };'), 'convertService: the returned object is the service surface');
-ok(rootDraft.ts.includes('injected Router'), 'convertService: injected dependencies are flagged for wiring');
+ok(rootDraft.ts.includes('const routerNavigate = async'), 'convertService: a service gets the same shim its rewritten calls name');
 ok(rootDraft.baseName === 'user', `serviceBaseName: UserService → user (got ${rootDraft.baseName})`);
 
 const scopedSvc = {

@@ -1079,9 +1079,19 @@ export function convertComponent(fact: ComponentFact, templateHtml: string, opts
   const body: string[] = [];
   body.push(`// Converted from ${fact.className} (${fact.file}).`);
   body.push('// Props are reactive getters: read `props.x` live, never destructure them.');
-  if (fact.injects.length) {
-    body.push(`// TODO(weave migrate): this component injected ${fact.injects.join(', ')} —`);
+  // Only the dependencies still UNANSWERED. Listing `Router` here as "make it a store" contradicted the
+  // rewritten `routerNavigate(…)` three lines below it, and told the reader to do work already done.
+  const unanswered: string[] = fact.injects.filter((dep) => !SERVICE_METHODS[dep]);
+  if (unanswered.length) {
+    body.push(`// TODO(weave migrate): this component injected ${unanswered.join(', ')} —`);
     body.push('// a singleton service becomes a `store()`, a scoped one `provide`/`inject` (see the plan).');
+  }
+  // `imports: [...]` says what the TEMPLATE was allowed to use. Weave has no such list — a file imports what it
+  // uses — but reading past it silently left the reader wondering whether it had been considered at all.
+  if (fact.declaredImports?.length) {
+    body.push(`// Its \`imports: [${fact.declaredImports.join(', ')}]\` — Weave has no such list: the template's`);
+    body.push('// tags are resolved by what THIS file imports, and Angular directives in there (RouterModule and');
+    body.push("// friends) became Weave's own bindings in the template. Nothing to declare.");
   }
   // The class body is the bulk of a component — carried across member by member, never summarised away.
   const inputSet: Set<string> = new Set<string>(fact.inputs);
@@ -1097,6 +1107,12 @@ export function convertComponent(fact: ComponentFact, templateHtml: string, opts
     for (const mem of asProps) for (const line of (mem.text ?? '').split('\n')) body.push(`// ${line}`);
   }
   const ctx: TranslateCtx = translateCtx(fact.members ?? [], fact.inputs);
+  // The shims the translated calls name. Without them the file calls functions that do not exist.
+  const adapters: string[] = adaptersFor(fact.members ?? [], fact.inputs);
+  if (adapters.length) {
+    body.push('');
+    body.push(...adapters);
+  }
   body.push(...draftMembers(carried, fact.className, ctx).lines);
 
   // The host element. Its members were drafted above (a @HostBinding getter is a computed like any other); what
@@ -1114,9 +1130,11 @@ export function convertComponent(fact: ComponentFact, templateHtml: string, opts
   // A reactive form becomes a `form({ … })` in setup(); the template binds its leaves with `use:control`.
   const imports: string[] = [];
   // Import exactly what the drafted body uses: fields become `signal`, getters become `computed`.
+  // An INJECTED field becomes no signal — its calls were rewritten and the field itself is only a comment.
+  // Counting it imported `signal` for a file that never calls it, which is a dead import in someone's lint.
   const runtimeNeeds: string[] = [
     ...new Set<string>([
-      ...(carried.some((mem) => mem.kind === 'field') ? ['signal'] : []),
+      ...(carried.some((mem) => mem.kind === 'field' && !ctx.injected.has(mem.name)) ? ['signal'] : []),
       ...(carried.some((mem) => mem.kind === 'getter') ? ['computed'] : []),
       ...host.runtimeNeeds,
     ]),
@@ -1413,11 +1431,39 @@ export interface TranslateCtx {
   elementRef?: string;
 }
 
+/**
+ * A local shim the converted code needs, because the Angular API and its Weave counterpart do not have the same
+ * SHAPE. Mapping them 1:1 anyway produced calls that read fine and did not compile — `Router.navigate` takes an
+ * array of commands and returns a `Promise<boolean>`, while Weave's `navigate` takes a path and returns nothing.
+ */
+interface Adapter {
+  lines: string[];
+  imports: string[];
+}
+
+const ADAPTERS: Record<string, Adapter> = {
+  routerNavigate: {
+    imports: ["import { navigate, type NavigateOptions } from '@weave-framework/router';"],
+    lines: [
+      "// Angular's `Router.navigate` took an array of COMMANDS and returned a Promise; Weave's `navigate` takes a",
+      '// path and is synchronous. This keeps your call sites as they were.',
+      '//',
+      "// One difference you cannot see from here: Angular's promise resolved FALSE when a guard cancelled the",
+      '// navigation. Weave does not report that, so this always resolves true — if your code branches on the',
+      '// result, that branch needs a decision.',
+      'const routerNavigate = async (commands: unknown, opts?: NavigateOptions): Promise<boolean> => {',
+      "  navigate(Array.isArray(commands) ? commands.join('/').replace(/\\/{2,}/g, '/') : String(commands ?? ''), opts);",
+      '  return true;',
+      '};',
+    ],
+  },
+};
+
 /** Angular services whose Weave replacement is a plain function, and where it comes from. */
-const SERVICE_METHODS: Record<string, Record<string, { call: string; from: string }>> = {
+const SERVICE_METHODS: Record<string, Record<string, { call: string; from: string; adapter?: string }>> = {
   Router: {
-    navigate: { call: 'navigate', from: '@weave-framework/router' },
-    navigateByUrl: { call: 'navigate', from: '@weave-framework/router' },
+    navigate: { call: 'routerNavigate', from: '', adapter: 'routerNavigate' },
+    navigateByUrl: { call: 'routerNavigate', from: '', adapter: 'routerNavigate' },
   },
   // The data client is emitted as a local `const client = createClient(…)`, so these need no import of their own.
   HttpClient: {
@@ -1609,16 +1655,37 @@ export function translateBody(body: string, ctx: TranslateCtx, params: string = 
 export function serviceImportsFor(members: ClassMember[], inputs: string[]): string[] {
   const ctx: TranslateCtx = translateCtx(members, inputs);
   const needed: Map<string, Set<string>> = new Map<string, Set<string>>();
-  const bodies: string = members.map((m) => m.body ?? '').join('\n');
+  const extra: string[] = [];
+  for (const { mapped } of servicesUsedBy(members, ctx)) {
+    // An adapter brings its OWN imports — the call site names the adapter, not the Weave function.
+    if (mapped.adapter) extra.push(...(ADAPTERS[mapped.adapter]?.imports ?? []));
+    if (!mapped.from) continue; // replaced by something already in scope (the local data client)
+    if (!needed.has(mapped.from)) needed.set(mapped.from, new Set<string>());
+    needed.get(mapped.from)?.add(mapped.call);
+  }
+  return [...new Set([...[...needed.entries()].map(([from, calls]) => `import { ${[...calls].sort().join(', ')} } from '${from}';`), ...extra])];
+}
+
+/** Every mapped service method a class's bodies actually call. */
+function servicesUsedBy(members: ClassMember[], ctx: TranslateCtx): Array<{ mapped: { call: string; from: string; adapter?: string } }> {
+  const bodies: string = members.map((m) => `${m.body ?? ''}\n${m.initializer ?? ''}`).join('\n');
+  const out: Array<{ mapped: { call: string; from: string; adapter?: string } }> = [];
   for (const [field, service] of ctx.injected) {
     for (const [method, mapped] of Object.entries(SERVICE_METHODS[service] ?? {})) {
-      if (!mapped.from) continue; // replaced by something already in scope (the local data client)
-      if (!new RegExp(`\\bthis\\.${field}\\.${method}\\s*\\(`).test(bodies)) continue;
-      if (!needed.has(mapped.from)) needed.set(mapped.from, new Set<string>());
-      needed.get(mapped.from)?.add(mapped.call);
+      if (new RegExp(`\\bthis\\.${field}\\.${method}\\s*(<[^()]*>)?\\s*\\(`).test(bodies)) out.push({ mapped });
     }
   }
-  return [...needed.entries()].map(([from, calls]) => `import { ${[...calls].sort().join(', ')} } from '${from}';`);
+  return out;
+}
+
+/**
+ * The local shims the converted bodies call. Emitted into the same scope as the translated code — the call sites
+ * name them, so without these the file references functions that do not exist.
+ */
+export function adaptersFor(members: ClassMember[], inputs: string[]): string[] {
+  const ctx: TranslateCtx = translateCtx(members, inputs);
+  const names: string[] = [...new Set(servicesUsedBy(members, ctx).map((s) => s.mapped.adapter).filter((n): n is string => Boolean(n)))];
+  return names.flatMap((n) => ADAPTERS[n]?.lines ?? []);
 }
 
 /**
@@ -1648,6 +1715,18 @@ export function getterToComputed(body: string, ctx: TranslateCtx): { code: strin
   const single: RegExpMatchArray | null = t.code.trim().match(/^return\s+([\s\S]+?);?$/);
   const inner: string = single && !/\breturn\b/.test(single[1]) ? single[1].trim() : `{\n${indent(t.code)}\n}`;
   return { code: `computed(() => ${inner})`, todos: t.todos };
+}
+
+/**
+ * The return-type annotation for a drafted function. `: void` was written on every one of them, which turned a
+ * method ending in `return false;` into a type error — the source said what it returned, or said nothing and let
+ * TypeScript work it out, and neither of those is `void`.
+ */
+export function returnAnnotation(mem: ClassMember, code: string): string {
+  if (mem.type) return `: ${mem.type}`; // the source declared it — carry it
+  // No annotation in the source. If the body returns a VALUE, let TypeScript infer it, exactly as Angular did;
+  // annotating would be inventing a type the source never stated.
+  return /\breturn\s+[^;\s]/.test(code) ? '' : ': void';
 }
 
 /** Angular lifecycle hooks that have a direct Weave equivalent. Named, so they don't read as ordinary methods. */
@@ -1718,7 +1797,7 @@ function draftMembers(members: ClassMember[], className: string, ctx?: Translate
       } else {
         const s: { code: string; todos: string[] } = translateBody(mem.body, cx, mem.params);
         for (const t of s.todos) out.push(tsTodo(t));
-        out.push(`const ${mem.name} = (${mem.params}): void => {${vis}`);
+        out.push(`const ${mem.name} = (${mem.params})${returnAnnotation(mem, s.code)} => {${vis}`);
         out.push(indent(s.code));
         out.push('};');
       }
@@ -1735,7 +1814,7 @@ function draftMembers(members: ClassMember[], className: string, ctx?: Translate
     }
     const m: { code: string; todos: string[] } = translateBody(mem.body, cx, mem.params);
     for (const t of m.todos) out.push(tsTodo(t));
-    out.push(`const ${mem.name} = (${mem.params}): void => {${mem.isPublic ? '' : ' // was private — a local, not returned'}`);
+    out.push(`const ${mem.name} = (${mem.params})${returnAnnotation(mem, m.code)} => {${mem.isPublic ? '' : ' // was private — a local, not returned'}`);
     if (m.code.trim()) out.push(indent(m.code));
     out.push('};');
     if ((mem.text ?? '').trim()) {
@@ -1774,13 +1853,17 @@ export function convertService(fact: ServiceFact, rxjsNames: string[] = []): { b
   else imports.push("import { createContext } from '@weave-framework/runtime';");
 
   const body: string[] = [];
-  if (fact.injects.length) {
-    body.push(tsTodo(`this service injected ${fact.injects.join(', ')} — call each one's store hook here,`));
+  // Only the dependencies still UNANSWERED — one whose calls were rewritten needs nothing from the reader.
+  const unanswered: string[] = fact.injects.filter((dep) => !SERVICE_METHODS[dep]);
+  if (unanswered.length) {
+    body.push(tsTodo(`this service injected ${unanswered.join(', ')} — call each one's store hook here,`));
     body.push('//   e.g. `const other = useOther();`, or `inject(OtherContext)` for a scoped one.');
   }
   if (fact.injects.includes('HttpClient')) {
     body.push(`const client = createClient({ baseUrl: '/api' }); ${tsTodo('set your real base URL + headers')}`);
   }
+  const svcAdapters: string[] = adaptersFor(fact.members ?? [], []);
+  if (svcAdapters.length) body.push(...svcAdapters);
   const drafted: { lines: string[]; publicNames: string[] } = draftMembers(fact.members ?? [], fact.className, translateCtx(fact.members ?? [], []));
   body.push(...drafted.lines);
   body.push('');
@@ -1800,6 +1883,9 @@ export function convertService(fact: ServiceFact, rxjsNames: string[] = []): { b
     imports.push("import { createClient } from '@weave-framework/data';");
     hintBlock.push(...httpDraft(fact));
   }
+  // What the rewritten calls and their shims need. A component already did this; a service did not, so its
+  // draft named `navigate` and `NavigateOptions` without importing either.
+  imports.push(...serviceImportsFor(fact.members ?? [], []));
 
   if (singleton) {
     lines.push(

@@ -35,9 +35,14 @@ export class HostComponent {
 
   constructor(private router: Router) {}
 
-  @HostListener('click') onClick(): void {
+  // No declared return type, and a branch that returns a VALUE. Writing `: void` on every drafted function made
+  // this a type error. And `Router.navigate` takes an array of COMMANDS and returns a Promise, while Weave's
+  // `navigate` takes a path and returns nothing — mapping them 1:1 compiled nowhere.
+  @HostListener('click') onClick() {
     if (this.hasRoute) {
-      this.router.navigate(this.routerLink);
+      this.router.navigate([this.routerLink, 'x']).then(() => {});
+    } else {
+      return false;
     }
   }
 

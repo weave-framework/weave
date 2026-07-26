@@ -67,6 +67,17 @@
   `@HostBinding('style.outlineWidth.px')` alike. Angular normalises the name; Weave passes it to `setProperty`,
   which only knows `background-color`, so the binding compiled, ran, and set nothing.
 
+  **Where the two APIs do not share a SHAPE, a shim carries the difference.** `Router.navigate` takes an array of
+  commands and returns a `Promise<boolean>`; Weave's `navigate` takes a path and returns nothing. Mapping them
+  one-to-one read perfectly and compiled nowhere, so the draft emits a small local adapter with Angular's shape —
+  call sites keep their array and their `.then()` — and says plainly the one thing it cannot reproduce: Angular
+  resolved `false` when a guard cancelled the navigation, and Weave does not report that.
+
+  A drafted function's return type is the source's, not `: void` on everything — a method ending in
+  `return false;` was a type error, and a type the source never stated is not one to invent. A dependency whose
+  calls were rewritten is no longer *also* listed as work still to do, and the decorator's `imports: [ … ]` is
+  accounted for in the output instead of read past.
+
   A field carries what it **held**: `count = 0` becomes `signal<number>(0)`, not `signal<unknown>(undefined)`. A
   template reading it calls it, since `{{ label }}` in Weave renders the function rather than its value. And a
   prop with a default is **not** optional in the `setup` signature — `propDefaults` guarantees it a value there;
