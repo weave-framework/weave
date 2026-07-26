@@ -642,8 +642,17 @@ ok(hostPair.ts.includes('const hover = (on: boolean): void => {'), 'returnAnnota
 ok(cv.returnAnnotation({ type: 'boolean' }, 'return true;') === ': boolean', 'returnAnnotation: a DECLARED return type is carried, never replaced');
 // Angular's Router.navigate takes an array of COMMANDS and returns a Promise; Weave's navigate takes a path and
 // returns nothing. Mapping them 1:1 read fine and compiled nowhere.
-ok(hostPair.ts.includes('const routerNavigate = async (commands: unknown'), 'adaptersFor: a shim is emitted where the Angular API and its Weave counterpart do not share a SHAPE');
-ok(hostPair.ts.includes("routerNavigate([props.routerLink, 'x']).then(() => {});"), 'adaptersFor: the call site is unchanged — the array and the .then() both still work');
+ok(hostPair.ts.includes('const routerNavigate = (commands: unknown, opts?: NavigateOptions): void =>'), 'adaptersFor: the shim is a plain function — a Promise that always resolves true is not a promise, it is a disguise');
+ok(hostPair.ts.includes("routerNavigate([props.routerLink, 'x']);"), "adaptersFor: the ARRAY of commands still works — that is the only difference the shim exists for");
+// Weave's navigation is synchronous, so "after the navigation" is simply the next statement.
+ok(!hostPair.ts.includes('.then(') || !/routerNavigate\([^;]*\)\.then/.test(hostPair.ts), 'unwrapSyncThen: no `.then()` is left hanging off a call that returns nothing');
+ok(/routerNavigate\(\[props\.routerLink, 'x'\]\);\s*\n\s*hover\(true\);/.test(hostPair.ts), 'unwrapSyncThen: the callback BODY becomes the statements that follow the call, not a dropped block');
+const thenTodos = [];
+ok(cv.unwrapSyncThen('navigate("/a").then((ok) => { use(ok); });', ['navigate'], thenTodos).includes('const ok = true;'), "unwrapSyncThen: a callback PARAMETER was Angular's result — bound to what the success path saw");
+ok(thenTodos.some((t) => t.includes('guard cancelled')), 'unwrapSyncThen: and the case Weave cannot report is stated, not hidden');
+const valueTodos = [];
+ok(cv.unwrapSyncThen('return navigate("/a").then(() => 1);', ['navigate'], valueTodos).includes('.then('), 'unwrapSyncThen: a `.then()` used as a VALUE is left alone — unwrapping it would silently drop the callback');
+ok(valueTodos.some((t) => t.includes('as a VALUE')), 'unwrapSyncThen: and that case is reported');
 ok(hostPair.ts.includes("import { navigate, type NavigateOptions } from '@weave-framework/router';"), 'adaptersFor: the shim brings its own imports');
 // A dependency whose calls were REWRITTEN needs nothing from the reader; saying "make it a store()" contradicted
 // the `routerNavigate(…)` three lines below it and asked for work already done.
@@ -654,7 +663,7 @@ ok(!/import \{[^}]*\bsignal\b/.test(hostPair.ts.split('export function setup')[0
 // search passed with the template rule switched off entirely.
 ok(hostPair.html.includes('<span>{{ label() }}</span>'), 'convertComponent: a template reading a FIELD calls its signal — `{{ label }}` would render the function');
 // A drafted block is multi-line; prefixing the ENTRY only indented its first line, so bodies hung outside setup().
-ok(hostPair.ts.includes("\n      routerNavigate([props.routerLink, 'x']).then(() => {});"), 'convertComponent: every line of a multi-line draft is indented inside setup(), not just its first');
+ok(hostPair.ts.includes("\n      routerNavigate([props.routerLink, 'x']);\n      hover(true);"), 'convertComponent: every line of a multi-line draft is indented inside setup(), and an unwrapped statement takes the indentation of the call it follows');
 const hostLost = hostFact.classBody.split('\n').map((l) => l.trim()).filter((l) => l && l !== '}' && l !== '{').filter((l) => !hostPair.ts.includes(l));
 ok(hostLost.length === 0, `NOTHING IS LOST (host): every line survives (lost: ${hostLost.join(' | ') || 'none'})`);
 
@@ -685,7 +694,7 @@ const rootSvc = {
   members: [
     { kind: 'constructor', name: '(constructor)', isPublic: true, params: 'private router: Router', body: '', initializer: '', isSignal: false, text: 'constructor(private router: Router) {}' },
     { kind: 'field', name: 'user', isPublic: true, params: '', body: '', initializer: 'signal(null)', isSignal: true },
-    { kind: 'method', name: 'logout', isPublic: true, params: '', body: "this.user.set(null);\nthis.router.navigate(['/login']);", initializer: '', isSignal: false },
+    { kind: 'method', name: 'logout', isPublic: true, params: '', body: "this.user.set(null);\nthis.router.navigate(['/login']);\nthis.router.navigateByUrl('/home');", initializer: '', isSignal: false },
   ],
 };
 const rootDraft = cv.convertService(rootSvc);
@@ -706,7 +715,11 @@ ok(bodyDraft.ts.includes('const apply = (n: number): void => {'), 'convertServic
 ok(/\/\/\s+this\.count = n;/.test(bodyDraft.ts), 'convertService: the original body is carried across, commented (so the draft still compiles)');
 ok(bodyDraft.ts.includes('original WithBodyService.apply()'), 'convertService: the carried body is labelled with where it came from');
 ok(rootDraft.ts.includes('return { user, logout };'), 'convertService: the returned object is the service surface');
-ok(rootDraft.ts.includes('const routerNavigate = async'), 'convertService: a service gets the same shim its rewritten calls name');
+ok(rootDraft.ts.includes('const routerNavigate = ('), 'convertService: a service gets the same shim its rewritten calls name');
+// `navigateByUrl` already takes the path — wrapping it too would be machinery around nothing.
+ok(rootDraft.ts.includes("navigate('/home');") && !rootDraft.ts.includes("routerNavigate('/home')"), 'SERVICE_METHODS: navigateByUrl is `navigate` outright — only the ARRAY form needs a shim');
+// A shim and a direct call can both need something from the same module. Two import lines is a duplicate identifier.
+ok((rootDraft.ts.match(/from '@weave-framework\/router'/g) ?? []).length === 1, 'serviceImportsFor: names are collected per MODULE — one import line, however many things need it');
 ok(rootDraft.baseName === 'user', `serviceBaseName: UserService → user (got ${rootDraft.baseName})`);
 
 const scopedSvc = {

@@ -1438,22 +1438,19 @@ export interface TranslateCtx {
  */
 interface Adapter {
   lines: string[];
-  imports: string[];
+  /** By module, so a name the shim needs and a name a direct call needs merge into ONE import statement. */
+  imports: Array<{ from: string; names: string[] }>;
 }
 
 const ADAPTERS: Record<string, Adapter> = {
   routerNavigate: {
-    imports: ["import { navigate, type NavigateOptions } from '@weave-framework/router';"],
+    imports: [{ from: '@weave-framework/router', names: ['navigate', 'type NavigateOptions'] }],
     lines: [
-      "// Angular's `Router.navigate` took an array of COMMANDS and returned a Promise; Weave's `navigate` takes a",
-      '// path and is synchronous. This keeps your call sites as they were.',
-      '//',
-      "// One difference you cannot see from here: Angular's promise resolved FALSE when a guard cancelled the",
-      '// navigation. Weave does not report that, so this always resolves true — if your code branches on the',
-      '// result, that branch needs a decision.',
-      'const routerNavigate = async (commands: unknown, opts?: NavigateOptions): Promise<boolean> => {',
+      "// Angular's `Router.navigate` took an ARRAY of commands; Weave's `navigate` takes the path itself. That is",
+      '// the whole difference — navigation is synchronous either way, so this returns nothing, and a `.then(…)`',
+      '// that followed the call has been unwrapped into the statements after it.',
+      'const routerNavigate = (commands: unknown, opts?: NavigateOptions): void => {',
       "  navigate(Array.isArray(commands) ? commands.join('/').replace(/\\/{2,}/g, '/') : String(commands ?? ''), opts);",
-      '  return true;',
       '};',
     ],
   },
@@ -1462,8 +1459,10 @@ const ADAPTERS: Record<string, Adapter> = {
 /** Angular services whose Weave replacement is a plain function, and where it comes from. */
 const SERVICE_METHODS: Record<string, Record<string, { call: string; from: string; adapter?: string }>> = {
   Router: {
+    // Only the COMMANDS form needs a shim. `navigateByUrl` already takes the path, so it is `navigate` outright —
+    // wrapping it too would be machinery around nothing.
     navigate: { call: 'routerNavigate', from: '', adapter: 'routerNavigate' },
-    navigateByUrl: { call: 'routerNavigate', from: '', adapter: 'routerNavigate' },
+    navigateByUrl: { call: 'navigate', from: '@weave-framework/router' },
   },
   // The data client is emitted as a local `const client = createClient(…)`, so these need no import of their own.
   HttpClient: {
@@ -1579,6 +1578,101 @@ function rewriteFieldWrites(code: string, ctx: TranslateCtx, paramNames: Set<str
   return out;
 }
 
+/** The index of the `)` closing the `(` at `open`, skipping strings. -1 when it never closes. */
+function matchParen(code: string, open: number): number {
+  let depth: number = 0;
+  let quote: string = '';
+  for (let i: number = open; i < code.length; i++) {
+    const ch: string = code[i];
+    if (quote) {
+      if (ch === '\\') i++;
+      else if (ch === quote) quote = '';
+      continue;
+    }
+    if (ch === '"' || ch === "'" || ch === '`') quote = ch;
+    else if (ch === '(') depth++;
+    else if (ch === ')' && --depth === 0) return i;
+  }
+  return -1;
+}
+
+/** A `.then` callback as the statements that follow the call. Null when its shape is not one to unwrap blindly. */
+function inlineThenCallback(cb: string, todos: string[]): string | null {
+  const arrow: RegExpMatchArray | null = cb.match(/^\(\s*([A-Za-z_$][\w$]*)?\s*(?::[^)]*)?\s*\)\s*=>\s*([\s\S]*)$/);
+  if (!arrow) return null;
+  const param: string | undefined = arrow[1];
+  const rest: string = arrow[2].trim();
+  const bodyText: string = rest.startsWith('{') ? dedent(rest.replace(/^\{/, '').replace(/\}$/, '')) : `${rest};`;
+  if (!param) return bodyText.trim();
+  // Angular's promise resolved TRUE on success and FALSE when a guard cancelled. Weave's navigate does not
+  // report the cancellation, so the parameter is bound to what the success path saw — and says the rest.
+  todos.push(`\`${param}\` was Angular's navigation result — false when a guard cancelled. Weave does not report that, so it is bound to true here`);
+  return [`const ${param} = true;`, bodyText.trim()].join('\n');
+}
+
+/** Strip the smallest common indentation from a block of lines. */
+function dedent(text: string): string {
+  const lines: string[] = text.split('\n').filter((l, i, all) => !(l.trim() === '' && (i === 0 || i === all.length - 1)));
+  const pad: number = Math.min(...lines.filter((l) => l.trim()).map((l) => l.match(/^[\t ]*/)?.[0].length ?? 0), Infinity);
+  return lines.map((l) => l.slice(Number.isFinite(pad) ? pad : 0)).join('\n');
+}
+
+/**
+ * `navigate(x).then(cb)` → `navigate(x);` followed by the callback's statements.
+ *
+ * Angular's navigation returned a promise; Weave's is synchronous and returns nothing. Keeping the chain meant
+ * calling `.then` on `void`, and faking a promise to keep it meant wrapping a plain function call in machinery
+ * that does nothing — a `Promise<boolean>` that is always `true` is not a promise, it is a disguise. Unwrapping
+ * is what the code MEANS: the callback ran after the navigation, and after the navigation is the next statement.
+ */
+export function unwrapSyncThen(code: string, names: string[], todos: string[]): string {
+  let out: string = code;
+  for (const name of names) {
+    for (let guard: number = 0; guard < 50; guard++) {
+      const re: RegExp = new RegExp(`\\b${name}\\s*\\(`, 'g');
+      let m: RegExpExecArray | null = null;
+      let done: boolean = true;
+      while ((m = re.exec(out)) !== null) {
+        const open: number = m.index + m[0].length - 1;
+        const close: number = matchParen(out, open);
+        if (close < 0) break;
+        const chain: RegExpMatchArray | null = out.slice(close + 1).match(/^\s*\.(then|catch|finally)\s*\(/);
+        if (!chain) continue;
+        if (chain[1] !== 'then') {
+          todos.push(`\`.${chain[1]}()\` after a navigation — Weave's \`navigate\` is synchronous and cannot reject, so this handler has nothing to attach to`);
+          continue;
+        }
+        // Only a statement-position call unwraps. `return navigate(x).then(…)` means something else, and
+        // rewriting it to `return navigate(x);` would quietly drop the callback.
+        // Line comments are carried over from the original body, so they sit between the previous statement and
+        // this one. Testing the raw text made a commented line look like an expression the call belongs to.
+        const before: string = out.slice(0, m.index).replace(/\/\/[^\n]*/g, '');
+        if (!/(^|[;{}])\s*$/.test(before)) {
+          todos.push(`a navigation's \`.then()\` is used as a VALUE here — Weave's \`navigate\` returns nothing, so this needs a decision`);
+          continue;
+        }
+        const cbOpen: number = close + 1 + chain[0].length - 1;
+        const cbClose: number = matchParen(out, cbOpen);
+        if (cbClose < 0) break;
+        const inlined: string | null = inlineThenCallback(out.slice(cbOpen + 1, cbClose).trim(), todos);
+        if (inlined === null) {
+          todos.push("this navigation's `.then()` callback is not a plain arrow — unwrap it by hand; `navigate` is synchronous");
+          continue;
+        }
+        // The unwrapped statements take the indentation of the call they follow, or they read as if they belong
+        // to a different block than the one they are actually in.
+        const pad: string = out.slice(0, m.index).match(/[^\n]*$/)?.[0].match(/^[\t ]*/)?.[0] ?? '';
+        const placed: string = inlined ? `\n${inlined.split('\n').map((l) => (l ? `${pad}${l}` : l)).join('\n')}` : '';
+        out = `${out.slice(0, close + 1)};${placed}${out.slice(cbClose + 1).replace(/^\s*;/, '')}`;
+        done = false;
+        break;
+      }
+      if (done) break;
+    }
+  }
+  return out;
+}
+
 /** Run `fn` over the code parts of a snippet, never over its string literals. */
 function outsideStrings(code: string, fn: (part: string) => string): string {
   return code
@@ -1628,6 +1722,10 @@ export function translateBody(body: string, ctx: TranslateCtx, params: string = 
       }),
   );
 
+  // The service calls are rewritten by now, so the promise chains that hung off them can be unwound: Weave's
+  // navigation is synchronous, and "after the navigation" is simply the next statement.
+  code = unwrapSyncThen(code, ['routerNavigate', 'navigate'], todos);
+
   // A field write is scanned, not matched — its right-hand side may contain string literals, which the
   // split-on-quotes pass above cannot see across.
   code = rewriteFieldWrites(code, ctx, paramNames, todos);
@@ -1654,16 +1752,20 @@ export function translateBody(body: string, ctx: TranslateCtx, params: string = 
 /** The imports for the Weave functions that replaced injected-service calls in a class's bodies. */
 export function serviceImportsFor(members: ClassMember[], inputs: string[]): string[] {
   const ctx: TranslateCtx = translateCtx(members, inputs);
+  // Names collected PER MODULE, not as finished import lines: a shim and a direct call can both need something
+  // from `@weave-framework/router`, and two `import … from '…/router'` lines is a duplicate-identifier error.
   const needed: Map<string, Set<string>> = new Map<string, Set<string>>();
-  const extra: string[] = [];
+  const add = (from: string, name: string): void => {
+    if (!needed.has(from)) needed.set(from, new Set<string>());
+    needed.get(from)?.add(name);
+  };
   for (const { mapped } of servicesUsedBy(members, ctx)) {
     // An adapter brings its OWN imports — the call site names the adapter, not the Weave function.
-    if (mapped.adapter) extra.push(...(ADAPTERS[mapped.adapter]?.imports ?? []));
+    for (const imp of ADAPTERS[mapped.adapter ?? '']?.imports ?? []) for (const n of imp.names) add(imp.from, n);
     if (!mapped.from) continue; // replaced by something already in scope (the local data client)
-    if (!needed.has(mapped.from)) needed.set(mapped.from, new Set<string>());
-    needed.get(mapped.from)?.add(mapped.call);
+    add(mapped.from, mapped.call);
   }
-  return [...new Set([...[...needed.entries()].map(([from, calls]) => `import { ${[...calls].sort().join(', ')} } from '${from}';`), ...extra])];
+  return [...needed.entries()].map(([from, names]) => `import { ${[...names].sort().join(', ')} } from '${from}';`);
 }
 
 /** Every mapped service method a class's bodies actually call. */

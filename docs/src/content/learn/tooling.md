@@ -167,7 +167,7 @@ comment rather than guessed at.
 | `@Pipe` | a plain function — `{{ x \| shorten }}` becomes `{{ shorten(x) }}` |
 | `@Directive` | a `use:` action — host bindings become `effect`s on the element, listeners are added *and removed* |
 | `ElementRef` | the element itself — an action is handed it, which is what `ElementRef` was for |
-| `Router.navigate([…])` | a local adapter over `navigate` — your array and your `.then()` keep working |
+| `Router.navigate([…])` | `navigate` — a shim joins the command array; a `.then()` becomes the next statement |
 | `*ngIf` / `*ngFor` / `*ngSwitch` | `@if` / `@for` / `@switch` |
 | `[prop]` / `(event)` / `[(ngModel)]` | `.prop` / `on:` / `bind:value` |
 | `<ng-template #x>` / `*ngTemplateOutlet` | `@snippet x()` / `@render (x())` |

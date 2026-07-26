@@ -40,7 +40,10 @@ export class HostComponent {
   // `navigate` takes a path and returns nothing — mapping them 1:1 compiled nowhere.
   @HostListener('click') onClick() {
     if (this.hasRoute) {
-      this.router.navigate([this.routerLink, 'x']).then(() => {});
+      // The `.then` has a BODY — an empty one proves nothing about unwrapping.
+      this.router.navigate([this.routerLink, 'x']).then(() => {
+        this.hover(true);
+      });
     } else {
       return false;
     }
