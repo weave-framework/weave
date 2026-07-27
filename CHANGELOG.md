@@ -121,6 +121,30 @@
   comment claiming the opposite. The command is now a single validated string, and the decision to run is a pure
   function, so the gate for "this must not execute" is not itself the thing that executes it.)
 
+- **`weave migrate` — six defects only RUNNING the migrated code could find.** The type-check was clean and the
+  app still threw, because each of these is valid TypeScript that means the wrong thing:
+
+  - **`asReadonly()`** is Angular's read-only view of a writable signal; Weave has none, and the call survived to
+    throw `asReadonly is not a function` on creation. `Computed<T>` **is** `() => T`, so it becomes
+    `computed(() => x())` — the same value, read-only, no judgement call.
+  - **A translated initializer that is already a signal** was wrapped in a second one (`signal(computed(…))`).
+  - **A call's arguments were read as a TYPE position**, so an Angular name in `signal(foo(…))` became
+    `signal(any(…))`. A type position is after `:`, inside `<…>` or in a union — not after `(` or `,`.
+  - **A `@for` alias** (`let last = $last`) was dropped from the header and left standing in the body, so the
+    loop rendered once and then `last is not defined`. It is now renamed inside its own block, brace-matched.
+  - **Imports are derived from the TEMPLATE too**, not just the module — a name only the markup used
+    (`t(…)` from a translate pipe) was never imported, and the component threw on first render.
+  - **A field holding a FUNCTION** became a signal, so `@if(showLink(…))` got a function back instead of calling
+    it, and the branch never ran. An initializer that is a function value stays a plain `const`.
+
+- **`weave migrate` guards a constructor body that reads a hole it declared itself.** A method body waits to be
+  called; a constructor body runs the moment the thing is created. So a dependency Weave does not provide —
+  emitted as `const _router = null as any` with the TODO that says so — was not a compile error there but a crash
+  at startup, or on the first navigation if the body registered a callback (`Cannot read properties of null`).
+  The body is now emitted whole inside `if (_router) { … }`, named in its own TODO: the app runs, the hole is
+  impossible to miss, and the guard falls away on its own once the dependency is real. Both spellings count, the
+  injected field and the constructor parameter-property.
+
 - **Fixed: an apostrophe in a comment switched the RxJS translation off for the rest of the file.** The scanners
   tracked string literals so no rewrite could match across one, but not comments — so prose like `// Router's
   calls were rewritten` opened a string that never closed, and every declaration after it was invisible. The

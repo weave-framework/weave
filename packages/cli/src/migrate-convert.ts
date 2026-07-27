@@ -578,13 +578,56 @@ function renderNode(node: Node, opts: ConvertOptions): string {
  * and flag it, since any use of the old name in the body still has to be renamed by a human.
  */
 export function convertBlockSyntax(text: string): ConvertedExpr {
-  const todos: string[] = [];
   const expr: string = text.replace(/;\s*let\s+([A-Za-z_$][\w$]*)\s*=\s*(\$?\w+)/g, (_full, alias: string, local: string) => {
     const weaveLocal: string = local.startsWith('$') ? local : `$${local}`;
-    todos.push(`\`let ${alias} = ${local}\` — Weave exposes \`${weaveLocal}\` directly; rename \`${alias}\` to \`${weaveLocal}\` in the block body`);
-    return ''; // drop the alias clause; the loop local is used by its Weave name
+    // The clause goes, and a MARKER takes its place so the whole-template pass below knows which block to rename
+    // in. Reporting the rename and leaving it undone put `last` in the body of a `@for` that declares no such
+    // name — the auto-return then exported it, and the component threw `last is not defined` on first render.
+    return `${ALIAS_MARK}${alias}=${weaveLocal}${ALIAS_MARK}`;
   });
-  return { expr, todos };
+  return { expr, todos: [] };
+}
+
+/** Wraps an alias rename in the template text between the block pass and the whole-template pass. */
+const ALIAS_MARK: string = 'weave-alias';
+
+/**
+ * Apply each `@for` alias rename inside the block it belongs to, and remove the marker.
+ *
+ * Scoped to the block by brace-matching, because the name is a LOOP LOCAL: `last` outside the loop is somebody
+ * else's `last`, and renaming it there would break code that was already correct.
+ */
+export function renameLoopAliases(html: string): string {
+  // Doubled backslashes: this is a TEMPLATE LITERAL, where `\w` is just `w` and `\$` is `$` — the anchor, not
+  // the character. Written singly the pattern matched nothing and the marker leaked into the template.
+  const mark: RegExp = new RegExp(`${ALIAS_MARK}([A-Za-z_$][\\w$]*)=(\\$[A-Za-z]+)${ALIAS_MARK}`);
+  let out: string = html;
+  for (;;) {
+    const m: RegExpMatchArray | null = out.match(mark);
+    if (!m || m.index === undefined) return out;
+    const [full, alias, weaveLocal] = m;
+    const open: number = out.indexOf('{', m.index + full.length);
+    const close: number = open < 0 ? -1 : matchBrace(out, open);
+    const head: string = out.slice(0, m.index) + out.slice(m.index + full.length, open < 0 ? undefined : open);
+    if (open < 0 || close < 0) {
+      out = head + (open < 0 ? '' : out.slice(open));
+      continue;
+    }
+    // Doubled, for the same reason as above: singly written, the class read as `[w$.]` and a one-letter alias
+    // matched inside ordinary words — `let i = index` rewrote the `i` of `<li>` and produced `<l$index>`.
+    const body: string = out.slice(open, close + 1).replace(new RegExp(`(?<![\\w$.])${alias}(?![\\w$])`, 'g'), weaveLocal);
+    out = head + body + out.slice(close + 1);
+  }
+}
+
+/** The `}` closing the `{` at `open`, or -1. */
+function matchBrace(text: string, open: number): number {
+  let depth: number = 0;
+  for (let i: number = open; i < text.length; i++) {
+    if (text[i] === '{') depth++;
+    else if (text[i] === '}' && --depth === 0) return i;
+  }
+  return -1;
 }
 
 /** Angular built-in elements with a confident Weave equivalent (a user's own selectors come via `opts`). */
@@ -726,7 +769,10 @@ export function convertTemplate(html: string, opts: ConvertOptions = {}): string
   const locals: Set<string> = new Set<string>(Object.values(snippets).flatMap((s) => s.params.map((p) => p.name)));
   const props: string[] = (opts.props ?? []).filter((p) => !locals.has(p));
   const signals: string[] = (opts.signals ?? []).filter((s) => !locals.has(s) && !props.includes(s));
-  return props.length || signals.length ? qualifyTemplateExpressions(out, props, signals) : out;
+  const qualified: string = props.length || signals.length ? qualifyTemplateExpressions(out, props, signals) : out;
+  // The loop aliases LAST: the rename is scoped to a block, and the block is only whole once every node has been
+  // rendered back to text.
+  return renameLoopAliases(qualified);
 }
 
 /**
@@ -1369,9 +1415,10 @@ export function convertComponent(fact: ComponentFact, templateHtml: string, opts
 
   // An import is dead only if NEITHER the module nor its template uses it — a `<Card>` import is named in the
   // markup and nowhere else, so pruning against the module alone would have deleted it.
-  // Whatever the assembled draft NAMES, it imports. The lists above are what each piece asked for as it was
-  // built; this is what the finished thing actually uses, and only the second one can be complete.
-  imports.push(...weaveImportsFor(tail.join('\n')));
+  // Whatever the assembled draft NAMES, it imports — and the TEMPLATE is part of the draft. `x | translate`
+  // becomes `t(x)`, which appears nowhere in the `.ts`, so deriving from that alone left the template calling a
+  // name nothing brought into scope: the component threw `t is not defined` on its first render.
+  imports.push(...weaveImportsFor(`${tail.join('\n')}\n${html}`));
   const kept: string[] = pruneRxImports(pruneImports(imports, `${tail.join('\n')}\n${html}`), tail.join('\n')).lines;
   const ts: string = [...(kept.length ? [...mergeImportLines(kept), ''] : []), ...tail].join('\n');
   return { baseName, ts, html };
@@ -1800,6 +1847,41 @@ export function readsBareInjected(members: ClassMember[], name: string, service:
 }
 
 /**
+ * The dependencies a draft declares as a HOLE — `const x = null as any`, because nothing in Weave provides them.
+ *
+ * Every branch of `draftMembers` that emits `placeholderFor(…)` is mirrored here, and nothing else is: the set has
+ * to be known BEFORE the members are walked (the constructor can come first in the source), so it cannot be
+ * collected while emitting.
+ */
+export function deadPlaceholders(members: ClassMember[], cx: TranslateCtx): Set<string> {
+  const dead: Set<string> = new Set<string>();
+  const fieldNames: Set<string> = new Set<string>(members.filter((m) => m.kind === 'field').map((m) => m.name));
+  for (const [name, service] of cx.injected) {
+    if (fieldNames.has(name) || SERVICE_METHODS[service]) continue;
+    if (service === 'ElementRef' && cx.elementRef) continue;
+    if (!cx.migrated?.get(service)) dead.add(name);
+  }
+  for (const mem of members) {
+    if (mem.kind !== 'field') continue;
+    const service: string | undefined = cx.injected.get(mem.name);
+    if (!service || cx.migrated?.get(service)) continue;
+    if (SERVICE_METHODS[service] && !readsBareInjected(members, mem.name, service)) continue;
+    dead.add(mem.name);
+  }
+  return dead;
+}
+
+/** Which of `names` the code actually READS — comments and string literals do not count. */
+export function namesRead(code: string, names: Set<string>): string[] {
+  let scan: string = '';
+  outsideStrings(code, (part: string): string => {
+    scan += part.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\/\/[^\n]*/g, ' ');
+    return part;
+  });
+  return [...names].filter((n: string) => new RegExp(`(?<![\\w$.])${n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w$])`).test(scan));
+}
+
+/**
  * Angular types that survived into a SIGNATURE, replaced by `unknown` and reported.
  *
  * `@angular` imports are dropped — that is the framework being migrated away from — so a drafted signature
@@ -1820,6 +1902,35 @@ export function stripAngularTypes(code: string, angularNames: Iterable<string>, 
     todos.push(`\`${name}\` was Angular's, so it is not imported here — the ${r.hits === 1 ? 'signature that named it now says' : `${r.hits} signatures that named it now say`} \`any\`; give ${r.hits === 1 ? 'it' : 'them'} the shape your Weave code passes`);
   }
   return out;
+}
+
+/**
+ * Angular's signal API, in Weave's spelling.
+ *
+ * Most of it needs nothing: a Weave `Signal` already has `set`, `update` and `peek`, and `set` already accepts
+ * an updater. `asReadonly` is the one that does not exist — and its equivalent is exact rather than a judgement
+ * call, because `Computed<T>` is `() => T`: a value that can be read and not written, which is the entire
+ * purpose of the call being replaced. Left alone it became `x.asReadonly is not a function` at runtime, on a
+ * line the type-check had already passed.
+ */
+export function angularSignalApi(code: string): string {
+  return outsideStrings(code, (part) =>
+    part.replace(/(?<![\w$])((?:[A-Za-z_$][\w$]*)(?:\.[A-Za-z_$][\w$]*)*)\.asReadonly\s*\(\s*\)/g, (_m, receiver: string) => `computed(() => ${receiver}())`),
+  );
+}
+
+/**
+ * Whether an initializer evaluates to a FUNCTION — an arrow, a function expression, or a bound method.
+ *
+ * A class field holding one of these is a method written as a field; Angular code does it constantly to keep
+ * `this`. It is behaviour, and behaviour is not state, so it must not become a signal.
+ */
+export function isFunctionValue(init: string): boolean {
+  const t: string = init.trim();
+  if (/^(?:async\s+)?function\b/.test(t)) return true;
+  if (/\.bind\s*\(\s*this\s*\)\s*$/.test(t)) return true;
+  // An arrow: a parameter list (or a single name) followed by `=>` at the top level of the expression.
+  return /^(?:async\s+)?(?:\([^)]*\)|[A-Za-z_$][\w$]*)\s*(?::[^=]*)?=>/.test(t);
 }
 
 /** A field holding some flavour of RxJS Subject — by its initializer or, when it has none, by its declared type. */
@@ -2127,6 +2238,11 @@ export function translateBody(body: string, ctx: TranslateCtx, params: string = 
       }),
   );
 
+  // Angular's signal API that Weave spells differently. `update` and `peek` exist on a Weave signal already, so
+  // they need nothing; `asReadonly` does not, and its exact equivalent is a `computed` over the same signal —
+  // `Computed<T>` IS `() => T`, a value that can be read and not written, which is the whole point of the call.
+  code = angularSignalApi(code);
+
   const leftovers: string[] = [...new Set((code.match(/\bthis\.[A-Za-z_$][\w$]*/g) ?? []).map((m) => m.slice(5)))];
   for (const name of leftovers) todos.push(`\`this.${name}\` has no counterpart here — it was not a field, input, getter or method of this class`);
   if (leftovers.length) code = outsideStrings(code, (p) => p.replace(/\bthis\./g, ''));
@@ -2252,6 +2368,14 @@ export function signalDecl(mem: ClassMember, ctx: TranslateCtx): { code: string;
     const t: { code: string; todos: string[] } = translateBody(init, ctx);
     return { code: t.code.trim(), todos: t.todos };
   }
+  // A field whose value is a FUNCTION is behaviour, not state. Wrapping it made `showLink` a signal, and the
+  // template's `showLink(crumb, $last)` then called the SIGNAL — which ignores arguments and hands back the
+  // function itself, so every comparison against its result silently failed and the block rendered nothing.
+  // Nothing about that is visible in a type error at the call site, which is why it survived to the browser.
+  if (init && isFunctionValue(init)) {
+    const t: { code: string; todos: string[] } = translateBody(init, ctx);
+    return { code: t.code.trim(), todos: t.todos };
+  }
   // A Subject IS the signal once converted, for the same reason: `new BehaviorSubject<T>(x)` becomes `signal<T>(x)`,
   // and the generic wrap below would have produced `signal<BehaviorSubject<T>>(signal<T>(x))` — a signal holding
   // a signal, typed as the very class that does not exist in Weave.
@@ -2272,7 +2396,13 @@ export function signalDecl(mem: ClassMember, ctx: TranslateCtx): { code: string;
   }
   if (init) {
     const t: { code: string; todos: string[] } = translateBody(init, ctx);
-    return { code: `signal${mem.type ? `<${mem.type}>` : ''}(${t.code.trim()})`, todos: t.todos };
+    const value: string = t.code.trim();
+    // A translated initializer that ALREADY evaluates to a signal must not be wrapped in another one. The
+    // `isSignal` check above reads the SOURCE, so it misses anything the translation turned into a signal on the
+    // way — `this.count.asReadonly()` becomes `computed(() => count())`, and wrapping that produced
+    // `signal(computed(…))`: a signal holding a function, and a template that renders it never reads a value.
+    if (/^(?:signal|computed|linkedSignal)\s*[(<]/.test(value)) return { code: value, todos: t.todos };
+    return { code: `signal${mem.type ? `<${mem.type}>` : ''}(${value})`, todos: t.todos };
   }
   // No initial value: it started `undefined`, and the declared type says what it will hold once set.
   return { code: `signal<${mem.type ? `${mem.type} | undefined` : 'unknown'}>(undefined)`, todos: [] };
@@ -2354,7 +2484,20 @@ function draftMembers(members: ClassMember[], className: string, ctx?: Translate
         out.push('// What the constructor ran on creation. This scope IS the constructor, so it runs here.');
         const ctor: { code: string; todos: string[] } = translateBody(mem.body, cx, mem.params);
         for (const t of ctor.todos) out.push(tsTodo(t));
-        out.push(...ctor.code.split('\n'));
+        // A method body only runs when something calls it; THIS body runs the moment the thing is created. So a
+        // dependency the draft declared as a hole (`null as any`) is not a compile error here — it is a crash on
+        // startup, or on the first navigation if the body registered a callback. The hole is already reported
+        // above it; the guard is what keeps the app running until it is filled, and it needs no edit once it is.
+        const holes: string[] = namesRead(ctor.code, deadPlaceholders(members, cx));
+        if (holes.length) {
+          out.push(tsTodo(`this reads ${holes.map((h) => `\`${h}\``).join(' and ')}, which nothing provides here (see above), so it is`));
+          out.push('//   GUARDED — it would throw on creation. The guard falls away on its own once that is wired up.');
+          out.push(`if (${holes.join(' && ')}) {`);
+          out.push(indent(ctor.code));
+          out.push('}');
+        } else {
+          out.push(...ctor.code.split('\n'));
+        }
       }
       out.push(`// ── original ${className} constructor ──`);
       out.push(...commented(mem.text, ''));

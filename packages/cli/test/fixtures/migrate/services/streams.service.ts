@@ -13,6 +13,9 @@ export class StreamsService {
   // `computed` if some member is a getter" rule read straight past it and the draft named it unimported.
   readonly count = signal(0);
   readonly doubled = computed(() => this.count() * 2);
+  // Angular's read-only VIEW of a writable signal. Weave has no `asReadonly`, and left alone this passed the
+  // type-check and threw `asReadonly is not a function` the moment the service was created.
+  readonly countPublic = this.count.asReadonly();
 
   // The alias the source wrote for `this.`, and a read of the service itself. Angular's `navigate` is rewritten
   // to Weave's, but `_router.url` is not — so the field has to survive, and the alias has to not.

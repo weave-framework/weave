@@ -512,10 +512,20 @@ ok(!rl.includes('.routerLink') && rl.includes('href={{ c.path }}') && rl.include
 // Angular's MODERN block syntax is already Weave's — it passes through, only the alias form differs
 const modern = conv('@if (a()) {\n  <p>{{ x }}</p>\n}');
 ok(modern.includes('@if (a()) {') && modern.includes('<p>{{ x }}</p>'), 'convertTemplate: Angular @if blocks pass through (the syntax is already Weave)');
-const alias = conv('@for (c of list(); track c; let last = $last) {}');
-const aliasHeader = alias.split('\n').find((l) => l.startsWith('@for')) ?? '';
-ok(aliasHeader === '@for (c of list(); track c) {}', `convertTemplate: @for's \`let x = $last\` alias is dropped from the header (got ${aliasHeader})`);
-ok(alias.includes('TODO(weave migrate)') && alias.includes('rename'), 'convertTemplate: the dropped alias is flagged so its uses get renamed to $last');
+// The alias is DROPPED from the header and its uses are RENAMED in the block. Reporting the rename and
+// leaving it undone put `last` in the body of a `@for` that declares no such name — the auto-return exported
+// it, and the component threw `last is not defined` on first render, which no type-check had objected to.
+const alias = conv('@for (c of list(); track c; let last = $last) {<li>{{ last }}</li>}');
+ok(alias.includes('@for (c of list(); track c) {'), "convertTemplate: @for's `let x = $last` alias is dropped from the header");
+ok(alias.includes('{{ $last }}'), 'convertTemplate: and its uses in the block body are renamed to the Weave local');
+ok(!alias.includes('weave-alias'), 'convertTemplate: the internal marker never reaches the template');
+// A bare loop local (`let i = index`) gets the `$` Weave spells it with.
+const oneLetter = conv('@for (c of l(); track c; let i = index) {<li>{{ i }}</li>}');
+ok(oneLetter.includes('{{ $index }}'), 'convertTemplate: an unprefixed loop local becomes the `$`-prefixed Weave one');
+ok(oneLetter.includes('<li>'), 'convertTemplate: a ONE-LETTER alias does not match inside ordinary words — `<li>` is not `<l$index>`');
+// The rename is scoped to the block: `last` outside the loop is somebody else's.
+const aliasScoped = conv('<p>{{ last }}</p>@for (c of l(); track c; let last = $last) {<b>{{ last }}</b>}');
+ok(aliasScoped.includes('<p>{{ last }}</p>') && aliasScoped.includes('<b>{{ $last }}</b>'), 'convertTemplate: the rename stops at the block — a same-named binding outside it is left alone');
 
 ok(conv('<router-outlet></router-outlet>').includes('<RouterView>'), 'convertTemplate: <router-outlet> → <RouterView> (@weave-framework/router)');
 
@@ -671,6 +681,13 @@ const derivedFact = a.findComponents(join(fx, 'components', 'derived.component.t
 const derivedPair = cv.convertComponent(derivedFact, '<p>{{ doubled }}</p>', {});
 ok(derivedPair.ts.includes('const doubled = computed('), 'derived: a computed FIELD stays a computed');
 ok(derivedPair.ts.split(NL).some((l) => l.startsWith('import {') && l.includes('computed') && l.includes('@weave-framework/runtime')), 'derived: and a component imports it — from what the draft names, not from a rule about getters');
+// The TEMPLATE is part of the draft. `x | translate` becomes `t(x)`, which appears nowhere in the `.ts`, so
+// deriving imports from that alone left the template calling a name nothing brought into scope — the component
+// threw `t is not defined` on its first render, with a clean type-check behind it.
+const tPair = cv.convertComponent(derivedFact, '<p>{{ label | translate }}</p>', {});
+ok(tPair.html.includes('t(label)'), 'template: `| translate` becomes the i18n `t(…)`');
+ok(tPair.ts.split(NL).some((l) => l.startsWith('import {') && l.includes('t') && l.includes('@weave-framework/i18n')), 'template: and `t` is IMPORTED — a name the TEMPLATE uses is a name the file needs');
+ok(!derivedPair.ts.includes('@weave-framework/i18n'), 'template: a component whose template names no i18n imports none');
 ok(hostPair.ts.includes('const hasRoute = computed(() => props.routerLink.length > 0);'), 'host: the getter behind a host binding is translated, not stubbed');
 // `: void` on every drafted function made a method ending in `return false;` a type error. The source either
 // declared a return type or said nothing and let TypeScript work it out — neither of those is `void`.
@@ -751,6 +768,9 @@ const bodyDraft = cv.convertService(bodySvc);
 ok(bodyDraft.ts.includes('const apply = (n: number): void => {'), 'convertService: the drafted function keeps the original signature');
 ok(/\/\/\s+this\.count = n;/.test(bodyDraft.ts), 'convertService: the original body is carried across, commented (so the draft still compiles)');
 ok(bodyDraft.ts.includes('original WithBodyService.apply()'), 'convertService: the carried body is labelled with where it came from');
+// The hole can come from a CONSTRUCTOR PARAMETER as easily as from a field — the guard has to see both.
+ok(/const zone = null as any;/.test(bodyDraft.ts), 'convertService: an unprovided constructor-parameter dependency is declared as a hole');
+ok(/if \(zone\) \{/.test(bodyDraft.ts), 'convertService: and the constructor body reading it is guarded, same as for a field');
 ok(rootDraft.ts.includes('return { user, logout };'), 'convertService: the returned object is the service surface');
 ok(rootDraft.ts.includes('const routerNavigate = ('), 'convertService: a service gets the same shim its rewritten calls name');
 // `navigateByUrl` already takes the path — wrapping it too would be machinery around nothing.
@@ -1192,11 +1212,30 @@ ok(streamsTs.includes('debounceTime'), 'convertService: the operator that stoppe
 // the hand-kept lists asked about, and it named `computed` without importing it.
 ok(/const doubled = computed\(/.test(streamsTs), 'convertService: a field that was already a derived signal stays one');
 ok(streamsTs.split(NL).some((l) => l.startsWith('import {') && l.includes('computed') && l.includes('@weave-framework/runtime')), 'convertService: and `computed` is IMPORTED — derived from the draft, not from a rule about getters');
+// `asReadonly` is Angular's read-only VIEW of a writable signal. Weave has none — but `Computed<T>` IS `() => T`,
+// a value that reads and does not write, so the equivalent is exact rather than a judgement call.
+ok(!/asReadonly/.test(streamsTs.split(NL).filter((l) => !l.trim().startsWith('//')).join(NL)), 'convertService: `asReadonly()` does not survive into live code — it threw at runtime on a line the type-check passed');
+ok(streamsTs.includes('const countPublic = computed(() => count());'), 'convertService: it becomes a `computed` over the same signal');
+ok(cv.angularSignalApi('const a = this.x.asReadonly();') === 'const a = computed(() => this.x());', 'angularSignalApi: the receiver is kept whole, whatever its shape');
+ok(cv.angularSignalApi('const s = "x.asReadonly()";') === 'const s = "x.asReadonly()";', 'angularSignalApi: a string literal is not code');
+ok(cv.angularSignalApi('const u = a.b.c.asReadonly();') === 'const u = computed(() => a.b.c());', 'angularSignalApi: a property chain receiver survives intact');
+ok(cv.angularSignalApi('x.update((v) => v + 1);') === 'x.update((v) => v + 1);', 'angularSignalApi: `update` is left alone — a Weave signal already has it');
 // The alias the source wrote for `this.` is dead once `this.` is gone, and it shadowed the real declaration.
 ok(!/const _router: Router = _router;/.test(streamsTs), 'convertService: `const x: T = this.x` does not survive as `const x: T = x`');
 // Its CALLS were rewritten, but `_router.url` reads the service itself — the field has to exist.
 ok(/const _router = null as any;/.test(streamsTs), 'convertService: a field read directly is declared even when its calls were rewritten away');
 ok(!/null as unknown as Router/.test(streamsTs), 'convertService: the placeholder does not name an Angular type the file no longer imports');
+// A method body waits to be called; the CONSTRUCTOR body runs on creation. Reading a hole the draft itself
+// declared is `any`, so nothing catches it — it crashed the running app with `Cannot read properties of null`.
+ok(/if \(_router\) \{/.test(streamsTs), 'convertService: a constructor body reading a declared hole is GUARDED, not left to throw on creation');
+ok(/if \(_router\) \{[\s\S]*?open\.set\(/.test(streamsTs), 'convertService: the body is kept whole inside the guard — nothing is dropped');
+ok(/GUARDED/.test(streamsTs), 'convertService: and the guard says why it is there, next to the hole it guards');
+// The guard must key on a REAL read, or every constructor gets wrapped for a dependency that was never a hole.
+ok(cv.namesRead('a._router.x', new Set(['_router'])).length === 0, 'namesRead: a PROPERTY of the same name is not a read of the binding');
+ok(cv.namesRead('// _router.x\nconst y = 1;', new Set(['_router'])).length === 0, 'namesRead: a name in a comment is not a read');
+ok(cv.namesRead("t('_router')", new Set(['_router'])).length === 0, 'namesRead: a name in a string is not a read');
+ok(cv.namesRead('_routerState.x', new Set(['_router'])).length === 0, 'namesRead: a LONGER name that merely starts the same is not a read');
+ok(cv.namesRead('_router.routerState', new Set(['_router'])).length === 1, 'namesRead: the real read is found');
 
 // The carried path — a helper module with no decorator is exactly where the streams hide.
 const helperTs = cv.carryFile(join(fx, 'services', 'streams.helper.ts'), { packages: [], components: [], services: [], files: [] });

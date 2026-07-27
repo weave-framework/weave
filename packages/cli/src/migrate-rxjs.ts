@@ -901,6 +901,10 @@ function findTypeAnnotation(code: string, name: string, from: number = 0): numbe
     if (i > 0 && /[\w$.]/.test(code[i - 1])) continue;
     if (/[\w$]/.test(code[i + name.length] ?? '')) continue;
     const before: string = code.slice(Math.max(0, i - 40), i);
+    // A type position is after `:`, inside `<…>`, or in a union/intersection — NOT after `(` or `,`. Those two
+    // were in this set for parameter lists and generic arguments, but they match a call's arguments far more
+    // often: `signal(computed(…))` read as a type annotation and came out `signal(any(…))`, which is `any` used
+    // as a value. A parameter's type arrives after its `:` anyway, so nothing is lost by dropping them.
     if (!/[:<|&,(]\s*$|\b(?:as|extends|implements)\s+$/.test(before)) continue;
     return i;
   }
