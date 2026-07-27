@@ -85,7 +85,7 @@ function componentItem(cf: ComponentFact, hard: Set<string>, branches: BranchFac
   const io: string = `${cf.inputs.length} input(s) → props, ${cf.outputs.length} output(s) → \`on:\``;
   const tpl: string = cf.templateInline ? 'inline template → sibling `.html`' : `template \`${cf.templateUrl ?? '?'}\``;
   if (hard.has(cf.file)) {
-    return { kind: 'component', name, effort: 'needs-you', note: `${io}; ${tpl}. Uses RxJS — its reactivity becomes signals; review each stream.` };
+    return { kind: 'component', name, effort: 'needs-you', note: `${io}; ${tpl}. Uses RxJS — the chains are translated where they fold to plain values; anything time-based is left named and marked.` };
   }
   const branchy: BranchFact | undefined = branches.find((b) => b.method.startsWith(`${cf.className}.`));
   const extra: string = branchy ? ' Has conditional logic — its branches must be preserved.' : '';
@@ -103,7 +103,7 @@ function serviceItem(sf: ServiceFact, hard: Set<string>): PlanItem {
   if (sf.signals.length) surface.push(`${sf.signals.length} already a signal (${sf.signals.join(', ')}) → maps 1:1 to a Weave signal`);
   const api: string = surface.join(', ');
   if (hard.has(sf.file)) {
-    return { kind: 'service', name: sf.className, effort: 'needs-you', note: `→ ${target}. ${api}.${deps} Uses RxJS — streams become signals/\`resource\`; review each.` };
+    return { kind: 'service', name: sf.className, effort: 'needs-you', note: `→ ${target}. ${api}.${deps} Uses RxJS — the chains are translated where they fold to plain values; anything time-based is left named and marked.` };
   }
   return { kind: 'service', name: sf.className, effort: 'auto', note: `→ ${target}. ${api}.${deps}` };
 }

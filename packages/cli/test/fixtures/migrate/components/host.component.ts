@@ -1,5 +1,7 @@
 import { Component, HostBinding, HostListener, Input } from '@angular/core';
 import { Router, RouterModule } from '@angular/router';
+import { Observable, of } from 'rxjs';
+import { map } from 'rxjs/operators';
 
 // The host element, declared BOTH ways Angular allows: decorators on members and the decorator's own `host: {}`.
 // All of it used to be read past. A @HostBinding getter became a `computed` that nothing read, so a class that was
@@ -55,5 +57,11 @@ export class HostComponent {
 
   hover(on: boolean): void {
     this.label = on ? 'hovered' : 'the logo';
+  }
+
+  // A component can hold a stream too, and its SIGNATURE has to follow the translated body — the annotation and
+  // the body only ever meet in the assembled draft, never inside a single member's rewrite.
+  labelWidth(): Observable<number> {
+    return of(this.label).pipe(map((l) => l.length));
   }
 }

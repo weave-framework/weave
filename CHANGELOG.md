@@ -30,8 +30,25 @@
   the snippet's parameters, not the context's keys) · `<ng-content>`/`<router-outlet>` → `<slot>`/`<RouterView>` ·
   reactive forms → `@weave-framework/forms` · route guards → `beforeEach` (an entry guard tests `nav.to`, a
   `canDeactivate` tests `nav.from`) · `HttpClient` → `@weave-framework/data` · `InjectionToken` → `createContext`
-  · RxJS → signals, with a note for every one of the 129 operators a file might import. An `@NgModule` becomes no
-  code — Weave has no modules — but a note records what it declared, provided and exported.
+  · RxJS → plain values, arrays, promises and signals (see below). An `@NgModule` becomes no code — Weave has no
+  modules — but a note records what it declared, provided and exported.
+
+- **`weave migrate` translates RxJS instead of describing it.** Weave has no stream primitive, so an app that
+  finished a migration still importing `rxjs` had been *moved*, not migrated. Chains are now rewritten by folding
+  the operators over the shape of their source: `of(x)` is one synchronous emission, so `map(f)` is `f(x)`;
+  `of(a, b)`/`concat(…)`/`EMPTY` are a finite sequence, so `mergeMap` is `flatMap`, `distinct` is a `Set` and
+  `toArray` is nothing at all; `from(p)`/`forkJoin([…])` are one asynchronous emission, so the chain is `.then(…)`.
+  `concat(of(ids), of([])).pipe(mergeMap((xs) => xs), filter(p), distinct(), toArray())` becomes
+  `[...new Set([ids, []].flatMap((xs) => xs).filter(p))]`. A `BehaviorSubject` becomes a `signal` — `.next(v)` is
+  `.set(v)`, `.value` is `()`, `.complete()` is dropped — and `firstValueFrom(x)` is `await x`, with the enclosing
+  function marked `async`. The **signature follows the body**: a folded chain's `Observable<T>` becomes `T` or
+  `Promise<T>`. This runs on converted components and services *and* on the plain `.ts` files carried across,
+  which is where the streams usually hide; the `rxjs` imports the rewrite made dead are pruned per binding.
+
+  **An operator with no equivalent stops its own chain, and the whole chain is left standing** — `debounceTime`,
+  `delay`, `scan` over a live source and the rest of the genuinely time-based operators keep their `rxjs` import
+  *and* their `Observable` signature, so a signature never promises a plain value over code that still returns a
+  stream. A chain rewritten up to the operator that stopped it would compile and lie.
 
   **It reports what it cannot do.** Every run prints how much of the source is genuinely converted versus merely
   carried across unchanged, names every declaration in each group, and says why. Anything without a faithful

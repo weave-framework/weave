@@ -14,6 +14,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import { resolveImports, type WeaveSymbol } from './migrate-symbols.js';
+import { asyncifyAwaiters, pruneRxImports, rewriteObservableTypes, rxAfterSubjects, rxToWeave, survivingRxNames, translateSubjects } from './migrate-rxjs.js';
 
 // Re-exported so the symbol model has ONE entry point: `symbolTable` is built here, and what it says about
 // collisions belongs beside it rather than a module away.
@@ -1278,14 +1279,19 @@ export function convertComponent(fact: ComponentFact, templateHtml: string, opts
       ]
     : [];
 
+  // The signatures follow the bodies, and they only meet here — a member that returned `Observable<T>` before
+  // the chain rewrite returns a plain `T` or a `Promise<T>` after it, and the annotation has to say so.
+  const bodyTyped: string[] = asyncifyAwaiters(rewriteObservableTypes(body.join('\n'), [])).split('\n');
+
   // Everything AFTER the imports, assembled first: an import is dead only if nothing in the whole file uses it,
   // and `propDefaults` / the `setup` wrapper are part of the file too.
   const tail: string[] = [
     ...defaultsBlock,
     `export function setup(${usesProps ? `props: ${propsType}` : ''}) {`,
-    // Split first: a drafted entry can be a whole multi-line block, and prefixing the ENTRY only indented its
-    // first line, leaving the rest hanging outside the function's indentation.
-    ...body.flatMap((l) => l.split('\n')).map((l) => (l ? `  ${l}` : l)),
+    // One entry per LINE: a drafted entry can be a whole multi-line block, and prefixing the ENTRY only indented
+    // its first line, leaving the rest hanging outside the function's indentation. The split happens where the
+    // body is assembled above, so what arrives here is already line-by-line.
+    ...bodyTyped.map((l) => (l ? `  ${l}` : l)),
     '}',
     '',
   ];
@@ -1295,7 +1301,7 @@ export function convertComponent(fact: ComponentFact, templateHtml: string, opts
 
   // An import is dead only if NEITHER the module nor its template uses it — a `<Card>` import is named in the
   // markup and nowhere else, so pruning against the module alone would have deleted it.
-  const kept: string[] = pruneImports(imports, `${tail.join('\n')}\n${html}`);
+  const kept: string[] = pruneRxImports(pruneImports(imports, `${tail.join('\n')}\n${html}`), tail.join('\n')).lines;
   const ts: string = [...(kept.length ? [...mergeImportLines(kept), ''] : []), ...tail].join('\n');
   return { baseName, ts, html };
 }
@@ -1549,6 +1555,9 @@ export interface TranslateCtx {
    *  of these is not unknown — it is the thing being migrated alongside, so it must not be reported as having
    *  "no recorded Weave equivalent". */
   migrated?: Map<string, MigratedService>;
+  /** Fields that held an RxJS Subject. They become signals, so `this.x.next(v)` is `x.set(v)` and `this.x.value`
+   *  is `x()` — but a method body carries no declaration, so the names have to travel with the context. */
+  subjects?: Set<string>;
 }
 
 /** How a converted service is reached from another file. */
@@ -1643,16 +1652,27 @@ export function translateCtx(members: ClassMember[], inputs: string[], propsRef:
     const call: RegExpMatchArray | null = (m.initializer ?? '').match(/^inject\s*(?:<[^>]*>)?\s*\(\s*([A-Za-z_$][\w$]*)/);
     if (call) injected.set(m.name, call[1]);
   }
+  // A Subject field IS a signal once converted, so it belongs in `signals` rather than `fields`: the read is the
+  // call the original already wrote (`x.value` → `x()`), and treating it as a plain field produced `x()().set(v)`.
+  const subjects: Set<string> = new Set<string>(
+    members.filter((m) => m.kind === 'field' && isSubjectField(m)).map((m) => m.name),
+  );
   return {
     inputs: inputSet,
-    fields: new Set<string>(members.filter((m) => m.kind === 'field' && !inputSet.has(m.name) && !injected.has(m.name)).map((m) => m.name)),
+    fields: new Set<string>(members.filter((m) => m.kind === 'field' && !inputSet.has(m.name) && !injected.has(m.name) && !subjects.has(m.name)).map((m) => m.name)),
     getters: new Set<string>(members.filter((m) => m.kind === 'getter').map((m) => m.name)),
     methods: new Set<string>(members.filter((m) => m.kind === 'method').map((m) => m.name)),
     injected,
-    signals: new Set<string>(members.filter((m) => m.kind === 'field' && m.isSignal).map((m) => m.name)),
+    signals: new Set<string>(members.filter((m) => m.kind === 'field' && (m.isSignal || subjects.has(m.name))).map((m) => m.name)),
     propsRef,
     migrated,
+    subjects,
   };
+}
+
+/** A field holding some flavour of RxJS Subject — by its initializer or, when it has none, by its declared type. */
+export function isSubjectField(mem: ClassMember): boolean {
+  return /new\s+(?:Behavior|Replay|Async)?Subject\s*[<(]/.test(mem.initializer ?? '') || /^(?:Behavior|Replay|Async)?Subject\s*</.test((mem.type ?? '').trim());
 }
 
 /**
@@ -1906,6 +1926,10 @@ export function translateBody(body: string, ctx: TranslateCtx, params: string = 
   // would turn it into a bare name and the shape would no longer be recognisable.
   let code: string = rewriteRouterEvents(body, ctx, todos);
 
+  // Subjects SECOND, while `this.` is still on them: `this.open.next(v)` is a write to what is now a signal, and
+  // once the renames below have run there is no longer a Subject-shaped thing to recognise.
+  code = translateSubjects(code, todos, ctx.subjects ?? []);
+
   code = outsideStrings(code, (part) =>
     part
       // `this.<ElementRef>.nativeElement` IS the element. An action is handed it directly, which is the whole
@@ -1954,6 +1978,13 @@ export function translateBody(body: string, ctx: TranslateCtx, params: string = 
   const leftovers: string[] = [...new Set((code.match(/\bthis\.[A-Za-z_$][\w$]*/g) ?? []).map((m) => m.slice(5)))];
   for (const name of leftovers) todos.push(`\`this.${name}\` has no counterpart here — it was not a field, input, getter or method of this class`);
   if (leftovers.length) code = outsideStrings(code, (p) => p.replace(/\bthis\./g, ''));
+
+  // RxJS LAST, when the receivers are the Weave names: Weave has no stream primitive, so a body that still holds
+  // a `.pipe(…)` has not been migrated. An operator with no equivalent stops its own chain and says so; it does
+  // not stop the rest of the body.
+  const rx: { code: string; todos: string[] } = rxAfterSubjects(code);
+  code = rx.code;
+  todos.push(...rx.todos);
   return { code, todos };
 }
 
@@ -2063,6 +2094,14 @@ export function signalDecl(mem: ClassMember, ctx: TranslateCtx): { code: string;
   if (mem.isSignal && init) {
     const t: { code: string; todos: string[] } = translateBody(init, ctx);
     return { code: t.code.trim(), todos: t.todos };
+  }
+  // A Subject IS the signal once converted, for the same reason: `new BehaviorSubject<T>(x)` becomes `signal<T>(x)`,
+  // and the generic wrap below would have produced `signal<BehaviorSubject<T>>(signal<T>(x))` — a signal holding
+  // a signal, typed as the very class that does not exist in Weave.
+  if (isSubjectField(mem)) {
+    const todos: string[] = [];
+    const code: string = translateSubjects(init || `new Subject<${mem.type?.replace(/^(?:Behavior|Replay|Async)?Subject\s*<([\s\S]*)>$/, '$1') ?? 'unknown'}>()`, todos);
+    return { code: code.trim(), todos };
   }
   // An initializer that CONSTRUCTS something Angular cannot be carried as live code: `@angular/*` imports are
   // dropped (that is the framework being migrated away from), so `signal(new FormGroup({…}))` named a class
@@ -2293,8 +2332,20 @@ export function convertService(fact: ServiceFact, rxjsNames: string[] = [], migr
       : `return {}; ${tsTodo('nothing was public — check what callers actually used')}`,
   );
 
-  const hints: string[] = rxjsSuggestions(rxjsNames);
-  const hintBlock: string[] = hints.length ? ['', tsTodo('this service used RxJS. In Weave:'), ...hints.map((h) => `//   ${h}`)] : [];
+  // The signatures and the bodies have to agree, so the type rewrite runs over the ASSEMBLED draft rather than
+  // over each body: `load(): Observable<string[]>` is decided by what the translated `load` now returns, and the
+  // annotation and the body only sit next to each other here.
+  const typed: string = asyncifyAwaiters(rewriteObservableTypes(body.join('\n'), []));
+  body.length = 0;
+  body.push(...typed.split('\n'));
+
+  // Guidance ONLY for the names that survived the translation. Listing what `map` "would become" beside code
+  // where `map` is already an `Array.prototype.map` is noise that reads as unfinished work.
+  const surviving: string[] = survivingRxNames(typed, rxjsNames);
+  const hints: string[] = rxjsSuggestions(surviving);
+  const hintBlock: string[] = hints.length
+    ? ['', tsTodo('these RxJS names could not be translated — Weave has no stream primitive, so each is by hand:'), ...hints.map((h) => `//   ${h}`)]
+    : [];
   // A service injecting HttpClient gets the data-package mapping, named to the verbs it actually calls.
   // Only `createClient` is imported, because only it is actually used below — `resource`/`action` are named in
   // the guidance and imported by the human when they write the call. A generated dead import is not a courtesy.
@@ -2335,7 +2386,11 @@ export function convertService(fact: ServiceFact, rxjsNames: string[] = [], migr
         `export const ${ctxName} = createContext<ReturnType<typeof create${fact.className}>>();`,
         '',
       ];
-  lines.push(...mergeImportLines(pruneImports(imports, tail.join('\n'))), '', ...tail);
+  // RxJS imports are pruned per BINDING, not per line: a single surviving `Observable` in an untranslated
+  // signature used to keep `of`, `map` and `concat` imported alongside it, so the migrated app still declared a
+  // dependency on a package it no longer calls.
+  const pruned: string[] = pruneRxImports(pruneImports(imports, tail.join('\n')), tail.join('\n')).lines;
+  lines.push(...mergeImportLines(pruned), '', ...tail);
   return { baseName: serviceBaseName(fact.className), ts: lines.join('\n') };
 }
 
@@ -2821,6 +2876,13 @@ export function carryFile(file: string, facts: MigrationFacts): string | null {
   // Repoint relative import/export specifiers whose target is a component (its `.component` suffix is dropped).
   const repointed: string = src.replace(/(from\s*['"])(\.[^'"]+)(['"])/g, (_m, head: string, spec: string, tail: string) => `${head}${repointSpecifier(spec)}${tail}`);
 
+  // "Carried" never meant "left alone about RxJS". A helper module with no decorator is exactly where the
+  // streams hide, and moving it unchanged hands the migrated app a dependency on a package Weave replaces.
+  const rx: { code: string; todos: string[] } = rxToWeave(repointed);
+  const rxNames: string[] = importedNamesFrom(file, 'rxjs');
+  const rxSurviving: string[] = survivingRxNames(rx.code, rxNames);
+  const carried: string = pruneRxImports(rx.code.split('\n'), rx.code).lines.join('\n');
+
   const angularImports: string[] = importedNamesFrom(file, '@angular');
   // A carried file with `@angular` imports does NOT "already work" — it is Angular code in a Weave app, and it
   // will not run. Saying otherwise about the very framework being migrated away from is the kind of soothing
@@ -2837,10 +2899,18 @@ export function carryFile(file: string, facts: MigrationFacts): string | null {
         '// This file had no @Component/@Injectable, so it is kept as-is — plain TypeScript that already works.',
         '// Check anything framework-specific below.',
       ];
-  if (facts.packages.some((p) => p.decision === 'auto' && importedNamesFrom(file, p.name).length)) {
+  if (rxNames.length) {
+    header.push(
+      rxSurviving.length
+        ? tsTodo(`its RxJS was translated except for ${rxSurviving.join(', ')} — those are about time or control flow, so they are by hand.`)
+        : '// Its RxJS was translated to plain values and promises; this file no longer depends on rxjs.',
+    );
+    for (const t of rx.todos) header.push(tsTodo(t));
+  }
+  if (facts.packages.some((p) => p.decision === 'auto' && importedNamesFrom(file, p.name).length && p.name !== 'rxjs')) {
     header.push(tsTodo('it uses a package you chose to migrate — check the plan for what it becomes.'));
   }
-  return `${header.join('\n')}\n\n${repointed}`;
+  return `${header.join('\n')}\n\n${carried}`;
 }
 
 /** The selector → component-name map, so converted templates reference each other as Weave components. */

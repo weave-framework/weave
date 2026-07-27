@@ -219,7 +219,7 @@ comment rather than guessed at.
 | a route resolver | a route `loader`, read with `useLoaderData()` |
 | `HttpClient` | `@weave-framework/data` — `resource` for reads, `action` for writes |
 | `InjectionToken` | `createContext` |
-| RxJS | signals — with a per-operator note for every operator your code imports |
+| RxJS | translated: `of`/`concat`/`from` and their operator chains become plain values, arrays and promises; a `BehaviorSubject` becomes a `signal` |
 | `@NgModule` | nothing: Weave has no modules. A note records what it declared, provided and exported. |
 
 Third-party packages are sorted into three groups — ones Weave replaces (`rxjs`, `@ngx-translate`), ones you
@@ -233,10 +233,47 @@ Your converted code still imports these — they stay dependencies of your app:
   • rxjs   — Weave replaces this: what is left is what could not be translated without guessing
 ~~~
 
-That second line is the honest half of a real limitation. Weave is signal-native and has no place for an
-`Observable` — a value that changes over time is a `signal`, a one-shot fetch is a `resource`. But a `pipe(…)`
-chain is not a rename, so the migration tells you what each operator becomes and leaves the code naming `rxjs`
-rather than guessing at a rewrite. Every remaining use is a decision, and now you can find them all.
+### RxJS is translated, not annotated
+
+Weave is signal-native and has no stream primitive, so an app that finishes a migration still importing `rxjs`
+has been *moved*, not migrated. The chains are rewritten.
+
+The rewrite is a fold over a **shape**, because an RxJS chain in application code is almost never an infinite
+stream — it is one of three things, and each has an exact JavaScript equivalent:
+
+| The source | Its shape | So the operators are |
+|---|---|---|
+| `of(x)` | one synchronous emission | plain expression application — `map(f)` is `f(x)` |
+| `of(a, b)`, `concat(…)`, `EMPTY` | a finite sequence | the array methods they were modelled on — `mergeMap` is `flatMap`, `distinct` is a `Set`, `toArray` is nothing at all |
+| `from(p)`, `forkJoin([…])` | one asynchronous emission | `.then(…)` / `await` |
+
+~~~ts
+// before
+load(ids: string[]): Observable<string[]> {
+  return concat(of(ids), of([])).pipe(mergeMap((xs) => xs), filter((x) => !!x), distinct(), toArray());
+}
+
+// after
+const load = (ids: string[]): string[] => {
+  return [...new Set([ids, []].flatMap((xs) => xs).filter((x) => !!x))];
+};
+~~~
+
+The signature follows the body: a chain that folded to a value returns that value, one that folded to a promise
+returns `Promise<T>`. A `BehaviorSubject` becomes a `signal` outright — it already held a current value, shared it
+with every reader, and notified on write — so `.next(v)` is `v.set(…)`, `.value` is `v()`, and `.complete()` is
+dropped because teardown is the owner scope's job. `firstValueFrom(x)` is `await x`, and the function that gained
+the `await` is marked `async`.
+
+**An operator with no equivalent stops its own chain, and the whole chain is left standing.** `debounceTime`,
+`delay`, `scan` over a live source and the rest of the genuinely time-based operators have no expression form, so
+those chains keep their `rxjs` import and their `Observable` signature — together, so the signature never
+promises a plain value over code that still returns a stream. Each one is named in a `TODO(weave migrate)`. A
+chain rewritten up to the operator that stopped it would compile and lie, so it is never half-rewritten.
+
+This covers the converted components and services *and* the files carried across untouched — a helper module with
+no decorator is exactly where the streams hide. The `rxjs` imports the translation made dead are pruned per
+binding, so a single surviving `Observable` no longer drags `of`, `map` and `concat` along with it.
 
 ### It asks for what it cannot see
 
@@ -272,7 +309,7 @@ A granted unit's output lands under its own folder (`src/sps-interfaces/…`), s
 > **This is assisted, not automatic.** Method and getter bodies *are* translated — `this.x` is a rename with a
 > known target, not a judgement call — and the original travels beside the result as a comment so every rewrite
 > is checkable. What is left to you is what the tool genuinely cannot know: an unmapped service call, a `this.`
-> with no counterpart in the class, an RxJS chain whose intent only you can name. Each one is a
+> with no counterpart in the class, an RxJS operator that is genuinely about time. Each one is a
 > `TODO(weave migrate)` with the reason. Read the plan, then work through them.
 
 ## weave.config.ts
