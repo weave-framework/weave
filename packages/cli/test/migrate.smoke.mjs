@@ -19,6 +19,8 @@ const repo = join(here, '..', '..', '..');
 const fx = join(here, 'fixtures', 'migrate');
 
 const NL = String.fromCharCode(10);
+const BS = String.fromCharCode(92);
+const SLASH = String.fromCharCode(47);
 let failures = 0;
 const ok = (cond, msg) => {
   console.log(`${cond ? '  ✔' : '  ✖'} ${msg}`);
@@ -1078,6 +1080,38 @@ ok(cv.devFlag('bun') === '-d' && cv.devFlag('yarn') === '-D', 'devFlag: bun spel
 const lines = m.installLines('pnpm', [{ spec: 'lodash@^4', dev: false }, { spec: '@org/interfaces@^1', dev: true }]);
 ok(lines.length === 2 && lines[0] === 'pnpm add lodash@^4' && lines[1] === 'pnpm add -D @org/interfaces@^1', 'installLines: runtime and type-only are SEPARATE commands — one list would put one of them in the wrong place');
 ok(m.installLines('pnpm', [{ spec: 'a', dev: false }]).length === 1, 'installLines: no dev command when there is nothing for it');
+
+/* ── where the converted code lands ── */
+// The output mirrors the source layout into `src/`, so without a choice a whole Angular folder tree drops into
+// the root of an app that already has one of its own.
+ok(cv.safeSubdir('') === '', 'safeSubdir: nothing typed is the root — the previous behaviour, exactly');
+ok(cv.safeSubdir('   ') === '', 'safeSubdir: whitespace is nothing typed');
+ok(cv.safeSubdir('features/breadcrumbs') === 'features/breadcrumbs', 'safeSubdir: a plain relative folder is taken as typed');
+ok(cv.safeSubdir('features'+BS+'breadcrumbs') === 'features/breadcrumbs', 'safeSubdir: a Windows separator is normalised, not refused');
+ok(cv.safeSubdir('/features/') === null, 'safeSubdir: an absolute path is refused');
+ok(cv.safeSubdir('C:/anywhere') === null, 'safeSubdir: a drive letter is refused');
+ok(cv.safeSubdir('../../etc') === null, 'safeSubdir: a `..` segment is refused — this command writes inside the app it was pointed at');
+ok(cv.safeSubdir('a/../../b') === null, 'safeSubdir: a `..` buried mid-path is refused too, not resolved away');
+ok(cv.safeSubdir('./features') === 'features', 'safeSubdir: a leading `./` is harmless and dropped');
+ok(cv.safeSubdir('a'+String.fromCharCode(0)+'b') === null, 'safeSubdir: a control character in a segment is refused');
+
+// The chosen folder has to reach the WRITER and the SYMBOL TABLE together — a table that still points at the
+// old root writes imports at files that are not there.
+const subFacts = a.assembleFacts(join(fx, 'nx-mono', 'apps', 'shop'));
+const rootItems = cv.planWrites(subFacts, 'D:/out');
+const subItems = cv.planWrites(subFacts, 'D:/out', 'features/shop');
+ok(rootItems.length === subItems.length, 'planWrites: the destination changes where files go, not which files there are');
+ok(subItems.every((i) => i.path.split(BS).join(SLASH).includes('/src/features/shop/')), 'planWrites: every written file lands under the chosen folder');
+const subTable = cv.symbolTable(subFacts, 'D:/out', 'features/shop');
+ok([...subTable.values()].every((v) => v.file.split(BS).join(SLASH).includes('/src/features/shop/')), 'symbolTable: the table follows the writer — otherwise every repointed import names a file that is not there');
+const written = new Set(subItems.map((i) => i.path));
+ok([...subTable.values()].every((v) => written.has(v.file) || !subItems.some((i) => i.path === v.file)), 'symbolTable: no symbol points at a path outside the plan');
+// The prompt lives on the interactive path, which no test can drive — so the WIRING is asserted at the source:
+// asking where to put the code and then not passing the answer on is a lie the paths above cannot catch.
+const migrateSrc = readFileSync(join(repo, 'packages', 'cli', 'src', 'migrate.ts'), 'utf8');
+ok(/planWrites\(facts, targetDir, subdir\)/.test(migrateSrc), 'convertStep: the chosen folder is passed to the writer');
+ok(/symbolTable\(facts, targetDir, subdir\)/.test(migrateSrc), 'convertStep: and to the symbol table, so imports point where the files actually land');
+ok(/const outRoot: string = join\(targetDir, 'src', subdir\)/.test(migrateSrc), 'convertStep: what it PRINTS is built from the same choice, not from the old root');
 
 // The same all-or-nothing rule for the sources that are not calls: `EMPTY` under a refused `.pipe` must stay
 // `EMPTY`, or the chain becomes `[].pipe(…)` — no longer RxJS, and no longer valid either.

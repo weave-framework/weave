@@ -2869,6 +2869,23 @@ function unitOf(file: string, facts: MigrationFacts): { dir: string; prefix: str
 }
 
 /**
+ * A user-typed destination folder, or null when it would land outside `src/`.
+ *
+ * The output otherwise mirrors the source layout straight into `src/`, which drops a whole Angular folder tree
+ * into the root of an app that already has its own. So the folder can be typed — and because it is typed, it is
+ * checked: an absolute path, a drive letter, or a `..` segment is refused rather than resolved, because the one
+ * thing this command promises is that it writes inside the app it was pointed at.
+ */
+export function safeSubdir(input: string): string | null {
+  const t: string = input.trim().replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+  if (!t) return ''; // nothing typed — the root, exactly as before
+  if (/^[A-Za-z]:/.test(t) || input.trim().startsWith('/') || input.trim().startsWith('\\')) return null;
+  const parts: string[] = t.split('/').filter((seg) => seg !== '.');
+  if (!parts.length || parts.some((seg) => seg === '..' || seg === '' || /[<>:"|?*\x00-\x1f]/.test(seg))) return null;
+  return parts.join('/');
+}
+
+/**
  * The absolute path a source file's conversion lands at. ONE calculation, shared by the writer and the symbol
  * table — computing it twice is how the table came to point at `./app/root` for a file written to `app/app.ts`,
  * which is exactly the class of mismatch the table exists to remove.
@@ -2877,11 +2894,11 @@ function unitOf(file: string, facts: MigrationFacts): { dir: string; prefix: str
  * because deriving it from the CLASS made `breadcrumbs.component.ts` and `BreadcrumbsService` both want
  * `breadcrumbs.ts`, and the second silently overwrote the first.
  */
-export function outputFileFor(sourceFile: string, facts: MigrationFacts, targetDir: string, component: boolean = false): string {
+export function outputFileFor(sourceFile: string, facts: MigrationFacts, targetDir: string, component: boolean = false, subdir: string = ''): string {
   const rel: string = outputPathFor(sourceFile, facts);
   const dir: string = dirname(rel) === '.' ? '' : dirname(rel);
   const name: string = rel.split(/[\\/]/).pop() ?? '';
-  return join(targetDir, 'src', dir, `${component ? weaveBaseName(name) : name.replace(/\.ts$/, '')}.ts`);
+  return join(targetDir, 'src', subdir, dir, `${component ? weaveBaseName(name) : name.replace(/\.ts$/, '')}.ts`);
 }
 
 /**
@@ -3050,21 +3067,21 @@ export function componentNameMap(facts: MigrationFacts): Record<string, string> 
  * mapping, so nothing written can name something that no longer exists — see `migrate-symbols.ts` for why that
  * is a model rather than another patch.
  */
-export function symbolTable(facts: MigrationFacts, targetDir: string): Map<string, WeaveSymbol> {
+export function symbolTable(facts: MigrationFacts, targetDir: string, subdir: string = ''): Map<string, WeaveSymbol> {
   const table: Map<string, WeaveSymbol> = new Map<string, WeaveSymbol>();
   for (const cf of facts.components) {
     // A component is the file's DEFAULT export — which is exactly what its importers did not know.
-    table.set(cf.className, { from: cf.className, to: cf.className, isDefault: true, file: outputFileFor(cf.file, facts, targetDir, true), kind: 'component' });
+    table.set(cf.className, { from: cf.className, to: cf.className, isDefault: true, file: outputFileFor(cf.file, facts, targetDir, true, subdir), kind: 'component' });
   }
   for (const sf of facts.services) {
     const m: MigratedService | undefined = migratedServices([sf]).get(sf.className);
-    if (m) table.set(sf.className, { from: sf.className, to: m.name, isDefault: false, file: outputFileFor(sf.file, facts, targetDir), kind: 'service' });
+    if (m) table.set(sf.className, { from: sf.className, to: m.name, isDefault: false, file: outputFileFor(sf.file, facts, targetDir, false, subdir), kind: 'service' });
   }
   for (const pf of facts.pipes ?? []) {
-    table.set(pf.className, { from: pf.className, to: pipeFunctionName(pf), isDefault: false, file: outputFileFor(pf.file, facts, targetDir), kind: 'pipe' });
+    table.set(pf.className, { from: pf.className, to: pipeFunctionName(pf), isDefault: false, file: outputFileFor(pf.file, facts, targetDir, false, subdir), kind: 'pipe' });
   }
   for (const df of facts.directives ?? []) {
-    table.set(df.className, { from: df.className, to: directiveFunctionName(df), isDefault: false, file: outputFileFor(df.file, facts, targetDir), kind: 'directive' });
+    table.set(df.className, { from: df.className, to: directiveFunctionName(df), isDefault: false, file: outputFileFor(df.file, facts, targetDir, false, subdir), kind: 'directive' });
   }
   // Everything a CARRIED file exports belongs in the table too. Only decorated classes were listed, so a type
   // imported through a workspace alias — `import { IBreadcrumb } from '@sps-interfaces'` — was migrated into the
@@ -3078,7 +3095,7 @@ export function symbolTable(facts: MigrationFacts, targetDir: string): Map<strin
   ]);
   for (const file of facts.files) {
     if (decorated.has(file)) continue;
-    const out: string = outputFileFor(file, facts, targetDir);
+    const out: string = outputFileFor(file, facts, targetDir, false, subdir);
     for (const name of exportedNames(file)) {
       // A decorated class wins: it is the one whose NAME changed, and the carried scan must not shadow it.
       if (!table.has(name)) table.set(name, { from: name, to: name, isDefault: false, file: out, kind: 'carried' });
@@ -3087,11 +3104,11 @@ export function symbolTable(facts: MigrationFacts, targetDir: string): Map<strin
   return table;
 }
 
-export function planWrites(facts: MigrationFacts, targetDir: string): WriteItem[] {
+export function planWrites(facts: MigrationFacts, targetDir: string, subdir: string = ''): WriteItem[] {
   const items: WriteItem[] = [];
   // The whole-unit mapping, built FIRST: every emitted file is resolved against it at the end, so a rename that
   // landed here cannot be missed over there.
-  const table: Map<string, WeaveSymbol> = symbolTable(facts, targetDir);
+  const table: Map<string, WeaveSymbol> = symbolTable(facts, targetDir, subdir);
   // What this run converts, so a call from one converted file into another is not reported as unknown.
   const migrated: Map<string, MigratedService> = migratedServices(facts.services);
   // The whole unit's `Observable<…>` returners, gathered BEFORE any file is converted. A chain's source is
@@ -3115,14 +3132,14 @@ export function planWrites(facts: MigrationFacts, targetDir: string): WriteItem[
       ['.ts', tsBody],
       ['.html', html === null ? `${todo('the original template could not be read — port it by hand')}\n` : `${pair.html}\n`],
     ] as Array<[string, string]>) {
-      const path: string = join(targetDir, 'src', dir, `${base}${ext}`);
+      const path: string = join(targetDir, 'src', subdir, dir, `${base}${ext}`);
       items.push({ path, content, status: existsSync(path) ? 'skip-exists' : 'write' });
     }
     // STYLES. A Weave component's stylesheet is its sibling, so the first source stylesheet becomes
     // `<base>.<ext>` and inline `styles:` are written out as that sibling too. Neither used to be carried at all:
     // styleUrls were recorded as a fact and the files left behind, and inline styles were only ever COUNTED.
     for (const item of componentStyles(cf, base)) {
-      const path: string = join(targetDir, 'src', dir, item.name);
+      const path: string = join(targetDir, 'src', subdir, dir, item.name);
       items.push({ path, content: item.content, status: existsSync(path) ? 'skip-exists' : 'write' });
     }
   }
@@ -3135,7 +3152,7 @@ export function planWrites(facts: MigrationFacts, targetDir: string): WriteItem[
     const dir: string = dirname(rel) === '.' ? '' : dirname(rel);
     const base: string = (rel.split(/[\\/]/).pop() ?? '').replace(/\.ts$/, '');
     const draft: { baseName: string; ts: string } = convertService(sf, importedNamesFrom(sf.file, 'rxjs'), migrated, returners);
-    const path: string = join(targetDir, 'src', dir, `${base || draft.baseName}.ts`);
+    const path: string = join(targetDir, 'src', subdir, dir, `${base || draft.baseName}.ts`);
     items.push({ path, content: draft.ts, status: existsSync(path) ? 'skip-exists' : 'write' });
   }
   // Pipes → functions, directives → `use:` actions. Both are real conversions, not carries.
@@ -3143,19 +3160,19 @@ export function planWrites(facts: MigrationFacts, targetDir: string): WriteItem[
     const rel: string = outputPathFor(pf.file, facts);
     const dir: string = dirname(rel) === '.' ? '' : dirname(rel);
     const base: string = (rel.split(/[\\/]/).pop() ?? '').replace(/\.ts$/, '');
-    const path: string = join(targetDir, 'src', dir, `${base}.ts`);
+    const path: string = join(targetDir, 'src', subdir, dir, `${base}.ts`);
     items.push({ path, content: convertPipe(pf).ts, status: existsSync(path) ? 'skip-exists' : 'write' });
   }
   for (const df of facts.directives ?? []) {
     const rel: string = outputPathFor(df.file, facts);
     const dir: string = dirname(rel) === '.' ? '' : dirname(rel);
     const base: string = (rel.split(/[\\/]/).pop() ?? '').replace(/\.ts$/, '');
-    const path: string = join(targetDir, 'src', dir, `${base}.ts`);
+    const path: string = join(targetDir, 'src', subdir, dir, `${base}.ts`);
     items.push({ path, content: convertDirective(df).ts, status: existsSync(path) ? 'skip-exists' : 'write' });
   }
   // Route resolvers → a route `loader`. They carry no decorator, so they used to be carried as plain TypeScript.
   for (const rf of facts.resolvers ?? []) {
-    const path: string = outputFileFor(rf.file, facts, targetDir);
+    const path: string = outputFileFor(rf.file, facts, targetDir, false, subdir);
     items.push({ path, content: convertResolver(rf).ts, status: existsSync(path) ? 'skip-exists' : 'write' });
   }
 
@@ -3164,13 +3181,13 @@ export function planWrites(facts: MigrationFacts, targetDir: string): WriteItem[
     const rel: string = outputPathFor(nm.file, facts);
     const dir: string = dirname(rel) === '.' ? '' : dirname(rel);
     const base: string = (rel.split(/[\\/]/).pop() ?? '').replace(/\.ts$/, '');
-    const path: string = join(targetDir, 'src', dir, `${base}.ts`);
+    const path: string = join(targetDir, 'src', subdir, dir, `${base}.ts`);
     items.push({ path, content: convertNgModule(nm), status: existsSync(path) ? 'skip-exists' : 'write' });
   }
   // InjectionTokens → one contexts module (a token is a value-injection, which is exactly what a context is).
   const tokensTs: string | null = convertTokens(facts.tokens ?? []);
   if (tokensTs) {
-    const path: string = join(targetDir, 'src', 'contexts.ts');
+    const path: string = join(targetDir, 'src', subdir, 'contexts.ts');
     items.push({ path, content: tokensTs, status: existsSync(path) ? 'skip-exists' : 'write' });
   }
 
@@ -3193,13 +3210,13 @@ export function planWrites(facts: MigrationFacts, targetDir: string): WriteItem[
     const base: string = (rel.split(/[\\/]/).pop() ?? '').replace(/\.ts$/, '');
     const carried: string | null = carryFile(file, facts, returners);
     if (carried === null) continue;
-    const path: string = join(targetDir, 'src', dir, `${base}.ts`);
+    const path: string = join(targetDir, 'src', subdir, dir, `${base}.ts`);
     items.push({ path, content: carried, status: existsSync(path) ? 'skip-exists' : 'write' });
   }
   // Route guards (M5.5) — one module, because Weave's `beforeEach` is global rather than per-route.
   const guards: string | null = convertGuards(facts.routes);
   if (guards) {
-    const path: string = join(targetDir, 'src', 'guards.ts');
+    const path: string = join(targetDir, 'src', subdir, 'guards.ts');
     items.push({ path, content: guards, status: existsSync(path) ? 'skip-exists' : 'write' });
   }
 

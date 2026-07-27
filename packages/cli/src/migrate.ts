@@ -20,6 +20,7 @@ import {
   carriedInstalls,
   carriedPackages,
   checkSpecs,
+  safeSubdir,
   danglingAcrossSections,
   detectPackageManager,
   installCommand,
@@ -540,12 +541,43 @@ async function accessStep(io: InputManager, facts: MigrationFacts): Promise<Migr
  * run against an app you already have — it is opt-in (a plain yes/no, defaulting to NO), and a path that already
  * exists is never overwritten, only reported. Nothing here is a surprise: the file list is printed first.
  */
+/**
+ * Ask where under `src/` the converted code should land.
+ *
+ * Enter means the root, which is what the command always did — the layout is mirrored from the source, so a
+ * library's folders arrive as they were. Typing a folder puts that whole tree under it instead, which is what
+ * you want when the app already has a `src/` of its own to keep readable.
+ *
+ * A path that would escape `src/` is refused and re-asked rather than resolved: this command writes inside the
+ * app it was pointed at, and that has to stay true of a typed answer as much as of a computed one.
+ */
+async function askSubdir(io: InputManager, targetDir: string): Promise<string> {
+  for (;;) {
+    const typed: string = await io.askLine(
+      `
+${c.bold('Where should the converted code go?')} ${c.dim(`[Enter = ${join(targetDir, 'src')}, or a folder under it]`)}
+${c.cyan('> ')}`,
+    );
+    const chosen: string | null = safeSubdir(typed);
+    if (chosen !== null) {
+      if (chosen) console.log(c.dim(`  → ${join(targetDir, 'src', chosen)}`));
+      return chosen;
+    }
+    console.log(`${c.red('✖')} ${c.yellow('That path would land outside the app.')} ${c.dim('Type a folder relative to src/, like `features/breadcrumbs`.')}`);
+  }
+}
+
 async function convertStep(io: InputManager, facts: MigrationFacts, targetDir: string, planPath: string): Promise<void> {
-  const items: WriteItem[] = planWrites(facts, targetDir);
-  if (!items.length) {
+  if (!planWrites(facts, targetDir).length) {
     console.log(c.dim('\nNothing to convert yet — no components were found in this unit.'));
     return;
   }
+  // WHERE it lands, asked before anything is planned. The output mirrors the source layout, so without this a
+  // whole Angular folder tree drops into the root of an app that already has one of its own. Empty keeps the
+  // previous behaviour exactly, so "put it where it went before" is the Enter key.
+  const subdir: string = await askSubdir(io, targetDir);
+  const items: WriteItem[] = planWrites(facts, targetDir, subdir);
+  const outRoot: string = join(targetDir, 'src', subdir);
   let fresh: WriteItem[] = items.filter((i) => i.status === 'write');
   const blocked: WriteItem[] = items.filter((i) => i.status === 'skip-exists');
 
@@ -553,7 +585,7 @@ async function convertStep(io: InputManager, facts: MigrationFacts, targetDir: s
   // reviews. The mapping spans the whole unit either way, so section two knows what section one renamed — but
   // what a chosen section NEEDS from one left behind has to be said, or the code lands not resolving and the
   // reason was a decision made three prompts earlier.
-  const groups: Array<{ name: string; paths: string[] }> = sections(fresh.map((i) => i.path), join(targetDir, 'src'));
+  const groups: Array<{ name: string; paths: string[] }> = sections(fresh.map((i) => i.path), outRoot);
   if (groups.length > 1 && fresh.length > SECTION_PROMPT_AT) {
     console.log(`\n${c.bold(`${fresh.length} files across ${groups.length} sections.`)}${c.dim(' Migrate all of it, or a section at a time:')}`);
     const labels: string[] = groups.map((g) => `${g.name}  ${c.dim(`(${g.paths.length} file(s))`)}`);
@@ -564,7 +596,7 @@ async function convertStep(io: InputManager, facts: MigrationFacts, targetDir: s
       return;
     }
     fresh = fresh.filter((i) => keep.has(i.path));
-    const dangling: Array<{ file: string; needs: string; from: string }> = danglingAcrossSections(fresh, symbolTable(facts, targetDir));
+    const dangling: Array<{ file: string; needs: string; from: string }> = danglingAcrossSections(fresh, symbolTable(facts, targetDir, subdir));
     if (dangling.length) {
       console.log(`\n${c.yellow('What you chose depends on what you did not:')}`);
       for (const d of dangling.slice(0, 8)) {
@@ -611,10 +643,12 @@ async function convertStep(io: InputManager, facts: MigrationFacts, targetDir: s
     // Naming them and stopping there left the app importing modules nothing provides, so the first `weave check`
     // after a migration was a wall of "cannot find module" with the real TODOs buried in it. The versions come
     // from the SOURCE app, so the code lands against what it was written for rather than whatever is latest.
-    const installs: Array<{ name: string; spec: string }> = carriedInstalls(items, facts.unit, targetDir);
+    const installs: Array<{ name: string; spec: string; dev: boolean }> = carriedInstalls(items, facts.unit, targetDir);
     if (installs.length) {
       console.log(`\n${c.yellow('Your app does not have these yet:')}`);
-      console.log(`  ${c.bold(installCommand(detectPackageManager(targetDir), installs.map((i) => i.spec)))}`);
+      // The SAME two commands the offer below runs. Printing one combined line here and two there said the
+      // type-only packages would land in `dependencies`, which is not where they go.
+      for (const line of installLines(detectPackageManager(targetDir), installs)) console.log(`  ${c.bold(line)}`);
       console.log(c.dim('  (Offered again after writing. `@angular/*` is never on this list — installing it would undo the migration.)'));
     }
   }

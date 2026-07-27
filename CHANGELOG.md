@@ -69,6 +69,13 @@
   alias a constructor wrote for it (`const _router: Router = this._router`) is dropped once `this.` is gone, and
   a placeholder no longer names an Angular type the converted file does not import.
 
+- **`weave migrate` asks where the converted code should go.** The output mirrors the source layout, so a whole
+  Angular folder tree dropped into the root of an app that already had a `src/` of its own. The destination is
+  now prompted for — Enter keeps the root (exactly the previous behaviour), and a typed folder puts the whole
+  tree under it. The symbol table follows the writer, so imports between the written files point where those
+  files actually landed. A path that would escape `src/` (absolute, a drive letter, a `..` segment) is refused
+  and re-asked rather than resolved.
+
 - **`weave migrate` offers to install the packages the written code needs.** It named the third-party packages
   the converted code still imports (`lodash`, `@ngx-translate/core`) and stopped there, so the first `weave check`
   after a migration was a wall of "cannot find module" with the real TODOs buried in it. The install command is

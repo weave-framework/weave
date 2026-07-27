@@ -308,6 +308,23 @@ This covers the converted components and services *and* the files carried across
 no decorator is exactly where the streams hide. The `rxjs` imports the translation made dead are pruned per
 binding, so a single surviving `Observable` no longer drags `of`, `map` and `concat` along with it.
 
+### Where it lands
+
+The converted code mirrors the source layout, so by default a library's folders arrive under `src/` as they were
+— which is fine in an empty app and crowded in one that already has a `src/` of its own. So the destination is
+asked for:
+
+~~~text
+Where should the converted code go? [Enter = D:\my-app\src, or a folder under it]
+> features/breadcrumbs
+  → D:\my-app\srceaturesreadcrumbs
+~~~
+
+Enter keeps the root. A typed folder puts the whole converted tree under it, and the symbol table follows, so the
+imports between the written files point where those files actually landed. A path that would escape `src/` — an
+absolute path, a drive letter, a `..` segment — is refused and re-asked rather than resolved: this command writes
+inside the app it was pointed at, and that stays true of a typed answer as much as of a computed one.
+
 ### What the target app has to be able to resolve
 
 A migrated file that imports from `@my-org/interfaces` compiles in the source workspace and nowhere else. Every
