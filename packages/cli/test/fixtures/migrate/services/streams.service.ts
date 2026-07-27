@@ -1,4 +1,4 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { BehaviorSubject, Observable, of } from 'rxjs';
 import { debounceTime, map } from 'rxjs/operators';
@@ -9,6 +9,10 @@ import { debounceTime, map } from 'rxjs/operators';
 export class StreamsService {
   private open = new BehaviorSubject<boolean>(false);
   private _router: Router = inject(Router);
+  // A field that was ALREADY a signal, derived. Nothing about it is a getter, so every hand-kept "import
+  // `computed` if some member is a getter" rule read straight past it and the draft named it unimported.
+  readonly count = signal(0);
+  readonly doubled = computed(() => this.count() * 2);
 
   // The alias the source wrote for `this.`, and a read of the service itself. Angular's `navigate` is rewritten
   // to Weave's, but `_router.url` is not — so the field has to survive, and the alias has to not.

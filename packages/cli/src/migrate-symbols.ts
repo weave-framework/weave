@@ -26,7 +26,7 @@ export interface WeaveSymbol {
   isDefault: boolean;
   /** Absolute path of the file that now holds it. */
   file: string;
-  kind: 'component' | 'service' | 'pipe' | 'directive' | 'token' | 'carried';
+  kind: 'component' | 'service' | 'pipe' | 'directive' | 'resolver' | 'token' | 'carried';
 }
 
 /** An import statement as written, taken apart. */
@@ -82,6 +82,8 @@ function specifierFrom(fromFile: string, toFile: string): string {
  */
 export function resolveImports(content: string, file: string, table: Map<string, WeaveSymbol>): string {
   let out: string = content;
+  // Which converted names this file ended up importing, so their CLASS-shaped uses can be flagged below.
+  const classUses: Map<string, WeaveSymbol> = new Map<string, WeaveSymbol>();
   for (const imp of parseImports(content)) {
     const matched: Array<{ binding: { name: string; alias: string }; sym: WeaveSymbol }> = imp.named
       .map((binding) => ({ binding, sym: table.get(binding.name) }))
@@ -119,6 +121,32 @@ export function resolveImports(content: string, file: string, table: Map<string,
       }
     }
     out = out.replace(imp.text, lines.join('\n'));
+    for (const k of known) classUses.set(k.binding.alias, k.sym);
+  }
+  return flagClassUses(out, classUses);
+}
+
+/**
+ * Mark the places that still use a converted declaration AS A CLASS.
+ *
+ * Repointing the import fixes the module, not the meaning: a resolver, a pipe and a directive all become
+ * FUNCTIONS, so `new CrumbsResolver()` now calls `new` on a function and `x instanceof CrumbsResolver` compares
+ * against one. Renaming the import and stopping there produced code that resolved and could not run — worse than
+ * the missing export it replaced, because the module now looks fine.
+ *
+ * The site is annotated where it stands. Rewriting it would mean guessing what the class was standing in for.
+ */
+function flagClassUses(content: string, symbols: Map<string, WeaveSymbol>): string {
+  let out: string = content;
+  for (const [alias, sym] of symbols) {
+    if (sym.kind === 'component' || sym.kind === 'carried') continue; // still a class, or still whatever it was
+    const escaped: string = alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const shaped: RegExp = new RegExp(`^([\\t ]*)(.*(?:new\\s+${escaped}\\s*\\(|instanceof\\s+${escaped}).*)$`, 'gm');
+    out = out.replace(shaped, (line, pad: string, code: string) =>
+      code.trimStart().startsWith('//')
+        ? line // the carried original travels beside every rewrite; it is a record, not a use
+        : `${pad}// TODO(weave migrate): \`${sym.from}\` is a ${sym.kind}, and in Weave that is the FUNCTION \`${sym.to}\` —\n${pad}//   there is no class here to construct, or to test with \`instanceof\`. Call it, or hold it as a value.\n${line}`,
+    );
   }
   return out;
 }

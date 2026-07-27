@@ -853,6 +853,31 @@ function dedupeUnionMember(code: string, at: number, end: number, replacement: s
   return { text: before + replacement + code.slice(end), at: at + replacement.length };
 }
 
+/**
+ * Replace a name where it is used as a TYPE, leaving every other occurrence alone.
+ *
+ * The scanner is the one the RxJS rewrite uses — string- and comment-aware — because the alternative is a regex
+ * that matches inside a carried original or a URL. Exported so the converter can apply the same rule to the
+ * Angular types it must not emit: `ActivatedRouteSnapshot` in a signature names a class the output does not
+ * import, and there is no Weave type to put in its place.
+ */
+export function replaceTypeName(code: string, name: string, replacement: string): { code: string; hits: number } {
+  let out: string = code;
+  let from: number = 0;
+  let hits: number = 0;
+  for (;;) {
+    const at: number = findTypeAnnotation(out, name, from);
+    if (at < 0) return { code: out, hits };
+    // A generic argument list belongs to the name, so `Foo<Bar>` goes as a whole.
+    const open: number = at + name.length;
+    const close: number = out[open] === '<' ? matchAngle(out, open) : open - 1;
+    const end: number = close < 0 ? open : close + 1;
+    out = out.slice(0, at) + replacement + out.slice(end);
+    from = at + replacement.length;
+    hits++;
+  }
+}
+
 /** `Observable` used as a TYPE — after `:`, `<`, `as`, or `extends` — rather than as a value. */
 function findTypeAnnotation(code: string, name: string, from: number = 0): number {
   let quote: string = '';

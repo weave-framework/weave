@@ -665,6 +665,12 @@ ok(hostPair.ts.includes('const lastSeen = signal<Date | undefined>(undefined);')
 ok(hostPair.ts.includes('const labelWidth = (): number =>'), 'host: a translated component method no longer says it returns an Observable');
 ok(hostPair.ts.includes('return label().length;'), 'host: the chain inside a component folds like any other');
 ok(!/from 'rxjs/.test(hostPair.ts), 'host: a component whose streams all translated imports nothing from rxjs');
+// A component whose only reactive member is a DERIVED signal — no getter in sight. Every hand-kept rule for
+// "when is `computed` needed" was phrased about getters, so this shape named it without importing it.
+const derivedFact = a.findComponents(join(fx, 'components', 'derived.component.ts'))[0];
+const derivedPair = cv.convertComponent(derivedFact, '<p>{{ doubled }}</p>', {});
+ok(derivedPair.ts.includes('const doubled = computed('), 'derived: a computed FIELD stays a computed');
+ok(derivedPair.ts.split(NL).some((l) => l.startsWith('import {') && l.includes('computed') && l.includes('@weave-framework/runtime')), 'derived: and a component imports it — from what the draft names, not from a rule about getters');
 ok(hostPair.ts.includes('const hasRoute = computed(() => props.routerLink.length > 0);'), 'host: the getter behind a host binding is translated, not stubbed');
 // `: void` on every drafted function made a method ending in `return false;` a type error. The source either
 // declared a return type or said nothing and let TypeScript work it out — neither of those is `void`.
@@ -1113,6 +1119,54 @@ ok(/planWrites\(facts, targetDir, subdir\)/.test(migrateSrc), 'convertStep: the 
 ok(/symbolTable\(facts, targetDir, subdir\)/.test(migrateSrc), 'convertStep: and to the symbol table, so imports point where the files actually land');
 ok(/const outRoot: string = join\(targetDir, 'src', subdir\)/.test(migrateSrc), 'convertStep: what it PRINTS is built from the same choice, not from the old root');
 
+/* ── three hand-kept lists replaced by one derivation each ── */
+// 1. IMPORTS come from what the finished draft names. Every version of "import X if some member is a Y" was a
+// list that could only be as complete as the day it was written, and each had already gone out of date.
+ok(cv.weaveImportsFor('const a = computed(() => 1);')[0] === "import { computed } from '@weave-framework/runtime';", 'weaveImportsFor: a name the draft CALLS is imported, whatever produced it');
+ok(cv.weaveImportsFor('const s = inject(Ctx);')[0].includes('inject'), 'weaveImportsFor: `inject` too — no condition decides it, the use does');
+ok(cv.weaveImportsFor('const x = 1;').length === 0, 'weaveImportsFor: a draft that calls nothing imports nothing');
+ok(cv.weaveImportsFor('const signal = 1; const s = signal(2);').length === 0, 'weaveImportsFor: a name the draft DECLARES is its own — a local `signal` is not the runtime API');
+ok(cv.weaveImportsFor(['// const a = computed(() => 1);', 'const b = 2;'].join(NL)).length === 0, 'weaveImportsFor: a name that survives only in the carried original is a comment, not a use');
+ok(cv.weaveImportsFor('const u = obj.signal(1);').length === 0, 'weaveImportsFor: a PROPERTY with the same name is not the API');
+const twoMods = cv.weaveImportsFor('const s = signal(1); const st = store(() => ({}));');
+ok(twoMods.length === 2 && twoMods.some((l) => l.includes('@weave-framework/store')), 'weaveImportsFor: one statement per module');
+// Every name in the map has to be something the package really exports — a generated import of a name that is
+// not there is worse than no import at all.
+for (const [name, mod] of [['t', 'i18n'], ['useLoaderData', 'router'], ['debounced', 'runtime'], ['optimistic', 'data'], ['fieldArray', 'forms'], ['store', 'store']]) {
+  const idx = readFileSync(join(repo, 'packages', mod, 'src', 'index.ts'), 'utf8');
+  ok(new RegExp(`(?<![\w$])${name}(?![\w$])`).test(idx), `WEAVE_API: \`${name}\` really is exported by @weave-framework/${mod}`);
+}
+
+// 2. The SYMBOL TABLE and the "already handled" set come from one list, so a kind cannot be in one and missing
+// from the other — which is exactly how a converted resolver kept its old name at every call site.
+const resUnit = join(fx, 'resolver-unit');
+ok(typeof cv.convertedDecls === 'function', 'convertedDecls: the one list exists');
+const declKinds = new Set(cv.convertedDecls(a.assembleFacts(resUnit)).map((d) => d.kind));
+ok(declKinds.has('resolver'), 'convertedDecls: a resolver is a converted declaration like any other');
+const resTable = cv.symbolTable(a.assembleFacts(resUnit), 'D:/out');
+ok(resTable.has('CrumbsResolver') && resTable.get('CrumbsResolver').to === 'loadCrumbs', 'symbolTable: a resolver is in the table under the name the output gives it');
+ok(cv.resolverFunctionName({ className: 'CrumbsResolver' }) === 'loadCrumbs', 'resolverFunctionName: the writer and the table ask the same function, so they cannot disagree');
+// The import at a call site really is repointed now.
+const resItems = cv.planWrites(a.assembleFacts(resUnit), 'D:/out');
+const userOfResolver = resItems.find((i) => /crumbs\.service\.ts$/.test(i.path));
+const resImports = userOfResolver.content.split(NL).filter((l) => /^import/.test(l)).join(NL);
+ok(/loadCrumbs/.test(resImports), 'planWrites: the import names what the resolver file actually exports');
+ok(/loadCrumbs as CrumbsResolver/.test(resImports), 'planWrites: the LOCAL name is kept, so the call sites below are left as the source wrote them');
+// Repointing the import fixes the module, not the meaning: the class became a function.
+ok(/is a resolver, and in Weave that is the FUNCTION/.test(userOfResolver.content), 'resolveImports: a `new X()` on a converted declaration is FLAGGED — resolving the module without saying this produced code that compiled and could not run');
+ok(userOfResolver.content.split('TODO(weave migrate): `CrumbsResolver` is a resolver').length === 2, 'resolveImports: flagged once — the carried original beside it is a record, not a second use');
+
+// 3. An ANGULAR type in a signature names a class the output does not import.
+const angTodos = [];
+const angOut = cv.stripAngularTypes('const f = (route: ActivatedRouteSnapshot): void => {};', ['ActivatedRouteSnapshot'], angTodos);
+ok(angOut.includes('(route: any)'), 'stripAngularTypes: an Angular type in a signature becomes `any`');
+ok(angTodos.length === 1 && angTodos[0].includes('ActivatedRouteSnapshot'), 'stripAngularTypes: and is named ONCE, rather than erroring at every use');
+ok(cv.stripAngularTypes('const x = 1;', ['Router'], []) === 'const x = 1;', 'stripAngularTypes: a draft that names none is untouched');
+// A file can NAME an Angular injectable without importing it by name — through a re-export, or a type it never
+// listed. The known-injectables fallback is what covers that, so it is asked directly.
+ok(cv.stripAngularTypes('const f = (r: Router): void => {};', [], []).includes('(r: any)'), "stripAngularTypes: Angular's own injectable types are stripped even when the source never imported the name");
+ok(cv.stripAngularTypes('// (route: Router) in the original', ['Router'], []).includes('Router'), 'stripAngularTypes: the carried original is a comment and stays as written');
+
 // The same all-or-nothing rule for the sources that are not calls: `EMPTY` under a refused `.pipe` must stay
 // `EMPTY`, or the chain becomes `[].pipe(…)` — no longer RxJS, and no longer valid either.
 ok(rx.rxToWeave('const y = EMPTY.pipe(debounceTime(9));').code.includes('EMPTY.pipe('), 'fold: EMPTY is not collapsed under a `.pipe` the fold refused');
@@ -1134,6 +1188,10 @@ ok(/settled[\s\S]{0,120}Observable<string>/.test(streamsTs), 'convertService: th
 ok(streamsTs.includes("import { Observable } from 'rxjs';"), 'convertService: only the binding the surviving signature needs is imported');
 ok(!/\bof\b|\bBehaviorSubject\b/.test(streamsTs.split('\n').filter((l) => l.startsWith('import')).join('\n')), 'convertService: the bindings the translation removed are NOT imported alongside it');
 ok(streamsTs.includes('debounceTime'), 'convertService: the operator that stopped its chain is still named in the advice');
+// The IMPORT comes from what the draft names. A derived `computed(...)` field is neither a getter nor anything
+// the hand-kept lists asked about, and it named `computed` without importing it.
+ok(/const doubled = computed\(/.test(streamsTs), 'convertService: a field that was already a derived signal stays one');
+ok(streamsTs.split(NL).some((l) => l.startsWith('import {') && l.includes('computed') && l.includes('@weave-framework/runtime')), 'convertService: and `computed` is IMPORTED — derived from the draft, not from a rule about getters');
 // The alias the source wrote for `this.` is dead once `this.` is gone, and it shadowed the real declaration.
 ok(!/const _router: Router = _router;/.test(streamsTs), 'convertService: `const x: T = this.x` does not survive as `const x: T = x`');
 // Its CALLS were rewritten, but `_router.url` reads the service itself — the field has to exist.

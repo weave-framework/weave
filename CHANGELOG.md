@@ -69,6 +69,28 @@
   alias a constructor wrote for it (`const _router: Router = this._router`) is dropped once `this.` is gone, and
   a placeholder no longer names an Angular type the converted file does not import.
 
+- **`weave migrate` derives three answers it used to keep by hand.** Each was a list that could only be as
+  complete as the day it was written, and each had gone out of date on a real Angular library:
+
+  - **Imports** now come from what the finished draft NAMES, not from rules like "import `computed` if some
+    member is a getter". A field that was already a derived signal is neither a getter nor anything the rules
+    asked about, so the draft named `computed` without importing it; the same hole swallowed every `inject(…)`.
+  - **The symbol table and the "already handled" set** come from ONE list of what this migration renames. They
+    had stopped agreeing: resolvers were in the skip-set but in no table, so a converted `CrumbsResolver` became
+    `loadCrumbs` on disk while its importer went on naming the class — the bundler stopped at "no matching
+    export", an error the type-check could not attribute to anything.
+  - **Angular names in TYPE positions** are replaced by `any` and reported once, the same rule the value side
+    already had. `@angular` imports are dropped, so a drafted signature saying `ActivatedRouteSnapshot` named
+    nothing.
+
+  Repointing an import fixes the module, not the meaning — so `new X()` and `x instanceof X` on a declaration
+  that became a FUNCTION (a resolver, pipe or directive) are now flagged where they stand, rather than left as
+  code that resolves and cannot run.
+
+  Measured on a real Angular component library: the migrated output went from **not building at all** to
+  building, with the type errors in it down from 25 to 21 — the rest are the genuine "needs you" items the
+  migration reports rather than guesses at.
+
 - **`weave migrate` asks where the converted code should go.** The output mirrors the source layout, so a whole
   Angular folder tree dropped into the root of an app that already had a `src/` of its own. The destination is
   now prompted for — Enter keeps the root (exactly the previous behaviour), and a typed folder puts the whole

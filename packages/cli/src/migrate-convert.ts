@@ -15,7 +15,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import { resolveImports, type WeaveSymbol } from './migrate-symbols.js';
-import { asyncifyAwaiters, observableReturners, pruneRxImports, rewriteObservableTypes, rxAfterSubjects, rxToWeave, survivingRxNames, translateSubjects } from './migrate-rxjs.js';
+import { asyncifyAwaiters, observableReturners, pruneRxImports, replaceTypeName, rewriteObservableTypes, rxAfterSubjects, rxToWeave, survivingRxNames, translateSubjects } from './migrate-rxjs.js';
 
 // Re-exported so the symbol model has ONE entry point: `symbolTable` is built here, and what it says about
 // collisions belongs beside it rather than a module away.
@@ -1115,6 +1115,64 @@ const DRAFT_LOCALS: string[] = [
 ];
 
 /**
+ * Every Weave API a draft can name, and the package it comes from.
+ *
+ * Verified against what those packages actually export — a generated import of something that is not there is
+ * worse than no import at all. Type-only exports are absent on purpose: this map answers "which VALUE does this
+ * code call", and importing a type as a value does not compile.
+ */
+const WEAVE_API: Record<string, string> = {
+  // @weave-framework/runtime
+  signal: '@weave-framework/runtime', computed: '@weave-framework/runtime', effect: '@weave-framework/runtime',
+  watch: '@weave-framework/runtime', batch: '@weave-framework/runtime', untrack: '@weave-framework/runtime',
+  tick: '@weave-framework/runtime', root: '@weave-framework/runtime', debounced: '@weave-framework/runtime',
+  linkedSignal: '@weave-framework/runtime', onMount: '@weave-framework/runtime', onDispose: '@weave-framework/runtime',
+  onCleanup: '@weave-framework/runtime', inject: '@weave-framework/runtime', provide: '@weave-framework/runtime',
+  createContext: '@weave-framework/runtime', catchError: '@weave-framework/runtime',
+  // @weave-framework/store
+  store: '@weave-framework/store',
+  // @weave-framework/router
+  navigate: '@weave-framework/router', afterEach: '@weave-framework/router', beforeEach: '@weave-framework/router',
+  useLoaderData: '@weave-framework/router', useRouter: '@weave-framework/router', currentPath: '@weave-framework/router',
+  currentQuery: '@weave-framework/router', back: '@weave-framework/router', prefetch: '@weave-framework/router',
+  // @weave-framework/forms
+  field: '@weave-framework/forms', form: '@weave-framework/forms', group: '@weave-framework/forms',
+  fieldArray: '@weave-framework/forms', validators: '@weave-framework/forms',
+  // @weave-framework/data
+  resource: '@weave-framework/data', action: '@weave-framework/data', createClient: '@weave-framework/data',
+  optimistic: '@weave-framework/data',
+  // @weave-framework/i18n
+  t: '@weave-framework/i18n', setLocale: '@weave-framework/i18n', locale: '@weave-framework/i18n',
+};
+
+/**
+ * The Weave imports a finished draft needs, DERIVED from the names it actually contains.
+ *
+ * Every place that decided this by hand — "import `computed` if any member is a getter" — was a list that could
+ * only be as complete as the day it was written, and each one had gone out of date: a signal field initialised
+ * with `computed(…)` named it without importing it, and so did every `inject(…)` the drafts emit. Reading the
+ * output instead cannot drift, because the output is the thing being asked about.
+ *
+ * A name the draft DECLARES is its own — a local `const form = …` is not `form` from the forms package — and a
+ * name that appears only in the carried original is a comment, not a use.
+ */
+export function weaveImportsFor(code: string, alreadyImported: Iterable<string> = []): string[] {
+  const live: string = code.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^[\t ]*\/\/.*$/gm, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+  const declared: Set<string> = new Set<string>([...alreadyImported]);
+  for (const m of live.matchAll(/(?:^|[;{}\n])\s*(?:export\s+)?(?:const|let|var|function|class)\s+([A-Za-z_$][\w$]*)/g)) declared.add(m[1]);
+  const byModule: Map<string, Set<string>> = new Map<string, Set<string>>();
+  for (const [name, mod] of Object.entries(WEAVE_API)) {
+    if (declared.has(name)) continue;
+    if (!new RegExp(`(?<![\\w$.])${name}\\s*[(<]`).test(live)) continue; // named as a CALL, not as a property
+    if (!byModule.has(mod)) byModule.set(mod, new Set<string>());
+    byModule.get(mod)?.add(name);
+  }
+  return [...byModule.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([mod, names]) => `import { ${[...names].sort().join(', ')} } from '${mod}';`);
+}
+
+/**
  * The names a file imports from `@angular/*`. Those imports do not come across — Angular is what is being
  * migrated away from — so any drafted code still naming one of them would reference something that is not there.
  */
@@ -1287,7 +1345,11 @@ export function convertComponent(fact: ComponentFact, templateHtml: string, opts
 
   // The signatures follow the bodies, and they only meet here — a member that returned `Observable<T>` before
   // the chain rewrite returns a plain `T` or a `Promise<T>` after it, and the annotation has to say so.
-  const bodyTyped: string[] = asyncifyAwaiters(rewriteObservableTypes(body.join('\n'), [])).split('\n');
+  const typeTodos: string[] = [];
+  const bodyTyped: string[] = [
+    ...asyncifyAwaiters(stripAngularTypes(rewriteObservableTypes(body.join('\n'), []), angularImportedNames(fact.file), typeTodos)).split('\n'),
+  ];
+  bodyTyped.unshift(...typeTodos.map((t) => tsTodo(t)));
 
   // Everything AFTER the imports, assembled first: an import is dead only if nothing in the whole file uses it,
   // and `propDefaults` / the `setup` wrapper are part of the file too.
@@ -1307,6 +1369,9 @@ export function convertComponent(fact: ComponentFact, templateHtml: string, opts
 
   // An import is dead only if NEITHER the module nor its template uses it — a `<Card>` import is named in the
   // markup and nowhere else, so pruning against the module alone would have deleted it.
+  // Whatever the assembled draft NAMES, it imports. The lists above are what each piece asked for as it was
+  // built; this is what the finished thing actually uses, and only the second one can be complete.
+  imports.push(...weaveImportsFor(tail.join('\n')));
   const kept: string[] = pruneRxImports(pruneImports(imports, `${tail.join('\n')}\n${html}`), tail.join('\n')).lines;
   const ts: string = [...(kept.length ? [...mergeImportLines(kept), ''] : []), ...tail].join('\n');
   return { baseName, ts, html };
@@ -1732,6 +1797,29 @@ export function readsBareInjected(members: ClassMember[], name: string, service:
     if (!method || !called || !rewritten.includes(method)) return true;
   }
   return false;
+}
+
+/**
+ * Angular types that survived into a SIGNATURE, replaced by `unknown` and reported.
+ *
+ * `@angular` imports are dropped — that is the framework being migrated away from — so a drafted signature
+ * naming `ActivatedRouteSnapshot` names nothing. The value side of this was already handled; the type side was
+ * not, and a type error in a generated signature reads as though the conversion misunderstood the code, when
+ * really it was carrying a name it had already decided not to import.
+ *
+ * `any` and not `unknown`, for the same reason the value placeholder is `any`: `unknown` turns one clear message
+ * into an error at every single use of the parameter, all of them pointing back at the hole the TODO above
+ * already names. Once is enough.
+ */
+export function stripAngularTypes(code: string, angularNames: Iterable<string>, todos: string[]): string {
+  let out: string = code;
+  for (const name of new Set<string>([...angularNames, ...ANGULAR_OWN_TYPES])) {
+    const r: { code: string; hits: number } = replaceTypeName(out, name, 'any');
+    if (!r.hits) continue;
+    out = r.code;
+    todos.push(`\`${name}\` was Angular's, so it is not imported here — the ${r.hits === 1 ? 'signature that named it now says' : `${r.hits} signatures that named it now say`} \`any\`; give ${r.hits === 1 ? 'it' : 'them'} the shape your Weave code passes`);
+  }
+  return out;
 }
 
 /** A field holding some flavour of RxJS Subject — by its initializer or, when it has none, by its declared type. */
@@ -2412,9 +2500,10 @@ export function convertService(fact: ServiceFact, rxjsNames: string[] = [], migr
   // The signatures and the bodies have to agree, so the type rewrite runs over the ASSEMBLED draft rather than
   // over each body: `load(): Observable<string[]>` is decided by what the translated `load` now returns, and the
   // annotation and the body only sit next to each other here.
-  const typed: string = asyncifyAwaiters(rewriteObservableTypes(body.join('\n'), []));
+  const typeTodos: string[] = [];
+  const typed: string = asyncifyAwaiters(stripAngularTypes(rewriteObservableTypes(body.join('\n'), []), angularImportedNames(fact.file), typeTodos));
   body.length = 0;
-  body.push(...typed.split('\n'));
+  body.push(...typeTodos.map((t) => tsTodo(t)), ...typed.split('\n'));
 
   // Guidance ONLY for the names that survived the translation. Listing what `map` "would become" beside code
   // where `map` is already an `Array.prototype.map` is noise that reads as unfinished work.
@@ -2466,6 +2555,7 @@ export function convertService(fact: ServiceFact, rxjsNames: string[] = [], migr
   // RxJS imports are pruned per BINDING, not per line: a single surviving `Observable` in an untranslated
   // signature used to keep `of`, `map` and `concat` imported alongside it, so the migrated app still declared a
   // dependency on a package it no longer calls.
+  imports.push(...weaveImportsFor(tail.join('\n')));
   const pruned: string[] = pruneRxImports(pruneImports(imports, tail.join('\n')), tail.join('\n')).lines;
   lines.push(...mergeImportLines(pruned), '', ...tail);
   return { baseName: serviceBaseName(fact.className), ts: lines.join('\n') };
@@ -2669,6 +2759,12 @@ export function convertDirective(fact: DirectiveFact): { baseName: string; ts: s
 
 /* ──────────── route resolvers → a route `loader` ──────────── */
 
+/** What a resolver class is called once it is a loader function. Named ONCE: the writer and the symbol table
+ *  both need it, and two spellings of the same rule is how an import comes to name something nothing exports. */
+export function resolverFunctionName(fact: ResolverFact): string {
+  return `load${fact.className.replace(/Resolver$/, '')}`;
+}
+
 /**
  * An Angular route RESOLVER becomes a Weave route `loader` — data fetched when the route renders, read by the
  * component with `useLoaderData()`.
@@ -2682,7 +2778,7 @@ export function convertDirective(fact: DirectiveFact): { baseName: string; ts: s
  * spellings, so the shape is drafted and the original travels beside it.
  */
 export function convertResolver(fact: ResolverFact): { baseName: string; ts: string } {
-  const fnName: string = `load${fact.className.replace(/Resolver$/, '')}`;
+  const fnName: string = resolverFunctionName(fact);
   const lines: string[] = [
     `// Converted from ${fact.className} (${fact.file}).`,
     '//',
@@ -3067,32 +3163,50 @@ export function componentNameMap(facts: MigrationFacts): Record<string, string> 
  * mapping, so nothing written can name something that no longer exists — see `migrate-symbols.ts` for why that
  * is a model rather than another patch.
  */
-export function symbolTable(facts: MigrationFacts, targetDir: string, subdir: string = ''): Map<string, WeaveSymbol> {
-  const table: Map<string, WeaveSymbol> = new Map<string, WeaveSymbol>();
-  for (const cf of facts.components) {
-    // A component is the file's DEFAULT export — which is exactly what its importers did not know.
-    table.set(cf.className, { from: cf.className, to: cf.className, isDefault: true, file: outputFileFor(cf.file, facts, targetDir, true, subdir), kind: 'component' });
-  }
+/** One converted declaration: what it was called, where it came from, and what the output calls it. */
+export interface ConvertedDecl {
+  className: string;
+  file: string;
+  to: string;
+  isDefault: boolean;
+  kind: WeaveSymbol['kind'];
+}
+
+/**
+ * EVERY declaration this migration renames, in one place.
+ *
+ * The symbol table and the "already handled, do not carry" set were two hand-kept lists of kinds that had to
+ * agree. They stopped agreeing: resolvers were in the skip-set but in no table, so `BreadcrumbsResolver` became
+ * `loadBreadcrumbs` on disk while its importer went on naming the class — a build error the type-check could not
+ * blame on anything. Derived from one list, a kind cannot be in one and missing from the other, and the next
+ * kind added lands in both by construction.
+ */
+export function convertedDecls(facts: MigrationFacts): ConvertedDecl[] {
+  const services: ConvertedDecl[] = [];
   for (const sf of facts.services) {
     const m: MigratedService | undefined = migratedServices([sf]).get(sf.className);
-    if (m) table.set(sf.className, { from: sf.className, to: m.name, isDefault: false, file: outputFileFor(sf.file, facts, targetDir, false, subdir), kind: 'service' });
+    if (m) services.push({ className: sf.className, file: sf.file, to: m.name, isDefault: false, kind: 'service' });
   }
-  for (const pf of facts.pipes ?? []) {
-    table.set(pf.className, { from: pf.className, to: pipeFunctionName(pf), isDefault: false, file: outputFileFor(pf.file, facts, targetDir, false, subdir), kind: 'pipe' });
+  return [
+    // A component is the file's DEFAULT export — which is exactly what its importers did not know.
+    ...facts.components.map((cf): ConvertedDecl => ({ className: cf.className, file: cf.file, to: cf.className, isDefault: true, kind: 'component' })),
+    ...services,
+    ...(facts.pipes ?? []).map((pf): ConvertedDecl => ({ className: pf.className, file: pf.file, to: pipeFunctionName(pf), isDefault: false, kind: 'pipe' })),
+    ...(facts.directives ?? []).map((df): ConvertedDecl => ({ className: df.className, file: df.file, to: directiveFunctionName(df), isDefault: false, kind: 'directive' })),
+    ...(facts.resolvers ?? []).map((rf): ConvertedDecl => ({ className: rf.className, file: rf.file, to: resolverFunctionName(rf), isDefault: false, kind: 'resolver' })),
+  ];
+}
+
+export function symbolTable(facts: MigrationFacts, targetDir: string, subdir: string = ''): Map<string, WeaveSymbol> {
+  const table: Map<string, WeaveSymbol> = new Map<string, WeaveSymbol>();
+  const converted: ConvertedDecl[] = convertedDecls(facts);
+  for (const d of converted) {
+    table.set(d.className, { from: d.className, to: d.to, isDefault: d.isDefault, file: outputFileFor(d.file, facts, targetDir, d.kind === 'component', subdir), kind: d.kind });
   }
-  for (const df of facts.directives ?? []) {
-    table.set(df.className, { from: df.className, to: directiveFunctionName(df), isDefault: false, file: outputFileFor(df.file, facts, targetDir, false, subdir), kind: 'directive' });
-  }
-  // Everything a CARRIED file exports belongs in the table too. Only decorated classes were listed, so a type
-  // imported through a workspace alias — `import { IBreadcrumb } from '@sps-interfaces'` — was migrated into the
-  // output and then still imported from the alias, which the target app does not have. The file was right there.
-  const decorated: Set<string> = new Set<string>([
-    ...facts.components.map((cf) => cf.file),
-    ...facts.services.map((sf) => sf.file),
-    ...(facts.pipes ?? []).map((pf) => pf.file),
-    ...(facts.directives ?? []).map((df) => df.file),
-    ...(facts.resolvers ?? []).map((rf) => rf.file),
-  ]);
+  // Everything a CARRIED file exports belongs in the table too. Only converted classes were listed, so a type
+  // imported through a workspace alias — `import { IBreadcrumb } from '@my-org/interfaces'` — was migrated into
+  // the output and then still imported from the alias, which the target app does not have.
+  const decorated: Set<string> = new Set<string>(converted.map((d) => d.file));
   for (const file of facts.files) {
     if (decorated.has(file)) continue;
     const out: string = outputFileFor(file, facts, targetDir, false, subdir);
