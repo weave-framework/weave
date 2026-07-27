@@ -19,6 +19,7 @@ import {
   applyWrites,
   carriedInstalls,
   carriedPackages,
+  checkSpecs,
   danglingAcrossSections,
   detectPackageManager,
   installCommand,
@@ -34,6 +35,21 @@ import {
 import { planItems, renderPlan, writePlan, type PlanItem } from './migrate-plan.js';
 import { collisions, hasInstalledDeps, verifyOutput, type OutputProblem } from './migrate-verify.js';
 import { c, inputManager, type InputManager } from './migrate-ui.js';
+
+/**
+ * The install command(s) for a set of packages — one for `dependencies`, one for `devDependencies`.
+ *
+ * They are separate commands because they land in separate places: what the bundle calls at runtime has to be a
+ * real dependency, and what only the type-checker reads must not be shipped to whoever installs this app.
+ */
+export function installLines(pm: PackageManager, wanted: Array<{ spec: string; dev: boolean }>): string[] {
+  const runtime: string[] = wanted.filter((i) => !i.dev).map((i) => i.spec);
+  const dev: string[] = wanted.filter((i) => i.dev).map((i) => i.spec);
+  const lines: string[] = [];
+  if (runtime.length) lines.push(installCommand(pm, runtime));
+  if (dev.length) lines.push(installCommand(pm, dev, true));
+  return lines;
+}
 
 /** Below this many files a section prompt is noise: you can read the list. Above it, the list IS the problem. */
 const SECTION_PROMPT_AT: number = 20;
@@ -647,18 +663,32 @@ async function convertStep(io: InputManager, facts: MigrationFacts, targetDir: s
   // The packages the written code needs. Asked rather than done: installing writes package.json and the
   // lockfile and goes to the network, and this app's manager is the one that must do it — running `npm i` in a
   // pnpm project rewrites node_modules behind pnpm's back.
-  const needed: string[] = [
-    ...requiredWeavePackages(items).filter((p) => !installedWeavePackages(targetDir).includes(p)),
-    ...carriedInstalls(items, facts.unit, targetDir).map((i) => i.spec),
+  const wanted: Array<{ name: string; spec: string; dev: boolean }> = [
+    ...requiredWeavePackages(items)
+      .filter((p) => !installedWeavePackages(targetDir).includes(p))
+      .map((p) => ({ name: p, spec: p, dev: false })),
+    ...carriedInstalls(items, facts.unit, targetDir),
   ];
+  const needed: string[] = wanted.map((i) => i.spec);
   if (needed.length) {
     const pm: PackageManager = detectPackageManager(targetDir);
-    const cmd: string = installCommand(pm, needed);
     console.log(`\n${c.bold('The written code needs packages this app does not have:')}`);
-    console.log(`  ${c.bold(cmd)}`);
-    const run: string = await io.askLine(`${c.bold('Run it now?')} ${c.dim(`[y/N] (${pm}, in ${targetDir})`)} ${c.cyan('> ')}`);
+    for (const line of installLines(pm, wanted)) console.log(`  ${c.bold(line)}`);
+    // A spec that is not a plain package name is never run. These come from `import` specifiers in the code
+    // being migrated, so migrating a repository you did not write must not be able to run a command.
+    const { refused } = checkSpecs(needed);
+    if (refused.length) {
+      console.log(`${c.red('✖')} ${c.yellow(`Not offering to run this: ${refused.join(', ')} ${refused.length === 1 ? 'is not' : 'are not'} a package name.`)}`);
+      console.log(c.dim('  Check where that came from before installing anything by hand.'));
+    }
+    const run: string = refused.length ? 'n' : await io.askLine(`${c.bold('Run it now?')} ${c.dim(`[y/N] (${pm}, in ${targetDir})`)} ${c.cyan('> ')}`);
     if (/^y(es)?$/i.test(run.trim())) {
-      const ok: boolean = runInstall(pm, needed, targetDir);
+      // Two commands when both kinds are present: what the bundle needs goes to `dependencies`, and what only
+      // the type-checker needs goes to `devDependencies`. One list would put one of them in the wrong place.
+      const runtime: string[] = wanted.filter((i) => !i.dev).map((i) => i.spec);
+      const dev: string[] = wanted.filter((i) => i.dev).map((i) => i.spec);
+      const ok: boolean =
+        (!runtime.length || runInstall(pm, runtime, targetDir, false)) && (!dev.length || runInstall(pm, dev, targetDir, true));
       console.log(ok ? `${c.green('✓')} ${c.dim('Installed.')}` : `${c.red('✖')} ${c.yellow('The install failed — run the command above yourself and read its output.')}`);
     } else {
       console.log(c.dim('  Not installed. The imports will not resolve until you run that.'));

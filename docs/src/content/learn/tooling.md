@@ -233,15 +233,28 @@ Your converted code still imports these — they stay dependencies of your app:
   • rxjs   — Weave replaces this: what is left is what could not be translated without guessing
 
 Your app does not have these yet:
-  pnpm add lodash@^4.17.21 @ngx-translate/core@^15.0.0
+  pnpm add lodash@^4.17.21
+  pnpm add -D @org/interfaces@^1.4.0
 ~~~
 
 The command uses **your** package manager (read from `packageManager` in `package.json`, then the lockfile) and
 pins each package to the version the **source** app used, so the code lands against what it was written for.
 After the files are written you are asked whether to run it — asked, not done, because installing writes
-`package.json` and the lockfile and goes to the network. `@angular/*` never appears on that list: those imports
-come from files that were carried rather than converted, and installing Angular to make them resolve is not a fix,
-it is the migration undone.
+`package.json` and the lockfile and goes to the network.
+
+There are two commands because there are two places. A package the converted code **calls** is a real
+`dependency`: it is in the bundle, and a runtime dependency parked in `devDependencies` disappears under a
+production install (`npm ci --omit=dev`) and breaks the app where nobody is looking. A package reached only
+through `import type` is erased by TypeScript and never reaches the bundle, so it is a `devDependency` — shipping
+it to everyone who installs your app would be for nothing. Imported both ways counts as runtime: one value import
+is enough to put it in the bundle.
+
+`@angular/*` never appears on either list: those imports come from files that were carried rather than converted,
+and installing Angular to make them resolve is not a fix, it is the migration undone.
+
+The specs are checked before anything runs. Package names come from `import` specifiers in the code being
+migrated, so migrating a repository you did not write must not be able to run a command: anything outside the
+npm-name-plus-range grammar stops the whole install and is named, rather than being escaped and hoped for.
 
 ### RxJS is translated, not annotated
 

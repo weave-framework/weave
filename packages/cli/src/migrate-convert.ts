@@ -2790,18 +2790,49 @@ export interface WriteItem {
  * A package the output still names is a package the app now depends on, and that has to be visible.
  */
 export function carriedPackages(items: WriteItem[]): string[] {
-  const out: Set<string> = new Set<string>();
+  return [...carriedPackageKinds(items).keys()].sort();
+}
+
+/**
+ * The same packages, split by whether the output needs them AT RUNTIME.
+ *
+ * A package reached only through `import type` never exists at runtime — TypeScript erases those imports, so
+ * nothing of it reaches the bundle. That makes it a `devDependency`, and the distinction is not cosmetic in the
+ * other direction either: a package that IS called at runtime and lands in `devDependencies` disappears under a
+ * production install (`npm ci --omit=dev`), and the app breaks where nobody was looking.
+ *
+ * A package imported both ways is runtime — one value import is enough to put it in the bundle.
+ */
+export function carriedPackageKinds(items: WriteItem[]): Map<string, 'runtime' | 'types'> {
+  const out: Map<string, 'runtime' | 'types'> = new Map<string, 'runtime' | 'types'>();
   for (const it of items) {
     if (!/\.(ts|tsx)$/.test(it.path)) continue;
     // Comments carry the ORIGINAL beside every rewrite; an import named only there is not a dependency.
     const code: string = it.content.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
-    for (const m of code.matchAll(/\bfrom\s*'([^']+)'/g)) {
-      const spec: string = m[1];
+    for (const m of code.matchAll(/\b(import|export)\s+(type\s+)?([\s\S]*?)\bfrom\s*'([^']+)'/g)) {
+      const spec: string = m[4];
       if (spec.startsWith('.') || spec.startsWith('@weave-framework/')) continue;
-      out.add(spec.startsWith('@') ? spec.split('/').slice(0, 2).join('/') : spec.split('/')[0]);
+      const root: string = spec.startsWith('@') ? spec.split('/').slice(0, 2).join('/') : spec.split('/')[0];
+      if (out.get(root) === 'runtime') continue; // one value import is enough
+      out.set(root, erasesAtRuntime(Boolean(m[2]), m[3] ?? '') ? 'types' : 'runtime');
     }
   }
-  return [...out].sort();
+  return out;
+}
+
+/**
+ * Whether an import clause leaves NOTHING behind once TypeScript has erased the types.
+ *
+ * Two spellings erase: the statement-level `import type { A } from 'x'`, and a braced clause whose every binding
+ * carries its own `type` keyword. A default or namespace binding never erases, and one plain named binding is
+ * enough to keep the whole import — and with it the package — at runtime.
+ */
+export function erasesAtRuntime(statementType: boolean, clause: string): boolean {
+  if (statementType) return true;
+  const braced: RegExpMatchArray | null = clause.match(/^\s*\{([\s\S]*)\}\s*$/);
+  if (!braced) return false; // a default or `* as ns` binding is a real value
+  const bindings: string[] = splitTopLevel(braced[1]).filter((b) => b.trim());
+  return bindings.length > 0 && bindings.every((b) => /^type\s/.test(b.trim()));
 }
 
 /**
@@ -3223,9 +3254,14 @@ export function detectPackageManager(appDir: string): PackageManager {
   return 'npm'; // package-lock.json, or nothing to go on
 }
 
-/** The command that adds dependencies with the given manager — each has its own verb. */
-export function installCommand(pm: PackageManager, packages: string[]): string {
-  return `${pm} ${installVerb(pm)} ${packages.join(' ')}`;
+/** The command that adds dependencies with the given manager — each has its own verb, and its own dev flag. */
+export function installCommand(pm: PackageManager, packages: string[], dev: boolean = false): string {
+  return `${pm} ${installVerb(pm)}${dev ? ` ${devFlag(pm)}` : ''} ${packages.join(' ')}`;
+}
+
+/** The "this is a devDependency" flag. `bun` spells it `-d`; the rest take `-D`. */
+export function devFlag(pm: PackageManager): string {
+  return pm === 'bun' ? '-d' : '-D';
 }
 
 /** `npm` adds with `i`; every other manager here uses `add`. */
@@ -3234,19 +3270,59 @@ export function installVerb(pm: PackageManager): string {
 }
 
 /**
+ * An npm package name with an optional version range, and nothing else.
+ *
+ * These specs are NOT trusted input: the names come from `import` specifiers in the code being migrated, and the
+ * ranges from a `package.json` in that same tree. Migrating a repository you did not write must not be able to
+ * run a command, so anything outside this grammar is refused rather than escaped — there is no legitimate
+ * package spec containing a space, a quote, or a shell metacharacter.
+ */
+const SAFE_SPEC: RegExp = /^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*(?:@[A-Za-z0-9.\-+^~><= |*]{1,64})?$/;
+
+/** The specs that are safe to hand a shell. Anything else is returned separately so the caller can name it. */
+export function checkSpecs(packages: string[]): { safe: string[]; refused: string[] } {
+  const safe: string[] = [];
+  const refused: string[] = [];
+  for (const p of packages) (SAFE_SPEC.test(p) ? safe : refused).push(p);
+  return { safe, refused };
+}
+
+/**
  * Actually run the install, with the app's own manager, in the app's own directory.
  *
- * `shell: true` because on Windows `pnpm`/`npm`/`yarn` are `.cmd` shims that `spawnSync` will not execute
- * directly. The package names are not interpolated into a shell string — they are passed as arguments, so a
- * name out of a `package.json` cannot become a command.
+ * A shell is unavoidable: on Windows `pnpm`/`npm`/`yarn` are `.cmd` shims, and since the BatBadBut fix Node
+ * refuses to spawn those without one. So the command is built as a SINGLE string — passing an args array
+ * alongside `shell: true` is what Node deprecated in DEP0190, because it concatenates them into a shell line
+ * without escaping. An earlier version of this function did exactly that, under a comment claiming the opposite.
+ *
+ * What makes the single string safe is not quoting, it is the grammar above: every spec is checked first, and an
+ * install with anything unrecognised in it does not run at all.
  */
-export function runInstall(pm: PackageManager, packages: string[], appDir: string): boolean {
-  const res: { status: number | null; error?: Error } = spawnSync(pm, [installVerb(pm), ...packages], {
-    cwd: appDir,
-    stdio: 'inherit',
-    shell: true,
-  });
+export function runInstall(pm: PackageManager, packages: string[], appDir: string, dev: boolean = false): boolean {
+  const plan: InstallPlan = installPlan(pm, packages, dev);
+  if (!plan.command) return false;
+  const res: { status: number | null; error?: Error } = spawnSync(plan.command, { cwd: appDir, stdio: 'inherit', shell: true });
   return !res.error && res.status === 0;
+}
+
+/** What an install WOULD do: the command, or nothing plus the specs that stopped it. */
+export interface InstallPlan {
+  /** The shell line to run, or null when this install must not happen. */
+  command: string | null;
+  /** The specs outside the grammar. Non-empty means `command` is null. */
+  refused: string[];
+}
+
+/**
+ * Decide the install without performing it.
+ *
+ * The decision is separated from the side effect so it can be TESTED without a test that spawns a shell — the
+ * gate for "an unrecognised spec must not run" cannot itself be the thing that runs it.
+ */
+export function installPlan(pm: PackageManager, packages: string[], dev: boolean = false): InstallPlan {
+  const { safe, refused } = checkSpecs(packages);
+  if (refused.length || !safe.length) return { command: null, refused };
+  return { command: installCommand(pm, safe, dev), refused: [] };
 }
 
 /**
@@ -3259,12 +3335,17 @@ export function runInstall(pm: PackageManager, packages: string[], appDir: strin
  * and installing Angular into a Weave app to make them resolve is not a fix, it is the migration undone.
  * `@weave-framework/*` is excluded too — it has its own line, checked against what the app already has.
  */
-export function carriedInstalls(items: WriteItem[], sourceDir: string, targetDir: string): Array<{ name: string; spec: string }> {
+export function carriedInstalls(items: WriteItem[], sourceDir: string, targetDir: string): Array<{ name: string; spec: string; dev: boolean }> {
   const versions: Record<string, string> = dependencyVersions(sourceDir);
   const already: Set<string> = new Set<string>(Object.keys(dependencyVersions(targetDir)));
-  return carriedPackages(items)
+  const kinds: Map<string, 'runtime' | 'types'> = carriedPackageKinds(items);
+  return [...kinds.keys()]
+    .sort()
     .filter((name) => !name.startsWith('@angular/') && !name.startsWith('@weave-framework/') && !already.has(name))
-    .map((name) => ({ name, spec: versions[name] ? `${name}@${versions[name]}` : name }));
+    // Runtime or types decides `dependencies` vs `devDependencies`, and both directions matter: a runtime
+    // package in devDependencies vanishes under `npm ci --omit=dev`, and a types-only one in dependencies is
+    // shipped to every consumer of this app for nothing.
+    .map((name) => ({ name, spec: versions[name] ? `${name}@${versions[name]}` : name, dev: kinds.get(name) === 'types' }));
 }
 
 /**

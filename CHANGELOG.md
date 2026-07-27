@@ -79,6 +79,19 @@
   from files that were carried rather than converted, and installing Angular to make them resolve is the
   migration undone.
 
+  **`dependencies` or `devDependencies` is decided by how the package is imported.** A package the converted code
+  calls is a real dependency — it is in the bundle, and a runtime dependency parked in `devDependencies` vanishes
+  under `npm ci --omit=dev`. A package reached only through `import type` is erased by TypeScript and never
+  reaches the bundle, so it is installed with `-D`. Imported both ways counts as runtime, whichever file is read
+  last. That is two commands, because they land in two places.
+
+  **The specs are checked before anything runs.** Package names come from `import` specifiers in the code being
+  migrated, so migrating a repository you did not write must not be able to run a command. Anything outside the
+  npm-name-plus-range grammar stops the whole install and is named. (The first version passed an argument array
+  alongside `shell: true`, which Node concatenates into a shell line without escaping — its own DEP0190 — under a
+  comment claiming the opposite. The command is now a single validated string, and the decision to run is a pure
+  function, so the gate for "this must not execute" is not itself the thing that executes it.)
+
 - **Fixed: an apostrophe in a comment switched the RxJS translation off for the rest of the file.** The scanners
   tracked string literals so no rewrite could match across one, but not comments — so prose like `// Router's
   calls were rewritten` opened a string that never closed, and every declaration after it was invisible. The

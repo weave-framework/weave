@@ -1036,6 +1036,49 @@ ok(cv.installCommand('npm', ['a@1']) === 'npm i a@1', 'installCommand: npm uses 
 ok(cv.installCommand('yarn', ['a@1']) === 'yarn add a@1' && cv.installCommand('bun', ['a@1']) === 'bun add a@1', 'installCommand: yarn and bun add');
 ok(cv.installVerb('npm') === 'i' && cv.installVerb('pnpm') === 'add', 'installVerb: the verb is per manager');
 
+// A spec is NOT trusted input: the names come from `import` specifiers in the code being migrated. Passing an
+// args array alongside `shell: true` concatenates them into a shell line unescaped (Node's DEP0190), so the
+// grammar is the guard — anything outside it is refused rather than escaped.
+ok(cv.checkSpecs(['lodash@^4.17.21', '@ngx-translate/core@^15.0.0', 'some-lib']).refused.length === 0, 'checkSpecs: real package specs pass');
+for (const evil of ['lodash; rm -rf /', 'a && curl evil.sh', 'x`whoami`', "a'b", 'a b', 'a$(id)', 'a|b', 'a>out']) {
+  ok(cv.checkSpecs([evil]).refused.length === 1, `checkSpecs: refuses a spec carrying a shell metacharacter (${evil})`);
+}
+// The PLAN, not the run: a gate for "this must not execute" must not be the thing that executes it.
+ok(cv.installPlan('npm', ['lodash; rm -rf /']).command === null, 'installPlan: an install containing an unrecognised spec produces NO command at all');
+ok(cv.installPlan('npm', ['lodash; rm -rf /']).refused[0] === 'lodash; rm -rf /', 'installPlan: the spec that stopped it is named');
+ok(cv.installPlan('npm', ['ok-pkg', 'a b']).command === null, 'installPlan: ONE bad spec stops the whole install, it is not filtered out and run anyway');
+ok(cv.installPlan('npm', []).command === null, 'installPlan: nothing to install is not a command');
+ok(cv.installPlan('pnpm', ['lodash@^4'], true).command === 'pnpm add -D lodash@^4', 'installPlan: a clean install produces the command it would run');
+
+// dependencies vs devDependencies. A package reached only through `import type` is erased by TypeScript, so it
+// never reaches the bundle; one that IS called at runtime and lands in devDependencies vanishes under
+// `npm ci --omit=dev` and the app breaks where nobody is looking.
+ok(cv.erasesAtRuntime(true, '{ A }'), 'erasesAtRuntime: `import type { A } from` erases');
+ok(cv.erasesAtRuntime(false, '{ type A, type B }'), 'erasesAtRuntime: a clause whose every binding is `type` erases');
+ok(!cv.erasesAtRuntime(false, '{ type A, b }'), 'erasesAtRuntime: ONE value binding keeps the package at runtime');
+ok(!cv.erasesAtRuntime(false, 'X'), 'erasesAtRuntime: a default binding is a real value');
+ok(!cv.erasesAtRuntime(false, '* as ns'), 'erasesAtRuntime: a namespace binding is a real value');
+const kindItems = [
+  { path: 'k.ts', status: 'write', content: ["import type { IB } from '@org/interfaces';", "import { template } from 'lodash';", 'const x = template; const y: IB = x;'].join(NL) },
+];
+const kinds = cv.carriedPackageKinds(kindItems);
+ok(kinds.get('@org/interfaces') === 'types', 'carriedPackageKinds: a type-only import is a devDependency');
+ok(kinds.get('lodash') === 'runtime', 'carriedPackageKinds: a value import is a runtime dependency');
+const bothItems = [
+  { path: 'b1.ts', status: 'write', content: ["import type { T } from 'dual';", 'const a: T = 1;'].join(NL) },
+  { path: 'b2.ts', status: 'write', content: ["import { fn } from 'dual';", 'fn();'].join(NL) },
+];
+ok(cv.carriedPackageKinds(bothItems).get('dual') === 'runtime', 'carriedPackageKinds: imported both ways is RUNTIME — one value import puts it in the bundle');
+ok(cv.carriedPackageKinds([bothItems[1], bothItems[0]]).get('dual') === 'runtime', 'carriedPackageKinds: still RUNTIME when the type-only file comes LAST — whichever file is read last must not decide it');
+ok(cv.carriedPackages(kindItems).join(',') === '@org/interfaces,lodash', 'carriedPackages: still reports both, sorted');
+// The flag is per manager, and the two kinds are two commands because they land in two places.
+ok(cv.installCommand('pnpm', ['a'], true) === 'pnpm add -D a', 'installCommand: a devDependency carries the dev flag');
+ok(cv.installCommand('npm', ['a'], true) === 'npm i -D a', 'installCommand: npm too');
+ok(cv.devFlag('bun') === '-d' && cv.devFlag('yarn') === '-D', 'devFlag: bun spells it -d, the rest -D');
+const lines = m.installLines('pnpm', [{ spec: 'lodash@^4', dev: false }, { spec: '@org/interfaces@^1', dev: true }]);
+ok(lines.length === 2 && lines[0] === 'pnpm add lodash@^4' && lines[1] === 'pnpm add -D @org/interfaces@^1', 'installLines: runtime and type-only are SEPARATE commands — one list would put one of them in the wrong place');
+ok(m.installLines('pnpm', [{ spec: 'a', dev: false }]).length === 1, 'installLines: no dev command when there is nothing for it');
+
 // The same all-or-nothing rule for the sources that are not calls: `EMPTY` under a refused `.pipe` must stay
 // `EMPTY`, or the chain becomes `[].pipe(…)` — no longer RxJS, and no longer valid either.
 ok(rx.rxToWeave('const y = EMPTY.pipe(debounceTime(9));').code.includes('EMPTY.pipe('), 'fold: EMPTY is not collapsed under a `.pipe` the fold refused');
