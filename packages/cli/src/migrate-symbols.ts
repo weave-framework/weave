@@ -26,7 +26,7 @@ export interface WeaveSymbol {
   isDefault: boolean;
   /** Absolute path of the file that now holds it. */
   file: string;
-  kind: 'component' | 'service' | 'pipe' | 'directive' | 'token';
+  kind: 'component' | 'service' | 'pipe' | 'directive' | 'token' | 'carried';
 }
 
 /** An import statement as written, taken apart. */

@@ -14,12 +14,13 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import { resolveImports, type WeaveSymbol } from './migrate-symbols.js';
-import { asyncifyAwaiters, pruneRxImports, rewriteObservableTypes, rxAfterSubjects, rxToWeave, survivingRxNames, translateSubjects } from './migrate-rxjs.js';
+import { asyncifyAwaiters, observableReturners, pruneRxImports, rewriteObservableTypes, rxAfterSubjects, rxToWeave, survivingRxNames, translateSubjects } from './migrate-rxjs.js';
 
 // Re-exported so the symbol model has ONE entry point: `symbolTable` is built here, and what it says about
 // collisions belongs beside it rather than a module away.
 export { danglingAcrossSections, resolveImports, sections, symbolCollisions, type WeaveSymbol } from './migrate-symbols.js';
 import {
+  exportedNames,
   importedNamesFrom,
   sourceImports,
   type ClassMember,
@@ -411,6 +412,9 @@ export interface ConvertOptions {
    *  carries the component's selector; Weave has no such element, so its template's single root element is where
    *  they belong. */
   host?: HostWiring;
+  /** Every name in the unit declared to return an `Observable<…>` — the map the RxJS fold classifies its sources
+   *  against. See `observableReturners`. */
+  returners?: Set<string>;
 }
 
 /** One `<ng-template #name let-a let-b="key">` turned into a Weave `@snippet name(a, b)`. */
@@ -1209,6 +1213,7 @@ export function convertComponent(fact: ComponentFact, templateHtml: string, opts
     ...translateCtx(fact.members ?? [], fact.inputs, 'props', opts.migrated),
     angularNames: angularImportedNames(fact.file),
     rename: localRenames(fact.members ?? [], carriedImportsFor(fact.file, opts.migrated)),
+    returners: opts.returners,
   };
   // The shims the translated calls name. Without them the file calls functions that do not exist.
   const adapters: string[] = adaptersFor(fact.members ?? [], fact.inputs);
@@ -1558,6 +1563,9 @@ export interface TranslateCtx {
   /** Fields that held an RxJS Subject. They become signals, so `this.x.next(v)` is `x.set(v)` and `this.x.value`
    *  is `x()` — but a method body carries no declaration, so the names have to travel with the context. */
   subjects?: Set<string>;
+  /** Every name in the UNIT declared to return an `Observable<…>`. Real chains start at a call, not at an
+   *  `of(…)`, so without this map the fold gave up on the first operator of almost every real file. */
+  returners?: Set<string>;
 }
 
 /** How a converted service is reached from another file. */
@@ -1668,6 +1676,61 @@ export function translateCtx(members: ClassMember[], inputs: string[], propsRef:
     migrated,
     subjects,
   };
+}
+
+/**
+ * Drop `const x: T = x;` — a declaration whose initializer is the very name it declares.
+ *
+ * The source wrote `const _router: Router = this._router;`, a local alias for a field. Once `this._router`
+ * became the bare `_router`, the alias declared a binding from itself: dead at best, and a shadow of the real
+ * declaration at worst, since the field is now declared in the same scope.
+ */
+export function dropSelfDeclarations(code: string): string {
+  return code
+    .split('\n')
+    // `\r` is in the trailing class on purpose: the source is read as-is, so on a CRLF file every line ends with
+    // one and an anchored `$` after `[\t ]*` never matched — the statement survived on exactly the files it was
+    // written for.
+    .filter((line) => !/^[\t ]*(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*(?::[^=]*)?=\s*\1\s*;?[\t \r]*$/.test(line))
+    .join('\n');
+}
+
+/**
+ * The stand-in for a dependency nothing provides.
+ *
+ * It used to be `null as unknown as Router` — but `Router` is Angular's, and `@angular` imports are DROPPED,
+ * so the placeholder named a type the file no longer has. The original type is kept in a trailing comment
+ * instead, where it informs without having to resolve.
+ *
+ * `any` and not `never`: the code around it READS this thing (`_router.url`), and every such read is an error
+ * against `never` — a wall of type errors pointing at a hole the TODO above already names. `any` says the same
+ * thing the TODO does, once.
+ */
+export function placeholderFor(type: string, ctx: TranslateCtx): string {
+  const head: string = type.replace(/<[\s\S]*$/, '').trim();
+  return ctx.angularNames?.has(head) || ANGULAR_OWN_TYPES.has(head) ? 'null as any' : `null as unknown as ${type}`;
+}
+
+/** Angular's own injectables, which a converted file never imports even when the source did not name them. */
+const ANGULAR_OWN_TYPES: Set<string> = new Set<string>(['Router', 'ActivatedRoute', 'ActivatedRouteSnapshot', 'Injector', 'ElementRef', 'Renderer2', 'ChangeDetectorRef', 'NgZone', 'HttpClient', 'DOCUMENT', 'ViewContainerRef', 'TemplateRef']);
+
+/**
+ * Whether anything in the class reads the injected field ITSELF rather than calling a method Weave replaces.
+ *
+ * `this._router.navigate(…)` is rewritten, so the field can go. `const r: Router = this._router` and
+ * `this._router.routerState.snapshot` are not — they need the thing, and dropping its declaration left the draft
+ * naming a binding that was never there.
+ */
+export function readsBareInjected(members: ClassMember[], name: string, service: string): boolean {
+  const rewritten: string[] = Object.keys(SERVICE_METHODS[service] ?? {});
+  const body: string = members.map((m) => `${m.body ?? ''}\n${m.initializer ?? ''}`).join('\n');
+  const uses: RegExp = new RegExp(`this\\.${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w$])\\s*(?:\\.\\s*([A-Za-z_$][\\w$]*)\\s*(\\()?)?`, 'g');
+  for (const m of body.matchAll(uses)) {
+    const method: string | undefined = m[1];
+    const called: boolean = Boolean(m[2]);
+    if (!method || !called || !rewritten.includes(method)) return true;
+  }
+  return false;
 }
 
 /** A field holding some flavour of RxJS Subject — by its initializer or, when it has none, by its declared type. */
@@ -1979,10 +2042,15 @@ export function translateBody(body: string, ctx: TranslateCtx, params: string = 
   for (const name of leftovers) todos.push(`\`this.${name}\` has no counterpart here — it was not a field, input, getter or method of this class`);
   if (leftovers.length) code = outsideStrings(code, (p) => p.replace(/\bthis\./g, ''));
 
+  // `const x: T = this.x;` translated to `const x: T = x;` — the field it copied is now the very name being
+  // declared, so the statement declares a binding from itself: dead at best, a shadow of the real declaration at
+  // worst. It carried no information in the original either; it was an alias for `this.`.
+  code = dropSelfDeclarations(code);
+
   // RxJS LAST, when the receivers are the Weave names: Weave has no stream primitive, so a body that still holds
   // a `.pipe(…)` has not been migrated. An operator with no equivalent stops its own chain and says so; it does
   // not stop the rest of the body.
-  const rx: { code: string; todos: string[] } = rxAfterSubjects(code);
+  const rx: { code: string; todos: string[] } = rxAfterSubjects(code, ctx.returners);
   code = rx.code;
   todos.push(...rx.todos);
   return { code, todos };
@@ -2179,7 +2247,7 @@ function draftMembers(members: ClassMember[], className: string, ctx?: Translate
     } else {
       out.push(tsTodo(`${service} was not migrated, so nothing provides this. The calls below compile and will`));
       out.push('//   throw the moment they run — wire it up, or delete them.');
-      out.push(`const ${name} = null as unknown as ${service};`);
+      out.push(`const ${name} = ${placeholderFor(service, cx)}; // was ${service}`);
     }
   }
 
@@ -2216,16 +2284,23 @@ function draftMembers(members: ClassMember[], className: string, ctx?: Translate
         if (m) {
           out.push(`// \`${service}\` is migrated alongside this file; this is how it is reached here.`);
           out.push(m.kind === 'store' ? `const ${mem.name} = ${m.name}();` : `const ${mem.name} = inject(${m.name});`);
-        } else if (SERVICE_METHODS[service]) {
+        } else if (SERVICE_METHODS[service] && !readsBareInjected(members, mem.name, service)) {
           out.push(`// \`${mem.name}\` held ${service}. Its calls above were rewritten to Weave's equivalents, so there is`);
           out.push('// nothing to hold here; anything still calling it needs a decision.');
+        } else if (SERVICE_METHODS[service]) {
+          // Its CALLS were rewritten, but something reads the field itself — `const r: Router = this._router;`,
+          // or a property like `this._router.routerState`. Dropping the declaration turned that into `const r =
+          // r;`: a self-assignment that does not even reach the runtime, let alone the missing service.
+          out.push(tsTodo(`${service}'s CALLS were rewritten, but something below reads \`${mem.name}\` directly`));
+          out.push(`//   (a property, or the service itself). That read has no Weave equivalent — decide what it should be.`);
+          out.push(`const ${mem.name} = ${placeholderFor(mem.type || service, cx)}; // was ${mem.type || service}`);
         } else {
           // NOT migrated and NOT one Weave replaces — usually because access to it was left closed. Its calls
           // were kept naming this field, so a bare comment left every one of them referencing nothing. The hole
           // is declared instead: it compiles, it is impossible to miss, and `null` throws the moment it is used.
           out.push(tsTodo(`${service} was not migrated, so nothing provides this. The calls below compile and will`));
           out.push('//   throw the moment they run — wire it up, or delete them.');
-          out.push(`const ${mem.name} = null as unknown as ${mem.type || service};`);
+          out.push(`const ${mem.name} = ${placeholderFor(mem.type || service, cx)}; // was ${mem.type || service}`);
         }
         out.push(...commented(mem.text, ''));
         continue;
@@ -2297,7 +2372,7 @@ export function serviceBaseName(className: string): string {
  * BODIES are not translated; each carries a TODO. That line is deliberate: the shape is mechanical, the logic is
  * a judgement call, and a plausible-but-wrong body is worse than an obvious hole.
  */
-export function convertService(fact: ServiceFact, rxjsNames: string[] = [], migrated?: Map<string, MigratedService>): { baseName: string; ts: string } {
+export function convertService(fact: ServiceFact, rxjsNames: string[] = [], migrated?: Map<string, MigratedService>, returners?: Set<string>): { baseName: string; ts: string } {
   const singleton: boolean = fact.providedIn === 'root';
   const lines: string[] = [];
   // Same rule as components: import what the drafted body actually uses (a getter becomes a `computed`).
@@ -2323,6 +2398,7 @@ export function convertService(fact: ServiceFact, rxjsNames: string[] = [], migr
     ...translateCtx(fact.members ?? [], [], 'props', migrated),
     angularNames: angularImportedNames(fact.file),
     rename: localRenames(fact.members ?? [], carriedImportsFor(fact.file, migrated)),
+    returners,
   });
   body.push(...drafted.lines);
   body.push('');
@@ -2866,7 +2942,7 @@ function repointSpecifier(spec: string): string {
  * them, as this used to, meant a migration silently dropped half a library — including the entry point its
  * consumers import. Returns null only when the file cannot be read.
  */
-export function carryFile(file: string, facts: MigrationFacts): string | null {
+export function carryFile(file: string, facts: MigrationFacts, returners?: Set<string>): string | null {
   let src: string;
   try {
     src = readFileSync(file, 'utf8');
@@ -2878,7 +2954,7 @@ export function carryFile(file: string, facts: MigrationFacts): string | null {
 
   // "Carried" never meant "left alone about RxJS". A helper module with no decorator is exactly where the
   // streams hide, and moving it unchanged hands the migrated app a dependency on a package Weave replaces.
-  const rx: { code: string; todos: string[] } = rxToWeave(repointed);
+  const rx: { code: string; todos: string[] } = rxToWeave(repointed, [], returners);
   const rxNames: string[] = importedNamesFrom(file, 'rxjs');
   const rxSurviving: string[] = survivingRxNames(rx.code, rxNames);
   const carried: string = pruneRxImports(rx.code.split('\n'), rx.code).lines.join('\n');
@@ -2911,6 +2987,15 @@ export function carryFile(file: string, facts: MigrationFacts): string | null {
     header.push(tsTodo('it uses a package you chose to migrate — check the plan for what it becomes.'));
   }
   return `${header.join('\n')}\n\n${carried}`;
+}
+
+/** A source file's text, or '' when it cannot be read — the returner scan must not fail a whole migration. */
+function tryReadSource(file: string): string {
+  try {
+    return readFileSync(file, 'utf8');
+  } catch {
+    return '';
+  }
 }
 
 /** The selector → component-name map, so converted templates reference each other as Weave components. */
@@ -2949,6 +3034,24 @@ export function symbolTable(facts: MigrationFacts, targetDir: string): Map<strin
   for (const df of facts.directives ?? []) {
     table.set(df.className, { from: df.className, to: directiveFunctionName(df), isDefault: false, file: outputFileFor(df.file, facts, targetDir), kind: 'directive' });
   }
+  // Everything a CARRIED file exports belongs in the table too. Only decorated classes were listed, so a type
+  // imported through a workspace alias — `import { IBreadcrumb } from '@sps-interfaces'` — was migrated into the
+  // output and then still imported from the alias, which the target app does not have. The file was right there.
+  const decorated: Set<string> = new Set<string>([
+    ...facts.components.map((cf) => cf.file),
+    ...facts.services.map((sf) => sf.file),
+    ...(facts.pipes ?? []).map((pf) => pf.file),
+    ...(facts.directives ?? []).map((df) => df.file),
+    ...(facts.resolvers ?? []).map((rf) => rf.file),
+  ]);
+  for (const file of facts.files) {
+    if (decorated.has(file)) continue;
+    const out: string = outputFileFor(file, facts, targetDir);
+    for (const name of exportedNames(file)) {
+      // A decorated class wins: it is the one whose NAME changed, and the carried scan must not shadow it.
+      if (!table.has(name)) table.set(name, { from: name, to: name, isDefault: false, file: out, kind: 'carried' });
+    }
+  }
   return table;
 }
 
@@ -2959,7 +3062,11 @@ export function planWrites(facts: MigrationFacts, targetDir: string): WriteItem[
   const table: Map<string, WeaveSymbol> = symbolTable(facts, targetDir);
   // What this run converts, so a call from one converted file into another is not reported as unknown.
   const migrated: Map<string, MigratedService> = migratedServices(facts.services);
-  const opts: ConvertOptions = { components: componentNameMap(facts), migrated };
+  // The whole unit's `Observable<…>` returners, gathered BEFORE any file is converted. A chain's source is
+  // usually a call into this same unit, and a fold that cannot classify its source gives up on the first
+  // operator — so the map has to exist before the first file is translated, not be discovered as it goes.
+  const returners: Set<string> = observableReturners(facts.files.map((f) => tryReadSource(f)));
+  const opts: ConvertOptions = { components: componentNameMap(facts), migrated, returners };
   for (const cf of facts.components) {
     const rel: string = outputPathFor(cf.file, facts);
     const dir: string = dirname(rel) === '.' ? '' : dirname(rel);
@@ -2995,7 +3102,7 @@ export function planWrites(facts: MigrationFacts, targetDir: string): WriteItem[
     const rel: string = outputPathFor(sf.file, facts);
     const dir: string = dirname(rel) === '.' ? '' : dirname(rel);
     const base: string = (rel.split(/[\\/]/).pop() ?? '').replace(/\.ts$/, '');
-    const draft: { baseName: string; ts: string } = convertService(sf, importedNamesFrom(sf.file, 'rxjs'), migrated);
+    const draft: { baseName: string; ts: string } = convertService(sf, importedNamesFrom(sf.file, 'rxjs'), migrated, returners);
     const path: string = join(targetDir, 'src', dir, `${base || draft.baseName}.ts`);
     items.push({ path, content: draft.ts, status: existsSync(path) ? 'skip-exists' : 'write' });
   }
@@ -3052,7 +3159,7 @@ export function planWrites(facts: MigrationFacts, targetDir: string): WriteItem[
     const rel: string = outputPathFor(file, facts);
     const dir: string = dirname(rel) === '.' ? '' : dirname(rel);
     const base: string = (rel.split(/[\\/]/).pop() ?? '').replace(/\.ts$/, '');
-    const carried: string | null = carryFile(file, facts);
+    const carried: string | null = carryFile(file, facts, returners);
     if (carried === null) continue;
     const path: string = join(targetDir, 'src', dir, `${base}.ts`);
     items.push({ path, content: carried, status: existsSync(path) ? 'skip-exists' : 'write' });

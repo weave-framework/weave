@@ -243,9 +243,16 @@ stream — it is one of three things, and each has an exact JavaScript equivalen
 
 | The source | Its shape | So the operators are |
 |---|---|---|
-| `of(x)` | one synchronous emission | plain expression application — `map(f)` is `f(x)` |
-| `of(a, b)`, `concat(…)`, `EMPTY` | a finite sequence | the array methods they were modelled on — `mergeMap` is `flatMap`, `distinct` is a `Set`, `toArray` is nothing at all |
+| `of(x)`, a call the unit declares as returning `Observable<T>` | one emission | plain expression application — `map(f)` is `f(x)` |
+| `of(a, b)`, `concat(…)`, `EMPTY` | a finite sequence | the array methods they were modelled on — `mergeMap` is `flatMap`, `distinct` is a `Set`, `toArray` collects it back into one emission |
 | `from(p)`, `forkJoin([…])` | one asynchronous emission | `.then(…)` / `await` |
+
+That second row of the first column matters more than it looks. Real chains do not start at an `of(…)` — they
+start at a **call**: `this._resolveCrumbs(route).pipe(…)`. So before converting anything, the migration scans the
+whole unit for every declaration returning an `Observable<…>` and folds against that map. Without it the fold
+gave up on the first operator of almost every real file, which is what "it did nothing to my code" looks like.
+The assumption is stated because it is one: such a function **emits once** — in application code an `Observable`
+returned by a resolver, a service call or a wrapper is a request, not a live feed.
 
 ~~~ts
 // before
@@ -271,9 +278,25 @@ those chains keep their `rxjs` import and their `Observable` signature — toget
 promises a plain value over code that still returns a stream. Each one is named in a `TODO(weave migrate)`. A
 chain rewritten up to the operator that stopped it would compile and lie, so it is never half-rewritten.
 
+`x instanceof Observable` becomes `false`: that is the class, checked at runtime, and after a migration nothing in
+the app is an Observable — so the branch it guards is dead, and saying so is the translation.
+
 This covers the converted components and services *and* the files carried across untouched — a helper module with
 no decorator is exactly where the streams hide. The `rxjs` imports the translation made dead are pruned per
 binding, so a single surviving `Observable` no longer drags `of`, `map` and `concat` along with it.
+
+### What the target app has to be able to resolve
+
+A migrated file that imports from `@my-org/interfaces` compiles in the source workspace and nowhere else. Every
+symbol the migration writes — including the ones in files carried across whole — goes into a table, and the
+assembled output is resolved against it in one pass, so an import through a workspace alias is repointed at the
+copy that actually landed. What is left over is reported before anything is written: the packages the converted
+code still imports, and the declarations nothing provides.
+
+Bindings the draft would otherwise name into thin air are declared instead. An injected `Router` whose *calls*
+were rewritten still has to exist when something reads the service itself (`_router.url`), so it is declared as a
+hole with a `TODO` rather than dropped; and the local alias a constructor wrote for it (`const _router: Router =
+this._router`) is removed, because once `this.` is gone that line declares a binding from itself.
 
 ### It asks for what it cannot see
 

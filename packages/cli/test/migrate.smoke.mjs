@@ -18,6 +18,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const repo = join(here, '..', '..', '..');
 const fx = join(here, 'fixtures', 'migrate');
 
+const NL = String.fromCharCode(10);
 let failures = 0;
 const ok = (cond, msg) => {
   console.log(`${cond ? '  ✔' : '  ✖'} ${msg}`);
@@ -660,7 +661,7 @@ ok(hostPair.ts.includes("const label = signal<string>('the logo');"), 'signalDec
 ok(hostPair.ts.includes('const lastSeen = signal<Date | undefined>(undefined);'), 'signalDecl: an uninitialised field is a signal of `T | undefined`, and `lastSeen: Date` is STATE, not an injected service');
 // A component holds streams too, and its signatures follow the translated bodies for the same reason a service's do.
 ok(hostPair.ts.includes('const labelWidth = (): number =>'), 'host: a translated component method no longer says it returns an Observable');
-ok(hostPair.ts.includes('((l) => l.length)(label())'), 'host: the chain inside a component folds like any other');
+ok(hostPair.ts.includes('return label().length;'), 'host: the chain inside a component folds like any other');
 ok(!/from 'rxjs/.test(hostPair.ts), 'host: a component whose streams all translated imports nothing from rxjs');
 ok(hostPair.ts.includes('const hasRoute = computed(() => props.routerLink.length > 0);'), 'host: the getter behind a host binding is translated, not stubbed');
 // `: void` on every drafted function made a method ending in `return false;` a type error. The source either
@@ -820,7 +821,7 @@ const plainSvc = {
 const plainDraft = cv.convertService(plainSvc, ['of', 'map']);
 ok(!plainDraft.ts.includes('could not be translated'), 'convertService: a chain that WAS translated gets no leftover RxJS advice');
 ok(!/from 'rxjs/.test(plainDraft.ts), 'convertService: a fully translated service imports nothing from rxjs');
-ok(plainDraft.ts.includes('((v) => v.length)(xs)'), 'convertService: `of(xs).pipe(map(f))` is the application `f(xs)`, not a stream');
+ok(plainDraft.ts.includes('return xs.length;'), 'convertService: `of(xs).pipe(map(f))` is the application `f(xs)`, not a stream');
 
 /* ──────────── RxJS → Weave: the translation itself ──────────── */
 // Weave has no stream primitive, so an app that finishes a migration still importing rxjs has been MOVED, not
@@ -838,7 +839,7 @@ ok(rx.classifySource('this.http.get(url)', []).shape === 'unknown', 'classifySou
 // The operators, folded over the shape they are being applied to.
 const fold = (src) => rx.rxToWeave(src).code.trim();
 ok(fold('const y = of(1, 2, 3).pipe(map((n) => n * 2));') === 'const y = [1, 2, 3].map((n) => n * 2);', 'fold: `map` over a sequence is Array.prototype.map');
-ok(fold('const y = of(v).pipe(map((n) => n * 2));') === 'const y = ((n) => n * 2)(v);', 'fold: `map` over a single value is application, not a `.map`');
+ok(fold('const y = of(v).pipe(map((n) => n * 2));') === 'const y = v * 2;', 'fold: `map` over a single value is application, not a `.map` — and a one-use projection is inlined rather than left as an IIFE');
 ok(fold('const y = concat(of(a), of(b)).pipe(mergeMap((xs) => xs), toArray());') === 'const y = [a, b].flatMap((xs) => xs);', 'fold: mergeMap is flatMap, and toArray over a sequence is nothing at all');
 ok(fold('const y = of(1, 2).pipe(distinct());') === 'const y = [...new Set([1, 2])];', 'fold: distinct is a Set');
 ok(fold('const y = of(1, 2).pipe(first());') === 'const y = [1, 2][0];', 'fold: first over a sequence is its first element');
@@ -855,7 +856,7 @@ ok(stopped.todos.some((t) => t.includes('debounceTime')), 'fold: the operator th
 
 // `.subscribe` is decided by the shape: once per emission is forEach, once for a value is a plain call.
 ok(fold('of(1, 2).pipe(map((n) => n)).subscribe((n) => log(n));') === '[1, 2].map((n) => n).forEach((n) => log(n));', 'subscribe: over a sequence it is forEach');
-ok(fold('of(v).subscribe((n) => log(n));') === '((n) => log(n))(v);', 'subscribe: on a single value it is the callback called once, with no pipe in between');
+ok(fold('of(v).subscribe((n) => log(n));') === 'log(v);', 'subscribe: on a single value it is the callback called once, with no pipe in between');
 
 // Subjects. A BehaviorSubject IS a signal — current value, shared readers, notify on write.
 const subj = rx.rxToWeave("class X {\n  private open = new BehaviorSubject<boolean>(false);\n  toggle() { this.open.next(!this.open.value); this.open.complete(); }\n}");
@@ -897,6 +898,107 @@ ok(rx.survivingRxNames("import { of } from 'rxjs';\nconst x = 1;", ['of']).lengt
 ok(rx.receiverStart('return concat(a, b)', 'return concat(a, b)'.length) === 'return '.length, 'receiverStart: the walk stops at the keyword before the expression');
 ok(rx.receiverStart('x = this.http.get<T>(u)', 'x = this.http.get<T>(u)'.length) === 'x = '.length, 'receiverStart: a property chain with a generic call walks back whole');
 
+/* ── the map the fold needs BEFORE it starts: what the unit declares as returning a stream ── */
+// Real chains do not start at an `of(…)`; they start at a call. Without this the fold gave up on the first
+// operator of almost every real file, which is what "the translator does nothing on my code" looks like.
+const RET_SRC = `
+export class R {
+  resolve(route: X): Observable<C[]> { return of([]); }
+  private _resolveCrumbs(route: X): Observable<C[]> { return of([]); }
+  plain(x: number): number { return x; }
+}
+export function wrapIntoObservable<T>(value: T): Observable<T> { return of(value); }
+const other = inject(Thing);
+const anon = function (x: number): Observable<number> { return of(x); };
+`;
+const returners = rx.observableReturners([RET_SRC]);
+ok(returners.has('_resolveCrumbs') && returners.has('resolve') && returners.has('wrapIntoObservable'), 'observableReturners: every declaration returning an Observable is found, methods and functions alike');
+ok(!returners.has('plain'), 'observableReturners: a declaration returning something else is not one');
+ok(!returners.has('function'), 'observableReturners: a keyword where the name would be is not a name');
+ok(!returners.has('inject') && !returners.has('R'), 'observableReturners: the scan does not pair an identifier with a `): Observable<` several declarations later — a lazy regex crossed the whole file and collected exactly this noise');
+
+// With the map, a chain whose source is a local call folds; without it, it does not.
+const CHAIN = 'const y = this._resolveCrumbs(r).pipe(mergeMap((x: C[]) => x), distinct((x: C) => x.text), toArray());';
+ok(rx.rxToWeave(CHAIN, [], returners).code.includes('new Set') === false && rx.rxToWeave(CHAIN, [], returners).code.includes('new Map('), 'returners: a chain starting at a local call FOLDS — this is the shape real code has');
+ok(rx.rxToWeave(CHAIN, [], returners).code.includes('__v.text'), 'returners: the key projection is inlined correctly — `x.text` over `__v` is `__v.text`, never `__v.te__vt`');
+ok(rx.rxToWeave(CHAIN).code.includes('.pipe('), 'returners: WITHOUT the map the same chain is left alone — the fold never guesses at a source it cannot classify');
+
+// `toArray` collects a sequence into ONE emission. Conflating the two made everything after it fold as if there
+// were still N emissions, so a `.subscribe` ran per item instead of once with the collected array.
+ok(rx.rxToWeave('of(1, 2).pipe(toArray()).subscribe((xs) => take(xs));').code.trim() === 'take([1, 2]);', 'toArray: it collects into one emission, so the subscription runs ONCE with the array');
+
+// An identity projection over a single emission is the canonical flatten; anything else maps that emission.
+ok(rx.rxToWeave('const y = src.pipe(mergeMap((x) => x), take(2));', [], new Set(['src'])).code.includes('.slice(0, 2)') === false, 'flatten: a source that is not a call is still not classified by name alone');
+const idFold = rx.rxToWeave('const y = load().pipe(mergeMap((x) => x), take(2));', [], new Set(['load']));
+ok(idFold.code.includes('load().slice(0, 2)'), 'flatten: `mergeMap((x) => x)` over one emission is the flatten it was written as, so the sequence continues');
+
+// A bare `concat` — nothing after it — is the collection its consumer reads, so the parts are spread.
+ok(rx.rxToWeave('crumbs = concat(crumbs, load(x));', [], new Set(['load'])).code.trim() === 'crumbs = [...crumbs, ...load(x)];', 'concat: with no operators after it, the parts are SPREAD — the consumer reads one collection');
+ok(rx.rxToWeave('const y = concat(of(a), of(b)).pipe(mergeMap((x) => x));').code.includes('[a, b].flatMap'), 'concat: as a pipe SOURCE it is still the sequence `[a, b]` — there the operators define the reading');
+
+// `instanceof Observable` is the CLASS, so no signature rewrite reaches it — and it was the last thing keeping
+// `rxjs` imported by files whose every chain had already folded.
+const inst = rx.rxToWeave('if (value instanceof Observable) { return value; }');
+ok(inst.code.includes('if (false)'), 'instanceof: nothing in a Weave app is an Observable, so the test is `false` and the branch is dead');
+ok(inst.todos.some((t) => t.includes('dead')), 'instanceof: the dead branch is reported, not silently flipped');
+
+// A union member that the rewrite turns into one already present is noise that reads like a mistake.
+ok(rx.rxToWeave('function f<T>(v: T | Promise<T> | Observable<T>): Observable<T> { return of(v); }').code.includes('(v: T | Promise<T>)'), 'types: a union member rewritten into one already there is dropped, not duplicated');
+// A body that returns BOTH a promise and a plain value must not be typed as only one of them.
+ok(rx.rxToWeave('function f<T>(v: T): Observable<T> { if (p(v)) { return from(v); } return v as T; }').code.includes(': T | Promise<T>'), 'types: a body that returns a promise on one branch and a value on another says so');
+ok(rx.rxToWeave('const y = from(Promise.resolve(v));').code.trim() === 'const y = Promise.resolve(v);', 'from: an argument that is already a promise is not wrapped a second time');
+
+// An APOSTROPHE in prose opened a string literal that never closed, and every declaration after it was invisible
+// to the scanners — so a comment reading `Router's calls were rewritten` silently switched the translation off
+// for the rest of the file. The migration writes such comments itself; so does everybody's source.
+const APOSTROPHE = [
+  "  // Router's CALLS were rewritten, so this is a note and nothing more.",
+  '  const lengths = (xs: string[]): Observable<number[]> => {',
+  '    return xs.map((s) => s.length);',
+  '  };',
+].join(NL);
+ok(!rx.rewriteObservableTypes(APOSTROPHE, []).includes('Observable'), "scanners: an apostrophe in a `//` comment does not open a string literal that swallows the rest of the file");
+const APOSTROPHE_CHAIN = ["  // it's a note", '  const y = of(v).pipe(map((n) => n + 1));'].join(NL);
+ok(!rx.rxToWeave(APOSTROPHE_CHAIN).code.includes('.pipe('), 'scanners: the chain after such a comment is still found and folded');
+ok(rx.rxToWeave(["  /* it's a block note */", '  const y = of(v).pipe(map((n) => n + 1));'].join(NL)).code.includes('.pipe(') === false, 'scanners: a block comment counts too');
+
+/* ── what the target app must actually be able to resolve ── */
+// A type reached through a workspace alias was MIGRATED into the output and then still imported from the alias,
+// which the target app does not have. The file was right there; only decorated classes were in the table.
+const aliasDir = mkdtempSync(join(tmpdir(), 'weave-alias-'));
+try {
+  mkdirSync(join(aliasDir, 'src'), { recursive: true });
+  writeFileSync(join(aliasDir, 'src', 'index.ts'), ["export * from './models';", "export * from './use';"].join(NL));
+  writeFileSync(join(aliasDir, 'src', 'models.ts'), 'export interface IBreadcrumb { text: string }');
+  writeFileSync(join(aliasDir, 'src', 'use.ts'), ["import { IBreadcrumb } from '@sps-interfaces';", 'export const first = (xs: IBreadcrumb[]): IBreadcrumb => xs[0];'].join(NL));
+  const aliasFacts = a.assembleFacts(aliasDir);
+  const table = cv.symbolTable(aliasFacts, join(aliasDir, 'out'));
+  ok(table.has('IBreadcrumb'), 'symbolTable: a CARRIED file exports are in the table — only decorated classes used to be');
+  const written = cv.planWrites(aliasFacts, join(aliasDir, 'out'));
+  const useOut = written.find((w) => /use\.ts$/.test(w.path));
+  ok(!!useOut && !/@sps-interfaces/.test(useOut.content), 'planWrites: an alias import is repointed at the migrated copy, not left naming a path the target app does not have');
+  ok(!!useOut && /from '\.\/models'/.test(useOut.content), 'planWrites: it is repointed at the file the symbol actually landed in');
+} finally {
+  rmSync(aliasDir, { recursive: true, force: true });
+}
+
+/* ── the draft must not name bindings that are not there ── */
+ok(cv.dropSelfDeclarations(['const r: Router = r;', 'const keep = 1;'].join(NL)) === 'const keep = 1;', 'dropSelfDeclarations: `const x: T = x;` is a binding declared from itself — dead, and a shadow of the real one');
+ok(cv.dropSelfDeclarations(['const r: Router = r;', 'const keep = 1;'].join(String.fromCharCode(13) + NL)).includes('const r') === false, 'dropSelfDeclarations: it fires on CRLF too — an anchored `$` after `[\t ]*` never matched on a real Windows source');
+ok(cv.dropSelfDeclarations('const r = other;') === 'const r = other;', 'dropSelfDeclarations: a real initializer is left alone');
+// The placeholder used to name the Angular type — which the converted file no longer imports.
+const ngCtx = { inputs: new Set(), fields: new Set(), getters: new Set(), methods: new Set(), injected: new Map(), signals: new Set() };
+ok(cv.placeholderFor('Router', ngCtx) === 'null as any', 'placeholderFor: an Angular type is not named — @angular imports are dropped, so the name would resolve to nothing');
+ok(cv.placeholderFor('MyOwnService', ngCtx) === 'null as unknown as MyOwnService', 'placeholderFor: a type the app really has is still named');
+// A field whose CALLS were rewritten still has to exist when something reads the field itself.
+const routerMembers = [
+  { kind: 'field', name: '_router', isPublic: false, params: '', body: '', initializer: 'inject(Router)', isSignal: false, type: 'Router' },
+  { kind: 'method', name: 'go', isPublic: true, params: '', body: "this._router.navigate(['/x']);", initializer: '', isSignal: false },
+];
+ok(cv.readsBareInjected(routerMembers, '_router', 'Router') === false, 'readsBareInjected: a field only ever CALLED through is not read directly');
+const readMembers = [...routerMembers, { kind: 'method', name: 'peek', isPublic: true, params: '', body: 'const s = this._router.routerState.snapshot;', initializer: '', isSignal: false }];
+ok(cv.readsBareInjected(readMembers, '_router', 'Router') === true, 'readsBareInjected: a PROPERTY read needs the field to exist — dropping it left the draft naming nothing');
+
 // The same all-or-nothing rule for the sources that are not calls: `EMPTY` under a refused `.pipe` must stay
 // `EMPTY`, or the chain becomes `[].pipe(…)` — no longer RxJS, and no longer valid either.
 ok(rx.rxToWeave('const y = EMPTY.pipe(debounceTime(9));').code.includes('EMPTY.pipe('), 'fold: EMPTY is not collapsed under a `.pipe` the fold refused');
@@ -918,6 +1020,11 @@ ok(/settled[\s\S]{0,120}Observable<string>/.test(streamsTs), 'convertService: th
 ok(streamsTs.includes("import { Observable } from 'rxjs';"), 'convertService: only the binding the surviving signature needs is imported');
 ok(!/\bof\b|\bBehaviorSubject\b/.test(streamsTs.split('\n').filter((l) => l.startsWith('import')).join('\n')), 'convertService: the bindings the translation removed are NOT imported alongside it');
 ok(streamsTs.includes('debounceTime'), 'convertService: the operator that stopped its chain is still named in the advice');
+// The alias the source wrote for `this.` is dead once `this.` is gone, and it shadowed the real declaration.
+ok(!/const _router: Router = _router;/.test(streamsTs), 'convertService: `const x: T = this.x` does not survive as `const x: T = x`');
+// Its CALLS were rewritten, but `_router.url` reads the service itself — the field has to exist.
+ok(/const _router = null as any;/.test(streamsTs), 'convertService: a field read directly is declared even when its calls were rewritten away');
+ok(!/null as unknown as Router/.test(streamsTs), 'convertService: the placeholder does not name an Angular type the file no longer imports');
 
 // The carried path — a helper module with no decorator is exactly where the streams hide.
 const helperTs = cv.carryFile(join(fx, 'services', 'streams.helper.ts'), { packages: [], components: [], services: [], files: [] });

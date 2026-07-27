@@ -1,4 +1,5 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
+import { Router } from '@angular/router';
 import { BehaviorSubject, Observable, of } from 'rxjs';
 import { debounceTime, map } from 'rxjs/operators';
 
@@ -7,6 +8,15 @@ import { debounceTime, map } from 'rxjs/operators';
 @Injectable({ providedIn: 'root' })
 export class StreamsService {
   private open = new BehaviorSubject<boolean>(false);
+  private _router: Router = inject(Router);
+
+  // The alias the source wrote for `this.`, and a read of the service itself. Angular's `navigate` is rewritten
+  // to Weave's, but `_router.url` is not — so the field has to survive, and the alias has to not.
+  constructor() {
+    const _router: Router = this._router;
+    this._router.navigate(['/x']);
+    this.open.next(_router.url.length > 0);
+  }
 
   toggle(): void {
     this.open.next(!this.open.value);

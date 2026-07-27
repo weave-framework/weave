@@ -50,6 +50,30 @@
   *and* their `Observable` signature, so a signature never promises a plain value over code that still returns a
   stream. A chain rewritten up to the operator that stopped it would compile and lie.
 
+  Measured on a real Angular component library (8 files, 3 services, a resolver): **0 live `rxjs` imports and 0
+  live `Observable` mentions** in the converted output, down from 3 and 6.
+
+- **`weave migrate` folds chains that start at a CALL, which is what real code has.** The fold could only
+  classify a literal source (`of(…)`, `concat(…)`, `from(…)`), so `this._resolveCrumbs(route).pipe(mergeMap(…),
+  distinct(…), toArray())` — the shape almost every real chain has — gave up on its first operator and came out
+  untranslated. The whole unit is now scanned for declarations returning `Observable<…>` **before** any file is
+  converted, and the fold classifies calls to them as one emission. `x instanceof Observable` becomes `false`
+  (nothing in a Weave app is an Observable, so that branch is dead), and a one-use projection is inlined rather
+  than left as a nest of IIFEs.
+
+- **`weave migrate` no longer emits imports and bindings the target app cannot resolve.** A symbol imported
+  through a workspace alias (`@my-org/interfaces`) was migrated into the output and then still imported from the
+  alias: only decorated classes were in the symbol table, so nothing a *carried* file exported could be
+  repointed. An injected service whose calls were rewritten is now still declared when something reads the
+  service itself (`_router.url`) instead of leaving the draft naming a binding that was never there, the local
+  alias a constructor wrote for it (`const _router: Router = this._router`) is dropped once `this.` is gone, and
+  a placeholder no longer names an Angular type the converted file does not import.
+
+- **Fixed: an apostrophe in a comment switched the RxJS translation off for the rest of the file.** The scanners
+  tracked string literals so no rewrite could match across one, but not comments — so prose like `// Router's
+  calls were rewritten` opened a string that never closed, and every declaration after it was invisible. The
+  migration writes such comments itself; so does everybody's source.
+
   **It reports what it cannot do.** Every run prints how much of the source is genuinely converted versus merely
   carried across unchanged, names every declaration in each group, and says why. Anything without a faithful
   Weave equivalent is left in place with a `TODO(weave migrate)` comment instead of being guessed at, and a

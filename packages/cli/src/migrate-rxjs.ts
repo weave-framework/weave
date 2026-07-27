@@ -140,6 +140,58 @@ function angleOpen(code: string, close: number): number {
   return -1;
 }
 
+/**
+ * Apply a projection to an argument, inlining it when that can be done without changing what runs.
+ *
+ * Folding over a single emission is `((x) => body)(v)` — correct, and unreadable once three of them nest, which
+ * is what a real chain produces. So the identity collapses to the argument itself, and a one-parameter
+ * expression arrow is substituted directly. Anything else (a block body, a destructured or multi-parameter
+ * signature, an argument that is not a plain reference) keeps the call form: inlining those would either
+ * duplicate work or change evaluation order.
+ */
+function applyInline(f: string, arg: string): string {
+  const t: string = f.trim();
+  if (isIdentity(t)) return arg;
+  const simple: RegExpMatchArray | null = t.match(/^\(?\s*([A-Za-z_$][\w$]*)\s*(?::[^)]*)?\)?\s*=>\s*([\s\S]+)$/);
+  const body: string | undefined = simple?.[2]?.trim();
+  if (!simple || !body || body.startsWith('{')) return `${wrap(t)}(${arg})`;
+  const param: string = simple[1];
+  // Substituting a big argument is safe when the parameter is used ONCE — nothing is duplicated and nothing is
+  // reordered. A plain reference may be substituted however often it appears, because re-reading it costs
+  // nothing. Anything else keeps the call form.
+  const uses: number = (body.match(new RegExp(`(?<![\\w$.])${param}(?![\\w$])`, 'g')) ?? []).length;
+  if (uses !== 1 && !/^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*$/.test(arg.trim())) return `${wrap(t)}(${arg})`;
+  // The backslashes are DOUBLED because this is a template literal: `\w` inside one is just `w`, so the class
+  // read as `[w$.]` and the `x` in `text` counted as a free-standing parameter — `x.text` came out `__v.te__vt`.
+  const substituted: string = body.replace(new RegExp(`(?<![\\w$.])${param}(?![\\w$])`, 'g'), arg.trim());
+  return needsGuard(substituted) ? `(${substituted})` : substituted;
+}
+
+/**
+ * Whether a substituted body has to be parenthesised where it lands.
+ *
+ * Only a TOP-LEVEL `?`, `:`, `,` or `=>` can bind wrongly. Testing the raw text instead put brackets round
+ * `take([1, 2])` because of the comma between its own arguments — parens that are harmless and read as though
+ * the rewrite did not understand what it produced.
+ */
+function needsGuard(text: string): boolean {
+  let depth: number = 0;
+  let quote: string = '';
+  for (let i: number = 0; i < text.length; i++) {
+    const ch: string = text[i];
+    if (quote) {
+      if (ch === '\\') i++;
+      else if (ch === quote) quote = '';
+      continue;
+    }
+    if (ch === '"' || ch === "'" || ch === '`') quote = ch;
+    else if ('([{'.includes(ch)) depth++;
+    else if (')]}'.includes(ch)) depth--;
+    else if (depth === 0 && ('?:,'.includes(ch) || (ch === '=' && text[i + 1] === '>'))) return true;
+  }
+  return false;
+}
+
 /** Wrap in parentheses only when a trailing `.method()` would otherwise bind to the wrong thing. */
 function wrap(code: string): string {
   const t: string = code.trim();
@@ -183,17 +235,26 @@ export interface Folded {
  * reason `concat(of(ids), of([]))` becomes `[ids, []]` rather than `[...ids]`, and getting it wrong silently
  * flattens a level.
  */
-export function classifySource(expr: string, todos: string[]): Folded {
+export function classifySource(expr: string, todos: string[], returners: Set<string> = new Set<string>()): Folded {
   const t: string = expr.trim();
   if (t === 'EMPTY') return { code: '[]', shape: 'array' };
 
-  const call: RegExpMatchArray | null = t.match(/^([A-Za-z_$][\w$]*)\s*(?:<[\s\S]*?>)?\s*\(/);
+  const call: RegExpMatchArray | null = t.match(/^(?:this\.)?([A-Za-z_$][\w$]*)\s*(?:<[\s\S]*?>)?\s*\(/);
   if (!call) return { code: t, shape: 'unknown' };
   const name: string = call[1];
   const open: number = t.indexOf('(', call[0].length - 1);
   const close: number = matchClose(t, open);
   if (close !== t.length - 1) return { code: t, shape: 'unknown' }; // not a single call — leave it alone
   const args: string[] = splitTop(t.slice(open + 1, close));
+
+  // A call to something the UNIT declares as returning `Observable<T>`. Almost every chain in real code starts
+  // here rather than at an `of(…)`, so without this the fold gave up on the first operator and the file came out
+  // untranslated — which is exactly what a migration that only handles the textbook shape looks like.
+  //
+  // The assumption, stated because it is one: such a function EMITS ONCE. In application code an `Observable<T>`
+  // returned from a resolver, a service call or a wrapper is a request, not a live feed — so it is one emission
+  // holding a `T`, and the operators after it fold over that.
+  if (returners.has(name)) return { code: t, shape: 'value' };
 
   switch (name) {
     case 'of':
@@ -247,7 +308,7 @@ const OPS: Record<string, OpFn> = {
   map: (c, [f]) =>
     c.shape === 'array' ? { code: `${wrap(c.code)}.map(${f})`, shape: 'array' }
     : c.shape === 'promise' ? { code: `${wrap(c.code)}.then(${f})`, shape: 'promise' }
-    : c.shape === 'value' ? { code: `${wrap(f)}(${c.code})`, shape: 'value' }
+    : c.shape === 'value' ? { code: applyInline(f, c.code), shape: 'value' }
     : null,
   mapTo: (c, [v]) =>
     c.shape === 'array' ? { code: `${wrap(c.code)}.map(() => ${v})`, shape: 'array' }
@@ -262,7 +323,7 @@ const OPS: Record<string, OpFn> = {
   },
   filter: (c, [p]) =>
     c.shape === 'array' ? { code: `${wrap(c.code)}.filter(${p})`, shape: 'array' }
-    : c.shape === 'value' ? { code: `${wrap(p)}(${c.code}) ? ${wrap(c.code)} : undefined`, shape: 'value' }
+    : c.shape === 'value' ? { code: `${applyInline(p, c.code)} ? ${wrap(c.code)} : undefined`, shape: 'value' }
     : null,
   // The three flattening strategies differ only in how they schedule the inner work. Over a finite sequence of
   // already-resolved values there is no scheduling left to differ about, so all three are `flatMap` — but
@@ -275,12 +336,15 @@ const OPS: Record<string, OpFn> = {
   },
   mergeAll: (c) => (c.shape === 'array' ? { code: `${wrap(c.code)}.flat()`, shape: 'array' } : null),
   concatAll: (c) => (c.shape === 'array' ? { code: `${wrap(c.code)}.flat()`, shape: 'array' } : null),
+  // `toArray` COLLECTS a sequence into one emission holding the array. Returning it as a sequence conflated the
+  // two, and everything after it folded as if there were still N emissions — `.subscribe` became a `forEach`
+  // that ran the callback per item instead of once with the collected array.
   toArray: (c) =>
-    c.shape === 'array' ? c : c.shape === 'value' ? { code: `[${c.code}]`, shape: 'array' } : null,
+    c.shape === 'array' ? { code: c.code, shape: 'value' } : c.shape === 'value' ? { code: `[${c.code}]`, shape: 'value' } : null,
   distinct: (c, [key]) =>
     c.shape !== 'array' ? null
     : key
-      ? { code: `[...new Map(${wrap(c.code)}.map((__v) => [${wrap(key)}(__v), __v])).values()]`, shape: 'array' }
+      ? { code: `[...new Map(${wrap(c.code)}.map((__v) => [${applyInline(key, '__v')}, __v])).values()]`, shape: 'array' }
       : { code: `[...new Set(${wrap(c.code)})]`, shape: 'array' },
   distinctUntilChanged: (c) =>
     c.shape === 'array' ? { code: `${wrap(c.code)}.filter((__v, __i, __a) => __i === 0 || __v !== __a[__i - 1])`, shape: 'array' }
@@ -327,12 +391,24 @@ const OPS: Record<string, OpFn> = {
   takeUntilDestroyed: ident,
 };
 
-/** `mergeMap`/`concatMap`/`switchMap` over a finite sequence is `flatMap`; over a single async value it is `then`. */
+/**
+ * `mergeMap`/`concatMap`/`switchMap` over a finite sequence is `flatMap`; over a single async value it is `then`.
+ *
+ * Over a SINGLE emission the projection is just applied — but what comes out depends on what the projection
+ * returns, and there is exactly one case where that is knowable: the identity. `mergeMap((x) => x)` over one
+ * emission holding a collection is the canonical "flatten this into a stream of its items", so the result is a
+ * sequence. Any other projection produces one emission of whatever it returned.
+ */
 function flatten(c: Folded, f: string): Folded | null {
   if (c.shape === 'array') return { code: `${wrap(c.code)}.flatMap(${f})`, shape: 'array' };
   if (c.shape === 'promise') return { code: `${wrap(c.code)}.then(${f})`, shape: 'promise' };
-  if (c.shape === 'value') return { code: `${wrap(f)}(${c.code})`, shape: 'unknown' };
+  if (c.shape === 'value') return { code: applyInline(f, c.code), shape: isIdentity(f) ? 'array' : 'value' };
   return null;
+}
+
+/** `(x) => x` and its spellings — the projection that says "these emissions ARE the collection". */
+function isIdentity(f: string): boolean {
+  return /^\(?\s*([A-Za-z_$][\w$]*)\s*(?::[^)]*)?\)?\s*=>\s*\1\s*$/.test(f.trim());
 }
 
 /** The operators this module can fold — used by callers to decide whether a chain is translatable at all. */
@@ -346,8 +422,8 @@ export function foldableOperators(): string[] {
  * Null is a deliberate all-or-nothing: a chain rewritten up to the operator that stopped it would read as
  * finished code that quietly drops the rest of the pipeline.
  */
-export function foldPipe(source: string, ops: string[], todos: string[]): Folded | null {
-  let cur: Folded = classifySource(source, todos);
+export function foldPipe(source: string, ops: string[], todos: string[], returners: Set<string> = new Set<string>()): Folded | null {
+  let cur: Folded = classifySource(source, todos, returners);
   for (const op of ops) {
     const call: RegExpMatchArray | null = op.trim().match(/^([A-Za-z_$][\w$]*)\s*(?:<[\s\S]*?>)?\s*\(/);
     if (!call) return null;
@@ -386,15 +462,15 @@ export interface RxResult {
  * Run to a fixpoint (bounded), because chains nest: the `of(x)` inside a `mergeMap` callback has to collapse
  * before the callback it sits in can be judged translatable.
  */
-export function translateRx(code: string): RxResult {
+export function translateRx(code: string, returners: Set<string> = new Set<string>()): RxResult {
   const todos: string[] = [];
   let out: string = code;
   let awaited: boolean = false;
   for (let pass: number = 0; pass < 6; pass++) {
     const before: string = out;
-    out = rewritePipes(out, todos);
-    out = rewriteBareSubscribes(out, todos);
-    const un: { code: string; awaited: boolean } = rewriteUnwrappers(out, todos);
+    out = rewritePipes(out, todos, returners);
+    out = rewriteBareSubscribes(out, todos, returners);
+    const un: { code: string; awaited: boolean } = rewriteUnwrappers(out, todos, returners);
     out = un.code;
     awaited = awaited || un.awaited;
     out = rewriteBareSources(out, todos);
@@ -404,7 +480,7 @@ export function translateRx(code: string): RxResult {
 }
 
 /** Every `X.pipe(…)` — and the `.subscribe(…)` hanging off it — folded into plain JavaScript. */
-function rewritePipes(code: string, todos: string[]): string {
+function rewritePipes(code: string, todos: string[], returners: Set<string>): string {
   let out: string = code;
   let from: number = 0;
   for (;;) {
@@ -421,7 +497,7 @@ function rewritePipes(code: string, todos: string[]): string {
       continue;
     }
     const start: number = receiverStart(out, at);
-    const folded: Folded | null = foldPipe(out.slice(start, at), splitTop(out.slice(open + 1, close)), todos);
+    const folded: Folded | null = foldPipe(out.slice(start, at), splitTop(out.slice(open + 1, close)), todos, returners);
     if (!folded) {
       from = close + 1;
       continue;
@@ -443,14 +519,14 @@ function rewritePipes(code: string, todos: string[]): string {
  * `v.subscribe(cb)`, a method call on a plain value. So the source is classified here and the subscription
  * becomes what the shape makes it, exactly as it would at the end of a chain.
  */
-function rewriteBareSubscribes(code: string, todos: string[]): string {
+function rewriteBareSubscribes(code: string, todos: string[], returners: Set<string>): string {
   let out: string = code;
   let scan: number = 0;
   for (;;) {
     const at: number = indexOfOutsideStrings(out, '.subscribe', scan);
     if (at < 0) return out;
     const start: number = receiverStart(out, at);
-    const folded: Folded = classifySource(out.slice(start, at), todos);
+    const folded: Folded = classifySource(out.slice(start, at), todos, returners);
     const tail: { code: string; end: number } | null = folded.shape === 'unknown' ? null : takeSubscribe(out, at, folded, todos);
     if (!tail) {
       scan = at + '.subscribe'.length;
@@ -478,14 +554,14 @@ function takeSubscribe(code: string, at: number, folded: Folded, todos: string[]
   const call: string =
     folded.shape === 'array' ? `${wrap(folded.code)}.forEach(${cb})`
     : folded.shape === 'promise' ? `void ${wrap(folded.code)}.then(${cb})`
-    : folded.shape === 'value' ? `${wrap(cb)}(${folded.code})`
+    : folded.shape === 'value' ? applyInline(cb, folded.code)
     : '';
   if (!call) return null;
   return { code: call, end: close + 1 };
 }
 
 /** `firstValueFrom(x)` / `lastValueFrom(x)` — the wrappers whose whole job was to leave the stream world. */
-function rewriteUnwrappers(code: string, todos: string[]): { code: string; awaited: boolean } {
+function rewriteUnwrappers(code: string, todos: string[], returners: Set<string>): { code: string; awaited: boolean } {
   let out: string = code;
   let awaited: boolean = false;
   for (const name of ['firstValueFrom', 'lastValueFrom']) {
@@ -496,7 +572,7 @@ function rewriteUnwrappers(code: string, todos: string[]): { code: string; await
       const close: number = matchClose(out, open);
       if (close < 0) break;
       const inner: string = out.slice(open + 1, close);
-      const folded: Folded = classifySource(inner, todos);
+      const folded: Folded = classifySource(inner, todos, returners);
       // A source that was already synchronous has nothing to await; anything else is a promise now.
       const replacement: string =
         folded.shape === 'value' ? folded.code
@@ -549,17 +625,62 @@ function rewriteBareSources(code: string, todos: string[]): string {
     const inner: string = out.slice(open + 1, close);
     // `Promise.resolve` and not the bare argument, because the SIGNATURE is decided by what the body says: a
     // body that reads as synchronous gets a synchronous return type, and this one is not.
-    const replacement: string = /^\[[\s\S]*\]$/.test(inner.trim()) ? inner : `Promise.resolve(${inner})`;
+    const replacement: string = /^\[[\s\S]*\]$/.test(inner.trim()) || alreadyPromise(inner) ? inner : `Promise.resolve(${inner})`;
     if (replacement !== inner) todos.push('`from(…)` was read as wrapping a PROMISE — if its argument was an iterable, drop the `Promise.resolve` and treat it as the array it already is');
     out = out.slice(0, at) + replacement + out.slice(close + 1);
     scan = 0;
   }
+  // A bare `concat(a, b)` — one with no operators after it — is the collection its consumer will read, so the
+  // parts are SPREAD. Inside a `.pipe` the same call means the sequence `[a, b]`, because there the operators
+  // define the reading: `mergeMap((x) => x)` is what flattens it. Here nothing follows, so nothing will.
+  for (const name of ['concat', 'merge']) {
+    let scan2: number = 0;
+    for (;;) {
+      const at: number = indexOfCallOutsideStrings(out, name, scan2);
+      if (at < 0) break;
+      const open: number = out.indexOf('(', at);
+      const close: number = matchClose(out, open);
+      if (close < 0) break;
+      if (stillPiped(out, close + 1)) {
+        scan2 = close + 1;
+        continue;
+      }
+      const parts: string[] = splitTop(out.slice(open + 1, close));
+      const replacement: string = `[${parts.map((p) => `...${wrap(classifySource(p, todos).code)}`).join(', ')}]`;
+      out = out.slice(0, at) + replacement + out.slice(close + 1);
+      scan2 = 0;
+    }
+  }
   return out.replace(/(?<![\w$.])EMPTY(?![\w$])(?!\s*\.pipe)/g, '[]');
+}
+
+/** Whether an expression is already a promise, so wrapping it again would only add a layer to read through. */
+function alreadyPromise(expr: string): boolean {
+  return /^\s*(?:await\b|Promise\s*\.)/.test(expr);
 }
 
 /** Whether a `.pipe(` or `.subscribe(` the fold declined to rewrite still hangs off this position. */
 function stillPiped(code: string, at: number): boolean {
   return /^\s*\.(?:pipe|subscribe)\s*\(/.test(code.slice(at));
+}
+
+/**
+ * Advance past a comment starting at `i`, or return `i` when none starts there.
+ *
+ * The scanners below track string literals so a regex never matches across one. They did NOT track comments —
+ * and an apostrophe in prose (`// Router's CALLS were rewritten`) opens a string that never closes, so every
+ * declaration after it was invisible. A generated comment triggered it; so does any hand-written one.
+ */
+function skipComment(code: string, i: number): number {
+  if (code[i] === '/' && code[i + 1] === '/') {
+    const nl: number = code.indexOf('\n', i);
+    return nl < 0 ? code.length : nl;
+  }
+  if (code[i] === '/' && code[i + 1] === '*') {
+    const end: number = code.indexOf('*/', i + 2);
+    return end < 0 ? code.length : end + 1;
+  }
+  return i;
 }
 
 /** `needle` at a position that is not inside a string literal, at or after `from`. */
@@ -570,6 +691,11 @@ function indexOfOutsideStrings(code: string, needle: string, from: number): numb
     if (quote) {
       if (ch === '\\') i++;
       else if (ch === quote) quote = '';
+      continue;
+    }
+    const skipped: number = skipComment(code, i);
+    if (skipped !== i) {
+      i = skipped;
       continue;
     }
     if (ch === '"' || ch === "'" || ch === '`') quote = ch;
@@ -586,6 +712,11 @@ function indexOfCallOutsideStrings(code: string, name: string, from: number = 0)
     if (quote) {
       if (ch === '\\') i++;
       else if (ch === quote) quote = '';
+      continue;
+    }
+    const skipped: number = skipComment(code, i);
+    if (skipped !== i) {
+      i = skipped;
       continue;
     }
     if (ch === '"' || ch === "'" || ch === '`') {
@@ -684,11 +815,42 @@ export function rewriteObservableTypes(code: string, todos: string[]): string {
       continue;
     }
     const isAsync: boolean = /(?<![\w$])await(?![\w$])|\.then\s*\(|Promise\s*[.<]/.test(body);
-    const replacement: string = isAsync ? `Promise<${inner}>` : inner;
-    out = out.slice(0, at) + replacement + out.slice(close + 1);
-    from = at + replacement.length;
+    // A body can do BOTH — return a promise on one branch and the value itself on another. Calling that
+    // `Promise<T>` is a signature its own code contradicts a line later.
+    const alsoPlain: boolean = isAsync && /(?<![\w$])return\s+(?!.*(?:await|Promise|\.then))[^;\n]+;/.test(body);
+    const replacement: string = isAsync ? (alsoPlain ? `${inner} | Promise<${inner}>` : `Promise<${inner}>`) : inner;
+    // Inside a UNION the rewrite can land on a member that is already there: `T | Promise<T> | Observable<T>`
+    // becomes `T | Promise<T> | T`. The duplicate is not wrong, it is noise that reads like a mistake — and it
+    // is one, in the sense that the union no longer says anything the first member did not.
+    const collapsed: { text: string; at: number } = dedupeUnionMember(out, at, close + 1, replacement);
+    out = collapsed.text;
+    from = collapsed.at;
   }
   return out;
+}
+
+/**
+ * Splice `replacement` in for `[at, end)`, dropping it entirely when it repeats a sibling of the same union.
+ * Returns the new text and where to resume scanning.
+ */
+function dedupeUnionMember(code: string, at: number, end: number, replacement: string): { text: string; at: number } {
+  const before: string = code.slice(0, at);
+  const bar: number = before.lastIndexOf('|');
+  const lineStart: number = before.lastIndexOf('\n') + 1;
+  if (bar > lineStart && before.slice(bar + 1).trim() === '') {
+    // The members to the left of this one, on the same annotation.
+    const head: string = before.slice(lineStart, bar);
+    const siblings: string[] = head.split('|').map((m) => m.trim().replace(/^[^:]*:\s*/, '').trim());
+    // The replacement can be a union in its own right — a body that returns both a promise and a plain value
+    // yields `T | Promise<T>`, and pasting that beside an existing `T | Promise<T>` doubled every member.
+    const fresh: string[] = replacement.split('|').map((m) => m.trim()).filter((m) => !siblings.includes(m));
+    if (!fresh.length) return { text: code.slice(0, bar).replace(/\s+$/, '') + code.slice(end), at: bar };
+    if (fresh.length !== replacement.split('|').length) {
+      const joined: string = fresh.join(' | ');
+      return { text: before + joined + code.slice(end), at: at + joined.length };
+    }
+  }
+  return { text: before + replacement + code.slice(end), at: at + replacement.length };
 }
 
 /** `Observable` used as a TYPE — after `:`, `<`, `as`, or `extends` — rather than as a value. */
@@ -699,6 +861,11 @@ function findTypeAnnotation(code: string, name: string, from: number = 0): numbe
     if (quote) {
       if (ch === '\\') i++;
       else if (ch === quote) quote = '';
+      continue;
+    }
+    const skipped: number = skipComment(code, i);
+    if (skipped !== i) {
+      i = skipped;
       continue;
     }
     if (ch === '"' || ch === "'" || ch === '`') {
@@ -869,10 +1036,10 @@ function awaitsIn(code: string, from: number): boolean {
  * Callers hand this a class body, a service draft, or a whole carried file — it is the same job either way, and
  * the RxJS names still standing afterwards are reported so the caller can say which ones survived and why.
  */
-export function rxToWeave(code: string, subjects: Iterable<string> = []): { code: string; todos: string[] } {
+export function rxToWeave(code: string, subjects: Iterable<string> = [], returners: Set<string> = new Set<string>()): { code: string; todos: string[] } {
   const todos: string[] = [];
   const out: string = translateSubjects(code, todos, subjects);
-  const rest: { code: string; todos: string[] } = rxAfterSubjects(out);
+  const rest: { code: string; todos: string[] } = rxAfterSubjects(out, returners);
   return { code: rest.code, todos: [...new Set([...todos, ...rest.todos])] };
 }
 
@@ -883,16 +1050,90 @@ export function rxToWeave(code: string, subjects: Iterable<string> = []): { code
  * intact (`this.open.next(v)`), and the chain rewrite has to run after the renames, when the receivers are the
  * Weave names. Splitting the entry point is what lets a caller sit in between.
  */
-export function rxAfterSubjects(code: string): { code: string; todos: string[] } {
+export function rxAfterSubjects(code: string, returners: Set<string> = new Set<string>()): { code: string; todos: string[] } {
   const todos: string[] = [];
-  const rx: RxResult = translateRx(code);
+  const rx: RxResult = translateRx(dropInstanceofObservable(code, todos), returners);
   let out: string = rewriteObservableTypes(rx.code, todos);
   if (rx.introducedAwait) out = asyncifyAwaiters(out);
   return { code: out, todos: [...new Set([...rx.todos, ...todos])] };
+}
+
+/**
+ * `x instanceof Observable` → `false`.
+ *
+ * `Observable` here is the CLASS, checked at runtime — not a type, so no signature rewrite reaches it, and it
+ * was the last thing keeping `rxjs` imported by files whose every chain had already folded. After a migration
+ * nothing in the app is an Observable, so the test cannot succeed: the branch it guards is dead, and saying so
+ * is the translation. It is left as a literal rather than deleted, because which branch was the live one is
+ * something the reader should see.
+ */
+export function dropInstanceofObservable(code: string, todos: string[]): string {
+  const test: RegExp = /(?<![\w$.])[A-Za-z_$][\w$.]*\s+instanceof\s+Observable(?![\w$])/g;
+  if (!test.test(code)) return code;
+  todos.push('an `instanceof Observable` test became `false` — nothing in a Weave app is an Observable, so that branch was dead; check which branch was the live one');
+  return code.replace(test, 'false');
 }
 
 /** The RxJS names still standing in a finished draft — what the migration owes the reader an explanation for. */
 export function survivingRxNames(code: string, candidates: string[]): string[] {
   const live: string = withoutImports(code);
   return [...new Set(candidates)].filter((n) => new RegExp(`(?<![\\w$.])${n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w$])`).test(live)).sort();
+}
+
+/**
+ * The names in a unit declared to return an `Observable<…>` — methods and functions alike.
+ *
+ * This is the map the fold needs before it starts. Scanned from the SOURCE, because the declaration is what says
+ * a call produces a stream; the body may not have been translated yet, and often cannot be until this is known.
+ *
+ * Scanned, not matched: a regex for `name(…): Observable<` has to cross the parameter list, and a lazy one
+ * crosses the whole FILE — it happily paired the last identifier before some `(` with a `): Observable<` several
+ * declarations later, so the map came back holding `inject` and `stringFormat` and none of the real returners.
+ * Here each `: Observable<` is found first, then the parameter list is walked back to the name that owns it.
+ */
+export function observableReturners(sources: string[]): Set<string> {
+  const out: Set<string> = new Set<string>();
+  for (const src of sources) {
+    for (let i: number = src.indexOf('Observable'); i >= 0; i = src.indexOf('Observable', i + 1)) {
+      if (/[\w$.]/.test(src[i - 1] ?? '')) continue;
+      if (src[i + 'Observable'.length] !== '<') continue;
+      // Back over the `:` that introduced the return type, then over the parameter list it belongs to.
+      let j: number = i - 1;
+      while (j >= 0 && /\s/.test(src[j])) j--;
+      if (src[j] !== ':') continue;
+      j--;
+      while (j >= 0 && /\s/.test(src[j])) j--;
+      if (src[j] !== ')') continue;
+      const open: number = backTo(src, j, '(', ')');
+      if (open < 0) continue;
+      // The name, past any generic parameter list of its own (`wrapIntoObservable<T>(…)`).
+      let k: number = open - 1;
+      while (k >= 0 && /\s/.test(src[k])) k--;
+      if (src[k] === '>') {
+        const lt: number = backTo(src, k, '<', '>');
+        if (lt < 0) continue;
+        k = lt - 1;
+        while (k >= 0 && /\s/.test(src[k])) k--;
+      }
+      const end: number = k + 1;
+      while (k >= 0 && /[\w$]/.test(src[k])) k--;
+      const name: string = src.slice(k + 1, end);
+      // `function` / `if` / `for` are not names, and neither is an empty run (an anonymous arrow).
+      if (name && !RESERVED.has(name)) out.add(name);
+    }
+  }
+  return out;
+}
+
+/** Keywords that can sit where a declaration's name would be — none of them is a callable to classify. */
+const RESERVED: Set<string> = new Set<string>(['function', 'if', 'for', 'while', 'switch', 'catch', 'return', 'new', 'typeof', 'await', 'constructor']);
+
+/** Walk back from the closer at `from` to its matching opener, or -1. */
+function backTo(code: string, from: number, open: string, close: string): number {
+  let depth: number = 0;
+  for (let i: number = from; i >= 0; i--) {
+    if (code[i] === close) depth++;
+    else if (code[i] === open && --depth === 0) return i;
+  }
+  return -1;
 }
