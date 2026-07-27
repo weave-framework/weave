@@ -17,15 +17,18 @@ import { join, relative, resolve } from 'node:path';
 import { assembleFacts, mergeFacts, outOfReach, writeFacts, type Coverage, type MigrationFacts, type PackagePlan, type Reach } from './migrate-analyze.js';
 import {
   applyWrites,
+  carriedInstalls,
   carriedPackages,
   danglingAcrossSections,
   detectPackageManager,
   installCommand,
   installedWeavePackages,
+  runInstall,
   planWrites,
   requiredWeavePackages,
   sections,
   symbolTable,
+  type PackageManager,
   type WriteItem,
 } from './migrate-convert.js';
 import { planItems, renderPlan, writePlan, type PlanItem } from './migrate-plan.js';
@@ -589,6 +592,15 @@ async function convertStep(io: InputManager, facts: MigrationFacts, targetDir: s
       console.log(`  ${c.yellow('•')} ${c.bold(name)} ${c.dim('—')} ${note}`);
     }
     console.log(c.dim('  Grep the written files for each one: every remaining use is a decision the tool would not make for you.'));
+    // Naming them and stopping there left the app importing modules nothing provides, so the first `weave check`
+    // after a migration was a wall of "cannot find module" with the real TODOs buried in it. The versions come
+    // from the SOURCE app, so the code lands against what it was written for rather than whatever is latest.
+    const installs: Array<{ name: string; spec: string }> = carriedInstalls(items, facts.unit, targetDir);
+    if (installs.length) {
+      console.log(`\n${c.yellow('Your app does not have these yet:')}`);
+      console.log(`  ${c.bold(installCommand(detectPackageManager(targetDir), installs.map((i) => i.spec)))}`);
+      console.log(c.dim('  (Offered again after writing. `@angular/*` is never on this list — installing it would undo the migration.)'));
+    }
   }
 
   // Does what we are about to write HOLD TOGETHER? Everything above looked at one declaration at a time; this
@@ -631,6 +643,27 @@ async function convertStep(io: InputManager, facts: MigrationFacts, targetDir: s
   const { written, skipped } = applyWrites(items);
   console.log(`\n${c.green('✓')} ${c.dim('Wrote')} ${c.bold(String(written.length))} ${c.dim('file(s).')}`);
   if (skipped.length) console.log(`${c.yellow('•')} ${c.yellow(`${skipped.length} left untouched because a file was already there.`)}`);
+
+  // The packages the written code needs. Asked rather than done: installing writes package.json and the
+  // lockfile and goes to the network, and this app's manager is the one that must do it — running `npm i` in a
+  // pnpm project rewrites node_modules behind pnpm's back.
+  const needed: string[] = [
+    ...requiredWeavePackages(items).filter((p) => !installedWeavePackages(targetDir).includes(p)),
+    ...carriedInstalls(items, facts.unit, targetDir).map((i) => i.spec),
+  ];
+  if (needed.length) {
+    const pm: PackageManager = detectPackageManager(targetDir);
+    const cmd: string = installCommand(pm, needed);
+    console.log(`\n${c.bold('The written code needs packages this app does not have:')}`);
+    console.log(`  ${c.bold(cmd)}`);
+    const run: string = await io.askLine(`${c.bold('Run it now?')} ${c.dim(`[y/N] (${pm}, in ${targetDir})`)} ${c.cyan('> ')}`);
+    if (/^y(es)?$/i.test(run.trim())) {
+      const ok: boolean = runInstall(pm, needed, targetDir);
+      console.log(ok ? `${c.green('✓')} ${c.dim('Installed.')}` : `${c.red('✖')} ${c.yellow('The install failed — run the command above yourself and read its output.')}`);
+    } else {
+      console.log(c.dim('  Not installed. The imports will not resolve until you run that.'));
+    }
+  }
   console.log(c.dim('Now run `weave check` in this app and work through the TODOs.'));
 }
 

@@ -12,6 +12,7 @@
  * Zero third-party deps — an in-house scanner, no HTML parser pulled in (RULE #1).
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import { resolveImports, type WeaveSymbol } from './migrate-symbols.js';
 import { asyncifyAwaiters, observableReturners, pruneRxImports, rewriteObservableTypes, rxAfterSubjects, rxToWeave, survivingRxNames, translateSubjects } from './migrate-rxjs.js';
@@ -3224,8 +3225,72 @@ export function detectPackageManager(appDir: string): PackageManager {
 
 /** The command that adds dependencies with the given manager — each has its own verb. */
 export function installCommand(pm: PackageManager, packages: string[]): string {
-  const verb: string = pm === 'npm' ? 'i' : 'add';
-  return `${pm} ${verb} ${packages.join(' ')}`;
+  return `${pm} ${installVerb(pm)} ${packages.join(' ')}`;
+}
+
+/** `npm` adds with `i`; every other manager here uses `add`. */
+export function installVerb(pm: PackageManager): string {
+  return pm === 'npm' ? 'i' : 'add';
+}
+
+/**
+ * Actually run the install, with the app's own manager, in the app's own directory.
+ *
+ * `shell: true` because on Windows `pnpm`/`npm`/`yarn` are `.cmd` shims that `spawnSync` will not execute
+ * directly. The package names are not interpolated into a shell string — they are passed as arguments, so a
+ * name out of a `package.json` cannot become a command.
+ */
+export function runInstall(pm: PackageManager, packages: string[], appDir: string): boolean {
+  const res: { status: number | null; error?: Error } = spawnSync(pm, [installVerb(pm), ...packages], {
+    cwd: appDir,
+    stdio: 'inherit',
+    shell: true,
+  });
+  return !res.error && res.status === 0;
+}
+
+/**
+ * The third-party packages the converted code still imports, each pinned to the version the SOURCE app used.
+ *
+ * Reporting them without an install command left the migrated app importing modules nothing provides, so the
+ * first `weave check` after a migration was a wall of "cannot find module" — noise that buries the real TODOs.
+ *
+ * `@angular/*` is EXCLUDED on purpose: those imports come from files that were carried rather than converted,
+ * and installing Angular into a Weave app to make them resolve is not a fix, it is the migration undone.
+ * `@weave-framework/*` is excluded too — it has its own line, checked against what the app already has.
+ */
+export function carriedInstalls(items: WriteItem[], sourceDir: string, targetDir: string): Array<{ name: string; spec: string }> {
+  const versions: Record<string, string> = dependencyVersions(sourceDir);
+  const already: Set<string> = new Set<string>(Object.keys(dependencyVersions(targetDir)));
+  return carriedPackages(items)
+    .filter((name) => !name.startsWith('@angular/') && !name.startsWith('@weave-framework/') && !already.has(name))
+    .map((name) => ({ name, spec: versions[name] ? `${name}@${versions[name]}` : name }));
+}
+
+/**
+ * Every dependency declared at or above `dir`, nearest wins.
+ *
+ * A component library inside a monorepo has its own `package.json` listing some of what it uses and inheriting
+ * the rest from the workspace root — so reading only one of them loses half the versions.
+ */
+export function dependencyVersions(dir: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  let current: string = resolve(dir);
+  for (;;) {
+    try {
+      const j: { dependencies?: Record<string, string>; devDependencies?: Record<string, string> } = JSON.parse(
+        readFileSync(join(current, 'package.json'), 'utf8'),
+      );
+      for (const [name, spec] of Object.entries({ ...j.devDependencies, ...j.dependencies })) {
+        if (!(name in out)) out[name] = spec; // nearest package.json wins
+      }
+    } catch {
+      /* no package.json here, or unreadable — keep walking up */
+    }
+    const parent: string = dirname(current);
+    if (parent === current) return out;
+    current = parent;
+  }
 }
 
 /** The `@weave-framework/*` packages a `package.json` already depends on. */

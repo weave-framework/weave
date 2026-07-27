@@ -69,6 +69,16 @@
   alias a constructor wrote for it (`const _router: Router = this._router`) is dropped once `this.` is gone, and
   a placeholder no longer names an Angular type the converted file does not import.
 
+- **`weave migrate` offers to install the packages the written code needs.** It named the third-party packages
+  the converted code still imports (`lodash`, `@ngx-translate/core`) and stopped there, so the first `weave check`
+  after a migration was a wall of "cannot find module" with the real TODOs buried in it. The install command is
+  now printed and offered — using **your** package manager (`packageManager` in `package.json`, then the
+  lockfile) and pinning each package to the version the **source** app declared, read from the nearest
+  `package.json` at or above the migrated folder. Offered rather than run, because installing writes
+  `package.json` and the lockfile and goes to the network. `@angular/*` is never on the list: those imports come
+  from files that were carried rather than converted, and installing Angular to make them resolve is the
+  migration undone.
+
 - **Fixed: an apostrophe in a comment switched the RxJS translation off for the rest of the file.** The scanners
   tracked string literals so no rewrite could match across one, but not comments — so prose like `// Router's
   calls were rewritten` opened a string that never closed, and every declaration after it was invisible. The

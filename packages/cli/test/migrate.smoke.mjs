@@ -999,6 +999,43 @@ ok(cv.readsBareInjected(routerMembers, '_router', 'Router') === false, 'readsBar
 const readMembers = [...routerMembers, { kind: 'method', name: 'peek', isPublic: true, params: '', body: 'const s = this._router.routerState.snapshot;', initializer: '', isSignal: false }];
 ok(cv.readsBareInjected(readMembers, '_router', 'Router') === true, 'readsBareInjected: a PROPERTY read needs the field to exist — dropping it left the draft naming nothing');
 
+/* ── the packages the written code needs ── */
+// Naming them and stopping there left the app importing modules nothing provides, so the first `weave check`
+// after a migration was a wall of "cannot find module" with the real TODOs buried in it.
+const depDir = mkdtempSync(join(tmpdir(), 'weave-deps-'));
+const appDir = mkdtempSync(join(tmpdir(), 'weave-app-'));
+try {
+  mkdirSync(join(depDir, 'pkg'), { recursive: true });
+  writeFileSync(join(depDir, 'package.json'), JSON.stringify({ dependencies: { lodash: '^4.17.21', rxjs: '~7.8.0' } }));
+  writeFileSync(join(depDir, 'pkg', 'package.json'), JSON.stringify({ dependencies: { lodash: '^3.0.0', '@ngx-translate/core': '^15.0.0' } }));
+  const vers = cv.dependencyVersions(join(depDir, 'pkg'));
+  ok(vers.lodash === '^3.0.0', 'dependencyVersions: the NEAREST package.json wins');
+  ok(vers.rxjs === '~7.8.0', 'dependencyVersions: a workspace-root dependency is inherited, not lost');
+
+  writeFileSync(join(appDir, 'package.json'), JSON.stringify({ dependencies: { '@weave-framework/runtime': '^2.0.0' } }));
+  const carriedItems = [
+    { path: 'a.ts', status: 'write', content: ["import { template } from 'lodash';", "import { T } from '@ngx-translate/core';", "import { Router } from '@angular/router';", "import { signal } from '@weave-framework/runtime';", 'const x = template && T && Router && signal;'].join(NL) },
+  ];
+  const installs = cv.carriedInstalls(carriedItems, join(depDir, 'pkg'), appDir);
+  const specs = installs.map((i) => i.spec).sort();
+  ok(specs.includes('lodash@^3.0.0'), 'carriedInstalls: the package is pinned to the version the SOURCE app used, not to latest');
+  ok(specs.includes('@ngx-translate/core@^15.0.0'), 'carriedInstalls: every carried third-party package is offered');
+  ok(!specs.some((s) => s.startsWith('@angular/')), 'carriedInstalls: @angular is NEVER offered — installing it to make carried imports resolve is the migration undone');
+  ok(!specs.some((s) => s.startsWith('@weave-framework/')), 'carriedInstalls: Weave packages are not duplicated here — they have their own line');
+  ok(cv.carriedInstalls(carriedItems, join(depDir, 'pkg'), depDir).every((i) => i.name !== 'lodash'), 'carriedInstalls: a package the target app ALREADY has is not offered again');
+  // A package the source never declared still has to be installable — by name, with no version.
+  const bare = cv.carriedInstalls([{ path: 'b.ts', status: 'write', content: ["import x from 'some-lib';", 'const y = x;'].join(NL) }], appDir, appDir);
+  ok(bare.length === 1 && bare[0].spec === 'some-lib', 'carriedInstalls: a package with no recorded version is offered by name alone');
+} finally {
+  rmSync(depDir, { recursive: true, force: true });
+  rmSync(appDir, { recursive: true, force: true });
+}
+// Each manager adds with its own verb; running the wrong one rewrites node_modules behind the right one's back.
+ok(cv.installCommand('pnpm', ['a@1']) === 'pnpm add a@1', 'installCommand: pnpm adds');
+ok(cv.installCommand('npm', ['a@1']) === 'npm i a@1', 'installCommand: npm uses `i`, not `add`');
+ok(cv.installCommand('yarn', ['a@1']) === 'yarn add a@1' && cv.installCommand('bun', ['a@1']) === 'bun add a@1', 'installCommand: yarn and bun add');
+ok(cv.installVerb('npm') === 'i' && cv.installVerb('pnpm') === 'add', 'installVerb: the verb is per manager');
+
 // The same all-or-nothing rule for the sources that are not calls: `EMPTY` under a refused `.pipe` must stay
 // `EMPTY`, or the chain becomes `[].pipe(…)` — no longer RxJS, and no longer valid either.
 ok(rx.rxToWeave('const y = EMPTY.pipe(debounceTime(9));').code.includes('EMPTY.pipe('), 'fold: EMPTY is not collapsed under a `.pipe` the fold refused');

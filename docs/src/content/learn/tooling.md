@@ -231,7 +231,17 @@ Before writing, it also names the packages the **converted** code still imports:
 Your converted code still imports these — they stay dependencies of your app:
   • lodash — no Weave equivalent — kept as-is
   • rxjs   — Weave replaces this: what is left is what could not be translated without guessing
+
+Your app does not have these yet:
+  pnpm add lodash@^4.17.21 @ngx-translate/core@^15.0.0
 ~~~
+
+The command uses **your** package manager (read from `packageManager` in `package.json`, then the lockfile) and
+pins each package to the version the **source** app used, so the code lands against what it was written for.
+After the files are written you are asked whether to run it — asked, not done, because installing writes
+`package.json` and the lockfile and goes to the network. `@angular/*` never appears on that list: those imports
+come from files that were carried rather than converted, and installing Angular to make them resolve is not a fix,
+it is the migration undone.
 
 ### RxJS is translated, not annotated
 
