@@ -20,10 +20,17 @@ overrides:
   # tracked lockfile. Pin to the 3.x patch line (`<4`) so ajv, which expects `fast-uri@^3`, is not forced onto
   # a major it never asked for; 3.1.3→3.1.4 is a patch.
   'fast-uri@>=3.0.0 <=3.1.3': '>=3.1.4 <4'
-  # brace-expansion 5.0.6 is in GHSA-3jxr-9vmj-r5cp's range (>= 3.0.0, < 5.0.7; a ReDoS; patched 5.0.7).
-  # Another dev/build-tooling transitive. Scope to the vulnerable range so the unaffected 2.x copy in the
-  # tree resolves normally.
-  'brace-expansion@>=3.0.0 <5.0.7': '>=5.0.7'
+  # brace-expansion, twice over. GHSA-3jxr-9vmj-r5cp (a ReDoS; >= 3.0.0, < 5.0.7, patched 5.0.7) and then
+  # GHSA-mh99-v99m-4gvg / CVE-2026-14257 (unbounded expansion → an OOM crash; <= 5.0.7, patched 5.0.8).
+  # The second one's range has no lower bound, so the pin has to be `>=5.0.8` — the old `>=5.0.7` would
+  # let a future resolution land on 5.0.7 and bring the alert straight back.
+  #
+  # The 2.x copy is NOT unaffected, as the older comment here assumed — the second advisory covers it, and
+  # there is no patched 2.x. It arrived through `vscode-languageclient@9 → minimatch@5 → brace-expansion@2`,
+  # and could not be overridden into the 5.x line: v2 exports the function itself (`module.exports = expand`)
+  # while v5 exports `{ expand }`, so minimatch 5 would call an object. The extension moved to
+  # `vscode-languageclient@10` (minimatch 10 → brace-expansion 5) instead — see editor/vscode/package.json.
+  'brace-expansion@>=3.0.0 <=5.0.7': '>=5.0.8'
 
 # esbuild ships a platform binary via a postinstall script. This environment's
 # pnpm requires explicit per-package build approval.

@@ -161,6 +161,19 @@ export function readTsPaths(root: string): TsPaths | null {
   return null;
 }
 
+/**
+ * Put the matched part of a specifier into a tsconfig `paths` target's `*`.
+ *
+ * TypeScript allows **at most one** `*` per target and rejects a second one, so substituting a
+ * single occurrence is the whole substitution, not a partial one. Written as an explicit split
+ * rather than `t.replace('*', rest)` because that reads as a first-occurrence-only bug (and is
+ * flagged as one) exactly where the invariant that makes it correct is invisible.
+ */
+function substituteWildcard(target: string, rest: string): string {
+  const star: number = target.indexOf('*');
+  return star < 0 ? target : target.slice(0, star) + rest + target.slice(star + 1);
+}
+
 /** Resolve a bare specifier through the workspace's tsconfig paths to an internal file, or null (not internal). */
 export function resolveAlias(spec: string, tsPaths: TsPaths): string | null {
   for (const pat of tsPaths.patterns) {
@@ -168,7 +181,7 @@ export function resolveAlias(spec: string, tsPaths: TsPaths): string | null {
       if (spec.startsWith(pat.prefix)) {
         const rest: string = spec.slice(pat.prefix.length);
         for (const t of pat.targets) {
-          const hit: string | null = fileFor(resolve(tsPaths.baseUrl, t.replace('*', rest)));
+          const hit: string | null = fileFor(resolve(tsPaths.baseUrl, substituteWildcard(t, rest)));
           if (hit) return hit;
         }
       }

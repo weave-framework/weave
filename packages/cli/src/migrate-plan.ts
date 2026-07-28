@@ -202,9 +202,19 @@ function table(headers: string[], rows: string[][]): string {
   return head + rows.map((r) => `| ${r.join(' | ')} |`).join('\n') + '\n';
 }
 
-/** Escape a cell's pipes so a value never breaks the table. */
+/**
+ * Escape a value so it can never break the table it sits in.
+ *
+ * Backslashes go FIRST, and the order is the whole point: escaping only the pipe turned `a\|b` into
+ * `a\\|b`, where markdown reads the `\\` as an escaped backslash and the pipe that follows is live —
+ * the row splits at exactly the value that was supposed to be protected. Names reaching here come
+ * from a foreign codebase (Angular selectors, file paths, notes quoting source), so a backslash is
+ * not hypothetical on Windows paths.
+ *
+ * A newline ends the row outright, so it collapses to a space.
+ */
 function cell(s: string): string {
-  return s.replace(/\|/g, '\\|');
+  return s.replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/\r?\n/g, ' ');
 }
 
 /**

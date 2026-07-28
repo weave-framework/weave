@@ -343,6 +343,30 @@
   copying an undeclared project directory into `dist/` would have shipped `src/`, `node_modules/`, the
   config and any `.env`. `weave dev` still serves the config directory by default, unchanged.
 
+### Fixed — security / tooling
+- **`brace-expansion` is pinned past CVE-2026-14257** (GHSA-mh99-v99m-4gvg — unbounded expansion
+  → an OOM crash; `<= 5.0.7`). The workspace already pinned the 3.x–5.x line for an earlier ReDoS,
+  but this advisory has no lower bound, so the 2.x copy was in range too and the old `>=5.0.7`
+  target would have let a future resolution land back on a vulnerable version. The pin is now
+  `>=5.0.8` over `<=5.0.7`.
+
+  The 2.x copy could not simply be overridden — v2 exports the function itself
+  (`module.exports = expand`) while v5 exports `{ expand }`, so its consumer would have called an
+  object. It arrived via `vscode-languageclient@9 → minimatch@5`, so **the VS Code extension moved
+  to `vscode-languageclient@10`** (minimatch 10 → brace-expansion 5.0.8), which raises the
+  extension's floor to **VS Code ^1.91**. The client surface it uses is unchanged.
+
+- **The migration plan's table cells escape backslashes, not only pipes.** A value carrying a
+  backslash immediately before a pipe — a Windows path, a note quoting source — was emitted as
+  `a\\|b`, which a markdown reader resolves as a literal backslash followed by a **live** pipe: the
+  row gained a column at exactly the value that was supposed to be protected. Embedded newlines
+  (which end a row outright) now collapse to a space.
+
+- **A `weave migrate` gate stopped accepting the wrong symbol.** The check that every name in the
+  converter's API map is really exported built its word boundary inside a template literal, where
+  `\w` is string-escaped to a plain `w` — so it asserted "not adjacent to the letter w" instead.
+  Measured: an index exporting `restore` but not `store` satisfied it.
+
 ### Fixed — compiler
 - **A comment between the pieces of a split `template`/`styles` no longer fails the build.** A long
   template is routinely split across lines with `+` (every `@weave-framework/ui` component does it),

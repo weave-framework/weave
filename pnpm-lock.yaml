@@ -7,7 +7,7 @@ settings:
 overrides:
   axios@>=1.15.2 <1.18.0: '>=1.18.0'
   fast-uri@>=3.0.0 <=3.1.3: '>=3.1.4 <4'
-  brace-expansion@>=3.0.0 <5.0.7: '>=5.0.7'
+  brace-expansion@>=3.0.0 <=5.0.7: '>=5.0.8'
 
 importers:
 
@@ -15,7 +15,7 @@ importers:
     devDependencies:
       '@nx/devkit':
         specifier: ^23.0.1
-        version: 23.0.1(nx@23.0.1)
+        version: 23.0.1(nx@23.0.1(debug@4.4.3(supports-color@7.2.0)))
       '@playwright/test':
         specifier: ^1.49.0
         version: 1.61.1
@@ -63,7 +63,7 @@ importers:
         version: 10.6.0(supports-color@7.2.0)
       nx:
         specifier: ^23.0.1
-        version: 23.0.1
+        version: 23.0.1(debug@4.4.3(supports-color@7.2.0))
       playwright:
         specifier: ^1.49.0
         version: 1.61.1
@@ -83,11 +83,11 @@ importers:
   editor/vscode:
     dependencies:
       vscode-languageclient:
-        specifier: ^9.0.1
-        version: 9.0.1
+        specifier: ^10.1.0
+        version: 10.1.0
     devDependencies:
       '@types/vscode':
-        specifier: ^1.75.0
+        specifier: ^1.91.0
         version: 1.125.0
       '@vscode/vsce':
         specifier: ^3.0.0
@@ -196,10 +196,10 @@ importers:
     dependencies:
       '@nx/devkit':
         specifier: ^23.0.1
-        version: 23.0.1(nx@23.0.1)
+        version: 23.0.1(nx@23.0.1(debug@4.4.3(supports-color@7.2.0)))
       nx:
         specifier: '>=21.0.0'
-        version: 23.0.1
+        version: 23.0.1(debug@4.4.3(supports-color@7.2.0))
 
   packages/prettier-plugin:
     dependencies:
@@ -1004,9 +1004,6 @@ packages:
   azure-devops-node-api@12.5.0:
     resolution: {integrity: sha512-R5eFskGvOm3U/GzeAuxRkUsAl0hrAwGgWn6zAd2KrZmrEhWZVqLew4OOupbQlXUuojUzpGtq62SmdhJ06N88og==}
 
-  balanced-match@1.0.2:
-    resolution: {integrity: sha512-3oSeUO0TMV67hN1AmbXsK4yaqU7tjiHlbxRDZOpH0KW9+CeX4bRAaX0Anxt0tx2MrpRpWwQaPwIlISEJhYU5Pw==}
-
   balanced-match@4.0.3:
     resolution: {integrity: sha512-1pHv8LX9CpKut1Zp4EXey7Z8OfH11ONNH6Dhi2WDUt31VVZFXZzKwXcysBgqSumFCmR+0dqjMK5v5JiFHzi0+g==}
     engines: {node: 20 || >=22}
@@ -1030,9 +1027,6 @@ packages:
 
   boundary@2.0.0:
     resolution: {integrity: sha512-rJKn5ooC9u8q13IMCrW0RSp31pxBCHE3y9V/tp3TdWSLf8Em3p6Di4NBpfzbJge9YjjFEsD0RtFEjtvHL5VyEA==}
-
-  brace-expansion@2.1.2:
-    resolution: {integrity: sha512-w5JZcKgdhDOgOwm8H+KgbosopHMuGcl6qbulwjtz3SM7I7P3yW1eAjzMPLrIE+NQ9vjgANKHWeMHnrT0OXW1oA==}
 
   brace-expansion@5.0.8:
     resolution: {integrity: sha512-JZyDyq3D4AUifKTPOB7DELf6XsB3WdPuNxCtob1vFXPsSXhdAiHBWJ/tJ8HAc9aH84BK+5JFZLNkJKx3G9kzQg==}
@@ -1720,10 +1714,6 @@ packages:
     resolution: {integrity: sha512-MULkVLfKGYDFYejP07QOurDLLQpcjk7Fw+7jXS2R2czRQzR56yHRveU5NDJEOviH+hETZKSkIk5c+T23GjFUMg==}
     engines: {node: 18 || 20 || >=22}
 
-  minimatch@5.1.9:
-    resolution: {integrity: sha512-7o1wEA2RyMP7Iu7GNba9vc0RWWGACJOCZBJX2GJWip0ikV+wcOsgVuY9uE8CPiyQhkGFSlhuSkZPavN7u1c2Fw==}
-    engines: {node: '>=10'}
-
   minimist@1.2.8:
     resolution: {integrity: sha512-2yyAR8qBkN3YuheJanUpWC5U3bb5osDywNB8RzDVlDwDHbocAJveqqj1u8+SVD7jkWT4yvsHCpWqqWqAxb0zCA==}
 
@@ -2255,9 +2245,13 @@ packages:
     resolution: {integrity: sha512-+VvMmQPJhtvJ+8O+zu2JKIRiLxXF8NW7krWgyMGeOHrp4Cn23T5hc0v2LknNeopDOB70wghHAds7mKtcZ0I4Sg==}
     engines: {node: '>=14.0.0'}
 
-  vscode-languageclient@9.0.1:
-    resolution: {integrity: sha512-JZiimVdvimEuHh5olxhxkht09m3JzUGwggb5eRUkzzJhZ2KjCN0nh55VfiED9oez9DyF8/fz1g1iBV3h+0Z2EA==}
-    engines: {vscode: ^1.82.0}
+  vscode-jsonrpc@9.0.1:
+    resolution: {integrity: sha512-rfuA6T75H6m5EkbhtEPzre9pT0HPcDI2MMy4+nPFIBks5J8JBAUHD4tRYSgaBOijIEC7SRkC1kKyXTLqbmh9jw==}
+    engines: {node: '>=14.0.0'}
+
+  vscode-languageclient@10.1.0:
+    resolution: {integrity: sha512-XXRx6lqVitQy/oOLr9MfNYRG+MbQkhXkDaxbQMiKxEm8zZNfheRFUKNb8UYNh2stn9btl2wQM5wZFJjJvoc+jA==}
+    engines: {vscode: ^1.91.0}
 
   vscode-languageserver-protocol@3.17.5:
     resolution: {integrity: sha512-mb1bvRJN8SVznADSGWM9u/b07H7Ecg0I3OgXDuLdn307rl/J3A9YD6/eYOssqhecL27hK1IPZAsaqh00i/Jljg==}
@@ -2265,8 +2259,14 @@ packages:
   vscode-languageserver-protocol@3.18.1:
     resolution: {integrity: sha512-RTiiVHdpxpYcJVI5sq6S5TLjQ4WDR/rBrIWru+kPXe6sGQ9PFQ3GamrTKLvPqbR4ylr1SoodhmcqbFII0WXVuw==}
 
+  vscode-languageserver-protocol@3.18.2:
+    resolution: {integrity: sha512-XRyDbT0Pp3sSNti3JmxVEUMySWCSi1hhM+/KUlCy1hV1zmrqpM1OwO12EAki8blhmLuIMpaJrYbo0OzGVfK2Qg==}
+
   vscode-languageserver-textdocument@1.0.12:
     resolution: {integrity: sha512-cxWNPesCnQCcMPeenjKKsOCKQZ/L6Tv19DTRIGuLWe32lyzWhihGVJ/rcckZXJxfdKCFvRLS3fpBIsV/ZGX4zA==}
+
+  vscode-languageserver-textdocument@1.0.13:
+    resolution: {integrity: sha512-nx0ZHwMGIsVkzFG3/VLeJYBLTaFBRuNdGDvevvjuoayU5EOS2fEYazOhtCM3PI9ClMMg5igc0uwXtAq4tJj+Dw==}
 
   vscode-languageserver-types@3.17.5:
     resolution: {integrity: sha512-Ld1VelNuX9pdF39h2Hgaeb5hEZM2Z3jUrrMgWQAu82jMtZp7p3vJT3BzToKtZI7NgQssZje5o0zryOrhQvzQAg==}
@@ -2372,34 +2372,34 @@ snapshots:
     dependencies:
       tslib: 2.8.1
 
-  '@azure/core-auth@1.11.0':
+  '@azure/core-auth@1.11.0(supports-color@7.2.0)':
     dependencies:
       '@azure/abort-controller': 2.2.0
-      '@azure/core-util': 1.14.0
+      '@azure/core-util': 1.14.0(supports-color@7.2.0)
       tslib: 2.8.1
     transitivePeerDependencies:
       - supports-color
 
-  '@azure/core-client@1.11.0':
+  '@azure/core-client@1.11.0(supports-color@7.2.0)':
     dependencies:
       '@azure/abort-controller': 2.2.0
-      '@azure/core-auth': 1.11.0
-      '@azure/core-rest-pipeline': 1.25.0
+      '@azure/core-auth': 1.11.0(supports-color@7.2.0)
+      '@azure/core-rest-pipeline': 1.25.0(supports-color@7.2.0)
       '@azure/core-tracing': 1.4.0
-      '@azure/core-util': 1.14.0
-      '@azure/logger': 1.4.0
+      '@azure/core-util': 1.14.0(supports-color@7.2.0)
+      '@azure/logger': 1.4.0(supports-color@7.2.0)
       tslib: 2.8.1
     transitivePeerDependencies:
       - supports-color
 
-  '@azure/core-rest-pipeline@1.25.0':
+  '@azure/core-rest-pipeline@1.25.0(supports-color@7.2.0)':
     dependencies:
       '@azure/abort-controller': 2.2.0
-      '@azure/core-auth': 1.11.0
+      '@azure/core-auth': 1.11.0(supports-color@7.2.0)
       '@azure/core-tracing': 1.4.0
-      '@azure/core-util': 1.14.0
-      '@azure/logger': 1.4.0
-      '@typespec/ts-http-runtime': 0.3.7
+      '@azure/core-util': 1.14.0(supports-color@7.2.0)
+      '@azure/logger': 1.4.0(supports-color@7.2.0)
+      '@typespec/ts-http-runtime': 0.3.7(supports-color@7.2.0)
       tslib: 2.8.1
     transitivePeerDependencies:
       - supports-color
@@ -2408,23 +2408,23 @@ snapshots:
     dependencies:
       tslib: 2.8.1
 
-  '@azure/core-util@1.14.0':
+  '@azure/core-util@1.14.0(supports-color@7.2.0)':
     dependencies:
       '@azure/abort-controller': 2.2.0
-      '@typespec/ts-http-runtime': 0.3.7
+      '@typespec/ts-http-runtime': 0.3.7(supports-color@7.2.0)
       tslib: 2.8.1
     transitivePeerDependencies:
       - supports-color
 
-  '@azure/identity@4.13.1':
+  '@azure/identity@4.13.1(supports-color@7.2.0)':
     dependencies:
       '@azure/abort-controller': 2.2.0
-      '@azure/core-auth': 1.11.0
-      '@azure/core-client': 1.11.0
-      '@azure/core-rest-pipeline': 1.25.0
+      '@azure/core-auth': 1.11.0(supports-color@7.2.0)
+      '@azure/core-client': 1.11.0(supports-color@7.2.0)
+      '@azure/core-rest-pipeline': 1.25.0(supports-color@7.2.0)
       '@azure/core-tracing': 1.4.0
-      '@azure/core-util': 1.14.0
-      '@azure/logger': 1.4.0
+      '@azure/core-util': 1.14.0(supports-color@7.2.0)
+      '@azure/logger': 1.4.0(supports-color@7.2.0)
       '@azure/msal-browser': 5.17.1
       '@azure/msal-node': 5.4.1
       open: 10.2.0
@@ -2432,9 +2432,9 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@azure/logger@1.4.0':
+  '@azure/logger@1.4.0(supports-color@7.2.0)':
     dependencies:
-      '@typespec/ts-http-runtime': 0.3.7
+      '@typespec/ts-http-runtime': 0.3.7(supports-color@7.2.0)
       tslib: 2.8.1
     transitivePeerDependencies:
       - supports-color
@@ -2615,13 +2615,13 @@ snapshots:
       '@nodelib/fs.scandir': 2.1.5
       fastq: 1.20.1
 
-  '@nx/devkit@23.0.1(nx@23.0.1)':
+  '@nx/devkit@23.0.1(nx@23.0.1(debug@4.4.3(supports-color@7.2.0)))':
     dependencies:
       '@zkochan/js-yaml': 0.0.7
       ejs: 5.0.1
       enquirer: 2.3.6
       minimatch: 10.2.5
-      nx: 23.0.1
+      nx: 23.0.1(debug@4.4.3(supports-color@7.2.0))
       semver: 7.8.5
       tslib: 2.8.1
       yargs-parser: 21.1.1
@@ -2725,18 +2725,18 @@ snapshots:
     dependencies:
       '@secretlint/types': 10.2.2
 
-  '@secretlint/config-loader@10.2.2':
+  '@secretlint/config-loader@10.2.2(supports-color@7.2.0)':
     dependencies:
       '@secretlint/profiler': 10.2.2
       '@secretlint/resolver': 10.2.2
       '@secretlint/types': 10.2.2
       ajv: 8.20.0
       debug: 4.4.3(supports-color@7.2.0)
-      rc-config-loader: 4.1.4
+      rc-config-loader: 4.1.4(supports-color@7.2.0)
     transitivePeerDependencies:
       - supports-color
 
-  '@secretlint/core@10.2.2':
+  '@secretlint/core@10.2.2(supports-color@7.2.0)':
     dependencies:
       '@secretlint/profiler': 10.2.2
       '@secretlint/types': 10.2.2
@@ -2745,11 +2745,11 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@secretlint/formatter@10.2.2':
+  '@secretlint/formatter@10.2.2(supports-color@7.2.0)':
     dependencies:
       '@secretlint/resolver': 10.2.2
       '@secretlint/types': 10.2.2
-      '@textlint/linter-formatter': 15.7.1
+      '@textlint/linter-formatter': 15.7.1(supports-color@7.2.0)
       '@textlint/module-interop': 15.7.1
       '@textlint/types': 15.7.1
       chalk: 5.6.2
@@ -2761,11 +2761,11 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@secretlint/node@10.2.2':
+  '@secretlint/node@10.2.2(supports-color@7.2.0)':
     dependencies:
-      '@secretlint/config-loader': 10.2.2
-      '@secretlint/core': 10.2.2
-      '@secretlint/formatter': 10.2.2
+      '@secretlint/config-loader': 10.2.2(supports-color@7.2.0)
+      '@secretlint/core': 10.2.2(supports-color@7.2.0)
+      '@secretlint/formatter': 10.2.2(supports-color@7.2.0)
       '@secretlint/profiler': 10.2.2
       '@secretlint/source-creator': 10.2.2
       '@secretlint/types': 10.2.2
@@ -2799,7 +2799,7 @@ snapshots:
 
   '@textlint/ast-node-types@15.7.1': {}
 
-  '@textlint/linter-formatter@15.7.1':
+  '@textlint/linter-formatter@15.7.1(supports-color@7.2.0)':
     dependencies:
       '@azu/format-text': 1.0.2
       '@azu/style-format': 1.0.1
@@ -2852,7 +2852,7 @@ snapshots:
       '@typescript-eslint/parser': 8.62.0(eslint@10.6.0(supports-color@7.2.0))(supports-color@7.2.0)(typescript@5.9.3)
       '@typescript-eslint/scope-manager': 8.62.0
       '@typescript-eslint/type-utils': 8.62.0(eslint@10.6.0(supports-color@7.2.0))(supports-color@7.2.0)(typescript@5.9.3)
-      '@typescript-eslint/utils': 8.62.0(eslint@10.6.0(supports-color@7.2.0))(typescript@5.9.3)
+      '@typescript-eslint/utils': 8.62.0(eslint@10.6.0(supports-color@7.2.0))(supports-color@7.2.0)(typescript@5.9.3)
       '@typescript-eslint/visitor-keys': 8.62.0
       eslint: 10.6.0(supports-color@7.2.0)
       ignore: 7.0.5
@@ -2866,7 +2866,7 @@ snapshots:
     dependencies:
       '@typescript-eslint/scope-manager': 8.62.0
       '@typescript-eslint/types': 8.62.0
-      '@typescript-eslint/typescript-estree': 8.62.0(typescript@5.9.3)
+      '@typescript-eslint/typescript-estree': 8.62.0(supports-color@7.2.0)(typescript@5.9.3)
       '@typescript-eslint/visitor-keys': 8.62.0
       debug: 4.4.3(supports-color@7.2.0)
       eslint: 10.6.0(supports-color@7.2.0)
@@ -2874,7 +2874,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@typescript-eslint/project-service@8.62.0(typescript@5.9.3)':
+  '@typescript-eslint/project-service@8.62.0(supports-color@7.2.0)(typescript@5.9.3)':
     dependencies:
       '@typescript-eslint/tsconfig-utils': 8.62.0(typescript@5.9.3)
       '@typescript-eslint/types': 8.62.0
@@ -2895,8 +2895,8 @@ snapshots:
   '@typescript-eslint/type-utils@8.62.0(eslint@10.6.0(supports-color@7.2.0))(supports-color@7.2.0)(typescript@5.9.3)':
     dependencies:
       '@typescript-eslint/types': 8.62.0
-      '@typescript-eslint/typescript-estree': 8.62.0(typescript@5.9.3)
-      '@typescript-eslint/utils': 8.62.0(eslint@10.6.0(supports-color@7.2.0))(typescript@5.9.3)
+      '@typescript-eslint/typescript-estree': 8.62.0(supports-color@7.2.0)(typescript@5.9.3)
+      '@typescript-eslint/utils': 8.62.0(eslint@10.6.0(supports-color@7.2.0))(supports-color@7.2.0)(typescript@5.9.3)
       debug: 4.4.3(supports-color@7.2.0)
       eslint: 10.6.0(supports-color@7.2.0)
       ts-api-utils: 2.5.0(typescript@5.9.3)
@@ -2906,9 +2906,9 @@ snapshots:
 
   '@typescript-eslint/types@8.62.0': {}
 
-  '@typescript-eslint/typescript-estree@8.62.0(typescript@5.9.3)':
+  '@typescript-eslint/typescript-estree@8.62.0(supports-color@7.2.0)(typescript@5.9.3)':
     dependencies:
-      '@typescript-eslint/project-service': 8.62.0(typescript@5.9.3)
+      '@typescript-eslint/project-service': 8.62.0(supports-color@7.2.0)(typescript@5.9.3)
       '@typescript-eslint/tsconfig-utils': 8.62.0(typescript@5.9.3)
       '@typescript-eslint/types': 8.62.0
       '@typescript-eslint/visitor-keys': 8.62.0
@@ -2921,12 +2921,12 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@typescript-eslint/utils@8.62.0(eslint@10.6.0(supports-color@7.2.0))(typescript@5.9.3)':
+  '@typescript-eslint/utils@8.62.0(eslint@10.6.0(supports-color@7.2.0))(supports-color@7.2.0)(typescript@5.9.3)':
     dependencies:
       '@eslint-community/eslint-utils': 4.9.1(eslint@10.6.0(supports-color@7.2.0))
       '@typescript-eslint/scope-manager': 8.62.0
       '@typescript-eslint/types': 8.62.0
-      '@typescript-eslint/typescript-estree': 8.62.0(typescript@5.9.3)
+      '@typescript-eslint/typescript-estree': 8.62.0(supports-color@7.2.0)(typescript@5.9.3)
       eslint: 10.6.0(supports-color@7.2.0)
       typescript: 5.9.3
     transitivePeerDependencies:
@@ -2937,10 +2937,10 @@ snapshots:
       '@typescript-eslint/types': 8.62.0
       eslint-visitor-keys: 5.0.1
 
-  '@typespec/ts-http-runtime@0.3.7':
+  '@typespec/ts-http-runtime@0.3.7(supports-color@7.2.0)':
     dependencies:
-      http-proxy-agent: 7.0.2
-      https-proxy-agent: 7.0.6
+      http-proxy-agent: 7.0.2(supports-color@7.2.0)
+      https-proxy-agent: 7.0.6(supports-color@7.2.0)
       tslib: 2.8.1
     transitivePeerDependencies:
       - supports-color
@@ -2964,7 +2964,7 @@ snapshots:
   '@volar/language-service@2.4.28':
     dependencies:
       '@volar/language-core': 2.4.28
-      vscode-languageserver-protocol: 3.18.1
+      vscode-languageserver-protocol: 3.18.2
       vscode-languageserver-textdocument: 1.0.12
       vscode-uri: 3.1.0
 
@@ -3019,8 +3019,8 @@ snapshots:
 
   '@vscode/vsce@3.9.2(supports-color@7.2.0)':
     dependencies:
-      '@azure/identity': 4.13.1
-      '@secretlint/node': 10.2.2
+      '@azure/identity': 4.13.1(supports-color@7.2.0)
+      '@secretlint/node': 10.2.2(supports-color@7.2.0)
       '@secretlint/secretlint-formatter-sarif': 10.2.2
       '@secretlint/secretlint-rule-no-dotenv': 10.2.2
       '@secretlint/secretlint-rule-preset-recommend': 10.2.2
@@ -3107,9 +3107,9 @@ snapshots:
 
   asynckit@0.4.0: {}
 
-  axios@1.18.1(supports-color@7.2.0):
+  axios@1.18.1(debug@4.4.3(supports-color@7.2.0))(supports-color@7.2.0):
     dependencies:
-      follow-redirects: 1.16.0
+      follow-redirects: 1.16.0(debug@4.4.3(supports-color@7.2.0))
       form-data: 4.0.6
       https-proxy-agent: 5.0.1(supports-color@7.2.0)
       proxy-from-env: 2.1.0
@@ -3121,8 +3121,6 @@ snapshots:
     dependencies:
       tunnel: 0.0.6
       typed-rest-client: 1.8.11
-
-  balanced-match@1.0.2: {}
 
   balanced-match@4.0.3: {}
 
@@ -3143,10 +3141,6 @@ snapshots:
   boolbase@1.0.0: {}
 
   boundary@2.0.0: {}
-
-  brace-expansion@2.1.2:
-    dependencies:
-      balanced-match: 1.0.2
 
   brace-expansion@5.0.8:
     dependencies:
@@ -3526,7 +3520,9 @@ snapshots:
 
   flatted@3.4.2: {}
 
-  follow-redirects@1.16.0: {}
+  follow-redirects@1.16.0(debug@4.4.3(supports-color@7.2.0)):
+    optionalDependencies:
+      debug: 4.4.3(supports-color@7.2.0)
 
   form-data@4.0.6:
     dependencies:
@@ -3626,7 +3622,7 @@ snapshots:
       domutils: 3.2.2
       entities: 7.0.1
 
-  http-proxy-agent@7.0.2:
+  http-proxy-agent@7.0.2(supports-color@7.2.0):
     dependencies:
       agent-base: 7.1.4
       debug: 4.4.3(supports-color@7.2.0)
@@ -3640,7 +3636,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  https-proxy-agent@7.0.6:
+  https-proxy-agent@7.0.6(supports-color@7.2.0):
     dependencies:
       agent-base: 7.1.4
       debug: 4.4.3(supports-color@7.2.0)
@@ -3849,10 +3845,6 @@ snapshots:
     dependencies:
       brace-expansion: 5.0.8
 
-  minimatch@5.1.9:
-    dependencies:
-      brace-expansion: 2.1.2
-
   minimist@1.2.8: {}
 
   minipass@7.1.3: {}
@@ -3899,7 +3891,7 @@ snapshots:
     dependencies:
       boolbase: 1.0.0
 
-  nx@23.0.1:
+  nx@23.0.1(debug@4.4.3(supports-color@7.2.0)):
     dependencies:
       '@emnapi/core': 1.4.5
       '@emnapi/runtime': 1.4.5
@@ -3914,7 +3906,7 @@ snapshots:
       ansi-styles: 4.3.0
       argparse: 2.0.1
       asynckit: 0.4.0
-      axios: 1.18.1(supports-color@7.2.0)
+      axios: 1.18.1(debug@4.4.3(supports-color@7.2.0))(supports-color@7.2.0)
       balanced-match: 4.0.3
       base64-js: 1.5.1
       bl: 4.1.0
@@ -3947,7 +3939,7 @@ snapshots:
       escape-string-regexp: 1.0.5
       figures: 3.2.0
       flat: 5.0.2
-      follow-redirects: 1.16.0
+      follow-redirects: 1.16.0(debug@4.4.3(supports-color@7.2.0))
       form-data: 4.0.6
       fs-constants: 1.0.0
       function-bind: 1.1.2
@@ -4175,7 +4167,7 @@ snapshots:
 
   queue-microtask@1.2.3: {}
 
-  rc-config-loader@4.1.4:
+  rc-config-loader@4.1.4(supports-color@7.2.0):
     dependencies:
       debug: 4.4.3(supports-color@7.2.0)
       js-yaml: 4.3.0
@@ -4250,8 +4242,8 @@ snapshots:
   secretlint@10.2.2(supports-color@7.2.0):
     dependencies:
       '@secretlint/config-creator': 10.2.2
-      '@secretlint/formatter': 10.2.2
-      '@secretlint/node': 10.2.2
+      '@secretlint/formatter': 10.2.2(supports-color@7.2.0)
+      '@secretlint/node': 10.2.2(supports-color@7.2.0)
       '@secretlint/profiler': 10.2.2
       debug: 4.4.3(supports-color@7.2.0)
       globby: 14.1.0
@@ -4458,8 +4450,8 @@ snapshots:
     dependencies:
       '@typescript-eslint/eslint-plugin': 8.62.0(@typescript-eslint/parser@8.62.0(eslint@10.6.0(supports-color@7.2.0))(supports-color@7.2.0)(typescript@5.9.3))(eslint@10.6.0(supports-color@7.2.0))(supports-color@7.2.0)(typescript@5.9.3)
       '@typescript-eslint/parser': 8.62.0(eslint@10.6.0(supports-color@7.2.0))(supports-color@7.2.0)(typescript@5.9.3)
-      '@typescript-eslint/typescript-estree': 8.62.0(typescript@5.9.3)
-      '@typescript-eslint/utils': 8.62.0(eslint@10.6.0(supports-color@7.2.0))(typescript@5.9.3)
+      '@typescript-eslint/typescript-estree': 8.62.0(supports-color@7.2.0)(typescript@5.9.3)
+      '@typescript-eslint/utils': 8.62.0(eslint@10.6.0(supports-color@7.2.0))(supports-color@7.2.0)(typescript@5.9.3)
       eslint: 10.6.0(supports-color@7.2.0)
       typescript: 5.9.3
     transitivePeerDependencies:
@@ -4526,11 +4518,14 @@ snapshots:
 
   vscode-jsonrpc@9.0.0: {}
 
-  vscode-languageclient@9.0.1:
+  vscode-jsonrpc@9.0.1: {}
+
+  vscode-languageclient@10.1.0:
     dependencies:
-      minimatch: 5.1.9
+      minimatch: 10.2.5
       semver: 7.8.5
-      vscode-languageserver-protocol: 3.17.5
+      vscode-languageserver-protocol: 3.18.2
+      vscode-languageserver-textdocument: 1.0.13
 
   vscode-languageserver-protocol@3.17.5:
     dependencies:
@@ -4542,7 +4537,14 @@ snapshots:
       vscode-jsonrpc: 9.0.0
       vscode-languageserver-types: 3.18.0
 
+  vscode-languageserver-protocol@3.18.2:
+    dependencies:
+      vscode-jsonrpc: 9.0.1
+      vscode-languageserver-types: 3.18.0
+
   vscode-languageserver-textdocument@1.0.12: {}
+
+  vscode-languageserver-textdocument@1.0.13: {}
 
   vscode-languageserver-types@3.17.5: {}
 

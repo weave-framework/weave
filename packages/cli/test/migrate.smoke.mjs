@@ -436,6 +436,46 @@ ok(blindMd.includes('./missing'), 'renderPlan: an unresolved import is reported'
 ok(blindMd.includes('Dynamic call'), 'renderPlan: a dynamic call is reported');
 ok(!blindMd.includes('Nothing was hidden'), 'renderPlan: with blind spots, it does NOT claim nothing was hidden');
 
+// A cell value can never break the table it sits in. Escaping the pipe alone was not enough: a
+// value carrying a backslash BEFORE a pipe (a Windows path, a note quoting source) came out as
+// `a\\|b`, where markdown reads `\\` as an escaped backslash and the pipe that follows is live —
+// so the row split at exactly the value that was supposed to be protected. Backslashes first.
+{
+  // Split a markdown row the way a RENDERER does: `\x` is a literal x, and only an UNESCAPED pipe
+  // starts a new cell. A `(?<!\\)\|` regex cannot express this — it can't tell `\\|` (escaped
+  // backslash, then a live pipe) from `\|` (an escaped pipe), which is the whole distinction here.
+  const renderCells = (row) => {
+    const out = [''];
+    for (let i = 0; i < row.length; i++) {
+      if (row[i] === '\\' && i + 1 < row.length) {
+        out[out.length - 1] += row[i + 1];
+        i++;
+      } else if (row[i] === '|') out.push('');
+      else out[out.length - 1] += row[i];
+    }
+    return out;
+  };
+
+  // The value that breaks it is a backslash IMMEDIATELY before a pipe — a Windows path, a note
+  // quoting source. Escaping the pipe alone turned `a\|b` into `a\\|b`, which a reader resolves as
+  // a literal backslash followed by a LIVE pipe: the row gains a column at exactly the value that
+  // was supposed to be protected. `facts.angular` entries go through `cell()` into a table.
+  const rowOf = (md, needle) => md.split('\n').find((l) => l.startsWith('|') && l.includes(needle));
+  const nastyMd = pl.renderPlan({ ...facts, angular: ['pkg-a\\|b\nsecond line'] });
+  const nastyRow = rowOf(nastyMd, 'pkg-a');
+  const cleanRow = rowOf(pl.renderPlan({ ...facts, angular: ['pkg-plain'] }), 'pkg-plain');
+  ok(nastyRow !== undefined && cleanRow !== undefined, 'renderPlan: both the awkward and the plain value render as table rows');
+  ok(
+    renderCells(nastyRow).length === renderCells(cleanRow).length,
+    `renderPlan: a backslash before a pipe does not add a column (${renderCells(nastyRow).length} cells vs ${renderCells(cleanRow).length})`,
+  );
+  ok(
+    renderCells(nastyRow).some((c) => c.includes('pkg-a\\|b')),
+    `renderPlan: the value survives intact — got ${JSON.stringify(renderCells(nastyRow).find((c) => c.includes('pkg-a')))}`,
+  );
+  ok(!nastyMd.split('\n').some((l) => l.startsWith('second line')), 'renderPlan: an embedded newline does not end the row');
+}
+
 // ── M4: the converter — Angular template → Weave template, and @Component → a setup()+html pair ──
 const conv = (html, opts) => cv.convertTemplate(html, opts);
 
@@ -1154,7 +1194,11 @@ ok(twoMods.length === 2 && twoMods.some((l) => l.includes('@weave-framework/stor
 // not there is worse than no import at all.
 for (const [name, mod] of [['t', 'i18n'], ['useLoaderData', 'router'], ['debounced', 'runtime'], ['optimistic', 'data'], ['fieldArray', 'forms'], ['store', 'store']]) {
   const idx = readFileSync(join(repo, 'packages', mod, 'src', 'index.ts'), 'utf8');
-  ok(new RegExp(`(?<![\w$])${name}(?![\w$])`).test(idx), `WEAVE_API: \`${name}\` really is exported by @weave-framework/${mod}`);
+  // `\\w`, not `\w`: this is a TEMPLATE LITERAL, so `\w` is string-escaped to a plain `w` before
+  // RegExp ever sees it, and the word boundary silently became "not next to the letter w or a $".
+  // Measured: with that, an index exporting `restore` but not `store` satisfied the check — the
+  // gate passed on a different symbol, which is the one thing it exists to catch.
+  ok(new RegExp(`(?<![\\w$])${name}(?![\\w$])`).test(idx), `WEAVE_API: \`${name}\` really is exported by @weave-framework/${mod}`);
 }
 
 // 2. The SYMBOL TABLE and the "already handled" set come from one list, so a kind cannot be in one and missing
