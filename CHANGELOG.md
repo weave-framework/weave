@@ -287,6 +287,15 @@
   with a `ResizeObserver`, and disconnects it in `dispose()` alongside the two listeners. (An `overlay.ts`
   comment had claimed this observer existed since the detach-leak fix — it did not; that is now true.)
 
+### Fixed — build tooling
+- **The `@weave-framework/ui` publish build no longer breaks on a component that declares `propDefaults`
+  or `extend`.** The step that gives each built component a props-typed default export *reconstructed*
+  the tail it expected (`export default defineComponent(render, setup);`) and threw on anything else — but
+  the compiler emits a third argument for `propDefaults` (shipped since 1.5.17) and an `extendSetup(…)`
+  wrapper for [RFC 0008](rfcs/0008-component-extension.md) extension components. The first ui component to
+  use either would have failed the publish build with an error blaming the compiler. It now reuses whatever
+  the compiler emitted, verbatim.
+
 ## 2.1.0 — 2026-07-24
 
 ### Added — UI

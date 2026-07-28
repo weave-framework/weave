@@ -18,6 +18,7 @@
     "verify:ui-sass": "node tools/verify-ui-sass.mjs",
     "verify:ui-compose": "node tools/verify-ui-compose.mjs",
     "verify:ui-consume": "node tools/verify-ui-consume.mjs",
+    "verify:ui-typed-default": "node tools/verify-ui-typed-default.mjs",
     "verify:size": "node tools/verify-size.mjs",
     "verify:server": "node packages/runtime/test/server.smoke.mjs",
     "verify:prerender": "node packages/cli/test/prerender.smoke.mjs",

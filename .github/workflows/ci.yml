@@ -133,6 +133,12 @@ jobs:
         run: pnpm verify:ui-compose
       - name: UI is consumable from dist
         run: pnpm verify:ui-consume
+      # The publish build rewrites each component's default export, and it used to do that by
+      # RECONSTRUCTING the tail it expected — so the first ui component to declare `propDefaults`
+      # (a shipped feature) or `extend` would have failed the build, blaming the compiler. Nothing
+      # noticed because no ui component uses either yet.
+      - name: UI typed default covers every compiler tail
+        run: pnpm verify:ui-typed-default
       - name: Component extension
         run: pnpm verify:extend
       - name: CLI assets

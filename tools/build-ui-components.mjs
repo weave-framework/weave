@@ -34,6 +34,7 @@ import {
 import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { typeDefault } from './ui-typed-default.mjs';
 
 const repo = fileURLToPath(new URL('..', import.meta.url));
 const srcDir = join(repo, 'packages/ui/src');
@@ -132,24 +133,6 @@ function injectChildImports(code, components, dir, script, filename) {
 /* ── per-component compile ── */
 
 const HAS_SETUP = /export\s+(?:async\s+)?function\s+setup\b|export\s+(?:const|let|var)\s+setup\b/;
-
-/** Replace compileComponent's plain default with a props-typed default so `weave check`
- *  (and TS consumers) see `import X from '…/x'` as a callable whose first param is the
- *  component's props. `Parameters<typeof setup>[0]` derives the props from the module's
- *  own setup, so one substitution fits every component. */
-function typeDefault(code, hasSetup) {
-  const propsType = hasSetup ? 'Parameters<typeof setup>[0]' : 'Record<string, unknown>';
-  const call = hasSetup ? 'defineComponent(render, setup)' : 'defineComponent(render)';
-  const typed =
-    `const _weaveDefault = ${call} as unknown as ` +
-    `(props: ${propsType}, slots?: Record<string, () => unknown>) => unknown;\n` +
-    `export default _weaveDefault;`;
-  const plain = `export default ${call};`;
-  if (!code.endsWith(plain)) {
-    throw new Error(`weave: unexpected compileComponent tail — cannot inject typed default`);
-  }
-  return code.slice(0, -plain.length) + typed;
-}
 
 let componentCount = 0;
 
