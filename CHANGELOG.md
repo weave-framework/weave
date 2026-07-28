@@ -277,6 +277,16 @@
   prop with a default is **not** optional in the `setup` signature — `propDefaults` guarantees it a value there;
   optionality is for the parent, which is what `propDefaults` already states.
 
+### Fixed — UI (CDK)
+- **An open overlay now follows its trigger when the page rearranges under a still window.**
+  `connectedPosition`'s live listeners were `scroll` and `resize` on `window` — both of which see the
+  *window* moving and neither of which fires when a container changes size on its own. So a Select
+  listbox, Menu, Autocomplete panel or Tooltip stayed exactly where it was placed while its trigger slid
+  out from under it: a splitter dragged, a sidebar collapsing, a drawer animating open, a flex reflow
+  after content changed. The strategy now also observes the origin, its containing block and the panel
+  with a `ResizeObserver`, and disconnects it in `dispose()` alongside the two listeners. (An `overlay.ts`
+  comment had claimed this observer existed since the detach-leak fix — it did not; that is now true.)
+
 ## 2.1.0 — 2026-07-24
 
 ### Added — UI

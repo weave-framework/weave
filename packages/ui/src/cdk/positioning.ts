@@ -5,7 +5,8 @@
  *   • **flips** to a fallback when the preferred one overflows,
  *   • **shifts** (clamps) along the axes to keep the panel on-screen if none fit,
  *   • reports the position it actually applied (for arrow placement / transform-origin),
- *   • repositions on scroll/resize while attached.
+ *   • repositions while attached — on scroll/window resize, and (via a ResizeObserver on the
+ *     origin, its containing block and the panel) whenever the page rearranges under a still window.
  *
  * Pure geometry against `getBoundingClientRect` + the viewport. RTL-aware: `start`/`end`
  * resolve through `activeDirection()`. Plugs into the overlay as a `PositionStrategy`.
@@ -148,6 +149,7 @@ export function connectedPosition(
   let currentEl: HTMLElement | null = null;
   let listening: boolean = false;
   let correctionFrame: number = 0;
+  let resizeObserver: ResizeObserver | null = null;
 
   function place(el: HTMLElement, pos: ConnectedPosition, rtl: boolean, vw: number, vh: number): Placement {
     const rect: DOMRect = origin.getBoundingClientRect();
@@ -203,6 +205,26 @@ export function connectedPosition(
       window.addEventListener('scroll', reposition, { passive: true, capture: true });
       window.addEventListener('resize', reposition, { passive: true });
 
+      // Those two see the WINDOW moving. They do not see the page rearranging under a still
+      // window — a splitter dragged, a sidebar collapsing, a drawer animating open, a flex
+      // reflow when content changes. In every one of those the trigger moves and the open
+      // panel stays where it was placed, because no scroll and no window resize ever fired.
+      // A ResizeObserver on the origin (and on the box that lays it out) is the only thing
+      // that reports those; the panel itself is observed too, so content arriving late moves
+      // the panel rather than merely growing it. Repositioning writes `left`/`top` only, never
+      // a size, so an observation cannot feed itself.
+      if (typeof ResizeObserver !== 'undefined') {
+        resizeObserver = new ResizeObserver(reposition);
+        resizeObserver.observe(el);
+        if (origin instanceof Element) {
+          resizeObserver.observe(origin);
+          // A trigger of fixed width does not itself resize when its container does — it just
+          // moves. Observing the containing block catches that.
+          const parent: Element | null = (origin as HTMLElement).offsetParent;
+          if (parent && parent !== origin) resizeObserver.observe(parent);
+        }
+      }
+
       // The panel's own size is the other input to the flip decision, and it is not there
       // yet: `apply` runs synchronously inside `attach`, and the panel fills its content (a
       // select's options) AFTER this — so this first pass measured a near-empty box (~10px),
@@ -239,6 +261,8 @@ export function connectedPosition(
     if (listening && isBrowser) {
       window.removeEventListener('scroll', reposition, { capture: true } as EventListenerOptions);
       window.removeEventListener('resize', reposition);
+      resizeObserver?.disconnect();
+      resizeObserver = null;
       if (correctionFrame) clearTimeout(correctionFrame);
       correctionFrame = 0;
       listening = false;

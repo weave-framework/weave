@@ -142,6 +142,75 @@ test('positioning: autoUpdate repositions on scroll', () => {
   ref.dispose();
 });
 
+/** A real trigger inside a real container, so layout — not a virtual rect — drives the origin. */
+function trigger(containerWidth: number): { container: HTMLElement; origin: HTMLElement } {
+  const container: HTMLElement = document.createElement('div');
+  container.style.cssText = `position: absolute; left: 0; top: 300px; width: ${containerWidth}px;`;
+  const origin: HTMLElement = document.createElement('button');
+  origin.style.cssText = 'display: block; width: 100%; height: 20px;';
+  container.append(origin);
+  document.body.append(container);
+  return { container, origin };
+}
+
+/** Wait past the post-attach settle loop (12 × 16ms), so nothing it does can be mistaken for a fix. */
+const afterSettle = (): Promise<void> => new Promise<void>((r) => setTimeout(r, 350));
+/** Give the ResizeObserver its delivery (end of frame) plus slack. */
+const afterObserver = (): Promise<void> => new Promise<void>((r) => setTimeout(r, 120));
+
+test('positioning: repositions when the trigger moves because its CONTAINER resized', async () => {
+  // The real-world failure: an open panel — a Select listbox, a Menu, an Autocomplete — is
+  // anchored to a trigger inside a resizable pane / collapsing sidebar / animating drawer. The
+  // pane changes width; the window neither scrolls nor resizes, so neither live listener fires
+  // and the panel stays where it was placed while the trigger slides out from under it.
+  const { container, origin } = trigger(400);
+  const strat: ConnectedPositionStrategy = connectedPosition(origin, { positions: ['bottom-end'] });
+  const ref: OverlayRef = createOverlay({ positionStrategy: strat });
+  const panel: HTMLElement = ref.attach(sized(80, 40));
+  await afterSettle();
+  // bottom-end: the panel's right edge tracks the trigger's right edge (400) → left = 320.
+  assert.equal(px(panel, 'left'), 320, 'anchored to the trigger inside the 400px container');
+
+  container.style.width = '250px'; // the pane shrinks — no scroll, no window resize
+  await afterObserver();
+  assert.equal(px(panel, 'left'), 170, 'followed the trigger to the narrowed container');
+
+  ref.dispose();
+  container.remove();
+});
+
+test('positioning: dispose releases the ResizeObserver too', () => {
+  // Measured on the observer itself, NOT on the panel's position: `dispose` also drops
+  // `currentEl`, so a leaked observer moves nothing and a position assertion would pass
+  // whether or not it was ever disconnected. What leaks here is the observation — one per
+  // open, for the life of the page, on components (Select, Autocomplete, the pickers) that
+  // detach-and-drop every time. So count live observers.
+  const Native: typeof ResizeObserver = window.ResizeObserver;
+  const live: Set<ResizeObserver> = new Set<ResizeObserver>();
+  class Spy extends Native {
+    override observe(target: Element, options?: ResizeObserverOptions): void {
+      live.add(this);
+      super.observe(target, options);
+    }
+    override disconnect(): void {
+      live.delete(this);
+      super.disconnect();
+    }
+  }
+  window.ResizeObserver = Spy;
+  const { container, origin } = trigger(400);
+  try {
+    const ref: OverlayRef = createOverlay({ positionStrategy: connectedPosition(origin, { positions: ['bottom-end'] }) });
+    ref.attach(sized(80, 40));
+    assert.equal(live.size, 1, 'attaching observes the origin/container/panel');
+    ref.dispose();
+    assert.equal(live.size, 0, 'dispose disconnects it');
+  } finally {
+    window.ResizeObserver = Native;
+    container.remove();
+  }
+});
+
 test('positioning: dispose stops repositioning', () => {
   let oy: number = 100;
   const strat: ConnectedPositionStrategy = connectedPosition(virtualOrigin(() => ({ x: 100, y: oy, w: 50, h: 20 })), { positions: ['bottom-start'] });
