@@ -347,3 +347,71 @@ test('mutual effects terminate: a convergent pair settles, a divergent one repor
   });
   assert.ok(threw, 'a divergent mutual pair is reported rather than settling on an arbitrary value');
 });
+
+test('flush does not recurse: a write inside an effect appends to the drain', () => {
+  // The crash this guards: `signal.set` ends in `flush()`, and an effect writing a signal is
+  // ORDINARY — `ref={{ el }}` does it on every component that takes a ref. Unguarded, each such
+  // write drained the REMAINING queue from inside the effect still running, so a list of
+  // ref-taking components nested one stack frame per item:
+  //   RangeError: Maximum call stack size exceeded
+  //     at runOnce → run → updateIfNecessary → flush → read.set → setRef → render
+  // …with the render abandoned mid-list. Enough queued effects and the stack is gone.
+  const N: number = 5000;
+  const runs: number[] = new Array<number>(N).fill(0);
+  let deepest: number = 0;
+  let depth: number = 0;
+  let threw: unknown = null;
+
+  root((dispose) => {
+    const trigger: Signal<number> = signal(0);
+    // A sink each effect writes but nobody reads — a write, not a dependency, so there is no loop.
+    const sink: Signal<number> = signal(0);
+    for (let i: number = 0; i < N; i++) {
+      effect(() => {
+        trigger(); // dependency: one `trigger.set` queues all N at once
+        depth++;
+        if (depth > deepest) deepest = depth;
+        runs[i]++;
+        sink.set(sink.peek() + 1); // the mid-flush write — this is what used to recurse
+        depth--;
+      });
+    }
+    try {
+      trigger.set(1);
+    } catch (e) {
+      threw = e;
+    }
+    // Dispose even on the failing path: an overflow leaves thousands of dirty effects queued, and
+    // the next test's first write would inherit them and fail for this test's reason.
+    dispose();
+  });
+
+  assert.equal(threw, null, `${N} queued effects each writing a signal must not overflow the stack (got: ${String(threw)})`);
+  assert.equal(deepest, 1, 'effects run one at a time, not nested inside each other');
+  // Nothing deferred, nothing dropped: `queue` is a Set, so entries added mid-drain are still
+  // visited by the same loop — every effect ran, exactly once, before `set` returned.
+  assert.equal(runs.filter((n) => n === 2).length, N, 'every effect ran once on create and once on the trigger');
+});
+
+test('flush re-entrancy does not drop an effect queued mid-drain', () => {
+  // The guard makes a nested flush a no-op, so the work must be picked up by the outer loop —
+  // not silently postponed past the write that caused it.
+  const seen: string[] = [];
+  root(() => {
+    const a: Signal<number> = signal(0);
+    const b: Signal<number> = signal(0);
+    effect(() => {
+      a();
+      seen.push('a');
+      b.set(b.peek() + 1); // queues the `b` effect from inside the `a` effect's own flush
+    });
+    effect(() => {
+      b();
+      seen.push('b');
+    });
+    seen.length = 0;
+    a.set(1);
+    // Synchronous contract: by the time `set` returns, both have run.
+    assert.deepEqual(seen, ['a', 'b'], 'the effect queued mid-drain ran before `set` returned');
+  });
+});

@@ -277,6 +277,22 @@
   prop with a default is **not** optional in the `setup` signature — `propDefaults` guarantees it a value there;
   optionality is for the parent, which is what `propDefaults` already states.
 
+### Fixed — reactivity
+- **A signal written during an effect no longer drains the queue on top of that effect.** `flush()`
+  guarded only on `batchDepth`, so a write that happened *while* the queue was draining started a
+  second drain nested inside the effect still running. Writing a signal from an effect is ordinary —
+  `ref={{ el }}` alone does it, on every component that takes a ref — so a long list of such
+  components nested one stack frame per item and ended in `RangeError: Maximum call stack size
+  exceeded`, with the render abandoned mid-list and the DOM left half-updated (rows still carrying a
+  column the render was in the middle of removing). Reported against a `<Table selectable expandable
+  resizableColumns>` at a few hundred rows, where a column-set change tipped it over.
+
+  `batch` could not help and was measured not to: it decrements `batchDepth` *before* flushing —
+  precisely so the queued effects run unbatched — so every write inside them saw depth 0 and recursed
+  anyway. `flush` now refuses re-entry and lets the outer loop pick the work up. Nothing is deferred
+  past the outermost write: `queue` is a `Set`, whose iteration visits entries added during the
+  iteration, so an effect queued mid-drain still runs before `set` returns.
+
 ### Fixed — UI (CDK)
 - **An open overlay now follows its trigger when the page rearranges under a still window.**
   `connectedPosition`'s live listeners were `scroll` and `resize` on `window` — both of which see the

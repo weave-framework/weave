@@ -378,3 +378,61 @@ test('table: numeric column marks cells tabular + right-aligned', async () => {
   assert.equal(ageCell.style.textAlign, 'end');
   m.dispose();
 });
+
+/* ── large grid: the flush-recursion crash ── */
+test('table: a column change on a large selectable grid rerenders every row (no stack overflow)', async () => {
+  // The reported crash: `<Table selectable expandable resizableColumns>` over a few hundred rows,
+  // then a column added or removed. Each row's composed <Checkbox> writes a `ref` DURING render, and
+  // an unguarded `flush` drained the remaining effect queue from inside the render that was still
+  // running — one stack frame per row:
+  //   RangeError: Maximum call stack size exceeded  (setRef → set → flush → run → render → setRef …)
+  // Three conditions, all present here: ref-writing row components, a column-set change on an
+  // ALREADY-rendered grid, and enough rendered rows.
+  //
+  // The throw is the visible half. The half a "does it throw" test would miss is the aftermath: the
+  // render aborts mid-list, leaving rows carrying the columns it was in the middle of removing. So
+  // this asserts the resulting DOM for EVERY row, not just that nothing threw.
+  //
+  // The row count is a STACK budget, not a property of the bug: it was reported at 150–200 rows in a
+  // production bundle (deeper frames per row, twenty columns). Measured here, this harness survives
+  // 400 and overflows at 3000 — so 400 would have been a test that passes with the bug present. The
+  // reactive-level gates in packages/runtime/test/reactive.browser.ts state the rule without a
+  // threshold; this one keeps the reported shape.
+  const N: number = 3000;
+  const rows: Row[] = Array.from({ length: N }, (_, i) => ({ id: i + 1, name: `Row ${i + 1}`, age: i }));
+  const cols: Signal<TableColumn<Row>[]> = signal<TableColumn<Row>[]>([
+    { key: 'name', header: 'Name' },
+    { key: 'age', header: 'Age', numeric: true },
+  ]);
+
+  const m: Mounted = await mount({
+    // `columns` is read through a getter so the grid re-renders when the column set changes.
+    get columns(): TableColumn<Row>[] {
+      return cols();
+    },
+    dataSource: rows,
+    trackBy: (r: Row): number => r.id,
+    selectable: true,
+    expandable: true,
+    resizableColumns: true,
+    detail: (r: Row): string => `detail ${r.id}`,
+  } as TableProps<Row>);
+  assert.equal(bodyRows(m).length, N, `${N} rows rendered`);
+
+  let threw: unknown = null;
+  try {
+    cols.set([{ key: 'name', header: 'Name' }]); // drop a column on the rendered grid
+    await tick();
+  } catch (e) {
+    threw = e;
+  }
+  assert.equal(threw, null, `a column change over ${N} rendered rows must not overflow the stack (got: ${String(threw)})`);
+
+  const body: HTMLTableRowElement[] = bodyRows(m);
+  assert.equal(body.length, N, 'every row survived the rerender');
+  const stale: number = body.filter((tr) => dataCellText(tr).length !== 1).length;
+  assert.equal(stale, 0, `${stale} of ${N} rows were left carrying the removed column — the render aborted mid-list`);
+  const missingCheckbox: number = body.filter((tr) => tr.querySelectorAll('.weave-checkbox').length !== 1).length;
+  assert.equal(missingCheckbox, 0, `${missingCheckbox} of ${N} rows lost their composed <Checkbox>`);
+  m.dispose();
+});
