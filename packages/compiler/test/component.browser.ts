@@ -313,6 +313,40 @@ test('extractSources joins a concatenated `template` string (multi-line + splits
   assert.equal(template, '<button class={{ c() }} disabled={{ d() }}><slot></slot></button>');
 });
 
+test('extractSources allows comments between the joined literals', () => {
+  // A split template is the norm, so annotating one of its lines is the next thing an author does.
+  // It used to fail with "`template` must be a static string" — about a template that is entirely
+  // static — because the `+` scan saw the `/` and gave up. Comments are trivia; skip them.
+  const script: string =
+    'export const template: string =\n' +
+    "  '<button class={{ c() }}' +\n" +
+    '  // the disabled state rides the native attribute\n' +
+    "  ' disabled={{ d() }}>' +\n" +
+    '  /* the slot is the label */\n' +
+    "  '<slot></slot></button>';\n" +
+    'export function setup(){ return {}; }';
+  const { template, script: rest } = extractSources(script);
+  assert.equal(template, '<button class={{ c() }} disabled={{ d() }}><slot></slot></button>');
+  // The declaration (comments and all) is blanked, and blanking keeps every newline — the line
+  // numbers `weave check` maps diagnostics to must not move.
+  assert.equal(rest.split('\n').length, script.split('\n').length, 'line count preserved');
+  assert.ok(!/disabled state rides/.test(rest), 'the comment is blanked out with the declaration');
+  assert.ok(/export function setup/.test(rest), 'the rest of the script survives');
+});
+
+test('extractSources takes a comment before the first literal, and an unterminated one', () => {
+  const before: string = "export const template = /* the shell */ '<i>x</i>';";
+  assert.equal(extractSources(before).template, '<i>x</i>');
+  // An unterminated block comment must report the piece the parser was looking for, not hang.
+  let message: string = '';
+  try {
+    extractSources("export const template = '<i>' + /* oops\n  '</i>';");
+  } catch (e) {
+    message = e instanceof Error ? e.message : String(e);
+  }
+  assert.ok(/static string|unterminated/.test(message), `expected a loud error, got: ${message || '(none)'}`);
+});
+
 test('extractSources rejects a non-static `+` join (fail loud)', () => {
   const script: string = "export const template = '<div>' + title + '</div>';";
   let message: string = '';

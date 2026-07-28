@@ -89,7 +89,7 @@ interface ParsedLiteral {
 
 /** Parse a string literal or an array of string literals starting at `i` (after `=`). */
 function parseLiteral(src: string, i: number, kind: string): ParsedLiteral {
-  i = skipWs(src, i);
+  i = skipTrivia(src, i);
   const c: string = src[i];
   if (c === '"' || c === "'" || c === '`') return parseConcat(src, i);
   if (c === '[') return parseArray(src, i);
@@ -110,9 +110,9 @@ function parseConcat(src: string, i: number): ParsedLiteral {
   let end: number = first.end;
   let single: boolean = true;
   for (;;) {
-    const plus: number = skipWs(src, end);
+    const plus: number = skipTrivia(src, end);
     if (src[plus] !== '+') break;
-    const nextStart: number = skipWs(src, plus + 1);
+    const nextStart: number = skipTrivia(src, plus + 1);
     const c: string = src[nextStart];
     if (c !== '"' && c !== "'" && c !== '`') {
       throw new Error('weave: `template`/`styles` must be a static string — `+` may only join string literals');
@@ -152,7 +152,7 @@ function parseArray(src: string, i: number): ParsedLiteral {
   const items: string[] = [];
   let j: number = i + 1; // past '['
   for (;;) {
-    j = skipWs(src, j);
+    j = skipTrivia(src, j);
     if (src[j] === ']') return { value: items, end: j + 1 };
     if (j >= src.length) throw new Error('weave: unterminated array in styles declaration');
     if (src[j] === ',') {
@@ -165,9 +165,34 @@ function parseArray(src: string, i: number): ParsedLiteral {
   }
 }
 
-function skipWs(src: string, i: number): number {
-  while (i < src.length && /\s/.test(src[i])) i++;
-  return i;
+/**
+ * Skip whitespace **and comments** — everything JS calls trivia.
+ *
+ * Comments have to be skipped, not merely tolerated. A template is routinely split across lines
+ * with `+` (all 30 ui components do it), and annotating one of those lines is the next thing an
+ * author reaches for — but the `+` scan below saw the `/` and reported "`template` must be a static
+ * string" about a template that is entirely static, which reads as the compiler being wrong.
+ *
+ * Called only BETWEEN tokens (after `=`, around a `+`, inside a `[…]`), never inside a literal:
+ * `parseString` has already consumed anything quoted. So a `/` in these positions can only open a
+ * comment — there is no regex-vs-division ambiguity to resolve.
+ */
+function skipTrivia(src: string, i: number): number {
+  for (;;) {
+    while (i < src.length && /\s/.test(src[i])) i++;
+    if (src[i] === '/' && src[i + 1] === '/') {
+      while (i < src.length && src[i] !== '\n') i++;
+      continue;
+    }
+    if (src[i] === '/' && src[i + 1] === '*') {
+      const close: number = src.indexOf('*/', i + 2);
+      // Unterminated: consume to the end so the caller reports the missing piece it was looking
+      // for (an unterminated literal, a missing `]`) rather than this scan looping.
+      i = close < 0 ? src.length : close + 2;
+      continue;
+    }
+    return i;
+  }
 }
 
 /** Replace the given ranges with same-length whitespace, preserving newlines. */

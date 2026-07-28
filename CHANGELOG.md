@@ -343,6 +343,17 @@
   copying an undeclared project directory into `dist/` would have shipped `src/`, `node_modules/`, the
   config and any `.env`. `weave dev` still serves the config directory by default, unchanged.
 
+### Fixed — compiler
+- **A comment between the pieces of a split `template`/`styles` no longer fails the build.** A long
+  template is routinely split across lines with `+` (every `@weave-framework/ui` component does it),
+  and annotating one of those lines is the next thing an author reaches for — but the extractor's
+  `+` scan saw the `/` and reported ``weave: `template`/`styles` must be a static string`` about a
+  template that is entirely static, which reads as the compiler being wrong rather than the code.
+  Comments are now skipped as trivia (`//` and `/* … */`, before the first literal and around every
+  `+`), exactly like whitespace. The declaration is still blanked out of the emitted script with its
+  newlines preserved, so `weave check` line:col mapping is unchanged — and a genuinely non-static
+  join (`'<div>' + title`) is still refused, loudly.
+
 ### Fixed — types
 - **A component's synthesized default export is typed `=> Node`, not `=> unknown`.** The runtime has
   always said so — `Component = (props?, slots?) => Node`; an instance returns its DOM — but both

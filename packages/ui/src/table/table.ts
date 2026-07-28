@@ -164,11 +164,6 @@ interface CellView {
   node: Node;
 }
 
-// Two rows in `<thead>` when `headerRow` is given — the second pins under the first, at an offset
-// only JS can know (`secondaryStyle`). In `<tbody>`, a virtual body brackets the rendered window
-// with two spacer rows, so the native scrollbar stays honest without the skipped rows existing.
-// (Comments cannot live INSIDE the concatenation: the loader's extractor requires the template to
-// be string literals joined by `+`, nothing else.)
 export const template: string =
   '<div class={{ rootClass() }} ref={{ host }}>' +
   '<div class="weave-table__scroll" style={{ scrollStyle() }} ref={{ scrollEl }}>' +
@@ -190,6 +185,8 @@ export const template: string =
   ' on:keydown={{ (e) => onGripKeydown(col.key, e) }}></span>}' +
   '</th>}' +
   '</tr>' +
+  // The second header row (per-column filters). It pins UNDER the header row, at an offset only JS
+  // can know — hence `secondaryStyle`, which appends the measured header height.
   '@if (hasHeaderRow()) {<tr class="weave-table__header-row weave-table__header-row--secondary">' +
   '@if (expandable()) {<td class="weave-table__header-filter-cell weave-table__expand weave-table__cell--sticky-start" style={{ secondaryStyle(expandStyle()) }}></td>}' +
   '@if (selectable()) {<td class="weave-table__header-filter-cell weave-table__select weave-table__cell--sticky-start" style={{ secondaryStyle(selectStyle()) }}></td>}' +
@@ -198,6 +195,8 @@ export const template: string =
   '</tr>}' +
   '</thead>' +
   '<tbody class="weave-table__body">' +
+  // A virtual body brackets the rendered window with two spacer rows, so the native scrollbar stays
+  // honest without the DOM for the skipped rows existing.
   '@if (topSpacer()) {<tr class="weave-table__spacer" aria-hidden="true"><td colspan={{ colSpan() }} style={{ spacerStyle(topSpacer()) }}></td></tr>}' +
   '@for (row of visibleRows(); track rowKey(row)) {' +
   '<tr class={{ rowClass(row) }} aria-selected={{ ariaSelected(row) }} aria-rowindex={{ ariaRowIndex(row) }} style={{ rowStyle() }}>' +
