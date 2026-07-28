@@ -190,7 +190,11 @@ await browser.close();
       // …and a bad one is a compile error (proves props are actually typed, not `any`).
       `// @ts-expect-error unknown prop must be rejected`,
       `const bad: Parameters<typeof Button>[0] = { nope: 1 };`,
-      `void good; void bad;`,
+      // A component instance IS a Node — assignable with no cast. This is what most imperative
+      // composition needs: a <Table> column's `cell: (row) => Node`, an <Expansion> body, any
+      // API taking a Node. While the declaration said `unknown`, every one of those needed a cast.
+      `const cell: (row: { id: number }) => Node = (row) => Button({ variant: 'outline' });`,
+      `void good; void bad; void cell;`,
     ].join('\n')
   );
 

@@ -108,6 +108,9 @@ for (const c of CASES) {
   ok(!/export default defineComponent\(/.test(out), `[${c.name}] the plain default is gone`);
   const propsType = c.hasSetup ? 'Parameters<typeof setup>[0]' : 'Record<string, unknown>';
   ok(out.includes(`(props: ${propsType},`), `[${c.name}] props type is ${propsType}`);
+  // A component instance always returns its DOM — the runtime's own `Component` says so. `unknown`
+  // here cost every imperative call site a cast, which is most of the composition surface.
+  ok(out.includes(`slots?: Record<string, () => Node>) => Node;`), `[${c.name}] returns Node, and slots are () => Node`);
   // Everything before the default export must survive untouched (render body, imports, setup).
   ok(
     out.startsWith(code.slice(0, code.lastIndexOf('export default '))),

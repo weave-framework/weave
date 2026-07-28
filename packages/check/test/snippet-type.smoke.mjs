@@ -80,5 +80,33 @@ if (diags.length) for (const d of diags) console.log(`      · ${d.message}`);
   ok(caught, `a typed @snippet param checks its body (n: number → n.toUpperCase() errors) — got ${typed.length} diag(s)`);
 }
 
+// A4 — a component instance IS a Node. `weave check` synthesizes the default export a component
+// module gets at build time, and it used to type that `=> unknown`. So calling a child imperatively
+// — the shape every <Table> cell, <Expansion> body and Node-taking API needs — forced a cast at each
+// call site. Assert the call assigns to a `Node` with none.
+{
+  const d3 = mkdtempSync(join(tmpdir(), 'weave-node-return-'));
+  mkdirSync(join(d3, 'app'), { recursive: true });
+  writeFileSync(
+    join(d3, 'app', 'leaf.ts'),
+    `export function setup(props: { label: string }): { label: string } { return { label: props.label }; }\n`
+  );
+  writeFileSync(join(d3, 'app', 'leaf.html'), `<span>{{ label }}</span>\n`);
+  writeFileSync(
+    join(d3, 'app', 'host.ts'),
+    `import Leaf from './leaf';\n` +
+      // No cast anywhere on this line — that is the whole point.
+      `const cell: (row: { id: number }) => Node = (row) => Leaf({ label: String(row.id) });\n` +
+      `export function setup(): { cell: (row: { id: number }) => Node } { return { cell }; }\n`
+  );
+  writeFileSync(join(d3, 'app', 'host.html'), `<div>{{ '' }}</div>\n`);
+  const nodeDiags = checkProject([d3]);
+  rmSync(d3, { recursive: true, force: true });
+  ok(
+    nodeDiags.length === 0,
+    `a component call assigns to a Node with no cast (got ${nodeDiags.length}${nodeDiags.length ? ': ' + nodeDiags.map((d) => d.message).join('; ') : ''})`
+  );
+}
+
 console.log(failures ? `\n✖ ${failures} check failure(s)` : '\n✔ snippet-type smoke passed');
 process.exit(failures ? 1 : 0);

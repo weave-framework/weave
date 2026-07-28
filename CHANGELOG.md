@@ -322,6 +322,15 @@
   copying an undeclared project directory into `dist/` would have shipped `src/`, `node_modules/`, the
   config and any `.env`. `weave dev` still serves the config directory by default, unchanged.
 
+### Fixed — types
+- **A component's synthesized default export is typed `=> Node`, not `=> unknown`.** The runtime has
+  always said so — `Component = (props?, slots?) => Node`; an instance returns its DOM — but both
+  places that synthesize the declaration (`weave check` / the editor plugin, and the built
+  `@weave-framework/ui` `.d.ts`) said `unknown`. Every imperative call site therefore needed a cast,
+  which is most of the composition surface: a `<Table>` column's `cell: (row) => Node | string`, an
+  `<Expansion>` panel body, any API taking a `Node`. Slots narrow the same way (`() => Node`). Pure
+  narrowing — no runtime change.
+
 ### Fixed — build tooling
 - **The `@weave-framework/ui` publish build no longer breaks on a component that declares `propDefaults`
   or `extend`.** The step that gives each built component a props-typed default export *reconstructed*

@@ -510,7 +510,10 @@ function assemble(
   const baseProps: string = hasSetup ? '__WeavePropsOf<typeof setup>' : 'Record<string, never>';
   const propsType: string =
     script && HAS_PROP_DEFAULTS.test(script) ? `__WeaveWithDefaults<${baseProps}, typeof propDefaults>` : baseProps;
-  out.push(`declare const __weaveDefault: (props: ${propsType}, slots?: Record<string, () => unknown>) => unknown;`);
+  // `=> Node`, matching the runtime's `Component` type: an instance always returns its DOM. With
+  // `unknown` here, calling a component imperatively — a `<Table>` cell, an `<Expansion>` body,
+  // anything typed `(…) => Node` — needed a cast at every call site.
+  out.push(`declare const __weaveDefault: (props: ${propsType}, slots?: Record<string, () => Node>) => Node;`);
   out.push('export default __weaveDefault;'); // also forces module scope
 
   // Char-precise mappings. The script is embedded verbatim at the very top, so it
