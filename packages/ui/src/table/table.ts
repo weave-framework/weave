@@ -12,8 +12,8 @@
  * indeterminate, accentSoft tint + 2px accent left border) via the CDK `SelectionModel`,
  * expandable detail rows, sticky header + sticky columns (`sticky:'start'|'end'`, offsets from
  * column widths), per-column show/hide (`hidden`), an optional second header row for per-column
- * filters (`headerRow`), and an optional `maxHeight` (the body scrolls vertically inside while the
- * header stays). Virtual body is the noted follow-on.
+ * filters (`headerRow`), an optional `maxHeight` (the body scrolls vertically inside while the
+ * header stays), and an optional **virtual body** (`virtual`) that renders only the rows in view.
  *
  *   import Table from '@weave-framework/ui/table';
  *   import Checkbox from '@weave-framework/ui/checkbox';   // optional — the build auto-resolves the composed <Checkbox>
@@ -26,10 +26,13 @@ import {
   draggable,
   activeDirection,
   resizeSignal,
+  virtualScroll,
   type SelectionModel,
   type DataSource,
   type DraggableRef,
   type Size,
+  type VirtualScroller,
+  type RenderedRange,
 } from '../cdk/index.js';
 
 export type SortDirection = 'asc' | 'desc';
@@ -107,6 +110,23 @@ export interface TableProps<T = Record<string, unknown>> {
   /** Cap the body height (number → px) — the body scrolls vertically, header stays. */
   maxHeight?: number | string;
 
+  /**
+   * Render only the rows in view (plus overscan) instead of the whole page. First render of a large
+   * page is the cost this removes: it is linear in cells (~15 µs each — 1000×20 measured at 482 ms
+   * of build, 851 ms laid out), and a viewport's worth is 20–40 rows however long the data is.
+   * Re-sorting is already cheap without it, because `trackBy` moves existing DOM.
+   *
+   * Requires `maxHeight` (there is no viewport to window without one) and a UNIFORM row height —
+   * the fixed-size strategy maps scroll position to an index arithmetically. `expandable` is
+   * therefore not compatible: a detail row of unknown height breaks that mapping. Both are
+   * reported at setup rather than left to drift.
+   */
+  virtual?: boolean;
+  /** Row height in px for {@link virtual} — must match what a row actually renders at. Default 34. */
+  rowHeight?: number;
+  /** Rows rendered above and below the viewport in {@link virtual} mode. Default 6. */
+  overscan?: number;
+
   /** Make every column resizable (per-column `resizable` overrides this). */
   resizableColumns?: boolean;
   /** Controlled column widths (px), keyed by column key — wins over internal + `column.width`. */
@@ -125,6 +145,8 @@ const SELECT_W: number = 44;
 const DEFAULT_STICKY_W: number = 120;
 const DEFAULT_MIN_W: number = 48;
 const RESIZE_STEP: number = 16; // keyboard resize increment (px)
+const DEFAULT_ROW_H: number = 34; // the compact row height the design ships (--weave-table-row-height)
+const DEFAULT_OVERSCAN: number = 6; // rows kept rendered above + below the viewport
 
 /** A layout slot (synthetic or data column) for sticky-offset computation. */
 interface Slot {
@@ -143,12 +165,14 @@ interface CellView {
 }
 
 // Two rows in `<thead>` when `headerRow` is given — the second pins under the first, at an offset
-// only JS can know (`secondaryStyle`). (Comments cannot live INSIDE the concatenation: the loader's
-// extractor requires the template to be string literals joined by `+`, nothing else.)
+// only JS can know (`secondaryStyle`). In `<tbody>`, a virtual body brackets the rendered window
+// with two spacer rows, so the native scrollbar stays honest without the skipped rows existing.
+// (Comments cannot live INSIDE the concatenation: the loader's extractor requires the template to
+// be string literals joined by `+`, nothing else.)
 export const template: string =
   '<div class={{ rootClass() }} ref={{ host }}>' +
-  '<div class="weave-table__scroll" style={{ scrollStyle() }}>' +
-  '<table class="weave-table__grid" aria-label={{ ariaLabel() }}>' +
+  '<div class="weave-table__scroll" style={{ scrollStyle() }} ref={{ scrollEl }}>' +
+  '<table class="weave-table__grid" aria-label={{ ariaLabel() }} aria-rowcount={{ ariaRowCount() }}>' +
   '<thead class="weave-table__header"><tr class="weave-table__header-row" ref={{ headEl }}>' +
   '@if (expandable()) {<th class="weave-table__header-cell weave-table__expand weave-table__cell--sticky-start" style={{ expandStyle() }}></th>}' +
   '@if (selectable()) {<th class="weave-table__header-cell weave-table__select weave-table__cell--sticky-start" style={{ selectStyle() }}>' +
@@ -174,8 +198,9 @@ export const template: string =
   '</tr>}' +
   '</thead>' +
   '<tbody class="weave-table__body">' +
-  '@for (row of rows(); track rowKey(row)) {' +
-  '<tr class={{ rowClass(row) }} aria-selected={{ ariaSelected(row) }}>' +
+  '@if (topSpacer()) {<tr class="weave-table__spacer" aria-hidden="true"><td colspan={{ colSpan() }} style={{ spacerStyle(topSpacer()) }}></td></tr>}' +
+  '@for (row of visibleRows(); track rowKey(row)) {' +
+  '<tr class={{ rowClass(row) }} aria-selected={{ ariaSelected(row) }} aria-rowindex={{ ariaRowIndex(row) }} style={{ rowStyle() }}>' +
   '@if (expandable()) {<td class="weave-table__cell weave-table__expand weave-table__cell--sticky-start" style={{ expandStyle() }}>' +
   '<button type="button" class="weave-table__expand-toggle" aria-label="Toggle row details"' +
   ' aria-expanded={{ ariaExpanded(row) }} on:click={{ () => toggleExpand(row) }}>' +
@@ -187,12 +212,22 @@ export const template: string =
   '</tr>' +
   '@if (rowExpanded(row)) {<tr class="weave-table__detail"><td class="weave-table__detail-cell" colspan={{ colSpan() }}>@render (detailNode(row))</td></tr>}' +
   '}' +
+  '@if (bottomSpacer()) {<tr class="weave-table__spacer" aria-hidden="true"><td colspan={{ colSpan() }} style={{ spacerStyle(bottomSpacer()) }}></td></tr>}' +
   '@if (isEmpty()) {<tr><td class="weave-table__empty" colspan={{ colSpan() }}>{{ emptyText() }}</td></tr>}' +
   '</tbody></table></div></div>';
 
 export interface TableContext<T> {
   host: Signal<HTMLElement | null>;
   headEl: Signal<HTMLElement | null>;
+  scrollEl: Signal<HTMLElement | null>;
+  /** The rows actually rendered — every row, or the virtual window. */
+  visibleRows: () => T[];
+  topSpacer: () => number;
+  bottomSpacer: () => number;
+  spacerStyle: (height: number) => string;
+  rowStyle: () => string;
+  ariaRowCount: () => string | undefined;
+  ariaRowIndex: (row: T) => string | undefined;
   hasHeaderRow: () => boolean;
   headerRowNode: (col: TableColumn<T>) => Node;
   headerRowClass: (col: TableColumn<T>) => string;
@@ -242,6 +277,7 @@ export interface TableContext<T> {
 export function setup<T = Record<string, unknown>>(props: TableProps<T>): TableContext<T> {
   const host: Signal<HTMLElement | null> = signal<HTMLElement | null>(null);
   const headEl: Signal<HTMLElement | null> = signal<HTMLElement | null>(null);
+  const scrollEl: Signal<HTMLElement | null> = signal<HTMLElement | null>(null);
 
   /* ── data source + client sort ── */
   const rowsView: Computed<T[]> = isDataSource<T>(props.dataSource)
@@ -273,6 +309,36 @@ export function setup<T = Record<string, unknown>>(props: TableProps<T>): TableC
     const cmp: (a: T, b: T) => number =
       col.compare ?? ((a, b) => cmpValues((a as Record<string, unknown>)[col.key], (b as Record<string, unknown>)[col.key]));
     return [...base].sort((a, b) => cmp(a, b) * dir);
+  };
+
+  /* ── virtual body (fixed-size, on the CDK engine) ── */
+  // Reported at setup, not left to drift: without a `maxHeight` the scroll box grows to fit and
+  // there is no viewport to window; with `expandable` a detail row of unknown height breaks the
+  // arithmetic that maps scroll position to a row index, which would show the WRONG rows rather
+  // than merely a wrong scrollbar.
+  if (props.virtual && props.maxHeight == null) {
+    throw new Error('weave Table: `virtual` needs `maxHeight` — without one the body has no viewport to window.');
+  }
+  if (props.virtual && props.expandable) {
+    throw new Error(
+      'weave Table: `virtual` and `expandable` are not compatible — the fixed-size window maps scroll ' +
+        'position to a row index, and a detail row of unknown height breaks that mapping. Render the ' +
+        'detail in a dialog or a side panel, or drop `virtual`.'
+    );
+  }
+  const rowHeight: number = props.rowHeight ?? DEFAULT_ROW_H;
+  const scroller: VirtualScroller | null = props.virtual
+    ? virtualScroll({
+        itemSize: rowHeight,
+        total: (): number => rows().length,
+        viewport: (): HTMLElement | null => scrollEl(),
+        buffer: props.overscan ?? DEFAULT_OVERSCAN,
+      })
+    : null;
+  const visibleRows = (): T[] => {
+    if (!scroller) return rows();
+    const { start, end }: RenderedRange = scroller.renderedRange();
+    return rows().slice(start, end);
   };
 
   const cycleSort = (key: string): void => {
@@ -441,7 +507,23 @@ export function setup<T = Record<string, unknown>>(props: TableProps<T>): TableC
   return {
     host,
     headEl,
-
+    scrollEl,
+    visibleRows,
+    topSpacer: (): number => (scroller ? Math.round(scroller.scrollOffset()) : 0),
+    bottomSpacer: (): number => (scroller ? Math.max(0, Math.round(scroller.endOffset())) : 0),
+    spacerStyle: (height: number): string => `height:${height}px;padding:0;box-shadow:none`,
+    // A virtual row must render at exactly `rowHeight`, since that is what the window arithmetic
+    // assumes. Outside virtual mode the row keeps its natural height.
+    rowStyle: (): string => (scroller ? `height:${rowHeight}px` : ''),
+    // Only a windowed grid needs these: a reader sees a handful of rows and has to be told how
+    // many there really are, and which one each rendered row is. `aria-rowcount` counts the header
+    // row too, and `aria-rowindex` is 1-based with the header at 1.
+    ariaRowCount: (): string | undefined => (scroller ? String(rows().length + 1) : undefined),
+    ariaRowIndex: (row: T): string | undefined => {
+      if (!scroller) return undefined;
+      const i: number = rows().indexOf(row);
+      return i < 0 ? undefined : String(i + 2);
+    },
     hasHeaderRow,
     headerRowNode: (col: TableColumn<T>): Node => asNode(props.headerRow?.(col) ?? ''),
     headerRowClass: (col: TableColumn<T>): string => {

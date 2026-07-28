@@ -508,3 +508,120 @@ test('table: no headerRow prop → no second row at all', async () => {
   m.dispose();
 });
 
+/* ── virtual body ── */
+const frame = (): Promise<void> => new Promise<void>((r) => setTimeout(r, 60));
+
+test('table: virtual renders a window of rows, not the whole page', async () => {
+  // First render of a large page is the cost this removes — linear in cells, ~15 µs each. A
+  // viewport's worth is 20-40 rows however long the data is.
+  const N: number = 1000;
+  const data: Row[] = Array.from({ length: N }, (_, i) => ({ id: i + 1, name: `Row ${i + 1}`, age: i }));
+  const m: Mounted = await mount({
+    columns: COLS,
+    dataSource: data,
+    trackBy: (r: Row): number => r.id,
+    maxHeight: 340,
+    virtual: true,
+    rowHeight: 34,
+  } as TableProps<Row>);
+  await frame(); // the viewport height arrives through a ResizeObserver
+
+  const rendered: HTMLTableRowElement[] = bodyRows(m);
+  assert.ok(rendered.length > 0 && rendered.length < 60, `a window, not the page (rendered ${rendered.length} of ${N})`);
+  assert.equal(dataCellText(rendered[0])[0], 'Row 1', 'the window starts at the top');
+
+  // The scrollbar must still describe the WHOLE list: spacer rows carry the missing height.
+  const scroll: HTMLElement = m.host.querySelector('.weave-table__scroll') as HTMLElement;
+  const spacers: HTMLElement[] = Array.from(m.host.querySelectorAll<HTMLElement>('.weave-table__spacer td'));
+  const spacerPx: number = spacers.reduce((sum, td) => sum + parseInt(td.style.height || '0', 10), 0);
+  assert.equal(spacerPx + rendered.length * 34, N * 34, 'rendered rows + spacers account for every row');
+  assert.ok(scroll.scrollHeight > N * 30, `the scrollbar spans the full list (scrollHeight ${scroll.scrollHeight})`);
+
+  // A windowed grid must tell a screen reader how many rows there really are, and which is which.
+  const table: HTMLElement = m.host.querySelector('table') as HTMLElement;
+  assert.equal(table.getAttribute('aria-rowcount'), String(N + 1), 'aria-rowcount counts the whole list');
+  assert.equal(rendered[0].getAttribute('aria-rowindex'), '2', 'first data row is index 2 (the header is 1)');
+  m.dispose();
+});
+
+test('table: scrolling a virtual body shows the rows at that offset', async () => {
+  // The assertion that matters: not "fewer rows exist" but "the RIGHT rows do". A window that
+  // renders 30 rows of the wrong slice passes every count-based check.
+  const N: number = 1000;
+  const data: Row[] = Array.from({ length: N }, (_, i) => ({ id: i + 1, name: `Row ${i + 1}`, age: i }));
+  const m: Mounted = await mount({
+    columns: COLS,
+    dataSource: data,
+    trackBy: (r: Row): number => r.id,
+    maxHeight: 340,
+    virtual: true,
+    rowHeight: 34,
+  } as TableProps<Row>);
+  await frame();
+
+  const scroll: HTMLElement = m.host.querySelector('.weave-table__scroll') as HTMLElement;
+  // The library stylesheet is not loaded in this harness, and it is what makes the box scrollable
+  // (`.weave-table__scroll { overflow: auto }`). Without it `scrollTop` is a no-op.
+  scroll.style.overflow = 'auto';
+  scroll.scrollTop = 34 * 500; // row 501 to the top
+  scroll.dispatchEvent(new Event('scroll'));
+  await frame();
+
+  const names: string[] = bodyRows(m).map((r) => dataCellText(r)[0]);
+  assert.ok(names.includes('Row 501'), `the row at that offset is rendered (got ${names[0]} … ${names.at(-1)})`);
+  assert.ok(!names.includes('Row 1'), 'and the top of the list is no longer in the DOM');
+  const top: number = parseInt((m.host.querySelector('.weave-table__spacer td') as HTMLElement).style.height, 10);
+  assert.equal(top, (Number(names[0].slice(4)) - 1) * 34, 'the top spacer equals the skipped rows exactly');
+  assert.equal(bodyRows(m)[0].getAttribute('aria-rowindex'), String(Number(names[0].slice(4)) + 1), 'aria-rowindex tracks the window');
+  m.dispose();
+});
+
+test('table: virtual selection still spans the whole data set, not the window', async () => {
+  // Select-all, the empty state and the indeterminate mark read the FULL row set; only the `@for`
+  // is windowed. Getting this wrong would silently select "all 30 visible rows".
+  const N: number = 500;
+  const data: Row[] = Array.from({ length: N }, (_, i) => ({ id: i + 1, name: `Row ${i + 1}`, age: i }));
+  const selected: Row[][] = [];
+  const m: Mounted = await mount({
+    columns: COLS,
+    dataSource: data,
+    trackBy: (r: Row): number => r.id,
+    maxHeight: 340,
+    virtual: true,
+    selectable: true,
+    onSelectionChange: (s: Row[]): number => selected.push(s),
+  } as unknown as TableProps<Row>);
+  await frame();
+  const all: HTMLInputElement = m.host.querySelector('thead .weave-checkbox__input') as HTMLInputElement;
+  all.click();
+  assert.equal(selected.at(-1)?.length, N, `select-all covers all ${N} rows, not the rendered window`);
+  m.dispose();
+});
+
+test('table: virtual reports the two configurations it cannot honour', async () => {
+  // Both would show the WRONG rows rather than merely look wrong, so they are refused at setup.
+  let noHeight: unknown = null;
+  try {
+    await mount({ columns: COLS, dataSource: ROWS, virtual: true } as TableProps<Row>);
+  } catch (e) {
+    noHeight = e;
+  }
+  assert.ok(String(noHeight).includes('maxHeight'), `virtual without maxHeight is reported (got: ${String(noHeight)})`);
+
+  let withExpand: unknown = null;
+  try {
+    await mount({ columns: COLS, dataSource: ROWS, virtual: true, maxHeight: 200, expandable: true } as TableProps<Row>);
+  } catch (e) {
+    withExpand = e;
+  }
+  assert.ok(String(withExpand).includes('expandable'), `virtual + expandable is reported (got: ${String(withExpand)})`);
+});
+
+test('table: without virtual every row is rendered and no aria-rowcount is invented', async () => {
+  const data: Row[] = Array.from({ length: 120 }, (_, i) => ({ id: i + 1, name: `Row ${i + 1}`, age: i }));
+  const m: Mounted = await mount({ columns: COLS, dataSource: data, trackBy: (r: Row): number => r.id });
+  assert.equal(bodyRows(m).length, 120, 'the default is unchanged — every row');
+  assert.equal(m.host.querySelectorAll('.weave-table__spacer').length, 0, 'no spacer rows');
+  assert.equal((m.host.querySelector('table') as HTMLElement).hasAttribute('aria-rowcount'), false, 'no aria-rowcount');
+  m.dispose();
+});

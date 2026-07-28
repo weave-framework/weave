@@ -286,6 +286,18 @@
   only lines up while *every* column has an explicit width, and drifts the moment one auto-sizes —
   so there was no version of this a consumer could build from outside.
 
+- **`<Table virtual>` — a virtual body.** Renders only the rows in view plus overscan, on the CDK's
+  existing `virtualScroll` engine, with spacer rows keeping the native scrollbar honest. First
+  render of a large page is what this removes: the cost is linear in cells (~15 µs each — a
+  1000×20 grid measured at 482 ms of build, 851 ms laid out), while a viewport holds 20–40 rows
+  however long the data is. Re-sorting was already cheap, because `trackBy` moves existing DOM.
+
+  It needs `maxHeight` and a uniform row height (`rowHeight`, default 34); `overscan` defaults to 6.
+  `expandable` is refused in combination, and so is a missing `maxHeight` — both would leave the
+  window showing the *wrong* rows rather than merely looking wrong, so they are reported at setup.
+  Selection, select-all and the empty state still read the whole data set; the table carries
+  `aria-rowcount` and each row its true `aria-rowindex`, so a reader is told what it cannot see.
+
 ### Fixed — reactivity
 - **A signal written during an effect no longer drains the queue on top of that effect.** `flush()`
   guarded only on `batchDepth`, so a write that happened *while* the queue was draining started a

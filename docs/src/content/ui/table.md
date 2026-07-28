@@ -108,6 +108,23 @@ tri-state select-all — click it to select or clear every row. `onSelectionChan
   body scrolls. It belongs inside `<thead>` for a concrete reason: a filter row rendered as a sibling above
   the table only lines up while *every* column has an explicit width — the moment one auto-sizes, the two
   drift apart.
+- **Virtual body** — `virtual` renders only the rows in view (plus overscan) instead of the whole page:
+
+  ~~~html
+  <Table columns={{ cols }} dataSource={{ rows }}
+         maxHeight={{ 480 }} virtual rowHeight={{ 34 }} />
+  ~~~
+
+  First render of a large page is what this removes — the cost is linear in cells, so a thousand rows of
+  twenty columns is ~21 000 cells and hundreds of milliseconds, while a viewport holds 20–40 rows however
+  long the data is. (Re-sorting is already cheap without it: `trackBy` moves the existing DOM.)
+
+  It needs `maxHeight` — without one the box grows to fit and there is no viewport to window — and a
+  **uniform row height**: the fixed-size strategy maps scroll position to a row index arithmetically, so
+  `rowHeight` must match what a row actually renders at. For the same reason `expandable` is not compatible,
+  and the combination is reported rather than left to drift. Selection, select-all and the empty state still
+  read the whole data set; only the rendered rows are windowed, and the table carries `aria-rowcount` with
+  each row's true `aria-rowindex` so a screen reader is told what it cannot see.
 
 ## Accessibility
 
@@ -135,6 +152,9 @@ tri-state checkbox. Name the table with `ariaLabel`.
 | `expandable` / `detail` | `boolean` / `(row: T) => Node \| string` | — | Expandable detail rows. |
 | `headerRow` | `(col: TableColumn<T>) => Node \| null` | — | A second `<thead>` row under the headers — the per-column filter slot. |
 | `maxHeight` | `number \| string` | — | Cap the body height (it scrolls; header stays). |
+| `virtual` | `boolean` | `false` | Render only the rows in view. Needs `maxHeight` + a uniform row height; not compatible with `expandable`. |
+| `rowHeight` | `number` | `34` | Row height (px) the virtual window assumes — must match what a row renders at. |
+| `overscan` | `number` | `6` | Rows kept rendered above and below the viewport in `virtual` mode. |
 | `resizableColumns` | `boolean` | `false` | Make every column resizable. |
 | `columnWidths` | `Record<string, number>` | — | Controlled column widths (px), keyed by column key. |
 | `onColumnResize` | `(event: ColumnResize) => void` | — | Called after a resize with `{ key, width }`. |
