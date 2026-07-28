@@ -507,6 +507,7 @@
     "--weave-table-duration",
     "--weave-table-empty-text",
     "--weave-table-expand-size",
+    "--weave-table-filter-padding-y",
     "--weave-table-font-size",
     "--weave-table-header-active",
     "--weave-table-header-size",

@@ -43,6 +43,32 @@
     box-shadow: 0 1px 0 var(--weave-table-line); // hairline under the header
   }
 
+  // Second header row (per-column filters). Sticks UNDER the header row — its `top` is written
+  // inline from the measured header height, because CSS cannot know it (a header wraps, carries a
+  // sort button, gets resized). Same width/alignment/sticky treatment as the header cell above it,
+  // and it carries the hairline instead, so the header's own shadow does not cut between the two.
+  .weave-table__header-filter-cell {
+    position: sticky;
+    z-index: 2;
+    box-sizing: border-box;
+    padding: var(--weave-table-filter-padding-y) var(--weave-table-cell-padding-x);
+    background: var(--weave-table-surface);
+    text-align: start;
+    white-space: nowrap;
+    box-shadow: 0 1px 0 var(--weave-table-line);
+  }
+
+  // With a second row present the hairline belongs under the PAIR, not between them.
+  .weave-table__header-row--secondary ~ .weave-table__header-row,
+  .weave-table__header:has(.weave-table__header-row--secondary) .weave-table__header-cell {
+    box-shadow: none;
+  }
+
+  .weave-table__header-filter-cell.weave-table__cell--sticky-start,
+  .weave-table__header-filter-cell.weave-table__cell--sticky-end {
+    z-index: 3;
+  }
+
   .weave-table__sort {
     display: inline-flex;
     align-items: center;

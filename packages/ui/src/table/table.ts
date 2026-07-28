@@ -11,15 +11,26 @@
  * sort for array sources), row selection (composed `<Checkbox>` column, select-all +
  * indeterminate, accentSoft tint + 2px accent left border) via the CDK `SelectionModel`,
  * expandable detail rows, sticky header + sticky columns (`sticky:'start'|'end'`, offsets from
- * column widths), per-column show/hide (`hidden`), and an optional `maxHeight` (the body
- * scrolls vertically inside while the header stays). Virtual body is the noted follow-on.
+ * column widths), per-column show/hide (`hidden`), an optional second header row for per-column
+ * filters (`headerRow`), and an optional `maxHeight` (the body scrolls vertically inside while the
+ * header stays). Virtual body is the noted follow-on.
  *
  *   import Table from '@weave-framework/ui/table';
  *   import Checkbox from '@weave-framework/ui/checkbox';   // optional — the build auto-resolves the composed <Checkbox>
  *   <Table columns={{ cols }} dataSource={{ rows }} selectable expandable />
  */
 import { signal, effect, onMount, type Signal, type Computed } from '@weave-framework/runtime';
-import { selectionModel, isDataSource, draggable, activeDirection, type SelectionModel, type DataSource, type DraggableRef } from '../cdk/index.js';
+import {
+  selectionModel,
+  isDataSource,
+  draggable,
+  activeDirection,
+  resizeSignal,
+  type SelectionModel,
+  type DataSource,
+  type DraggableRef,
+  type Size,
+} from '../cdk/index.js';
 
 export type SortDirection = 'asc' | 'desc';
 
@@ -81,6 +92,18 @@ export interface TableProps<T = Record<string, unknown>> {
   expandable?: boolean;
   detail?: (row: T) => Node | string;
 
+  /**
+   * A second header row, rendered inside `<thead>` directly under the column headers — the slot a
+   * per-column filter belongs in. Called once per visible column; return `null` for a column that
+   * gets no control.
+   *
+   * It has to live here rather than above the table, because a row rendered outside `<thead>` only
+   * lines up when EVERY column has an explicit width — the moment a column auto-sizes, the two
+   * drift apart. Each cell inherits its header's width, alignment and sticky treatment, and sticks
+   * under the header when the body scrolls. The synthetic expand/select columns get empty cells.
+   */
+  headerRow?: (col: TableColumn<T>) => Node | null;
+
   /** Cap the body height (number → px) — the body scrolls vertically, header stays. */
   maxHeight?: number | string;
 
@@ -119,11 +142,14 @@ interface CellView {
   node: Node;
 }
 
+// Two rows in `<thead>` when `headerRow` is given — the second pins under the first, at an offset
+// only JS can know (`secondaryStyle`). (Comments cannot live INSIDE the concatenation: the loader's
+// extractor requires the template to be string literals joined by `+`, nothing else.)
 export const template: string =
   '<div class={{ rootClass() }} ref={{ host }}>' +
   '<div class="weave-table__scroll" style={{ scrollStyle() }}>' +
   '<table class="weave-table__grid" aria-label={{ ariaLabel() }}>' +
-  '<thead class="weave-table__header"><tr class="weave-table__header-row">' +
+  '<thead class="weave-table__header"><tr class="weave-table__header-row" ref={{ headEl }}>' +
   '@if (expandable()) {<th class="weave-table__header-cell weave-table__expand weave-table__cell--sticky-start" style={{ expandStyle() }}></th>}' +
   '@if (selectable()) {<th class="weave-table__header-cell weave-table__select weave-table__cell--sticky-start" style={{ selectStyle() }}>' +
   '@if (showSelectAll()) {<Checkbox checked={{ allChecked() }} indeterminate={{ someChecked() }} onChange={{ onSelectAll }} label="Select all rows" />}' +
@@ -139,7 +165,14 @@ export const template: string =
   ' aria-valuenow={{ gripValueNow(col) }} aria-valuemin={{ gripValueMin(col) }}' +
   ' on:keydown={{ (e) => onGripKeydown(col.key, e) }}></span>}' +
   '</th>}' +
-  '</tr></thead>' +
+  '</tr>' +
+  '@if (hasHeaderRow()) {<tr class="weave-table__header-row weave-table__header-row--secondary">' +
+  '@if (expandable()) {<td class="weave-table__header-filter-cell weave-table__expand weave-table__cell--sticky-start" style={{ secondaryStyle(expandStyle()) }}></td>}' +
+  '@if (selectable()) {<td class="weave-table__header-filter-cell weave-table__select weave-table__cell--sticky-start" style={{ secondaryStyle(selectStyle()) }}></td>}' +
+  '@for (col of dataCols(); track col.key) {' +
+  '<td class={{ headerRowClass(col) }} style={{ secondaryStyle(headStyle(col)) }}>@render (headerRowNode(col))</td>}' +
+  '</tr>}' +
+  '</thead>' +
   '<tbody class="weave-table__body">' +
   '@for (row of rows(); track rowKey(row)) {' +
   '<tr class={{ rowClass(row) }} aria-selected={{ ariaSelected(row) }}>' +
@@ -159,6 +192,12 @@ export const template: string =
 
 export interface TableContext<T> {
   host: Signal<HTMLElement | null>;
+  headEl: Signal<HTMLElement | null>;
+  hasHeaderRow: () => boolean;
+  headerRowNode: (col: TableColumn<T>) => Node;
+  headerRowClass: (col: TableColumn<T>) => string;
+  /** Append the secondary row's sticky offset (the measured header height) to a cell's style. */
+  secondaryStyle: (base: string) => string;
   rootClass: () => string;
   scrollStyle: () => string;
   ariaLabel: () => string | undefined;
@@ -202,6 +241,7 @@ export interface TableContext<T> {
 
 export function setup<T = Record<string, unknown>>(props: TableProps<T>): TableContext<T> {
   const host: Signal<HTMLElement | null> = signal<HTMLElement | null>(null);
+  const headEl: Signal<HTMLElement | null> = signal<HTMLElement | null>(null);
 
   /* ── data source + client sort ── */
   const rowsView: Computed<T[]> = isDataSource<T>(props.dataSource)
@@ -373,6 +413,21 @@ export function setup<T = Record<string, unknown>>(props: TableProps<T>): TableC
 
   const asNode = (content: Node | string): Node => (typeof content === 'string' ? document.createTextNode(content) : content);
 
+  /* ── secondary header row (per-column filters) ── */
+  // Both header rows are `position: sticky`. The first pins at 0; the second has to pin at the
+  // first one's height, which CSS cannot express — a header can wrap, carry a sort button, or be
+  // resized. So measure it (ResizeObserver-backed, so it re-pins when the header changes height)
+  // and write the offset inline. Before the ref lands the offset is 0, which is only ever wrong
+  // for the frame before the observer reports.
+  const hasHeaderRow = (): boolean => props.headerRow !== undefined;
+  let headSize: (() => Size) | null = null;
+  const headerHeight = (): number => {
+    const el: HTMLElement | null = headEl();
+    if (!el) return 0;
+    if (!headSize) headSize = resizeSignal(el);
+    return Math.round(headSize().height);
+  };
+
   const cellClassOf = (col: TableColumn<T>): string => {
     const parts: string[] = ['weave-table__cell'];
     if (col.numeric) parts.push('weave-table__cell--numeric');
@@ -385,6 +440,16 @@ export function setup<T = Record<string, unknown>>(props: TableProps<T>): TableC
 
   return {
     host,
+    headEl,
+
+    hasHeaderRow,
+    headerRowNode: (col: TableColumn<T>): Node => asNode(props.headerRow?.(col) ?? ''),
+    headerRowClass: (col: TableColumn<T>): string => {
+      const parts: string[] = ['weave-table__header-filter-cell'];
+      if (col.sticky) parts.push(`weave-table__cell--sticky-${col.sticky}`);
+      return parts.join(' ');
+    },
+    secondaryStyle: (base: string): string => joinStyle(base, `top:${headerHeight()}px`),
     rootClass: (): string => {
       const parts: string[] = ['weave-table'];
       if (selectable()) parts.push('weave-table--selectable');

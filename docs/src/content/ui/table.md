@@ -96,6 +96,18 @@ tri-state select-all — click it to select or clear every row. `onSelectionChan
   `onColumnResize` reports the new width. The grip is a focusable `role="separator"`, so **Arrow Left / Right**
   resize from the keyboard too. Pass `columnWidths` to control the widths yourself.
 - **`maxHeight`** — cap the body height and it scrolls vertically while the header stays put.
+- **Per-column filters** — `headerRow={{ (col) => … }}` renders a **second row inside `<thead>`**, directly
+  under the column headers, one cell per visible column (return `null` for a column that gets no control):
+
+  ~~~html
+  <Table columns={{ cols }} dataSource={{ rows }}
+         headerRow={{ (col) => filterInputFor(col) }} />
+  ~~~
+
+  Each cell inherits its header's width, alignment and sticky treatment, and pins under the header when the
+  body scrolls. It belongs inside `<thead>` for a concrete reason: a filter row rendered as a sibling above
+  the table only lines up while *every* column has an explicit width — the moment one auto-sizes, the two
+  drift apart.
 
 ## Accessibility
 
@@ -121,6 +133,7 @@ tri-state checkbox. Name the table with `ariaLabel`.
 | `onSelectionChange` | `(selected: T[]) => void` | — | Called with the selected rows. |
 | `compareWith` | `(a: T, b: T) => boolean` | `===` | Identity comparator for selection + expansion. |
 | `expandable` / `detail` | `boolean` / `(row: T) => Node \| string` | — | Expandable detail rows. |
+| `headerRow` | `(col: TableColumn<T>) => Node \| null` | — | A second `<thead>` row under the headers — the per-column filter slot. |
 | `maxHeight` | `number \| string` | — | Cap the body height (it scrolls; header stays). |
 | `resizableColumns` | `boolean` | `false` | Make every column resizable. |
 | `columnWidths` | `Record<string, number>` | — | Controlled column widths (px), keyed by column key. |

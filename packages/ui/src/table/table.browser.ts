@@ -436,3 +436,75 @@ test('table: a column change on a large selectable grid rerenders every row (no 
   assert.equal(missingCheckbox, 0, `${missingCheckbox} of ${N} rows lost their composed <Checkbox>`);
   m.dispose();
 });
+
+/* ── second header row (per-column filters) ── */
+test('table: headerRow renders a second <thead> row aligned to the columns', async () => {
+  // A per-column filter has to live INSIDE <thead>: rendered as a sibling above the table it only
+  // lines up when every column has an explicit width, and drifts the moment one auto-sizes.
+  const cols: TableColumn<Row>[] = [
+    { key: 'name', header: 'Name' },
+    { key: 'age', header: 'Age', numeric: true, width: 90 },
+  ];
+  const m: Mounted = await mount({
+    columns: cols,
+    dataSource: ROWS,
+    headerRow: (col: TableColumn<Row>): Node | null => {
+      if (col.key === 'age') return null; // a column may opt out
+      const input: HTMLInputElement = document.createElement('input');
+      input.className = 'filter';
+      input.setAttribute('data-col', col.key);
+      return input;
+    },
+  } as TableProps<Row>);
+
+  const thead: HTMLElement = m.host.querySelector('thead') as HTMLElement;
+  const rows: HTMLTableRowElement[] = Array.from(thead.querySelectorAll('tr'));
+  assert.equal(rows.length, 2, 'two rows in <thead>');
+  assert.ok(rows[1].classList.contains('weave-table__header-row--secondary'), 'the filter row is the second one');
+
+  const cells: HTMLElement[] = Array.from(rows[1].querySelectorAll<HTMLElement>('.weave-table__header-filter-cell'));
+  assert.equal(cells.length, 2, 'one cell per visible column');
+  assert.equal(cells[0].querySelectorAll('input.filter').length, 1, 'the returned node is rendered');
+  assert.equal(cells[1].querySelectorAll('input.filter').length, 0, 'null means no control for that column');
+  assert.equal((cells[0].querySelector('input') as HTMLInputElement).dataset.col, 'name', 'called per column');
+  // Alignment is inherited from the header cell, which is the whole reason it lives in <thead>.
+  const headAge: HTMLElement = thead.querySelectorAll<HTMLElement>('th[scope="col"]')[1];
+  assert.equal(cells[1].style.width, headAge.style.width, 'the filter cell carries its column width');
+  assert.equal(cells[1].style.textAlign, 'end', 'and its alignment (numeric → end)');
+  m.dispose();
+});
+
+test('table: the filter row sticks under the header, not on top of it', async () => {
+  // Both header rows are sticky; the second pins at the first one's height. CSS cannot express
+  // that (a header wraps, carries a sort button, gets resized), so it is measured and written
+  // inline — at 0 the two rows would overlap the moment the body scrolled.
+  const m: Mounted = await mount({
+    columns: COLS,
+    dataSource: ROWS,
+    selectable: true,
+    expandable: true,
+    headerRow: (): Node => document.createElement('input'),
+  } as TableProps<Row>);
+  // The measurement is ResizeObserver-backed, and an observer delivers at the end of a frame —
+  // later than the microtask `mount` awaits. Until then the offset is 0 (the two rows would
+  // overlap), which is the one frame the source comment calls out.
+  await new Promise<void>((r) => setTimeout(r, 60));
+  const headRow: HTMLElement = m.host.querySelector('.weave-table__header-row') as HTMLElement;
+  const cell: HTMLElement = m.host.querySelector('.weave-table__header-filter-cell') as HTMLElement;
+  const headH: number = Math.round(headRow.getBoundingClientRect().height);
+  assert.ok(headH > 0, `the header row has a measurable height (got ${headH})`);
+  assert.equal(cell.style.top, `${headH}px`, 'the filter row pins below the header row');
+  // The synthetic columns get empty cells so the data columns stay in their own slots.
+  const filterRow: HTMLElement = m.host.querySelector('.weave-table__header-row--secondary') as HTMLElement;
+  assert.equal(filterRow.children.length, COLS.length + 2, 'expand + select columns get an empty cell each');
+  assert.equal((filterRow.children[0] as HTMLElement).textContent, '', 'the expand slot is empty');
+  m.dispose();
+});
+
+test('table: no headerRow prop → no second row at all', async () => {
+  const m: Mounted = await mount({ columns: COLS, dataSource: ROWS });
+  assert.equal(m.host.querySelectorAll('thead tr').length, 1, 'thead has only the header row');
+  assert.equal(m.host.querySelectorAll('.weave-table__header-filter-cell').length, 0, 'and no filter cells');
+  m.dispose();
+});
+

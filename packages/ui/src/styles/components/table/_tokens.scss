@@ -31,6 +31,9 @@ $tokens: (
     marker-width: 2px,
     // Gap between a sort header's label and its arrow.
     control-gap: 6px,
+    // Second header row (per-column filters) — tighter than a header cell, since it holds controls
+    // that bring their own height.
+    filter-padding-y: 4px,
     expand-size: 20px,
     // Column-resize grip: hit area + the visible hairline width.
     resize-grip-width: 9px,

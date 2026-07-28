@@ -277,6 +277,15 @@
   prop with a default is **not** optional in the `setup` signature — `propDefaults` guarantees it a value there;
   optionality is for the parent, which is what `propDefaults` already states.
 
+### Added — UI
+- **`<Table headerRow>` — a second header row, for per-column filters.** Rendered inside `<thead>`
+  directly under the column headers, one cell per visible column (`(col) => Node | null`; `null`
+  for a column that gets no control). Each cell inherits its header's width, alignment and sticky
+  treatment, and pins under the header when the body scrolls; the synthetic expand/select columns
+  get empty cells. It has to live in `<thead>`: a filter row rendered as a sibling above the table
+  only lines up while *every* column has an explicit width, and drifts the moment one auto-sizes —
+  so there was no version of this a consumer could build from outside.
+
 ### Fixed — reactivity
 - **A signal written during an effect no longer drains the queue on top of that effect.** `flush()`
   guarded only on `batchDepth`, so a write that happened *while* the queue was draining started a
