@@ -1,9 +1,9 @@
 /** `weave build` — one-shot production bundle: JS via esbuild + one `app.css`. */
 
 import { build as esbuild } from 'esbuild';
-import { mkdir, mkdtemp, writeFile, readFile, rm, cp } from 'node:fs/promises';
+import { mkdir, mkdtemp, writeFile, readFile, readdir, rm, cp } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, relative, isAbsolute } from 'node:path';
 import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
 import { weave, type WeaveState } from './plugin.js';
@@ -37,6 +37,44 @@ export interface BuildConfig {
   resumable?: boolean;
 }
 
+/** Is `inner` the same path as, or inside, `outer`? */
+function contains(outer: string, inner: string): boolean {
+  const rel: string = relative(outer, inner);
+  return !rel.startsWith('..') && !isAbsolute(rel);
+}
+
+/**
+ * Copy the static web root into the output dir, leaving the output dir itself behind.
+ *
+ * `publicDir` DEFAULTS to the config's own directory, so the equally default `outDir: 'dist'`
+ * sits inside it — and Node's `cp` refuses that outright, before any `filter` runs:
+ * `EINVAL … cannot copy <app> to a subdirectory of self <app>/dist`. An app that simply omits
+ * `publicDir` — the documented default — failed its very first `weave build` with what reads
+ * like a filesystem fault rather than a configuration one. So when the output is nested, walk
+ * the tree and skip that one branch.
+ */
+async function copyPublicDir(publicDir: string, outDir: string): Promise<void> {
+  if (!contains(publicDir, outDir)) {
+    await cp(publicDir, outDir, { recursive: true });
+    return;
+  }
+  await copyTreeExcept(publicDir, outDir, outDir);
+}
+
+/** Copy `srcDir` → `destDir`, omitting the `exclude` branch (an absolute path inside `srcDir`). */
+async function copyTreeExcept(srcDir: string, destDir: string, exclude: string): Promise<void> {
+  await mkdir(destDir, { recursive: true });
+  for (const entry of await readdir(srcDir, { withFileTypes: true })) {
+    const src: string = join(srcDir, entry.name);
+    if (relative(src, exclude) === '') continue; // this IS the output dir
+    const dest: string = join(destDir, entry.name);
+    // A deeper `outDir` (say `build/dist`) makes this child a self-copy in turn — recurse
+    // instead of handing `cp` the same refusal one level down.
+    if (entry.isDirectory() && contains(src, exclude)) await copyTreeExcept(src, dest, exclude);
+    else await cp(src, dest, { recursive: true });
+  }
+}
+
 export async function build(config: BuildConfig): Promise<void> {
   const { outDir } = config;
   if (config.clean) await rm(outDir, { recursive: true, force: true });
@@ -65,7 +103,7 @@ export async function build(config: BuildConfig): Promise<void> {
   // Copy the static web root (favicons, manifest, the raw index.html) into the output;
   // the injected index.html below overwrites the raw copy.
   if (config.publicDir && existsSync(config.publicDir)) {
-    await cp(config.publicDir, outDir, { recursive: true });
+    await copyPublicDir(config.publicDir, outDir);
   }
 
   // Global entry styles (in declared order) first, then component scoped CSS. Each stylesheet's

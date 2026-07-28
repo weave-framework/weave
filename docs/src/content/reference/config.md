@@ -53,7 +53,7 @@ All relative paths in the config are resolved against the **directory containing
 | `entry` | `string` | — | Hand-written entry module — the escape hatch when you want to write the bootstrap yourself. **Mutually exclusive with `root`.** |
 | `mount` | `string` | `'#app'` | CSS selector the generated root mounts into. **Only meaningful with `root`; ignored when `entry` is used.** |
 | `index` | `string` | — | HTML shell template. Weave injects the entry `<script>` and the stylesheet `<link>` at build/dev time. |
-| `publicDir` | `string` | the config-file directory | Static web root — served as-is in dev and copied verbatim into the build output. |
+| `publicDir` | `string` | the config-file directory | Static web root — served as-is in dev, and copied verbatim into the build output **when you declare it** (see below). |
 | `outDir` | `string` | `'dist'` | Output directory for `weave build`. |
 | `styleLang` | `'css' \| 'scss' \| 'sass'` | `'css'` | Component style language. The loader pairs each component with its sibling `<base>.<styleLang>` — no probing of other extensions. |
 | `routesDir` | `string` | — (off) | File-based routing directory. When set, `weave build`/`dev` regenerate `routes.gen.ts` from it before bundling. |
@@ -118,19 +118,15 @@ Each value is either a `target` origin (shorthand) or a rule:
 
 The request (method, headers, body, query) is streamed to the backend and the response piped back unchanged, so `Cookie` (up) and `Set-Cookie` (down) pass through both ways. If the backend can't be reached the dev server replies `502` and stays up.
 
-## You must declare `root` or `entry` (fail-loud)
+## An app declares `root` or `entry` — never both (fail-loud)
 
-These two options choose your bootstrap style, and the config validator enforces a strict either/or:
+These two options choose your bootstrap style, and the config validator enforces a strict either/or. Declaring **both** throws while the config is resolved, so the CLI fails immediately — there is no precedence rule:
 
-- Declaring **neither** throws:
+> `weave: config declares both \`root\` and \`entry\` — pick one`
 
-  > `weave: config must declare either \`root\` (generated bootstrap) or \`entry\` (hand-written)`
+Declaring **neither** is how a **component library** is configured (see below). An app must declare one: `weave build` and `weave dev` need something to bundle, and they say so plainly rather than handing esbuild an undefined entry:
 
-- Declaring **both** throws:
-
-  > `weave: config declares both \`root\` and \`entry\` — pick one`
-
-The error is raised while resolving the config, so the CLI fails immediately — there is no silent fallback or precedence rule. Pick exactly one.
+> `weave build: this config declares neither \`root\` (generated bootstrap) nor \`entry\` (hand-written), so there is no app to build.`
 
 | You want… | Use | What Weave does |
 |-----------|-----|-----------------|
@@ -138,6 +134,22 @@ The error is raised while resolving the config, so the CLI fails immediately —
 | To hand-write the bootstrap | `entry` | Imports your module as-is. You call `mountComponent` yourself (e.g. to register a service worker, add a polyfill, or mount somewhere unusual). `mount` is **ignored** — the mount point is wherever your code puts it. |
 
 See [Custom elements & bootstrap](/learn/custom-elements) for both styles.
+
+## A component library declares neither
+
+A package that ships components but has no app of its own omits both `root` and `entry`:
+
+~~~ts title="weave.config.ts"
+import { defineConfig } from '@weave-framework/cli';
+
+export default defineConfig({
+  styleLang: 'scss',
+});
+~~~
+
+It still needs a config, because `styleLang` cannot be inferred: the loader pairs a component with its sibling `<base>.<styleLang>` and **does not probe** other extensions, and a component with no stylesheet at all is perfectly legal. So a wrong or missing value does not fail — it ships components with no styles, silently. Anything compiling that library's components reads the value from here.
+
+Such a config loads, and `weave check` type-checks the library normally. Only `weave build` and `weave dev` require an entry, and they name it when it is missing.
 
 ## A minimal shell
 
@@ -160,11 +172,15 @@ With `root` set, the HTML shell only needs a mount point matching `mount`:
 
 ## `publicDir` defaults to the config directory
 
-When `publicDir` is omitted it defaults to the **directory the config lives in**, not a `public/` subfolder.
+When `publicDir` is omitted it defaults to the **directory the config lives in**, not a `public/` subfolder. `weave dev` serves that directory, so every file next to `weave.config.ts` is reachable in development.
 
-:::callout tip "Consequence: a bare config serves your whole project"
-With no `publicDir`, the static web root is the config directory itself — so the dev server and the build will expose every file alongside `weave.config.ts` (source included). For anything beyond a throwaway demo, set `publicDir` to a dedicated folder such as `'public'`.
+**`weave build` copies a static root only when you declare one.** An undeclared `publicDir` is not copied into `dist/`: the project directory holds your sources, `node_modules/`, the config and possibly a `.env`, and copying that verbatim into a deployable output is a leak, not a large build. So a config with no `publicDir` builds a `dist/` containing exactly the bundle, `app.css` and the injected `index.html`.
+
+:::callout tip "Put your static assets in a folder you name"
+Favicons, `manifest.webmanifest`, images — anything that must ship — belong in a dedicated folder declared as `publicDir: 'public'`. That is the only form the build copies, and it is what every Weave scaffold does. Without it, dev serves files that the build will not ship.
 :::
+
+A declared `publicDir` may contain the `outDir` (for instance `publicDir: 'public'` with `outDir: 'public/dist'`): the output directory is skipped when copying, so it never copies itself into itself.
 
 ## Generated files
 

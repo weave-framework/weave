@@ -31,6 +31,22 @@ function syncRoutes(config: ResolvedConfig): void {
   console.log(`weave routes → ${generateRoutes(config.routesDir, { lazy: true })}`);
 }
 
+/**
+ * `build` and `dev` need something to bundle. A config declaring neither `root` nor `entry` is a
+ * component-LIBRARY config (it exists for `styleLang` and friends) — perfectly valid to load and
+ * to `weave check`, but there is no app here to build or serve. Say that, rather than handing
+ * esbuild an undefined entry.
+ */
+function requireAppEntry(config: ResolvedConfig, cmd: string): void {
+  if (config.entry || config.rootComponent) return;
+  console.error(
+    `weave ${cmd}: this config declares neither \`root\` (generated bootstrap) nor \`entry\` ` +
+      `(hand-written), so there is no app to ${cmd === 'dev' ? 'serve' : 'build'}. Add one — or, if this ` +
+      `is a component library, run \`weave check\` instead (a library config needs no entry).`
+  );
+  process.exit(1);
+}
+
 /** Build the framework-owned entry (Level C) when the config declares a `root` component. */
 function virtualEntryFor(config: ResolvedConfig): { code: string; resolveDir: string } | undefined {
   if (!config.rootComponent) return undefined;
@@ -53,6 +69,7 @@ export async function main(argv: string[]): Promise<void> {
   if (cmd === 'build') {
     try {
       if (config) {
+        requireAppEntry(config, 'build');
         const ssg: boolean = rest.includes('--ssg');
         syncRoutes(config); // file-based routing: regenerate routes.gen.ts (lazy) before bundling
         // An explicit `--out` overrides the config's `outDir` (used by `@weave-framework/nx`, which
@@ -91,7 +108,7 @@ export async function main(argv: string[]): Promise<void> {
             minify: config.minify,
             styleLang: config.styleLang,
             styles: config.styles,
-            publicDir: config.publicDir,
+            publicDir: config.publicDirDeclared ? config.publicDir : undefined,
             resume,
           });
           console.log(`weave build --ssg → ${outDir}/ (${routes.length} route${routes.length === 1 ? '' : 's'})`);
@@ -104,7 +121,8 @@ export async function main(argv: string[]): Promise<void> {
           minify: config.minify,
           styleLang: config.styleLang,
           styles: config.styles,
-          publicDir: config.publicDir,
+          // Only a DECLARED static root is copied — see `publicDirDeclared`.
+          publicDir: config.publicDirDeclared ? config.publicDir : undefined,
           index: config.index,
           clean: true, // a fresh, self-contained artifact each prod build
         });
@@ -130,6 +148,7 @@ export async function main(argv: string[]): Promise<void> {
   }
   if (cmd === 'dev') {
     if (config) {
+      requireAppEntry(config, 'dev');
       syncRoutes(config); // file-based routing: regenerate routes.gen.ts before serving
       // Serve the static web root (publicDir) from memory (outdir === servedir so
       // `main.js` lives at the web root); nothing is written to disk.

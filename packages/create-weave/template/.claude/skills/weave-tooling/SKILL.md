@@ -50,7 +50,8 @@ export default defineConfig({
 - **`dev.proxy`** forwards matching requests to a backend during `weave dev`.
 - **`routesDir`** turns on file-based routing (`routes.gen.ts` is regenerated before each build/dev).
 - **`ssg: { routes, resume }`** configures `weave build --ssg`. `routes` defaults to the static routes derived from `routesDir` (or `/`). `resume: true` is the islands build — the server embeds a state snapshot and the client **adopts** the server DOM, so `setup` never re-runs and static content ships no JS. `--ssg` requires a `root` config (it renders the root headlessly); an `entry` config opts out. Request-time SSR/streaming is deliberately not built.
-- **`root` vs `entry`** are mutually exclusive and one is REQUIRED — the config throws if you declare neither or both.
+- **`root` vs `entry`** are mutually exclusive — the config throws if you declare both. An APP must declare one: `weave build`/`weave dev` fail (naming both fields) without it. A component LIBRARY declares neither — it has no app, but it still needs the config for `styleLang`, and `weave check` runs there normally.
+- **`publicDir`** defaults to the config's own directory. `weave dev` serves that; **`weave build` copies a static root only when you declare one** (an undeclared project directory would ship `src/`, `node_modules/` and `.env` into `dist/`). Put shipped assets in a folder and name it — `publicDir: 'public'`.
 - **Custom elements**: a component that `export const tag = 'my-widget'` auto-registers as a custom element (use it as `<my-widget>` anywhere, including outside Weave).
 
 ## Scaffolding

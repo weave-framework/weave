@@ -287,6 +287,25 @@
   with a `ResizeObserver`, and disconnects it in `dispose()` alongside the two listeners. (An `overlay.ts`
   comment had claimed this observer existed since the detach-leak fix — it did not; that is now true.)
 
+### Fixed — CLI
+- **A component library may declare a `weave.config.ts`.** Resolving a config rejected one that declared
+  neither `root` nor `entry`, so a package that ships components but has no app of its own could not
+  declare `styleLang` anywhere supported — and `weave check` failed on it outright. `styleLang` is not
+  inferable: the loader pairs a component with `<base>.<styleLang>` and does not probe, while a component
+  with no stylesheet is perfectly legal, so a wrong value ships unstyled components in silence. Such a
+  config now loads and `weave check` runs; `weave build`/`weave dev` still require an entry and now say
+  so themselves, naming both fields, instead of handing esbuild an undefined entry point.
+
+- **`weave build` no longer fails when `publicDir` is left at its default**, and no longer ships your
+  project directory when it is. `publicDir` defaults to the config's own directory and `outDir` to `dist`
+  inside it, so the copy step asked Node to copy a directory into itself and got a raw
+  `EINVAL … cannot copy … to a subdirectory of self` — an app that simply omitted `publicDir`, the
+  documented default, failed its first build with what read like a filesystem fault. Two changes: the
+  output directory is now skipped when copying a static root (at any depth, so `publicDir: 'public'` with
+  `outDir: 'public/dist'` works), and a build copies a static root **only when the config declares one** —
+  copying an undeclared project directory into `dist/` would have shipped `src/`, `node_modules/`, the
+  config and any `.env`. `weave dev` still serves the config directory by default, unchanged.
+
 ### Fixed — build tooling
 - **The `@weave-framework/ui` publish build no longer breaks on a component that declares `propDefaults`
   or `extend`.** The step that gives each built component a props-typed default export *reconstructed*

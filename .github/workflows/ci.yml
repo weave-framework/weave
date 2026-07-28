@@ -143,6 +143,11 @@ jobs:
         run: pnpm verify:extend
       - name: CLI assets
         run: pnpm verify:cli-assets
+      # A component library's config (no app entry) was rejected outright, and `weave build` with
+      # the DEFAULT publicDir crashed with a raw `cp` EINVAL — the output dir sits inside the
+      # static root it copies. Both were found by building a real package against a release.
+      - name: CLI config surface (library configs, default publicDir)
+        run: pnpm verify:cli-config
       - name: weave check
         run: pnpm verify:check
       - name: Prettier plugin

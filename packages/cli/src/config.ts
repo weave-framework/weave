@@ -93,6 +93,13 @@ export interface ResolvedConfig {
   mount: string;
   /** Static web root (absolute) — defaults to {@link root} when no `publicDir` is set. */
   publicDir: string;
+  /**
+   * Whether `publicDir` was DECLARED. `weave dev` serves the default (the project directory)
+   * happily, but `weave build` must not copy it: a project directory holds `src/`, `node_modules/`,
+   * the config — and `.env`. Copying that verbatim into a deployable `dist/` is not a big output,
+   * it is a leak. So the build copies a static root only when the author named one.
+   */
+  publicDirDeclared: boolean;
   index?: string;
   outDir: string;
   styleLang: StyleLang;
@@ -162,9 +169,14 @@ async function importConfigModule(file: string): Promise<WeaveConfig> {
 
 function resolveConfig(raw: WeaveConfig, root: string): ResolvedConfig {
   const abs = (p: string): string => (isAbsolute(p) ? p : resolve(root, p));
-  if (!raw.root && !raw.entry) {
-    throw new Error('weave: config must declare either `root` (generated bootstrap) or `entry` (hand-written)');
-  }
+  // A config declaring NEITHER is legal: a component LIBRARY has no app to bootstrap, yet it
+  // still has to declare `styleLang` — the loader pairs a component with `<base>.<styleLang>`
+  // and does not probe, so anything compiling that library's components must know the value,
+  // and a component with no sibling stylesheet is perfectly legal, so a wrong guess ships
+  // unstyled components in silence. Requiring root/entry here left nowhere supported to put it:
+  // the library either shipped no config at all or got a hard error from `weave check`. The
+  // requirement belongs to the commands that build or serve an APP — see `requireAppEntry` in
+  // cli.ts, which reports it framed, per command.
   if (raw.root && raw.entry) {
     throw new Error('weave: config declares both `root` and `entry` — pick one');
   }
@@ -174,6 +186,7 @@ function resolveConfig(raw: WeaveConfig, root: string): ResolvedConfig {
     rootComponent: raw.root ? abs(raw.root) : undefined,
     mount: raw.mount ?? '#app',
     publicDir: raw.publicDir ? abs(raw.publicDir) : root,
+    publicDirDeclared: raw.publicDir != null,
     index: raw.index ? abs(raw.index) : undefined,
     outDir: abs(raw.outDir ?? 'dist'),
     styleLang: raw.styleLang ?? 'css',
