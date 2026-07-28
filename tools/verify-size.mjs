@@ -28,7 +28,18 @@ const BUDGETS = [
   {
     label: 'SPA core (reactive + dom)',
     files: ['packages/runtime/dist/reactive.js', 'packages/runtime/dist/dom.js'],
-    budget: 22_528, // 22 KB — the number that protects "tiny"
+    // 22 KB — the number that protects "tiny".
+    // → 22_784 (+256, a deliberate call): `flush` gained a re-entrancy guard, without which a write
+    // made during a render — `ref={{ el }}` on any component that takes one — drained the queue from
+    // inside the effect still running, one stack frame per item, and a long list ended in
+    // `RangeError: Maximum call stack size exceeded` with the DOM left half-updated. It is a crash
+    // fix in the core; the code is a flag plus a try/finally (the flag cannot be skipped — a throw
+    // that escaped would wedge the scheduler permanently). The reactive line stays inside its own
+    // budget; this one had 166 bytes of headroom and needed a little more.
+    // NOTE while raising it: this gate measures the UNMINIFIED dist, so doc comments count against a
+    // number that no consumer downloads (their bundler strips them). Worth revisiting — measuring the
+    // minified bytes would make every line here mean what it says.
+    budget: 22_784,
   },
   // Phase E entries — opt-in, NOT part of the SPA core (0 bytes for apps that don't import them).
   // runtime/serialize (E0.1): the wire-format codec, used by SSR-resume + local-first. Baseline 3.1 KB.

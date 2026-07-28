@@ -51,7 +51,7 @@ let currentOwner: Owner | null = null;
 let batchDepth: number = 0;
 /** Effects scheduled to run once the current batch unwinds. */
 const queue: Set<Computation> = new Set<Computation>();
-/** True while {@link flush} is draining the queue — see the re-entrancy note there. */
+/** True while {@link flush} drains the queue. */
 let flushing: boolean = false;
 
 /** Register an edge from `source` to the active listener, if any. */
@@ -191,25 +191,9 @@ function updateIfNecessary(c: Computation): void {
   if ((c.state as State) === DIRTY) run(c);
 }
 
-/**
- * Run queued effects (called when the outermost batch unwinds, and after every unbatched write).
- *
- * **Re-entrancy.** A write that happens WHILE the queue is draining must append to the drain, not
- * start a second one on top of it. `signal.set` ends in `flush()`, and an effect writing a signal is
- * ordinary — `ref={{ el }}` alone does it, on every component that takes a ref. Without the guard,
- * each such write drained the REMAINING queue from inside the effect that is still running, so a list
- * of ref-taking components nested one stack frame per item and blew the stack at a few hundred rows
- * (`RangeError: Maximum call stack size exceeded`) — with the render abandoned mid-list, which is the
- * worse half: the DOM was left half-updated.
- *
- * `batchDepth` cannot cover this. `batch` decrements it BEFORE flushing, precisely so the queued
- * effects run unbatched — so every write inside those effects saw depth 0 and recursed anyway. That
- * is why wrapping the mutation in `batch` changed nothing.
- *
- * Nothing is deferred past the outermost `set`: `queue` is a `Set`, and `Set` iteration visits
- * entries added during the iteration, so an effect queued by a mid-flush write is still picked up by
- * the loop below before it returns. Only the recursion goes.
- */
+/** Run queued effects. Re-entrant calls return: a write made mid-drain (an effect writing a signal —
+ *  `ref={{ el }}` does it) appends to this loop, which `Set` iteration picks up, rather than nesting a
+ *  whole drain inside the effect still running — one stack frame per item. See the `flush` tests. */
 function flush(): void {
   if (batchDepth > 0 || flushing) return;
   flushing = true;
