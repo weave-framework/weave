@@ -18,6 +18,13 @@ this list is a live intention, not a historical note.
 - **UI testing harnesses** (`@weave-framework/ui/testing`). Ready-made utilities for consumers to drive and
   assert Weave components in their own tests (open an overlay, exercise the keyboard map, check focus return).
 
+## Planned — migration
+
+- **`weave migrate` for React (and others).** ([RFC 0011](rfcs/0011-migrate.md) — Angular shipped in 2.2.0.)
+  The command is built as a front door with a source-framework module behind it: the dependency walk, the plan
+  writer and the output layout are language-level and already shared, so a second source framework is a module,
+  not a second tool. React is the next one intended.
+
 ## Planned — framework
 
 - **Component extension — `weave check` for patch markup.** ([RFC 0008](rfcs/0008-component-extension.md) —

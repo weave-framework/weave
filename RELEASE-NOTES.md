@@ -3,6 +3,62 @@
 Human-readable highlights, one section per release — everything notable that landed since
 the previous one. For the granular, per-version log see [CHANGELOG.md](CHANGELOG.md).
 
+## 2.2.0 — 2026-07-29
+
+A feature release built around one large addition — a migration path into Weave — plus a crash in the reactive
+core that any large list could reach. Everything is backward-compatible; 2.x code keeps working.
+
+**`weave migrate` — assisted migration of an Angular app into Weave** ([RFC 0011](rfcs/0011-migrate.md)). Run it
+from inside the Weave app you are migrating *into*. It reads your Angular project (only ever reads it), builds a
+map of facts, writes a `migration-plan.md` you read **before** anything changes, and then — only if you say yes —
+writes the converted code into `src/`. An existing file in the target is never overwritten.
+
+It converts `@Component` → `setup()` plus a sibling template · `@Injectable({providedIn:'root'})` → `store()`,
+and a scoped one → `createContext` + `provide`/`inject` · `@Pipe` → a plain function · `@Directive` → a `use:`
+action · `*ngIf`/`*ngFor`/`*ngSwitch` → `@if`/`@for`/`@switch` · `[prop]`/`(event)`/`[(ngModel)]` →
+`.prop`/`on:`/`bind:value` · `<ng-template>`/`*ngTemplateOutlet` → `@snippet`/`@render` · `<ng-content>` →
+`<slot>` · reactive forms → `@weave-framework/forms` · route guards → `beforeEach` · `HttpClient` →
+`@weave-framework/data` · Angular Material → the Weave UI library. **RxJS is translated, not described**: chains
+are rewritten by folding the operators over the shape of their source, so an app that finishes a migration is not
+left importing `rxjs`. It is an assistant, not a magic button — everything it cannot do confidently is written
+into the plan as *needs you*, with the reason.
+
+**`<Table>` gained a per-column filter row and a virtual body.** `headerRow={{ (col) => … }}` renders a second
+row inside `<thead>`, directly under the headers, each cell inheriting its column's width, alignment and sticky
+treatment — the one place a filter row can live and stay aligned when a column auto-sizes. `virtual` renders only
+the rows in view: first render of a 1000×20 grid was ~480 ms of build and ~850 ms laid out, and a viewport holds
+20–40 rows however long the data is. It needs `maxHeight` and a uniform `rowHeight`; the two configurations it
+cannot honour are refused at setup rather than left to show the wrong rows.
+
+**A signal written during a render no longer recurses per item.** `flush()` guarded only against batching, so a
+write that happened *while* the effect queue was draining started a second drain inside the effect still running.
+Writing a signal from an effect is ordinary — `ref={{ el }}` alone does it, on every component that takes a ref —
+so a long list of such components nested one stack frame per item and ended in `RangeError: Maximum call stack
+size exceeded`, with the render abandoned mid-list and the DOM left half-updated. Reported against a large
+`<Table>` where a column change tipped it over. `batch` could not help and was measured not to.
+
+**A component's type now says it returns a `Node`.** Both places that synthesize a component's default export —
+`weave check` (and through it the editor plugin) and the built `@weave-framework/ui` `.d.ts` — said `unknown`, so
+every imperative call site needed a cast. That is most of the composition surface: a `<Table>` column's `cell`, an
+`<Expansion>` panel body, anything typed to take a `Node`. Pure narrowing, no runtime change.
+
+**Overlays follow their trigger when the page rearranges.** A connected panel — a Select listbox, a Menu, an
+Autocomplete panel, a Tooltip — only repositioned on window scroll/resize, so it stayed where it was placed when a
+splitter was dragged, a sidebar collapsed, or a drawer animated open. It now observes the origin, its containing
+block and the panel.
+
+**Also:** a component **library** can declare a `weave.config.ts` (it needs one for `styleLang`, and resolving a
+config used to reject anything without `root`/`entry`) · `weave build` no longer fails when `publicDir` is left at
+its default, and no longer copies an undeclared project directory — sources, `node_modules`, `.env` — into `dist/`
+· a **comment between the pieces of a split `template`** is no longer read as a non-static template · the ui
+publish build no longer breaks on a component declaring `propDefaults` or `extend`.
+
+**Security.** `brace-expansion` is pinned past CVE-2026-14257 (the pin's old target would have let a future
+resolution land back on a vulnerable version), which also moved the VS Code extension to
+`vscode-languageclient@10` — raising its floor to VS Code ^1.91. Four code-scanning alerts are closed, one of
+which was a gate quietly not gating: a word-boundary regex written inside a template literal accepted a different
+symbol than the one it was checking for.
+
 ## 2.1.0 — 2026-07-24
 
 A feature release driven by real-app use, plus an internal refactor of the resume engine. Everything is

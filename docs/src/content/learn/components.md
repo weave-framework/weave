@@ -173,6 +173,17 @@ Weave refuses ambiguous or unsafe declarations at **build time** rather than gue
 | Made `template` an array | "`template` must be a single string, not an array" |
 | Gave `template`/`styles` a non-static value (not a string literal, or array of string literals) | "must be a static string" (these are read **statically**, never evaluated — a variable or function call can't be inspected at build time) |
 
+A long `template` may be split across lines with `+`, and **comments between the pieces are fine** — they are
+trivia, like whitespace:
+
+~~~ts
+export const template: string =
+  '<button class={{ c() }}' +
+  // the disabled state rides the native attribute
+  ' disabled={{ d() }}>' +
+  '<slot></slot></button>';
+~~~
+
 :::callout tip "Why a backtick still can't interpolate"
 You may write a `template` with backticks for multi-line convenience — but `${expr}` inside it is rejected. Weave's binding is `{{ expr }}` in the template, resolved by the compiler; `${…}` is JavaScript string interpolation that would run *before* Weave ever sees the markup. Keeping them separate is what makes the markup analyzable.
 :::

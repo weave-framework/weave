@@ -63,6 +63,7 @@ Weave's core is solid — signal-native, covered by a broad browser test suite, 
 - **DevTools** — an in‑app panel to watch the fabric update live: named signals/computeds/effects, their values, who triggers whom, a temporal trigger‑trace, and a component/owner tree. `mountDevtoolsPanel()`.
 - **Editor & monorepo integration** — an **MCP server** (`@weave-framework/mcp`) so AI editors can compile‑check, type‑check, and scaffold through structured tools, and an **Nx plugin** (`@weave-framework/nx`) so a Weave app is a first‑class project with inferred cached targets.
 - **Component extension** — a component can `extend` another: reuse its whole setup and behaviour, then override the template outright or patch it declaratively.
+- **A way in for an existing app** — `weave migrate` reads an Angular project, writes a `migration-plan.md` you read *before* anything changes, then converts what it safely can into your Weave app: components, services, pipes, directives, templates, reactive forms, route guards, `HttpClient`, Angular Material — and it *translates* RxJS rather than leaving it behind. It is an assistant, not a magic button: what it cannot do confidently is written into the plan, with the reason.
 
 **Still ahead** — the live list, with what we've deliberately left out, is the [public roadmap](TODO.md). Request‑time SSR and streaming are a conscious omission, not a gap: static generation covers SEO and first paint without a server in the request path.
 

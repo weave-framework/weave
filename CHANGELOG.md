@@ -14,7 +14,7 @@
 > already left it behind — Phase E ran 94 commits without a bump, and then released as one MINOR. The public
 > promise wins; the habit is retired.)*
 
-## Unreleased
+## 2.2.0 — 2026-07-29
 
 ### Added — CLI
 - **`weave migrate` — assisted migration of an Angular app into Weave** ([RFC 0011](rfcs/0011-migrate.md)). Run it
