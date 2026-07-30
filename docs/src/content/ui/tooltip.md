@@ -58,6 +58,26 @@ export function setup() {
 | `position` | `PositionName` | `'top'` | Preferred side; flips to the opposite one when it would overflow. |
 | `delay` | `number` | `150` | Delay (ms) before **hover** shows it. Focus always shows with no delay. |
 | `disabled` | `boolean` | `false` | Suppress the tooltip without detaching the action. |
+| `class` | `string` | — | Extra class(es) on the bubble, for a per-instance variant (see below). |
+
+## Styling one tooltip differently
+
+The bubble is rendered into the CDK overlay container at the top of the document, not inside the component that asked for it. So component-scoped CSS never reaches it, and neither does a token like `--weave-tooltip-background` set on an ancestor of the host. `class` is the hook: it lands on the same element that carries `.weave-tooltip`, so your rule can set that component's own tokens.
+
+:::tabs
+~~~html title="app.html"
+<span class="field-error" use:tooltip={{ { text: message(), class: 'tooltip-error' } }}>!</span>
+<button use:tooltip={{ 'Save changes' }}>Save</button>
+~~~
+~~~scss title="styles/main.scss"
+.tooltip-error {
+  --weave-tooltip-background: var(--weave-color-error);
+  --weave-tooltip-text: var(--weave-color-surface);
+}
+~~~
+:::
+
+The error bubble turns red; the Save button's tooltip on the same screen stays neutral. Without the class the only lever was `.weave-tooltip` itself — which is every tooltip in the app.
 
 `position` takes any of the CDK position names — `'top'`, `'bottom'`, `'left'`, `'right'`, and their
 `-start` / `-end` variants (`'bottom-start'`, `'right-end'`, …).

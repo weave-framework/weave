@@ -111,3 +111,48 @@ test('tooltip: cleanup detaches the panel and clears aria-describedby (no leak)'
   assert.equal(host.getAttribute('aria-describedby'), null);
   host.remove();
 });
+
+/* ──────── per-instance styling hook ──────── */
+
+test('tooltip: a `class` lands on the bubble alongside weave-tooltip', () => {
+  const { host, cleanup } = mount({ text: 'Required', class: 'tooltip-error' });
+  host.dispatchEvent(new FocusEvent('focusin'));
+  const p: HTMLElement = panels()[0];
+  assert.ok(p.classList.contains('weave-tooltip'), 'the library class is kept');
+  assert.ok(p.classList.contains('tooltip-error'), 'the consumer class is added');
+  assert.equal(p.className, 'weave-tooltip tooltip-error', 'exact class list');
+  teardown(host, cleanup);
+});
+
+test('tooltip: with no `class` the bubble is unchanged', () => {
+  const { host, cleanup } = mount('Save changes');
+  host.dispatchEvent(new FocusEvent('focusin'));
+  assert.equal(panels()[0].className, 'weave-tooltip', 'exactly the library class, nothing appended');
+  teardown(host, cleanup);
+});
+
+test('tooltip: one variant on screen does not restyle the others', () => {
+  // The whole point: the bubble lives in the overlay container, so a consumer cannot reach it with
+  // component-scoped CSS — and before this hook the only lever was `.weave-tooltip` itself, which is
+  // every tooltip in the app. Prove the two bubbles are independently addressable, by measuring the
+  // COMPUTED colour through the component's own token rather than trusting the class list.
+  const style: HTMLStyleElement = document.createElement('style');
+  style.textContent =
+    '.weave-tooltip { background: var(--weave-tooltip-background, rgb(0, 0, 0)); }' +
+    '.tooltip-error { --weave-tooltip-background: rgb(255, 0, 0); }';
+  document.head.appendChild(style);
+  const plain: { host: HTMLButtonElement; cleanup: () => void } = mount({ text: 'neutral' });
+  const error: { host: HTMLButtonElement; cleanup: () => void } = mount({ text: 'bad', class: 'tooltip-error' });
+  try {
+    plain.host.dispatchEvent(new FocusEvent('focusin'));
+    error.host.dispatchEvent(new FocusEvent('focusin'));
+    const [a, b]: HTMLElement[] = panels();
+    assert.equal(panels().length, 2, 'both bubbles are up');
+    assert.equal(getComputedStyle(a).backgroundColor, 'rgb(0, 0, 0)', 'the neutral one keeps the default');
+    assert.equal(getComputedStyle(b).backgroundColor, 'rgb(255, 0, 0)', 'only the flagged one is restyled');
+  } finally {
+    teardown(plain.host, plain.cleanup);
+    teardown(error.host, error.cleanup);
+    style.remove();
+  }
+});

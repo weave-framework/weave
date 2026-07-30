@@ -43,7 +43,7 @@ All **38**, each importable as `@weave-framework/ui/<name>`:
 
 Don't invent a component outside this list. Note `divider` and `overlay` are **style-only** subpaths (SCSS, no JS component to import); `context-menu` is JS-only.
 
-Form controls (`input`, `select`, `checkbox`, `radio`, `slide-toggle`, `slider`, `datepicker`, `chips`, `autocomplete`) integrate with **weave-forms** (`use:control`) and with `bind:`. Overlays (`dialog`, `menu`, `tooltip`, `snackbar`, `bottom-sheet`) sit on the CDK overlay/positioning layer.
+Form controls (`input`, `select`, `checkbox`, `radio`, `slide-toggle`, `slider`, `datepicker`, `chips`, `autocomplete`) integrate with **weave-forms** (`use:control`) and with `bind:`. Overlays (`dialog`, `menu`, `tooltip`, `snackbar`, `bottom-sheet`) sit on the CDK overlay/positioning layer — their panels render in a top-level container, so **component-scoped CSS cannot reach them**. To vary ONE instance, pass a class through the component's own option (`use:tooltip={{ { text, class: 'x' } }}`, `createOverlay({ panelClass })`) and set that component's tokens on it; restyling `.weave-tooltip` &co. changes every instance in the app.
 
 ## Theming & tokens
 

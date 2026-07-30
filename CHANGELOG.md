@@ -14,6 +14,26 @@
 > already left it behind — Phase E ran 94 commits without a bump, and then released as one MINOR. The public
 > promise wins; the habit is retired.)*
 
+## Unreleased
+
+### Added — UI
+- **`tooltip` takes a `class`, so one tooltip can look different from the rest.** The bubble renders
+  into the CDK overlay container at the top of the document, not inside the component that asked for
+  it — so component-scoped CSS never reaches it, and neither does a `--weave-tooltip-*` custom
+  property set on an ancestor of the host. The only lever was `.weave-tooltip` itself, which is every
+  tooltip in the app. The class lands on the same element that carries `.weave-tooltip`, so a
+  consumer's rule sets that component's own tokens:
+
+  ```html
+  <span use:tooltip={{ { text: message(), class: 'tooltip-error' } }}>!</span>
+  ```
+  ```scss
+  .tooltip-error { --weave-tooltip-background: var(--weave-color-error); }
+  ```
+
+  A field's validation bubble reads as an error while the submit button's tooltip on the same screen
+  stays neutral. Omitting `class` leaves the panel's class list exactly as before.
+
 ## 2.2.1 — 2026-07-29
 
 ### Fixed — router

@@ -25,6 +25,22 @@ export interface TooltipOptions {
   delay?: number;
   /** Suppress the tooltip without detaching the action. */
   disabled?: boolean;
+  /**
+   * Extra class(es) on the bubble, for a per-instance variant.
+   *
+   * The bubble is rendered into a CDK overlay at the top of the document, not inside the component
+   * that asked for it — so component-scoped CSS cannot reach it, and neither can a `--weave-tooltip-*`
+   * custom property set on an ancestor of the host. Without this, the only way to make ONE tooltip
+   * look different was to restyle `.weave-tooltip`, which changes every tooltip in the app.
+   *
+   * The class lands on the same element that carries `.weave-tooltip`, so a consumer's rule can set
+   * that component's own tokens and nothing else needs to know:
+   *
+   *   `<span use:tooltip={{ { text: msg, class: 'tooltip-error' } }}></span>`
+   *
+   *   .tooltip-error { --weave-tooltip-background: var(--weave-color-error); }
+   */
+  class?: string;
 }
 
 let _idSeq: number = 0;
@@ -50,7 +66,8 @@ export function tooltip(host: HTMLElement, options: string | TooltipOptions): ()
   function show(): void {
     if (opts.disabled || shown || !opts.text) return;
     const panel: HTMLElement = document.createElement('div');
-    panel.className = 'weave-tooltip';
+    // Read at show time, like `text` — so a mutated options object is picked up on the next show.
+    panel.className = opts.class ? `weave-tooltip ${opts.class}` : 'weave-tooltip';
     panel.setAttribute('role', 'tooltip');
     panel.id = id;
     panel.textContent = opts.text;
