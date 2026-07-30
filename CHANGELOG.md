@@ -14,7 +14,7 @@
 > already left it behind — Phase E ran 94 commits without a bump, and then released as one MINOR. The public
 > promise wins; the habit is retired.)*
 
-## Unreleased
+## 2.3.0 — 2026-07-31
 
 ### Added — UI
 - **`tooltip` takes a `class`, so one tooltip can look different from the rest.** The bubble renders

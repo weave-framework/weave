@@ -3,6 +3,32 @@
 Human-readable highlights, one section per release — everything notable that landed since
 the previous one. For the granular, per-version log see [CHANGELOG.md](CHANGELOG.md).
 
+## 2.3.0 — 2026-07-31
+
+One small addition, from a real screen that needed it. A **minor**: new optional surface with a safe
+default, nothing existing touched.
+
+**`tooltip` takes a `class`, so one tooltip can look different from the rest.** The bubble renders into the CDK
+overlay container at the top of the document, not inside the component that asked for it — so component-scoped
+CSS never reaches it, and neither does a token set on an ancestor of the host. Until now the only lever was
+`.weave-tooltip` itself, which is every tooltip in the app.
+
+The class lands on the same element that carries `.weave-tooltip`, so your rule sets that component's own
+tokens and nothing else needs to know:
+
+~~~html
+<span use:tooltip={{ { text: message(), class: 'tooltip-error' } }}>!</span>
+~~~
+~~~scss
+.tooltip-error {
+  --weave-tooltip-background: var(--weave-color-error);
+  --weave-tooltip-text: var(--weave-color-surface);
+}
+~~~
+
+A field's validation bubble reads as an error while the submit button's tooltip on the same screen stays
+neutral. Omitting `class` leaves the panel exactly as before.
+
 ## 2.2.1 — 2026-07-29
 
 A router fix, reported from a real app. A **patch** by the rule in
