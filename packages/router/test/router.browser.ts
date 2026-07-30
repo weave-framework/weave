@@ -898,3 +898,243 @@ test('beforeEach: a pop (browser back) is gated — a false guard stays put, a t
     offYes();
   }
 });
+
+/* ──────── an empty-prefix route must not apply policy to its siblings' paths ──────── */
+// `path: '/'` (and an index child `path: ''`) compile to ZERO segments, and matching is
+// prefix-based — so they match EVERY url at their level. `redirect`/`guard` used to be
+// evaluated there before anything checked whether a child consumes the remainder, so a
+// redirect meant for the index fired for unrelated paths, sent the router back to a path
+// that matched the same route again, and the hop cap returned an EMPTY chain: a blank
+// outlet, no error, nothing logged.
+
+test("router: a guard on '/' does not hijack a sibling path", () => {
+  let guardRuns: number = 0;
+  const r: Router = createRouter([
+    {
+      path: '/',
+      guard: (): string => {
+        guardRuns++;
+        return '/login';
+      },
+    },
+    { path: '/users', component: User },
+    { path: '/login', component: Login },
+    { path: '*', component: NotFound },
+  ]);
+  navigate('/users');
+  assert.equal(r.chain().length, 1, `chain resolved (got ${r.chain().length})`);
+  assert.is(r.matched()?.view, User, 'the sibling route renders');
+  assert.equal(r.redirectTo(), null, 'no redirect was applied');
+  assert.equal(guardRuns, 0, "the '/' guard never ran for /users");
+});
+
+test("router: a static redirect on '/' does not hijack a sibling path", () => {
+  const r: Router = createRouter([
+    { path: '/', redirect: '/login' },
+    { path: '/users', component: User },
+    { path: '/login', component: Login },
+    { path: '*', component: NotFound },
+  ]);
+  navigate('/users');
+  assert.is(r.matched()?.view, User, 'the sibling route renders');
+  navigate('/');
+  assert.is(r.matched()?.view, Login, "…and '/' itself still redirects");
+  assert.equal(r.redirectTo(), '/login', 'the canonical URL is surfaced');
+});
+
+test("router: a plain '/' route is not in the chain for a sibling path", () => {
+  const r: Router = createRouter([
+    { path: '/', component: Home },
+    { path: '/users', component: User },
+    { path: '*', component: NotFound },
+  ]);
+  navigate('/users');
+  assert.equal(r.chain().length, 1, 'only the matched route');
+  assert.is(r.matched()?.view, User);
+});
+
+test("router: '/' WITH children stays a root layout (it consumes the level)", () => {
+  const r: Router = createRouter([
+    {
+      path: '/',
+      component: Home,
+      children: [
+        { path: '', component: About },
+        { path: 'users', component: User },
+      ],
+    },
+    { path: '*', component: NotFound },
+  ]);
+  navigate('/users');
+  const ch: Match[] = r.chain();
+  assert.equal(ch.length, 2, 'layout + child');
+  assert.is(ch[0].view, Home, 'the root layout IS in the chain');
+  assert.is(ch[1].view, User);
+  navigate('/');
+  assert.is(r.matched(1)?.view, About, 'and its index child still resolves');
+});
+
+test('router: an index-child redirect fires only for the parent path', () => {
+  const AdminLayout: Component = () => span('admin-layout');
+  const AdminUsers: Component = () => span('admin-users');
+  const AdminSettings: Component = () => span('admin-settings');
+  const r: Router = createRouter([
+    {
+      path: '/admin',
+      component: AdminLayout,
+      children: [
+        { path: '', redirect: '/admin/settings' },
+        { path: 'users', component: AdminUsers },
+        { path: 'settings', component: AdminSettings },
+      ],
+    },
+    { path: '*', component: NotFound },
+  ]);
+  navigate('/admin/users');
+  assert.is(r.matched(1)?.view, AdminUsers, 'the sibling child renders');
+  assert.equal(r.redirectTo(), null, 'no redirect for /admin/users');
+  navigate('/admin');
+  assert.is(r.matched(1)?.view, AdminSettings, '…and /admin itself still redirects to settings');
+});
+
+test('router: a guard higher in the chain runs BEFORE a guard below it', () => {
+  const order: string[] = [];
+  const r: Router = createRouter([
+    {
+      path: '/app',
+      component: Home,
+      guard: (): boolean => {
+        order.push('parent');
+        return true;
+      },
+      children: [
+        {
+          path: 'page',
+          component: About,
+          guard: (): boolean => {
+            order.push('child');
+            return true;
+          },
+        },
+      ],
+    },
+    { path: '*', component: NotFound },
+  ]);
+  navigate('/app/page');
+  assert.is(r.matched(1)?.view, About, 'the nested route resolved');
+  assert.deepEqual(order, ['parent', 'child'], 'outside-in: the parent guard decides first');
+});
+
+test('router: a redirect cycle gives up with an empty chain AND says so', () => {
+  const errors: string[] = [];
+  const realError: typeof console.error = console.error;
+  console.error = (...args: unknown[]): void => {
+    errors.push(args.map(String).join(' '));
+  };
+  try {
+    const r: Router = createRouter([
+      { path: '/a', redirect: '/b' },
+      { path: '/b', redirect: '/a' },
+      { path: '*', component: NotFound },
+    ]);
+    navigate('/a');
+    assert.equal(r.chain().length, 0, 'gives up rather than spinning');
+    assert.ok(
+      errors.some((e) => /redirect loop/i.test(e)),
+      `the give-up is reported (got: ${errors.join(' | ') || '(silence)'})`,
+    );
+    assert.ok(
+      errors.some((e) => e.includes('/a') && e.includes('/b')),
+      'and the message names the cycle',
+    );
+  } finally {
+    console.error = realError;
+  }
+});
+
+test('router: a matched route with no component says so instead of rendering nothing', () => {
+  const warnings: string[] = [];
+  const realWarn: typeof console.warn = console.warn;
+  console.warn = (...args: unknown[]): void => {
+    warnings.push(args.map(String).join(' '));
+  };
+  try {
+    const r: Router = createRouter([
+      { path: '/group', children: [{ path: 'leaf', component: About }] },
+      { path: '*', component: NotFound },
+    ]);
+    navigate('/group/leaf');
+    assert.equal(r.chain().length, 2, 'the chain still resolves');
+    assert.ok(
+      warnings.some((w) => /no `component`/.test(w) && w.includes('/group')),
+      `the viewless route is named (got: ${warnings.join(' | ') || '(silence)'})`,
+    );
+  } finally {
+    console.warn = realWarn;
+  }
+});
+
+test('router: a guard on a PARENT does not run for a sub-path no child matches', () => {
+  // The variant the report calls out as NOT fixed by the cheap stop-gap ("skip candidates with no
+  // children"): this candidate HAS children, they just don't consume the remainder. Structural
+  // matching has to complete before policy is consulted, which is why the fix is two-phase.
+  let guardRuns: number = 0;
+  const r: Router = createRouter([
+    {
+      path: '/app',
+      component: Home,
+      guard: (): string => {
+        guardRuns++;
+        return '/login';
+      },
+      children: [{ path: 'known', component: About }],
+    },
+    { path: '/login', component: Login },
+    { path: '*', component: NotFound },
+  ]);
+  navigate('/app/unknown');
+  assert.is(r.matched()?.view, NotFound, 'no child consumes it → the catch-all, not the guard');
+  assert.equal(guardRuns, 0, 'the parent guard never ran for a path it cannot serve');
+  navigate('/app/known');
+  assert.is(r.matched()?.view, Login, '…and it still guards the path it CAN serve');
+  assert.equal(guardRuns, 1, 'the guard ran exactly once, for the real match');
+});
+
+test('router: a blocked branch offers the next candidate, not the catch-all', () => {
+  // The docs promise `false` "aborts the current sibling and tries the next one". Two-phase
+  // resolution would have lost that — a blocked route anywhere in the chain would drop straight to
+  // the catch-all — so the blocked route is struck out and matching is offered a second chance.
+  const Alt: Component = () => span('alt');
+  const r: Router = createRouter([
+    {
+      path: '/a',
+      component: Home,
+      children: [{ path: 'b', component: About, guard: (): boolean => false }],
+    },
+    { path: '/a/b', component: Alt },
+    { path: '*', component: NotFound },
+  ]);
+  navigate('/a/b');
+  assert.is(r.matched()?.view, Alt, 'the next route that matches the same URL wins');
+  assert.equal(r.chain().length, 1, 'and the blocked branch is not in the chain');
+});
+
+test('router: when every candidate is blocked it falls through to the catch-all', () => {
+  const r: Router = createRouter([
+    { path: '/x', component: Home, guard: (): boolean => false },
+    { path: '/x', component: About, guard: (): boolean => false },
+    { path: '*', component: NotFound },
+  ]);
+  navigate('/x');
+  assert.is(r.matched()?.view, NotFound, 'nothing left to try → catch-all');
+});
+
+test('router: a guard blocking a sibling does not block the one after it', () => {
+  const r: Router = createRouter([
+    { path: '/y', component: Home, guard: (): boolean => false },
+    { path: '/y', component: About },
+    { path: '*', component: NotFound },
+  ]);
+  navigate('/y');
+  assert.is(r.matched()?.view, About, 'the second definition of the same path serves it');
+});

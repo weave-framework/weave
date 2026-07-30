@@ -287,7 +287,13 @@ r.navigate('/dashboard');
 `createRouter`'s options are `{ basename?, viewTransitions? }` — `basename` is equivalent to `setBasename` (see [Hosting under a sub-path](#hosting-under-a-sub-path)); `viewTransitions` is covered under [Animating route changes](#animating-route-changes).
 
 :::callout info "Redirect-loop protection"
-Resolution follows redirect and guard-redirect hops, but caps the chase at **16 hops**. If a redirect loop never settles, resolution gives up and yields an **empty chain** — a deliberate failure outcome (nothing renders) rather than an infinite spin. Design your redirects so they converge well under 16 hops.
+Resolution follows redirect and guard-redirect hops, but caps the chase at **16 hops**. If a redirect loop never settles, resolution gives up and yields an **empty chain** — a deliberate failure outcome (nothing renders) rather than an infinite spin — and logs a `console.error` naming the cycle it followed, so a blank outlet is never silent. Design your redirects so they converge well under 16 hops.
+:::
+
+:::callout tip "`guard` and `redirect` only run for a route that fully matches"
+Matching is prefix-based, and `path: '/'` (like an index child `path: ''`) compiles to **zero segments** — so it is a prefix of *every* URL at its level. A route only counts as matched when the whole path is consumed: either it has no remainder, or a child consumes what's left. Policy follows that same rule, so a `guard` or `redirect` on `/` does **not** fire for `/users`, and an index child's `redirect` fires for `/admin` but not for `/admin/users`.
+
+`path: '/'` is therefore usable both ways: as an exact route for the home page, and — with `children` — as a root layout that wraps everything.
 :::
 
 ## Guards and redirects
@@ -311,7 +317,7 @@ The `RouteContext` handed to a guard is `{ path: string; params: Record<string,s
 | Return | Effect |
 |--------|--------|
 | `true` | Allow — render this route |
-| `false` (or `null`) | **Block this branch.** Resolution aborts the current sibling and tries the next one; if none match, it falls through to the catch-all. At a nested level this aborts just that branch. |
+| `false` (or `null`) | **Block this branch.** The blocked route is struck out and matching runs again, so the next route that matches the same URL gets its turn — at any depth. Only when nothing is left does it fall through to the catch-all. |
 | a `string` | Redirect to that path (re-resolved as a new hop) |
 
 Two ordering facts:

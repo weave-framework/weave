@@ -14,6 +14,34 @@
 > already left it behind — Phase E ran 94 commits without a bump, and then released as one MINOR. The public
 > promise wins; the habit is retired.)*
 
+## Unreleased
+
+### Fixed — router
+- **A `guard` or `redirect` on `path: '/'` (or an index child `path: ''`) no longer hijacks every
+  sibling path.** Matching is prefix-based and those patterns compile to **zero segments**, so they
+  are a prefix of every URL at their level — and policy was evaluated on such a candidate *before*
+  anything checked whether a child consumed the remainder. A redirect meant for the index therefore
+  fired on unrelated paths, sent the router back to a path matching the same route again, and the
+  16-hop cap returned an **empty chain**: a blank outlet with no throw, no warning, `chain()` `[]`
+  and `redirectTo()` `null`. From the outside the router simply looked broken.
+
+  Resolution is now two passes. First it matches **structurally**, ignoring policy, under the rule
+  the old code stated in a comment but never applied to `guard`/`redirect`: *a route that cannot
+  complete is not a match.* Then it walks the resulting chain **outside-in** applying `redirect` and
+  `guard`, so a layout's auth check still decides before its child is consulted. `path: '/'` is
+  usable both as an exact route and as a root layout with children, and this also covers the case a
+  narrower fix would miss: a route **with** children whose guard used to run for a sub-path none of
+  them matched.
+
+  `false` keeps meaning "block this branch" — the blocked route is struck out and matching runs
+  again, so the next route matching the same URL gets its turn at **any** depth. That is what the
+  docs always promised; at the top level the old code did not do it.
+
+- **The two silent failures are silent no longer.** A redirect loop that exhausts the 16 hops logs a
+  `console.error` naming the cycle it followed (`/users → /login → /users → …`) instead of just
+  rendering nothing, and a matched route with no `component` — which renders a blank outlet and
+  stops any nested `<RouterView>` below it from mounting — is reported once by name.
+
 ## 2.2.0 — 2026-07-29
 
 ### Added — CLI

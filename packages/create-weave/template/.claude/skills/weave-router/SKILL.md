@@ -103,6 +103,7 @@ Only the **top** outlet acts on `redirectTo()` — don't wire it yourself.
 
 - **Route `guard`** — synchronous; reads signals; return `true` (allow), `false` (block → fallback), or a **path string** (redirect). Because it reads signals, the route re-resolves automatically when auth changes.
 - **Static `redirect`** — `{ path: '/old', redirect: '/new' }`.
+- **Both only run for a route that FULLY matches.** Matching is prefix-based and `path: '/'` (like an index child `path: ''`) is zero segments, i.e. a prefix of every URL at its level — but a route counts as matched only when the path is consumed (no remainder, or a child consumes it). So a `guard`/`redirect` on `/` does not fire for `/users`, and an index child's `redirect` fires for `/admin` but not `/admin/users`. `path: '/'` works both as the home route and, with `children`, as a root layout.
 - **`beforeEach(fn)`** — an **async** before-leave guard (return `boolean | Promise<boolean>`); the place for an "unsaved changes?" dialog. Register in a component and unregister on cleanup.
 - **`afterEach(fn)`** — runs after every navigation (title, analytics, focus). Both return an unsubscribe function.
 

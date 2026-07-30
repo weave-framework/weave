@@ -557,7 +557,64 @@ export interface Match {
 
 type LevelResult = { chain: Match[] } | { redirect: string } | null;
 
-/** Resolve one sibling level: first matching route → redirect / guard / descend / leaf. */
+/** A structurally matched route plus the params accumulated down to it — before any policy runs. */
+interface Candidate {
+  c: Compiled;
+  params: RouteParams;
+}
+
+/**
+ * PHASE 1 — structure only: which routes does this path actually resolve to, with `guard` and
+ * `redirect` ignored entirely?
+ *
+ * This separation is the fix for a class of bug, not one instance. Matching is PREFIX-based, and
+ * `path: '/'` (or an index child `path: ''`) compiles to ZERO segments — so it matches every URL at
+ * its level, with the whole path left over as the remainder. Policy used to be evaluated on such a
+ * candidate before anything asked whether a child consumed that remainder, so a redirect meant for
+ * the index fired on unrelated paths, sent the router back to a path matching the same route again,
+ * and the hop cap below returned an EMPTY chain: a blank outlet, no throw, nothing logged.
+ *
+ * The rule this restores is the one the old code already stated in a comment but did not apply to
+ * policy: **a route that cannot complete is not a match.** Segments remaining with no child to
+ * consume them → try the next sibling, exactly as an unmatched literal does.
+ */
+function matchChain(
+  routes: Compiled[],
+  pathSegs: string[],
+  inherited: RouteParams,
+  rejected: Set<Compiled>
+): Candidate[] | null {
+  for (const c of routes) {
+    if (rejected.has(c)) continue; // a guard already blocked this branch — offer the next candidate
+    const m: { params: RouteParams; rest: string[] } | null = matchPrefix(c.segs, pathSegs);
+    if (!m) continue;
+    const params: RouteParams = { ...inherited, ...m.params };
+    const here: Candidate = { c, params };
+    if (m.rest.length === 0) {
+      // Path fully consumed: include an index child (`path: ''`) if one matches.
+      if (c.children.length) {
+        const idx: Candidate[] | null = matchChain(c.children, [], params, rejected);
+        if (idx) return [here, ...idx];
+      }
+      return [here];
+    }
+    // Segments remain: this route only matches if a child consumes the rest.
+    if (c.children.length) {
+      const sub: Candidate[] | null = matchChain(c.children, m.rest, params, rejected);
+      if (sub) return [here, ...sub];
+    }
+    // No child matched the remainder → not a full match; try the next sibling.
+  }
+  return null;
+}
+
+/**
+ * Resolve one level: match structurally, then apply policy to the chain that actually resulted.
+ *
+ * Policy runs **outside-in** — a parent's decision is made before its child is consulted, so an auth
+ * guard on a layout still short-circuits everything below it. That ordering is why this is two
+ * passes rather than "resolve the child first, then ask the parent".
+ */
 function resolveLevel(
   routes: Compiled[],
   pathSegs: string[],
@@ -565,33 +622,37 @@ function resolveLevel(
   fullPath: string,
   inherited: RouteParams
 ): LevelResult {
-  for (const c of routes) {
-    const m: { params: RouteParams; rest: string[] } | null = matchPrefix(c.segs, pathSegs);
-    if (!m) continue;
-    const params: RouteParams = { ...inherited, ...m.params };
-    if (c.route.redirect) return { redirect: c.route.redirect };
-    const verdict: boolean | string = c.route.guard ? c.route.guard({ path: fullPath, params, query }) : true;
-    if (verdict === false) return null; // blocked → caller falls back
-    if (typeof verdict === 'string') return { redirect: verdict };
-    const here: Match = { view: c.route.component!, params, loader: c.route.loader };
-    if (m.rest.length === 0) {
-      // Path fully consumed: include an index child (`path: ''`) if one matches.
-      if (c.children.length) {
-        const idx: LevelResult = resolveLevel(c.children, [], query, fullPath, params);
-        if (idx && 'redirect' in idx) return idx;
-        if (idx && 'chain' in idx) return { chain: [here, ...idx.chain] };
+  // A `false` verdict blocks its BRANCH, not the whole resolution: the blocked route is struck out
+  // and the next structural candidate is offered, exactly as an unmatched path would be — only then
+  // does it fall through to the catch-all. Terminates because each pass strikes out one route.
+  const rejected: Set<Compiled> = new Set<Compiled>();
+  for (;;) {
+    const candidates: Candidate[] | null = matchChain(routes, pathSegs, inherited, rejected);
+    if (!candidates) return null;
+    let blocked: Compiled | null = null;
+    for (const { c, params } of candidates) {
+      if (c.route.redirect) return { redirect: c.route.redirect };
+      const verdict: boolean | string = c.route.guard ? c.route.guard({ path: fullPath, params, query }) : true;
+      if (verdict === false) {
+        blocked = c;
+        break;
       }
-      return { chain: [here] };
+      if (typeof verdict === 'string') return { redirect: verdict };
     }
-    // Segments remain: this route only matches if a child consumes the rest.
-    if (c.children.length) {
-      const sub: LevelResult = resolveLevel(c.children, m.rest, query, fullPath, params);
-      if (sub && 'redirect' in sub) return sub;
-      if (sub && 'chain' in sub) return { chain: [here, ...sub.chain] };
+    if (blocked) {
+      rejected.add(blocked);
+      continue;
     }
-    // No child matched the remainder → not a full match; try the next sibling.
+    return {
+      chain: candidates.map(({ c, params }) => {
+        // `component` is optional on Route because a `redirect`-only route legitimately has none —
+        // and such a route never reaches here. One that DOES reach here without a component renders
+        // a blank outlet, indistinguishable from a mounting problem, so say it out loud once.
+        if (!c.route.component) warnViewless(c.route.path);
+        return { view: c.route.component!, params, loader: c.route.loader };
+      }),
+    };
   }
-  return null;
 }
 
 /** A router instance — owns its reactive URL state and resolves the matched route chain. Created by {@link createRouter}; reach the ambient one with {@link useRouter}. */
@@ -614,6 +675,24 @@ export interface Router {
   redirectTo: () => string | null;
   /** Warm a path's lazy route chunk(s) ahead of navigation (Link prefetch). */
   preload: (to: string) => void;
+}
+
+/**
+ * A route that resolves but has no `component` renders nothing — the outlet goes blank and a nested
+ * `<RouterView>` below it never gets mounted. `component` is optional because a `redirect`-only route
+ * legitimately has none (it never reaches a chain), so the type cannot catch this; the blank page is
+ * the only symptom. Report it once per offending route rather than per resolution — this runs inside
+ * a computed that re-runs on every path/query change.
+ */
+const viewlessWarned: Set<string> = new Set<string>();
+function warnViewless(path: string): void {
+  if (viewlessWarned.has(path)) return;
+  viewlessWarned.add(path);
+  console.warn(
+    `[weave router] route "${path}" matched but has no \`component\`, so it renders nothing ` +
+      `(and any nested <RouterView> under it never mounts). Give it a component, or make it a ` +
+      `\`redirect\` route.`
+  );
 }
 
 /** The most recently created router — the target of the module-level {@link prefetch}. */
@@ -645,7 +724,9 @@ export function createRouter(routes: Route[], options?: { basename?: string; vie
     const q: RouteParams = state.query();
     const start: string = state.path();
     let p: string = start;
+    const visited: string[] = [];
     for (let hops: number = 0; hops < 16; hops++) {
+      visited.push(p);
       const res: LevelResult = resolveLevel(compiled, splitSegs(p), q, p, {});
       const synced: string | null = p !== start ? p : null;
       if (res && 'redirect' in res) {
@@ -655,7 +736,13 @@ export function createRouter(routes: Route[], options?: { basename?: string; vie
       if (res && 'chain' in res) return { chain: res.chain, redirectTo: synced };
       return { chain: fallbackChain(), redirectTo: synced };
     }
-    return { chain: [], redirectTo: null }; // redirect loop — give up rather than spin
+    // Give up rather than spin — but SAY SO. An empty chain renders an empty outlet, which is
+    // indistinguishable from a mounting problem: the same silence cost a consumer hours.
+    console.error(
+      `[weave router] redirect loop, gave up after 16 hops: ${visited.join(' → ')} → …\n` +
+        `Each hop redirected to a path that redirects again. Check the \`redirect\`/\`guard\` on these routes.`
+    );
+    return { chain: [], redirectTo: null };
   });
 
   const chain = (): Match[] => resolution().chain;
