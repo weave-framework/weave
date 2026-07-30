@@ -14,7 +14,7 @@
 > already left it behind — Phase E ran 94 commits without a bump, and then released as one MINOR. The public
 > promise wins; the habit is retired.)*
 
-## Unreleased
+## 2.2.1 — 2026-07-29
 
 ### Fixed — router
 - **A `guard` or `redirect` on `path: '/'` (or an index child `path: ''`) no longer hijacks every

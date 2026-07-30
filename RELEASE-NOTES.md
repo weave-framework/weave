@@ -3,6 +3,33 @@
 Human-readable highlights, one section per release — everything notable that landed since
 the previous one. For the granular, per-version log see [CHANGELOG.md](CHANGELOG.md).
 
+## 2.2.1 — 2026-07-29
+
+A router fix, reported from a real app. A **patch** by the rule in
+[VERSIONING.md](VERSIONING.md): behaviour moves toward what was documented and intended, and no API shape
+changes — the behaviour being replaced was a blank page, not something an app could have worked against.
+
+**`guard` and `redirect` on `path: '/'` no longer fire for every other route.** Matching is prefix-based and
+`/` — like an index child `''` — compiles to **zero segments**, so it is a prefix of every URL at its level.
+Policy was evaluated on such a candidate before anything checked whether a child consumed the remainder, so a
+redirect meant for the index fired on unrelated paths, sent the router back to a path that matched the same
+route again, and the 16-hop cap returned an **empty chain**: nothing rendered, nothing threw, nothing was
+logged. A menu-driven route table with `{ path: '/', guard: () => '/login' }` simply looked like a router that
+does not work.
+
+Resolution is now two passes — match structurally, then apply `redirect`/`guard` **outside-in** over the chain
+that actually resulted — so a layout's auth check still decides before its child is consulted, and `path: '/'`
+is usable both as the home route and as a root layout with children. The same change fixes a subtler case: a
+route **with** children whose guard used to run for a sub-path none of them matched.
+
+`false` still means "block this branch", and now does so at every depth: the blocked route is struck out and
+matching runs again, so the next route matching that URL gets its turn. That is what the docs already
+described; at the top level the code did not do it.
+
+**Two silent failures now speak.** A redirect loop that exhausts its 16 hops logs the cycle it followed
+(`/users → /login → /users → …`) instead of rendering nothing, and a matched route with no `component` — which
+blanks the outlet and stops any nested `<RouterView>` from mounting — is named in a warning.
+
 ## 2.2.0 — 2026-07-29
 
 A feature release built around one large addition — a migration path into Weave — plus a crash in the reactive
