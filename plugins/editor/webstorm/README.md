@@ -18,6 +18,13 @@ In WebStorm: **Settings → Plugins → ⚙ (gear) → Install Plugin from Disk�
 - **`weave-webstorm-0.23.0.zip`** — current/complete: HTML syntax coloring, go-to-definition,
   hover, and red-squiggle diagnostics, plus the Weave logo. Built on the M10 unified `{{ }}`
   binding syntax. Verified working on WebStorm 261 (2026.1).
+
+  > **Known: WebStorm 2026.2 (build 262) reports this build as incompatible** and disables it on
+  > update. Nothing is broken — this `.zip` declares `until-build="261.*"`, a ceiling that expires
+  > on a date nobody chose. The source no longer sets one ([`editor/webstorm/build.gradle.kts`]),
+  > so the next build carries no upper bound; until that build is cut, WebStorm 2026.2 users stay
+  > on `weave check` in the terminal, which is unaffected. Rebuilding needs Gradle + **JDK 21**:
+  > `pnpm build:ls`, then from `editor/webstorm/`: `gradle --no-daemon buildPlugin`.
   - **0.23.0** — **a call inside a binding was never colored.** `WEAVE_BINDING_CALL` fell back to
     `DEFAULT_FUNCTION_CALL`, which carries **no foreground in any scheme the IDE ships** — Default,
     IntelliJ Light and Darcula all leave it as plain text. So `{{ onPick }}` was purple (its

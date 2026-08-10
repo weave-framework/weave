@@ -14,6 +14,25 @@
 > already left it behind — Phase E ran 94 commits without a bump, and then released as one MINOR. The public
 > promise wins; the habit is retired.)*
 
+## Unreleased
+
+### Fixed — editor tooling
+- **The shipped VS Code extension no longer carries the vulnerable `brace-expansion`.**
+  `weave-language-0.6.1.vsix` replaces `0.6.0`, rebuilt on `vscode-languageclient@10` (whose
+  `minimatch@10` pulls the patched `brace-expansion@5.0.8`). 2.2.1 closed CVE-2026-14257 in the
+  repository, but the extension bundles its dependencies, so the vulnerable copy stayed inside the
+  artifact users actually install. Verified in the archives themselves: the new `.vsix` carries the
+  5.x fingerprint, the old one does not. The extension now requires **VS Code ^1.91** (client 10's
+  own floor); the four client symbols it uses are unchanged.
+
+- **The WebStorm plugin no longer declares an expiry.** It shipped `until-build="261.*"`, so the day
+  WebStorm 2026.2 (build 262) arrived, every user was told *"Plugin incompatible with the new build
+  found: Weave"* and the plugin was disabled on update — with nothing actually broken. The build now
+  sets no upper bound: the plugin is a thin shell around a bundled LSP server, so the exposure to a
+  platform break is small, and a certain recurring outage is the worse of the two. **The shipped
+  `weave-webstorm-0.23.0.zip` still carries the old ceiling** — rebuilding it needs Gradle + JDK 21,
+  which is noted in `plugins/editor/webstorm/README.md`.
+
 ## 2.3.0 — 2026-07-31
 
 ### Added — UI
