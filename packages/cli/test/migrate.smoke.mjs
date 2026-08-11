@@ -77,6 +77,18 @@ await esbuild({
 });
 const cv = await import(pathToFileURL(outC).href);
 
+// Bundle the stylesheet reader — which classes a template uses, and which files define them.
+const outS = join(repo, 'node_modules', '.weave-migrate-styles-smoke.mjs');
+await esbuild({
+  entryPoints: [join(repo, 'packages', 'cli', 'src', 'migrate-styles.ts')],
+  bundle: true,
+  format: 'esm',
+  platform: 'node',
+  packages: 'external',
+  outfile: outS,
+});
+const st = await import(pathToFileURL(outS).href);
+
 // Bundle Weave's OWN compiler: a converted template has to be one Weave can actually compile. Every `html`
 // assertion below checks the shape of a string; only this checks the thing is usable.
 const outW = join(repo, 'node_modules', '.weave-migrate-compiler-smoke.mjs');
@@ -1976,10 +1988,74 @@ ok(uiOn.sanitize('C:/Program Files/app') === 'C:/Program Files/app', 'sanitize: 
 delete process.env.NO_COLOR;
 delete process.env.FORCE_COLOR;
 
+// ── styles that live OUTSIDE the component folder ──
+// A migration carries a component's own `styleUrls`. A project with a shared stylesheet library keeps half its
+// look there, in no component folder — so the component landed correct and rendered unstyled, with nothing
+// saying why. The classes are now looked up across the source workspace and the defining file is NAMED.
+ok(st.templateClassNames('<div class="a b">x</div>').sort().join(',') === 'a,b', 'templateClassNames: static class tokens are names');
+ok(!st.templateClassNames('<i class="icon-{{ kind }}-sm"></i>').length, 'templateClassNames: an interpolated token is a family of names, so none is claimed');
+ok(st.templateClassNames('<i class="fixed icon-{{ k }}"></i>').join(',') === 'fixed', 'templateClassNames: the static tokens beside an interpolated one are still read');
+ok(st.templateClassNames('<b class:is-on={{ live() }}>x</b>').join(',') === 'is-on', 'templateClassNames: a `class:` toggle names its class in the binding');
+ok(st.definedClassNames('.crumbs { &__item { color: red } }').has('crumbs__item'), 'definedClassNames: SCSS `&` composition is resolved — the nested name is the one people search for');
+ok(st.definedClassNames('.a { @media (min-width: 40.5em) { &__b { top: 0 } } }').has('a__b'), 'definedClassNames: an at-rule block does not lose the parent `&` refers to');
+ok(!st.definedClassNames('.a { width: 40.5em }').has('5em'), 'definedClassNames: a decimal in a value is not a class');
+// Both of these have to sit in a SELECTOR position. A `.ghost` inside a block body is never scanned anyway —
+// the first cut of these two asserted against text nothing reads, and passed with the stripping deleted.
+ok(!st.definedClassNames('.a[data-icon=".ghost"] { color: red }').has('ghost'), 'definedClassNames: a class name inside a string is not a selector');
+ok(!st.definedClassNames('/* .spook */ .real { color: red }').has('spook'), 'definedClassNames: a class name inside a comment defines nothing');
+ok(st.definedClassNames('/* .spook */ .real { color: red }').has('real'), 'definedClassNames: and stripping the comment does not take the selector after it');
+// `//` is only a comment when it does not follow a `:`. Read as one, it eats the rest of the LINE — and a
+// stylesheet that opens with an `@import url(…)` would lose every selector sharing that line with it.
+ok(st.definedClassNames('@import url(http://cdn/x.css); .real { color: red }').has('real'), 'definedClassNames: the `//` in a URL is not a comment, so the selectors beside it survive');
+ok(st.definedClassNames('.flat\n  color: red\n.other\n  color: blue').has('other'), 'definedClassNames: indented Sass has no braces, and is read line-wise');
+
+const styDir = mkdtempSync(join(tmpdir(), 'weave-styles-'));
+try {
+  const feature = join(styDir, 'libs', 'feature', 'src', 'lib');
+  const shared = join(styDir, 'libs', 'styles', 'src', 'lib');
+  mkdirSync(feature, { recursive: true });
+  mkdirSync(shared, { recursive: true });
+  writeFileSync(join(styDir, 'tsconfig.base.json'), '{}\n'); // the workspace root the lookup walks up to
+  writeFileSync(join(styDir, 'libs', 'feature', 'src', 'index.ts'), "export * from './lib/widget.component';\n");
+  // The shared stylesheet library: the rules no component folder holds. `&__row` is the case a flat scan misses.
+  writeFileSync(join(shared, '_widget.scss'), '.widget {\n  color: red;\n  &__row { padding: 4px }\n}\n.is-active { font-weight: 700 }\n');
+  writeFileSync(join(feature, 'widget.component.scss'), '.widget-own { margin: 0 }\n');
+  writeFileSync(
+    join(feature, 'widget.component.html'),
+    '<div class="widget__row widget-own nowhere-defined" [class.is-active]="on">x</div>\n',
+  );
+  writeFileSync(
+    join(feature, 'widget.component.ts'),
+    "import { Component } from '@angular/core';\n@Component({ selector: 'x-widget', templateUrl: './widget.component.html', styleUrls: ['./widget.component.scss'] })\nexport class WidgetComponent { on = true; }\n",
+  );
+  const styFacts = a.assembleFacts(join(styDir, 'libs', 'feature'));
+  const styWrites = cv.planWrites(styFacts, join(styDir, 'out'));
+  const tpl = styWrites.find((w) => w.path.endsWith('widget.html'));
+  // The markup itself names every class, so each assertion reads the NOTE alone — otherwise "is it reported?"
+  // and "is it in the file?" are the same question and none of these checks means anything.
+  const note = (tpl?.content ?? '').split('-->')[0];
+  ok(!!tpl && /TODO\(weave migrate\)/.test(note), 'planWrites: a template using classes styled elsewhere says so at its top');
+  ok(/_widget\.scss/.test(note), 'planWrites: and it NAMES the source stylesheet that defines them');
+  ok(/\.widget__row/.test(note), 'planWrites: a class defined only through SCSS nesting is reported, not missed');
+  ok(/\.is-active/.test(note), 'planWrites: a `class:` toggle counts as a use — it is a class the markup applies');
+  ok(!/\.widget-own/.test(note), "planWrites: a class the component's OWN carried stylesheet defines is not reported");
+  ok(!/\.nowhere-defined/.test(note), 'planWrites: a class defined nowhere in the workspace is not reported — it belongs to a global stylesheet, or to nothing');
+  ok(!!tpl && /nowhere-defined/.test(tpl.content), 'planWrites: and the markup itself is untouched — reporting a class never means editing it out');
+  ok(!/padding: 4px/.test(note), 'planWrites: the rules are NAMED, never copied — lifted out of their library they lose their variables and mixins');
+  ok(!note.includes(styDir), 'planWrites: the note carries a workspace-relative path, not an absolute one');
+  ok(!!tpl && (tpl.styleGaps ?? []).length === 2, `planWrites: the gap is recorded on the item so the CLI can report it once for the whole run (got ${(tpl?.styleGaps ?? []).length})`);
+  const own = styWrites.find((w) => w.path.endsWith('widget.scss'));
+  ok(!!own && /\.widget-own/.test(own.content), "planWrites: the component's own stylesheet is still carried");
+} finally {
+  rmSync(styDir, { recursive: true, force: true });
+}
+ok(/styleGaps/.test(migrateSrc), 'convertStep: the run reports the missing stylesheets once, before anything is written');
+
 rmSync(out, { force: true });
 rmSync(outA, { force: true });
 rmSync(outP, { force: true });
 rmSync(outC, { force: true });
+rmSync(outS, { force: true });
 rmSync(outUi, { force: true });
 
 if (failures) {

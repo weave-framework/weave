@@ -16,6 +16,20 @@
 
 ## Unreleased
 
+### Added — `weave migrate`
+- **A migrated component now says where its missing styles live.** A component carries its own `styleUrls`;
+  a project that keeps a shared stylesheet library keeps half its look in no component folder at all, so the
+  converted component landed correct and rendered unstyled — default bullets, no separators — with nothing
+  saying why. Every converted template is now read for the classes it applies (static `class="…"` tokens and
+  `class:` toggles), and any class its own stylesheets do not define is looked up across the source workspace;
+  the file that defines it is named at the top of the template and once more for the whole run before anything
+  is written. SCSS `&` composition is resolved, so `.crumbs { &__item { … } }` is found under the name the
+  markup actually uses — a flat scan would have reported that file as irrelevant to the very class that sent
+  you looking. The rules are **named, never copied**: lifted out of its library a rule loses the variables and
+  mixins around it, so a carried copy is about as likely to fail to compile as to work. A class assembled at
+  runtime (`class="icon-{{ kind }}"`) is not a name and nothing is claimed about it; a class defined nowhere in
+  the workspace is not reported, since it belongs to a global stylesheet the app already loads.
+
 ### Fixed — editor tooling
 - **The shipped VS Code extension no longer carries the vulnerable `brace-expansion`.**
   `weave-language-0.6.1.vsix` replaces `0.6.0`, rebuilt on `vscode-languageclient@10` (whose

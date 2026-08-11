@@ -21,7 +21,16 @@ import { asyncifyAwaiters, observableReturners, pruneRxImports, replaceTypeName,
 // collisions belongs beside it rather than a module away.
 export { danglingAcrossSections, resolveImports, sections, symbolCollisions, type WeaveSymbol } from './migrate-symbols.js';
 import {
+  definedClassNames,
+  externalStyleUses,
+  indexStylesheets,
+  styleNote,
+  templateClassNames,
+  type ExternalStyleUse,
+} from './migrate-styles.js';
+import {
   exportedNames,
+  findWorkspaceRoot,
   importedNamesFrom,
   sourceImports,
   type ClassMember,
@@ -3019,6 +3028,9 @@ export interface WriteItem {
   content: string;
   /** `write` — new file. `skip-exists` — something is already there, so we do NOT touch it. */
   status: 'write' | 'skip-exists';
+  /** Classes this template uses that are styled outside the component — recorded so the CLI can report them
+   *  once for the whole run instead of the reader finding the same note file by file. */
+  styleGaps?: ExternalStyleUse[];
 }
 
 /**
@@ -3361,6 +3373,23 @@ export function symbolTable(facts: MigrationFacts, targetDir: string, subdir: st
   return table;
 }
 
+/**
+ * The source workspace's stylesheets, indexed by the classes they define — built at most ONCE per workspace.
+ *
+ * `planWrites` runs twice in a normal session (once to see whether there is anything to convert, once for real),
+ * and a monorepo's stylesheet tree is the largest thing this command reads. The index is a property of the
+ * source, not of the run, so it is cached by root for the life of the process.
+ */
+const SHEET_INDEX: Map<string, Map<string, string[]>> = new Map<string, Map<string, string[]>>();
+function sheetIndex(facts: MigrationFacts): Map<string, string[]> {
+  const root: string = findWorkspaceRoot(facts.unit);
+  const cached: Map<string, string[]> | undefined = SHEET_INDEX.get(root);
+  if (cached) return cached;
+  const built: Map<string, string[]> = indexStylesheets(root);
+  SHEET_INDEX.set(root, built);
+  return built;
+}
+
 export function planWrites(facts: MigrationFacts, targetDir: string, subdir: string = ''): WriteItem[] {
   const items: WriteItem[] = [];
   // The whole-unit mapping, built FIRST: every emitted file is resolved against it at the end, so a rename that
@@ -3385,17 +3414,27 @@ export function planWrites(facts: MigrationFacts, targetDir: string, subdir: str
       html === null
         ? `${pair.ts}\n// TODO(weave migrate): the template could not be read (${cf.templateUrl ?? 'no template'}) — port it by hand.\n`
         : pair.ts;
-    for (const [ext, content] of [
-      ['.ts', tsBody],
-      ['.html', html === null ? `${todo('the original template could not be read — port it by hand')}\n` : `${pair.html}\n`],
-    ] as Array<[string, string]>) {
-      const path: string = join(targetDir, 'src', subdir, dir, `${base}${ext}`);
-      items.push({ path, content, status: existsSync(path) ? 'skip-exists' : 'write' });
-    }
     // STYLES. A Weave component's stylesheet is its sibling, so the first source stylesheet becomes
     // `<base>.<ext>` and inline `styles:` are written out as that sibling too. Neither used to be carried at all:
     // styleUrls were recorded as a fact and the files left behind, and inline styles were only ever COUNTED.
-    for (const item of componentStyles(cf, base)) {
+    const sheets: Array<{ name: string; content: string }> = componentStyles(cf, base);
+    // And the half no component folder holds: a class this template uses whose rule lives in a shared stylesheet
+    // library. Carried nothing, said nothing — the component rendered unstyled and looked like a conversion bug.
+    // Computed before the template is queued, because the note belongs at the top of it.
+    const own: Set<string> = new Set<string>(sheets.flatMap((s: { name: string; content: string }) => [...definedClassNames(s.content)]));
+    const gaps: ExternalStyleUse[] = html === null ? [] : externalStyleUses(templateClassNames(pair.html), own, sheetIndex(facts));
+    const root: string = findWorkspaceRoot(facts.unit);
+    const note: string = styleNote(gaps, (f: string) => relative(root, f).split(sep).join('/'));
+    const tsPath: string = join(targetDir, 'src', subdir, dir, `${base}.ts`);
+    items.push({ path: tsPath, content: tsBody, status: existsSync(tsPath) ? 'skip-exists' : 'write' });
+    const htmlPath: string = join(targetDir, 'src', subdir, dir, `${base}.html`);
+    items.push({
+      path: htmlPath,
+      content: html === null ? `${todo('the original template could not be read — port it by hand')}\n` : `${note}${pair.html}\n`,
+      status: existsSync(htmlPath) ? 'skip-exists' : 'write',
+      ...(gaps.length ? { styleGaps: gaps } : {}),
+    });
+    for (const item of sheets) {
       const path: string = join(targetDir, 'src', subdir, dir, item.name);
       items.push({ path, content: item.content, status: existsSync(path) ? 'skip-exists' : 'write' });
     }

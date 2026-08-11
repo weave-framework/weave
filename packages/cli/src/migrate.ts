@@ -653,6 +653,19 @@ async function convertStep(io: InputManager, facts: MigrationFacts, targetDir: s
     }
   }
 
+  // The look that does NOT come with the folder. A component carries its own `styleUrls`; a class whose rule
+  // lives in a shared stylesheet library carries nothing, and the component renders unstyled with no clue why.
+  // Each affected template says so at its top — this says it once, for the whole run, before anything is written.
+  const gapFiles: string[] = [...new Set(fresh.flatMap((i: WriteItem) => (i.styleGaps ?? []).flatMap((g) => g.files)))];
+  if (gapFiles.length) {
+    const templates: number = fresh.filter((i: WriteItem) => i.styleGaps?.length).length;
+    console.log(`\n${c.yellow('Some of the look lives outside these components:')} ${c.dim(`${templates} template(s) use classes styled elsewhere.`)}`);
+    for (const f of gapFiles.slice(0, 8)) console.log(`  ${c.yellow('•')} ${relative(facts.unit, f)}`);
+    if (gapFiles.length > 8) console.log(c.dim(`  … and ${gapFiles.length - 8} more`));
+    console.log(c.dim('  Those rules are NOT copied — lifted out of their library they lose the variables and mixins'));
+    console.log(c.dim('  around them. Each template names the classes it is missing; bring the rules over yourself.'));
+  }
+
   // Does what we are about to write HOLD TOGETHER? Everything above looked at one declaration at a time; this
   // type-checks the planned files as one program, so a rename that landed in one file and not in its importer
   // is a line on screen instead of something you find later.

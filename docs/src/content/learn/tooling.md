@@ -338,6 +338,27 @@ were rewritten still has to exist when something reads the service itself (`_rou
 hole with a `TODO` rather than dropped; and the local alias a constructor wrote for it (`const _router: Router =
 this._router`) is removed, because once `this.` is gone that line declares a binding from itself.
 
+### The look that does not come with the folder
+
+A component carries its own stylesheets: `styleUrls` are renamed to the sibling Weave expects, and inline
+`styles:` are written out as that sibling too. What no component folder holds is the shared stylesheet library
+many projects keep — and a component migrated out of such a project lands *correct* and renders unstyled, with
+nothing on screen saying why.
+
+So every converted template is read for the classes it applies — static `class="…"` tokens and `class:` toggles
+alike — and any class its own stylesheets do not define is looked up across the source workspace. Where the rule
+lives is written at the top of the template, and named once for the whole run before anything is written:
+
+~~~text
+Some of the look lives outside these components: 3 template(s) use classes styled elsewhere.
+  • libs/styles/src/lib/_breadcrumbs.scss
+~~~
+
+The rules are **named, never copied**. Lifted out of its library a rule loses the variables, the mixins and the
+nesting around it, so a carried copy is about as likely to fail to compile as to work. A class assembled at
+runtime (`class="icon-{{ kind }}"`) is not a name, so nothing is claimed about it; a class defined nowhere in the
+workspace is not reported at all, because it belongs to a global stylesheet the app already loads.
+
 ### It asks for what it cannot see
 
 A method calls a method calls a method, and some of those live somewhere the walk never went — a workspace
