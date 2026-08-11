@@ -25,13 +25,20 @@
   5.x fingerprint, the old one does not. The extension now requires **VS Code ^1.91** (client 10's
   own floor); the four client symbols it uses are unchanged.
 
-- **The WebStorm plugin no longer declares an expiry.** It shipped `until-build="261.*"`, so the day
-  WebStorm 2026.2 (build 262) arrived, every user was told *"Plugin incompatible with the new build
-  found: Weave"* and the plugin was disabled on update — with nothing actually broken. The build now
-  sets no upper bound: the plugin is a thin shell around a bundled LSP server, so the exposure to a
-  platform break is small, and a certain recurring outage is the worse of the two. **The shipped
-  `weave-webstorm-0.23.0.zip` still carries the old ceiling** — rebuilding it needs Gradle + JDK 21,
-  which is noted in `plugins/editor/webstorm/README.md`.
+- **The WebStorm plugin no longer declares an expiry.** `weave-webstorm-0.23.1.zip` replaces `0.23.0`
+  — identical plugin code, rebuilt with no `until-build`. The old build declared `until-build="261.*"`,
+  so the day WebStorm 2026.2 (build 262) arrived, every user was told *"Plugin incompatible with the
+  new build found: Weave"* and the plugin was disabled on update, with nothing actually broken. A
+  pinned ceiling expires on a date nobody chose; this plugin is a thin shell around a bundled LSP
+  server, so the exposure to a real platform break is small, and a certain recurring outage is the
+  worse of the two.
+
+- **The WebStorm plugin builds from a clean clone now.** It had no Gradle wrapper, so `buildPlugin`
+  depended on whatever Gradle and JDK happened to be on the machine — which is why it built fine for
+  months and then appeared to "stop working" the moment anyone tried it from a shell rather than
+  from the IDE. `gradlew`/`gradlew.bat` + `gradle/wrapper/` are now committed: `./gradlew buildPlugin`
+  fetches its own Gradle. A JDK **21** is still required (`jvmToolchain(21)`, and there is no
+  toolchain resolver configured to download one).
 
 ## 2.3.0 — 2026-07-31
 

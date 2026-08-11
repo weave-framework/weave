@@ -15,16 +15,14 @@ hover. Works for both `.weave` single-file components and the separate `.ts` + `
 In WebStorm: **Settings → Plugins → ⚙ (gear) → Install Plugin from Disk…** → pick the
 **latest** `weave-webstorm-*.zip` from this folder → **Restart**.
 
-- **`weave-webstorm-0.23.0.zip`** — current/complete: HTML syntax coloring, go-to-definition,
+- **`weave-webstorm-0.23.1.zip`** — current/complete: HTML syntax coloring, go-to-definition,
   hover, and red-squiggle diagnostics, plus the Weave logo. Built on the M10 unified `{{ }}`
-  binding syntax. Verified working on WebStorm 261 (2026.1).
-
-  > **Known: WebStorm 2026.2 (build 262) reports this build as incompatible** and disables it on
-  > update. Nothing is broken — this `.zip` declares `until-build="261.*"`, a ceiling that expires
-  > on a date nobody chose. The source no longer sets one ([`editor/webstorm/build.gradle.kts`]),
-  > so the next build carries no upper bound; until that build is cut, WebStorm 2026.2 users stay
-  > on `weave check` in the terminal, which is unaffected. Rebuilding needs Gradle + **JDK 21**:
-  > `pnpm build:ls`, then from `editor/webstorm/`: `gradle --no-daemon buildPlugin`.
+  binding syntax.
+  - **0.23.1** — **no `until-build` ceiling.** Identical plugin code to 0.23.0; only the declared
+    compatibility range changed. 0.23.0 said `until-build="261.*"`, so the day WebStorm 2026.2
+    (build 262) shipped, every user was told *"Plugin incompatible with the new build found:
+    Weave"* and the plugin was disabled on update — with nothing actually broken. A pinned ceiling
+    expires on a date nobody chose. This build declares only `since-build="243"`.
   - **0.23.0** — **a call inside a binding was never colored.** `WEAVE_BINDING_CALL` fell back to
     `DEFAULT_FUNCTION_CALL`, which carries **no foreground in any scheme the IDE ships** — Default,
     IntelliJ Light and Darcula all leave it as plain text. So `{{ onPick }}` was purple (its
