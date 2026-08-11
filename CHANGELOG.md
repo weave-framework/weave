@@ -14,9 +14,9 @@
 > already left it behind — Phase E ran 94 commits without a bump, and then released as one MINOR. The public
 > promise wins; the habit is retired.)*
 
-## Unreleased
+## 3.0.0
 
-> ⚠️ **This batch contains a BREAKING change and requires a MAJOR** — see the option-accessor entry
+> ⚠️ **MAJOR — this release contains a BREAKING change** — see the option-accessor entry
 > immediately below. Code that passes a domain object to `<Select>`/`<Autocomplete>` without
 > `optionValue`/`optionLabel` compiled before and does not now. It never worked at runtime (the
 > defaults read `.value`/`.label`, which such an option does not have, so every row rendered

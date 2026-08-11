@@ -66,6 +66,16 @@ A deprecated API keeps working until at least the next major release, and is onl
 removed — so deprecations don't pile up forever, and nothing disappears without that
 window to migrate.
 
+**One case has no deprecation window, and saying so is fairer than implying otherwise: a
+TYPE narrowed to reject code that never worked.** A deprecation window means the old way
+keeps working while it warns — but there is nothing to keep working here. The code the
+narrowed type now rejects was already broken at runtime; the type was simply not saying so.
+Warning instead of erroring would leave the defect in place and add noise on top of it.
+Such a change still lands only in a major, still gets migration notes, and still never
+arrives in a routine upgrade — it just goes straight to the error, because the interval a
+deprecation buys you is an interval of code that does not work. `3.0.0`'s option accessors
+are the first instance; it is named in the release notes with the one-line migration.
+
 ## 1.0 and onward
 
 **Weave is 1.0.** The public API surface above was audited and settled ([RFC 0005](rfcs/0005-api-surface-audit.md)),

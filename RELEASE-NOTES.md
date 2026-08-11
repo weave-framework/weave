@@ -3,6 +3,82 @@
 Human-readable highlights, one section per release — everything notable that landed since
 the previous one. For the granular, per-version log see [CHANGELOG.md](CHANGELOG.md).
 
+## 3.0.0 — 2026-08-11
+
+A **major**, for one reason: a type that used to accept code now refuses it. Everything else here is a fix
+for something that was quietly not working — checking that wasn't happening, a page shipping without its own
+`<head>`, a tool that died on a file it should have skipped.
+
+### Breaking: `<Select>` / `<Autocomplete>` require their option accessors
+
+`optionValue` and `optionLabel` default to reading `.value` and `.label` off each option. If your options are
+an API row with neither, those defaults return `undefined` and every row renders empty — and the type said
+nothing, because it declared the accessors optional. It now requires them for an option type it cannot read:
+
+~~~ts
+// still fine — the defaults genuinely handle these
+Select({ options: [{ value: 'lt', label: 'Lithuania' }] });
+Select({ options: ['Small', 'Large'] });
+
+// now an error, and always was broken at runtime
+Select({ options: rows });                       // rows: { id, name }[]
+// the fix is the two accessors you already needed
+Select({ options: rows, optionValue: (r) => r.id, optionLabel: (r) => r.name });
+~~~
+
+An option type is "self-describing" when it is a plain string or carries a `value` field — a `{ value, label }`
+list, a string list, an empty list, and a domain object that already passes its accessors are all unchanged.
+If you annotate the props bag by hand, name the whole contract: `SelectProps<Row> & RequiredAccessors<Row>`.
+
+### A generic component was never really type-checked
+
+The same audit found why the above stayed invisible. A component whose `setup` is generic — six of them:
+`autocomplete`, `list`, `select`, `table`, `tabs`, `tree` — shipped a default export with the type parameter
+thrown away, because both producers of it read the parameter out of the function type, and TypeScript resolves
+an uninstantiated generic to `unknown`. In a template that meant `options` was `unknown[]` and accepted
+anything at all; imperatively it meant `Select<Option>(…)` would not compile and an accessor written for your
+own row type was rejected against `(item: unknown)`.
+
+Both halves are fixed. The parameters are re-declared onto the default export from the source, and a
+component tag's props are now checked by *calling* the component, so the parameter is inferred from the props
+you pass. One consequence you may see: a wrong prop type is now reported on the prop's expression rather than
+on its name.
+
+### `weave check` reads the markup inside `patch` ops
+
+A component-file extension that patches its base's template (RFC 0008) wrote no template of its own, so the
+checker treated it as an ordinary module and its patched markup was the one template Weave never looked at. It
+is now checked *in place* — patched into the base and checked there, so an op landing inside the base's `@for`
+sees that block's local, and the context is the base's plus your own. A typo lands on the character you wrote
+it on. Errors in the base's own markup stay the base's.
+
+### A prerendered page is your document
+
+`weave build --ssg` assembled each page from scratch — charset, title, stylesheet — and dropped everything
+your `index.html` said: the viewport meta, `lang`, your description and social meta, your favicon, and
+`<base>`. That last one broke more than itself, since a page at `/learn/templates` resolves relative URLs
+against `/learn/`. Your `<html>` attributes and whole `<head>` are now inherited by every generated route;
+only `<meta charset>` and the per-route `<title>` stay the generator's.
+
+### `weave migrate` tells you where the missing styles live
+
+A migrated component carries its own `styleUrls`. A project that keeps a shared stylesheet library keeps half
+its look in no component folder at all, so the component arrived correct and rendered unstyled with nothing
+saying why. Every converted template is now read for the classes it applies, and any class its own stylesheets
+don't define is looked up across your source workspace — the file that defines it is named at the top of the
+template. The rules are named, never copied: lifted out of their library they lose the variables and mixins
+around them.
+
+### Also
+
+- **Auto-expose no longer writes a `return` naming bindings your `setup` cannot see** — it could, for a patch
+  extension, and the component threw `ReferenceError` the first time it was created.
+- **`weave check` no longer dies on a module that quotes a component declaration.** Any file holding Weave
+  examples as data — a documentation page does — had its own prose read as a declaration, and one such file
+  aborted the whole run with a stack trace.
+- **Editor plugins:** the VS Code extension (`0.6.1`) no longer bundles the vulnerable `brace-expansion`, and
+  the WebStorm plugin (`0.23.1`) declares no `until-build`, so a new IDE build no longer disables it.
+
 ## 2.3.0 — 2026-07-31
 
 One small addition, from a real screen that needed it. A **minor**: new optional surface with a safe
