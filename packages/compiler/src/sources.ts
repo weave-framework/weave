@@ -23,6 +23,8 @@
  * to the `.ts` line:col.
  */
 
+import { blankComments } from './extension.js';
+
 export interface ExtractedSources {
   /** Raw `template` value (file path or inline markup), or undefined if not declared. */
   template?: string;
@@ -52,9 +54,16 @@ export function extractSources(script: string): ExtractedSources {
   let styles: string[] | undefined;
   const blanks: Array<[number, number]> = [];
 
+  // Scan a copy with comments and string CONTENTS blanked, so a declaration quoted inside a string is
+  // not read as one. A module holding Weave examples as text — every generated docs page does — otherwise
+  // threw `\`template\` must be a static string` on prose, and one such file aborted the whole
+  // `weave check` with a stack trace. Blanking is length-preserving, so every offset still indexes the
+  // ORIGINAL, which is what the values below are parsed out of.
+  const scan: string = blankComments(script, true);
+
   DECL.lastIndex = 0;
   let m: RegExpExecArray | null;
-  while ((m = DECL.exec(script)) !== null) {
+  while ((m = DECL.exec(scan)) !== null) {
     const kind: string = m[1];
     const valueStart: number = m.index + m[0].length;
     const parsed: ParsedLiteral = parseLiteral(script, valueStart, kind);

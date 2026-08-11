@@ -313,6 +313,30 @@ test('extractSources joins a concatenated `template` string (multi-line + splits
   assert.equal(template, '<button class={{ c() }} disabled={{ d() }}><slot></slot></button>');
 });
 
+test('extractSources ignores a declaration that only appears INSIDE a string', () => {
+  // A module holding Weave examples as text — every generated docs page does — is not a component.
+  // The scan used to read the quoted `export const template =` as a real declaration and throw
+  // "`template` must be a static string" on prose, and one such file aborted the whole
+  // `weave check` with a stack trace rather than a diagnostic.
+  const script: string =
+    'export const docs: string = `Write it inline:\n' +
+    'export const template = someHelper();\n' +
+    '`;\n' +
+    'export function setup(){ return {}; }';
+  const { template, script: rest } = extractSources(script);
+  assert.equal(template, undefined, 'nothing is extracted from inside a string literal');
+  assert.equal(rest.length, script.length, 'and the script comes back the same length (offsets intact)');
+});
+
+test('extractSources still reads a REAL declaration in a module that also quotes one', () => {
+  // The mirror of the case above: blanking the strings must not blank the declaration itself.
+  const script: string =
+    "export const note: string = 'export const template = nope();';\n" +
+    "export const template: string = '<b>hi</b>';\n" +
+    'export function setup(){ return {}; }';
+  assert.equal(extractSources(script).template, '<b>hi</b>');
+});
+
 test('extractSources allows comments between the joined literals', () => {
   // A split template is the norm, so annotating one of its lines is the next thing an author does.
   // It used to fail with "`template` must be a static string" — about a template that is entirely
