@@ -50,7 +50,7 @@ await build({
   platform: 'node',
   outfile: compilerJs,
 });
-const { compileComponent, extractSources, childImportCandidates } = await import(pathToFileURL(compilerJs).href);
+const { compileComponent, extractSources, childImportCandidates, genericDefaultProps } = await import(pathToFileURL(compilerJs).href);
 
 /* ── child-tag resolution — mirrors packages/cli/src/plugin.ts ── */
 
@@ -150,7 +150,9 @@ function compileOne(tsPath, source, decl) {
   // types without checking it); type-checking of the real source is the `typecheck`
   // gate's job on src/. This staged tree is EMIT-ONLY, so silence tsc's checks on it —
   // declaration emit (the typed default, setup, exported types) still runs.
-  return '// @ts-nocheck\n' + typeDefault(wired, hasSetup);
+  // The reader comes from the compiler bundle, so this build and `verify:ui-typed-default` cannot
+  // disagree about what a component's props are.
+  return '// @ts-nocheck\n' + typeDefault(wired, hasSetup, genericDefaultProps, relative(repo, tsPath));
 }
 
 /* ── stage the tree ── */

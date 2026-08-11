@@ -26,15 +26,30 @@
  * to declare `propDefaults` — shipped since 1.5.17 — failed the publish build with an error
  * pointing at the compiler instead of at this assumption.
  */
-export function typeDefault(code, hasSetup) {
-  const propsType = hasSetup ? 'Parameters<typeof setup>[0]' : 'Record<string, unknown>';
+export function typeDefault(code, hasSetup, genericDefaultProps, name) {
+  // A GENERIC setup cannot be read by `Parameters<>`: applied to an uninstantiated generic, TypeScript
+  // resolves every type parameter to `unknown`, and the declared default does not apply (a default is for
+  // a CALL, not for destructuring a type). So `<Select>`'s `options` shipped as `unknown[]` and accepted
+  // an array of anything — in a template, where an author cannot write a type argument to get out of it.
+  // The parameters are re-declared from the source instead. A non-generic component keeps `Parameters<>`,
+  // which is exact, so its emitted default is byte-for-byte what it was.
+  const generic = hasSetup && genericDefaultProps ? genericDefaultProps(code) : null;
+  if (hasSetup && !generic && /export\s+(?:async\s+)?function\s+setup\s*</.test(code)) {
+    throw new Error(
+      `weave: ${name ?? 'component'} — \`setup\` is generic but its props parameter has no type annotation, ` +
+        `so the type parameters cannot be carried onto the default export and every one would silently ` +
+        `become \`unknown\`. Annotate the parameter (\`props: XProps<T>\`).`
+    );
+  }
+  const propsType = generic ? generic.propsType : hasSetup ? 'Parameters<typeof setup>[0]' : 'Record<string, unknown>';
+  const typeParams = generic ? `<${generic.typeParams}>` : '';
   const m = /(?:^|\n)export default (defineComponent\([\s\S]*\));$/.exec(code);
   if (m === null) {
     throw new Error(`weave: unexpected compileComponent tail — cannot inject typed default`);
   }
   const typed =
     `const _weaveDefault = ${m[1]} as unknown as ` +
-    `(props: ${propsType}, slots?: Record<string, () => Node>) => Node;\n` +
+    `${typeParams}(props: ${propsType}, slots?: Record<string, () => Node>) => Node;\n` +
     `export default _weaveDefault;`;
   const head = code.slice(0, m.index);
   return (m[0].startsWith('\n') ? head + '\n' : head) + typed;

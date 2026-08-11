@@ -11,6 +11,7 @@ export {
   type CompileResult,
 } from './codegen.js';
 export { applyPatches, parsePatchMarkup, shiftOffsets, type PatchOp } from './patch.js';
+export { setupSignature, genericDefaultProps, type SetupSignature } from './setup-signature.js';
 export {
   blankComments,
   defaultImportSpec,

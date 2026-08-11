@@ -16,6 +16,33 @@
 
 ## Unreleased
 
+### Fixed — generic components lost their type parameter (W-8)
+- **A component whose `setup` is generic shipped a default export with the type parameter thrown away.**
+  Both producers of that default flattened `setup`'s first parameter — `Parameters<typeof setup>[0]` in
+  the `.d.ts` `@weave-framework/ui` ships, `F extends (props: infer P, …)` in the virtual module
+  `weave check` and the editor type against — and TypeScript resolves an *uninstantiated* generic's
+  parameter to `unknown`. The declared default (`T = { value: string; label: string }`) does not apply:
+  a default is for a CALL, not for destructuring a type.
+  The loud half was that `Select<Option>({ options })` would not compile, and that an accessor typed to
+  a domain object (`optionValue: (o: Option) => o.value`) was rejected against `(item: unknown)`. The
+  quiet half is the one that mattered: a **template** checked its props against that same flattened
+  default, so the checking the component's author wrote `SelectProps<T>` to provide was simply absent —
+  and a template cannot write a type argument, so there was no way for an author to opt out of it.
+  Six components were affected: `autocomplete`, `list`, `select`, `table`, `tabs`, `tree`.
+  The parameters are now **re-declared** from the source onto the synthesized default (they cannot be
+  recovered by substitution over `typeof setup` — the list has to be written out), by a single reader in
+  the compiler that both producers call, so the shipped `.d.ts` and the editor cannot check different
+  contracts. A non-generic component's emitted default is byte-for-byte unchanged. A generic `setup`
+  whose props parameter carries no type annotation now **fails the ui build naming the component**,
+  rather than silently degrading to `unknown` — which is the defect itself.
+- **And the template side, which the declaration alone does not fix.** A component tag's props were
+  checked by annotating a const with `NonNullable<Parameters<typeof Child>[0]>`, which re-flattens a
+  generic exactly the same way. Props are now checked by **calling** the component, so the parameter is
+  inferred from the props being passed — which is what the runtime does with them anyway. One visible
+  consequence: TypeScript pins a prop error in a call argument to the *value*, where it pinned an
+  annotated const's to the *key*, so a wrong prop type is now reported on its expression. Both spans are
+  mapped, so both still reach the editor.
+
 ### Added — `weave check`
 - **The markup inside `patch` ops is type-checked.** ([RFC 0008](rfcs/0008-component-extension.md)'s last
   follow-on.) A `#3` extension writes no template of its own, so the checker classified it as an ordinary

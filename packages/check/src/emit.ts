@@ -23,6 +23,7 @@ import {
   inferCtxNames,
   injectAutoReturn,
   applyPatches,
+  genericDefaultProps,
   shiftOffsets,
   rewrite,
   type PatchOp,
@@ -257,7 +258,6 @@ export function buildVirtualPatch(
 function emit(nodes: TemplateNode[], ctx: Set<string>): Line[] {
   const lines: Line[] = [];
   let awaitN: number = 0; // unique source-binding names for `@await` type-queries
-  let propsN: number = 0; // unique names for child-component prop-check objects
 
   // A plain scaffolding line (no source mapping), optionally pinned to a source
   // offset for the legacy line→offset `templateMap`.
@@ -356,15 +356,20 @@ function emit(nodes: TemplateNode[], ctx: Set<string>): Line[] {
         emitAttr(attr, locals); // events / stray directives — checked, not part of props
       }
     }
-    const id: string = `__props${propsN++}`;
     const anchor: number | undefined = dataProps.find((p) => p.srcOffset !== undefined)?.srcOffset;
-    // The tag name is emitted as a *mapped* expression (not scaffolding), so the
-    // `<Component>` tag itself supports go-to-definition into the `.ts` import and an
-    // unknown tag surfaces "Cannot find name 'X'" pinned to the tag span.
+    // The props are checked by CALLING the component, not by annotating a const with its first
+    // parameter's type. `Parameters<typeof X>[0]` reads a GENERIC component wrong: it resolves every
+    // type parameter to `unknown`, so `<Select options={{ … }}>` accepted an array of anything, and a
+    // template cannot write a type argument to get the checking back. A call infers the parameter from
+    // the props being passed, which is what the runtime does with them anyway.
+    //
+    // The tag name is emitted as a *mapped* expression (not scaffolding), so the `<Component>` tag
+    // itself supports go-to-definition into the `.ts` import and an unknown tag surfaces
+    // "Cannot find name 'X'" pinned to the tag span.
     mk()
-      .lit(`  const ${id}: NonNullable<Parameters<typeof `)
+      .lit('  void ')
       .expr(node.tagOffset, node.tag, locals)
-      .lit(`>[0]> = {`)
+      .lit(`({`)
       .push(anchor ?? node.tagOffset);
     for (const p of dataProps) {
       // The KEY is emitted mapped (not as scaffolding): TypeScript reports a prop-contract
@@ -387,8 +392,7 @@ function emit(nodes: TemplateNode[], ctx: Set<string>): Line[] {
           .push(p.keyOffset);
       }
     }
-    push(`  };`);
-    push(`  void ${id};`);
+    push(`  });`);
   };
 
   const walk = (list: TemplateNode[], locals: Set<string>): void => {
@@ -593,13 +597,24 @@ function assemble(
   // Synthesize the typed default export the loader emits at build time
   // (`defineComponent(render, setup)`), so a PARENT importing this component
   // type-checks the props it passes against this component's `setup` contract.
-  const baseProps: string = hasSetup ? '__WeavePropsOf<typeof setup>' : 'Record<string, never>';
+  // A GENERIC setup cannot be read by extraction: `F extends (props: infer P, …)` applied to an
+  // uninstantiated generic resolves every type parameter to `unknown`, and the declared default does not
+  // apply (a default is for a CALL, not for destructuring a type). So `<Select options={{ … }}>` was
+  // checked against `unknown[]` and accepted an array of anything. The parameters are re-declared from
+  // the source instead. A non-generic component keeps the extraction, which is exact.
+  const generic: { typeParams: string; propsType: string } | null = script ? genericDefaultProps(script) : null;
+  const baseProps: string = generic
+    ? generic.propsType
+    : hasSetup
+      ? '__WeavePropsOf<typeof setup>'
+      : 'Record<string, never>';
   const propsType: string =
     script && HAS_PROP_DEFAULTS.test(script) ? `__WeaveWithDefaults<${baseProps}, typeof propDefaults>` : baseProps;
+  const typeParams: string = generic ? `<${generic.typeParams}>` : '';
   // `=> Node`, matching the runtime's `Component` type: an instance always returns its DOM. With
   // `unknown` here, calling a component imperatively — a `<Table>` cell, an `<Expansion>` body,
   // anything typed `(…) => Node` — needed a cast at every call site.
-  out.push(`declare const __weaveDefault: (props: ${propsType}, slots?: Record<string, () => Node>) => Node;`);
+  out.push(`declare const __weaveDefault: ${typeParams}(props: ${propsType}, slots?: Record<string, () => Node>) => Node;`);
   out.push('export default __weaveDefault;'); // also forces module scope
 
   // Char-precise mappings. The script is embedded verbatim at the very top, so it
