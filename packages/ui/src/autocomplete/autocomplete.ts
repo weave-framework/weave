@@ -18,7 +18,7 @@
  */
 import { signal, effect, onDispose, type Signal } from '@weave-framework/runtime';
 import { createOverlay, connectedPosition, listKeyManager, type OverlayRef, type ListKeyManager } from '../cdk/index.js';
-import { optValue, optLabel, optDescription, type OptionAccessors } from '../shared/options.js';
+import { optValue, optLabel, optDescription, type OptionAccessors, type RequiredAccessors } from '../shared/options.js';
 import { buildPositions, type MenuPosition } from '../shared/positions.js';
 
 /** The subset of a forms `Field<string>` an Autocomplete binds to (the text value). */
@@ -27,6 +27,10 @@ export interface AutocompleteControl {
   touched?: Signal<boolean>;
   error?: () => string | null;
 }
+
+// The option-shape contract, re-exported so a consumer can NAME it: an option type the defaults
+// cannot read (a domain object) requires the accessors, and an annotation has to be able to say so.
+export type { OptionAccessors, RequiredAccessors, SelfDescribingOption } from '../shared/options.js';
 
 export interface AutocompleteProps<T = { value: string; label: string }> extends OptionAccessors<T> {
   /** Static options — filtered locally by the typed text. */
@@ -91,7 +95,7 @@ export interface AutocompleteContext {
 
 let _seq: number = 0;
 
-export function setup<T = { value: string; label: string }>(props: AutocompleteProps<T>): AutocompleteContext {
+export function setup<T = { value: string; label: string }>(props: AutocompleteProps<T> & RequiredAccessors<T>): AutocompleteContext {
   const id: number = ++_seq;
   const input: Signal<HTMLInputElement | null> = signal<HTMLInputElement | null>(null);
   const open: Signal<boolean> = signal<boolean>(false);

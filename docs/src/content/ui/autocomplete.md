@@ -117,8 +117,8 @@ Open with typing or ↓, move with ↑/↓, select with Enter, close with Esc.
 | `value` | `string` | — | Controlled text value. Ignored when `control` is set. |
 | `onInput` | `(text: string) => void` | — | Called on every input. Ignored when `control` is set. |
 | `control` | `Field<string>` | — | A forms field — two-way text + touched-on-blur + error underline. |
-| `optionValue` | `(o: T) => string` | `o.value` | Pick the value field. |
-| `optionLabel` | `(o: T) => string` | `o.label` | Pick the display field. |
+| `optionValue` | `(o: T) => string` | `o.value` | Pick the value field. **Required** when `T` has no `value` field. |
+| `optionLabel` | `(o: T) => string` | `o.label` | Pick the display field. **Required** when `T` has no `value` field. |
 | `optionDescription` | `(o: T) => string` | `o.description` | Optional subtext per suggestion. |
 | `minChars` | `number` | `1` | Characters before suggestions show. |
 | `placeholder` | `string` | — | Placeholder text. |

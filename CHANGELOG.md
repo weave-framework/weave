@@ -16,6 +16,30 @@
 
 ## Unreleased
 
+> ⚠️ **This batch contains a BREAKING change and requires a MAJOR** — see the option-accessor entry
+> immediately below. Code that passes a domain object to `<Select>`/`<Autocomplete>` without
+> `optionValue`/`optionLabel` compiled before and does not now. It never worked at runtime (the
+> defaults read `.value`/`.label`, which such an option does not have, so every row rendered
+> `undefined`) — but a type that stops accepting previously-accepted code is a break either way, and
+> `VERSIONING.md` does not grade breaks by whether the old behaviour was any good.
+
+### BREAKING — the option accessors are required when the defaults cannot read the option
+- **`<Select>` / `<Autocomplete>` now demand `optionValue` + `optionLabel` for an option type that is
+  not self-describing.** The type used to say the accessors were optional while the runtime went on
+  reading `.value` and `.label`, so passing an API row type-checked clean and rendered `undefined` in
+  every row — the silent half of W-8, and the reason its reported case (`options: [{ nothing: 'x' },
+  42, null]`) still compiled after the type parameter was restored: `SelectProps<T>` asked nothing of
+  `T`, so any array satisfied it.
+  Self-describing means a plain string, or an object carrying `value` (`label` falls back to it) —
+  every shape the defaults genuinely handle. Those keep the accessors optional, so a `{ value, label }`
+  list, a string list, an empty list, and a domain object that already supplies its accessors are all
+  unchanged. **The migration is to write the two accessors you already needed**, or to name the full
+  contract in an annotation: `SelectProps<Row> & RequiredAccessors<Row>` (`RequiredAccessors` and
+  `SelfDescribingOption` are exported from both components).
+  Deliberately non-distributive (`[T] extends [ … ]`): a union of option shapes is self-describing only
+  if all of it is, and it keeps an empty `options={{ [] }}` (`T = never`) on the optional side instead
+  of collapsing the props type to `never`.
+
 ### Fixed — generic components lost their type parameter (W-8)
 - **A component whose `setup` is generic shipped a default export with the type parameter thrown away.**
   Both producers of that default flattened `setup`'s first parameter — `Parameters<typeof setup>[0]` in
@@ -42,6 +66,14 @@
   consequence: TypeScript pins a prop error in a call argument to the *value*, where it pinned an
   annotated const's to the *key*, so a wrong prop type is now reported on its expression. Both spans are
   mapped, so both still reach the editor.
+
+### Fixed — `weave check` died on a module that quotes a component declaration
+- **A `template` declaration written inside a STRING is no longer read as a real one.** The extractor
+  scanned raw text, so any module holding Weave examples as data — every generated documentation page
+  does — threw ``weave: `template` must be a static string`` about its own prose, and one such file
+  aborted the whole `weave check` with a stack trace instead of a diagnostic. It now scans a copy with
+  comments and string contents blanked; blanking is length-preserving, so every offset still indexes
+  the original and the values are parsed out of that.
 
 ### Added — `weave check`
 - **The markup inside `patch` ops is type-checked.** ([RFC 0008](rfcs/0008-component-extension.md)'s last

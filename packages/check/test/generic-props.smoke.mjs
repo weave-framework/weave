@@ -161,6 +161,48 @@ function check(parentHtml, parentSetup = 'export function setup(): Record<string
   );
 }
 
+// ── 5b. A contract that REQUIRES accessors for an option type its defaults cannot read (W-8's
+// criterion 4) reaches the template too. This is the shape `@weave-framework/ui` now ships: the
+// requirement is conditional on the inferred parameter, so it can only work if the template
+// instantiates the generic rather than flattening it. ──
+{
+  const dir = mkdtempSync(join(tmpdir(), 'weave-required-'));
+  mkdirSync(join(dir, 'app'), { recursive: true });
+  writeFileSync(
+    join(dir, 'app', 'picker.ts'),
+    'export type SelfDescribing = string | { value: string };\n' +
+      'export type Needs<T> = [T] extends [SelfDescribing] ? unknown : { label: (item: T) => string };\n' +
+      'export interface PickerProps<T> { items: T[]; label?: (item: T) => string }\n' +
+      'export function setup<T = { value: string }>(props: PickerProps<T> & Needs<T>): { items: () => T[] } {\n' +
+      '  return { items: (): T[] => props.items };\n' +
+      '}\n'
+  );
+  writeFileSync(join(dir, 'app', 'picker.html'), '<div>{{ items().length }}</div>\n');
+  const parent = (html, setup) => {
+    writeFileSync(join(dir, 'app', 'page.ts'), `import Picker from './picker';\nvoid Picker;\n${setup}`);
+    writeFileSync(join(dir, 'app', 'page.html'), html);
+    return checkProject([dir]).filter((d) => /page\.(ts|html)$/.test(d.file.replace(/\\/g, '/')));
+  };
+  const domain =
+    'export interface Row { id: string; name: string }\n' +
+    'export function setup(): { rows: () => Row[]; show: (r: Row) => string } {\n' +
+    "  return { rows: (): Row[] => [{ id: '1', name: 'a' }], show: (r: Row): string => r.name };\n" +
+    '}\n';
+  const missing = parent('<Picker items={{ rows() }} />\n', domain);
+  ok(missing.length > 0, 'a domain option type with no accessor is rejected — the runtime would read undefined');
+  const supplied = parent('<Picker items={{ rows() }} label={{ show }} />\n', domain);
+  ok(supplied.length === 0, `and supplying it compiles (got: ${supplied.map((d) => d.message).join(' | ')})`);
+  const selfDescribing =
+    'export function setup(): { rows: () => Array<{ value: string }> } {\n' +
+    "  return { rows: () => [{ value: 'a' }] };\n" +
+    '}\n';
+  const dflt = parent('<Picker items={{ rows() }} />\n', selfDescribing);
+  ok(dflt.length === 0, `a self-describing option type still needs nothing (got: ${dflt.map((d) => d.message).join(' | ')})`);
+  const empty = parent('<Picker items={{ [] }} />\n');
+  ok(empty.length === 0, `and an empty list does not collapse the contract to never (got: ${empty.map((d) => d.message).join(' | ')})`);
+  rmSync(dir, { recursive: true, force: true });
+}
+
 // ── 6. An unknown TAG still surfaces on the tag itself, not swallowed by the call shape. ──
 {
   const diags = check('<Nope items={{ [] }} />\n');

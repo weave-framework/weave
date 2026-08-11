@@ -178,6 +178,9 @@ mountComponent(Table, '#app', {
 
 await browser.close();
 
+/** The compiler settings both consumer checks run under — a real app's, near enough. */
+let options;
+
 /* ── 3. TYPES: a consumer type-checks `import Button` from dist ── */
 {
   const consumer = join(tmp, 'consume.ts');
@@ -198,7 +201,7 @@ await browser.close();
     ].join('\n')
   );
 
-  const options = {
+  const opts = {
     target: ts.ScriptTarget.ES2022,
     module: ts.ModuleKind.ESNext,
     moduleResolution: ts.ModuleResolutionKind.Bundler,
@@ -210,12 +213,63 @@ await browser.close();
     esModuleInterop: true,
     resolveJsonModule: true,
   };
-  const program = ts.createProgram([consumer], options);
+  options = opts; // shared with the generic-component check below, so both run a consumer's settings
+  const program = ts.createProgram([consumer], opts);
   const diags = [...program.getSemanticDiagnostics(), ...program.getSyntacticDiagnostics()].filter(
     (d) => d.file && d.file.fileName === consumer.replace(/\\/g, '/')
   );
   const messages = diags.map((d) => `TS${d.code}: ${ts.flattenDiagnosticMessageText(d.messageText, ' ')}`);
   ok(diags.length === 0, `Button (dist): consumer type-checks clean${messages.length ? ' — ' + messages.join('; ') : ''}`);
+}
+
+/* ── 4. TYPES: a GENERIC component, on the shipped declaration (W-8) ──
+ * Two defects met here. The type parameter used to be flattened away, so `options` was `unknown[]`
+ * and took an array of anything; and even once it survived, the accessors stayed optional while the
+ * runtime went on reading `.value`/`.label`, so a domain object type-checked clean and rendered
+ * `undefined` in every row. Every line below is the shipped contract, read from dist. */
+{
+  const consumer = join(tmp, 'consume-generic.ts');
+  const select = JSON.stringify(join(distDir, 'select/select.js').replace(/\\/g, '/'));
+  writeFileSync(
+    consumer,
+    [
+      `import Select from ${select};`,
+      `interface Row { id: string; name: string }`,
+      `const rows: Row[] = [{ id: '1', name: 'One' }];`,
+      // Shapes the defaults can genuinely read stay accessor-free — nothing that worked stops working.
+      `const dflt = Select({ options: [{ value: 'a', label: 'A' }] });`,
+      `const strs = Select({ options: ['small', 'large'] });`,
+      `const none = Select({ options: [] });`,
+      `const nums = Select({ options: [{ value: 1, label: 'One' }] });`,
+      // A domain object WITH accessors: the parameter is inferred, so they are typed to it.
+      `const dom = Select({ options: rows, optionValue: (r: Row): string => r.id, optionLabel: (r: Row): string => r.name });`,
+      // …and an accessor written for a DIFFERENT shape is a real error (was silent under `unknown`).
+      `// @ts-expect-error the accessor disagrees with the options`,
+      `const mismatch = Select({ options: rows, optionValue: (o: { other: number }): string => String(o.other) });`,
+      // The reported case: an array of nothing option-shaped, with no accessors.
+      `// @ts-expect-error an option type the defaults cannot read requires the accessors`,
+      `const absurd = Select({ options: [{ nothing: 'x' }, 42, null] });`,
+      // Half the contract is not the contract.
+      `// @ts-expect-error optionLabel is required too`,
+      `const half = Select({ options: rows, optionValue: (r: Row): string => r.id });`,
+      // An explicit type argument compiles — the default export is generic, not a plain const.
+      `const explicit = Select<{ value: string; label: string }>({ options: [{ value: 'a', label: 'A' }] });`,
+      // The same contract on the other option-driven component — one gate per component, because a
+      // tightening applied to only one of them is exactly the drift this is here to catch.
+      `import Autocomplete from ${JSON.stringify(join(distDir, 'autocomplete/autocomplete.js').replace(/\\/g, '/'))};`,
+      `const ac = Autocomplete({ options: rows, optionValue: (r: Row): string => r.id, optionLabel: (r: Row): string => r.name });`,
+      `// @ts-expect-error Autocomplete requires them for a domain option type too`,
+      `const acBad = Autocomplete({ options: rows });`,
+      `void dflt; void strs; void none; void nums; void dom; void mismatch; void absurd; void half; void explicit; void ac; void acBad;`,
+    ].join('\n')
+  );
+  const program = ts.createProgram([consumer], options);
+  const diags = [...program.getSemanticDiagnostics(), ...program.getSyntacticDiagnostics()].filter(
+    (d) => d.file && d.file.fileName === consumer.replace(/\\/g, '/')
+  );
+  const messages = diags.map((d) => `TS${d.code}: ${ts.flattenDiagnosticMessageText(d.messageText, ' ')}`);
+  // Every `@ts-expect-error` above is an assertion in both directions: unused, tsc reports it here.
+  ok(diags.length === 0, `Select (dist): a generic component's contract holds${messages.length ? ' — ' + messages.join('; ') : ''}`);
 }
 
 if (failed) {

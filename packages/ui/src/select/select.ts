@@ -19,11 +19,24 @@
  */
 import { signal, effect, onMount, onDispose, type Signal } from '@weave-framework/runtime';
 import { createOverlay, connectedPosition, listKeyManager, type OverlayRef, type ListKeyManager } from '../cdk/index.js';
-import { optValue, optLabel, optDescription, optDisabled, emitSelection, type OptionAccessors } from '../shared/options.js';
+import {
+  optValue,
+  optLabel,
+  optDescription,
+  optDisabled,
+  emitSelection,
+  type OptionAccessors,
+  type RequiredAccessors,
+} from '../shared/options.js';
 import { buildPositions, type MenuPosition } from '../shared/positions.js';
 
 /** What a Select's value can be (single or multiple; value strings or whole objects). */
 export type SelectValue<T> = string | T | Array<string | T> | undefined;
+
+// The option-shape contract, re-exported so a consumer can NAME it: an option type the defaults
+// cannot read (a domain object) requires the accessors, and an annotation has to be able to say so.
+export type { OptionAccessors, RequiredAccessors, SelfDescribingOption } from '../shared/options.js';
+
 
 /** The subset of a forms `Field` a Select binds to. */
 export interface SelectControl<T> {
@@ -102,7 +115,7 @@ export interface SelectContext<T> {
 
 let _seq: number = 0;
 
-export function setup<T = { value: string; label: string }>(props: SelectProps<T>): SelectContext<T> {
+export function setup<T = { value: string; label: string }>(props: SelectProps<T> & RequiredAccessors<T>): SelectContext<T> {
   const id: number = ++_seq;
   const root: Signal<HTMLElement | null> = signal<HTMLElement | null>(null);
   const trigger: Signal<HTMLElement | null> = signal<HTMLElement | null>(null);

@@ -47,7 +47,12 @@ export function setup() {
 ## Any option shape
 
 Your options don't have to be `{ value, label }` — point the accessors at whatever fields your data has. Plain
-strings work with no accessors at all:
+strings work with no accessors at all.
+
+**Required, not optional, for a shape the defaults can't read.** `optionValue`/`optionLabel` default to reading
+`.value` and `.label`, so an option type that has neither renders `undefined` in every row. The type says so:
+supply both, or use a shape with a `value` field (a plain string, `{ value }`, `{ value, label }`), and the
+accessors stay optional as before.
 
 ```html
 <!-- arbitrary objects -->
@@ -124,8 +129,8 @@ arrows (or **typeahead** — start typing a label), select with Enter/Space, clo
 | `value` | `SelectValue<T>` | — | Controlled value. Ignored when `control` is set. |
 | `onChange` | `(value: SelectValue<T>) => void` | — | Called with the next value. |
 | `control` | `Field` | — | A forms field — two-way + touched-on-close + error state. Wins over `value`. |
-| `optionValue` | `(o: T) => string` | `o.value` | Pick the value field. |
-| `optionLabel` | `(o: T) => string` | `o.label ?? o.value` | Pick the display field. |
+| `optionValue` | `(o: T) => string` | `o.value` | Pick the value field. **Required** when `T` has no `value` field. |
+| `optionLabel` | `(o: T) => string` | `o.label ?? o.value` | Pick the display field. **Required** when `T` has no `value` field. |
 | `optionDescription` | `(o: T) => string \| undefined` | `o.description` | Optional subtext per option. |
 | `optionDisabled` | `(o: T) => boolean` | `o.disabled` | Disable individual options. |
 | `emit` | `'value' \| 'object'` | `'value'` | Emit the option's value or the whole object. |

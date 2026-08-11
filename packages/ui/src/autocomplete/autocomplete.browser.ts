@@ -4,6 +4,7 @@ import * as dom from '@weave-framework/runtime/dom';
 import { compileTemplate } from '@weave-framework/compiler';
 import { overlayContainer } from '@weave-framework/ui/cdk';
 import { setup, template, type AutocompleteProps, type AutocompleteContext, type AutocompleteControl } from '@weave-framework/ui/autocomplete';
+import type { RequiredAccessors } from '@weave-framework/ui/autocomplete';
 import * as InputMod from '@weave-framework/ui/input';
 import * as IconMod from '@weave-framework/ui/icon';
 import { toComponent } from '../internal/compose.js';
@@ -38,9 +39,11 @@ interface Mounted {
   dispose: () => void;
 }
 
-function mount(props: AutocompleteProps<Fruit>): Mounted {
+function mount(props: Partial<AutocompleteProps<Fruit>> & { options: Fruit[] }): Mounted {
   // Default the accessors to the Fruit shape (id/name); tests can override.
-  const merged: AutocompleteProps<Fruit> = {
+  // The accessors are part of the CONTRACT for an option type the defaults cannot read, so the
+  // annotation has to say so — `AutocompleteProps<Fruit>` alone leaves them optional.
+  const merged: AutocompleteProps<Fruit> & RequiredAccessors<Fruit> = {
     optionValue: (f: Fruit): string => f.id,
     optionLabel: (f: Fruit): string => f.name,
     ...props,

@@ -32,6 +32,40 @@ export interface OptionAccessors<T> {
   emit?: 'value' | 'object';
 }
 
+/**
+ * An option the defaults can read without help: a plain string, or an object carrying `value`.
+ *
+ * These are exactly the shapes {@link optValue} and {@link optLabel} handle on their own — the string
+ * itself, or `.value` with `.label` falling back to it.
+ */
+export type SelfDescribingOption = string | { value: string | number };
+
+/**
+ * The accessors a component REQUIRES when its option type is one the defaults cannot read.
+ *
+ * Without this the type said "accessors are optional" while the runtime said "then I will read `.value`
+ * and `.label`" — so passing a domain object (or, as an audit found, an array of numbers and nulls) type-
+ * checked clean and rendered `undefined` in every row. Nothing reported it, in a template least of all:
+ * the props were being checked against an uninstantiated generic, so the option type was `unknown` and
+ * anything at all satisfied it.
+ *
+ * `[T] extends [ … ]` deliberately, not the distributive form: a UNION of option shapes is self-describing
+ * only if all of it is, and distributing would ask the question of each member separately and accept a
+ * union where one arm is readable and the rest are not. It also keeps `T = never` (an empty `options={{ [] }}`)
+ * on the optional side rather than collapsing the whole props type to `never`.
+ *
+ * `unknown` on the satisfied branch because `X & unknown` is `X` — the props type is untouched for every
+ * option shape that already worked.
+ */
+export type RequiredAccessors<T> = [T] extends [SelfDescribingOption]
+  ? unknown
+  : {
+      /** Required: this option type has no `value` for the default to read. */
+      optionValue: (item: T) => string;
+      /** Required: this option type has no `label` (and no `value` to fall back to). */
+      optionLabel: (item: T) => string;
+    };
+
 interface AnyOption {
   value?: unknown;
   label?: unknown;
