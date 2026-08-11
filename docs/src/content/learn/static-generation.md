@@ -51,6 +51,12 @@ const Chart = lazy(() => import('./chart.js'));
 
 **A `lazy()` component still prerenders.** The build waits for the import, renders the real component, and writes its HTML — then leaves the chunk out of everyone else's bundle. Lazy means "not in your bundle", not "not in your HTML", so there is no trade to make between a complete first paint and a small download.
 
+## Your document, on every page
+
+A generated page is your `index.html`, not a new document. Its `<html>` attributes and its whole `<head>` are carried onto every prerendered route — `lang`, a theme attribute, `<base>`, the viewport meta, your description and social meta, your favicon, anything else you put there. Two things the generator owns: `<meta charset>`, and the `<title>`, which is **the route's own** (whatever the render set) rather than the shell's.
+
+`<base href="/">` matters more here than in a single-page build. A prerendered route lives at a real path — `/learn/templates/index.html` — so a browser resolves every *relative* URL on that page against `/learn/templates/`, not the site root. With your `<base>` carried across, `href="favicon.svg"` means the same thing on every page it did on the first one.
+
 ## Data
 
 A `resource()` that fetches during a prerender is **awaited before the HTML is written**, and its result travels in the snapshot:

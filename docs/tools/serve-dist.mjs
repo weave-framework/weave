@@ -1,7 +1,12 @@
 /**
- * Serves the built docs (docs/dist) like GitHub Pages would: static files, with a
- * 404.html SPA fallback for unknown paths. For previewing the production build
- * locally before deploy. `node docs/tools/serve-dist.mjs` → http://localhost:8200
+ * Serves the built docs (docs/dist) the way the site is actually hosted: Cloudflare static
+ * assets — a file if there is one, else `<path>/index.html`, else the SPA fallback. For
+ * previewing the production build locally before deploy.
+ * `node docs/tools/serve-dist.mjs` → http://localhost:8200
+ *
+ * It used to mimic GitHub Pages, which is where the docs lived before Cloudflare. The
+ * difference is not cosmetic: Pages has no directory-index step, so a prerendered `--ssg`
+ * route was served by the SPA fallback here and looked identical to the SPA build.
  */
 
 import { createServer } from 'node:http';
@@ -33,8 +38,17 @@ createServer(async (req, res) => {
   try {
     if (url.endsWith('/')) file = join(dist, rel, 'index.html');
     let body = await readFile(file).catch(() => null);
+    // Cloudflare's static assets try `<path>/index.html` before falling back
+    // (`html_handling: auto-trailing-slash`, its default). That is what serves a prerendered
+    // `--ssg` route: /learn/templates is a DIRECTORY holding index.html, not a missing file.
+    // Without this the preview answers such a path with the SPA fallback — which happens to
+    // render the same page, so the one thing SSG changes would be invisible here.
     if (body === null && !extname(file)) {
-      // Unknown route, no extension → SPA fallback (what Pages does with 404.html).
+      body = await readFile(join(dist, rel, 'index.html')).catch(() => null);
+      if (body !== null) file = join(dist, rel, 'index.html');
+    }
+    if (body === null && !extname(file)) {
+      // Nothing prerendered there → the SPA fallback (`not_found_handling`, wrangler.toml).
       body = await readFile(join(dist, '404.html'));
       res.writeHead(200, { 'content-type': TYPES['.html'] });
       res.end(body);

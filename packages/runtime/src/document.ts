@@ -31,6 +31,12 @@ export interface DocumentOptions {
   /** Client entry module URL — emitted as `<script type="module" src="…">` after the snapshot. */
   entry?: string;
   lang?: string;
+  /**
+   * The `<html>` element's attributes, verbatim (`lang="en" data-theme="light"`). Takes the place of
+   * {@link lang} when given — an app's own document tag routinely carries more than a language, and a
+   * generated page that drops the rest renders under different rules than every other page of the site.
+   */
+  htmlAttrs?: string;
 }
 
 /** Escape a serialized-JSON string so it is safe to embed inside a `<script>` (no `</script>` break-out). */
@@ -46,11 +52,13 @@ const escapeAttr = (s: string): string => s.replace(/&/g, '&amp;').replace(/"/g,
 export function renderDocument(artifact: PageArtifact, options: DocumentOptions = {}): string {
   // An explicit option wins; else the title the render captured (document.title); else none.
   const title: string = options.title ?? artifact.title ?? '';
-  const { head = '', entry, lang } = options;
+  const { head = '', entry, lang, htmlAttrs } = options;
+  // `htmlAttrs` is raw for the same reason `head` is: it comes from the app's own document, not from data.
+  const openTag: string = htmlAttrs ? `<html ${htmlAttrs}>` : `<html${lang ? ` lang="${escapeAttr(lang)}"` : ''}>`;
   // The title is routinely derived from DATA (a route-title effect reading a CMS record), so unescaped it is
   // a stored XSS in every generated page. `head` is the one raw hole by design — injecting markup is its job.
   return (
-    `<!DOCTYPE html>\n<html${lang ? ` lang="${escapeAttr(lang)}"` : ''}>\n<head>\n<meta charset="utf-8">\n` +
+    `<!DOCTYPE html>\n${openTag}\n<head>\n<meta charset="utf-8">\n` +
     (title ? `<title>${escapeText(title)}</title>\n` : '') +
     (head ? head + '\n' : '') +
     `</head>\n<body>\n${artifact.html}\n${artifact.snapshotScript}\n` +

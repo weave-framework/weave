@@ -51,6 +51,36 @@ function jsLiteral(s: string): string {
     .replace(/[\u2028\u2029]/g, (c) => '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0'));
 }
 
+/** The parts of an author's `index.html` a generated page has to inherit to be the same site. */
+export interface DocumentShell {
+  /** The `<html>` element's attributes, verbatim (`lang="en" data-theme="light"`), or ''. */
+  htmlAttrs: string;
+  /** The head's contents, minus what the generator emits itself (`<title>`, `<meta charset>`). */
+  head: string;
+}
+
+/**
+ * Read an author's `index.html` as a shell for `weave build --ssg`.
+ *
+ * A prerendered page used to be assembled from nothing — charset, title, stylesheet, done. Everything else
+ * the author's own document said was silently dropped: the viewport meta (so every generated page rendered
+ * unscaled on a phone), `lang` and any theme attribute, the description and social meta the whole point of
+ * static generation is to serve, the favicon, and `<base>` — whose absence also broke every RELATIVE URL,
+ * because a page at `/learn/templates` resolves them against `/learn/` and not the root.
+ *
+ * `<title>` and `<meta charset>` are dropped here because the generator emits them per page: the title is
+ * the route's own, captured from the render.
+ */
+export function documentShell(html: string): DocumentShell {
+  const htmlTag: RegExpMatchArray | null = html.match(/<html\b([^>]*)>/i);
+  const headMatch: RegExpMatchArray | null = html.match(/<head\b[^>]*>([\s\S]*?)<\/head>/i);
+  const head: string = (headMatch?.[1] ?? '')
+    .replace(/[ \t]*<title\b[^>]*>[\s\S]*?<\/title>\s*\n?/gi, '')
+    .replace(/[ \t]*<meta\b[^>]*\bcharset\b[^>]*>\s*\n?/gi, '')
+    .replace(/^\s*\n|\s+$/g, '');
+  return { htmlAttrs: (htmlTag?.[1] ?? '').trim(), head };
+}
+
 export function injectHtml(html: string, opts: InjectOptions): string {
   let out: string = stripLiveReload(html);
 

@@ -28,6 +28,20 @@
   If the base lies outside the checked roots its half of the context cannot be typed and goes unchecked;
   nothing is reported that is not real.
 
+### Fixed — `weave build --ssg`
+- **A prerendered page is now the app's own document, not one assembled from nothing.** Every generated
+  route carried a synthesized head — charset, title, stylesheet — and silently dropped everything the
+  author's `index.html` said: the viewport meta (so every generated page rendered unscaled on a phone),
+  `lang` and any theme attribute on `<html>`, the description and social meta that static generation
+  exists to serve, the favicon, and `<base>`. That last one broke more than itself: a page at
+  `/learn/templates` resolves *relative* URLs against `/learn/`, so with no `<base>` a shared
+  `href="favicon.svg"` 404ed on every nested route. The `<html>` attributes and the whole `<head>` are
+  now inherited; `<meta charset>` and `<title>` stay the generator's, the title being the route's own.
+  A stylesheet link the shell already carries is not added twice. `DocumentOptions` gains `htmlAttrs`.
+  Found by serving the built site locally the way it is actually hosted — the preview server had been
+  mimicking GitHub Pages, which the docs left for Cloudflare, and Pages has no directory-index step, so
+  a prerendered route was answered by the SPA fallback and looked identical to the SPA build.
+
 ### Fixed — compiler
 - **Auto-expose no longer synthesizes a `return` naming bindings the setup cannot see.** When `setup`
   omits its `return`, one is inserted exposing the names the template reads. For a `#3` patch extension

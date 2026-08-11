@@ -9,7 +9,7 @@ import { pathToFileURL } from 'node:url';
 import { weave, type WeaveState } from './plugin.js';
 import { entryPlugin, VIRTUAL_ENTRY } from './entry.js';
 import { compileStyleFileWithAssets, type StyleAsset, type StyleLang } from './styles.js';
-import { injectHtml } from './html.js';
+import { injectHtml, documentShell, type DocumentShell } from './html.js';
 import { prerender } from './prerender.js';
 // The DOM-free document types — the server render itself runs inside the bundled server entry (which installs
 // the headless DOM); `prerender` assembles each document from strings, so no DOM is imported here.
@@ -153,8 +153,10 @@ export interface SsgBuildConfig {
   publicDir?: string;
   /** `<title>` for the generated documents. */
   title?: string;
-  /** `<html lang>` for the generated documents. */
+  /** `<html lang>` for the generated documents — the fallback when there is no {@link index} to read. */
   lang?: string;
+  /** The app's own HTML shell. Its `<html>` attributes and `<head>` are inherited by every generated page. */
+  index?: string;
   /**
    * Phase E (E1.4) — the islands mode. Compile BOTH bundles in the `resumable` target, so the server render
    * embeds the per-instance state snapshot + resume markers and the client entry ADOPTS that DOM in place
@@ -237,7 +239,18 @@ export async function buildSsg(config: SsgBuildConfig): Promise<void> {
   });
   // 2. Render each route headlessly (bundle + import the server entry once), writing a document per route.
   const id: string = mountId(config.mount);
-  const head: string = '<link rel="stylesheet" href="/app.css">';
+  // The author's own document is the shell. Synthesizing one from scratch dropped everything it said —
+  // viewport, lang, description, favicon, `<base>` — so a generated page was a different document from
+  // every hand-served one, and relative URLs on a nested route resolved against the wrong directory.
+  const shell: DocumentShell = config.index
+    ? documentShell(await readFile(config.index, 'utf8'))
+    : { htmlAttrs: '', head: '' };
+  const cssLink: string = '<link rel="stylesheet" href="/app.css">';
+  const head: string = /<link[^>]+href=["']\/app\.css["']/i.test(shell.head)
+    ? shell.head
+    : shell.head
+      ? `${shell.head}\n${cssLink}`
+      : cssLink;
   const server: ServerRenderer = await loadServerEntry(config.serverEntry, config.styleLang, config.minify, config.resume);
   try {
     await prerender({
@@ -255,7 +268,14 @@ export async function buildSsg(config: SsgBuildConfig): Promise<void> {
           title: artifact.title,
         };
       },
-      document: (): DocumentOptions => ({ title: config.title, head, entry: '/main.js', lang: config.lang }),
+      document: (): DocumentOptions => ({
+        title: config.title,
+        head,
+        entry: '/main.js',
+        lang: config.lang,
+        // `lang` stays as the fallback for an app with no index.html of its own.
+        ...(shell.htmlAttrs ? { htmlAttrs: shell.htmlAttrs } : {}),
+      }),
     });
   } finally {
     await server.dispose();

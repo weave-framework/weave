@@ -109,6 +109,9 @@ export async function main(argv: string[]): Promise<void> {
             styleLang: config.styleLang,
             styles: config.styles,
             publicDir: config.publicDirDeclared ? config.publicDir : undefined,
+            // The app's own shell — a generated page inherits its `<html>` attributes and `<head>`, so it is
+            // the same document as every other page of the site rather than a bare one built from scratch.
+            index: config.index,
             resume,
           });
           console.log(`weave build --ssg → ${outDir}/ (${routes.length} route${routes.length === 1 ? '' : 's'})`);

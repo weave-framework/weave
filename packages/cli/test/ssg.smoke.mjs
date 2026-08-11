@@ -208,6 +208,66 @@ try {
   rmSync(rout, { recursive: true, force: true });
 }
 
+/* ── Part 3b — the app's own document shell is INHERITED by every generated page ──
+ * A prerendered page used to be assembled from nothing, so everything the author's index.html said was
+ * dropped: the viewport meta (every page unscaled on a phone), `lang` and a theme attribute, the
+ * description and social meta static generation exists to serve, the favicon, and `<base>` — whose
+ * absence also broke every relative URL, since a page at /learn/x resolves them against /learn/. */
+const sapp = mkdtempSync(join(here, '.smoke-ssg-sapp-'));
+const sout = mkdtempSync(join(here, '.smoke-ssg-sout-'));
+try {
+  writeFileSync(join(sapp, 'deep.ts'), `export const template = '<h1>Deep page</h1>';\n`);
+  writeFileSync(
+    join(sapp, 'app.ts'),
+    `import { createRouter, route, RouterView } from '@weave-framework/router';\n` +
+      `import Deep from './deep';\n` +
+      `export const template = '<RouterView router={{ router }} />';\n` +
+      `export function setup() {\n` +
+      `  const router = createRouter([ route('/deep/page', { component: Deep }) ]);\n` +
+      `  return { router };\n}\n`
+  );
+  writeFileSync(
+    join(sapp, 'index.html'),
+    '<!doctype html>\n<html lang="fi" data-theme="dark">\n  <head>\n    <base href="/" />\n' +
+      '    <meta charset="utf-8" />\n    <meta name="viewport" content="width=device-width, initial-scale=1" />\n' +
+      '    <title>Shell title</title>\n    <meta name="description" content="from the shell" />\n' +
+      '    <link rel="icon" href="favicon.svg" type="image/svg+xml" />\n' +
+      // Deliberate: an app that already links the built stylesheet must not get a second copy of it.
+      '    <link rel="stylesheet" href="/app.css" />\n  </head>\n' +
+      '  <body>\n    <div id="app"></div>\n  </body>\n</html>\n'
+  );
+
+  const sroot = join(sapp, 'app.ts');
+  await buildSsg({
+    virtualEntry: { code: generateEntry(sroot, '#app', sapp, discoverCustomElements(sapp)), resolveDir: sapp },
+    serverEntry: { code: generateServerEntry(sroot, sapp, { routed: true }), resolveDir: sapp },
+    mount: '#app',
+    routes: ['/deep/page'],
+    outDir: sout,
+    minify: false,
+    styleLang: 'css',
+    lang: 'en',
+    index: join(sapp, 'index.html'),
+  });
+
+  const deepFile = join(sout, 'deep', 'page', 'index.html');
+  const deep = existsSync(deepFile) ? readFileSync(deepFile, 'utf8') : '';
+  ok(existsSync(deepFile), "'/deep/page' → deep/page/index.html");
+  ok(/<html lang="fi" data-theme="dark">/.test(deep), "the shell's <html> attributes are inherited, not just `lang`");
+  ok(!/lang="en"/.test(deep), 'and they REPLACE the config fallback rather than appearing twice');
+  ok(/<base href="\/" \/>/.test(deep), '<base> is carried — without it a relative URL on a nested route resolves against its directory');
+  ok(/name="viewport"/.test(deep), 'the viewport meta is carried');
+  ok(/content="from the shell"/.test(deep), 'the description meta is carried');
+  ok(/rel="icon"/.test(deep), 'the favicon link is carried');
+  // The generator owns these two: the title is the ROUTE's, and charset is emitted first by construction.
+  ok(!/Shell title/.test(deep), "the shell's <title> is NOT carried — each page's title is its own");
+  ok((deep.match(/<meta charset/gi) ?? []).length === 1, 'charset appears exactly once');
+  ok((deep.match(/app\.css/g) ?? []).length === 1, 'the stylesheet link is added once, and not duplicated');
+} finally {
+  rmSync(sapp, { recursive: true, force: true });
+  rmSync(sout, { recursive: true, force: true });
+}
+
 /* ── Part 3b — E1.12: a ROUTED page resumes (the router is re-derived; the view adopts in place) ── */
 
 const rrapp = mkdtempSync(join(here, '.smoke-ssg-rr-'));
