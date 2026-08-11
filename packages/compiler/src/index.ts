@@ -10,7 +10,15 @@ export {
   type CompileOptions,
   type CompileResult,
 } from './codegen.js';
-export { applyPatches, type PatchOp } from './patch.js';
+export { applyPatches, parsePatchMarkup, shiftOffsets, type PatchOp } from './patch.js';
+export {
+  blankComments,
+  defaultImportSpec,
+  extensionBase,
+  hasPatchDeclaration,
+  patchArrayExpr,
+  readPatchOps,
+} from './extension.js';
 export { parseTemplate, ParseError } from './parser.js';
 export { scopeCss, scopeAttr, hostAttr, hashCss } from './css.js';
 export { inferCtxNames } from './infer.js';

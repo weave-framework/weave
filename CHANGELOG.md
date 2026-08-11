@@ -16,6 +16,27 @@
 
 ## Unreleased
 
+### Added — `weave check`
+- **The markup inside `patch` ops is type-checked.** ([RFC 0008](rfcs/0008-component-extension.md)'s last
+  follow-on.) A `#3` extension writes no template of its own, so the checker classified it as an ordinary
+  module and its patched markup was the one template Weave never looked at: a typo in a patched expression
+  surfaced at build or run time instead of in the editor. It is now checked **in place** — patched into the
+  base's template, so an op landing inside the base's `@for` sees that block's local, and the context is
+  the base's plus the extension's own, which is what `extendSetup` builds at runtime. Errors in the base's
+  own markup stay the base's: reported once, against the base, never repeated against every extension that
+  patches it. A selector matching no element is reported too — at runtime that patch simply does nothing.
+  If the base lies outside the checked roots its half of the context cannot be typed and goes unchecked;
+  nothing is reported that is not real.
+
+### Fixed — compiler
+- **Auto-expose no longer synthesizes a `return` naming bindings the setup cannot see.** When `setup`
+  omits its `return`, one is inserted exposing the names the template reads. For a `#3` patch extension
+  those names include the BASE's — so a setup that could see only its own `pick` was handed
+  `return { items, pick, title }`, and the component threw `ReferenceError` the first time it was created.
+  The synthesized return now names only identifiers that actually occur in the module's own code (strings
+  and comments do not count). The test is deliberately over-generous: it can only ever drop a name that
+  provably could not resolve, so no working component changes. Found by the new patch-checking gate.
+
 ### Added — `weave migrate`
 - **A migrated component now says where its missing styles live.** A component carries its own `styleUrls`;
   a project that keeps a shared stylesheet library keeps half its look in no component folder at all, so the

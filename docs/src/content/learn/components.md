@@ -400,8 +400,12 @@ Ops: `attr` / `removeAttr`, `prepend` / `append` (children), `before` / `after` 
 
 Two constraints: the base must be a **local** component (a published package ships no raw template — patch a local base, or use full override), and a patch extension uses **either** patches **or** a full-override template, never both.
 
-:::callout info "Patch markup isn't type-checked yet"
-`weave check` type-checks a normal template (and a full-override extension's template) against `setup`, but it does **not yet** look inside the strings in `patch` ops. A typo in a patched expression (`{{ totalCont() }}`) surfaces at build/runtime, not in your editor. Full-override (`#1`) extensions are fully type-checked — reach for those when you want the check to cover your additions. Patch-markup type-checking is a planned follow-up ([RFC 0008](https://github.com/weave-framework/weave/blob/main/rfcs/0008-component-extension.md)).
+:::callout info "Patch markup is type-checked"
+`weave check` checks the markup inside `patch` ops the same way it checks any other template: a typo in a patched expression (`{{ totalCont() }}`) is an error at the character you wrote it on, in your own file.
+
+It is checked **in place** — patched into the base's template, so an op landing inside the base's `@for` sees that block's local (`{{ pick(item) }}` is valid there and nowhere else), and the context is the base's plus your own, exactly as `extendSetup` builds it at runtime. Errors in the *base's* markup stay the base's: they are reported once, against the base, not repeated against every extension that patches it.
+
+One limit: if the base is outside the roots you pass to `weave check`, its half of the context cannot be typed and expressions reading base bindings go unchecked. Nothing is reported that is not real.
 :::
 
 Full override (write your own `template`) vs patch (`export const patch`) — pick whichever is less work for the change. See [RFC 0008](https://github.com/weave-framework/weave/blob/main/rfcs/0008-component-extension.md).

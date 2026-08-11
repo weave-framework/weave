@@ -27,7 +27,20 @@ import ts from 'typescript';
 import { readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import { compileComponent, parseSfc, extractSources, classifyTemplate, classifyStyle, childImportCandidates, hashCss, ParseError } from '@weave-framework/compiler';
+import {
+  compileComponent,
+  parseSfc,
+  extractSources,
+  classifyTemplate,
+  classifyStyle,
+  childImportCandidates,
+  hashCss,
+  ParseError,
+  extensionBase,
+  defaultImportSpec,
+  hasPatchDeclaration,
+  readPatchOps,
+} from '@weave-framework/compiler';
 import type { ComponentSource, ExtractedSources, PatchOp, CompiledComponent } from '@weave-framework/compiler';
 import { compileStyleFileTracked, compileStyleSource, type StyleLang } from './styles.js';
 
@@ -276,58 +289,6 @@ function injectChildImports(
 
 /* ───────────────── RFC 0008 `#3` — component-file extension via base-template patches ───────────────── */
 
-/** The base identifier of a `#3` extension: `export const extend = List` → `"List"` (else null). */
-function extensionBase(script: string): string | null {
-  const m: RegExpMatchArray | null = stripComments(script).match(/export\s+const\s+extend\s*=\s*([A-Za-z_$][\w$]*)/);
-  return m ? m[1] : null;
-}
-
-/** The module specifier a default import binds `name` to: `import List from './list'` → `"./list"`. */
-function defaultImportSpec(script: string, name: string): string | null {
-  const code: string = stripComments(script);
-  const re: RegExp = new RegExp(`import\\s+${name}\\b[^;]*?\\bfrom\\s+['"]([^'"]+)['"]`);
-  const m: RegExpMatchArray | null = code.match(re);
-  return m ? m[1] : null;
-}
-
-/** Extract the balanced `[ … ]` after `export const patch =`, respecting string literals. */
-function patchArrayExpr(script: string): string | null {
-  const code: string = stripComments(script);
-  const decl: RegExpMatchArray | null = code.match(/export\s+const\s+patch\s*=/);
-  if (!decl || decl.index === undefined) return null;
-  const start: number = code.indexOf('[', decl.index);
-  if (start === -1) return null;
-  let depth: number = 0;
-  let quote: string = '';
-  for (let i: number = start; i < code.length; i++) {
-    const c: string = code[i];
-    if (quote) {
-      if (c === '\\') { i++; continue; }
-      if (c === quote) quote = '';
-      continue;
-    }
-    if (c === '"' || c === "'" || c === '`') { quote = c; continue; }
-    if (c === '[') depth++;
-    else if (c === ']' && --depth === 0) return code.slice(start, i + 1);
-  }
-  return null;
-}
-
-/** Evaluate the (static, literal) patch array in isolation — it references no imports. */
-function readPatchOps(script: string, filename: string): PatchOp[] {
-  const expr: string | null = patchArrayExpr(script);
-  if (!expr) throw new Error(`weave: ${filename} — could not read \`export const patch = [ … ]\` (must be a static array literal).`);
-  try {
-    const ops: unknown = new Function(`return (${expr});`)();
-    if (!Array.isArray(ops)) throw new Error('not an array');
-    return ops as PatchOp[];
-  } catch (e) {
-    throw new Error(
-      `weave: ${filename} — \`export const patch\` must be a STATIC array literal (plain objects/strings, no identifiers or imports): ${(e as Error).message}`
-    );
-  }
-}
-
 /** A resolved base component's template + where it lives (for hash + child-import resolution). */
 interface BaseTemplate {
   template: string;
@@ -425,7 +386,7 @@ export function weave(state: WeaveState, options: WeaveOptions = {}): Plugin {
         // and compile — reusing the BASE's hash so the base's scoped CSS still matches, and resolving
         // the base template's child tags relative to the BASE dir.
         const baseIdent: string | null = decl.template === undefined && !hasSiblingHtml ? extensionBase(decl.script ?? source) : null;
-        if (baseIdent && /export\s+const\s+patch\s*=/.test(stripComments(decl.script ?? source))) {
+        if (baseIdent && hasPatchDeclaration(decl.script ?? source)) {
           const spec: string | null = defaultImportSpec(decl.script ?? source, baseIdent);
           if (!spec) {
             throw new Error(`weave: ${args.path} — extends '${baseIdent}' but no matching \`import ${baseIdent} from '…'\` was found.`);

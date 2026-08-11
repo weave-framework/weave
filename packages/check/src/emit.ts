@@ -22,7 +22,10 @@ import {
   parseSfcLoc,
   inferCtxNames,
   injectAutoReturn,
+  applyPatches,
+  shiftOffsets,
   rewrite,
+  type PatchOp,
   type Scope,
   type TemplateNode,
   type ElementNode,
@@ -81,7 +84,26 @@ export interface Virtual {
   scriptLineCount: number;
   /** Char-precise generated↔source runs for editor tooling. */
   mappings: WeaveMapping[];
+  /**
+   * Offsets at or above this belong to ANOTHER file, and its own check reports them — so a diagnostic
+   * mapping here is dropped rather than reported twice against the wrong source.
+   *
+   * Only a `#3` patch extension sets it. Its harness has to emit the whole BASE template, because that
+   * is what gives a patched expression its enclosing scope (`{{ f(item) }}` inside the base's `@for`),
+   * but an error in the base's own markup is the base's, at the base's line, and is already reported
+   * there. Tagging those offsets out of range is what tells the two apart.
+   */
+  foreignFrom?: number;
 }
+
+/**
+ * Offsets in a `#3` patch harness that came from the BASE template are shifted into this range.
+ *
+ * It sits far past any real file length, so a tagged offset can never be confused with a genuine one —
+ * and if the tagging were ever dropped, the base's offsets would collide with the extension's and the
+ * diagnostic would land on an unrelated line rather than fail loudly.
+ */
+export const FOREIGN_OFFSET: number = 1_000_000_000;
 
 interface LineSeg {
   /** column within this line's `text` */
@@ -168,6 +190,65 @@ export function buildVirtualSeparate(
     scriptLine: 0,
     scriptLineCount: asm.scriptLineCount,
     mappings: asm.mappings,
+  };
+}
+
+/**
+ * How a `#3` extension names its base's template context.
+ *
+ * `spec` is the module specifier that resolves to the BASE's own virtual — the harness imports its
+ * `__WeaveCtx` and intersects. Absent when the base was not among the checked files: then the base half
+ * of the context degrades to `Record<string, any>`, which checks less but never invents an error about
+ * a binding that really does exist.
+ */
+export interface BaseCtx {
+  spec?: string;
+}
+
+/**
+ * Build a virtual module for a `#3` component-file extension — one that writes no template of its own
+ * and declares `export const patch = [ … ]` against its base's.
+ *
+ * The whole PATCHED template is emitted, not just the inserted fragments, because a fragment's scope is
+ * the markup around it: `on:dblclick={{ pick(item) }}` patched onto a row inside the base's `@for` reads
+ * a local that only exists there. Errors in the base's own markup are dropped ({@link Virtual.foreignFrom})
+ * — the base is checked as itself, and reporting them twice, against the extension's file, would be worse
+ * than not reporting them here at all.
+ */
+export function buildVirtualPatch(
+  tsPath: string,
+  tsSource: string,
+  script: string,
+  baseTemplate: string,
+  ops: PatchOp[],
+  baseCtx: BaseCtx
+): Virtual {
+  // The base's offsets are tagged out of range BEFORE patching, so the fragments the ops splice in keep
+  // the real `.ts` offsets `readPatchOps` gave them and stay distinguishable from everything around them.
+  const baseNodes: TemplateNode[] = parseTemplate(baseTemplate);
+  shiftOffsets(baseNodes, FOREIGN_OFFSET);
+  const nodes: TemplateNode[] = applyPatches(baseNodes, ops);
+  const all: string[] = inferCtxNames(nodes);
+  const body: Line[] = emit(nodes, new Set(all));
+  const hasSetup: boolean = HAS_SETUP.test(script);
+  // `injectAutoReturn` drops the names this setup cannot see, which for an extension is most of them:
+  // the context here is the base's plus its own. Same call as every other component, deliberately — the
+  // rule belongs in one place, and this path is where its absence first showed.
+  const auto: AutoReturnResult = hasSetup ? injectAutoReturn(script, all) : { code: script };
+  const asm: ReturnType<typeof assemble> = assemble(auto.code || undefined, hasSetup, body, 0, injectionOf(auto), baseCtx);
+  return {
+    path: tsPath,
+    text: asm.text,
+    // Both regions are the extension's own `.ts`: the markup it owns lives inside string literals there.
+    templateFile: tsPath,
+    templateText: tsSource,
+    templateMap: asm.templateMap,
+    scriptFile: tsPath,
+    scriptText: tsSource,
+    scriptLine: 0,
+    scriptLineCount: asm.scriptLineCount,
+    mappings: asm.mappings,
+    foreignFrom: FOREIGN_OFFSET,
   };
 }
 
@@ -474,18 +555,23 @@ function assemble(
   hasSetup: boolean,
   body: Line[],
   scriptBaseOffset: number,
-  injection?: { at: number; len: number }
+  injection?: { at: number; len: number },
+  baseCtx?: BaseCtx
 ): { text: string; scriptLineCount: number; templateMap: Map<number, number>; mappings: WeaveMapping[] } {
   const out: string[] = [];
   const scriptLines: string[] = script ? script.split('\n') : [];
   for (const l of scriptLines) out.push(l);
 
   out.push('');
-  out.push(
-    hasSetup
-      ? 'type __WeaveCtx = ReturnType<typeof setup>;'
-      : 'type __WeaveCtx = Record<string, any>;'
-  );
+  // A `#3` extension's template context is the BASE's, with its own setup layered on top — that is what
+  // `extendSetup(extend, setup)` builds at runtime, so the harness has to say the same thing or a patched
+  // expression reading a base binding is an error here and correct everywhere else.
+  if (baseCtx?.spec) out.push(`import type { __WeaveCtx as __WeaveBaseCtx } from ${JSON.stringify(baseCtx.spec)};`);
+  const ownCtx: string = hasSetup ? 'ReturnType<typeof setup>' : 'Record<string, any>';
+  const withBase: string = baseCtx ? ` & ${baseCtx.spec ? '__WeaveBaseCtx' : 'Record<string, any>'}` : '';
+  // Exported so an extension patching THIS component can name its context. A type export changes nothing
+  // else: the harness is never emitted.
+  out.push(`export type __WeaveCtx = ${ownCtx}${withBase};`);
   out.push('declare const __ctx: __WeaveCtx;');
   // `@await (src)` resolved-value type: a resource's data type, else the awaited Promise.
   out.push('type __WeaveAwaited<S> = S extends { data: () => infer D } ? NonNullable<D> : Awaited<S>;');

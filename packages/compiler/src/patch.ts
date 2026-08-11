@@ -16,8 +16,16 @@
 import { parseTemplate } from './parser.js';
 import type { TemplateNode, ElementNode, Attr, StaticAttr } from './ast.js';
 
-/** A declarative patch op. Authored as an entry of `export const patch = [ … ]`. */
-export type PatchOp =
+/**
+ * A declarative patch op. Authored as an entry of `export const patch = [ … ]`.
+ *
+ * `srcOffset` is not authored — it is filled in by `readPatchOps` with where this op's markup sits in
+ * the source file, so a diagnostic inside patched markup can be reported at the character that is
+ * wrong. Absent when the op carries no markup, or when it was built by hand.
+ */
+export type PatchOp = PatchOpKind & { srcOffset?: number };
+
+type PatchOpKind =
   /** Add (or replace) an attribute/binding on matched elements. `attr` is markup, e.g. `on:dblclick={{ f(item) }}`. */
   | { op: 'attr'; sel: string; attr: string }
   /** Remove a named attribute/binding from matched elements. */
@@ -139,13 +147,52 @@ function locate(ast: TemplateNode[], target: TemplateNode): Loc | null {
   return walk(ast);
 }
 
+/**
+ * Shift every source offset in a parsed subtree by `delta`, in place.
+ *
+ * A patch fragment is parsed on its own, so its offsets start at 0 — a coordinate system that means
+ * nothing outside that string. Moving them onto where the string sits in the authoring file is what
+ * lets a diagnostic inside patched markup point at the author's own character. Generic over the AST on
+ * purpose: offsets live on some thirty different fields, and a hand-written per-node-type walker would
+ * silently miss the next one added.
+ */
+export function shiftOffsets(nodes: TemplateNode[], delta: number): void {
+  const seen: Set<object> = new Set<object>();
+  const walk = (value: unknown): void => {
+    if (Array.isArray(value)) {
+      for (const v of value) walk(v);
+      return;
+    }
+    if (!value || typeof value !== 'object' || seen.has(value)) return;
+    seen.add(value);
+    const rec: Record<string, unknown> = value as Record<string, unknown>;
+    for (const key of Object.keys(rec)) {
+      const v: unknown = rec[key];
+      if (typeof v === 'number' && (key === 'offset' || key.endsWith('Offset'))) rec[key] = v + delta;
+      else walk(v);
+    }
+  };
+  walk(nodes);
+}
+
+/** Parse a patch op's markup with its offsets already pointing at where that markup lives in the file. */
+export function parsePatchMarkup(markup: string, srcOffset?: number): TemplateNode[] {
+  const nodes: TemplateNode[] = parseTemplate(markup);
+  if (srcOffset !== undefined) shiftOffsets(nodes, srcOffset);
+  return nodes;
+}
+
+/** The `<w-patch ` this wraps a bare attribute in, so the attribute's own offsets can be corrected for it. */
+const ATTR_WRAP: number = '<w-patch '.length;
+
 /** Parse a bare attribute string (e.g. `on:click={{ f }}`) by wrapping it in a dummy element. */
-function parseAttr(attrText: string): Attr {
+function parseAttr(attrText: string, srcOffset?: number): Attr {
   const [el] = parseTemplate(`<w-patch ${attrText}/>`) as ElementNode[];
   if (!el || el.type !== 'element' || el.attrs.length !== 1) {
     throw new Error(`weave: patch attr must be a single attribute, got: ${attrText}`);
   }
-  return el.attrs[0];
+  if (srcOffset !== undefined) shiftOffsets([el], srcOffset - ATTR_WRAP);
+  return el.attrs[0]!;
 }
 
 /**
@@ -163,7 +210,7 @@ export function applyPatches(ast: TemplateNode[], ops: PatchOp[]): TemplateNode[
     }
     for (const node of hits) {
       if (op.op === 'attr') {
-        const next: Attr = parseAttr(op.attr);
+        const next: Attr = parseAttr(op.attr, op.srcOffset);
         const name: string | undefined = 'name' in next ? next.name : undefined;
         node.attrs = node.attrs.filter((a) => !('name' in a && name !== undefined && a.name === name)).concat(next);
         continue;
@@ -173,7 +220,7 @@ export function applyPatches(ast: TemplateNode[], ops: PatchOp[]): TemplateNode[
         continue;
       }
       if (op.op === 'prepend' || op.op === 'append') {
-        const frag: TemplateNode[] = parseTemplate(op.html);
+        const frag: TemplateNode[] = parsePatchMarkup(op.html, op.srcOffset);
         node.children = op.op === 'prepend' ? frag.concat(node.children) : node.children.concat(frag);
         continue;
       }
@@ -181,7 +228,7 @@ export function applyPatches(ast: TemplateNode[], ops: PatchOp[]): TemplateNode[
       if (NODE_OPS.has(op.op)) {
         const loc: Loc | null = locate(root, node);
         if (!loc) continue; // already removed by a prior op in this batch
-        const frag: TemplateNode[] = 'html' in op ? parseTemplate(op.html) : [];
+        const frag: TemplateNode[] = 'html' in op ? parsePatchMarkup(op.html, op.srcOffset) : [];
         if (op.op === 'before') loc.arr.splice(loc.index, 0, ...frag);
         else if (op.op === 'after') loc.arr.splice(loc.index + 1, 0, ...frag);
         else if (op.op === 'replace') loc.arr.splice(loc.index, 1, ...frag);

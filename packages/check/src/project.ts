@@ -7,9 +7,22 @@
  */
 
 import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
-import { join, resolve, dirname } from 'node:path';
-import { extractSources, classifyTemplate, faithfulTemplate, ParseError, type ExtractedSources } from '@weave-framework/compiler';
-import { buildVirtualSfc, buildVirtualSeparate, type Virtual } from './emit.js';
+import { join, resolve, dirname, relative } from 'node:path';
+import {
+  extractSources,
+  classifyTemplate,
+  faithfulTemplate,
+  parseSfc,
+  extensionBase,
+  defaultImportSpec,
+  hasPatchDeclaration,
+  readPatchOps,
+  ParseError,
+  type ExtractedSources,
+  type ComponentSource,
+  type PatchOp,
+} from '@weave-framework/compiler';
+import { buildVirtualSfc, buildVirtualSeparate, buildVirtualPatch, type Virtual } from './emit.js';
 import { runCheck, offsetToLineCol, type Diagnostic } from './check.js';
 
 const SKIP: Set<string> = new Set(['node_modules', 'dist', '.git', '.weave']);
@@ -20,8 +33,21 @@ const SKIP: Set<string> = new Set(['node_modules', 'dist', '.git', '.weave']);
 export function checkProject(roots: string[]): Diagnostic[] {
   const virtuals: Virtual[] = [];
   const parseDiags: Diagnostic[] = [];
-  for (const root of roots) collect(root, virtuals, parseDiags);
+  const patchers: Patcher[] = [];
+  for (const root of roots) collect(root, virtuals, parseDiags, patchers);
+  // Patch extensions come LAST: each needs to know whether its base is among the checked files, because
+  // that is what decides whether its context can be typed off the base or has to degrade.
+  for (const p of patchers) buildPatcher(p, virtuals, parseDiags);
   return [...parseDiags, ...(virtuals.length ? runCheck(virtuals) : [])];
+}
+
+/** A `#3` extension found during the walk, held until every other virtual exists. */
+interface Patcher {
+  tsPath: string;
+  source: string;
+  script: string;
+  /** The identifier `export const extend =` names, and the specifier its default import came from. */
+  spec: string;
 }
 
 /** Turn a compiler {@link ParseError} into a source-located diagnostic. `source` is the exact text
@@ -45,13 +71,13 @@ function tryBuild(build: () => Virtual, file: string, source: string, out: Virtu
   }
 }
 
-function collect(path: string, out: Virtual[], diags: Diagnostic[]): void {
+function collect(path: string, out: Virtual[], diags: Diagnostic[], patchers: Patcher[]): void {
   if (!existsSync(path)) return;
   const st: ReturnType<typeof statSync> = statSync(path);
   if (st.isDirectory()) {
     for (const entry of readdirSync(path)) {
       if (SKIP.has(entry)) continue;
-      collect(join(path, entry), out, diags);
+      collect(join(path, entry), out, diags, patchers);
     }
     return;
   }
@@ -61,7 +87,7 @@ function collect(path: string, out: Virtual[], diags: Diagnostic[]): void {
     const source: string = readFileSync(path, 'utf8');
     tryBuild(() => buildVirtualSfc(path, source), path, source, out, diags);
   } else if (path.endsWith('.ts') && !path.endsWith('.d.ts')) {
-    collectTs(path, out, diags);
+    collectTs(path, out, diags, patchers);
   }
 }
 
@@ -80,10 +106,11 @@ function absolutize(v: Virtual): Virtual {
 
 /** Resolve a `.ts` component's template into a virtual (or nothing if it is not a component); a
  *  parse failure is recorded as a diagnostic against the offending template file. */
-function collectTs(tsPath: string, out: Virtual[], diags: Diagnostic[]): void {
+function collectTs(tsPath: string, out: Virtual[], diags: Diagnostic[], patchers: Patcher[]): void {
   const source: string = readFileSync(tsPath, 'utf8');
   const decl: ExtractedSources = extractSources(source);
   const siblingHtml: string = tsPath.replace(/\.ts$/, '.html');
+  const script: string = decl.script ?? source;
 
   if (decl.template !== undefined) {
     if (classifyTemplate(decl.template) === 'inline') {
@@ -107,5 +134,78 @@ function collectTs(tsPath: string, out: Virtual[], diags: Diagnostic[]): void {
     tryBuild(() => buildVirtualSeparate(tsPath, decl.script, siblingHtml, html), siblingHtml, html, out, diags);
     return;
   }
+
+  // RFC 0008 `#3` — an extension with no template of its own, patching its base's. It looked like an
+  // ordinary module here, which is why the markup inside `patch` was the one template Weave never checked.
+  const baseIdent: string | null = extensionBase(script);
+  if (baseIdent && hasPatchDeclaration(script)) {
+    const spec: string | null = defaultImportSpec(script, baseIdent);
+    // A base from a published package ships no raw template, so there is nothing to patch against and
+    // nothing to check — the build says the same thing, and this is not the place to repeat it.
+    if (spec?.startsWith('.')) patchers.push({ tsPath, source, script, spec });
+    return;
+  }
   // ordinary module → not a component
+}
+
+/** A base component's template text, and the file its virtual lives at (for the context-type import). */
+interface ResolvedBase {
+  template: string;
+  virtualPath: string;
+}
+
+/** Read a LOCAL base component's raw template — the same resolution order the build loader uses. */
+function resolveBase(spec: string, fromDir: string): ResolvedBase | null {
+  const base: string = resolve(fromDir, spec);
+  const weavePath: string = base + '.weave';
+  if (existsSync(weavePath)) {
+    const src: ComponentSource = parseSfc(readFileSync(weavePath, 'utf8'));
+    // A `.weave` virtual lives at `<file>.weave.ts` — see `buildVirtualSfc`.
+    return { template: src.template, virtualPath: weavePath + '.ts' };
+  }
+  const tsPath: string = base + '.ts';
+  if (!existsSync(tsPath)) return null;
+  const decl: ExtractedSources = extractSources(readFileSync(tsPath, 'utf8'));
+  if (decl.template !== undefined && classifyTemplate(decl.template) === 'inline') {
+    return { template: decl.template, virtualPath: tsPath };
+  }
+  const htmlPath: string = base + '.html';
+  if (existsSync(htmlPath)) return { template: readFileSync(htmlPath, 'utf8'), virtualPath: tsPath };
+  if (decl.template !== undefined) {
+    const tf: string = resolve(dirname(tsPath), decl.template);
+    if (existsSync(tf)) return { template: readFileSync(tf, 'utf8'), virtualPath: tsPath };
+  }
+  return null;
+}
+
+/** The specifier that reaches `to` from the file at `fromFile`, extension dropped (`./list`, `../ui/list.weave`). */
+function specifierTo(fromFile: string, to: string): string {
+  const rel: string = relative(dirname(fromFile), to).replace(/\\/g, '/').replace(/\.ts$/, '');
+  return rel.startsWith('.') ? rel : `./${rel}`;
+}
+
+/** Build the virtual for one `#3` extension, now that every other component's virtual exists. */
+function buildPatcher(p: Patcher, out: Virtual[], diags: Diagnostic[]): void {
+  const base: ResolvedBase | null = resolveBase(p.spec, dirname(p.tsPath));
+  if (!base) return; // the build reports an unresolvable base; check does not duplicate it
+  let ops: PatchOp[];
+  try {
+    ops = readPatchOps(p.script, p.tsPath);
+  } catch {
+    return; // not a static array literal — the build says so, in one place
+  }
+  // Only if the base was actually checked can its context be named; otherwise the base half of the
+  // context degrades, which checks less and never invents an error about a binding that does exist.
+  const known: boolean = out.some((v: Virtual) => resolve(v.path) === resolve(base.virtualPath));
+  const spec: string | undefined = known ? specifierTo(p.tsPath, base.virtualPath) : undefined;
+  try {
+    out.push(absolutize(buildVirtualPatch(p.tsPath, p.source, p.script, base.template, ops, { spec })));
+  } catch (e) {
+    if (e instanceof ParseError) {
+      diags.push(parseDiagnostic(p.tsPath, p.source, e));
+      return;
+    }
+    // A selector that matches nothing throws by design — a real defect, reported where it was written.
+    diags.push({ file: p.tsPath, line: 1, col: 1, code: 0, message: (e as Error).message, category: 'error' });
+  }
 }

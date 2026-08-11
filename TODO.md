@@ -27,12 +27,6 @@ this list is a live intention, not a historical note.
 
 ## Planned — framework
 
-- **Component extension — `weave check` for patch markup.** ([RFC 0008](rfcs/0008-component-extension.md) —
-  the last follow-on.) Extending a component already works both ways — a full-template override, or
-  *declarative patches* against the base template (see
-  [Extending a component](https://weaveframework.dev/learn/components)). What's still planned is `weave check`
-  type-checking of the markup inside `patch` ops: today a typo in a patched expression surfaces at
-  build/runtime rather than in the editor, while full overrides are already fully checked.
 - **Splitting below the component.** `weave build --ssg` splits per route, and `lazy()` splits per component —
   but an interactive component still carries its whole module. Shipping *one handler* and nothing else, so a
   mostly-static page pays only for the island on it, is sketched in

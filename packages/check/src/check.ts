@@ -107,10 +107,11 @@ export function runCheck(virtuals: Virtual[]): Diagnostic[] {
     raw.push(...program.getSyntacticDiagnostics(sf), ...program.getSemanticDiagnostics(sf));
   }
 
-  return raw.map((d) => mapDiagnostic(d, byPath));
+  return raw.map((d) => mapDiagnostic(d, byPath)).filter((d): d is Diagnostic => d !== null);
 }
 
-function mapDiagnostic(d: ts.Diagnostic, byPath: Map<string, Virtual>): Diagnostic {
+/** Map one `tsc` diagnostic back to source. `null` when it belongs to another file that reports it itself. */
+function mapDiagnostic(d: ts.Diagnostic, byPath: Map<string, Virtual>): Diagnostic | null {
   const message: string = ts.flattenDiagnosticMessageText(d.messageText, '\n');
   const category: Diagnostic['category'] = categoryName(d.category);
 
@@ -129,6 +130,10 @@ function mapDiagnostic(d: ts.Diagnostic, byPath: Map<string, Virtual>): Diagnost
 
   const offset: number | undefined = v.templateMap.get(vLine);
   if (offset !== undefined) {
+    // A `#3` patch harness carries its BASE's template too — the only way a patched expression gets the
+    // scope it is written in. Those lines are the base's, they are reported when the base is checked, and
+    // repeating them here would name the wrong file at a line number from another one.
+    if (v.foreignFrom !== undefined && offset >= v.foreignFrom) return null;
     const { line: l, col } = offsetToLineCol(v.templateText, offset);
     return { file: v.templateFile, line: l, col, code: d.code, message, category };
   }

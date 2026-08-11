@@ -27,6 +27,8 @@
  * explicit return.
  */
 
+import { blankComments } from './extension.js';
+
 const WS: RegExp = /\s/;
 const ID_CHAR: RegExp = /[A-Za-z0-9_$]/;
 const ID_START: RegExp = /[A-Za-z_$]/;
@@ -61,13 +63,34 @@ export function injectAutoReturn(script: string, names: string[]): AutoReturnRes
   if (open === null) return { code: script }; // unlocatable / concise arrow / annotated → leave as-is
   const scan: BodyScan | null = scanBody(script, open);
   if (scan === null || scan.hasTopReturn) return { code: script };
-  const inserted: string = `\n  return { ${names.join(', ')} };\n`;
+  const visible: string[] = names.filter((n: string) => occurs(script, n));
+  if (visible.length === 0) return { code: script };
+  const inserted: string = `\n  return { ${visible.join(', ')} };\n`;
   const at: number = scan.closeIndex; // insert just before the body-closing '}'
   return {
     code: script.slice(0, at) + inserted + script.slice(at),
     injectedAt: at,
     injectedLen: inserted.length,
   };
+}
+
+/**
+ * Could `name` possibly be in this script's scope? A synthesized `return` may only name bindings the
+ * setup can actually see — one it cannot is a `ReferenceError` the first time the component is created.
+ *
+ * The test is deliberately over-generous: ANY standalone occurrence of the identifier counts, whether it
+ * is a declaration, an import binding, a parameter, or just a use. Over-approximating "in scope" is the
+ * safe direction — it can only ever keep the previous behaviour for a name, never drop one that worked.
+ * A name occurring nowhere in the text, on the other hand, provably cannot resolve.
+ *
+ * It was a `#3` patch extension that made this matter. Its context is the BASE's plus its own, so the
+ * names the patched template reads include the base's — and a setup that omitted its `return` was handed
+ * `return { items, pick, title }` when it could see only `pick`. The component threw on creation.
+ * (Comments and strings are blanked first: a name mentioned only in prose is not in scope either.)
+ */
+function occurs(script: string, name: string): boolean {
+  if (!/^[A-Za-z_$][\w$]*$/.test(name)) return true; // not a plain identifier — leave it alone
+  return new RegExp(`(?:^|[^\\w$.])${name}(?![\\w$])`).test(blankComments(script, true));
 }
 
 /* ──────────── locate the setup body's opening brace ──────────── */
