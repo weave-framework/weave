@@ -14,7 +14,7 @@
 > already left it behind — Phase E ran 94 commits without a bump, and then released as one MINOR. The public
 > promise wins; the habit is retired.)*
 
-## Unreleased
+## 3.0.1
 
 ### Security
 - **Every open advisory closed: 8 Dependabot alerts + 2 code-scanning alerts.** The dependency half is

@@ -3,6 +3,37 @@
 Human-readable highlights, one section per release — everything notable that landed since
 the previous one. For the granular, per-version log see [CHANGELOG.md](CHANGELOG.md).
 
+## 3.0.1 — 2026-08-12
+
+A **patch**: three fixes for things that were quietly not working, and every open security advisory closed.
+Nothing new, nothing changed shape.
+
+### Numbers in template expressions
+
+`{{ 182_400 }}` did not compile. Neither did `{{ 0xFF }}`, `{{ 1e3 }}`, `{{ 0b1010 }}`, `{{ 0o17 }}` or
+`{{ 9007199254740993n }}` — every numeric literal except a plain integer and a plain decimal was a build
+error on valid JavaScript, reported against generated code rather than against your template.
+
+The expression tokenizer had no notion of numbers: digits were copied one at a time, so the first
+character inside a literal that can also *start* an identifier — `_`, `x`, `b`, `o`, `e`, `n` — began one,
+and it was then resolved against your component's context. `182_400` was emitted as `182ctx._400`. A
+numeric literal is now a single token, covering hex, binary, octal, exponents, separators and BigInt.
+
+### Security — every open advisory closed
+
+Eight dependency advisories (`undici` ×5, `fast-uri`, `js-yaml`, `nx`) and two code-scanning findings. The
+dependency half is entirely build tooling — none of it is in a published Weave package's dependency tree,
+and the zero-runtime-dependency promise is unchanged.
+
+The two code-scanning findings were real and in the compiler: two declaration-reading regexes with a
+polynomial-backtracking shape, run over your own source files. Both were rewritten so the scan is linear.
+
+### `weave check` no longer dies on a file that quotes a component declaration
+
+Any module holding Weave examples as *data* — a documentation page, a snippet library — had its own prose
+read as a component declaration, and one such file stopped the entire check with a stack trace instead of a
+diagnostic.
+
 ## 3.0.0 — 2026-08-11
 
 A **major**, for one reason: a type that used to accept code now refuses it. Everything else here is a fix
