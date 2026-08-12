@@ -150,6 +150,15 @@ const GENERIC_CASES = [
   // An optional props parameter — the `?` sits before the colon, so it must not become part of the type.
   { name: 'an optional props parameter', decl: 'export function setup<T = unknown>(props?: VProps<T>)', typeParams: 'T = unknown', propsType: 'VProps<T>' },
   { name: 'an arrow-declared setup', decl: 'export const setup = <T = unknown,>(props: ZProps<T>): { a: number } => ({ a: 1 })', typeParams: 'T = unknown', propsType: 'ZProps<T>' },
+  // The annotation carries its own `=>`. The scan that finds the assignment must step over it, or the
+  // "props type" is read out of the middle of the annotation. (The declaration's regex no longer spans
+  // the annotation — that shape was polynomial backtracking over a user's own source.)
+  {
+    name: 'an annotated arrow-declared setup',
+    decl: 'export const setup: <T>(props: QProps<T>) => { a: number } = <T = unknown,>(props: QProps<T>) => ({ a: 1 })',
+    typeParams: 'T = unknown',
+    propsType: 'QProps<T>',
+  },
 ];
 
 for (const g of GENERIC_CASES) {

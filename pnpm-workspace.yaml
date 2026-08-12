@@ -14,12 +14,25 @@ overrides:
   # never shipped runtime code, but the alert is on the tracked lockfile. Scope the override to the
   # vulnerable range so any other range resolves normally; 1.16→1.18 is a minor bump nx accepts.
   'axios@>=1.15.2 <1.18.0': '>=1.18.0'
-  # fast-uri 3.1.3 (an ajv transitive, pulled through the nx/@nx/devkit build toolchain) is in the 3.x
-  # vulnerable range of GHSA-v2hh-gcrm-f6hx (>= 3.0.0, <= 3.1.3; patched 3.1.4 — the advisory also has 2.x
-  # and 4.x ranges we don't hit). Build-tool transitive, never shipped runtime code, but the alert is on the
-  # tracked lockfile. Pin to the 3.x patch line (`<4`) so ajv, which expects `fast-uri@^3`, is not forced onto
-  # a major it never asked for; 3.1.3→3.1.4 is a patch.
-  'fast-uri@>=3.0.0 <=3.1.3': '>=3.1.4 <4'
+  # nx < 23.0.2 — GHSA-vp3h-ghgh-jr7g, Zip-Slip in the self-hosted remote cache. The root devDependency
+  # and `packages/nx`'s `@nx/devkit` range were both bumped, which is the right fix for a DIRECT dependency;
+  # this override exists for the PEER resolution `packages/nx` declares (`nx: >=21.0.0`), which a range bump
+  # cannot reach. nx is build tooling — it is never in a published Weave package's dependency tree.
+  'nx@>=23.0.0 <23.0.2': '>=23.0.2'
+  # fast-uri, twice. GHSA-v2hh-gcrm-f6hx (host confusion; <= 3.1.3, patched 3.1.4) and then
+  # GHSA-7p8r-x3mc-p8w7 (host confusion again, via a backslash authority introducer; < 3.1.5,
+  # patched 3.1.5). The pin has to name the LATER patch or the earlier one holds it on 3.1.4, which
+  # the second advisory covers — an override is only as current as the last advisory it was written for.
+  # Still `<4`: ajv expects `fast-uri@^3` and must not be dragged across a major it never asked for.
+  'fast-uri@>=3.0.0 <3.1.5': '>=3.1.5 <4'
+  # undici < 7.29.0 — five advisories at once (GHSA-4cwx-7wf7-3272 cross-user disclosure + parse-time
+  # crash via degenerate private cache directives, plus -8xcm/-jr45/-m8rv/-v3r7 on Cache-Control parsing,
+  # retry desync, cookie attribute injection and CRLF injection). All fixed in 7.29.0. It arrives through
+  # the nx build toolchain; nothing Weave ships makes an HTTP request.
+  'undici@>=7.0.0 <7.29.0': '>=7.29.0 <8'
+  # js-yaml < 4.3.1 — GHSA-5p4m-2wfm-xmqj, quadratic CPU consumption resolving `!!omap`. A build-tool
+  # transitive (the nx toolchain reads YAML configs); no Weave package parses YAML at runtime.
+  'js-yaml@>=4.0.0 <4.3.1': '>=4.3.1 <5'
   # brace-expansion, twice over. GHSA-3jxr-9vmj-r5cp (a ReDoS; >= 3.0.0, < 5.0.7, patched 5.0.7) and then
   # GHSA-mh99-v99m-4gvg / CVE-2026-14257 (unbounded expansion → an OOM crash; <= 5.0.7, patched 5.0.8).
   # The second one's range has no lower bound, so the pin has to be `>=5.0.8` — the old `>=5.0.7` would

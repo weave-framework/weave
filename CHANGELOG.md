@@ -14,6 +14,28 @@
 > already left it behind — Phase E ran 94 commits without a bump, and then released as one MINOR. The public
 > promise wins; the habit is retired.)*
 
+## Unreleased
+
+### Security
+- **Every open advisory closed: 8 Dependabot alerts + 2 code-scanning alerts.** The dependency half is
+  `undici` (five advisories at once, all fixed in 7.29.0), `fast-uri` (a second host-confusion advisory
+  the earlier pin did not reach — an override is only as current as the last advisory it was written
+  for), `js-yaml` (quadratic CPU on `!!omap`) and `nx` (Zip-Slip in the self-hosted remote cache). All
+  four are build-tooling transitives of the nx toolchain and none is in a published Weave package's
+  dependency tree; the zero-runtime-dependency promise is unaffected. Fixed with scoped overrides in
+  `pnpm-workspace.yaml` — pnpm 11 ignores `pnpm.overrides` in `package.json` and only warns — plus a
+  direct range bump for `nx`, which is a declared dev dependency rather than a transitive.
+
+### Fixed — compiler
+- **Two polynomial-backtracking regexes, on input that is a user's own source file.** Both read a
+  declaration head with the type annotation folded in (`(?::[^=
+]+)?`), which puts two
+  whitespace-accepting quantifiers either side of an optional group: on `export const template` followed
+  by a run of spaces and no `=`, the engine retries every split of that run at every start position.
+  CodeQL flagged both (`js/polynomial-redos`). The annotation is no longer part of either pattern — the
+  assignment is found by a linear scan that also steps over the `=>` an annotation routinely contains
+  (`: (p: P) => Ctx`), which the regex never handled either.
+
 ## 3.0.0
 
 > ⚠️ **MAJOR — this release contains a BREAKING change** — see the option-accessor entry

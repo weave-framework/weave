@@ -313,6 +313,23 @@ test('extractSources joins a concatenated `template` string (multi-line + splits
   assert.equal(template, '<button class={{ c() }} disabled={{ d() }}><slot></slot></button>');
 });
 
+test('extractSources reads past a type annotation that contains an arrow', () => {
+  // The annotation is no longer part of the regex — folding it in was a polynomial-backtracking shape
+  // over a user's own source file. A linear scan finds the assignment instead, and it has to step over
+  // the `=>` an annotation can carry, or the value would be read from the middle of the type.
+  const script: string =
+    "export const template: ReturnType<() => string> = '<b>hi</b>';\n" + 'export function setup(){ return {}; }';
+  assert.equal(extractSources(script).template, '<b>hi</b>');
+});
+
+test('extractSources skips a declaration with no assignment on its line', () => {
+  // `export const template: string;` declares nothing to read. It must be stepped over, not treated as
+  // a malformed declaration — and the scan must continue to the real one below it.
+  const script: string =
+    'declare module "x" { export const template: string; }\n' + "export const template: string = '<i>real</i>';\n";
+  assert.equal(extractSources(script).template, '<i>real</i>');
+});
+
 test('extractSources ignores a declaration that only appears INSIDE a string', () => {
   // A module holding Weave examples as text — every generated docs page does — is not a component.
   // The scan used to read the quoted `export const template =` as a real declaration and throw

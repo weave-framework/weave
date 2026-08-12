@@ -36,11 +36,38 @@ export interface ExtractedSources {
   script: string;
 }
 
-// Allow an optional type annotation (`: string`, `: string[]`, …) — the project's
-// lint requires one — between the name and `=`.
-// The optional type annotation is bounded to a single line (`[^=\n]` not `[^=]`) so the
-// match can't scan across the whole script — avoids a polynomial-ReDoS backtracking shape.
-const DECL: RegExp = /export\s+const\s+(template|styles)\s*(?::[^=\n]+)?=\s*/g;
+/**
+ * The declaration HEAD only — up to the `:` of an optional type annotation, or the `=` itself.
+ *
+ * The annotation is deliberately NOT part of the pattern. Matching it as `(?::[^=\n]+)?` put two
+ * quantifiers that both accept whitespace (`\s*` and `[^=\n]+`) either side of an optional group, which
+ * is a polynomial-backtracking shape: on `export const template` followed by a run of spaces and no `=`,
+ * the engine retries every split of that run, at every start position. CodeQL flagged it
+ * (`js/polynomial-redos`), and it is a real input — the scan runs over a user's own source file.
+ *
+ * Whatever follows the `:` is found by {@link assignmentAt}, a linear scan with no backtracking at all.
+ */
+const DECL: RegExp = /export\s+const\s+(template|styles)\s*[:=]/g;
+
+/**
+ * Offset of a declaration's assignment `=`, starting from just after its `:`. -1 if the line has none.
+ *
+ * `=>` is skipped: a type annotation routinely contains one (`: Record<string, () => Node>`), and taking
+ * that for the assignment would read the annotation's tail as the value.
+ */
+function assignmentAt(src: string, from: number): number {
+  for (let i: number = from; i < src.length; i++) {
+    const c: string = src[i];
+    if (c === '\n') return -1; // the annotation is a single line; anything else is not a declaration we read
+    if (c !== '=') continue;
+    if (src[i + 1] === '>') {
+      i++; // an arrow inside the annotation
+      continue;
+    }
+    return i;
+  }
+  return -1;
+}
 
 /**
  * Pull the `template`/`styles` declarations out of a component script. Throws on a
@@ -65,7 +92,15 @@ export function extractSources(script: string): ExtractedSources {
   let m: RegExpExecArray | null;
   while ((m = DECL.exec(scan)) !== null) {
     const kind: string = m[1];
-    const valueStart: number = m.index + m[0].length;
+    const head: number = m.index + m[0].length; // just past the `:` or the `=`
+    // The head stopped at whichever came first. On a `:` the assignment is found by a linear scan; a
+    // declaration with no `=` on that line (`export const template: string;`) is not one to read.
+    const eq: number = scan[head - 1] === '=' ? head - 1 : assignmentAt(scan, head);
+    if (eq === -1) {
+      DECL.lastIndex = head;
+      continue;
+    }
+    const valueStart: number = eq + 1;
     const parsed: ParsedLiteral = parseLiteral(script, valueStart, kind);
     if (kind === 'template') {
       if (Array.isArray(parsed.value)) throw new Error('weave: `template` must be a single string, not an array');

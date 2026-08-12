@@ -101,9 +101,28 @@ function locateSetup(code: string): { typeParams: string | null; parenAt: number
   if (fn) {
     i = skipSpace(code, fn.index + fn[0].length);
   } else {
-    const v: RegExpExecArray | null = /export\s+(?:const|let|var)\s+setup\s*(?::[^=]*)?=/.exec(code);
+    // The head only, up to the `:` or the `=`. Folding the annotation in as `(?::[^=]*)?` put two
+    // whitespace-accepting quantifiers either side of an optional group — a polynomial-backtracking
+    // shape over what is, here, a user's own source file (CodeQL `js/polynomial-redos`). Past the `:`
+    // the assignment is found by a linear scan, which also has to step over the `=>` a type annotation
+    // routinely contains (`: (p: P) => Ctx`).
+    const v: RegExpExecArray | null = /export\s+(?:const|let|var)\s+setup\s*[:=]/.exec(code);
     if (!v) return null;
-    i = skipSpace(code, v.index + v[0].length);
+    const head: number = v.index + v[0].length;
+    let eq: number = code[head - 1] === '=' ? head - 1 : -1;
+    if (eq === -1) {
+      for (let j: number = head; j < code.length && code[j] !== '\n'; j++) {
+        if (code[j] !== '=') continue;
+        if (code[j + 1] === '>') {
+          j++;
+          continue;
+        }
+        eq = j;
+        break;
+      }
+    }
+    if (eq === -1) return null;
+    i = skipSpace(code, eq + 1);
     if (code.startsWith('async', i)) i = skipSpace(code, i + 5);
     if (code.startsWith('function', i)) i = skipSpace(code, i + 8);
   }
