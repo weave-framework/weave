@@ -27,6 +27,21 @@
   direct range bump for `nx`, which is a declared dev dependency rather than a transitive.
 
 ### Fixed — compiler
+- **Every non-decimal numeric literal in a template expression was mis-lexed (W-9).** The expression
+  tokenizer had no number branch at all: digits fell through to its copy-a-character default, so the
+  first character inside a literal that can also START an identifier — `_`, `x`, `b`, `o`, `e`, `n` —
+  began one, and the scope pass qualified it against the component context. In ctx mode, which is what
+  every real component compiles in, that made `182_400` come out as `182ctx._400` and the build die on
+  generated code. Only a plain integer and a plain decimal survived; `0xFF`, `0b1010`, `0o17`, `1e3`,
+  `1e+3`, `1.5e-3`, `1n` and every separator form were build errors on valid ECMAScript.
+  A numeric literal is now one token, covering hex, binary, octal, exponents with a sign, `_`
+  separators wherever they are legal, and the BigInt `n` suffix — in BOTH scanners, because the
+  analysis half would otherwise infer the tail of a literal as a context name and hand `setup` a
+  binding to return that does not exist. It is a real token rather than "refuse an identifier that
+  follows a digit": the narrow patch fixes the output while leaving the scanner unable to say where a
+  number ends.
+
+### Fixed — compiler
 - **Two polynomial-backtracking regexes, on input that is a user's own source file.** Both read a
   declaration head with the type annotation folded in (`(?::[^=
 ]+)?`), which puts two

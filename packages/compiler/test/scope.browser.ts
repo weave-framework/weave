@@ -269,3 +269,75 @@ test('E1.49: the ANALYSIS agrees with rewrite about comments', () => {
   assert.deepEqual(unresolvedRefs("// a note.\nknown = 1;", new Set(['known']), [], ''), [],
     'and a known one still resolves');
 });
+
+/* ── W-9: numeric literals are ONE token ──────────────────────────────────────────────
+ * The tokenizer had no number branch, so digits fell through to the copy-a-character default and the
+ * first character inside a literal that can START an identifier began one. In ctx mode — which is what
+ * every real component compiles in — every unbound name becomes `ctx.<name>`, so `182_400` was emitted
+ * as `182ctx._400` and the build died pointing at generated code.
+ *
+ * A row per literal FORM on purpose: a single "separators work" test would have passed while `0xFF`
+ * was still broken, which is exactly how the narrow reading of this survives. */
+const NUMERIC_FORMS: string[] = [
+  '1000', '1.5', '0.5', '.5',                  // the two that already worked, and a leading dot
+  '182_400', '1_000.5',                        // separators — what was reported
+  '0xFF', '0xDE_AD', '0XfF',                   // hex, either case
+  '0b1010', '0b1010_1010', '0B11',             // binary
+  '0o17', '0o1_7', '0O7',                      // octal
+  '017',                                       // legacy octal — read as decimal here, which is fine
+  '1e3', '1e+3', '1E3', '1.5e-3', '1_0e1_0',   // exponents
+  '1n', '0xFFn', '9007199254740993n',          // BigInt
+];
+
+test('W-9: every numeric literal form survives a ctx-mode rewrite', () => {
+  for (const lit of NUMERIC_FORMS) {
+    // The scope is deliberately hostile: it BINDS every name the old lexer split these into, which is
+    // the only condition under which the bug is visible AT ALL — an unbound tail is left bare and the
+    // pieces concatenate back to the original. A scope missing one tail is a test that passes while
+    // that form is still broken, which is exactly how the narrow reading of this bug survives.
+    const sc: Scope = ctxScope([
+      '_400', '_000', 'xFF', 'b1010', 'o17', 'e3', 'n', 'x', 'e',
+      '_AD', 'xDE_AD', 'XfF', 'fF', '_1010', 'b1010_1010', 'B11', '_7', 'o1_7', 'O7',
+      '_0', 'e1_0', 'E3', 'xFFn', '_3', '_5',
+    ]);
+    const r: ReturnType<typeof rewrite> = rewrite(lit, sc, 'ctx');
+    assert.equal(r.code, lit, `${lit} was rewritten to ${r.code}`);
+    assertVerbatim(lit, r.code, r.segments);
+    assertFullSourceCoverage(lit, r.segments);
+  }
+});
+
+test('W-9: a numeric literal in an expression, beside real references', () => {
+  const sc: Scope = ctxScope(['total', 'n']);
+  assert.equal(rewrite('total * 182_400', sc, 'ctx').code, 'ctx.total * 182_400');
+  assert.equal(rewrite('total & 0xFF', sc, 'ctx').code, 'ctx.total & 0xFF');
+  assert.equal(rewrite('1e3 + total', sc, 'ctx').code, '1e3 + ctx.total');
+  // A binding really named `n` still rewrites, and a BigInt in the SAME expression stays a literal.
+  assert.equal(rewrite('n + 9n', sc, 'ctx').code, 'ctx.n + 9n');
+});
+
+test('W-9: a number is a VALUE, so what follows it is read correctly', () => {
+  const sc: Scope = ctxScope(['a', 'b']);
+  // `/` after a literal is division, not the start of a regex — the token has to set that.
+  assert.equal(rewrite('10 / a', sc, 'ctx').code, '10 / ctx.a');
+  assert.equal(rewrite('0xFF / 2 / a', sc, 'ctx').code, '0xFF / 2 / ctx.a');
+  // A member access ON a literal: the first dot belongs to the number, the second is the accessor.
+  assert.equal(rewrite('1..toFixed(2)', sc, 'ctx').code, '1..toFixed(2)');
+  assert.equal(rewrite('(0.5).toFixed(1)', sc, 'ctx').code, '(0.5).toFixed(1)');
+  // `e` without a digit after it is not an exponent, so the identifier still resolves.
+  assert.equal(rewrite('1 + a', sc, 'ctx').code, '1 + ctx.a');
+});
+
+test('W-9: a literal inside a string or template literal is untouched', () => {
+  const sc: Scope = ctxScope(['_400', 'total']);
+  assert.equal(rewrite("'182_400'", sc, 'ctx').code, "'182_400'");
+  assert.equal(rewrite('`v 0xFF ${ total }`', sc, 'ctx').code, '`v 0xFF ${ ctx.total }`');
+});
+
+test('W-9: the ANALYSIS agrees — a literal contributes no reference', () => {
+  // `freeIdentifiers` runs its own scan. Left unfixed there, `182_400` would put `_400` into the
+  // auto-exposed context and `1n` an `n` — a setup told to return bindings that do not exist.
+  assert.deepEqual(unresolvedRefs('182_400 + 0xFF + 1n', new Set(), [], ''), []);
+  assert.deepEqual(unresolvedRefs('total + 182_400', new Set(), [], ''), ['total'],
+    'and a real reference beside one is still found');
+});

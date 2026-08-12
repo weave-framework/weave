@@ -216,6 +216,18 @@ export function rewrite(expr: string, scope: Scope, ctxRef: string = 'ctx', oute
       continue;
     }
 
+    // A NUMERIC LITERAL is one token. Before the identifier branch, because the character that ends a
+    // literal is routinely one that starts an identifier (`_400`, `xFF`, `e3`, `n`).
+    {
+      const end: number = scanNumber(expr, i);
+      if (end > i) {
+        copy(i, expr.slice(i, end));
+        sig = '0'; // a VALUE: a following `/` is division, and it is not a `.` accessor
+        i = end;
+        continue;
+      }
+    }
+
     if (ID_START.test(c)) {
       let j: number = i + 1;
       while (j < n && ID_CHAR.test(expr[j])) j++;
@@ -305,6 +317,55 @@ function declaresLocal(expr: string, i: number): boolean {
   const word: string = expr.slice(k + 1, end);
   if (word !== 'const' && word !== 'let' && word !== 'var') return false;
   return k < 0 || !ID_CHAR.test(expr[k]); // a whole word, not the tail of `myconst`
+}
+
+/**
+ * Consume a NUMERIC LITERAL starting at `i`, returning the offset just past it (`i` if there is none).
+ *
+ * The tokenizer had no notion of numbers at all: digits fell through to the copy-a-character default, so
+ * the first character inside a literal that can START an identifier — `_`, `x`, `b`, `o`, `e`, `n` —
+ * began one. In ctx mode every unbound name becomes `ctx.<name>`, so `182_400` was emitted as
+ * `182ctx._400` and the build died on generated code. Only a plain integer and a plain decimal survived.
+ *
+ * It is a whole token rather than "refuse an identifier that follows a digit", because the narrow patch
+ * fixes the output while leaving the scanner unable to say where a number ends — and the next reader has
+ * to rediscover all of this. Covers the ECMAScript numeric grammar: hex/binary/octal, exponents with a
+ * sign, `_` separators anywhere they are legal, and the BigInt `n` suffix.
+ *
+ * Deliberately starts only at a DIGIT. A leading-dot literal (`.5`) already comes out right: the `.` is
+ * copied as punctuation and the `5` starts a number here.
+ */
+function scanNumber(expr: string, i: number): number {
+  const n: number = expr.length;
+  if (!/[0-9]/.test(expr[i])) return i;
+  let j: number = i;
+  const radix: string = expr[i] === '0' ? (expr[i + 1] ?? '').toLowerCase() : '';
+  if (radix === 'x' || radix === 'b' || radix === 'o') {
+    const digits: RegExp = radix === 'x' ? /[0-9a-fA-F_]/ : radix === 'b' ? /[01_]/ : /[0-7_]/;
+    j = i + 2;
+    while (j < n && digits.test(expr[j])) j++;
+  } else {
+    while (j < n && /[0-9_]/.test(expr[j])) j++;
+    // A `.` is part of the literal only when it is not the start of a member access on it — `1.5` yes,
+    // `1..toString()` takes the FIRST dot and leaves the second as the accessor.
+    if (expr[j] === '.') {
+      j++;
+      while (j < n && /[0-9_]/.test(expr[j])) j++;
+    }
+    // An exponent needs at least one digit after the optional sign, or the `e` is not an exponent at all
+    // (`1e` is a syntax error, but `1einvalid` must not be swallowed as one token).
+    if (expr[j] === 'e' || expr[j] === 'E') {
+      let k: number = j + 1;
+      if (expr[k] === '+' || expr[k] === '-') k++;
+      if (k < n && /[0-9]/.test(expr[k])) {
+        k++;
+        while (k < n && /[0-9_]/.test(expr[k])) k++;
+        j = k;
+      }
+    }
+  }
+  if (expr[j] === 'n') j++; // BigInt suffix
+  return j;
 }
 
 function lastNonSpace(s: string): string {
@@ -587,6 +648,17 @@ export function freeIdentifiers(expr: string, outerParams?: ReadonlySet<string>)
       sig = '/';
       continue;
     }
+    // The same numeric token as `rewrite`. Without it this scanner INFERS the tail of a literal as a
+    // ctx name — `182_400` would put `_400` into the auto-exposed context, and `1n` an `n`.
+    {
+      const end: number = scanNumber(expr, i);
+      if (end > i) {
+        sig = '0';
+        i = end;
+        continue;
+      }
+    }
+
     if (ID_START.test(c)) {
       let j: number = i + 1;
       while (j < n && ID_CHAR.test(expr[j])) j++;
