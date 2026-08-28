@@ -99,7 +99,7 @@ button {
 }
 ~~~
 
-That's a complete component. Here's the same counter, running live on this very page — click it:
+That's a complete component. Here's one running live on this very page — the same `signal` + `on:click`, with a reset button added. Click it:
 
 :::demo counter
 

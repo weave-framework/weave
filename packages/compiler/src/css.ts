@@ -36,13 +36,28 @@ export function hashCss(input: string): string {
 }
 
 /** Rewrite `css` so it only targets elements carrying `[data-w-<hash>]`. */
-export function scopeCss(css: string, hash: string): string {
-  return transformBlock(css, scopeAttr(hash), hostAttr(hash), false);
+export function scopeCss(css: string, hash: string, onUnscopable?: (selector: string) => void): string {
+  return transformBlock(css, scopeAttr(hash), hostAttr(hash), false, onUnscopable);
 }
+
+/**
+ * Selectors whose rightmost compound names an element OUTSIDE the component — `:root`, `<html>`,
+ * `<body>`. Weave stamps its scope attribute only on the DOM it generated, so scoping one of these
+ * produces `[data-w-x]:root`: valid CSS that can never match anything. It compiles, it ships, and it
+ * does nothing — which is exactly how the UI library's theme fails when it is pasted into a component
+ * stylesheet instead of a global one. `:global(body)` is the deliberate form and is left alone.
+ */
+const OUTSIDE_COMPONENT: RegExp = /^(:root|html|body)\b/i;
 
 /* ──────────── block-level walk ──────────── */
 
-function transformBlock(css: string, attr: string, host: string, keyframes: boolean): string {
+function transformBlock(
+  css: string,
+  attr: string,
+  host: string,
+  keyframes: boolean,
+  onUnscopable?: (selector: string) => void
+): string {
   let out: string = '';
   let i: number = 0;
   const n: number = css.length;
@@ -128,14 +143,14 @@ function transformBlock(css: string, attr: string, host: string, keyframes: bool
     } else if (trimmed.startsWith('@')) {
       const kw: string = (/^@-?\w[\w-]*/.exec(trimmed)?.[0] ?? '').toLowerCase();
       if (kw.endsWith('keyframes')) {
-        out += prelude + '{' + transformBlock(body, attr, host, true) + '}';
+        out += prelude + '{' + transformBlock(body, attr, host, true, onUnscopable) + '}';
       } else if (kw === '@font-face' || kw === '@page' || kw === '@property' || kw === '@counter-style') {
         out += prelude + '{' + body + '}'; // declarations only — nothing to scope
       } else {
-        out += prelude + '{' + transformBlock(body, attr, host, false) + '}'; // @media/@supports/@container/@layer…
+        out += prelude + '{' + transformBlock(body, attr, host, false, onUnscopable) + '}'; // @media/@supports/@container/@layer…
       }
     } else {
-      out += scopeSelectorList(prelude, attr, host) + '{' + transformBlock(body, attr, host, false) + '}';
+      out += scopeSelectorList(prelude, attr, host, onUnscopable) + '{' + transformBlock(body, attr, host, false, onUnscopable) + '}';
     }
     i = after;
   }
@@ -144,13 +159,18 @@ function transformBlock(css: string, attr: string, host: string, keyframes: bool
 
 /* ──────────── selector scoping ──────────── */
 
-function scopeSelectorList(prelude: string, attr: string, host: string): string {
+function scopeSelectorList(
+  prelude: string,
+  attr: string,
+  host: string,
+  onUnscopable?: (selector: string) => void
+): string {
   return splitTopLevel(prelude, ',')
-    .map((s) => scopeSelector(s, attr, host))
+    .map((s) => scopeSelector(s, attr, host, onUnscopable))
     .join(', ');
 }
 
-function scopeSelector(raw: string, attr: string, host: string): string {
+function scopeSelector(raw: string, attr: string, host: string, onUnscopable?: (selector: string) => void): string {
   const sel: string = raw.trim();
   if (!sel) return sel;
 
@@ -169,6 +189,7 @@ function scopeSelector(raw: string, attr: string, host: string): string {
   if (rightTrim.startsWith(':global(') || right.includes('&')) {
     return prefix + unwrapGlobal(right);
   }
+  if (onUnscopable && OUTSIDE_COMPONENT.test(rightTrim)) onUnscopable(sel);
   return prefix + insertAttr(unwrapGlobal(right), attr);
 }
 

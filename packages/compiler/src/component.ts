@@ -399,7 +399,11 @@ export function compileComponent(src: ComponentSource, opts: ComponentOptions = 
     .replace('export default function render', 'function render')
     .replace(/\n?export default render;?\s*$/, '');
 
-  const css: string = src.styles ? scopeCss(src.styles, hash) : '';
+  // Selectors scoping turns into something that can never match — `:root`/`html`/`body`, which live
+  // outside anything this component renders. Silent until now: the rule compiled, shipped, and applied
+  // to nothing, which is exactly how a theme pasted into a component stylesheet fails.
+  const unscopable: string[] = [];
+  const css: string = src.styles ? scopeCss(src.styles, hash, (sel: string) => unscopable.push(sel)) : '';
   const script: string = src.script ?? '';
   const hasSetup: boolean = HAS_SETUP.test(script);
   // Auto-expose: when `setup` omits its `return`, synthesize one exposing exactly the
@@ -448,6 +452,14 @@ export function compileComponent(src: ComponentSource, opts: ComponentOptions = 
   // E1.5/E1.6 — a resumable build reports what will NOT survive resume. A dead handler site is ground truth
   // from the codegen (whatever the cause); the reason comes from the extraction when it knows one.
   const warnings: string[] = resumed ? [...resumed.warnings] : [];
+  for (const sel of unscopable) {
+    warnings.push(
+      `\`${sel}\` cannot match: component styles are scoped to the elements this component renders, and ` +
+        `:root/<html>/<body> are not among them. Move the rule to a global stylesheet (\`styles: ['…']\` in ` +
+        `weave.config.ts) — that is where design tokens, resets and the UI library's theme belong — or, for a ` +
+        `single rule, write \`:global(${sel.trim()})\`.`
+    );
+  }
   // E1.14 — the big one: a render that cannot be adopted means this component's WHOLE subtree is re-rendered
   // on the client (its setup re-runs; nothing below it resumes). It used to be entirely silent, which is what
   // made a docs page look resumed when nothing had run at all.

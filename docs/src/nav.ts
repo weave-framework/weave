@@ -121,11 +121,14 @@ const ui: NavSection = {
   label: 'UI',
   icon: 'package',
   basePath: '/ui',
-  home: '/ui/theming',
+  home: '/ui/installation',
   groups: [
     {
       label: 'Overview',
-      items: [{ label: 'Styling & theming', path: '/ui/theming' }],
+      items: [
+        { label: 'Installation', path: '/ui/installation' },
+        { label: 'Styling & theming', path: '/ui/theming' },
+      ],
     },
     {
       label: 'Foundational',

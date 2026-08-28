@@ -8,18 +8,34 @@ system: how to load it, how tokens are named, and every knob you can turn.
 ## The one-time setup
 
 Pull the library's Sass in through its package entry (the `pkg:` importer resolves it), then emit two things: the
-**theme** (all the token values) and the **structural styles** (the component CSS that reads them).
+**theme** (all the token values) and the **structural styles** (the component CSS that reads them) — from a
+**global** stylesheet listed in `styles`, not from a component's own:
 
-```scss
+```scss title="src/styles/main.scss"
 @use 'pkg:@weave-framework/ui' as weave;
 
 @include weave.theme();      // the token values — :root custom properties
 @include weave.all-styles(); // the component CSS that consumes them
 ```
 
+```ts title="weave.config.ts"
+export default defineConfig({
+  styleLang: 'scss',
+  styles: ['src/styles/main.scss'], // global: compiled first, and NOT scoped
+});
+```
+
 That's the entire baseline. `theme()` writes the `--weave-*` custom properties; `all-styles()` writes the rules for
 every built-in component. Import a component's JS from its subpath (`@weave-framework/ui/button`) and its styles are
 already present.
+
+:::callout warn "Why the `styles` entry, and not `app.scss`"
+Component stylesheets are **scoped**: every selector is rewritten to match only what that component renders. Put
+this block in one and `:root { --weave-… }` compiles to `[data-w-xxxxxx]:root` — a selector that can never match.
+No token is ever defined, every component renders unstyled, and the whole theme still ships. The compiler warns
+when it scopes a `:root`/`html`/`body` rule, but the fix is always to move it to a global entry. Full walkthrough:
+[Installation](/ui/installation).
+:::
 
 :::callout tip "Per-component styles, if you prefer"
 Instead of `all-styles()`, you can pull just the components you use — each has its own Sass entry:

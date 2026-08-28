@@ -202,6 +202,15 @@ body { margin: 0; font-family: system-ui, sans-serif; color: var(--text); }
 
 A common, tidy split: **tokens and resets** go in the global stylesheet; **everything else** lives scoped next to its component and references the tokens via `var(--…)`.
 
+:::callout warn "`:root`, `html` and `body` in a component stylesheet never match"
+Scoping rewrites the rightmost compound of every selector, and Weave stamps its scope attribute only on
+the DOM *this component* renders. `:root { --brand: … }` in `app.scss` compiles to `[data-w-xxxxxx]:root`
+— valid CSS that can match nothing, so the variable is simply never defined. Same for a bare `body` or
+`html` rule. The compiler warns when it scopes one; move the rule to a `styles` entry above (or, for a
+one-off, write `:global(body)`). This is the single most common way a design-token or UI-library theme
+setup silently does nothing.
+:::
+
 :::callout info "How styles get to the page: dev vs build"
 The scoped output is identical either way — only the **delivery** differs. In **dev**, each component's CSS is injected with a tiny per-component `<style>` (nothing is written to disk; the dev server serves from memory). In a **build**, every component's scoped CSS is collected and emitted as **one** stylesheet. You author the same CSS in both; the compiler just packages it differently.
 :::

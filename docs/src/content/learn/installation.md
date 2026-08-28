@@ -64,8 +64,14 @@ yarn dev
 
 Open the printed URL (default <http://localhost:5173>). You have a running Weave app with **live reload** — edit `src/app/app.html` and the page updates on save.
 
+:::callout info "The UI component library is NOT included"
+`@weave-framework/ui` — the buttons, inputs, dialogs and tables — is a separate install, and its styles need
+three lines of setup that nothing warns you about if you skip them (the component renders, unstyled). Four
+steps, once: [UI → Installation](/ui/installation). The scaffold's own `README.md` carries the same recipe.
+:::
+
 :::callout tip "What you got"
-The scaffold is a tiny, complete project: a `weave.config.ts`, an HTML shell, one component (`src/app/app.{ts,html,css}`), and **every first-party package wired up** — `@weave-framework/runtime` plus `router`, `store`, `forms`, `i18n`, and `data` (and `@weave-framework/cli` for tooling). They're all installed so a feature is there the moment you reach for it; anything you don't `import` is **tree-shaken out** of the build (zero bundle cost — see [the note below](#3-add-weave-to-an-existing-project-manual)). That's the whole shape of a Weave app — the [Quick start](/learn/quick-start) walks through every line.
+The scaffold is a tiny, complete project: a `README.md` with the local recipes, a `weave.config.ts`, an HTML shell, one component (`src/app/app.{ts,html,css}`), and **every first-party package wired up** — `@weave-framework/runtime` plus `router`, `store`, `forms`, `i18n`, and `data` (and `@weave-framework/cli` for tooling). They're all installed so a feature is there the moment you reach for it; anything you don't `import` is **tree-shaken out** of the build (zero bundle cost — see [the note below](#3-add-weave-to-an-existing-project-manual)). That's the whole shape of a Weave app — the [Quick start](/learn/quick-start) walks through every line.
 :::
 
 ## 3. Add Weave to an existing project (manual)

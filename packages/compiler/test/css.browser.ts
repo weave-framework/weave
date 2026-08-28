@@ -198,3 +198,40 @@ test(':host styles the root element but not a nested child', () => {
   assert.equal(getComputedStyle(rootEl).color, 'rgb(0, 128, 0)', ':host matched the root');
   assert.equal(getComputedStyle(span).color, 'rgb(0, 0, 255)', ':host did not leak to the child');
 });
+
+/*
+ * A selector that can never match. `:root`, `<html>` and `<body>` live OUTSIDE the component, so they
+ * never carry its scope attribute — scoping them produces `[data-w-x]:root`, which matches nothing.
+ * This is how the documented UI-library setup fails when it is pasted into a component stylesheet
+ * instead of a global one: 120 KB of theme CSS compiles, ships, and applies to nothing, silently.
+ */
+test(':root in a component stylesheet is scoped into a selector that cannot match', () => {
+  const hash: string = 'rt' + hashCss('root');
+  const css: string = scopeCss(':root { --x: 1px }', hash);
+  assert.ok(css.includes(`[data-w-${hash}]:root`), `the scoped form cannot match (got ${css})`);
+
+  const style: HTMLStyleElement = document.createElement('style');
+  style.textContent = css;
+  document.head.appendChild(style);
+  assert.equal(getComputedStyle(document.documentElement).getPropertyValue('--x').trim(), '', 'the token is never defined');
+});
+
+test('scopeCss reports every selector it scopes into something unmatchable', () => {
+  const seen: string[] = [];
+  const css: string =
+    ':root { --a: 1 }\n' +
+    'body { margin: 0 }\n' +
+    'html.dark .card { color: red }\n' + // rightmost compound is the author's own — fine
+    '@media (min-width: 40em) { body { margin: 1px } }\n' +
+    ':global(body) { padding: 0 }\n' + // deliberately global — fine
+    ':host { display: block }\n' + // the component's own root — fine
+    '.card { color: blue }\n';
+  scopeCss(css, 'h', (sel: string) => seen.push(sel));
+
+  assert.equal(seen.length, 3, `three unmatchable selectors (got ${JSON.stringify(seen)})`);
+  assert.ok(seen.includes(':root'), ':root is reported');
+  assert.ok(
+    seen.filter((s) => s === 'body').length === 2,
+    `both bare body rules are reported, including the one inside @media (got ${JSON.stringify(seen)})`
+  );
+});

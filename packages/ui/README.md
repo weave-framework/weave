@@ -10,18 +10,30 @@ npm install @weave-framework/ui
 
 ## Quick start
 
-Two steps: pull in the styles once, then import components per subpath.
+Three steps: emit the styles once **from a global stylesheet**, register that stylesheet, then import
+components per subpath. Full walkthrough: [UI → Installation](https://weaveframework.dev/ui/installation).
 
 **1. Styles** — the whole library is painted from CSS custom properties emitted by one Sass engine:
 
 ```scss
+// src/styles/main.scss
 @use 'pkg:@weave-framework/ui' as weave;
 
 @include weave.theme();      // the token values — :root custom properties
 @include weave.all-styles(); // the component CSS that consumes them
 ```
 
-**2. Components** — each is a default export on its own subpath:
+**2. Register it as a GLOBAL stylesheet** (and set `styleLang: 'scss'`):
+
+```ts
+// weave.config.ts
+export default defineConfig({
+  styleLang: 'scss',
+  styles: ['src/styles/main.scss'], // global — component stylesheets are scoped, and a scoped
+});                                 // `:root` compiles to a selector that can never match
+```
+
+**3. Components** — each is a default export on its own subpath:
 
 ```ts
 import Button from '@weave-framework/ui/button';

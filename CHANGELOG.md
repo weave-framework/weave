@@ -14,6 +14,41 @@
 > already left it behind — Phase E ran 94 commits without a bump, and then released as one MINOR. The public
 > promise wins; the habit is retired.)*
 
+## Unreleased
+
+*A first-run audit — scaffold an app from npm, follow the docs, then make the mistakes a beginner makes —
+found the framework silent in the places a beginner needs it loudest. This is that list, being worked through.*
+
+### Fixed — the dev loop
+- **A compiler error used to end the dev session.** `weave dev` turned only a `ParseError` into a located
+  esbuild error; every other failure was re-thrown, and an exception escaping an `onLoad` callback takes
+  esbuild's watch state with it. After one such error the server kept serving the last good bundle forever and
+  ignored every later save, with no message anywhere — the cure was restarting. Reachable by an ordinary typo
+  (an editor truncating a template on save, a component tag with nothing to resolve, a missing style file).
+  Failures are now diagnostics located at the author's file, with the template and style files kept in
+  `watchFiles` so the save that repairs the error is still watched.
+
+### Changed — `weave check`
+- **It checks the whole project now, not only the components.** Plain modules — services, stores, helpers,
+  `routes.gen.ts` — were pulled into the program as dependencies and never reported on, so an app whose only
+  quality script is `weave check` could pass with a type error plain `tsc --noEmit` refuses. Every non-component
+  `.ts` under the checked roots is now a program root too, under the same tsconfig, with paths printed relative
+  to the working directory like a component's. **This can surface errors in code that was never checked before.**
+
+### Added — diagnostics
+- **A selector scoped into something that can never match is now a build warning.** `:root`, `html` and `body`
+  live outside anything a component renders, so scoping them produces `[data-w-xxxxxx]:root` — valid CSS
+  matching nothing. That is exactly how the UI library's theme fails when it is pasted into a component
+  stylesheet instead of a global one: it compiles, ships ~120 KB, and applies to nothing, silently.
+
+### Docs
+- **A UI → Installation page**, because there was none: nothing in the docs said `npm install
+  @weave-framework/ui`, and the theming page never said *where* its Sass block belongs. Four steps, with the
+  scoped-`:root` trap named. The theming page, the package README, and the framework's own installation page
+  now point at it.
+- **The scaffold ships a `README.md`** — it had none, while shipping 120 KB of AI agent skills. Scripts, layout,
+  how to add a component, the UI-library recipe, and the SPA-rewrite note for deploying.
+
 ## 3.0.1
 
 ### Security

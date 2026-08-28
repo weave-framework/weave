@@ -78,7 +78,7 @@ Produces a static bundle you can deploy. Both pipelines minify by default and co
 
 ### weave check
 
-Static type-checking for your templates — the thing a plain bundler can't do. It runs the same in both pipelines (it doesn't load the config at all; it just takes root paths). Covered in full in [its own section below](#type-checking-templates-weave-check).
+Static type-checking for your project: the templates — the thing a plain bundler can't do — **and** the ordinary `.ts` modules beside them. It runs the same in both pipelines (it doesn't load the config at all; it just takes root paths). Covered in full in [its own section below](#type-checking-templates-weave-check).
 
 | Flag | Default | Effect |
 |------|---------|--------|
@@ -451,6 +451,8 @@ Sass is a *lazy* dependency: it's only imported the first time a `.scss`/`.sass`
 
 `weave check` type-checks your templates against your code — the thing a plain bundler can't do. For each component it builds a virtual TypeScript module that places every template expression against `ReturnType<typeof setup>`, then checks it all in one strict program. Diagnostics map back to the exact `.html` line and column, printed as `file:line:col - error TS<code>: message`.
 
+**Everything else under the roots is checked too.** Services, stores, helpers, generated route modules — every `.ts` that is not a component joins the same program, under the same tsconfig, so `weave check` is the whole project's gate and not only its templates'. (It used to check components alone, which meant a plain module could hold an error `tsc --noEmit` would refuse.)
+
 It catches:
 
 - **Bad template expressions** — a typo'd binding, calling a non-function, a wrong type inside `{{ }}`, `@if`, `@for`, `@let`, or `@await`.
@@ -458,6 +460,7 @@ It catches:
 - **Generic components, at the type they are actually used with.** A `setup<T>` is checked by *instantiating* it from the props you pass, not by reading its parameter type out of the function. `<Select options={{ rows() }} optionValue={{ pick }} />` infers `T` from `rows()`, so an accessor written for a different shape is an error — the checking the component's author wrote `SelectProps<T>` to provide, in a template, which cannot write a type argument of its own.
 - **Directive references** — `use:` and `transition:` names must resolve to something real.
 - **Template-only imports** — an import used *only* in the template isn't falsely flagged as unused.
+- **Everything a plain `tsc --noEmit` catches, in the rest of your code** — a wrong type in a service, an import of a module that does not exist, an unused-but-typed mistake in a store.
 
 Pass one or more roots; with none, it defaults to `['src']`. Any error makes it exit non-zero, so it's a drop-in CI gate.
 

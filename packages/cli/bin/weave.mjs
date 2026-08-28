@@ -9,17 +9,29 @@
  * users get a fast, build-free launch with no monorepo-layout assumptions.
  */
 import { build as esbuild } from 'esbuild';
-import { mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
+
+// `files: ["dist", "bin"]` ships this dev bin inside the published tarball too, where `src/` does not
+// exist — running it there used to die on `Could not resolve …/src/cli.ts` with an esbuild stack. It is
+// not the published entry point (publishConfig.bin points at weave-dist.mjs), but anything shipped has
+// to work when someone runs it. With no source to bundle, hand over to the prebuilt CLI.
+const source = join(here, '../src/cli.ts');
+if (!existsSync(source)) {
+  const { main } = await import(pathToFileURL(join(here, '../dist/cli.js')).href);
+  await main(process.argv.slice(2));
+  process.exit(0);
+}
+
 const cacheDir = join(resolve(here, '../../..'), 'node_modules', '.weave');
 mkdirSync(cacheDir, { recursive: true });
 const out = join(cacheDir, 'cli.mjs');
 
 await esbuild({
-  entryPoints: [join(here, '../src/cli.ts')],
+  entryPoints: [source],
   bundle: true,
   format: 'esm',
   platform: 'node',
