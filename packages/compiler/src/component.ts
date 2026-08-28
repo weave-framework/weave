@@ -14,6 +14,7 @@
  */
 
 import { compileTemplateAst, type CompileResult } from './codegen.js';
+import { lintTemplate } from './lint.js';
 import { parseTemplate } from './parser.js';
 import type { TemplateNode } from './ast.js';
 import { applyPatches, type PatchOp } from './patch.js';
@@ -355,6 +356,9 @@ export function compileComponent(src: ComponentSource, opts: ComponentOptions = 
   // Parse once; a `#3` extension patches the base template's AST before scope-inference + codegen.
   let ast: TemplateNode[] = parseTemplate(src.template);
   if (src.patches?.length) ast = applyPatches(ast, src.patches);
+  // Markup that compiles but cannot do what it says: `onclick={{ fn }}` (an attribute, not a listener),
+  // an unknown binding prefix, a misspelled event or block keyword. Each was silent end to end.
+  const lint: string[] = lintTemplate(ast);
   const scope: string[] = inferCtxNames(ast);
   // Stamp the `:host` root marker only when the styles actually use `:host` (else zero cost).
   const host: string | undefined = src.styles && /:host\b/.test(src.styles) ? hostAttr(hash) : undefined;
@@ -452,6 +456,7 @@ export function compileComponent(src: ComponentSource, opts: ComponentOptions = 
   // E1.5/E1.6 — a resumable build reports what will NOT survive resume. A dead handler site is ground truth
   // from the codegen (whatever the cause); the reason comes from the extraction when it knows one.
   const warnings: string[] = resumed ? [...resumed.warnings] : [];
+  warnings.push(...lint);
   for (const sel of unscopable) {
     warnings.push(
       `\`${sel}\` cannot match: component styles are scoped to the elements this component renders, and ` +

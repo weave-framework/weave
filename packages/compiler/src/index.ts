@@ -21,6 +21,7 @@ export {
   readPatchOps,
 } from './extension.js';
 export { parseTemplate, ParseError } from './parser.js';
+export { lintTemplate } from './lint.js';
 export { scopeCss, scopeAttr, hostAttr, hashCss } from './css.js';
 export { inferCtxNames } from './infer.js';
 export { injectAutoReturn, type AutoReturnResult } from './auto-return.js';

@@ -435,7 +435,10 @@ function emit(nodes: TemplateNode[], ctx: Set<string>): Line[] {
         case 'comment':
           break; // dropped at compile time; only the formatter opts into comment nodes
         case 'interp':
-          mk().lit('  void (').expr(node.offset, node.expr, scope).lit(');').push(node.offset);
+          // Text interpolation is the one position where a FUNCTION is never what the author meant:
+          // `{{ count }}` instead of `{{ count() }}` renders the signal getter's source into the page.
+          // `__wText` refuses a callable, and its parameter type carries the advice (see the prelude).
+          mk().lit('  __wText(').expr(node.offset, node.expr, scope).lit(');').push(node.offset);
           break;
         case 'let': {
           mk().lit(`  const ${node.name} = (`).expr(node.exprOffset, node.expr, scope).lit(');').push(node.exprOffset);
@@ -584,6 +587,14 @@ function assemble(
   // With `export const propDefaults`, the defaulted keys become optional for a PARENT
   // (setup still sees them as declared); a key in D but not P is ignored.
   out.push('type __WeaveWithDefaults<P, D> = Omit<P, keyof D> & Partial<Pick<P, Extract<keyof D, keyof P>>>;');
+  // Text interpolation guard. A function reaching `{{ }}` is stringified into the page — the classic
+  // "forgot the `()`" — so the harness routes every interpolation through a parameter type that a
+  // callable cannot satisfy, and whose NAME is the error message TypeScript will print.
+  out.push(
+    'type __WeaveTextValue<T> = T extends (...args: never[]) => unknown ' +
+      "? { __weave: 'a function renders as its own source text — call it, e.g. {{ count() }}' } : T;"
+  );
+  out.push('declare function __wText<T>(value: __WeaveTextValue<T>): void;');
   out.push('function __weave__(): void {');
 
   const bodyBase: number = out.length; // out index of body[0]

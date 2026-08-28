@@ -20,6 +20,12 @@ Text is always inserted as plain text content, never as HTML — so `{{ "<b>" }}
 
 A `null`, `undefined`, or `false` value renders as the empty string (handy for `{{ cond && label() }}`). Everything else is stringified with `String(...)`.
 
+:::callout warn "Don't forget the `()`"
+`{{ count }}` interpolates the signal *itself*, and `String(fn)` is a function's source code — so the page
+reads `() => { … }`. `weave check` reports it (*"is a function, and a template renders a function as its own
+source text"*), because this is the one position where a function is never what you meant.
+:::
+
 ### Escaping a literal `@`
 
 The `@` character starts a control-flow block. To write a literal `@` in text — for example to document the block keywords themselves — double it: `@@`. The parser emits a single `@` and does not treat what follows as a block.
@@ -65,6 +71,13 @@ A few details worth knowing:
 <button on:click={{ () => count.set(0) }}>Reset</button>
 <form on:submit={{ onSubmit }}>…</form>
 ~~~
+
+:::callout warn "`onclick={{ … }}` is not an event binding"
+The `on:` prefix is what makes it one. `onclick={{ inc }}` (no colon) is an ordinary attribute binding, so
+the attribute is set to the *stringified function* and no listener is ever attached — the button renders and
+does nothing. The compiler warns on it, and on a misspelled event name (`on:clik`), because both are silent
+at runtime.
+:::
 
 ### Modifiers
 

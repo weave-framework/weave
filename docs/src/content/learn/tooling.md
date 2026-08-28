@@ -458,6 +458,10 @@ It catches:
 - **Bad template expressions** — a typo'd binding, calling a non-function, a wrong type inside `{{ }}`, `@if`, `@for`, `@let`, or `@await`.
 - **Child-component prop contracts** — a parent's `<Child prop={{ expr }}>` is checked against the child's `setup` first parameter, so passing the wrong prop type (or omitting a required prop) is an error at the usage site.
 - **Generic components, at the type they are actually used with.** A `setup<T>` is checked by *instantiating* it from the props you pass, not by reading its parameter type out of the function. `<Select options={{ rows() }} optionValue={{ pick }} />` infers `T` from `rows()`, so an accessor written for a different shape is an error — the checking the component's author wrote `SelectProps<T>` to provide, in a template, which cannot write a type argument of its own.
+- **A signal read without its `()`** — `{{ count }}` where you meant `{{ count() }}`. A function reaching a text
+  position is rendered as its own source code, which used to be a page that says `() => { … }` and no error
+  anywhere. Text interpolation is the only position where this is checked: a function passed to an event or a
+  callback prop is exactly right and stays silent.
 - **Directive references** — `use:` and `transition:` names must resolve to something real.
 - **Template-only imports** — an import used *only* in the template isn't falsely flagged as unused.
 - **Everything a plain `tsc --noEmit` catches, in the rest of your code** — a wrong type in a service, an import of a module that does not exist, an unused-but-typed mistake in a store.

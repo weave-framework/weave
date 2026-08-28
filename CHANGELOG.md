@@ -36,6 +36,18 @@ found the framework silent in the places a beginner needs it loudest. This is th
   to the working directory like a component's. **This can surface errors in code that was never checked before.**
 
 ### Added — diagnostics
+- **The four silent template mistakes now speak.** Measured on a scaffolded app, each of these compiled
+  clean, passed `weave check`, and failed invisibly at runtime: `onclick={{ fn }}` (an attribute set to the
+  function's source text — the button does nothing), an unknown binding prefix (`xyz:abc`, emitted as a plain
+  attribute), a misspelled event name (`on:clik`), and a misspelled block (`@fro (…) { … }`, left in the page
+  as literal text). Each is a build warning naming the fix. The rules are narrow by design — a static
+  `onclick="…"` is real HTML, `xlink:href` is a real namespace, and a genuinely custom event name is nobody's
+  typo, so none of those warn.
+- **`{{ count }}` without its `()` is now a type error.** A function in a text position is rendered as its own
+  source, so the page read `() => { track(node); return node.value; }` with nothing reported anywhere. The
+  check harness routes every text interpolation through a parameter type no callable satisfies, and the
+  message says what to do rather than what failed to assign. Only text interpolation — a function passed to an
+  event or a callback prop is exactly right. Verified against the whole docs app: zero new diagnostics.
 - **A selector scoped into something that can never match is now a build warning.** `:root`, `html` and `body`
   live outside anything a component renders, so scoping them produces `[data-w-xxxxxx]:root` — valid CSS
   matching nothing. That is exactly how the UI library's theme fails when it is pasted into a component

@@ -120,7 +120,7 @@ export function runCheck(virtuals: Virtual[], plain: string[] = []): Diagnostic[
 
 /** Map one `tsc` diagnostic back to source. `null` when it belongs to another file that reports it itself. */
 function mapDiagnostic(d: ts.Diagnostic, byPath: Map<string, Virtual>): Diagnostic | null {
-  const message: string = ts.flattenDiagnosticMessageText(d.messageText, '\n');
+  const message: string = friendly(ts.flattenDiagnosticMessageText(d.messageText, '\n'));
   const category: Diagnostic['category'] = categoryName(d.category);
 
   if (!d.file || d.start === undefined) {
@@ -161,6 +161,23 @@ function mapDiagnostic(d: ts.Diagnostic, byPath: Map<string, Virtual>): Diagnost
 
   // A generated scaffold line — should not carry user errors; surface it plainly.
   return { file: v.templateFile, line: 1, col: 1, code: d.code, message: `[generated] ${message}`, category };
+}
+
+/** The phrase the harness's text-interpolation guard carries in its parameter TYPE, so TypeScript's own
+ *  message already contains the advice. Matching on it lets the assignability boilerplate be replaced. */
+const TEXT_GUARD: string = 'a function renders as its own source text';
+
+/**
+ * Restate a diagnostic that TypeScript phrased in terms of this checker's own harness. Only the guards
+ * the harness synthesizes are rewritten; a real type error from the author's code is never touched.
+ */
+function friendly(message: string): string {
+  if (!message.includes(TEXT_GUARD)) return message;
+  const type: string = /Argument of type '([^']+)'/.exec(message)?.[1] ?? 'This value';
+  return (
+    `${type} is a function, and a template renders a function as its own source text. ` +
+    'Call it — a signal is read with `()`, as in {{ count() }}.'
+  );
 }
 
 /** A file path relative to where the command runs, when it is under it; the absolute path otherwise. */
