@@ -9,7 +9,7 @@
  */
 
 import ts from 'typescript';
-import { dirname } from 'node:path';
+import { dirname, relative, isAbsolute } from 'node:path';
 import type { Virtual } from './emit.js';
 
 export interface Diagnostic {
@@ -75,11 +75,19 @@ function optionsFor(searchFrom: string): ts.CompilerOptions {
   };
 }
 
-/** Type-check the given virtual modules; returns diagnostics mapped to original source. */
-export function runCheck(virtuals: Virtual[]): Diagnostic[] {
+/**
+ * Type-check the given virtual modules, plus the project's ordinary `.ts` modules, in one program.
+ *
+ * `plain` is every non-component source file under the checked roots. They used to be visible to the
+ * program only as dependencies, and diagnostics were requested for the components alone — so a type
+ * error in a service or a store passed `weave check` while `tsc --noEmit` failed on it. Both halves of
+ * a project are checked together, and by the same options.
+ */
+export function runCheck(virtuals: Virtual[], plain: string[] = []): Diagnostic[] {
   const byPath: Map<string, Virtual> = new Map(virtuals.map((v) => [norm(v.path), v]));
-  // Search from the first virtual's directory: every virtual belongs to the project being checked.
-  const options: ts.CompilerOptions = virtuals.length ? optionsFor(dirname(virtuals[0].path)) : OPTIONS;
+  // Search from the first checked file's directory: everything checked belongs to one project.
+  const searchFrom: string | undefined = virtuals[0]?.path ?? plain[0];
+  const options: ts.CompilerOptions = searchFrom ? optionsFor(dirname(searchFrom)) : OPTIONS;
 
   const host: ts.CompilerHost = ts.createCompilerHost(options, true);
   const getSourceFile: ts.CompilerHost['getSourceFile'] = host.getSourceFile.bind(host);
@@ -95,14 +103,14 @@ export function runCheck(virtuals: Virtual[]): Diagnostic[] {
   host.fileExists = (fileName) => byPath.has(norm(fileName)) || fileExists(fileName);
 
   const program: ts.Program = ts.createProgram(
-    virtuals.map((v) => v.path),
+    [...virtuals.map((v) => v.path), ...plain],
     options,
     host
   );
 
   const raw: ts.Diagnostic[] = [];
-  for (const v of virtuals) {
-    const sf: ts.SourceFile | undefined = program.getSourceFile(v.path);
+  for (const path of [...virtuals.map((v) => v.path), ...plain]) {
+    const sf: ts.SourceFile | undefined = program.getSourceFile(path);
     if (!sf) continue;
     raw.push(...program.getSyntacticDiagnostics(sf), ...program.getSemanticDiagnostics(sf));
   }
@@ -122,8 +130,10 @@ function mapDiagnostic(d: ts.Diagnostic, byPath: Map<string, Virtual>): Diagnost
   const { line, character } = d.file.getLineAndCharacterOfPosition(d.start); // 0-based
   const v: Virtual | undefined = byPath.get(norm(d.file.fileName));
   if (!v) {
-    // An error surfaced in a real dependency — report it as-is.
-    return { file: d.file.fileName, line: line + 1, col: character + 1, code: d.code, message, category };
+    // A plain module of the project (or a real dependency). Components print their path as it was
+    // passed in — relative to where the command runs — so print these the same way rather than mixing
+    // one absolute path per line into an otherwise relative list.
+    return { file: displayPath(d.file.fileName), line: line + 1, col: character + 1, code: d.code, message, category };
   }
 
   const vLine: number = line + 1; // 1-based virtual line
@@ -151,6 +161,12 @@ function mapDiagnostic(d: ts.Diagnostic, byPath: Map<string, Virtual>): Diagnost
 
   // A generated scaffold line — should not carry user errors; surface it plainly.
   return { file: v.templateFile, line: 1, col: 1, code: d.code, message: `[generated] ${message}`, category };
+}
+
+/** A file path relative to where the command runs, when it is under it; the absolute path otherwise. */
+function displayPath(file: string): string {
+  const rel: string = relative(process.cwd(), file);
+  return rel && !rel.startsWith('..') && !isAbsolute(rel) ? rel : file;
 }
 
 function categoryName(c: ts.DiagnosticCategory): Diagnostic['category'] {

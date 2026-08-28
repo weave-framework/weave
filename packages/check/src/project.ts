@@ -34,11 +34,16 @@ export function checkProject(roots: string[]): Diagnostic[] {
   const virtuals: Virtual[] = [];
   const parseDiags: Diagnostic[] = [];
   const patchers: Patcher[] = [];
-  for (const root of roots) collect(root, virtuals, parseDiags, patchers);
+  // Every `.ts` under the roots that is NOT a component: services, stores, helpers, generated route
+  // modules. They are checked in the same program as the components — a project whose only quality
+  // script is `weave check` would otherwise have its whole non-component half unchecked.
+  const plain: string[] = [];
+  for (const root of roots) collect(root, virtuals, parseDiags, patchers, plain);
   // Patch extensions come LAST: each needs to know whether its base is among the checked files, because
   // that is what decides whether its context can be typed off the base or has to degrade.
   for (const p of patchers) buildPatcher(p, virtuals, parseDiags);
-  return [...parseDiags, ...(virtuals.length ? runCheck(virtuals) : [])];
+  const checked: Diagnostic[] = virtuals.length || plain.length ? runCheck(virtuals, plain) : [];
+  return [...parseDiags, ...checked];
 }
 
 /** A `#3` extension found during the walk, held until every other virtual exists. */
@@ -71,13 +76,13 @@ function tryBuild(build: () => Virtual, file: string, source: string, out: Virtu
   }
 }
 
-function collect(path: string, out: Virtual[], diags: Diagnostic[], patchers: Patcher[]): void {
+function collect(path: string, out: Virtual[], diags: Diagnostic[], patchers: Patcher[], plain: string[]): void {
   if (!existsSync(path)) return;
   const st: ReturnType<typeof statSync> = statSync(path);
   if (st.isDirectory()) {
     for (const entry of readdirSync(path)) {
       if (SKIP.has(entry)) continue;
-      collect(join(path, entry), out, diags, patchers);
+      collect(join(path, entry), out, diags, patchers, plain);
     }
     return;
   }
@@ -87,7 +92,7 @@ function collect(path: string, out: Virtual[], diags: Diagnostic[], patchers: Pa
     const source: string = readFileSync(path, 'utf8');
     tryBuild(() => buildVirtualSfc(path, source), path, source, out, diags);
   } else if (path.endsWith('.ts') && !path.endsWith('.d.ts')) {
-    collectTs(path, out, diags, patchers);
+    if (!collectTs(path, out, diags, patchers)) plain.push(resolve(path));
   }
 }
 
@@ -104,9 +109,10 @@ function absolutize(v: Virtual): Virtual {
   return v;
 }
 
-/** Resolve a `.ts` component's template into a virtual (or nothing if it is not a component); a
- *  parse failure is recorded as a diagnostic against the offending template file. */
-function collectTs(tsPath: string, out: Virtual[], diags: Diagnostic[], patchers: Patcher[]): void {
+/** Resolve a `.ts` component's template into a virtual; a parse failure is recorded as a diagnostic
+ *  against the offending template file. Returns false when the file is an ordinary module, so the
+ *  caller can hand it to the checker as a plain source file instead. */
+function collectTs(tsPath: string, out: Virtual[], diags: Diagnostic[], patchers: Patcher[]): boolean {
   const source: string = readFileSync(tsPath, 'utf8');
   const decl: ExtractedSources = extractSources(source);
   const siblingHtml: string = tsPath.replace(/\.ts$/, '.html');
@@ -120,19 +126,19 @@ function collectTs(tsPath: string, out: Virtual[], diags: Diagnostic[], patchers
         ? faithfulTemplate(source, decl.templateRange)
         : decl.template;
       tryBuild(() => buildVirtualSeparate(tsPath, decl.script, tsPath, faithful), tsPath, faithful, out, diags);
-      return;
+      return true;
     }
     const file: string = resolve(dirname(tsPath), decl.template);
-    if (!existsSync(file)) return; // build reports the missing file; check just skips
+    if (!existsSync(file)) return true; // build reports the missing file; check just skips
     const html: string = readFileSync(file, 'utf8');
     tryBuild(() => buildVirtualSeparate(tsPath, decl.script, file, html), file, html, out, diags);
-    return;
+    return true;
   }
 
   if (existsSync(siblingHtml)) {
     const html: string = readFileSync(siblingHtml, 'utf8');
     tryBuild(() => buildVirtualSeparate(tsPath, decl.script, siblingHtml, html), siblingHtml, html, out, diags);
-    return;
+    return true;
   }
 
   // RFC 0008 `#3` — an extension with no template of its own, patching its base's. It looked like an
@@ -143,9 +149,9 @@ function collectTs(tsPath: string, out: Virtual[], diags: Diagnostic[], patchers
     // A base from a published package ships no raw template, so there is nothing to patch against and
     // nothing to check — the build says the same thing, and this is not the place to repeat it.
     if (spec?.startsWith('.')) patchers.push({ tsPath, source, script, spec });
-    return;
+    return true;
   }
-  // ordinary module → not a component
+  return false; // ordinary module → checked as a plain source file
 }
 
 /** A base component's template text, and the file its virtual lives at (for the context-type import). */
