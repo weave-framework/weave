@@ -7,6 +7,8 @@ import { loadConfig } from './config.js';
 import type { ResolvedConfig } from './config.js';
 import { discoverCustomElements, generateEntry, generateServerEntry, type CustomElement } from './entry.js';
 import { checkProject, type Diagnostic } from '@weave-framework/check';
+import { readdirSync, statSync, type Dirent } from 'node:fs';
+import { join } from 'node:path';
 
 function flag(args: string[], name: string): string | undefined {
   const i: number = args.indexOf(name);
@@ -55,11 +57,92 @@ function virtualEntryFor(config: ResolvedConfig): { code: string; resolveDir: st
   return { code, resolveDir: config.root };
 }
 
+/**
+ * The whole CLI, in one screen.
+ *
+ * There was no help before this — every form (`weave`, `weave --help`, `weave nonsense`) printed the same
+ * one-line usage string and exited 1, and `weave build --help` did not print anything at all: the flag was
+ * ignored and a production build ran, wiping `outDir` on the way. A tool whose `--help` has side effects
+ * teaches people not to try things.
+ */
+const HELP: string = `weave — the Weave CLI
+
+usage: weave <command> [options]
+
+commands
+  dev                    Start the dev server: watch, rebuild, live-reload
+  build                  Write a minified, deployable bundle to dist/
+  check [paths…]         Type-check templates and the rest of your .ts (default root: src)
+  routes [dir]           Regenerate the file-based route module (default dir: src/routes)
+  migrate                Assisted migration of an Angular project into Weave
+  mcp                    Run the Weave MCP server over stdio (for AI editors)
+
+options
+  --config <file>        Use this weave.config.ts instead of the one found in the current directory
+  --out <dir>            Output directory (build), overriding the config's outDir
+  --port <n>             Dev server port; steps to the next free one when taken
+  --serve <dir>          Dev server web root (config-less mode)
+  --no-minify            Leave the build unminified
+  --ssg                  Prerender every route to static HTML (build)
+  --eager                Inline routes instead of code-splitting them (routes)
+  -h, --help             Print this
+
+examples
+  weave dev                        run the app in this directory
+  weave build --ssg                prerender every route
+  weave check src lib              type-check two roots
+  weave routes src/pages           regenerate routes from a pages directory
+
+docs: https://weaveframework.dev`;
+
+/** Human-readable byte size — the build summary's whole vocabulary. */
+function fileSize(bytes: number): string {
+  return bytes < 1024 ? `${bytes} B` : bytes < 1024 * 1024 ? `${(bytes / 1024).toFixed(1)} kB` : `${(bytes / 1024 / 1024).toFixed(2)} MB`;
+}
+
+/**
+ * What the build actually produced. `weave build → dist/` said only that the command had run: not what was
+ * emitted, not how big it is, not how long it took — so the first thing anyone asks about a build ("is my
+ * bundle reasonable?") needed a separate `ls`. Source maps are summarised in one line rather than listed:
+ * they are not shipped to a browser, and they are usually the biggest files in the directory.
+ */
+function summarizeBuild(outDir: string, startedAt: number): void {
+  console.log(`weave build → ${outDir}/ (${Date.now() - startedAt} ms)`);
+  let entries: Dirent[];
+  try {
+    entries = readdirSync(outDir, { withFileTypes: true });
+  } catch {
+    return; // an unreadable outDir is the build's problem to report, not the summary's
+  }
+  const files: Array<{ name: string; size: number }> = [];
+  let maps: number = 0;
+  for (const e of entries) {
+    if (!e.isFile()) continue;
+    const size: number = statSync(join(outDir, e.name)).size;
+    if (e.name.endsWith('.map')) {
+      maps += size;
+      continue;
+    }
+    files.push({ name: e.name, size });
+  }
+  files.sort((a, b) => b.size - a.size);
+  const width: number = files.reduce((w, f) => Math.max(w, f.name.length), 0);
+  for (const f of files) console.log(`  ${f.name.padEnd(width)}  ${fileSize(f.size).padStart(9)}`);
+  if (maps) console.log(`  ${'(source maps)'.padEnd(width)}  ${fileSize(maps).padStart(9)}`);
+}
+
 export { defineConfig } from './config.js';
 export type { WeaveConfig } from './config.js';
 
 export async function main(argv: string[]): Promise<void> {
   const [cmd, ...rest] = argv;
+
+  // `--help` anywhere, `help`, or no command at all: print the help and succeed. Asking a tool what it can
+  // do is not an error, and it must never do the thing instead — `weave build --help` used to build.
+  if (cmd === undefined || cmd === 'help' || cmd === '--help' || cmd === '-h' || rest.includes('--help') || rest.includes('-h')) {
+    console.log(HELP);
+    return;
+  }
   const entry: string = rest.find((a) => !a.startsWith('-')) ?? 'src/main.ts';
   const outdir: string = flag(rest, '--out') ?? 'dist';
   // A `weave.config.ts/json` (auto-discovered in cwd, or via `--config`) switches both
@@ -67,6 +150,7 @@ export async function main(argv: string[]): Promise<void> {
   const config: ResolvedConfig | null = await loadConfig(process.cwd(), flag(rest, '--config'));
 
   if (cmd === 'build') {
+    const startedAt: number = Date.now();
     try {
       if (config) {
         requireAppEntry(config, 'build');
@@ -129,12 +213,12 @@ export async function main(argv: string[]): Promise<void> {
           index: config.index,
           clean: true, // a fresh, self-contained artifact each prod build
         });
-        console.log(`weave build → ${outDir}/`);
+        summarizeBuild(outDir, startedAt);
         return;
       }
       // `weave build` is the production bundle → minify by default; `--no-minify` opts out.
       await build({ entry, outDir: outdir, minify: !rest.includes('--no-minify') });
-      console.log(`weave build → ${outdir}/`);
+      summarizeBuild(outdir, startedAt);
       return;
     } catch (e) {
       // esbuild already prints each error framed at `file:line:col` (including template parse errors
@@ -219,9 +303,9 @@ export async function main(argv: string[]): Promise<void> {
     return;
   }
 
-  console.error(
-    'usage: weave <build|dev|check|routes|mcp|migrate> [entry|paths…] [--config file] [--out dir] [--serve dir] [--port n] [--no-minify] [--eager] [--ssg]'
-  );
+  console.error(`weave: unknown command \`${cmd}\`.
+`);
+  console.error(HELP);
   process.exit(1);
 }
 

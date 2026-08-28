@@ -28,6 +28,16 @@ found the framework silent in the places a beginner needs it loudest. This is th
   Failures are now diagnostics located at the author's file, with the template and style files kept in
   `watchFiles` so the save that repairs the error is still watched.
 
+### Fixed — the CLI's front door
+- **A busy port crashed the dev server** with Node's `Unhandled 'error' event` and a raw EADDRINUSE stack —
+  for the most ordinary situation there is, a second terminal already running `weave dev`. It steps to the
+  next free port and says which one it took.
+- **`weave --help` exited 1 with a single usage line, and `weave build --help` ran a build** (wiping
+  `outDir`) instead of printing anything. There is now real help — commands, options, examples — printed on
+  `--help`/`-h`/`help`/no command, and an unknown command says so before printing it.
+- **A finished build reports what it produced** — elapsed time, then each emitted file with its size, source
+  maps summarised in one line. `weave build → dist/` alone said only that the command had run.
+
 ### Changed — `weave check`
 - **It checks the whole project now, not only the components.** Plain modules — services, stores, helpers,
   `routes.gen.ts` — were pulled into the program as dependencies and never reported on, so an app whose only

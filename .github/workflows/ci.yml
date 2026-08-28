@@ -200,3 +200,9 @@ jobs:
       # with it: every later save was ignored and the stale bundle was served forever, with no message.
       - name: Dev server survives a compiler error
         run: pnpm verify:dev-compiler-error
+      # A busy port used to surface as Node's "Unhandled 'error' event" stack — for two terminals.
+      - name: Dev server steps past a busy port
+        run: pnpm verify:dev-port
+      # `weave --help` exited 1, and `weave build --help` ran a build instead of printing anything.
+      - name: CLI help, unknown commands, and the build summary
+        run: pnpm verify:cli-help

@@ -367,12 +367,41 @@ async function handleRequest(
   }
 }
 
+/** How many ports past the requested one to try before giving up. */
+const PORT_ATTEMPTS: number = 20;
+
+/**
+ * Bind the dev server, stepping to the next free port when the requested one is taken.
+ *
+ * With no `error` listener, a busy port surfaced as Node's `Unhandled 'error' event` — a raw stack trace
+ * ending in `EADDRINUSE`, for the most ordinary situation there is: a second terminal already running
+ * `weave dev`. It steps forward instead, and says so, so two apps (or a forgotten server) is a one-line
+ * notice rather than a crash dump.
+ */
 function listen(server: Server, port?: number): Promise<number> {
-  return new Promise((resolve: (port: number) => void): void => {
-    server.listen(port ?? 0, '127.0.0.1', (): void => {
-      const addr: AddressInfo | string | null = server.address();
-      resolve(typeof addr === 'object' && addr ? addr.port : (port ?? 0));
+  return new Promise((resolve: (port: number) => void, reject: (e: Error) => void): void => {
+    let attempt: number = port ?? 0;
+    let tried: number = 0;
+
+    server.on('error', (err: NodeJS.ErrnoException): void => {
+      // Port 0 means "any free port" — it cannot be in use, so a failure there is real.
+      if (err.code === 'EADDRINUSE' && attempt !== 0 && tried < PORT_ATTEMPTS) {
+        tried++;
+        const next: number = attempt + 1;
+        console.log(`weave dev: port ${attempt} is already in use — trying ${next}`);
+        attempt = next;
+        server.listen(attempt, '127.0.0.1');
+        return;
+      }
+      reject(err);
     });
+
+    server.on('listening', (): void => {
+      const addr: AddressInfo | string | null = server.address();
+      resolve(typeof addr === 'object' && addr ? addr.port : attempt);
+    });
+
+    server.listen(attempt, '127.0.0.1');
   });
 }
 
