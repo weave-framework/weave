@@ -196,3 +196,7 @@ jobs:
       # with the real error only in the terminal. This drives the real dev server through break-and-repair.
       - name: Dev server survives a failed rebuild
         run: pnpm verify:dev-overlay
+      # A compiler error used to escape the esbuild plugin as a thrown exception, taking the watch state
+      # with it: every later save was ignored and the stale bundle was served forever, with no message.
+      - name: Dev server survives a compiler error
+        run: pnpm verify:dev-compiler-error

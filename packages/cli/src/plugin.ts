@@ -113,6 +113,23 @@ function parseErrorResult(e: ParseError, file: string, source: string): OnLoadRe
 }
 
 /**
+ * Every other failure a compile step can raise, as a DIAGNOSTIC rather than a thrown exception.
+ *
+ * An exception escaping an `onLoad` callback takes esbuild's watch state with it: `weave dev` then
+ * serves the last good bundle forever and silently ignores every later save, so a developer's first
+ * typo of this class ends the dev loop until they restart the server. Only `ParseError` used to be
+ * converted; the compiler has a dozen other `throw`s an ordinary typo reaches (an empty template, a
+ * component tag that resolves to nothing, a non-static `template` declaration, a missing style file).
+ *
+ * Returning the error also puts the AUTHOR'S file in the message instead of a stack inside
+ * node_modules. Gate: packages/cli/test/dev-compiler-error.smoke.mjs.
+ */
+function loadErrorResult(e: unknown, file: string, watchFiles: string[]): OnLoadResult {
+  const text: string = e instanceof Error ? e.message : String(e);
+  return { errors: [{ text, location: { file } }], watchFiles };
+}
+
+/**
  * Resolve a component's template to its source text. Precedence: a declared
  * `template` (inline markup, or a path-shaped value read from disk) wins; otherwise
  * the sibling `<base>.html`. Fails loud on ambiguity (declared + sibling) and on a
@@ -351,102 +368,131 @@ export function weave(state: WeaveState, options: WeaveOptions = {}): Plugin {
       });
 
       build.onLoad({ filter: /\.weave$/ }, async (args: OnLoadArgs) => {
-        const source: string = await readFile(args.path, 'utf8');
-        const src: ComponentSource = parseSfc(source);
-        const styles: string | undefined = src.styles
-          ? await compileStyleSource(src.styles, styleLang, dirname(args.path))
-          : undefined;
+        let template: string = '';
         try {
+          const source: string = await readFile(args.path, 'utf8');
+          const src: ComponentSource = parseSfc(source);
+          template = src.template;
+          const styles: string | undefined = src.styles
+            ? await compileStyleSource(src.styles, styleLang, dirname(args.path))
+            : undefined;
           const { code, css, components, warnings } = compileComponent({ ...src, styles }, { filename: args.path, resumable, ts });
           const wired: string = injectChildImports(code, components, dirname(args.path), src.script, args.path);
           return emit(wired, css, dirname(args.path), warnings, args.path);
         } catch (e) {
-          if (e instanceof ParseError) return parseErrorResult(e, args.path, src.template);
-          throw e;
+          if (e instanceof ParseError) return parseErrorResult(e, args.path, template);
+          return loadErrorResult(e, args.path, []);
         }
       });
 
       build.onLoad({ filter: /\.ts$/ }, async (args: OnLoadArgs) => {
-        if (args.path.includes('node_modules')) return undefined;
-        // Generated modules (`*.gen.ts`) are never components — and one like a docs
-        // `content.gen.ts` (markdown bundled as strings) can contain the literal text
-        // `export const template`/`styles` inside an example, which would otherwise be
-        // mis-detected as a string-SFC component and compiled. Treat as an ordinary module.
-        if (args.path.endsWith('.gen.ts')) return undefined;
-        const source: string = await readFile(args.path, 'utf8');
-        const decl: ExtractedSources = extractSources(source);
+        // Files this module depends on besides the `.ts` itself (its template, its stylesheets, a
+        // patched base). They are reported even on FAILURE so the save that repairs the error still
+        // triggers a rebuild — without them esbuild stops watching the file the author is editing.
+        const watched: string[] = [];
+        // The file a failure should be blamed on once it is known: the template, not the script.
+        let templateFile: string | undefined;
+        try {
+          if (args.path.includes('node_modules')) return undefined;
+          // Generated modules (`*.gen.ts`) are never components — and one like a docs
+          // `content.gen.ts` (markdown bundled as strings) can contain the literal text
+          // `export const template`/`styles` inside an example, which would otherwise be
+          // mis-detected as a string-SFC component and compiled. Treat as an ordinary module.
+          if (args.path.endsWith('.gen.ts')) return undefined;
+          const source: string = await readFile(args.path, 'utf8');
+          const decl: ExtractedSources = extractSources(source);
 
-        const siblingHtml: string = args.path.replace(/\.ts$/, '.html');
-        const hasSiblingHtml: boolean = existsSync(siblingHtml);
-        const dir: string = dirname(args.path);
+          const siblingHtml: string = args.path.replace(/\.ts$/, '.html');
+          const hasSiblingHtml: boolean = existsSync(siblingHtml);
+          const dir: string = dirname(args.path);
 
-        // RFC 0008 `#3` — a component-file extension that PATCHES its base's template rather than
-        // writing its own (`export const extend = Base` + `export const patch = [ … ]`, no own
-        // template/sibling .html). Resolve the base's raw template (local only), apply the patch ops,
-        // and compile — reusing the BASE's hash so the base's scoped CSS still matches, and resolving
-        // the base template's child tags relative to the BASE dir.
-        const baseIdent: string | null = decl.template === undefined && !hasSiblingHtml ? extensionBase(decl.script ?? source) : null;
-        if (baseIdent && hasPatchDeclaration(decl.script ?? source)) {
-          const spec: string | null = defaultImportSpec(decl.script ?? source, baseIdent);
-          if (!spec) {
-            throw new Error(`weave: ${args.path} — extends '${baseIdent}' but no matching \`import ${baseIdent} from '…'\` was found.`);
+          // RFC 0008 `#3` — a component-file extension that PATCHES its base's template rather than
+          // writing its own (`export const extend = Base` + `export const patch = [ … ]`, no own
+          // template/sibling .html). Resolve the base's raw template (local only), apply the patch ops,
+          // and compile — reusing the BASE's hash so the base's scoped CSS still matches, and resolving
+          // the base template's child tags relative to the BASE dir.
+          const baseIdent: string | null = decl.template === undefined && !hasSiblingHtml ? extensionBase(decl.script ?? source) : null;
+          if (baseIdent && hasPatchDeclaration(decl.script ?? source)) {
+            const spec: string | null = defaultImportSpec(decl.script ?? source, baseIdent);
+            if (!spec) {
+              throw new Error(`weave: ${args.path} — extends '${baseIdent}' but no matching \`import ${baseIdent} from '…'\` was found.`);
+            }
+            const base: BaseTemplate | null = await readBaseTemplate(spec, dir);
+            if (base) {
+              watched.push(base.file);
+              templateFile = base.file;
+            }
+            if (!base) {
+              throw new Error(
+                `weave: ${args.path} — a \`#3\` (patch) extension needs a LOCAL base with a readable template; '${spec}' did not resolve. ` +
+                  `Published packages ship no raw template — use a local base, or \`#1\` (write your own \`template\`).`
+              );
+            }
+            const patches: PatchOp[] = readPatchOps(decl.script ?? source, args.path);
+            try {
+              const compiled: CompiledComponent = compileComponent(
+                { script: decl.script, template: base.template, patches },
+                { filename: args.path, hash: hashCss(base.filename), resumable, ts }
+              );
+              // Base-template child tags resolve relative to the BASE dir; inserted tags the extension
+              // itself imports are skipped by injectChildImports (explicit import wins).
+              const wired: string = injectChildImports(compiled.code, compiled.components, base.dir, decl.script, args.path);
+              return { ...emit(wired, compiled.css, dir, compiled.warnings, args.path), watchFiles: [base.file] };
+            } catch (e) {
+              if (e instanceof ParseError) return { ...parseErrorResult(e, base.file, base.template), watchFiles: [base.file] };
+              throw e;
+            }
           }
-          const base: BaseTemplate | null = await readBaseTemplate(spec, dir);
-          if (!base) {
-            throw new Error(
-              `weave: ${args.path} — a \`#3\` (patch) extension needs a LOCAL base with a readable template; '${spec}' did not resolve. ` +
-                `Published packages ship no raw template — use a local base, or \`#1\` (write your own \`template\`).`
-            );
+
+          // A `.ts` is a component iff it declares a template OR has a sibling `.html`.
+          if (decl.template === undefined && !hasSiblingHtml) return undefined; // ordinary module
+
+          // Watch the sibling template from HERE, not only after a successful compile: an empty or
+          // malformed template must still rebuild once the author fixes it.
+          if (hasSiblingHtml) {
+            watched.push(siblingHtml);
+            templateFile = siblingHtml;
           }
-          const patches: PatchOp[] = readPatchOps(decl.script ?? source, args.path);
+          const template: { text: string; files: string[] } = await resolveTemplate(
+            decl,
+            args.path,
+            siblingHtml,
+            hasSiblingHtml
+          );
+          watched.push(...template.files);
+          templateFile = template.files[0] ?? templateFile;
+          const styles: { css: string | undefined; files: string[] } = await resolveStyles(
+            decl,
+            args.path,
+            dir,
+            styleLang
+          );
+          watched.push(...styles.files);
+
           try {
-            const compiled: CompiledComponent = compileComponent(
-              { script: decl.script, template: base.template, patches },
-              { filename: args.path, hash: hashCss(base.filename), resumable, ts }
+            const { code, css, components, warnings } = compileComponent(
+              { script: decl.script, template: template.text, styles: styles.css },
+              { filename: args.path, resumable, ts }
             );
-            // Base-template child tags resolve relative to the BASE dir; inserted tags the extension
-            // itself imports are skipped by injectChildImports (explicit import wins).
-            const wired: string = injectChildImports(compiled.code, compiled.components, base.dir, decl.script, args.path);
-            return { ...emit(wired, compiled.css, dir, compiled.warnings, args.path), watchFiles: [base.file] };
+            const wired: string = injectChildImports(code, components, dir, decl.script, args.path);
+            // Tell esbuild this module also depends on its template + style files, so a
+            // template-only or style-only edit (which leaves the .ts untouched) still
+            // triggers a watch-mode rebuild + live-reload.
+            return { ...emit(wired, css, dir, warnings, args.path), watchFiles: [...template.files, ...styles.files] };
           } catch (e) {
-            if (e instanceof ParseError) return { ...parseErrorResult(e, base.file, base.template), watchFiles: [base.file] };
+            // A malformed template → a framed `file:line:col` esbuild error at the .html/template,
+            // not a raw parser stack trace. Point at the template file (sibling/declared), else the .ts.
+            if (e instanceof ParseError) {
+              return { ...parseErrorResult(e, template.files[0] ?? args.path, template.text), watchFiles: watched };
+            }
             throw e;
           }
-        }
-
-        // A `.ts` is a component iff it declares a template OR has a sibling `.html`.
-        if (decl.template === undefined && !hasSiblingHtml) return undefined; // ordinary module
-
-        const template: { text: string; files: string[] } = await resolveTemplate(
-          decl,
-          args.path,
-          siblingHtml,
-          hasSiblingHtml
-        );
-        const styles: { css: string | undefined; files: string[] } = await resolveStyles(
-          decl,
-          args.path,
-          dir,
-          styleLang
-        );
-
-        try {
-          const { code, css, components, warnings } = compileComponent(
-            { script: decl.script, template: template.text, styles: styles.css },
-            { filename: args.path, resumable, ts }
-          );
-          const wired: string = injectChildImports(code, components, dir, decl.script, args.path);
-          // Tell esbuild this module also depends on its template + style files, so a
-          // template-only or style-only edit (which leaves the .ts untouched) still
-          // triggers a watch-mode rebuild + live-reload.
-          return { ...emit(wired, css, dir, warnings, args.path), watchFiles: [...template.files, ...styles.files] };
         } catch (e) {
-          // A malformed template → a framed `file:line:col` esbuild error at the .html/template,
-          // not a raw parser stack trace. Point at the template file (sibling/declared), else the .ts.
-          if (e instanceof ParseError) {
-            return { ...parseErrorResult(e, template.files[0] ?? args.path, template.text), watchFiles: template.files };
-          }
-          throw e;
+          // Everything else the compile path can raise: an empty template, a component tag that
+          // resolves to nothing, a non-static `template`/`styles` declaration, a style file that does
+          // not exist. Reported as a diagnostic, so the dev server survives it and keeps watching.
+          if (e instanceof ParseError) return { ...parseErrorResult(e, templateFile ?? args.path, ''), watchFiles: watched };
+          return loadErrorResult(e, templateFile ?? args.path, watched);
         }
       });
     },
