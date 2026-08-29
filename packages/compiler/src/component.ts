@@ -14,7 +14,7 @@
  */
 
 import { compileTemplateAst, type CompileResult } from './codegen.js';
-import { lintTemplate } from './lint.js';
+import { lintTemplateFindings, type LintFinding } from './lint.js';
 import { parseTemplate } from './parser.js';
 import type { TemplateNode } from './ast.js';
 import { applyPatches, type PatchOp } from './patch.js';
@@ -81,6 +81,13 @@ export interface CompiledComponent {
    * Empty for an eager build.
    */
   warnings?: string[];
+  /**
+   * The same list, structured: each entry keeps its source offset when the AST carried one, and a
+   * `fix` when the rule knows exactly one right answer. `warnings` is this list's string projection,
+   * in the same order, so it stays byte-identical for existing callers. The loader uses `findings` to
+   * frame a template mistake at its line in the TEMPLATE file rather than naming the whole component.
+   */
+  findings?: LintFinding[];
 }
 
 const HAS_SETUP: RegExp = /export\s+(?:async\s+)?function\s+setup\b|export\s+(?:const|let|var)\s+setup\b/;
@@ -358,7 +365,7 @@ export function compileComponent(src: ComponentSource, opts: ComponentOptions = 
   if (src.patches?.length) ast = applyPatches(ast, src.patches);
   // Markup that compiles but cannot do what it says: `onclick={{ fn }}` (an attribute, not a listener),
   // an unknown binding prefix, a misspelled event or block keyword. Each was silent end to end.
-  const lint: string[] = lintTemplate(ast);
+  const lint: LintFinding[] = lintTemplateFindings(ast);
   const scope: string[] = inferCtxNames(ast);
   // Stamp the `:host` root marker only when the styles actually use `:host` (else zero cost).
   const host: string | undefined = src.styles && /:host\b/.test(src.styles) ? hostAttr(hash) : undefined;
@@ -455,10 +462,10 @@ export function compileComponent(src: ComponentSource, opts: ComponentOptions = 
 
   // E1.5/E1.6 — a resumable build reports what will NOT survive resume. A dead handler site is ground truth
   // from the codegen (whatever the cause); the reason comes from the extraction when it knows one.
-  const warnings: string[] = resumed ? [...resumed.warnings] : [];
-  warnings.push(...lint);
+  const resumeWarnings: string[] = resumed ? [...resumed.warnings] : [];
+  const otherWarnings: string[] = [];
   for (const sel of unscopable) {
-    warnings.push(
+    otherWarnings.push(
       `\`${sel}\` cannot match: component styles are scoped to the elements this component renders, and ` +
         `:root/<html>/<body> are not among them. Move the rule to a global stylesheet (\`styles: ['…']\` in ` +
         `weave.config.ts) — that is where design tokens, resets and the UI library's theme belong — or, for a ` +
@@ -469,7 +476,7 @@ export function compileComponent(src: ComponentSource, opts: ComponentOptions = 
   // on the client (its setup re-runs; nothing below it resumes). It used to be entirely silent, which is what
   // made a docs page look resumed when nothing had run at all.
   if (opts.resumable && compiled.notAdoptable?.length) {
-    warnings.push(
+    otherWarnings.push(
       `this component cannot be resumed — its template uses ${compiled.notAdoptable.join('; and ')}. ` +
         `The whole subtree will be client-rendered instead (setup re-runs). Remove or move that construct to ` +
         `make the component adoptable.`
@@ -477,7 +484,7 @@ export function compileComponent(src: ComponentSource, opts: ComponentOptions = 
   }
   for (const name of compiled.deadHandlers ?? []) {
     const why: string | undefined = resumed?.reasons.get(name);
-    warnings.push(
+    otherWarnings.push(
       `handler \`${name}\` will not work after resume — ` +
         (why
           ? `it reads ${why}. Return it from setup(), or inline the handler in the template.`
@@ -486,7 +493,24 @@ export function compileComponent(src: ComponentSource, opts: ComponentOptions = 
     );
   }
 
-  return { code, css, hash, components: compiled.components, ...(warnings.length ? { warnings } : {}) };
+  // One structured list; `warnings` is its exact string projection, in the same order. Keeping the
+  // published `warnings` field byte-identical is the point — `findings` is purely additive, and it is
+  // what lets the loader frame a template mistake at the line it is on, in the file it is in, instead
+  // of naming the whole component.
+  const findings: LintFinding[] = [
+    ...resumeWarnings.map((message: string): LintFinding => ({ message })),
+    ...lint,
+    ...otherWarnings.map((message: string): LintFinding => ({ message })),
+  ];
+  const warnings: string[] = findings.map((f: LintFinding): string => f.message);
+
+  return {
+    code,
+    css,
+    hash,
+    components: compiled.components,
+    ...(warnings.length ? { warnings, findings } : {}),
+  };
 }
 
 /**

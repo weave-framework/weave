@@ -52,6 +52,7 @@
     "verify:dev-runtime-error": "node packages/cli/test/dev-runtime-error.smoke.mjs",
     "verify:base-path": "node packages/cli/test/base-path.smoke.mjs",
     "verify:base-router": "node packages/cli/test/base-router.smoke.mjs",
+    "verify:lint-location": "node packages/cli/test/lint-location.smoke.mjs",
     "verify:no-private": "node tools/verify-no-private-paths.mjs",
     "verify:authorship": "node tools/verify-authorship.mjs",
     "verify:template-ranges": "node tools/verify-template-ranges.mjs"

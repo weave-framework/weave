@@ -217,3 +217,8 @@ jobs:
       # navigating and surviving a deep-link refresh through the emitted 404.html.
       - name: A routed app navigates under a sub-path
         run: pnpm verify:base-router
+      # A template mistake must name the TEMPLATE file and the line it is on. The rules always said the
+      # right thing; the loader attached it to the component module with no position, which made a
+      # correct message unusable in any template long enough to matter.
+      - name: A template mistake is reported at its own file and line
+        run: pnpm verify:lint-location

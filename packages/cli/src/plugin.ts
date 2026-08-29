@@ -45,7 +45,7 @@ import {
 // The build and `weave check` must resolve a child tag to the SAME module — one implementation,
 // owned by the checker (the CLI already depends on it), rather than a private copy on each side.
 import { resolveChildModule } from '@weave-framework/check';
-import type { ComponentSource, ExtractedSources, PatchOp, CompiledComponent } from '@weave-framework/compiler';
+import type { ComponentSource, ExtractedSources, PatchOp, CompiledComponent, LintFinding } from '@weave-framework/compiler';
 import { compileStyleFileTracked, compileStyleSource, type StyleLang } from './styles.js';
 
 export interface WeaveState {
@@ -97,8 +97,9 @@ function cssInjector(css: string): string {
  * `file`. For a `.weave` SFC the template is the block body, so the reported line is relative to
  * that block — good enough to jump to the bad markup.
  */
-function parseErrorResult(e: ParseError, file: string, source: string): OnLoadResult {
-  const offset: number = Math.min(e.offset ?? 0, source.length);
+/** An offset in `source` as the 1-based line / 0-based column + that line's text esbuild frames with. */
+function frame(source: string, at: number): { line: number; column: number; lineText: string } {
+  const offset: number = Math.min(Math.max(at, 0), source.length);
   let line: number = 1;
   let column: number = 0;
   let lineStart: number = 0;
@@ -112,8 +113,34 @@ function parseErrorResult(e: ParseError, file: string, source: string): OnLoadRe
     }
   }
   const nl: number = source.indexOf('\n', lineStart);
-  const lineText: string = source.slice(lineStart, nl === -1 ? source.length : nl);
-  return { errors: [{ text: e.message, location: { file, line, column, length: 1, lineText } }] };
+  return { line, column, lineText: source.slice(lineStart, nl === -1 ? source.length : nl) };
+}
+
+function parseErrorResult(e: ParseError, file: string, source: string): OnLoadResult {
+  return { errors: [{ text: e.message, location: { file, length: 1, ...frame(source, e.offset ?? 0) } }] };
+}
+
+/**
+ * A component's findings as esbuild warnings.
+ *
+ * A template mistake belongs at the line it is on, in the FILE it is in — which is the `.html`, not the
+ * `.ts` the loader happens to be compiling. Before this, every one of them was reported against the
+ * component module with no position at all, so `on:clik` in a 200-line template said only "this
+ * component". A finding the AST could not place — a coalesced text run, or a resume diagnostic that is
+ * about the component rather than a span of markup — keeps the file-only form instead of being handed
+ * an invented position.
+ */
+function findingWarnings(
+  findings: LintFinding[] | undefined,
+  templateSource: string,
+  templateFile: string,
+  componentFile: string
+): NonNullable<OnLoadResult['warnings']> {
+  return (findings ?? []).map((f: LintFinding) =>
+    f.offset === undefined
+      ? { text: f.message, location: { file: componentFile } }
+      : { text: f.message, location: { file: templateFile, length: 1, ...frame(templateSource, f.offset) } }
+  );
 }
 
 /**
@@ -397,7 +424,7 @@ export function weave(state: WeaveState, options: WeaveOptions = {}): Plugin {
           watched.push(...styles.files);
 
           try {
-            const { code, css, components, warnings } = compileComponent(
+            const { code, css, components, findings } = compileComponent(
               { script: decl.script, template: template.text, styles: styles.css },
               { filename: args.path, resumable, ts }
             );
@@ -405,7 +432,11 @@ export function weave(state: WeaveState, options: WeaveOptions = {}): Plugin {
             // Tell esbuild this module also depends on its template + style files, so a
             // template-only or style-only edit (which leaves the .ts untouched) still
             // triggers a watch-mode rebuild + live-reload.
-            return { ...emit(wired, css, dir, warnings, args.path), watchFiles: [...template.files, ...styles.files] };
+            return {
+              ...emit(wired, css, dir, undefined, args.path),
+              warnings: findingWarnings(findings, template.text, templateFile ?? args.path, args.path),
+              watchFiles: [...template.files, ...styles.files],
+            };
           } catch (e) {
             // A malformed template → a framed `file:line:col` esbuild error at the .html/template,
             // not a raw parser stack trace. Point at the template file (sibling/declared), else the .ts.
