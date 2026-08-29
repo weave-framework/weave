@@ -493,11 +493,11 @@ function emit(nodes: TemplateNode[], ctx: Set<string>): Line[] {
         // `@render` mounts AND what a template-prop like `rowTemplate`/`itemTemplate`/`tabTemplate`
         // (typed `(row) => Node`) expects, so passing a snippet to one type-checks. The body is
         // emitted as statements (no real return); a trailing typed return satisfies the annotation.
-        push(`  const ${s.name} = (${params}): Node => {`);
+        push(`  const ${s.name} = (${params}): __WeaveNode => {`);
         const inner: Set<string> = new Set(scope);
         for (const p of s.params) inner.add(p);
         walk(s.children, inner);
-        push(`    return null as unknown as Node;`);
+        push(`    return null as unknown as __WeaveNode;`);
         push(`  };`);
       }
     }
@@ -670,6 +670,12 @@ function assemble(
   // `@await (src)` resolved-value type: a resource's data type, else the awaited Promise.
   out.push('type __WeaveAwaited<S> = S extends { data: () => infer D } ? NonNullable<D> : Awaited<S>;');
   // A child component's prop contract = the first parameter of its `setup`.
+  // The component's own script is embedded verbatim in this same module, so any global name used below
+  // can be SHADOWED by it. A component that declares its own `interface Node` (a tree, a graph, a menu —
+  // the most natural name in the world) silently retyped its own default export, and every parent that
+  // rendered it got `Type 'Node' is not assignable to type 'Node'`. Going through `globalThis` is not
+  // shadowable: a local type declaration lives in a different declaration space from the global VALUE.
+  out.push('type __WeaveNode = typeof globalThis.Node.prototype;');
   out.push('type __WeavePropsOf<F> = F extends (props: infer P, ...rest: any[]) => any ? P : Record<string, never>;');
   // With `export const propDefaults`, the defaulted keys become optional for a PARENT
   // (setup still sees them as declared); a key in D but not P is ignored.
@@ -712,7 +718,9 @@ function assemble(
   // `=> Node`, matching the runtime's `Component` type: an instance always returns its DOM. With
   // `unknown` here, calling a component imperatively — a `<Table>` cell, an `<Expansion>` body,
   // anything typed `(…) => Node` — needed a cast at every call site.
-  out.push(`declare const __weaveDefault: ${typeParams}(props: ${propsType}, slots?: Record<string, () => Node>) => Node;`);
+  out.push(
+    `declare const __weaveDefault: ${typeParams}(props: ${propsType}, slots?: Record<string, () => __WeaveNode>) => __WeaveNode;`
+  );
   out.push('export default __weaveDefault;'); // also forces module scope
 
   // Char-precise mappings. The script is embedded verbatim at the very top, so it
