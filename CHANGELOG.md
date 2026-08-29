@@ -39,6 +39,11 @@ found the framework silent in the places a beginner needs it loudest. This is th
   maps summarised in one line. `weave build → dist/` alone said only that the command had run.
 
 ### Changed — `weave check`
+- **It agrees with the build about child components.** The loader resolves a PascalCase tag by convention
+  (`<TodoItem>` → `./todo-item/todo-item.ts`) and wires the import itself, so an app that never writes that
+  import compiles, runs and renders — while `weave check` reported `Cannot find name 'TodoItem'` about it.
+  The resolution rule now has ONE implementation, which both sides import. A tag that resolves to nothing is
+  still an error in both.
 - **It checks the whole project now, not only the components.** Plain modules — services, stores, helpers,
   `routes.gen.ts` — were pulled into the program as dependencies and never reported on, so an app whose only
   quality script is `weave check` could pass with a type error plain `tsc --noEmit` refuses. Every non-component

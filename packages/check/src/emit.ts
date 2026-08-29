@@ -34,6 +34,7 @@ import {
   type SnippetNode,
   type ComponentSourceLoc,
   type AutoReturnResult,
+  importsBinding,
 } from '@weave-framework/compiler';
 
 const FOR_VARS: string[] = ['$index', '$count', '$first', '$last', '$even', '$odd'];
@@ -139,8 +140,63 @@ function injectionOf(auto: AutoReturnResult): { at: number; len: number } | unde
     : undefined;
 }
 
+/**
+ * How a PascalCase tag finds its module — injected, never imported.
+ *
+ * The lookup needs a filesystem; this module must not. It is bundled into the browser by the mapping
+ * tests (which import `../src/emit.js` directly to stay clear of the node-only `check.ts`/`project.ts`),
+ * and one `node:fs` import here breaks that bundle outright. So Node callers — `checkProject`, the
+ * language server — pass `resolveChildModule` from `./children-fs.js`; a browser bundle passes nothing
+ * and simply resolves no children, which its fixtures never rely on.
+ */
+export type ResolveChild = (tag: string, dir: string) => string | null;
+
+/**
+ * The imports a component's harness needs for the child tags its template composes but its script does
+ * not import — exactly the set the build loader injects, so both agree on what compiles.
+ */
+function childImports(
+  nodes: TemplateNode[],
+  script: string | undefined,
+  tsPath: string,
+  resolveChild?: ResolveChild
+): string[] {
+  if (!resolveChild) return [];
+  // `dirname`, spelled out: this module cannot import `node:path` (see ResolveChild above), and both
+  // separators have to be honoured — a Windows path is backslashed, and half of one is worse than none.
+  const cut: number = Math.max(tsPath.lastIndexOf('/'), tsPath.lastIndexOf('\\'));
+  const dir: string = cut === -1 ? '.' : tsPath.slice(0, cut);
+  const out: string[] = [];
+  for (const tag of composedTags(nodes)) {
+    if (importsBinding(script, tag)) continue;
+    const spec: string | null = resolveChild(tag, dir);
+    // An unresolvable tag is left alone on purpose: TypeScript then reports `Cannot find name '<Tag>'`,
+    // which is what the build says about it too, in the same place.
+    if (spec) out.push(`import ${tag} from ${JSON.stringify(spec)};`);
+  }
+  return out;
+}
+
+/** Every capitalized tag in a template, deduplicated — a component tag is one that starts uppercase. */
+function composedTags(nodes: TemplateNode[]): string[] {
+  const seen: Set<string> = new Set();
+  const visit = (list: unknown): void => {
+    if (!Array.isArray(list)) return;
+    for (const node of list) {
+      if (!node || typeof node !== 'object') continue;
+      const n: Record<string, unknown> = node as Record<string, unknown>;
+      if (n.type === 'element' && typeof n.tag === 'string' && /^[A-Z]/.test(n.tag)) seen.add(n.tag);
+      for (const key of ['children', 'branches', 'cases', 'empty', 'placeholder', 'pending', 'then', 'catch']) {
+        visit(n[key]);
+      }
+    }
+  };
+  visit(nodes);
+  return [...seen];
+}
+
 /** Build a virtual module for a `.weave` SFC. */
-export function buildVirtualSfc(filePath: string, source: string): Virtual {
+export function buildVirtualSfc(filePath: string, source: string, resolveChild?: ResolveChild): Virtual {
   const loc: ComponentSourceLoc = parseSfcLoc(source);
   const nodes: TemplateNode[] = parseTemplate(loc.template);
   const names: string[] = inferCtxNames(nodes);
@@ -149,7 +205,15 @@ export function buildVirtualSfc(filePath: string, source: string): Virtual {
   // Auto-expose: type the context off a synthesized `return` when setup omits one, so
   // `ReturnType<typeof setup>` matches what the runtime module (loader) will also expose.
   const auto: AutoReturnResult = hasSetup ? injectAutoReturn(loc.script ?? '', names) : { code: loc.script ?? '' };
-  const asm: ReturnType<typeof assemble> = assemble(auto.code || undefined, hasSetup, body, loc.scriptOffset, injectionOf(auto));
+  const asm: ReturnType<typeof assemble> = assemble(
+    auto.code || undefined,
+    hasSetup,
+    body,
+    loc.scriptOffset,
+    injectionOf(auto),
+    undefined,
+    childImports(nodes, loc.script, filePath, resolveChild)
+  );
   return {
     path: filePath + '.ts',
     text: asm.text,
@@ -169,14 +233,23 @@ export function buildVirtualSeparate(
   tsPath: string,
   tsSource: string,
   htmlPath: string,
-  htmlSource: string
+  htmlSource: string,
+  resolveChild?: ResolveChild
 ): Virtual {
   const nodes: TemplateNode[] = parseTemplate(htmlSource);
   const names: string[] = inferCtxNames(nodes);
   const body: Line[] = emit(nodes, new Set(names));
   const hasSetup: boolean = HAS_SETUP.test(tsSource);
   const auto: AutoReturnResult = hasSetup ? injectAutoReturn(tsSource, names) : { code: tsSource };
-  const asm: ReturnType<typeof assemble> = assemble(auto.code || undefined, hasSetup, body, 0, injectionOf(auto));
+  const asm: ReturnType<typeof assemble> = assemble(
+    auto.code || undefined,
+    hasSetup,
+    body,
+    0,
+    injectionOf(auto),
+    undefined,
+    childImports(nodes, tsSource, tsPath, resolveChild)
+  );
   return {
     // Live at the real `.ts` path (shadowing disk) so a parent's `import Foo from
     // './foo'` resolves to this virtual — which carries the synthesized typed
@@ -222,7 +295,8 @@ export function buildVirtualPatch(
   script: string,
   baseTemplate: string,
   ops: PatchOp[],
-  baseCtx: BaseCtx
+  baseCtx: BaseCtx,
+  resolveChild?: ResolveChild
 ): Virtual {
   // The base's offsets are tagged out of range BEFORE patching, so the fragments the ops splice in keep
   // the real `.ts` offsets `readPatchOps` gave them and stay distinguishable from everything around them.
@@ -236,7 +310,15 @@ export function buildVirtualPatch(
   // the context here is the base's plus its own. Same call as every other component, deliberately — the
   // rule belongs in one place, and this path is where its absence first showed.
   const auto: AutoReturnResult = hasSetup ? injectAutoReturn(script, all) : { code: script };
-  const asm: ReturnType<typeof assemble> = assemble(auto.code || undefined, hasSetup, body, 0, injectionOf(auto), baseCtx);
+  const asm: ReturnType<typeof assemble> = assemble(
+    auto.code || undefined,
+    hasSetup,
+    body,
+    0,
+    injectionOf(auto),
+    baseCtx,
+    childImports(nodes, script, tsPath, resolveChild)
+  );
   return {
     path: tsPath,
     text: asm.text,
@@ -563,13 +645,18 @@ function assemble(
   body: Line[],
   scriptBaseOffset: number,
   injection?: { at: number; len: number },
-  baseCtx?: BaseCtx
+  baseCtx?: BaseCtx,
+  imports: string[] = []
 ): { text: string; scriptLineCount: number; templateMap: Map<number, number>; mappings: WeaveMapping[] } {
   const out: string[] = [];
   const scriptLines: string[] = script ? script.split('\n') : [];
   for (const l of scriptLines) out.push(l);
 
   out.push('');
+  // Child components the template composes and the script does not import — the build loader injects
+  // exactly these, so the harness must have them too or the checker disagrees with the thing that runs.
+  // They go AFTER the author's script, so every line of it keeps its number.
+  for (const line of imports) out.push(line);
   // A `#3` extension's template context is the BASE's, with its own setup layered on top — that is what
   // `extendSetup(extend, setup)` builds at runtime, so the harness has to say the same thing or a patched
   // expression reading a base binding is an error here and correct everywhere else.

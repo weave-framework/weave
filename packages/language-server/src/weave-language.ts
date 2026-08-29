@@ -33,6 +33,9 @@ import {
   type Virtual,
   type WeaveMapping,
 } from '@weave-framework/check/emit';
+// The editor has to resolve a child tag the way the build does, or a component that renders shows a red
+// squiggle. Node-only, hence its own entry point — `emit` itself must stay bundleable for a browser.
+import { resolveChildModule } from '@weave-framework/check/children';
 import { parseSfcLoc, type ComponentSourceLoc } from '@weave-framework/compiler';
 
 /** Every mapped region gets the full set of language features. */
@@ -140,7 +143,7 @@ function buildRoot(uri: URI, languageId: string, snapshot: ts.IScriptSnapshot, c
 /** A `.weave` SFC: embedded `ts` + `css`, both mapping into the single file. */
 function buildSfcRoot(uri: URI, snapshot: ts.IScriptSnapshot): VirtualCode {
   const source: string = snapshot.getText(0, snapshot.getLength());
-  const v: Virtual = buildVirtualSfc(uri.fsPath, source);
+  const v: Virtual = buildVirtualSfc(uri.fsPath, source, resolveChildModule);
 
   // Both `script` and `template` runs index into the same `.weave` file.
   const tsMappings: CodeMapping[] = v.mappings.map(toMapping);
@@ -187,7 +190,7 @@ function buildTsComponentRoot(uri: URI, snapshot: ts.IScriptSnapshot): VirtualCo
   const source: string = snapshot.getText(0, snapshot.getLength());
   const htmlPath: string = siblingHtml(uri.fsPath);
   const htmlSource: string = existsSync(htmlPath) ? readFileSync(htmlPath, 'utf8') : '';
-  const v: Virtual = buildVirtualSeparate(uri.fsPath, source, htmlPath, htmlSource);
+  const v: Virtual = buildVirtualSeparate(uri.fsPath, source, htmlPath, htmlSource, resolveChildModule);
 
   const tsCode: VirtualCode = {
     id: 'ts',
@@ -218,7 +221,7 @@ function buildTemplateRoot(uri: URI, snapshot: ts.IScriptSnapshot, ctx: CodegenC
   }
 
   const tsSource: string = readFileSync(tsPath, 'utf8');
-  const v: Virtual = buildVirtualSeparate(tsPath, tsSource, htmlPath, htmlSource);
+  const v: Virtual = buildVirtualSeparate(tsPath, tsSource, htmlPath, htmlSource, resolveChildModule);
 
   // Template runs map to THIS `.html` (the root); the inlined script region maps back
   // to the sibling `.ts` as an *associated script* — so a definition that resolves

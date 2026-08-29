@@ -18,6 +18,7 @@ tools/.verify-dev-compiler-error-bundle.mjs
 tools/.verify-dev-compiler-app-*/
 tools/.verify-check-plain-*/
 tools/.verify-check-interp-*/
+tools/.verify-check-child-*/
 tools/.verify-cli-help-app-*/
 tools/.verify-dev-port-bundle.mjs
 *.tsbuildinfo

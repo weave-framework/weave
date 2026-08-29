@@ -23,6 +23,9 @@ import {
   type PatchOp,
 } from '@weave-framework/compiler';
 import { buildVirtualSfc, buildVirtualSeparate, buildVirtualPatch, type Virtual } from './emit.js';
+// A component tag with no import resolves by convention — the same rule the build loader applies, so
+// the checker agrees with what actually compiles.
+import { resolveChildModule } from './children-fs.js';
 import { runCheck, offsetToLineCol, type Diagnostic } from './check.js';
 
 const SKIP: Set<string> = new Set(['node_modules', 'dist', '.git', '.weave']);
@@ -90,7 +93,7 @@ function collect(path: string, out: Virtual[], diags: Diagnostic[], patchers: Pa
     // A `.weave` template parses `parseSfcLoc(source).template`, which blanks the script/style
     // regions in place — so offsets map 1:1 back to the raw `.weave` source.
     const source: string = readFileSync(path, 'utf8');
-    tryBuild(() => buildVirtualSfc(path, source), path, source, out, diags);
+    tryBuild(() => buildVirtualSfc(path, source, resolveChildModule), path, source, out, diags);
   } else if (path.endsWith('.ts') && !path.endsWith('.d.ts')) {
     if (!collectTs(path, out, diags, patchers)) plain.push(resolve(path));
   }
@@ -125,19 +128,19 @@ function collectTs(tsPath: string, out: Virtual[], diags: Diagnostic[], patchers
       const faithful: string = decl.templateRange
         ? faithfulTemplate(source, decl.templateRange)
         : decl.template;
-      tryBuild(() => buildVirtualSeparate(tsPath, decl.script, tsPath, faithful), tsPath, faithful, out, diags);
+      tryBuild(() => buildVirtualSeparate(tsPath, decl.script, tsPath, faithful, resolveChildModule), tsPath, faithful, out, diags);
       return true;
     }
     const file: string = resolve(dirname(tsPath), decl.template);
     if (!existsSync(file)) return true; // build reports the missing file; check just skips
     const html: string = readFileSync(file, 'utf8');
-    tryBuild(() => buildVirtualSeparate(tsPath, decl.script, file, html), file, html, out, diags);
+    tryBuild(() => buildVirtualSeparate(tsPath, decl.script, file, html, resolveChildModule), file, html, out, diags);
     return true;
   }
 
   if (existsSync(siblingHtml)) {
     const html: string = readFileSync(siblingHtml, 'utf8');
-    tryBuild(() => buildVirtualSeparate(tsPath, decl.script, siblingHtml, html), siblingHtml, html, out, diags);
+    tryBuild(() => buildVirtualSeparate(tsPath, decl.script, siblingHtml, html, resolveChildModule), siblingHtml, html, out, diags);
     return true;
   }
 
@@ -205,7 +208,7 @@ function buildPatcher(p: Patcher, out: Virtual[], diags: Diagnostic[]): void {
   const known: boolean = out.some((v: Virtual) => resolve(v.path) === resolve(base.virtualPath));
   const spec: string | undefined = known ? specifierTo(p.tsPath, base.virtualPath) : undefined;
   try {
-    out.push(absolutize(buildVirtualPatch(p.tsPath, p.source, p.script, base.template, ops, { spec })));
+    out.push(absolutize(buildVirtualPatch(p.tsPath, p.source, p.script, base.template, ops, { spec }, resolveChildModule)));
   } catch (e) {
     if (e instanceof ParseError) {
       diags.push(parseDiagnostic(p.tsPath, p.source, e));

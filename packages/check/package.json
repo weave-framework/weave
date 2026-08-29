@@ -10,6 +10,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./emit": "./src/emit.ts",
+    "./children": "./src/children-fs.ts",
     "./package.json": "./package.json"
   },
   "files": [
@@ -36,6 +37,10 @@
       "./emit": {
         "types": "./dist/emit.d.ts",
         "import": "./dist/emit.js"
+      },
+      "./children": {
+        "types": "./dist/children-fs.d.ts",
+        "import": "./dist/children-fs.js"
       },
       "./package.json": "./package.json"
     }
