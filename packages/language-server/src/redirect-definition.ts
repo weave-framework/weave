@@ -22,11 +22,11 @@ interface ServiceInstance {
 }
 /** Any Volar service plugin — a `create(context)` that yields an instance. */
 type ServicePlugin = { create(context: never): unknown };
-interface LspPos {
+export interface LspPos {
   line: number;
   character: number;
 }
-interface LspRange {
+export interface LspRange {
   start: LspPos;
   end: LspPos;
 }
@@ -39,7 +39,7 @@ interface LocationLinkish {
 }
 
 /** LSP {line,character} → absolute offset in `text`. */
-function offsetAt(text: string, pos: LspPos): number {
+export function offsetAt(text: string, pos: LspPos): number {
   let line: number = 0;
   let i: number = 0;
   while (line < pos.line && i < text.length) {
@@ -50,7 +50,7 @@ function offsetAt(text: string, pos: LspPos): number {
 }
 
 /** Absolute offset → LSP {line,character}. */
-function posAt(text: string, offset: number): LspPos {
+export function posAt(text: string, offset: number): LspPos {
   let line: number = 0;
   let last: number = 0;
   for (let i: number = 0; i < offset && i < text.length; i++) {
@@ -95,7 +95,7 @@ function inReturn(node: import('typescript').Node, ts: Ts): boolean {
 }
 
 /** If `offset` is on a shorthand property in a `setup` return, the same-named `const` name node. */
-function setupConstFor(sf: import('typescript').SourceFile, offset: number, ts: Ts): import('typescript').Identifier | undefined {
+export function setupConstFor(sf: import('typescript').SourceFile, offset: number, ts: Ts): import('typescript').Identifier | undefined {
   const node: import('typescript').Node | undefined = nodeAt(sf, offset, ts);
   if (!node || !ts.isIdentifier(node)) return undefined;
   const shorthand: import('typescript').Node = node.parent;

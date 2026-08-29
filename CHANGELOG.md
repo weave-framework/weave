@@ -75,6 +75,26 @@ guess: `{{ total }}` could be anything, and a return type that is not a type lit
 other declaration. The error stays, so nothing is hidden. A plausible-looking guess is the fastest way
 to make a helpful tool something people turn off.
 
+### Renaming a template binding renames the `const` behind it
+
+Renaming from a template always edited both files — and left two names for one thing. `return { count }`
+is a shorthand, and renaming the context PROPERTY cannot rename the const through it, so TypeScript took
+the only safe option it had and expanded it to `return { total: count }`. It compiled; it was not what
+anyone meant.
+
+Now the const and everything that reads it follow, and the shorthand stays a shorthand:
+
+```ts
+// F2 on `{{ count() }}` in the template, renaming it to `total`
+const total = (): number => 1;
+const twice = (): number => total() * 2;   // the reader follows too
+return { total, twice };
+```
+
+The const's references are not found by us — they are asked of TypeScript, which gets them right. That
+matters: renaming a declaration without its references is a silent breakage, and the scaffold's own
+`inc` reads `count`. Renaming *from* the `.ts` is unchanged; `{ count: total }` is already correct there.
+
 ### Internal
 
 - `verify:size` measured the raw `tsc` emit, so doc comments counted against a budget no browser ever

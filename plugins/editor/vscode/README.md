@@ -10,7 +10,7 @@ separate `.ts` + `.html` (+ `.scss`) authoring form.
 Download the latest `.vsix` from this folder, then:
 
 ```sh
-code --install-extension weave-language-0.6.4.vsix
+code --install-extension weave-language-0.6.5.vsix
 ```
 
 Or in VS Code: **Extensions** panel → **⋯** menu → **Install from VSIX…** → pick the file.

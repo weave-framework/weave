@@ -469,6 +469,13 @@ Your editor shows the same warnings as you type, underlined where they are, with
 lightbulb ("Replace `clik` with `click`"). The editor and `weave check` run the same code, so they
 never disagree about the same file.
 
+### Renaming a binding renames the code behind it
+
+Rename `{{ count() }}` in a template (F2) and the `const count` in the sibling `.ts` follows, along with
+everything in `setup` that reads it — and `return { count }` stays a shorthand rather than becoming
+`return { total: count }`. The references are found by TypeScript itself, so nothing is renamed that
+should not be.
+
 ### The template can declare into `setup` for you
 
 A component is two files, and you say every name twice — once where you use it, once where you define it.
@@ -520,8 +527,8 @@ Pass one or more roots; with none, it defaults to `['src']`. Any error makes it 
 Weave has real IDE integration — red squiggles on type errors *inside templates*, hover, completion, go-to-definition, and rename across the `.ts`/`.html` boundary. It's powered by a shared [Volar](https://volarjs.dev) language server, so the same engine backs every editor.
 
 > **Where to get the plugins.** They are **not on the VS Code Marketplace or the JetBrains Marketplace yet** — you install them from a file. Download the latest build from the repo's [`plugins/editor/`](https://github.com/weave-framework/weave/tree/main/plugins/editor) folder:
-> - VS Code → [`plugins/editor/vscode/weave-language-0.6.4.vsix`](https://github.com/weave-framework/weave/tree/main/plugins/editor/vscode)
-> - WebStorm → [`plugins/editor/webstorm/weave-webstorm-0.23.4.zip`](https://github.com/weave-framework/weave/tree/main/plugins/editor/webstorm)
+> - VS Code → [`plugins/editor/vscode/weave-language-0.6.5.vsix`](https://github.com/weave-framework/weave/tree/main/plugins/editor/vscode)
+> - WebStorm → [`plugins/editor/webstorm/weave-webstorm-0.23.5.zip`](https://github.com/weave-framework/weave/tree/main/plugins/editor/webstorm)
 >
 > (Use whatever the newest version in those folders is.)
 
@@ -530,7 +537,7 @@ Weave has real IDE integration — red squiggles on type errors *inside template
 1. Download the `.vsix` file (above).
 2. Install it — either from the terminal:
    ```bash
-   code --install-extension weave-language-0.6.4.vsix
+   code --install-extension weave-language-0.6.5.vsix
    ```
    …or from the UI: open the **Extensions** panel → click the **⋯** menu at the top → **Install from VSIX…** → pick the file.
 3. Reload VS Code (**Developer: Reload Window**, or just restart it).
