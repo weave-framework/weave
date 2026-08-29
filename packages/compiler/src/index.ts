@@ -21,7 +21,7 @@ export {
   readPatchOps,
 } from './extension.js';
 export { parseTemplate, ParseError } from './parser.js';
-export { lintTemplate } from './lint.js';
+export { lintTemplate, lintTemplateFindings, type LintFinding, type LintFix } from './lint.js';
 export { importsBinding } from './children.js';
 export { scopeCss, scopeAttr, hostAttr, hashCss } from './css.js';
 export { inferCtxNames } from './infer.js';

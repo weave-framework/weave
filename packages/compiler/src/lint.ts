@@ -86,17 +86,50 @@ function nearest(name: string, candidates: readonly string[]): string | null {
   return candidates.find((c) => withinOneEdit(name.toLowerCase(), c)) ?? null;
 }
 
+/** A replacement that is certainly correct — offered only where exactly one right answer exists. */
+export interface LintFix {
+  /** Offsets into the template source passed to `parseTemplate`. */
+  start: number;
+  end: number;
+  /** Text to put in place of `[start, end)`. */
+  text: string;
+}
+
 /**
- * Walk a parsed template and collect warnings. Pure: it reads the AST and returns strings, so both the
- * build loader and any other caller can decide how to surface them.
+ * One warning, with a position when the AST carries one and a `fix` when the rule already KNOWS the
+ * answer. A rule that merely explains ("this prefix is not a Weave binding") has no `fix`: guessing
+ * one would be worse than none. Applying several fixes to one file must go BACK TO FRONT, or an
+ * earlier edit shifts every later offset.
  */
-export function lintTemplate(nodes: TemplateNode[]): string[] {
-  const out: string[] = [];
+export interface LintFinding {
+  message: string;
+  /** Offset of what the message is about, when known. `undefined` means "no position", never 0. */
+  offset?: number;
+  fix?: LintFix;
+}
+
+/**
+ * Walk a parsed template and collect warnings WITH their positions and fixes.
+ *
+ * Added alongside `lintTemplate` rather than changing it: that function is a published export of
+ * `@weave-framework/compiler`, so widening its return type would be a breaking change for a purely
+ * additive capability.
+ */
+export function lintTemplateFindings(nodes: TemplateNode[]): LintFinding[] {
+  const out: LintFinding[] = [];
   walk(nodes, out);
   return out;
 }
 
-function walk(nodes: TemplateNode[] | undefined, out: string[]): void {
+/**
+ * The message-only projection — the original signature, unchanged. Pure: it reads the AST and returns
+ * strings, so both the build loader and any other caller can decide how to surface them.
+ */
+export function lintTemplate(nodes: TemplateNode[]): string[] {
+  return lintTemplateFindings(nodes).map((f) => f.message);
+}
+
+function walk(nodes: TemplateNode[] | undefined, out: LintFinding[]): void {
   if (!nodes) return;
   for (const node of nodes) {
     switch (node.type) {
@@ -105,7 +138,7 @@ function walk(nodes: TemplateNode[] | undefined, out: string[]): void {
         walk((node as ElementNode).children, out);
         break;
       case 'text':
-        lintText(node.value, out);
+        lintText(node.value, node.offset, out);
         break;
       default:
         // Every block kind carries its children under one of these names; walking them all keeps this
@@ -125,12 +158,16 @@ function walk(nodes: TemplateNode[] | undefined, out: string[]): void {
   }
 }
 
-function lintAttr(attr: Attr, out: string[]): void {
+function lintAttr(attr: Attr, out: LintFinding[]): void {
   if (attr.type === 'event') {
     const name: string = attr.name;
     const near: string | null = DOM_EVENTS.includes(name.toLowerCase()) ? null : nearest(name, DOM_EVENTS);
     if (near) {
-      out.push(`\`on:${name}\` — no such DOM event. Did you mean \`on:${near}\`? (A listener for an event nothing fires is silent at runtime.)`);
+      out.push({
+        message: `\`on:${name}\` — no such DOM event. Did you mean \`on:${near}\`? (A listener for an event nothing fires is silent at runtime.)`,
+        offset: attr.nameOffset,
+        fix: attr.nameOffset === undefined ? undefined : { start: attr.nameOffset, end: attr.nameOffset + name.length, text: near },
+      });
     }
     return;
   }
@@ -141,10 +178,16 @@ function lintAttr(attr: Attr, out: string[]): void {
   // text. The element renders, the handler never runs, and nothing complains.
   const asEvent: RegExpExecArray | null = /^on([a-z]{3,})$/.exec(name);
   if (asEvent && DOM_EVENTS.includes(asEvent[1])) {
-    out.push(
-      `\`${name}={{ … }}\` sets an ATTRIBUTE, not a listener — the handler never runs. Weave binds events ` +
-        `with \`on:\`: write \`on:${asEvent[1]}={{ … }}\`.`
-    );
+    out.push({
+      message:
+        `\`${name}={{ … }}\` sets an ATTRIBUTE, not a listener — the handler never runs. Weave binds events ` +
+        `with \`on:\`: write \`on:${asEvent[1]}={{ … }}\`.`,
+      offset: attr.nameOffset,
+      fix:
+        attr.nameOffset === undefined
+          ? undefined
+          : { start: attr.nameOffset, end: attr.nameOffset + name.length, text: `on:${asEvent[1]}` },
+    });
     return;
   }
 
@@ -152,16 +195,19 @@ function lintAttr(attr: Attr, out: string[]): void {
   if (colon > 0) {
     const prefix: string = name.slice(0, colon);
     if (!NAMESPACES.has(prefix) && !WEAVE_PREFIXES.has(prefix)) {
-      out.push(
-        `\`${name}\` — \`${prefix}:\` is not a Weave binding prefix, so this is emitted as a plain attribute. ` +
-          `The prefixes are \`on:\`, \`bind:\`, \`use:\`, \`class:\`, \`style:\`, \`transition:\`/\`in:\`/\`out:\`.`
-      );
+      // No `fix`: several prefixes could have been meant, and a wrong auto-fix is worse than none.
+      out.push({
+        message:
+          `\`${name}\` — \`${prefix}:\` is not a Weave binding prefix, so this is emitted as a plain attribute. ` +
+          `The prefixes are \`on:\`, \`bind:\`, \`use:\`, \`class:\`, \`style:\`, \`transition:\`/\`in:\`/\`out:\`.`,
+        offset: attr.nameOffset,
+      });
     }
   }
 }
 
 /** An unrecognised `@word (…) {` left in the text — a misspelled block, which renders as literal text. */
-function lintText(text: string, out: string[]): void {
+function lintText(text: string, offset: number | undefined, out: LintFinding[]): void {
   // `[^{}]*` rather than `[^)]*`: a block head holds calls of its own — `@for (t of todos())` — so the
   // scan has to run to the LAST `)` before the brace, not the first one.
   const RE: RegExp = /@([A-Za-z]+)\s*(\([^{}]*\))?\s*\{/g;
@@ -171,7 +217,13 @@ function lintText(text: string, out: string[]): void {
     if (BLOCKS.includes(word)) continue; // the parser would have taken it; a leftover is inside a snippet
     const near: string | null = nearest(word, BLOCKS);
     if (near) {
-      out.push(`\`@${word}\` is not a Weave block and was left in the page as text. Did you mean \`@${near}\`?`);
+      // `m.index + 1` skips the `@`; the word itself is what gets replaced.
+      const at: number | undefined = offset === undefined ? undefined : offset + m.index + 1;
+      out.push({
+        message: `\`@${word}\` is not a Weave block and was left in the page as text. Did you mean \`@${near}\`?`,
+        offset: at,
+        fix: at === undefined ? undefined : { start: at, end: at + word.length, text: near },
+      });
     }
   }
 }

@@ -1,6 +1,6 @@
 import { test, assert } from '../../../tools/harness.js';
-import { lintTemplate, parseTemplate } from '@weave-framework/compiler';
-import type { TemplateNode } from '@weave-framework/compiler';
+import { lintTemplate, lintTemplateFindings, parseTemplate } from '@weave-framework/compiler';
+import type { LintFinding, LintFix, TemplateNode } from '@weave-framework/compiler';
 
 /*
  * The mistakes a first-time Weave author actually makes, every one of which used to compile clean and
@@ -70,4 +70,74 @@ test('a correct template produces no warnings at all', () => {
       '</main>'
   );
   assert.equal(w.length, 0, `nothing to report (got ${JSON.stringify(w)})`);
+});
+
+/*
+ * Structured findings (`lintTemplateFindings`) — the same rules, plus the position and, where exactly
+ * one answer exists, the replacement. The gate that matters is not "a fix was offered" but "applying
+ * it produces the correct source, byte for byte, and silences the rule". A fix that lands one
+ * character off would still LOOK like a fix in a message-only assertion.
+ */
+
+const findings = (html: string): LintFinding[] => lintTemplateFindings(parseTemplate(html) as TemplateNode[]);
+
+/** Apply every offered fix. Back to front, or an earlier edit shifts every later offset. */
+const applyFixes = (src: string): string => {
+  const fixes: LintFix[] = findings(src)
+    .map((f) => f.fix)
+    .filter((f): f is LintFix => f !== undefined)
+    .sort((a, b) => b.start - a.start);
+  let out: string = src;
+  for (const f of fixes) out = out.slice(0, f.start) + f.text + out.slice(f.end);
+  return out;
+};
+
+test('a typo’d event name carries a fix that lands exactly on the name', () => {
+  const src: string = '<button on:clik={{ inc }}>x</button>';
+  const f: LintFinding[] = findings(src);
+  assert.equal(f.length, 1, 'one finding (got ' + JSON.stringify(f.map((x) => x.message)) + ')');
+  assert.ok(f[0].fix !== undefined, 'it carries a fix');
+  assert.equal(src.slice(f[0].fix.start, f[0].fix.end), 'clik', 'the range covers exactly the event name');
+  assert.equal(applyFixes(src), '<button on:click={{ inc }}>x</button>', 'applying it yields the correct source');
+});
+
+test('an event bound as a plain attribute is fixed to the on: form', () => {
+  const src: string = '<button onclick={{ inc }}>x</button>';
+  assert.equal(applyFixes(src), '<button on:click={{ inc }}>x</button>', 'onclick becomes on:click');
+});
+
+test('a misspelled block is fixed to the block it meant', () => {
+  const src: string = '<div>@fro (t of todos()) { <b>{{ t }}</b> }</div>';
+  const f: LintFinding[] = findings(src);
+  assert.ok(f[0].fix !== undefined, 'it carries a fix');
+  assert.equal(src.slice(f[0].fix.start, f[0].fix.end), 'fro', 'the range covers the word, not the @');
+  assert.equal(applyFixes(src), '<div>@for (t of todos()) { <b>{{ t }}</b> }</div>', 'applying it yields the correct source');
+});
+
+test('three mistakes in one template are all fixed, and the result lints clean', () => {
+  const broken: string = '<div>@fro (t of ts()) { <button onclick={{ a }} on:clik={{ b }}>x</button> }</div>';
+  const fixed: string = '<div>@for (t of ts()) { <button on:click={{ a }} on:click={{ b }}>x</button> }</div>';
+  assert.equal(findings(broken).filter((f) => f.fix !== undefined).length, 3, 'three fixes offered');
+  assert.equal(applyFixes(broken), fixed, 'all three applied back-to-front give exactly the fixed source');
+  assert.equal(findings(fixed).length, 0, 'and the fixed source has nothing left to report');
+});
+
+test('a rule with more than one plausible answer offers NO fix', () => {
+  const f: LintFinding[] = findings('<b xyz:abc={{ x }}>t</b>');
+  assert.equal(f.length, 1, 'still reported');
+  assert.equal(f[0].fix, undefined, 'but no fix is guessed');
+});
+
+test('a coalesced text run reports without a position rather than a wrong one', () => {
+  // The comment is dropped, so the two text runs merge and an index into `value` no longer maps to
+  // the source. The warning must survive; the position must not be invented.
+  const f: LintFinding[] = findings('<div>x<!-- c -->@fro (a) { }</div>');
+  assert.equal(f.length, 1, 'still reported (got ' + JSON.stringify(f) + ')');
+  assert.equal(f[0].offset, undefined, 'no position');
+  assert.equal(f[0].fix, undefined, 'and therefore no fix');
+});
+
+test('the original string-only API is unchanged', () => {
+  const src: string = '<button on:clik={{ inc }}>x</button>';
+  assert.equal(JSON.stringify(lintTemplate(parseTemplate(src) as TemplateNode[])), JSON.stringify(findings(src).map((f) => f.message)), 'lintTemplate is the message projection');
 });

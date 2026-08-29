@@ -107,6 +107,7 @@ class Parser {
         out.push(this.parseElement());
         continue;
       }
+      const textStart: number = this.pos;
       const text: string = this.readText(stopAtBrace);
       if (text) {
         // Coalesce with a preceding text node. Two text runs become adjacent when a
@@ -114,8 +115,14 @@ class Parser {
         // when the emitted template HTML is parsed, so the AST must too — otherwise the
         // child-index paths the codegen computes are off by one for every later sibling.
         const last: TemplateNode | undefined = out[out.length - 1];
-        if (last && last.type === 'text') last.value += text;
-        else out.push({ type: 'text', value: text });
+        if (last && last.type === 'text') {
+          last.value += text;
+          // Coalesced: an index into `value` no longer maps to the source, so drop the position
+          // instead of keeping one that is wrong for everything after the join.
+          last.offset = undefined;
+        } else {
+          out.push({ type: 'text', value: text, offset: textStart });
+        }
       }
     }
     if (closeTag !== null) throw new ParseError(`Unclosed <${closeTag}>`, this.pos);
@@ -587,6 +594,8 @@ class Parser {
     // key, so without this the diagnostic maps nowhere and never reaches the editor.
     if (attr.type === 'static' || attr.type === 'attr') attr.nameOffset = nameStart;
     if (attr.type === 'bind') attr.nameOffset = nameStart + 'bind:'.length;
+    // The event NAME, not the expression: `on:clik` is a typo the linter can offer to replace.
+    if (attr.type === 'event') attr.nameOffset = nameStart + 'on:'.length;
     return attr;
   }
 

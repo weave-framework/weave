@@ -165,6 +165,14 @@ export interface ElementNode {
 export interface TextNode {
   type: 'text';
   value: string;
+  /**
+   * Offset of the run's first character. Present only when the node is a SINGLE source run:
+   * two runs are coalesced when a comment between them is skipped, and after that an index into
+   * `value` no longer maps linearly back to the source — so coalescing CLEARS this rather than
+   * leaving a number that is quietly wrong. Consumers must treat `undefined` as "no position",
+   * never as zero.
+   */
+  offset?: Offset;
 }
 
 /** `{{ expr }}` */
@@ -235,6 +243,8 @@ export interface EventAttr {
   modifiers: string[];
   expr: string;
   offset?: Offset;
+  /** Offset of the EVENT NAME (after `on:`), so a typo diagnostic can point at — and replace — it. */
+  nameOffset?: Offset;
 }
 /** class:name={expr} */
 export interface ClassAttr {
