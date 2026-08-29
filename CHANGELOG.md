@@ -66,6 +66,10 @@ export function setup(): { n: number; save: () => void } {
 }
 ```
 
+The editor offers the same thing on the lightbulb — *Declare `save` in setup()* — from the same code, so
+the two can never propose different things. It is offered once: if the name appears anywhere in the
+script already, nothing is proposed, because a duplicate declaration would be worse than no offer.
+
 It writes **declarations, never logic** — the `TODO` is yours — and it declines wherever the shape is a
 guess: `{{ total }}` could be anything, and a return type that is not a type literal belongs to some
 other declaration. The error stays, so nothing is hidden. A plausible-looking guess is the fastest way

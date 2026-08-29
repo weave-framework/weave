@@ -125,7 +125,7 @@ function setupConstFor(sf: import('typescript').SourceFile, offset: number, ts: 
  * the sibling `.ts`'s for the script region — where a setup return always lives. We resolve the
  * sibling `.ts`, keep the original `targetUri`, and rewrite only the range; Volar maps it back.
  */
-function realTsForTarget(uri: string): string | undefined {
+export function realTsForTarget(uri: string): string | undefined {
   if (uri.toLowerCase().endsWith('.ts')) {
     try {
       return fileURLToPath(uri);
