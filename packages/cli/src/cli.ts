@@ -50,10 +50,10 @@ function requireAppEntry(config: ResolvedConfig, cmd: string): void {
 }
 
 /** Build the framework-owned entry (Level C) when the config declares a `root` component. */
-function virtualEntryFor(config: ResolvedConfig): { code: string; resolveDir: string } | undefined {
+function virtualEntryFor(config: ResolvedConfig, devtools: boolean = false): { code: string; resolveDir: string } | undefined {
   if (!config.rootComponent) return undefined;
   const elements: CustomElement[] = discoverCustomElements(config.root);
-  const code: string = generateEntry(config.rootComponent, config.mount, config.root, elements);
+  const code: string = generateEntry(config.rootComponent, config.mount, config.root, elements, { devtools });
   return { code, resolveDir: config.root };
 }
 
@@ -85,6 +85,7 @@ options
   --no-minify            Leave the build unminified
   --fix                  Apply the fixes check is certain of, then re-check (check)
   --impact <file>        List what renders this component, directly and transitively (check)
+  --devtools             Show the reactive-graph panel in the page (dev)
   --ssg                  Prerender every route to static HTML (build)
   --eager                Inline routes instead of code-splitting them (routes)
   -h, --help             Print this
@@ -241,6 +242,7 @@ export async function main(argv: string[]): Promise<void> {
     }
   }
   if (cmd === 'dev') {
+    const devtools: boolean = rest.includes('--devtools');
     if (config) {
       requireAppEntry(config, 'dev');
       syncRoutes(config); // file-based routing: regenerate routes.gen.ts before serving
@@ -248,7 +250,7 @@ export async function main(argv: string[]): Promise<void> {
       // `main.js` lives at the web root); nothing is written to disk.
       const { url } = await dev({
         entry: config.entry,
-        virtualEntry: virtualEntryFor(config),
+        virtualEntry: virtualEntryFor(config, devtools),
         base: config.base,
         servedir: config.publicDir,
         outdir: config.publicDir,
@@ -260,6 +262,8 @@ export async function main(argv: string[]): Promise<void> {
         proxy: config.proxy,
       });
       console.log(`weave dev → ${url}`);
+      // Discoverable without being imposed: the panel is real, and it is off unless asked for.
+      if (!devtools) console.log('  (--devtools shows the reactive graph in the page)');
       return;
     }
     const servedir: string = flag(rest, '--serve') ?? '.';

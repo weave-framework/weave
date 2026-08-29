@@ -126,6 +126,19 @@ probably read; a transitive one is a screen that can change under you without it
 It resolves children both ways — by explicit `import` and by the no-import convention — and it answers
 without type-checking, since the question is usually asked while the tree is red.
 
+### `weave dev --devtools` — the reactive graph, in the page
+
+The introspection registry and the panel have been in the runtime for a long time, and no app ever saw
+them: they only work if the author calls `enableDevtools()` before the mount and then mounts the panel.
+A real capability, effectively unreachable. `weave dev --devtools` does both, and `weave dev` prints one
+line saying the flag exists.
+
+It is off unless asked for. An overlay nobody requested, appearing over their app, is worse than no
+feature — so the gate asserts both that it appears with the flag and that nothing appears without it.
+
+Named nodes only, and only ones with an owner: a signal created at module scope is never registered, so
+it does not appear however early devtools is switched on.
+
 ### Internal
 
 - `verify:size` measured the raw `tsc` emit, so doc comments counted against a budget no browser ever

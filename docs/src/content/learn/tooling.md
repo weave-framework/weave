@@ -469,6 +469,19 @@ Your editor shows the same warnings as you type, underlined where they are, with
 lightbulb ("Replace `clik` with `click`"). The editor and `weave check` run the same code, so they
 never disagree about the same file.
 
+### Seeing the reactive graph
+
+~~~bash
+weave dev --devtools
+~~~
+
+A panel in the corner of your own app: every named `signal`, `computed` and `effect` with its live value,
+plus a graph, a trace of what triggered what, and the owner tree. It updates without polling — it is itself
+an effect, so it re-runs when anything it reads changes.
+
+Off unless you ask for it. Two things it will not show: a node you did not `name`, and a signal created at
+module scope — a node is registered through its owner, and a module-scope one has none.
+
 ### What will this change break?
 
 ~~~bash

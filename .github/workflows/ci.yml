@@ -237,3 +237,8 @@ jobs:
       # convention. Reading only the convention found ONE user across the whole docs site.
       - name: --impact reports who renders a component
         run: pnpm verify:impact
+      # The devtools panel has existed in the runtime for a long time and no app ever saw it, because it
+      # only works if the author enables it before the mount. Both halves are asserted: it appears with
+      # the flag, and NOTHING appears without it.
+      - name: weave dev --devtools shows the reactive graph, and only when asked
+        run: pnpm verify:devtools-flag

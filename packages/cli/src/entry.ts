@@ -115,16 +115,24 @@ export function generateEntry(
   mount: string,
   rootDir: string,
   elements: CustomElement[],
-  options: { resume?: boolean } = {}
+  options: { resume?: boolean; devtools?: boolean } = {}
 ): string {
   const spec = (file: string): string => importSpec(rootDir, file);
-  const lines: string[] = [`import Root from ${spec(rootComponent)};`];
+  const lines: string[] = [];
+  lines.push(`import Root from ${spec(rootComponent)};`);
   elements.forEach((ce, i) => lines.push(`import __ce${i} from ${spec(ce.file)};`));
   lines.push(
     options.resume
       ? 'import { resumePage } from "@weave-framework/runtime/graph";\nimport { mountComponent, defineCustomElement } from "@weave-framework/runtime/dom";'
       : 'import { mountComponent, defineCustomElement } from "@weave-framework/runtime/dom";'
   );
+  if (options.devtools) {
+    // Before the mount, because that is when `setup` runs and creates the nodes: a node is registered
+    // only when it has an OWNER (`reactive.ts`), so a module-scope signal never appears in the panel
+    // however early this runs, and nothing has to be done about import hoisting.
+    lines.push('import { enableDevtools, mountDevtoolsPanel } from "@weave-framework/runtime";');
+    lines.push('enableDevtools(true);');
+  }
   // Register custom elements BEFORE bringing the root online, so a tag is defined at first render.
   elements.forEach((ce, i) =>
     lines.push(`defineCustomElement(${JSON.stringify(ce.tag)}, __ce${i}, { props: ${JSON.stringify(ce.props)} });`)
@@ -149,6 +157,7 @@ export function generateEntry(
   } else {
     lines.push(`mountComponent(Root, ${JSON.stringify(mount)});`);
   }
+  if (options.devtools) lines.push('mountDevtoolsPanel();');
   return lines.join('\n');
 }
 
