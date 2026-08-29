@@ -1,6 +1,6 @@
 # RFC 0012: An app with no plumbing — ambient scope, resolved at compile time
 
-- **Status:** Draft
+- **Status:** Draft — deliberately not started; see "Measured before building"
 - **Author(s):** Aidas Josas (@aidasjosas)
 - **Discussion:** —
 
@@ -69,6 +69,31 @@ These are the rules that decide whether this is safe. Each exists because of a w
 Resolving a name across a component tree requires knowing that tree **statically**. A framework whose tree is
 assembled at runtime cannot. Weave compiles the whole app and already builds the graph — the same one
 `weave check --impact` now reads.
+
+## Measured before building — and the measurement says wait
+
+The motivation above is an argument. Before writing any of it, the argument was checked against the code
+that exists here (the docs site, the demo, and the UI library, including the inline-template components the
+first two attempts at this measurement silently skipped):
+
+```
+components with a template   487
+  declaring props             37   (287 props)
+  props used in a template    47
+  props ONLY handed to a child 1
+```
+
+**One.** Prop drilling is the thing this RFC removes, and in every app in reach it is not happening: a page
+composes UI components directly, so almost nothing is threaded through an intermediate component. The cost
+this would pay back is not being paid here.
+
+That is not proof the problem is imaginary — these are shallow apps, and a deep business app is exactly where
+threading appears. It IS proof that we cannot judge the design here, and the plan's own rule applies: no
+speculative building; a milestone waits for a real pull from a real app.
+
+**So: this RFC stays Draft, and the trigger is explicit.** Re-run the measurement on the next real
+dogfooding app. If "props only handed to a child" is still in the single digits, the feature is not worth its
+risk. If it is in the dozens, build stage 1 and measure again.
 
 ## Staging
 
