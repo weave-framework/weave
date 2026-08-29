@@ -165,3 +165,67 @@ test('dispose is called for removed rows', () => {
   update([]);
   assert.deepEqual(disposed.sort(), [1, 2, 3]);
 });
+
+/*
+ * Keeping a row's IDENTITY was never the whole story. `insertBefore` on a node already in the document
+ * removes it and puts it back, and the removal throws away what the DOM does not restore: focus, a
+ * running animation, a playing <video>, an open <details>, an <iframe>'s document. So a reorder kept the
+ * same element and still reset whatever the user was in the middle of. `moveBefore` reparents without
+ * the removal.
+ *
+ * The first assertion is not ceremony: without it, a browser lacking `moveBefore` would take the
+ * fallback path and these tests would pass while proving nothing at all.
+ */
+
+test('the test browser actually has moveBefore, so the rest of this proves something', () => {
+  assert.equal(typeof (Element.prototype as { moveBefore?: unknown }).moveBefore, 'function', 'Element.prototype.moveBefore');
+});
+
+test('reordering a list keeps the focus that was inside a row', () => {
+  const l: List = makeList((d: Item): HTMLElement => {
+    const li: HTMLElement = document.createElement('li');
+    const input: HTMLInputElement = document.createElement('input');
+    input.value = d.text;
+    li.appendChild(input);
+    return li;
+  });
+  l.update([{ id: 1, text: 'a' }, { id: 2, text: 'b' }, { id: 3, text: 'c' }]);
+
+  const first: HTMLInputElement = l.parent.querySelector('[data-id="1"] input') as HTMLInputElement;
+  first.focus();
+  first.setSelectionRange(1, 1);
+  assert.is(document.activeElement, first, 'focused to begin with');
+
+  // `[2,3,1]`, not a reverse: 2 and 3 are the stable run, so row 1 is the one that actually MOVES.
+  // Reversing would have left row 1 in place and the assertion would have held for the wrong reason.
+  l.update([{ id: 2, text: 'b' }, { id: 3, text: 'c' }, { id: 1, text: 'a' }]);
+
+  assert.deepEqual(l.order(), ['2', '3', '1'], 'the list did reorder');
+  assert.is(document.activeElement, first, 'and the focus is still in the row that moved');
+});
+
+test("reordering a list keeps a row scrolled where the user left it", () => {
+  // A Web Animations animation was tried here first and was a BAD signal: it is attached to the element
+  // object, so it survives a detach and the test passed without the fix. Scroll offset is layout state -
+  // it is discarded the moment the node leaves the document, which is exactly what this is about.
+  const l: List = makeList((d: Item): HTMLElement => {
+    const li: HTMLElement = document.createElement('li');
+    li.style.height = '40px';
+    li.style.overflow = 'auto';
+    const tall: HTMLElement = document.createElement('div');
+    tall.style.height = '400px';
+    tall.textContent = d.text;
+    li.appendChild(tall);
+    return li;
+  });
+  l.update([{ id: 1, text: 'a' }, { id: 2, text: 'b' }, { id: 3, text: 'c' }]);
+
+  const moved: HTMLElement = l.parent.querySelector('[data-id="1"]') as HTMLElement;
+  moved.scrollTop = 120;
+  assert.equal(moved.scrollTop, 120, 'scrolled to begin with');
+
+  l.update([{ id: 2, text: 'b' }, { id: 3, text: 'c' }, { id: 1, text: 'a' }]);
+  assert.deepEqual(l.order(), ['2', '3', '1'], 'the list did reorder');
+
+  assert.equal(moved.scrollTop, 120, 'and the row is still scrolled where the user left it');
+});

@@ -481,13 +481,39 @@ function rowSpan(row: Row): ChildNode[] {
   return out;
 }
 
+/**
+ * Reparent `node` WITHOUT tearing it down first.
+ *
+ * `insertBefore` on a node that is already in the document removes it and puts it back, and the removal
+ * throws away state the DOM never restores: focus and selection, a playing `<video>`, a running CSS
+ * animation or transition, an open `<details>`, an `<iframe>`'s entire document. A keyed list did that
+ * to every row it moved, so reordering a list silently reset whatever the user was in the middle of.
+ *
+ * `moveBefore` performs the same reparenting without the removal, and the row keeps what it had. It is
+ * feature-detected and the `try` is not decoration: it throws for a node that is not connected, or is in
+ * another document, and `insertBefore` is the right answer in both cases. A browser without it loses
+ * nothing it had before.
+ */
+function moveNode(parent: Node, node: Node, before: Node | null): void {
+  const p: Node & { moveBefore?: (n: Node, b: Node | null) => void } = parent;
+  if (p.moveBefore && node.parentNode === parent) {
+    try {
+      p.moveBefore(node, before);
+      return;
+    } catch {
+      // not movable - fall through to the ordinary path
+    }
+  }
+  parent.insertBefore(node, before);
+}
+
 /** Move a row's whole span before `before` (gathered first, since moving shifts siblings). */
 function placeRow(parent: Node, row: Row, before: Node): void {
   if (!row.end || row.end === row.node) {
-    parent.insertBefore(row.node, before);
+    moveNode(parent, row.node, before);
     return;
   }
-  for (const n of rowSpan(row)) parent.insertBefore(n, before);
+  for (const n of rowSpan(row)) moveNode(parent, n, before);
 }
 
 /**

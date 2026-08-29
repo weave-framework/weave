@@ -95,6 +95,17 @@ The const's references are not found by us — they are asked of TypeScript, whi
 matters: renaming a declaration without its references is a silent breakage, and the scaffold's own
 `inc` reads `count`. Renaming *from* the `.ts` is unchanged; `{ count: total }` is already correct there.
 
+### Reordering a list no longer resets the row it moves
+
+`insertBefore` on a node that is already in the document removes it and puts it back, and the removal
+throws away what the DOM never restores: focus and selection, a scrolled position, a playing `<video>`,
+a CSS animation, an `<iframe>`'s whole document. A keyed `@for` did that to every row it moved — so
+sorting a table while someone was typing in it silently took their cursor away.
+
+Keyed-list moves now use `moveBefore`, which reparents without the removal. Feature-detected, with the
+ordinary path kept for browsers that do not have it and for nodes that cannot be moved. Nothing changes
+for anyone; things simply stop being lost.
+
 ### Internal
 
 - `verify:size` measured the raw `tsc` emit, so doc comments counted against a budget no browser ever
