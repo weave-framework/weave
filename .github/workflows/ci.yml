@@ -222,3 +222,8 @@ jobs:
       # correct message unusable in any template long enough to matter.
       - name: A template mistake is reported at its own file and line
         run: pnpm verify:lint-location
+      # And `weave check --fix` repairs the ones with exactly one answer. The assertion is the outcome:
+      # three fixes in one file must leave it byte-identical to the correct source, which only holds if
+      # they are applied back to front.
+      - name: weave check --fix repairs what it is certain of
+        run: pnpm verify:check-fix

@@ -14,18 +14,24 @@ npm install -D @weave-framework/cli
 |---------|--------------|
 | `weave build` | Bundle the app for production. `--ssg` also prerenders every route to HTML. |
 | `weave dev` | Dev server: watch, rebuild, live-reload. |
-| `weave check` | Type-check the project, templates included. |
+| `weave check` | Type-check the project, templates included, and report template mistakes that compile clean but fail silently. `--fix` repairs the ones with exactly one right answer. |
 | `weave routes` | Regenerate the file-based route module from `routesDir`. |
 | `weave migrate` | Assisted migration of an existing Angular app into this one. Reads your source project, writes a plan, then the converted code. |
 | `weave mcp` | Start the Weave MCP server over stdio, for MCP-capable AI editors. |
 
 ```
 usage: weave <build|dev|check|routes|migrate|mcp> [entry|paths…] [--config file] [--out dir]
-             [--serve dir] [--port n] [--no-minify] [--eager] [--ssg]
+             [--serve dir] [--port n] [--no-minify] [--eager] [--ssg] [--fix]
 ```
 
 `weave --help` (or `-h`, or no command) prints the full help; `weave dev` steps to the next free port when the
 one it wants is taken; and a finished `weave build` lists what it emitted, with sizes.
+
+`weave check` also reports the template mistakes that compile clean and fail silently — a listener bound as a
+plain attribute, a misspelled DOM event or block keyword, an unknown binding prefix — each at its own line in
+the template file. They are warnings, so they do not fail the command. `weave check --fix` applies the ones
+with exactly one right answer and re-checks; a rule that could plausibly mean more than one thing never
+guesses.
 
 ## Configuration
 

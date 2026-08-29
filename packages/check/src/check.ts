@@ -21,6 +21,12 @@ export interface Diagnostic {
   code: number;
   message: string;
   category: 'error' | 'warning' | 'suggestion' | 'message';
+  /**
+   * A replacement that is certainly correct, in offsets into `file`. Present only where the rule
+   * knows exactly one right answer — never a guess. Applying several to one file must go BACK TO
+   * FRONT, or an earlier edit shifts every later offset.
+   */
+  fix?: { start: number; end: number; text: string };
 }
 
 const OPTIONS: ts.CompilerOptions = {

@@ -87,9 +87,11 @@ Static type-checking for your project: the templates — the thing a plain bundl
 ~~~bash
 weave check            # checks src/ by default
 weave check src lib    # multiple roots
+weave check --fix      # apply the fixes it is certain of, then re-check
 ~~~
 
-It exits non-zero when there are errors, so it drops straight into CI as a gate.
+It exits non-zero when there are **errors**, so it drops straight into CI as a gate. Template mistakes are
+reported as **warnings**, so adding them to a project that was green does not turn it red.
 
 ### weave routes
 
@@ -453,6 +455,20 @@ Sass is a *lazy* dependency: it's only imported the first time a `.scss`/`.sass`
 `weave check` type-checks your templates against your code — the thing a plain bundler can't do. For each component it builds a virtual TypeScript module that places every template expression against `ReturnType<typeof setup>`, then checks it all in one strict program. Diagnostics map back to the exact `.html` line and column, printed as `file:line:col - error TS<code>: message`.
 
 **Everything else under the roots is checked too.** Services, stores, helpers, generated route modules — every `.ts` that is not a component joins the same program, under the same tsconfig, so `weave check` is the whole project's gate and not only its templates'. (It used to check components alone, which meant a plain module could hold an error `tsc --noEmit` would refuse.)
+
+It also reports the mistakes that *compile clean and fail silently* — markup that produces a working build
+and a broken page. Each is framed at its own line in the template file:
+
+- `<button onclick={{ inc }}>` sets an **attribute** whose value is the function's source text. The button
+  renders; the handler never runs. Weave binds events with `on:`.
+- `on:clik` — a listener for an event nothing ever fires.
+- `@fro (t of items()) { … }` — an unrecognised block, left in the page as literal text.
+- `xyz:abc={{ x }}` — an unknown prefix, emitted as a plain attribute.
+
+`weave check --fix` repairs the ones with **exactly one** right answer — the three above — and then re-checks.
+The unknown-prefix rule offers no fix: several prefixes could have been meant, and a wrong automatic edit is
+worse than none. Fixing `@fro` often removes a type error too, since the loop variable only becomes real once
+the block is a block.
 
 It catches:
 

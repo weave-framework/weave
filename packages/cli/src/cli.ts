@@ -7,7 +7,7 @@ import { loadConfig } from './config.js';
 import type { ResolvedConfig } from './config.js';
 import { discoverCustomElements, generateEntry, generateServerEntry, type CustomElement } from './entry.js';
 import { checkProject, type Diagnostic } from '@weave-framework/check';
-import { readdirSync, statSync, type Dirent } from 'node:fs';
+import { readdirSync, readFileSync, statSync, writeFileSync, type Dirent } from 'node:fs';
 import { join } from 'node:path';
 
 function flag(args: string[], name: string): string | undefined {
@@ -83,6 +83,7 @@ options
   --port <n>             Dev server port; steps to the next free one when taken
   --serve <dir>          Dev server web root (config-less mode)
   --no-minify            Leave the build unminified
+  --fix                  Apply the fixes check is certain of, then re-check (check)
   --ssg                  Prerender every route to static HTML (build)
   --eager                Inline routes instead of code-splitting them (routes)
   -h, --help             Print this
@@ -268,7 +269,18 @@ export async function main(argv: string[]): Promise<void> {
   }
   if (cmd === 'check') {
     const roots: string[] = rest.filter((a) => !a.startsWith('-'));
-    const diags: Diagnostic[] = checkProject(roots.length ? roots : ['src']);
+    const where: string[] = roots.length ? roots : ['src'];
+    let diags: Diagnostic[] = checkProject(where);
+    if (rest.includes('--fix')) {
+      const applied: number = applyFixes(diags);
+      if (applied) {
+        console.log(`weave check --fix: repaired ${applied} mistake${applied === 1 ? '' : 's'}`);
+        // The files changed, so the earlier diagnostics describe a state that no longer exists.
+        diags = checkProject(where);
+      } else {
+        console.log('weave check --fix: nothing to repair');
+      }
+    }
     for (const d of diags) console.error(formatDiagnostic(d));
     const errors: number = diags.filter((d) => d.category === 'error').length;
     if (errors) {
@@ -313,6 +325,36 @@ export async function main(argv: string[]): Promise<void> {
 `);
   console.error(HELP);
   process.exit(1);
+}
+
+/**
+ * Apply every fix a diagnostic is certain of, and report how many landed.
+ *
+ * Per file, back to front: an earlier edit shifts every later offset. A fix overlapping one already
+ * applied is skipped rather than stacked — two rules pointing at the same span means at least one of
+ * them no longer describes the text that is actually there.
+ */
+function applyFixes(diags: Diagnostic[]): number {
+  const byFile: Map<string, NonNullable<Diagnostic['fix']>[]> = new Map();
+  for (const d of diags) {
+    if (!d.fix) continue;
+    const list: NonNullable<Diagnostic['fix']>[] = byFile.get(d.file) ?? [];
+    list.push(d.fix);
+    byFile.set(d.file, list);
+  }
+  let applied: number = 0;
+  for (const [file, fixes] of byFile) {
+    let text: string = readFileSync(file, 'utf8');
+    let lastStart: number = Number.MAX_SAFE_INTEGER;
+    for (const f of [...fixes].sort((a, b) => b.start - a.start)) {
+      if (f.end > lastStart) continue; // overlaps a fix already applied
+      text = text.slice(0, f.start) + f.text + text.slice(f.end);
+      lastStart = f.start;
+      applied++;
+    }
+    writeFileSync(file, text);
+  }
+  return applied;
 }
 
 function formatDiagnostic(d: Diagnostic): string {

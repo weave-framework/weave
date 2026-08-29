@@ -14,6 +14,41 @@
 > already left it behind — Phase E ran 94 commits without a bump, and then released as one MINOR. The public
 > promise wins; the habit is retired.)*
 
+## Unreleased
+
+### A template mistake now says WHERE, and `weave check --fix` repairs the certain ones
+
+The five template lint rules have always produced the right sentence. Three of them even computed the
+exact answer — `on:clik` knew it meant `on:click`, `onclick={{ … }}` knew it meant `on:click`, `@fro`
+knew it meant `@for` — and that answer only ever reached a human, as prose, with no position attached.
+
+- **Warnings carry a position.** A finding is now framed at the line it is on, in the **template** file
+  it is in — with the source line underlined — instead of naming the component module (and naming the
+  `.ts`, which is not even the file the mistake is in). In a 200-line template the old message said only
+  "this component".
+- **`weave check` reports them at all.** It used to type-check the template and say nothing about markup
+  that compiles clean and fails silently, so the checker and the build disagreed about whether the same
+  file was fine. They are **warnings**: `weave check` exits non-zero on errors only, so a pipeline that
+  was green stays green.
+- **`weave check --fix`** applies every fix a rule is certain of, then re-checks. A rule with more than
+  one plausible answer (an unknown binding prefix) offers no fix — a wrong auto-fix is worse than none.
+
+Measured on real code: **0 new warnings** across the docs site's 446 templates and the demo app — the
+rules stay as narrow as they were. On a deliberately broken template, `--fix` turned three warnings and
+one type error into a clean check in a single run (repairing `@fro` → `@for` makes the loop variable
+real, so the type error it caused disappears with it).
+
+New API, additive: `lintTemplateFindings()` returns `{ message, offset?, fix? }` and `compileComponent`
+returns `findings` alongside `warnings`, which stays its exact string projection. `TextNode.offset` and
+`EventAttr.nameOffset` are new optional AST fields; a text run coalesced with another (a comment between
+them) **clears** its offset rather than keeping one that no longer maps to the source.
+
+### Internal
+
+- `verify:size` measured the raw `tsc` emit, so doc comments counted against a budget no browser ever
+  downloads — 70% of the number was prose. It now minifies before gzipping and every budget is
+  re-baselined: the SPA core reads **6.6 KB**, not 22.1 KB.
+
 ## 3.1.0
 
 *A first-run audit — scaffold an app from the published package, follow the docs, then make the mistakes a

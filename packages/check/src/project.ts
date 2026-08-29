@@ -13,6 +13,9 @@ import {
   classifyTemplate,
   faithfulTemplate,
   parseSfc,
+  parseSfcLoc,
+  parseTemplate,
+  lintTemplateFindings,
   extensionBase,
   defaultImportSpec,
   hasPatchDeclaration,
@@ -21,6 +24,8 @@ import {
   type ExtractedSources,
   type ComponentSource,
   type PatchOp,
+  type TemplateNode,
+  type LintFinding,
 } from '@weave-framework/compiler';
 import { buildVirtualSfc, buildVirtualSeparate, buildVirtualPatch, type Virtual } from './emit.js';
 // A component tag with no import resolves by convention — the same rule the build loader applies, so
@@ -67,7 +72,48 @@ function parseDiagnostic(file: string, source: string, e: ParseError): Diagnosti
 }
 
 /** Run a virtual builder; a `ParseError` becomes a diagnostic (any other error still throws). */
-function tryBuild(build: () => Virtual, file: string, source: string, out: Virtual[], diags: Diagnostic[]): void {
+/**
+ * The template lint as `weave check` diagnostics.
+ *
+ * These used to exist only during a build: `weave check` type-checked the template and said nothing
+ * about markup that compiles clean and fails silently, so the checker and the build disagreed about
+ * whether the same file was fine. They are WARNINGS — `weave check` exits non-zero on errors only, so
+ * a pipeline that was green stays green — and each carries a `fix` when the rule knows the one answer.
+ *
+ * `template` is offset-faithful to `file` in every case: a sibling `.html` is the file, an inline
+ * template is blanked into its `.ts` at the real offsets, and a `.weave` gets its script/style regions
+ * blanked in place. Linting a raw `.weave` instead would read its `<script>` body as markup.
+ */
+function templateWarnings(file: string, template: string): Diagnostic[] {
+  let nodes: TemplateNode[];
+  try {
+    nodes = parseTemplate(template);
+  } catch {
+    return []; // unparseable — the parse error is already reported, and there is nothing to lint
+  }
+  return lintTemplateFindings(nodes).map((f: LintFinding): Diagnostic => {
+    const at: { line: number; col: number } =
+      f.offset === undefined ? { line: 1, col: 1 } : offsetToLineCol(template, f.offset);
+    return {
+      file,
+      line: at.line,
+      col: at.col,
+      code: 0,
+      message: f.message,
+      category: 'warning',
+      ...(f.fix ? { fix: f.fix } : {}),
+    };
+  });
+}
+
+function tryBuild(
+  build: () => Virtual,
+  file: string,
+  source: string,
+  out: Virtual[],
+  diags: Diagnostic[],
+  template: string = source
+): void {
   try {
     out.push(absolutize(build()));
   } catch (e) {
@@ -77,6 +123,7 @@ function tryBuild(build: () => Virtual, file: string, source: string, out: Virtu
     }
     throw e;
   }
+  diags.push(...templateWarnings(file, template));
 }
 
 function collect(path: string, out: Virtual[], diags: Diagnostic[], patchers: Patcher[], plain: string[]): void {
@@ -93,7 +140,7 @@ function collect(path: string, out: Virtual[], diags: Diagnostic[], patchers: Pa
     // A `.weave` template parses `parseSfcLoc(source).template`, which blanks the script/style
     // regions in place — so offsets map 1:1 back to the raw `.weave` source.
     const source: string = readFileSync(path, 'utf8');
-    tryBuild(() => buildVirtualSfc(path, source, resolveChildModule), path, source, out, diags);
+    tryBuild(() => buildVirtualSfc(path, source, resolveChildModule), path, source, out, diags, parseSfcLoc(source).template);
   } else if (path.endsWith('.ts') && !path.endsWith('.d.ts')) {
     if (!collectTs(path, out, diags, patchers)) plain.push(resolve(path));
   }
