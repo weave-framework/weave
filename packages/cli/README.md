@@ -14,7 +14,7 @@ npm install -D @weave-framework/cli
 |---------|--------------|
 | `weave build` | Bundle the app for production. `--ssg` also prerenders every route to HTML. |
 | `weave dev` | Dev server: watch, rebuild, live-reload. |
-| `weave check` | Type-check the project, templates included, and report template mistakes that compile clean but fail silently. `--fix` repairs the ones with exactly one right answer. |
+| `weave check` | Type-check the project, templates included, and report template mistakes that compile clean but fail silently. `--fix` repairs the ones with exactly one right answer; `--impact <file>` lists what renders a component. |
 | `weave routes` | Regenerate the file-based route module from `routesDir`. |
 | `weave migrate` | Assisted migration of an existing Angular app into this one. Reads your source project, writes a plan, then the converted code. |
 | `weave mcp` | Start the Weave MCP server over stdio, for MCP-capable AI editors. |

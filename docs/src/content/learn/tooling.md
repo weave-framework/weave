@@ -469,6 +469,28 @@ Your editor shows the same warnings as you type, underlined where they are, with
 lightbulb ("Replace `clik` with `click`"). The editor and `weave check` run the same code, so they
 never disagree about the same file.
 
+### What will this change break?
+
+~~~bash
+weave check --impact src/lib/code-block/code-block.ts
+~~~
+
+~~~
+src/lib/code-block/code-block.ts is rendered by 2 files
+
+  directly (1):
+    src/lib/api-page/api-page.ts
+
+  and reached through those (1):
+    src/pages/reference/[pkg].ts
+~~~
+
+Read from the composition graph, not from a search — a grep finds a tag's *name*, which is not the same as
+the components that resolve to this file. Direct and transitive are kept apart because they mean different
+things: a direct user is a file you will probably read, a transitive one is a screen that can change under
+you without its own file being touched. It does not type-check, since the question is usually asked while
+the tree is still red.
+
 ### Renaming a binding renames the code behind it
 
 Rename `{{ count() }}` in a template (F2) and the `const count` in the sibling `.ts` follows, along with

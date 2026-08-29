@@ -55,6 +55,7 @@
     "verify:lint-location": "node packages/cli/test/lint-location.smoke.mjs",
     "verify:check-fix": "node packages/cli/test/check-fix.smoke.mjs",
     "verify:grow-setup": "node packages/cli/test/grow-setup.smoke.mjs",
+    "verify:impact": "node packages/cli/test/impact.smoke.mjs",
     "verify:no-private": "node tools/verify-no-private-paths.mjs",
     "verify:authorship": "node tools/verify-authorship.mjs",
     "verify:template-ranges": "node tools/verify-template-ranges.mjs"

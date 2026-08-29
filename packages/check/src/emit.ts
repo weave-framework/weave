@@ -178,7 +178,7 @@ function childImports(
 }
 
 /** Every capitalized tag in a template, deduplicated — a component tag is one that starts uppercase. */
-function composedTags(nodes: TemplateNode[]): string[] {
+export function composedTags(nodes: TemplateNode[]): string[] {
   const seen: Set<string> = new Set();
   const visit = (list: unknown): void => {
     if (!Array.isArray(list)) return;

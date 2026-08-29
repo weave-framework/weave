@@ -6,7 +6,7 @@ import { generateRoutes, staticRoutePaths } from './routes.js';
 import { loadConfig } from './config.js';
 import type { ResolvedConfig } from './config.js';
 import { discoverCustomElements, generateEntry, generateServerEntry, type CustomElement } from './entry.js';
-import { checkProject, type Diagnostic } from '@weave-framework/check';
+import { checkProject, impactOf, type Diagnostic } from '@weave-framework/check';
 import { readdirSync, readFileSync, statSync, writeFileSync, type Dirent } from 'node:fs';
 import { join } from 'node:path';
 
@@ -84,6 +84,7 @@ options
   --serve <dir>          Dev server web root (config-less mode)
   --no-minify            Leave the build unminified
   --fix                  Apply the fixes check is certain of, then re-check (check)
+  --impact <file>        List what renders this component, directly and transitively (check)
   --ssg                  Prerender every route to static HTML (build)
   --eager                Inline routes instead of code-splitting them (routes)
   -h, --help             Print this
@@ -268,8 +269,35 @@ export async function main(argv: string[]): Promise<void> {
     return;
   }
   if (cmd === 'check') {
-    const roots: string[] = rest.filter((a) => !a.startsWith('-'));
+    const flagged: number = rest.indexOf('--impact');
+    const roots: string[] = rest.filter((a, i) => !a.startsWith('-') && i !== flagged + 1);
     const where: string[] = roots.length ? roots : ['src'];
+    if (flagged !== -1) {
+      const target: string | undefined = rest[flagged + 1];
+      if (!target) {
+        console.error('weave check --impact needs a file');
+        process.exit(1);
+      }
+      // Asked BEFORE editing, so it reads the graph rather than type-checking anything.
+      const { direct, transitive } = impactOf(where, target);
+      const total: number = direct.length + transitive.length;
+      if (!total) {
+        console.log(`nothing under ${where.join(', ')} renders ${target}`);
+        return;
+      }
+      console.log(`${target} is rendered by ${total} file${total === 1 ? '' : 's'}
+`);
+      if (direct.length) {
+        console.log(`  directly (${direct.length}):`);
+        for (const f of direct) console.log(`    ${f}`);
+      }
+      if (transitive.length) {
+        console.log(`
+  and reached through those (${transitive.length}):`);
+        for (const f of transitive) console.log(`    ${f}`);
+      }
+      return;
+    }
     let diags: Diagnostic[] = checkProject(where);
     if (rest.includes('--fix')) {
       const applied: number = applyFixes(diags);

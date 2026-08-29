@@ -232,3 +232,8 @@ jobs:
       # a return type that is not a type literal must not be rewritten.
       - name: the template grows the .ts, and declines where it is not certain
         run: pnpm verify:grow-setup
+      # And --impact answers "what will this change break" from the composition graph. Both resolution
+      # paths are covered: an explicit import (how a real app mostly does it) and the no-import
+      # convention. Reading only the convention found ONE user across the whole docs site.
+      - name: --impact reports who renders a component
+        run: pnpm verify:impact

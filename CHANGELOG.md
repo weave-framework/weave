@@ -106,6 +106,26 @@ Keyed-list moves now use `moveBefore`, which reparents without the removal. Feat
 ordinary path kept for browsers that do not have it and for nodes that cannot be moved. Nothing changes
 for anyone; things simply stop being lost.
 
+### `weave check --impact <file>` — what renders this component
+
+The question asked before editing a component, answered from the composition graph rather than a search:
+grep finds a tag's *name*, which is not the same as the components that actually resolve to this file.
+
+```
+src/lib/code-block/code-block.ts is rendered by 2 files
+
+  directly (1):
+    src/lib/api-page/api-page.ts
+
+  and reached through those (1):
+    src/pages/reference/[pkg].ts
+```
+
+Direct and transitive are separated because they mean different things: a direct user is a file you will
+probably read; a transitive one is a screen that can change under you without its own file being touched.
+It resolves children both ways — by explicit `import` and by the no-import convention — and it answers
+without type-checking, since the question is usually asked while the tree is red.
+
 ### Internal
 
 - `verify:size` measured the raw `tsc` emit, so doc comments counted against a budget no browser ever
