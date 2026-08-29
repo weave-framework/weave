@@ -37,6 +37,7 @@ tools/.verify-impact-bundle.mjs
 tools/.verify-impact-app-*/
 tools/.verify-devtools-bundle.mjs
 tools/.verify-devtools-app-*/
+tools/.verify-check-outside-*/
 tools/.verify-state-bundle.mjs
 tools/.verify-state-app-*/
 tools/.verify-merge-bundle.mjs

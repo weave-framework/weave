@@ -99,7 +99,11 @@ function optionsFor(searchFrom: string): ts.CompilerOptions {
  * error in a service or a store passed `weave check` while `tsc --noEmit` failed on it. Both halves of
  * a project are checked together, and by the same options.
  */
-export function runCheck(virtuals: Virtual[], plain: string[] = []): Diagnostic[] {
+export function runCheck(
+  virtuals: Virtual[],
+  plain: string[] = [],
+  dependency?: (tsPath: string) => Virtual | undefined
+): Diagnostic[] {
   const byPath: Map<string, Virtual> = new Map(virtuals.map((v) => [norm(v.path), v]));
   // Search from the first checked file's directory: everything checked belongs to one project.
   const searchFrom: string | undefined = virtuals[0]?.path ?? plain[0];
@@ -110,12 +114,30 @@ export function runCheck(virtuals: Virtual[], plain: string[] = []): Diagnostic[
   const readFile: ts.CompilerHost['readFile'] = host.readFile.bind(host);
   const fileExists: ts.CompilerHost['fileExists'] = host.fileExists.bind(host);
 
+  // A component imported from OUTSIDE the checked roots gets its virtual built on demand, once, and
+  // cached in the same table. Its default export is synthesized by the compiler, so the file on disk
+  // has none and every such import would otherwise be an error on a perfectly correct project.
+  const declined: Set<string> = new Set<string>();
+  const lookup = (fileName: string): Virtual | undefined => {
+    const key: string = norm(fileName);
+    const known: Virtual | undefined = byPath.get(key);
+    if (known) return known;
+    if (!dependency || declined.has(key) || !key.endsWith('.ts') || key.endsWith('.d.ts')) return undefined;
+    const built: Virtual | undefined = dependency(fileName);
+    if (!built) {
+      declined.add(key);
+      return undefined;
+    }
+    byPath.set(key, built);
+    return built;
+  };
+
   host.getSourceFile = (fileName, languageVersion, onError, shouldCreate) => {
-    const v: Virtual | undefined = byPath.get(norm(fileName));
+    const v: Virtual | undefined = lookup(fileName);
     if (v) return ts.createSourceFile(fileName, v.text, languageVersion, true);
     return getSourceFile(fileName, languageVersion, onError, shouldCreate);
   };
-  host.readFile = (fileName) => byPath.get(norm(fileName))?.text ?? readFile(fileName);
+  host.readFile = (fileName) => lookup(fileName)?.text ?? readFile(fileName);
   host.fileExists = (fileName) => byPath.has(norm(fileName)) || fileExists(fileName);
 
   const program: ts.Program = ts.createProgram(

@@ -16,6 +16,19 @@
 
 ## Unreleased
 
+### `weave check` stops erroring on components it did not compile
+
+A Weave component's default export is synthesized by the compiler, so the `.ts` on disk really has
+none. The checker built virtuals only for components under the roots it was given, so importing a
+component from anywhere else — a shared package, a sibling library, a directory the command was not
+pointed at — was reported as **`has no default export`**. Pointed at this repo's own docs site, that
+was 396 errors on correct code.
+
+Such a component is now compiled on demand as a dependency. Nothing is reported *from* it (it is not
+a checked file); what it contributes is its export and its prop types — so a wrong prop handed to a
+component across a package boundary is now caught, where before the import itself was the only thing
+the checker had to say.
+
 ### Any screen, in any state, in one second
 
 Getting a screen into the state you need to look at meant driving the app there by hand, every time. The

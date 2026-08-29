@@ -48,8 +48,32 @@ export function checkProject(roots: string[]): Diagnostic[] {
   // Patch extensions come LAST: each needs to know whether its base is among the checked files, because
   // that is what decides whether its context can be typed off the base or has to degrade.
   for (const p of patchers) buildPatcher(p, virtuals, parseDiags);
-  const checked: Diagnostic[] = virtuals.length || plain.length ? runCheck(virtuals, plain) : [];
+  const checked: Diagnostic[] = virtuals.length || plain.length ? runCheck(virtuals, plain, dependencyVirtual) : [];
   return [...parseDiags, ...checked];
+}
+
+/**
+ * Build a virtual for a component that is NOT under the checked roots — one imported from a shared
+ * package, a sibling library, or simply a directory the command was not pointed at.
+ *
+ * Without this, every such import is an error: a component's default export is SYNTHESIZED by the
+ * compiler, so the raw `.ts` on disk really does not have one, and TypeScript is right to say so. The
+ * effect was a wall of `has no default export` on a correct project — 396 of them on this repo's own
+ * docs site — which is the fastest way to make someone stop running the checker.
+ *
+ * Nothing is reported FROM these files: they are dependencies, not checked files. What they contribute
+ * is the export and the prop types, so a child component's props are still type-checked across a
+ * package boundary. Anything that fails to build is simply not a component, and the on-disk file is
+ * used as it always was.
+ */
+function dependencyVirtual(tsPath: string): Virtual | undefined {
+  const out: Virtual[] = [];
+  try {
+    if (!collectTs(tsPath, out, [], [])) return undefined;
+  } catch {
+    return undefined; // an unreadable or unparsable dependency is not this command's business
+  }
+  return out[0];
 }
 
 /** A `#3` extension found during the walk, held until every other virtual exists. */
