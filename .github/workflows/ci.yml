@@ -213,3 +213,7 @@ jobs:
       # white page, and nothing versioned the bundle a CDN was holding.
       - name: Sub-path deploys resolve, and assets carry a content version
         run: pnpm verify:base-path
+      # The other half of `base`: a real routed app, built and served from a sub-path in a real browser,
+      # navigating and surviving a deep-link refresh through the emitted 404.html.
+      - name: A routed app navigates under a sub-path
+        run: pnpm verify:base-router
