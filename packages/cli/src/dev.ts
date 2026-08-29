@@ -26,7 +26,7 @@ import {
 } from 'node:http';
 import { request as httpsRequest } from 'node:https';
 import type { AddressInfo } from 'node:net';
-import { mkdir, writeFile, readFile } from 'node:fs/promises';
+import { mkdir, writeFile, readFile, readdir } from 'node:fs/promises';
 import { join, extname, relative, sep, isAbsolute } from 'node:path';
 import { weave, type WeaveState } from './plugin.js';
 import type { ProxyTable, ProxyRule } from './config.js';
@@ -57,6 +57,11 @@ export interface DevConfig {
   base?: string;
   /** Dev proxy: forward matching request paths to a backend so API calls stay same-origin. */
   proxy?: ProxyTable;
+  /**
+   * Where named app states are kept (`.weave/states` under the project). Set when the dev server
+   * should answer `/__weave_state` — the devtools panel saves to it and reads it back.
+   */
+  statesDir?: string;
 }
 
 export interface DevServer {
@@ -66,6 +71,8 @@ export interface DevServer {
 
 /** The live-reload SSE endpoint Weave's dev server exposes (and the injected client connects to). */
 const RELOAD_PATH: string = '/__weave_reload';
+/** Named app states: `GET` the list, `GET /<name>` one, `PUT /<name>` to save. */
+const STATE_PATH: string = '/__weave_state';
 
 const MIME: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
@@ -276,6 +283,60 @@ async function devInMemory(config: DevConfig): Promise<DevServer> {
   return { ctx, url: `http://127.0.0.1:${port}` };
 }
 
+/**
+ * Serve and store named app states under `dir`.
+ *
+ * `name` arrives from the browser, so it is validated rather than sanitised: anything that is not a
+ * plain word is refused outright. Rewriting a suspicious name into a safe one is how a path traversal
+ * gets through in the end.
+ */
+async function handleState(req: IncomingMessage, res: ServerResponse, dir: string, name: string): Promise<void> {
+  const decoded: string = decodeURIComponent(name);
+  if (decoded === '') {
+    let names: string[] = [];
+    try {
+      names = (await readdir(dir)).filter((f: string) => f.endsWith('.json')).map((f: string) => f.slice(0, -5));
+    } catch {
+      /* nothing saved yet */
+    }
+    res.writeHead(200, { 'content-type': 'application/json' });
+    res.end(JSON.stringify(names.sort()));
+    return;
+  }
+  if (!/^[\w-]{1,64}$/.test(decoded)) {
+    res.writeHead(400, { 'content-type': 'text/plain; charset=utf-8' });
+    res.end('A state name is letters, digits, dashes and underscores.');
+    return;
+  }
+  const file: string = join(dir, decoded + '.json');
+  if (req.method === 'PUT') {
+    const chunks: Buffer[] = [];
+    for await (const chunk of req) chunks.push(chunk as Buffer);
+    try {
+      const body: string = Buffer.concat(chunks).toString('utf8');
+      JSON.parse(body); // refuse to store something that is not the wire format
+      await mkdir(dir, { recursive: true });
+      await writeFile(file, body);
+    } catch (err) {
+      res.writeHead(400, { 'content-type': 'text/plain; charset=utf-8' });
+      res.end(`Could not save the state: ${(err as Error).message}`);
+      return;
+    }
+    console.log(`weave dev: saved state \`${decoded}\` → ${file}`);
+    res.writeHead(204);
+    res.end();
+    return;
+  }
+  try {
+    const body: Buffer = await readFile(file);
+    res.writeHead(200, { 'content-type': 'application/json' });
+    res.end(body);
+  } catch {
+    res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' });
+    res.end('No state saved under that name.');
+  }
+}
+
 async function handleRequest(
   req: IncomingMessage,
   res: ServerResponse,
@@ -315,6 +376,13 @@ async function handleRequest(
     req.on('close', (): void => {
       clients.delete(res);
     });
+    return;
+  }
+
+  // Named app states (`weave dev --devtools` / `--state`). Confined to `statesDir`: a name is a bare
+  // file name, never a path, so nothing here can read or write outside that one directory.
+  if (config.statesDir && (url === STATE_PATH || url.startsWith(STATE_PATH + '/'))) {
+    await handleState(req, res, config.statesDir, url.slice(STATE_PATH.length).replace(/^\//, ''));
     return;
   }
 

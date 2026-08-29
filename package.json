@@ -58,6 +58,7 @@
     "verify:impact": "node packages/cli/test/impact.smoke.mjs",
     "verify:devtools-flag": "node packages/cli/test/devtools-flag.smoke.mjs",
     "verify:merge": "node packages/cli/test/merge.smoke.mjs",
+    "verify:dev-state": "node packages/cli/test/dev-state.smoke.mjs",
     "verify:no-private": "node tools/verify-no-private-paths.mjs",
     "verify:authorship": "node tools/verify-authorship.mjs",
     "verify:template-ranges": "node tools/verify-template-ranges.mjs"

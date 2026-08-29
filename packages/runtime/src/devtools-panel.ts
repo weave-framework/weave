@@ -26,9 +26,10 @@ import {
   type DevTrigger,
   type DevOwnerNode,
 } from './devtools.js';
+import type { StatesAdapter } from './dev-states.js';
 
-/** Which view the panel shows. */
-type PanelView = 'nodes' | 'trace' | 'tree';
+/** Which view the panel shows. `states` appears only when an adapter is supplied. */
+type PanelView = 'nodes' | 'trace' | 'tree' | 'states';
 
 /** Options for {@link mountDevtoolsPanel} — where to dock the floating panel and which container to mount it into. */
 export interface DevtoolsPanelOptions {
@@ -36,6 +37,12 @@ export interface DevtoolsPanelOptions {
   position?: 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
   /** Container to mount into. Default `document.body`. */
   target?: HTMLElement;
+  /**
+   * Saving and re-applying named app states. Supply it (`weave dev --devtools` supplies the dev
+   * server's) and the panel grows a **States** tab; without it there is no tab, because there is
+   * nowhere to put a state.
+   */
+  states?: StatesAdapter;
 }
 
 const KIND_COLOR: Record<DevKind, string> = {
@@ -144,6 +151,86 @@ function renderTraceView(list: HTMLDivElement, events: DevTrigger[], q: string):
 }
 
 /** The "Tree" view: nodes nested under the component/owner scope hierarchy. */
+/**
+ * The **States** tab: name what is on screen right now and save it, or put a saved one back.
+ *
+ * Rendered imperatively and refreshed by bumping the panel's version signal, because the list lives
+ * on the dev server rather than in the reactive graph — there is nothing here for an effect to track.
+ */
+function renderStatesView(list: HTMLDivElement, states: StatesAdapter, refresh: () => void): void {
+  const bar: HTMLDivElement = document.createElement('div');
+  bar.style.cssText = 'display:flex;gap:6px;padding:4px 10px 8px';
+  const name: HTMLInputElement = document.createElement('input');
+  name.placeholder = 'name this state…';
+  name.setAttribute('aria-label', 'Name for the state to save');
+  name.setAttribute('data-weave-devtools-state-name', '');
+  name.style.cssText =
+    'flex:1;min-width:0;background:#010409;color:inherit;border:1px solid #30363d;' +
+    'border-radius:5px;padding:3px 6px;font:inherit';
+  const save: HTMLButtonElement = document.createElement('button');
+  save.type = 'button';
+  save.textContent = 'Save';
+  save.setAttribute('data-weave-devtools-state-save', '');
+  save.style.cssText =
+    'flex:none;background:#010409;color:#e6edf3;border:1px solid #30363d;border-radius:5px;' +
+    'padding:2px 10px;font:inherit;cursor:pointer';
+  const note: HTMLDivElement = document.createElement('div');
+  note.style.cssText = 'padding:0 10px 6px;color:#8b949e';
+  note.setAttribute('data-weave-devtools-state-note', '');
+  save.addEventListener('click', () => {
+    const n: string = name.value.trim();
+    if (!n) {
+      note.textContent = 'Give it a name first.';
+      return;
+    }
+    note.textContent = `Saving ${n}…`;
+    states.save(n).then(
+      () => {
+        name.value = '';
+        refresh();
+      },
+      (err: Error) => void (note.textContent = err.message),
+    );
+  });
+  bar.append(name, save);
+  list.append(bar, note);
+
+  const rows: HTMLDivElement = document.createElement('div');
+  list.appendChild(rows);
+  states.list().then((names: string[]) => {
+    rows.textContent = '';
+    if (!names.length) {
+      const empty: HTMLDivElement = document.createElement('div');
+      empty.style.cssText = 'padding:2px 10px;color:#8b949e';
+      empty.textContent = 'Nothing saved yet — get the app where you want it, then save.';
+      rows.appendChild(empty);
+      return;
+    }
+    for (const n of names) {
+      const row: HTMLDivElement = document.createElement('div');
+      row.style.cssText = 'display:flex;gap:6px;align-items:baseline;padding:2px 10px';
+      const label: HTMLSpanElement = document.createElement('span');
+      label.textContent = n;
+      label.style.cssText = 'flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis';
+      const apply: HTMLButtonElement = document.createElement('button');
+      apply.type = 'button';
+      apply.textContent = 'Apply';
+      apply.setAttribute('data-weave-devtools-state-apply', n);
+      apply.style.cssText =
+        'flex:none;background:#010409;color:#7ee787;border:1px solid #30363d;border-radius:5px;' +
+        'padding:1px 8px;font:inherit;cursor:pointer';
+      apply.addEventListener('click', () => {
+        states.apply(n).then(
+          (count: number) => void (note.textContent = `${n} → ${count} signal${count === 1 ? '' : 's'}`),
+          (err: Error) => void (note.textContent = err.message),
+        );
+      });
+      row.append(label, apply);
+      rows.appendChild(row);
+    }
+  });
+}
+
 function renderTreeView(list: HTMLDivElement, roots: DevOwnerNode[], q: string): void {
   let painted: number = 0;
   const paintScope = (scope: DevOwnerNode, depth: number): void => {
@@ -223,12 +310,13 @@ export function mountDevtoolsPanel(options: DevtoolsPanelOptions = {}): () => vo
   // Tab bar — Nodes / Trace / Tree.
   const tabs: HTMLDivElement = document.createElement('div');
   tabs.style.cssText = 'display:flex;gap:4px;padding:6px 10px;border-bottom:1px solid #30363d';
-  const TAB_LABELS: Record<PanelView, string> = { nodes: 'Nodes', trace: 'Trace', tree: 'Tree' };
+  const TAB_LABELS: Partial<Record<PanelView, string>> = { nodes: 'Nodes', trace: 'Trace', tree: 'Tree' };
+  if (options.states) TAB_LABELS.states = 'States';
   const tabButtons: Record<PanelView, HTMLButtonElement> = {} as Record<PanelView, HTMLButtonElement>;
   (Object.keys(TAB_LABELS) as PanelView[]).forEach((v) => {
     const b: HTMLButtonElement = document.createElement('button');
     b.type = 'button';
-    b.textContent = TAB_LABELS[v];
+    b.textContent = TAB_LABELS[v] as string;
     b.setAttribute('data-weave-devtools-tab', v);
     b.style.cssText =
       'flex:1;background:#010409;color:#8b949e;border:1px solid #30363d;border-radius:5px;' +
@@ -272,6 +360,9 @@ export function mountDevtoolsPanel(options: DevtoolsPanelOptions = {}): () => vo
     } else if (v === 'tree') {
       title.textContent = `Weave DevTools · tree`;
       renderTreeView(list, inspectTree(), q);
+    } else if (v === 'states' && options.states) {
+      title.textContent = `Weave DevTools · states`;
+      renderStatesView(list, options.states, () => version.set(version.peek() + 1));
     } else {
       const graph: { nodes: DevSnapshot[]; edges: { from: number; to: number }[] } = inspectGraph();
       const shown: number = graph.nodes.filter((n) => !q || n.name.toLowerCase().includes(q)).length;

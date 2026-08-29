@@ -246,3 +246,8 @@ jobs:
       # driven one is allowed to merge, or the gate would be proving nothing about git.
       - name: templates merge by structure
         run: pnpm verify:merge
+      # Driven by clicking, saved from the panel, then reopened by a SECOND server with nobody
+      # clicking. The control (no flag, still 41) is what stops it passing for a fixture that
+      # simply started in the saved state.
+      - name: a named state is saved and reopened
+        run: pnpm verify:dev-state

@@ -31,6 +31,8 @@ export interface DevNode {
   name: string;
   kind: DevKind;
   read?: () => unknown;
+  /** Set the node's value — signals only. What makes a captured state applyable again. */
+  write?: (value: unknown) => void;
   /** The ownership scope this node was created in (for the component/owner tree). */
   owner?: DevOwner | null;
 }
@@ -89,11 +91,12 @@ export function registerDevNode(
   name: string | undefined,
   read?: () => unknown,
   node?: object,
-  owner?: DevOwner | null
+  owner?: DevOwner | null,
+  write?: (value: unknown) => void
 ): () => void {
   if (!enabled || !name) return noop;
   const id: number = nextId++;
-  registry.set(id, { id, name, kind, read, owner });
+  registry.set(id, { id, name, kind, read, owner, write });
   if (node) {
     internalNodes.set(id, node);
     nodeToId.set(node, id);
@@ -132,6 +135,45 @@ export function inspect(): DevSnapshot[] {
     out.push(row);
   }
   return out;
+}
+
+/**
+ * Every named signal's current value, by name — the state of the app as the author named it.
+ *
+ * Deliberately not "the whole state": what is captured is exactly what was given a name, which is the
+ * same rule the panel already shows. Nothing is inferred, nothing is walked, and a signal nobody named
+ * is nobody's business. A `computed` is left out because it is not state — it is derived, and setting
+ * its sources reproduces it.
+ */
+export function captureState(): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const node of registry.values()) {
+    if (node.kind !== 'signal' || !node.read) continue;
+    // A name registered twice is the app's own ambiguity; the first one wins so a capture is stable.
+    if (node.name in out) continue;
+    try {
+      out[node.name] = node.read();
+    } catch {
+      /* a node that throws on read is not state worth capturing */
+    }
+  }
+  return out;
+}
+
+/**
+ * Set every named signal that `state` mentions, and report how many were actually set. Names the app
+ * no longer has are skipped rather than being an error: a state saved last week is still worth most of
+ * its value after a rename, and the count is what tells you some of it went missing.
+ */
+export function applyState(state: Record<string, unknown>): number {
+  let applied: number = 0;
+  for (const node of registry.values()) {
+    if (node.kind !== 'signal' || !node.write) continue;
+    if (!Object.prototype.hasOwnProperty.call(state, node.name)) continue;
+    node.write(state[node.name]);
+    applied++;
+  }
+  return applied;
 }
 
 /** Number of registered nodes (mostly for tests / a panel header). */

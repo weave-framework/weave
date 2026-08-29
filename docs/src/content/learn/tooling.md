@@ -657,6 +657,40 @@ The panel updates live with no polling (it reads the graph inside an effect), fi
 
 For programmatic access: `inspect()` snapshots all named nodes, `inspectGraph()` returns nodes **plus edges**, `inspectTrace(limit?)` / `traceFor(id)` read the trigger-trace ring-buffer (bounded via `setTraceLimit`; `clearTrace()` empties it), and `inspectTree()` returns the owner hierarchy. Gate the calls behind a dev flag (e.g. `import.meta.env.DEV`) so nothing ships to production.
 
+## Any screen, in any state, in one second
+
+Getting a screen into the state you actually need to look at — no rows, ten thousand rows, the request
+failed, the document already sent — normally means driving the app there by hand every time, or standing
+up fake data to do it for you. Weave state is a graph of **named** signals that is not fused to the DOM,
+so a state can be captured from a real run and set back.
+
+With `weave dev --devtools`, the panel has a **States** tab: get the app where you want it, give the
+state a name, press **Save**. It lands in `.weave/states/<name>.json` — plain JSON, so commit it and the
+whole team has that screen.
+
+~~~bash
+weave dev --state empty     # open the app already in that state
+~~~
+
+**Apply** in the panel does the same thing live, without a reload, which is the fast way to flip between
+states while you work on the screen.
+
+What is captured is exactly the signals you **named**:
+
+~~~ts
+const rows = signal<Row[]>([], { name: 'rows' });   // in the state
+const draft = signal('');                            // not — it has no name
+~~~
+
+Nothing is predicted and nothing is inferred. A `computed` is not saved either, because it is not state —
+setting its sources reproduces it. Values travel through Weave's own serialization, so a `Date`, a `Map`
+or a `Set` in a signal survives the round trip. Names the app no longer has are skipped when a state is
+applied, and the panel tells you how many signals it actually set — a state saved before a rename is
+still worth most of its value.
+
+All of it is dev-only: `--devtools` and `--state` exist on `weave dev`, and a production build has no
+part of it.
+
 ## Merging templates without inventing conflicts
 
 Two people work on one template: one wires a handler onto a button, the other rewords its label. Git
@@ -702,7 +736,7 @@ A file the template parser cannot read — a page with a `<!DOCTYPE>`, say — i
 Equivalently, `weave mcp` starts the same server. The tools are `weave_compile_template` (validate markup → real compiler errors), `weave_check` (project diagnostics), `weave_routes` (file-based route tree), and `weave_scaffold_component` (generate a component's files — returned, never written without you).
 
 :::callout info "What you just learned"
-One `weave` CLI does it all — once `@weave-framework/cli` is a dev dependency you run it as `weave <cmd>` (via `npm run`/`npx`). The commands are `dev` (watch + live-reload), `build` (static `dist/`, plus `--ssg` prerendering), `check` (template + child-prop type-checking), `routes` (file-based route gen), `merge` (a git merge driver for templates), and `mcp` (the AI-editor server). The big idea: a `weave.config.ts` switches `dev`/`build` into the full config-driven pipeline, while no config drops you into a bare legacy flag-driven one — and `dev` behaves quite differently between them (in-memory server vs esbuild's serve, port from config vs `--port`). Flags like `--config`, `--out`, `--serve`, `--port`, `--no-minify`, and `--eager` each belong to a specific command and pipeline. `styleLang` really compiles `css`/`scss`/`sass` differently, and editor support is a shared Volar server behind a VS Code extension and a WebStorm/LSP4IJ plugin.
+One `weave` CLI does it all — once `@weave-framework/cli` is a dev dependency you run it as `weave <cmd>` (via `npm run`/`npx`). The commands are `dev` (watch + live-reload), `build` (static `dist/`, plus `--ssg` prerendering), `check` (template + child-prop type-checking), `routes` (file-based route gen), `merge` (a git merge driver for templates), and `mcp` (the AI-editor server). `dev` also takes `--devtools` (the reactive-graph panel) and `--state <name>` (open the app in a state you saved from it). The big idea: a `weave.config.ts` switches `dev`/`build` into the full config-driven pipeline, while no config drops you into a bare legacy flag-driven one — and `dev` behaves quite differently between them (in-memory server vs esbuild's serve, port from config vs `--port`). Flags like `--config`, `--out`, `--serve`, `--port`, `--no-minify`, and `--eager` each belong to a specific command and pipeline. `styleLang` really compiles `css`/`scss`/`sass` differently, and editor support is a shared Volar server behind a VS Code extension and a WebStorm/LSP4IJ plugin.
 :::
 
 [Next: Recipes →](/learn/recipes) · [Reference: configuration →](/reference/config) · [Installation →](/learn/installation)

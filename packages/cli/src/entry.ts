@@ -115,7 +115,7 @@ export function generateEntry(
   mount: string,
   rootDir: string,
   elements: CustomElement[],
-  options: { resume?: boolean; devtools?: boolean } = {}
+  options: { resume?: boolean; devtools?: boolean; state?: string } = {}
 ): string {
   const spec = (file: string): string => importSpec(rootDir, file);
   const lines: string[] = [];
@@ -126,11 +126,15 @@ export function generateEntry(
       ? 'import { resumePage } from "@weave-framework/runtime/graph";\nimport { mountComponent, defineCustomElement } from "@weave-framework/runtime/dom";'
       : 'import { mountComponent, defineCustomElement } from "@weave-framework/runtime/dom";'
   );
-  if (options.devtools) {
+  if (options.devtools || options.state) {
     // Before the mount, because that is when `setup` runs and creates the nodes: a node is registered
     // only when it has an OWNER (`reactive.ts`), so a module-scope signal never appears in the panel
-    // however early this runs, and nothing has to be done about import hoisting.
-    lines.push('import { enableDevtools, mountDevtoolsPanel } from "@weave-framework/runtime";');
+    // however early this runs, and nothing has to be done about import hoisting. `--state` needs the
+    // same switch for the same reason: an unregistered signal cannot be set from a saved state.
+    const named: string[] = ['enableDevtools'];
+    if (options.devtools) named.push('mountDevtoolsPanel', 'devServerStates');
+    if (options.state) named.push('startInState');
+    lines.push(`import { ${named.join(', ')} } from "@weave-framework/runtime";`);
     lines.push('enableDevtools(true);');
   }
   // Register custom elements BEFORE bringing the root online, so a tag is defined at first render.
@@ -157,7 +161,10 @@ export function generateEntry(
   } else {
     lines.push(`mountComponent(Root, ${JSON.stringify(mount)});`);
   }
-  if (options.devtools) lines.push('mountDevtoolsPanel();');
+  if (options.devtools) lines.push('mountDevtoolsPanel({ states: devServerStates() });');
+  // After the mount: the state sets signals the mounted components already own, and the fetch it waits
+  // on would otherwise hold the first paint.
+  if (options.state) lines.push(`startInState(${JSON.stringify(options.state)});`);
   return lines.join('\n');
 }
 

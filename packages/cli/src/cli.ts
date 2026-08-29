@@ -50,10 +50,14 @@ function requireAppEntry(config: ResolvedConfig, cmd: string): void {
 }
 
 /** Build the framework-owned entry (Level C) when the config declares a `root` component. */
-function virtualEntryFor(config: ResolvedConfig, devtools: boolean = false): { code: string; resolveDir: string } | undefined {
+function virtualEntryFor(
+  config: ResolvedConfig,
+  devtools: boolean = false,
+  state?: string
+): { code: string; resolveDir: string } | undefined {
   if (!config.rootComponent) return undefined;
   const elements: CustomElement[] = discoverCustomElements(config.root);
-  const code: string = generateEntry(config.rootComponent, config.mount, config.root, elements, { devtools });
+  const code: string = generateEntry(config.rootComponent, config.mount, config.root, elements, { devtools, state });
   return { code, resolveDir: config.root };
 }
 
@@ -87,6 +91,7 @@ options
   --fix                  Apply the fixes check is certain of, then re-check (check)
   --impact <file>        List what renders this component, directly and transitively (check)
   --devtools             Show the reactive-graph panel in the page (dev)
+  --state <name>         Start in a state saved from that panel (dev)
   --ssg                  Prerender every route to static HTML (build)
   --eager                Inline routes instead of code-splitting them (routes)
   -h, --help             Print this
@@ -96,6 +101,7 @@ examples
   weave build --ssg                prerender every route
   weave check src lib              type-check two roots
   weave routes src/pages           regenerate routes from a pages directory
+  weave dev --state empty          open the app in a state you saved earlier
   weave merge --install            once per clone: git merges templates by structure
 
 docs: https://weaveframework.dev`;
@@ -245,6 +251,7 @@ export async function main(argv: string[]): Promise<void> {
   }
   if (cmd === 'dev') {
     const devtools: boolean = rest.includes('--devtools');
+    const state: string | undefined = flag(rest, '--state');
     if (config) {
       requireAppEntry(config, 'dev');
       syncRoutes(config); // file-based routing: regenerate routes.gen.ts before serving
@@ -252,7 +259,7 @@ export async function main(argv: string[]): Promise<void> {
       // `main.js` lives at the web root); nothing is written to disk.
       const { url } = await dev({
         entry: config.entry,
-        virtualEntry: virtualEntryFor(config, devtools),
+        virtualEntry: virtualEntryFor(config, devtools, state),
         base: config.base,
         servedir: config.publicDir,
         outdir: config.publicDir,
@@ -262,10 +269,14 @@ export async function main(argv: string[]): Promise<void> {
         index: config.index,
         inMemory: true,
         proxy: config.proxy,
+        // Saved states are tooling scratch space, so they live in `.weave/` next to the config the
+        // command was run against — not inside the source tree.
+        statesDir: join(process.cwd(), '.weave', 'states'),
       });
       console.log(`weave dev → ${url}`);
       // Discoverable without being imposed: the panel is real, and it is off unless asked for.
       if (!devtools) console.log('  (--devtools shows the reactive graph in the page)');
+      if (state) console.log(`  (starting in the saved state \`${state}\`)`);
       return;
     }
     const servedir: string = flag(rest, '--serve') ?? '.';

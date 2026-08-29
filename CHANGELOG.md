@@ -16,6 +16,21 @@
 
 ## Unreleased
 
+### Any screen, in any state, in one second
+
+Getting a screen into the state you need to look at meant driving the app there by hand, every time. The
+DevTools panel now has a **States** tab: get the app where you want it, name the state, save it. It is
+written to `.weave/states/<name>.json` — plain JSON you can commit — and `weave dev --state <name>` opens
+the app already in it. **Apply** in the panel does the same live, with no reload.
+
+A state is exactly the values of the signals you **named**; nothing is predicted, nothing is inferred, and
+a `computed` is not saved because setting its sources reproduces it. Values go through Weave's own
+serialization, so a `Date`/`Map`/`Set` survives the round trip. Names the app no longer has are skipped,
+and the count of signals actually set is reported. Dev-only in every part.
+
+New API: `captureState()` / `applyState()` on the devtools registry, `devServerStates()` and
+`startInState()` for the dev-server protocol, and a `states` option on `mountDevtoolsPanel`.
+
 ### `weave merge` — git stops inventing template conflicts
 
 Two people on one template is the everyday case, and git merges lines. A tag and its text share a line,

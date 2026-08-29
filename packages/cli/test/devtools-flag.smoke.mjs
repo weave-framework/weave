@@ -5,10 +5,11 @@
  * saw them: they only work if the author calls `enableDevtools()` before any named node is created and
  * then mounts the panel. So the capability was real and effectively unreachable.
  *
- * The ordering is the whole trick, and it is what this asserts by looking for a MODULE-SCOPE signal:
- * `enableDevtools` cannot be a statement in the entry, because every `import` is hoisted above it and the
- * app module would already have been evaluated with registration still off. It is its own side-effect
- * module, imported first.
+ * The ordering is the whole trick: `enableDevtools` runs as a statement in the generated entry, before
+ * the mount, because the mount is when `setup` runs and creates the nodes. (An elaborate side-effect
+ * module was built first to beat import hoisting, on the theory that a module-scope signal had to be
+ * registered too — it never is, since a node registers only through its OWNER, so the problem it solved
+ * did not exist and it was removed.)
  *
  * Run: `node packages/cli/test/devtools-flag.smoke.mjs` (wired into `pnpm verify:devtools-flag`).
  */

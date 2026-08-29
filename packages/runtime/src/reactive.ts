@@ -233,7 +233,11 @@ export function signal<T>(initial: T, opts: { equals?: (a: T, b: T) => boolean; 
     // Register the TRACKED getter (`read`), not the raw value — so a devtools consumer that
     // reads `inspect()` inside an effect (the panel) subscribes and re-renders on change.
     // Outside a reactive context `track()` no-ops, so a plain `inspect()` snapshot is unchanged.
-    currentOwner?._disposers.push(registerDevNode('signal', opts.name, read, node, currentOwner));
+    // `read.set` is assigned below, so the setter is reached through a lambda rather than passed
+    // directly — the write handle is what lets a captured state be applied back.
+    currentOwner?._disposers.push(
+      registerDevNode('signal', opts.name, read, node, currentOwner, (v: unknown) => void read.set(v as T))
+    );
   }
   read.set = (next) => {
     const value: T = typeof next === 'function' ? (next as (prev: T) => T)(node.value) : next;
