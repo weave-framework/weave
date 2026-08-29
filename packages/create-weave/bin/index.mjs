@@ -37,4 +37,5 @@ console.log('Next steps:');
 console.log(`  cd ${arg || 'weave-app'}`);
 console.log('  npm install      # or: pnpm install / yarn');
 console.log('  npm run dev      # start the dev server\n');
-console.log('Then open the printed URL and edit src/app/app.html — it reloads on save.\n');
+console.log('Then open the printed URL and edit src/app/app.html — it reloads on save.');
+console.log('README.md in the new project covers adding components, the UI library, and deploying.\n');
