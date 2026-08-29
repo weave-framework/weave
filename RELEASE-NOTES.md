@@ -83,6 +83,14 @@ A `setup()` that throws rendered nothing at all — a white document with the me
 dev overlay now paints uncaught runtime errors too, but only when the page came out empty: an app that
 rendered and then threw keeps its screen.
 
+### Editor plugins refreshed
+
+WebStorm **0.23.2** and VS Code **0.6.2** ship in
+[`plugins/editor/`](https://github.com/weave-framework/weave/tree/main/plugins/editor). Each bundles a copy
+of the Weave language server, and this release changed it — the editor now resolves a child component by the
+same convention the build does, so a component that renders no longer shows a red squiggle. If you have an
+earlier build installed, reinstall from the file to pick it up.
+
 ### The CLI's front door
 
 - A busy port crashed the dev server with Node's `Unhandled 'error' event` and a raw EADDRINUSE stack — for

@@ -90,6 +90,13 @@ check, and a broken app. Every item below was measured on that app, not on this 
   matching nothing. That is exactly how the UI library's theme fails when it is pasted into a component
   stylesheet instead of a global one: it compiles, ships ~120 KB, and applies to nothing, silently.
 
+### Editor plugins
+- **Rebuilt and re-shipped** — WebStorm `0.23.2`, VS Code `0.6.2`. Both bundle a copy of the language
+  server, and this release changed it (a child component resolves by convention in the editor exactly as it
+  does in the build). A stale bundled server does not fail loudly; it reports wrong diagnostics on correct
+  code, so the freshness gate treats "the server moved and the plugins did not" as a failure. It caught this
+  one on the release commit.
+
 ### Docs
 - **A UI → Installation page**, because there was none: nothing in the docs said `npm install
   @weave-framework/ui`, and the theming page never said *where* its Sass block belongs. Four steps, with the
