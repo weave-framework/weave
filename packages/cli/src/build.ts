@@ -41,6 +41,12 @@ export interface BuildConfig {
    * Default '' (the root).
    */
   base?: string;
+  /**
+   * Also write the shell as `404.html` — what a static host serves for an unknown path, and therefore
+   * what makes a deep-link refresh work on a host with no rewrite rules (GitHub Pages is the common one).
+   * Set for an app with client routes; pointless for a single-page one, so it is not the default.
+   */
+  spaFallback?: boolean;
 }
 
 /**
@@ -171,6 +177,10 @@ export async function build(config: BuildConfig): Promise<void> {
       base,
     });
     await writeFile(join(outDir, 'index.html'), html);
+    // A router app refreshed on `/about` asks the host for a page that does not exist. Hosts with rewrite
+    // rules can be told to answer with the shell; GitHub Pages cannot — it serves `404.html`. Writing the
+    // same document there costs one file and turns a broken refresh into a working one.
+    if (config.spaFallback) await writeFile(join(outDir, '404.html'), html);
   }
 }
 

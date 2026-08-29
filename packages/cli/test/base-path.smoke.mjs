@@ -44,7 +44,7 @@ process.on('exit', () => rmSync(cliJs, { force: true }));
 /** A one-component app, built with the given base. Returns the emitted index.html.
  *  `dir` can be reused so a second build sees the SAME paths — a component's scope hash is derived from
  *  its filename, so two builds in two temp dirs differ in content by construction. */
-async function buildApp(base, existing, template = '<p>{{ n() }}</p>\n') {
+async function buildApp(base, existing, template = '<p>{{ n() }}</p>\n', spaFallback = false) {
   const dir = existing ?? mkdtempSync(join(repo, 'tools', '.verify-base-path-app-'));
   mkdirSync(join(dir, 'src'), { recursive: true });
   writeFileSync(join(dir, 'src', 'index.html'), '<!doctype html><html><head></head><body><div id="app"></div></body></html>');
@@ -58,6 +58,7 @@ async function buildApp(base, existing, template = '<p>{{ n() }}</p>\n') {
     index: join(dir, 'src', 'index.html'),
     minify: true,
     base,
+    spaFallback,
     clean: true,
   });
   const html = readFileSync(join(dir, 'dist', 'index.html'), 'utf8');
@@ -102,6 +103,27 @@ async function buildApp(base, existing, template = '<p>{{ n() }}</p>\n') {
   ok(Boolean(changed) && changed !== first, `a changed source gets a new version (${first} → ${changed})`);
 
   // Windows holds the just-written bundle briefly; retry rather than fail the run on cleanup.
+  rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+}
+
+// 4. An app with client routes gets the shell under `404.html` too — the only way a deep-link refresh
+//    survives on a host that cannot be given rewrite rules (GitHub Pages serves 404.html).
+{
+  const dir = mkdtempSync(join(repo, 'tools', '.verify-base-path-app-'));
+  await buildApp(undefined, dir, undefined, true);
+  const shell = readFileSync(join(dir, 'dist', 'index.html'), 'utf8');
+  const fallback = readFileSync(join(dir, 'dist', '404.html'), 'utf8');
+  ok(fallback === shell, 'the SPA fallback is the same document as the shell');
+
+  await buildApp(undefined, dir, undefined, false);
+  let exists = true;
+  try {
+    readFileSync(join(dir, 'dist', '404.html'), 'utf8');
+  } catch {
+    exists = false;
+  }
+  ok(!exists, 'and an app without client routes gets no stray 404.html');
+
   rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 }
 

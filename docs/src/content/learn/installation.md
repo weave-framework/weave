@@ -210,7 +210,7 @@ This writes a clean, minified, self-contained folder to **`dist/`** (override wi
 - A plain web server (`nginx`, Apache) — serve the folder.
 
 :::callout tip "Client-side routing on a static host"
-If your app uses the [router](/learn/router) with clean URLs, configure the host to fall back to `index.html` for unknown paths (an SPA rewrite). On GitHub Pages, a copied `404.html` does the same job. Without it, a deep-link refresh returns a 404.
+If your app uses the [router](/learn/router) with clean URLs, a deep-link refresh asks the host for a page that does not exist. With `routesDir` configured, `weave build` writes **`404.html`** alongside `index.html` (the same document) — which is exactly what GitHub Pages serves for an unknown path, so the refresh works with nothing to configure. On a host with rewrite rules, point unknown paths at `index.html` instead.
 :::
 
 :::callout tip "Serving from a sub-path (a project page, `/docs/`, a reverse proxy)"

@@ -42,6 +42,9 @@ found the framework silent in the places a beginner needs it loudest. This is th
   that could fix it. Now every injected URL carries the base, `weave dev` answers under it (so a sub-path is
   developed against, not discovered in production), and the router picks it up as its basename with nothing
   for the author to wire. Static generation carries it too.
+- **An app with client routes also gets `404.html`** — the same document as the shell. It is what a static
+  host serves for an unknown path, so it is what makes a deep-link refresh work where rewrite rules are not
+  available (GitHub Pages). Only for apps with `routesDir`: a single-page app has no deep links to lose.
 - **Injected assets carry a content version** (`/main.js?v=1a2b3c`), derived from the built file's own bytes:
   a CDN can no longer answer fresh HTML with a stale bundle, and an unchanged rebuild keeps its URL so
   nothing re-downloads.

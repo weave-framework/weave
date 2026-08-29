@@ -14,6 +14,11 @@ npm run dev      # http://localhost:5173, reloads on save
 | `npm run build` | A deployable static bundle in `dist/` |
 | `npm run check` | Type-check your components, templates **and** the rest of your `.ts` |
 
+> **On `npm install`:** npm may warn that `esbuild` and `@parcel/watcher` have install scripts "not yet
+> covered by allowScripts". Both are build tooling — esbuild bundles your app, `@parcel/watcher` powers
+> `weave dev`'s file watching — and neither ships in what your users download. `pnpm` is pre-approved for
+> them by the `pnpm-workspace.yaml` in this folder; npm prints the notice and installs anyway.
+
 ## What's here
 
 ```
@@ -93,9 +98,13 @@ Full list and theming knobs: [weaveframework.dev/ui](https://weaveframework.dev/
 
 ## Deploying
 
-`npm run build` writes plain `.html`, `.js` and `.css` to `dist/` — host it anywhere static. If you add
-the router with clean URLs, configure the host to fall back to `index.html` for unknown paths (an SPA
-rewrite), or a deep-link refresh returns 404.
+`npm run build` writes plain `.html`, `.js` and `.css` to `dist/` — host it anywhere static.
+
+- **Client routes:** with `routesDir` set, the build also writes `404.html` (a copy of the shell), which is
+  what makes a deep-link refresh work on GitHub Pages. On a host with rewrite rules, point unknown paths at
+  `index.html` instead.
+- **Not at the domain root?** Set `base: '/my-app/'` in `weave.config.ts` — a GitHub Pages *project* site
+  lives under the repository name, and without `base` the page comes up blank.
 
 ## Learn more
 

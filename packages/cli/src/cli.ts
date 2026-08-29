@@ -207,6 +207,9 @@ export async function main(argv: string[]): Promise<void> {
           virtualEntry: virtualEntryFor(config),
           outDir,
           base: config.base,
+          // Client routes mean deep links; a static host needs the shell under `404.html` to survive a
+          // refresh on one. An app with no `routesDir` has no deep links to lose.
+          spaFallback: config.routesDir != null,
           minify: config.minify,
           styleLang: config.styleLang,
           styles: config.styles,
