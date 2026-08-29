@@ -35,6 +35,17 @@ found the framework silent in the places a beginner needs it loudest. This is th
   error when the page came out empty. Only when it is empty: an app that rendered and then threw keeps its
   screen, because covering a working UI with a modal would be worse than saying nothing.
 
+### Added — deploying
+- **`base` in `weave.config.ts`** — the sub-path an app is served under (`/my-app/`). The build injected
+  root-absolute URLs and nothing else, so a GitHub Pages *project* site — which the installation page
+  recommends by name — served `user.github.io/main.js`, got a 404, and showed a white page, with no setting
+  that could fix it. Now every injected URL carries the base, `weave dev` answers under it (so a sub-path is
+  developed against, not discovered in production), and the router picks it up as its basename with nothing
+  for the author to wire. Static generation carries it too.
+- **Injected assets carry a content version** (`/main.js?v=1a2b3c`), derived from the built file's own bytes:
+  a CDN can no longer answer fresh HTML with a stale bundle, and an unchanged rebuild keeps its URL so
+  nothing re-downloads.
+
 ### Fixed — the CLI's front door
 - **A busy port crashed the dev server** with Node's `Unhandled 'error' event` and a raw EADDRINUSE stack —
   for the most ordinary situation there is, a second terminal already running `weave dev`. It steps to the

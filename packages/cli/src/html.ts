@@ -12,6 +12,14 @@ export interface InjectOptions {
   css?: string;
   /** Live-reload SSE endpoint — wires an `EventSource` reload client (dev only). */
   liveReload?: string;
+  /**
+   * The sub-path the app is served under (`/my-app`), published to the page as `__WEAVE_BASE__`.
+   *
+   * It has to come from the DOCUMENT, not from the entry module: `import` declarations hoist, so an
+   * assignment written above them in the generated entry would run after the router had already
+   * initialised. A classic inline script before the module tag is the only order that holds.
+   */
+  base?: string;
 }
 
 /** Escape a string for safe use inside a `RegExp`. */
@@ -93,6 +101,12 @@ export function injectHtml(html: string, opts: InjectOptions): string {
       /<\/body>/i,
       `    <script type="module" src="${opts.script}"></script>\n  </body>`
     );
+  }
+
+  if (opts.base) {
+    const decl: string = `<script>window.__WEAVE_BASE__=${jsLiteral(opts.base)}</script>`;
+    if (!out.includes('__WEAVE_BASE__')) out = out.replace(/<\/head>/i, `    ${decl}
+  </head>`);
   }
 
   if (opts.liveReload) {

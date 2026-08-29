@@ -108,7 +108,10 @@ export function route<Path extends string>(path: Path, config: RouteConfig<Path>
 // "internal" — written as if the app were at the origin root. `basename` is the
 // prefix the app is actually served under (default '' = root). It's stripped when
 // reading location and re-added when writing history, so nothing else changes.
-let basename: string = '';
+// Seeded from the build when `base` is configured: the framework-generated entry sets
+// `globalThis.__WEAVE_BASE__` before anything imports the router, so an app deployed under a sub-path
+// routes correctly without the author wiring `setBasename` by hand. `setBasename` still wins if called.
+let basename: string = normalizeBase(String((globalThis as { __WEAVE_BASE__?: string }).__WEAVE_BASE__ ?? ''));
 
 /** Normalize a base: strip trailing slashes; treat '' / '/' as "no base". */
 function normalizeBase(b: string): string {

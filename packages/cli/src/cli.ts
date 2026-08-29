@@ -189,6 +189,7 @@ export async function main(argv: string[]): Promise<void> {
             mount: config.mount,
             routes,
             outDir,
+            base: config.base,
             minify: config.minify,
             styleLang: config.styleLang,
             styles: config.styles,
@@ -205,6 +206,7 @@ export async function main(argv: string[]): Promise<void> {
           entry: config.entry,
           virtualEntry: virtualEntryFor(config),
           outDir,
+          base: config.base,
           minify: config.minify,
           styleLang: config.styleLang,
           styles: config.styles,
@@ -242,6 +244,7 @@ export async function main(argv: string[]): Promise<void> {
       const { url } = await dev({
         entry: config.entry,
         virtualEntry: virtualEntryFor(config),
+        base: config.base,
         servedir: config.publicDir,
         outdir: config.publicDir,
         port: config.port,

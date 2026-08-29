@@ -213,4 +213,27 @@ This writes a clean, minified, self-contained folder to **`dist/`** (override wi
 If your app uses the [router](/learn/router) with clean URLs, configure the host to fall back to `index.html` for unknown paths (an SPA rewrite). On GitHub Pages, a copied `404.html` does the same job. Without it, a deep-link refresh returns a 404.
 :::
 
+:::callout tip "Serving from a sub-path (a project page, `/docs/`, a reverse proxy)"
+A GitHub Pages **project** site lives at `user.github.io/my-app/`, not at the root — and root-absolute asset
+URLs (`/main.js`) then resolve to the wrong place and the page comes up blank. Say where the app lives:
+
+~~~ts title="weave.config.ts"
+export default defineConfig({
+  root: 'src/app/app',
+  base: '/my-app/', // matches the repository name for a GitHub Pages project site
+});
+~~~
+
+Every URL the framework injects picks it up, `weave dev` answers under it (so you develop against the same
+shape you deploy), and the router adopts it as its basename — `<Link to="/about">` still reads as `/about`
+in your code and resolves to `/my-app/about` in the browser. A **user** site (`user.github.io`) is at the
+root and needs no `base`.
+:::
+
+:::callout info "Caching"
+The injected `<script>` and `<link>` carry a content marker (`/main.js?v=1a2b3c`) derived from the built
+file itself, so a host or CDN cannot answer today's HTML with yesterday's bundle. An unchanged rebuild keeps
+the same marker, so nothing re-downloads for no reason.
+:::
+
 [Next: Quick start →](/learn/quick-start)

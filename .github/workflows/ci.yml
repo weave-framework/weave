@@ -209,3 +209,7 @@ jobs:
       # A `setup()` that throws used to leave a blank white page with the error only in the console.
       - name: A runtime error explains itself when the page is blank
         run: pnpm verify:dev-runtime-error
+      # Root-absolute asset URLs made a GitHub Pages project site (which the docs recommend by name) a
+      # white page, and nothing versioned the bundle a CDN was holding.
+      - name: Sub-path deploys resolve, and assets carry a content version
+        run: pnpm verify:base-path

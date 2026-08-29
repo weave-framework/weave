@@ -49,6 +49,12 @@ export interface DevConfig {
   index?: string;
   /** In-memory mode: write nothing to disk, run Weave's own dev server. Default false (legacy). */
   inMemory?: boolean;
+  /**
+   * Where the app is served from when that is not the root (`/my-app`). Dev answers under it and injects
+   * URLs that carry it, so a sub-path deploy is exercised in development rather than discovered in
+   * production — the one place where getting it wrong is a white page.
+   */
+  base?: string;
   /** Dev proxy: forward matching request paths to a backend so API calls stay same-origin. */
   proxy?: ProxyTable;
 }
@@ -278,7 +284,12 @@ async function handleRequest(
   clients: Set<ServerResponse>,
   assetMap: Map<string, string> = new Map()
 ): Promise<void> {
-  const url: string = (req.url ?? '/').split('?')[0];
+  const raw: string = (req.url ?? '/').split('?')[0];
+  // Everything below matches paths as if the app were at the root; the configured base is stripped here
+  // once, so `/my-app/main.js` and `/main.js` reach the same lookup and a sub-path dev server behaves
+  // exactly like the deployed one.
+  const base: string = config.base ?? '';
+  const url: string = base && (raw === base || raw.startsWith(base + '/')) ? raw.slice(base.length) || '/' : raw;
 
   // Dev proxy: forward matching paths to a backend so the app's API calls stay same-origin
   // (no CORS, cookie auth just works). Runs FIRST — before SSE, build outputs, static, and
@@ -355,9 +366,11 @@ async function handleRequest(
   // No extension → a client route: serve the injected shell (SPA fallback).
   try {
     const shell: string = config.index ?? join(config.servedir, 'index.html');
+    const b: string = config.base ?? '';
     const html: string = injectHtml(await readFile(shell, 'utf8'), {
-      script: '/main.js',
-      liveReload: RELOAD_PATH,
+      script: `${b}/main.js`,
+      liveReload: `${b}${RELOAD_PATH}`,
+      base: b,
     });
     res.writeHead(200, { 'content-type': MIME['.html'] });
     res.end(html);

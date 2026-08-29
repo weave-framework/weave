@@ -35,6 +35,40 @@ export interface BuildConfig {
   clean?: boolean;
   /** Phase E (E1.4): compile every component in the `resumable` target (for an SSG-resume client bundle). Default false. */
   resumable?: boolean;
+  /**
+   * Where the app is served from, when that is not the domain root — `/my-app/` for a GitHub Pages
+   * project site, `/docs/` behind a reverse proxy. Every framework-injected URL is prefixed with it.
+   * Default '' (the root).
+   */
+  base?: string;
+}
+
+/**
+ * Normalize a base path to `''` (the root) or `/prefix` — leading slash, no trailing one, so a URL is
+ * always `${base}/name` with exactly one separator however the author wrote it: `my-app`, `/my-app` and
+ * `/my-app/` all mean the same place.
+ */
+export function normalizeBase(base: string | undefined): string {
+  const trimmed: string = (base ?? '').trim();
+  if (!trimmed || trimmed === '/') return '';
+  return '/' + trimmed.replace(/^\/+/, '').replace(/\/+$/, '');
+}
+
+/**
+ * A short content marker appended to an injected asset URL (`/main.js?v=1a2b3c`).
+ *
+ * Without one, a host or CDN holding `main.js` served yesterday's bundle against today's HTML for as long
+ * as its TTL ran — a deploy that looks broken for a reason nothing on the page reveals. The value comes
+ * from the file's own bytes, so an unchanged build keeps its URL (nothing re-downloads) and a changed one
+ * cannot be answered from cache. FNV-1a over the content: a cache key, not a checksum.
+ */
+export function contentVersion(text: string): string {
+  let h: number = 0x811c9dc5;
+  for (let i: number = 0; i < text.length; i++) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return (h >>> 0).toString(36);
 }
 
 /** Is `inner` the same path as, or inside, `outer`? */
@@ -113,7 +147,8 @@ export async function build(config: BuildConfig): Promise<void> {
   );
   const globalCss: string = compiledStyles.map((s) => s.css).join('\n');
   await mkdir(outDir, { recursive: true });
-  await writeFile(join(outDir, 'app.css'), [globalCss, ...state.css].filter(Boolean).join('\n'));
+  const css: string = [globalCss, ...state.css].filter(Boolean).join('\n');
+  await writeFile(join(outDir, 'app.css'), css);
 
   // Emit each referenced url() asset (deduped by served path) next to app.css.
   const seen: Set<string> = new Set();
@@ -128,9 +163,12 @@ export async function build(config: BuildConfig): Promise<void> {
   // Copy the HTML shell into the output, injecting the entry script + stylesheet link
   // (and stripping any dev live-reload) so dist/ is self-contained + deployable.
   if (config.index) {
+    const base: string = normalizeBase(config.base);
+    const jsVersion: string = contentVersion(await readFile(join(outDir, 'main.js'), 'utf8').catch(() => ''));
     const html: string = injectHtml(await readFile(config.index, 'utf8'), {
-      script: '/main.js',
-      css: '/app.css',
+      script: `${base}/main.js?v=${jsVersion}`,
+      css: `${base}/app.css?v=${contentVersion(css)}`,
+      base,
     });
     await writeFile(join(outDir, 'index.html'), html);
   }
@@ -157,6 +195,8 @@ export interface SsgBuildConfig {
   lang?: string;
   /** The app's own HTML shell. Its `<html>` attributes and `<head>` are inherited by every generated page. */
   index?: string;
+  /** Where the app is served from, when that is not the domain root (see {@link BuildConfig.base}). */
+  base?: string;
   /**
    * Phase E (E1.4) — the islands mode. Compile BOTH bundles in the `resumable` target, so the server render
    * embeds the per-instance state snapshot + resume markers and the client entry ADOPTS that DOM in place
@@ -234,9 +274,11 @@ export async function buildSsg(config: SsgBuildConfig): Promise<void> {
     styleLang: config.styleLang,
     styles: config.styles,
     publicDir: config.publicDir,
+    base: config.base,
     clean: true,
     resumable: config.resume,
   });
+  const base: string = normalizeBase(config.base);
   // 2. Render each route headlessly (bundle + import the server entry once), writing a document per route.
   const id: string = mountId(config.mount);
   // The author's own document is the shell. Synthesizing one from scratch dropped everything it said —
@@ -245,7 +287,11 @@ export async function buildSsg(config: SsgBuildConfig): Promise<void> {
   const shell: DocumentShell = config.index
     ? documentShell(await readFile(config.index, 'utf8'))
     : { htmlAttrs: '', head: '' };
-  const cssLink: string = '<link rel="stylesheet" href="/app.css">';
+  const cssLink: string =
+    `<link rel="stylesheet" href="${base}/app.css">` +
+    // Published from the document, before the entry module: `import` hoists, so a base assigned inside
+    // the bundle would land after the router had already read it.
+    (base ? `<script>window.__WEAVE_BASE__=${JSON.stringify(base)}</script>` : '');
   const head: string = /<link[^>]+href=["']\/app\.css["']/i.test(shell.head)
     ? shell.head
     : shell.head
@@ -271,7 +317,7 @@ export async function buildSsg(config: SsgBuildConfig): Promise<void> {
       document: (): DocumentOptions => ({
         title: config.title,
         head,
-        entry: '/main.js',
+        entry: `${base}/main.js`,
         lang: config.lang,
         // `lang` stays as the fallback for an app with no index.html of its own.
         ...(shell.htmlAttrs ? { htmlAttrs: shell.htmlAttrs } : {}),

@@ -242,7 +242,12 @@ A tag is a **child component** when its name starts with an **uppercase letter**
 And because component tags compile to a function call with a props object, **static, dynamic (`{{ }}`), and `on:` attributes are the props/events surface of a `<Component>`**. A **bare** attribute (`<Button disabled>`) passes the boolean `true`; a quoted one (`label="Go"`, or an explicit empty `hint=""`) passes the string. Two DOM directives are also allowed: **`use:` forwards its action to the component's single root element** (same lifecycle as on an element — see [`use:` on components](/learn/templates#use-on-components)), and **`bind:value={{ sig }}` passes the signal itself** for two-way (sugar for handing a child the writable signal — see below). The other DOM-level directives — `class:`, `transition:`, `ref`, `show`, `.prop` — are compile errors on a component tag (they only mean something on a real element). Pass data as props instead.
 :::
 
-You make a child available the ordinary way — `import TaskCard from './task-card'`. It's used only in the template, never elsewhere in the `.ts`, but the [Weave editor tooling](/learn/tooling) recognizes a component-tag usage as a real use — so the import is **not** flagged "unused", and you don't need a `void TaskCard;` keep-alive line. (Without the tooling active, `tsc --noUnusedLocals` may still flag it; that's the only case a `void` line helps.)
+You make a child available the ordinary way — `import TaskCard from './task-card'`. If you don't, Weave
+resolves the tag by **convention** before giving up: `<TaskCard>` looks for `../task-card/task-card`,
+`./task-card`, then `./task-card/task-card` (`.ts` or `.weave`), and wires the import for you. `weave check`
+resolves it the same way, so a component that renders is never reported as an unknown name; a tag that
+matches nothing is an error in both. Write the import when you want the module named explicitly — an
+explicit import always wins. It's used only in the template, never elsewhere in the `.ts`, but the [Weave editor tooling](/learn/tooling) recognizes a component-tag usage as a real use — so the import is **not** flagged "unused", and you don't need a `void TaskCard;` keep-alive line. (Without the tooling active, `tsc --noUnusedLocals` may still flag it; that's the only case a `void` line helps.)
 
 ## Two-way: pass the signal itself
 

@@ -50,6 +50,7 @@
     "verify:dev-port": "node packages/cli/test/dev-port.smoke.mjs",
     "verify:cli-help": "node packages/cli/test/cli-help.smoke.mjs",
     "verify:dev-runtime-error": "node packages/cli/test/dev-runtime-error.smoke.mjs",
+    "verify:base-path": "node packages/cli/test/base-path.smoke.mjs",
     "verify:no-private": "node tools/verify-no-private-paths.mjs",
     "verify:authorship": "node tools/verify-authorship.mjs",
     "verify:template-ranges": "node tools/verify-template-ranges.mjs"

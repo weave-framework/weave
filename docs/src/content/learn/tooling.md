@@ -408,6 +408,7 @@ One config file is the source of truth for the config-driven pipeline. Every opt
 | `index` | `string` | — | HTML shell; Weave injects the entry script + stylesheet link. |
 | `publicDir` | `string` | the config dir | Static web root — served live in dev, copied verbatim into the build. |
 | `outDir` | `string` | `'dist'` | Output directory for `weave build`. |
+| `base` | `string` | `''` (root) | Sub-path the app is served under (`'/my-app/'`). Prefixes every injected URL, is answered by the dev server, and becomes the router's basename. |
 | `styleLang` | `'css' \| 'scss' \| 'sass'` | `'css'` | Component style language; the loader pairs `<base>.<styleLang>` with no probing. |
 | `routesDir` | `string` | — | Pages directory; routes regenerate before each build/dev. |
 | `styles` | `string[]` | `[]` | Global stylesheets, compiled and concatenated *before* component CSS. |

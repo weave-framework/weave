@@ -10,6 +10,7 @@
  */
 
 import { build as esbuildBuild } from 'esbuild';
+import { normalizeBase } from './build.js';
 import type { BuildResult, PluginBuild } from 'esbuild';
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
@@ -54,6 +55,12 @@ export interface WeaveConfig {
   index?: string;
   /** Output directory for `weave build` (default `dist`). */
   outDir?: string;
+  /**
+   * Where the app is SERVED from, when that is not the domain root — `/my-app/` for a GitHub Pages
+   * project site, `/docs/` behind a reverse proxy. Every URL the framework injects is prefixed with it,
+   * the dev server answers under it, and the router adopts it as its basename. Default `''` (the root).
+   */
+  base?: string;
   /** Component style language — the loader pairs `<base>.<styleLang>`, no probing (default `css`). */
   styleLang?: StyleLang;
   /**
@@ -102,6 +109,8 @@ export interface ResolvedConfig {
   publicDirDeclared: boolean;
   index?: string;
   outDir: string;
+  /** Normalized serve base — `''` (root) or `/prefix`, never with a trailing slash. */
+  base: string;
   styleLang: StyleLang;
   /** Pages directory (absolute) for file-based routing, or undefined. */
   routesDir?: string;
@@ -185,6 +194,7 @@ function resolveConfig(raw: WeaveConfig, root: string): ResolvedConfig {
     entry: raw.entry ? abs(raw.entry) : undefined,
     rootComponent: raw.root ? abs(raw.root) : undefined,
     mount: raw.mount ?? '#app',
+    base: normalizeBase(raw.base),
     publicDir: raw.publicDir ? abs(raw.publicDir) : root,
     publicDirDeclared: raw.publicDir != null,
     index: raw.index ? abs(raw.index) : undefined,
