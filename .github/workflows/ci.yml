@@ -227,3 +227,8 @@ jobs:
       # they are applied back to front.
       - name: weave check --fix repairs what it is certain of
         run: pnpm verify:check-fix
+      # And a name the TEMPLATE asks for is declared into `setup` — where the markup says without doubt
+      # what it is. The half that matters is the declining: an ambiguous value must not be guessed, and
+      # a return type that is not a type literal must not be rewritten.
+      - name: the template grows the .ts, and declines where it is not certain
+        run: pnpm verify:grow-setup

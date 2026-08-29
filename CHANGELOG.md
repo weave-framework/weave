@@ -46,6 +46,31 @@ returns `findings` alongside `warnings`, which stays its exact string projection
 `EventAttr.nameOffset` are new optional AST fields; a text run coalesced with another (a comment between
 them) **clears** its offset rather than keeping one that no longer maps to the source.
 
+### The template declares into `setup` for you
+
+A component is two files, and you used to say every name twice — once where you use it, once where you
+define it. One of those mirrors was already gone (auto-expose writes `setup`'s `return`). This removes
+the other, for the cases where the markup says **without doubt** what the missing thing is.
+
+`<button on:click={{ save }}>` with no `save` can only be `() => void`. `weave check --fix` now writes
+the declaration, adds it to the return, and adds it to the declared return type — one edit, and the
+result is byte-identical to what you would have typed:
+
+```ts
+export function setup(): { n: number; save: () => void } {
+  const n = 1;
+  const save = (): void => {
+    // TODO
+  };
+  return { n, save };
+}
+```
+
+It writes **declarations, never logic** — the `TODO` is yours — and it declines wherever the shape is a
+guess: `{{ total }}` could be anything, and a return type that is not a type literal belongs to some
+other declaration. The error stays, so nothing is hidden. A plausible-looking guess is the fastest way
+to make a helpful tool something people turn off.
+
 ### Internal
 
 - `verify:size` measured the raw `tsc` emit, so doc comments counted against a budget no browser ever

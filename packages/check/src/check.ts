@@ -9,6 +9,7 @@
  */
 
 import ts from 'typescript';
+import { declarationFor, growSetup, type ScriptEdit } from './grow-setup.js';
 import { dirname, relative, isAbsolute } from 'node:path';
 import type { Virtual } from './emit.js';
 
@@ -26,7 +27,16 @@ export interface Diagnostic {
    * knows exactly one right answer — never a guess. Applying several to one file must go BACK TO
    * FRONT, or an earlier edit shifts every later offset.
    */
-  fix?: { start: number; end: number; text: string };
+  fix?: {
+    /**
+     * The file the edit belongs to, when that is NOT the file the diagnostic is reported in. A
+     * template says what a component needs; the declaration that answers it lives in the `.ts`.
+     */
+    file?: string;
+    start: number;
+    end: number;
+    text: string;
+  };
 }
 
 const OPTIONS: ts.CompilerOptions = {
@@ -151,7 +161,20 @@ function mapDiagnostic(d: ts.Diagnostic, byPath: Map<string, Virtual>): Diagnost
     // repeating them here would name the wrong file at a line number from another one.
     if (v.foreignFrom !== undefined && offset >= v.foreignFrom) return null;
     const { line: l, col } = offsetToLineCol(v.templateText, offset);
-    return { file: v.templateFile, line: l, col, code: d.code, message, category };
+    // The template named something `setup` does not return. Where the markup says WITHOUT DOUBT what
+    // that thing is, the fix declares it — in the `.ts`, not in the file this diagnostic points at.
+    const miss: RegExpExecArray | null = MISSING_PROP.exec(ts.flattenDiagnosticMessageText(d.messageText, String.fromCharCode(10)));
+    const decl: { declaration: string; type: string } | null = miss ? declarationFor(v.templateText, miss[1]) : null;
+    const grown: ScriptEdit | null = decl && miss ? growSetup(v.scriptText, miss[1], decl.declaration, decl.type) : null;
+    return {
+      file: v.templateFile,
+      line: l,
+      col,
+      code: d.code,
+      message,
+      category,
+      ...(grown ? { fix: { file: v.scriptFile, ...grown } } : {}),
+    };
   }
 
   if (vLine <= v.scriptLineCount) {
@@ -171,6 +194,9 @@ function mapDiagnostic(d: ts.Diagnostic, byPath: Map<string, Virtual>): Diagnost
 
 /** The phrase the harness's text-interpolation guard carries in its parameter TYPE, so TypeScript's own
  *  message already contains the advice. Matching on it lets the assignability boilerplate be replaced. */
+/** `Property 'x' does not exist on type '…'` — the template asking for something `setup` never returned. */
+const MISSING_PROP: RegExp = /^Property '([A-Za-z_$][\w$]*)' does not exist on type/;
+
 const TEXT_GUARD: string = 'a function renders as its own source text';
 
 /**

@@ -338,9 +338,12 @@ function applyFixes(diags: Diagnostic[]): number {
   const byFile: Map<string, NonNullable<Diagnostic['fix']>[]> = new Map();
   for (const d of diags) {
     if (!d.fix) continue;
-    const list: NonNullable<Diagnostic['fix']>[] = byFile.get(d.file) ?? [];
+    // A fix does not have to belong to the file the diagnostic points at: a TEMPLATE saying it needs a
+    // name is answered by a declaration in the component's `.ts`.
+    const target: string = d.fix.file ?? d.file;
+    const list: NonNullable<Diagnostic['fix']>[] = byFile.get(target) ?? [];
     list.push(d.fix);
-    byFile.set(d.file, list);
+    byFile.set(target, list);
   }
   let applied: number = 0;
   for (const [file, fixes] of byFile) {

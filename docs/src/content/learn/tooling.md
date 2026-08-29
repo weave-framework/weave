@@ -469,6 +469,29 @@ Your editor shows the same warnings as you type, underlined where they are, with
 lightbulb ("Replace `clik` with `click`"). The editor and `weave check` run the same code, so they
 never disagree about the same file.
 
+### The template can declare into `setup` for you
+
+A component is two files, and you say every name twice — once where you use it, once where you define it.
+One of those mirrors is already gone: auto-expose writes `setup`'s `return` when you omit it. `--fix`
+removes the other, where the markup says **without doubt** what the missing thing is.
+
+`<button on:click={{ save }}>` with no `save` can only be `() => void`, so `weave check --fix` writes it:
+
+~~~ts
+export function setup(): { n: number; save: () => void } {
+  const n = 1;
+  const save = (): void => {
+    // TODO
+  };
+  return { n, save };
+}
+~~~
+
+The declaration, the return and the declared type move together. It writes **declarations, never logic** —
+the `TODO` is yours — and it declines wherever the shape would be a guess. `{{ total }}` could be a string,
+a number or a signal, so nothing is written and the error stays; a return type that is not written inline
+belongs to another declaration and is left alone. A tool that guesses here is one you would switch off.
+
 `weave check --fix` repairs the ones with **exactly one** right answer — the three above — and then re-checks.
 The unknown-prefix rule offers no fix: several prefixes could have been meant, and a wrong automatic edit is
 worse than none. Fixing `@fro` often removes a type error too, since the loop variable only becomes real once
