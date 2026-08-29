@@ -24,6 +24,9 @@ usage: weave <build|dev|check|routes|migrate|mcp> [entry|paths…] [--config fil
              [--serve dir] [--port n] [--no-minify] [--eager] [--ssg]
 ```
 
+`weave --help` (or `-h`, or no command) prints the full help; `weave dev` steps to the next free port when the
+one it wants is taken; and a finished `weave build` lists what it emitted, with sizes.
+
 ## Configuration
 
 A `weave.config.ts` in the working directory (or `--config <file>`) switches `build` and `dev` into the config-driven pipeline; without one, the flags drive a single-entry build.
@@ -39,11 +42,23 @@ export default defineConfig({
   outDir: 'dist',
   routesDir: 'src/pages',  // opt into file-based routing
   styleLang: 'scss',
+  base: '/my-app/',        // only when the app is not served from the domain root
   dev: { port: 5173, proxy: { '/api': 'http://localhost:3000' } },
 });
 ```
 
 Also available: `mount` (selector, default `#app`), `entry` (single-entry mode instead of `root`), `styles`, and `build: { minify }`. An explicit `--out` overrides the config's `outDir`.
+
+### Deploying
+
+`base` is what makes a sub-path deploy work — a GitHub Pages *project* site, a reverse proxy, `/docs/`. Every
+URL the framework injects carries it, `weave dev` answers under it, and the router adopts it as its basename,
+so `<Link to="/about">` is still written as `/about` and resolves to `/my-app/about`.
+
+The injected `<script>` and `<link>` also carry a content marker (`/main.js?v=1a2b3c`), so a CDN cannot answer
+fresh HTML with a stale bundle. An app with `routesDir` additionally gets a **`404.html`** — a copy of the
+shell, which is what a static host serves for an unknown path and therefore what makes a deep-link refresh
+work where rewrite rules are not available.
 
 ## Static generation
 

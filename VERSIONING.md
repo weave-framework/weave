@@ -37,6 +37,17 @@ Weave follows [Semantic Versioning](https://semver.org). One question decides a 
   a UI token/DOM-contract change, or a type that's narrowed so previously-valid code no
   longer type-checks.
 
+### A tool that reports more is a MINOR, not a MAJOR
+
+`weave check`, `weave build`'s warnings and the editor plugins are **tools**, not the API a consumer writes
+against. When one of them starts reporting a defect it used to miss, unchanged code can go from a green
+pipeline to a red one — but nothing about that code's behaviour changed, and the API it was written against
+did not move. That is a MINOR, and the release notes have to say so plainly so an upgrade is not a surprise.
+
+First applied in `3.1.0`: `weave check` began type-checking the ordinary `.ts` modules beside the components
+(it had only ever checked components), so a project whose service layer had never been checked can fail on
+the first run after the upgrade.
+
 ## One version, every package
 
 Every `@weave-framework/*` package (and `create-weave`) shares a **single lockstep version**, released

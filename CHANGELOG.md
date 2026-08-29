@@ -14,10 +14,11 @@
 > already left it behind — Phase E ran 94 commits without a bump, and then released as one MINOR. The public
 > promise wins; the habit is retired.)*
 
-## Unreleased
+## 3.1.0
 
-*A first-run audit — scaffold an app from npm, follow the docs, then make the mistakes a beginner makes —
-found the framework silent in the places a beginner needs it loudest. This is that list, being worked through.*
+*A first-run audit — scaffold an app from the published package, follow the docs, then make the mistakes a
+beginner makes — found the framework SILENT in the places a beginner needs it loudest: a clean build, a green
+check, and a broken app. Every item below was measured on that app, not on this repo.*
 
 ### Fixed — the dev loop
 - **A compiler error used to end the dev session.** `weave dev` turned only a `ParseError` into a located

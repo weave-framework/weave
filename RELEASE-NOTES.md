@@ -3,6 +3,94 @@
 Human-readable highlights, one section per release — everything notable that landed since
 the previous one. For the granular, per-version log see [CHANGELOG.md](CHANGELOG.md).
 
+## 3.1.0 — 2026-08-29
+
+A **minor**: nothing about writing a Weave app changed, but a great deal about being *told* what you did.
+
+This release came out of a first-run audit — scaffold an app from the published package, follow the
+documentation literally, then make the mistakes a beginner makes. Every finding had the same shape: Weave
+was **silent** exactly where it should have spoken. A clean build, a green check, and an app that does not
+work. Ten of those are closed here.
+
+### The dev server no longer stops working after one typo
+
+`weave dev` turned a template *parse* error into a proper message, and every other compiler failure into a
+thrown exception — which took esbuild's watch state with it. After one of those, the server kept serving the
+last good bundle **forever**: every later save was ignored, with nothing in the terminal and nothing in the
+browser. The cure was restarting, if you guessed that was the problem.
+
+An editor truncating a file on save was enough to trigger it. Now every failure is a located diagnostic —
+your file, your line — and the save that fixes it rebuilds.
+
+### The five silent template mistakes
+
+Each of these compiled cleanly, passed `weave check`, and then failed invisibly in the browser:
+
+- **`{{ count }}` without its `()`.** A function in a text position renders as its own source code, so the
+  page read `clicked () => { track(node); return node.value; } times`. It is now a type error that says to
+  call it.
+- **`onclick={{ inc }}`** set an *attribute* to the stringified function. The button rendered, clicked, and
+  did nothing.
+- **`on:clik`** bound a listener for an event nothing fires.
+- **`xyz:abc={{ … }}`** was emitted as a plain attribute.
+- **`@fro (t of todos()) { … }`** was left in the page as literal text.
+
+The last four are build warnings that name the fix. The rules are deliberately narrow — a static
+`onclick="…"` is real HTML, `xlink:href` is a real namespace, and an event or block name only warns when it
+is one edit from a real one, so a genuinely custom event stays silent.
+
+### `weave check` checks your whole project
+
+It built one program from your components and then asked for diagnostics on those files alone. Everything
+else — services, stores, helpers, generated route modules — was pulled in as a dependency and never reported
+on. A scaffolded app, whose only quality script is `weave check`, could hold a type error that plain
+`tsc --noEmit` refuses.
+
+**This can surface errors in code that was never checked before.** That is the point, but it is worth
+knowing before you upgrade a CI pipeline.
+
+It also stopped disagreeing with the build about child components: the loader resolves `<TodoItem>` to
+`./todo-item/todo-item.ts` by convention, and the checker used to call that same working app broken.
+
+### The UI library has an installation page
+
+There was none. Nothing in the documentation said `npm install @weave-framework/ui`, and the theming page
+gave its Sass block without saying where the file goes. Put it in the obvious place — your component's own
+stylesheet — and it does *nothing*: component styles are scoped, so `:root { --weave-… }` compiles to
+`[data-w-xxxxxx]:root`, a selector that can never match. 120 KB of theme, applied to nothing, with a clean
+build and an unstyled button on screen.
+
+Now: a four-step [Installation](https://weaveframework.dev/ui/installation) page, and the compiler warns
+whenever it scopes a `:root`, `html` or `body` rule into something unmatchable.
+
+The scaffold also ships a **README** — it had none — with the same recipe, the scripts, and the deploy notes.
+
+### Deploying somewhere other than the domain root
+
+`base: '/my-app/'` in `weave.config.ts`. Every URL the framework injects picks it up, `weave dev` answers
+under it, static generation carries it, and the router adopts it as its basename — so `<Link to="/about">`
+still reads as `/about` in your code. Without it, a GitHub Pages *project* site (which the installation page
+recommends by name) asked for `user.github.io/main.js`, got a 404, and showed a white page.
+
+Alongside it: injected assets now carry a content marker (`/main.js?v=1a2b3c`) so a CDN cannot answer fresh
+HTML with a stale bundle, and an app with client routes also gets a **`404.html`** — what a static host
+serves for an unknown path, and therefore what makes a deep-link refresh work where rewrite rules are not
+available.
+
+### A blank page explains itself
+
+A `setup()` that throws rendered nothing at all — a white document with the message only in the console. The
+dev overlay now paints uncaught runtime errors too, but only when the page came out empty: an app that
+rendered and then threw keeps its screen.
+
+### The CLI's front door
+
+- A busy port crashed the dev server with Node's `Unhandled 'error' event` and a raw EADDRINUSE stack — for
+  the most ordinary situation there is, a second terminal. It steps to the next free port and says so.
+- `weave --help` exited 1 with a single usage line, and **`weave build --help` ran a build**, wiping the
+  output directory. There is real help now, and an unknown command says what it is before printing it.
+- A finished build reports what it produced: elapsed time, then each file with its size.
+
 ## 3.0.1 — 2026-08-12
 
 A **patch**: three fixes for things that were quietly not working, and every open security advisory closed.

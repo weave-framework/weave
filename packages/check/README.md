@@ -1,6 +1,6 @@
 # @weave-framework/check
 
-Weave template type-checking — virtual `.ts` generation + `tsc`, mapped back to source.
+Weave project type-checking — templates through virtual `.ts` generation + `tsc`, mapped back to source, and the ordinary modules beside them in the same program.
 
 Part of **[Weave](https://weaveframework.dev/)** — a fine-grained reactive, signal-native UI framework: no Virtual DOM, zero third-party runtime dependencies.
 
@@ -16,7 +16,7 @@ npm create weave@latest my-app
 
 ## What it does
 
-Type-checking stops at the template boundary in most toolchains. Here it doesn't: each template is compiled into a **virtual TypeScript file** whose expressions are the template's expressions, that file is handed to `tsc`, and every diagnostic is mapped back through a source map to the line and column in the template you actually wrote.
+Every `.ts` under the checked roots is type-checked, components and plain modules alike — a service or a store is not somebody else's problem. And type-checking stops at the *template* boundary in most toolchains; here it doesn't: each template is compiled into a **virtual TypeScript file** whose expressions are the template's expressions, that file is handed to `tsc`, and every diagnostic is mapped back through a source map to the line and column in the template you actually wrote.
 
 So a typo in an interpolation, a misspelled prop on a child component, or a call with the wrong argument type is a build error with a real location — not a blank screen at runtime.
 
