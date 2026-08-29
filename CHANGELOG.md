@@ -28,6 +28,13 @@ found the framework silent in the places a beginner needs it loudest. This is th
   Failures are now diagnostics located at the author's file, with the template and style files kept in
   `watchFiles` so the save that repairs the error is still watched.
 
+### Fixed — the dev loop (continued)
+- **A runtime error that renders nothing now says so, in the page.** A `setup()` that throws produced a
+  blank white document with the message only in the console — nothing to read, nothing to click, no sign
+  anything was wrong. The dev client's overlay (until now only for build errors) also paints an uncaught
+  error when the page came out empty. Only when it is empty: an app that rendered and then threw keeps its
+  screen, because covering a working UI with a modal would be worse than saying nothing.
+
 ### Fixed — the CLI's front door
 - **A busy port crashed the dev server** with Node's `Unhandled 'error' event` and a raw EADDRINUSE stack —
   for the most ordinary situation there is, a second terminal already running `weave dev`. It steps to the

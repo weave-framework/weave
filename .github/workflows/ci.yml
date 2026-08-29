@@ -206,3 +206,6 @@ jobs:
       # `weave --help` exited 1, and `weave build --help` ran a build instead of printing anything.
       - name: CLI help, unknown commands, and the build summary
         run: pnpm verify:cli-help
+      # A `setup()` that throws used to leave a blank white page with the error only in the console.
+      - name: A runtime error explains itself when the page is blank
+        run: pnpm verify:dev-runtime-error

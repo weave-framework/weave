@@ -100,12 +100,30 @@ export function injectHtml(html: string, opts: InjectOptions): string {
     // into a bundle that no longer existed (404) and went WHITE, with the real error only in the terminal.
     // Now a failure sends `error:<text>` and paints an overlay over the last working page; the next
     // successful build sends `reload` and the overlay goes with it.
-    const client: string = `<script>(function(){var o;new EventSource(${jsLiteral(opts.liveReload)})
-.addEventListener("message",function(e){var d=e.data||"";
-if(d.indexOf("error:")===0){if(!o){o=document.createElement("div");o.id="__weave_error";
+    // The same overlay also catches a RUNTIME error that leaves nothing on the page. A `setup()` that
+    // throws produced a blank white document with the message only in the console — the most confusing
+    // possible outcome for someone who has just started, and the one every framework's newcomer hits.
+    // It is deliberately conditional on an EMPTY page: an app that rendered and then threw somewhere is
+    // the developer's own console to read, and covering a working screen with a modal would be worse.
+    const client: string = `<script>(function(){var o;
+function show(t){if(!o){o=document.createElement("div");o.id="__weave_error";
 o.setAttribute("style","position:fixed;inset:0;z-index:2147483647;overflow:auto;margin:0;padding:24px;"
 +"background:#1b1b1fef;color:#ffb4ab;font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap");
-document.body.appendChild(o);}o.textContent=decodeURIComponent(d.slice(6));return;}
+document.body.appendChild(o);}o.textContent=t;}
+function blank(){var b=document.body;if(!b)return true;
+if((b.innerText||"").trim())return false;
+for(var i=0;i<b.children.length;i++){var c=b.children[i];
+if(c===o||c.tagName==="SCRIPT")continue;
+if(c.getBoundingClientRect().height>0)return false;}
+return true;}
+function runtime(err){if(!blank())return;
+show("The app threw before it rendered anything.\\n\\n"+((err&&(err.stack||err.message))||String(err))
++"\\n\\n(weave dev shows this because the page is empty — the same error is in the console.)");}
+addEventListener("error",function(e){runtime(e.error||e.message);});
+addEventListener("unhandledrejection",function(e){runtime(e.reason);});
+new EventSource(${jsLiteral(opts.liveReload)})
+.addEventListener("message",function(e){var d=e.data||"";
+if(d.indexOf("error:")===0){show(decodeURIComponent(d.slice(6)));return;}
 if(o){o.remove();o=undefined;}location.reload();});})();</script>`;
     out = out.replace(/<\/body>/i, `    ${client}\n  </body>`);
   }
