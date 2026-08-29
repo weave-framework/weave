@@ -1,5 +1,6 @@
 import { signal } from '@weave-framework/runtime';
 import { contextMenu } from '@weave-framework/ui/context-menu';
+import type { ContextMenuOptions } from '@weave-framework/ui/context-menu';
 
 // `contextMenu` is a use: action — it must be in scope for `use:contextMenu`.
 void contextMenu;
@@ -12,7 +13,7 @@ interface Lang {
 
 interface Setup {
   contextMenu: typeof contextMenu;
-  ctxOpts: unknown;
+  ctxOpts: ContextMenuOptions<Lang>;
   locale: () => string;
 }
 
@@ -38,7 +39,7 @@ export function setup(): Setup {
     row.append(flag, name);
     return row;
   };
-  const ctxOpts = {
+  const ctxOpts: ContextMenuOptions<Lang> = {
     items: langs,
     optionValue: (l: Lang) => l.value,
     optionLabel: (l: Lang) => l.label,

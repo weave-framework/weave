@@ -21,7 +21,7 @@
           class="item"
           class:active={{ isActive($index) }}
           href={{ r.entry.path }}
-          on:click={{ (e) => { e.preventDefault(); go(r); } }}
+          on:click={{ (e: MouseEvent) => { e.preventDefault(); go(r); } }}
         >
           <span class="item-main">
             <span class="item-title">{{ r.entry.title }}</span>

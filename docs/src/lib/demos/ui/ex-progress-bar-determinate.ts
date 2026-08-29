@@ -17,7 +17,7 @@ export function setup(): Setup {
   const pct = signal(40);
   return {
     pct,
-    bump: (): void => pct.set((n) => Math.min(100, n + 10)),
-    reset: (): void => pct.set(0),
+    bump: (): void => { pct.set((n) => Math.min(100, n + 10)); },
+    reset: (): void => { pct.set(0); },
   };
 }

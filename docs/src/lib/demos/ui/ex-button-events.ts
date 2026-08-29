@@ -22,8 +22,8 @@ export function setup(): Setup {
   return {
     count,
     status,
-    inc: (): void => count.set((n) => n + 1),
-    onFocus: (): void => status.set('focused'),
-    onBlur: (): void => status.set('blurred'),
+    inc: (): void => { count.set((n) => n + 1); },
+    onFocus: (): void => { status.set('focused'); },
+    onBlur: (): void => { status.set('blurred'); },
   };
 }

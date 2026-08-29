@@ -1,4 +1,5 @@
 import Table from '@weave-framework/ui/table';
+import type { TableColumn } from '@weave-framework/ui/table';
 
 // Capitalized tags in the template resolve to this import.
 void Table;
@@ -12,7 +13,7 @@ interface Row {
 }
 interface Setup {
   rows: Row[];
-  columns: unknown[];
+  columns: TableColumn<Row>[];
   trackBy: (r: Row) => number;
 }
 
@@ -29,7 +30,7 @@ export function setup(): Setup {
     { id: 4, name: 'Ona', role: 'Frontend', city: 'Šiauliai', commits: 96 },
     { id: 5, name: 'Petras', role: 'QA', city: 'Panevėžys', commits: 51 },
   ];
-  const columns = [
+  const columns: TableColumn<Row>[] = [
     { key: 'name', header: 'Name', sticky: 'start', width: 120 },
     { key: 'role', header: 'Role', width: 160 },
     { key: 'city', header: 'City', width: 160 },

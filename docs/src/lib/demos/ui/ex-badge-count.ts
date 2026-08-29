@@ -20,7 +20,7 @@ export function setup(): Setup {
   const count = signal(2);
   return {
     count,
-    inc: (): void => count.set((n) => n + 1),
-    clear: (): void => count.set(0),
+    inc: (): void => { count.set((n) => n + 1); },
+    clear: (): void => { count.set(0); },
   };
 }

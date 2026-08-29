@@ -17,6 +17,6 @@ interface Setup {
 /** `disabled` freezes every control — navigation, the jump input and the size menu all ignore input. */
 export function setup(): Setup {
   const page = signal(3);
-  const onPage = (e: PageEvent): void => page.set(e.pageIndex);
+  const onPage = (e: PageEvent): void => { page.set(e.pageIndex); };
   return { page, onPage };
 }

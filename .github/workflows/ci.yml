@@ -251,3 +251,15 @@ jobs:
       # simply started in the saved state.
       - name: a named state is saved and reopened
         run: pnpm verify:dev-state
+      # A type-level property, so the gate runs the type checker over a fixture — with a negative case,
+      # or a fixture that quietly stopped being checked would pass forever.
+      - name: a field is typed by its value, not by its validators
+        run: pnpm verify:forms-inference
+      # The binding each picker's own documentation recommends. Also type-level, also with a negative
+      # case: a value that cannot be cleared must still be refused.
+      - name: control={{ field }} type-checks
+        run: pnpm verify:ui-control
+      # The docs site is the biggest Weave app there is, and nothing type-checked it: pointing the
+      # checker at it found 456 errors, and several of them were the framework's, not the site's.
+      - name: the docs site type-checks
+        run: pnpm docs:check

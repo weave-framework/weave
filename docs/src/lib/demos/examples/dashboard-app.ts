@@ -2,7 +2,9 @@ import { signal, computed } from '@weave-framework/runtime';
 import Card from '@weave-framework/ui/card';
 import Badge from '@weave-framework/ui/badge';
 import Select from '@weave-framework/ui/select';
+import type { SelectValue } from '@weave-framework/ui/select';
 import Table from '@weave-framework/ui/table';
+import type { TableColumn } from '@weave-framework/ui/table';
 import Paginator from '@weave-framework/ui/paginator';
 import ProgressBar from '@weave-framework/ui/progress-bar';
 
@@ -74,7 +76,7 @@ function progressCell(value: number): HTMLElement {
 }
 
 interface Setup {
-  columns: unknown[];
+  columns: TableColumn<Project>[];
   statusOpts: { value: string; label: string }[];
   status: () => string;
   sort: () => SortState;
@@ -84,7 +86,7 @@ interface Setup {
   pageRows: () => Project[];
   kpi: () => { count: number; active: number; avg: number; budget: string };
   trackBy: (p: Project) => number;
-  setStatus: (v: string | string[]) => void;
+  setStatus: (v: SelectValue<{ value: string; label: string }>) => void;
   onSort: (s: SortState) => void;
   onPage: (e: PageEvent) => void;
 }

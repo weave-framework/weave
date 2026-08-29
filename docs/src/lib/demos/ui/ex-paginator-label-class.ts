@@ -17,6 +17,6 @@ interface Setup {
 /** `label` names the <nav> landmark for assistive tech; `class` forwards extra classes onto it. */
 export function setup(): Setup {
   const page = signal(0);
-  const onPage = (e: PageEvent): void => page.set(e.pageIndex);
+  const onPage = (e: PageEvent): void => { page.set(e.pageIndex); };
   return { page, onPage };
 }

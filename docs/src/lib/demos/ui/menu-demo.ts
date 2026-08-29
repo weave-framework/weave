@@ -1,5 +1,6 @@
 import { signal } from '@weave-framework/runtime';
 import { menu } from '@weave-framework/ui/menu';
+import type { MenuOptions, MenuItem } from '@weave-framework/ui/menu';
 import Icon from '@weave-framework/ui/icon';
 
 // `menu` is a use: action — it must be in scope for `use:menu` in the template.
@@ -9,7 +10,7 @@ void Icon;
 
 interface Setup {
   menu: typeof menu;
-  menuOpts: unknown;
+  menuOpts: MenuOptions<MenuItem>;
   picked: () => string;
 }
 

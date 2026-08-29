@@ -4,6 +4,7 @@ import Stepper from '@weave-framework/ui/stepper';
 import FormField from '@weave-framework/ui/form-field';
 import Input from '@weave-framework/ui/input';
 import Select from '@weave-framework/ui/select';
+import type { SelectValue } from '@weave-framework/ui/select';
 import Checkbox from '@weave-framework/ui/checkbox';
 import { snackbar } from '@weave-framework/ui/snackbar';
 
@@ -16,7 +17,13 @@ const ROLES = [
   { value: 'manager', label: 'Product manager' },
   { value: 'other', label: 'Something else' },
 ];
-const roleLabel = (v: string): string => ROLES.find((r) => r.value === v)?.label ?? v;
+// The select's value may be a value string, a whole option, or nothing at all — the label reads
+// whichever it is given.
+const roleLabel = (v: SelectValue<{ value: string; label: string }>): string => {
+  if (v == null) return '—';
+  const code: string = typeof v === 'string' ? v : Array.isArray(v) ? String(v[0] ?? '') : v.value;
+  return ROLES.find((r) => r.value === code)?.label ?? code;
+};
 
 interface Setup {
   steps: () => { label: string; content: () => Node; completed: boolean }[];
@@ -31,7 +38,9 @@ export function setup(): Setup {
   const email = field('', [validators.required('Email is required'), validators.email()]);
   const password = field('', [validators.required('Password is required'), validators.minLength(8, 'At least 8 characters')]);
   const fullName = field('', [validators.required('Your name is required')]);
-  const role = field('developer');
+  // The select can clear to `undefined` and can hold a whole option object, so the field it binds
+  // to is typed for what the select puts in it.
+  const role = field<SelectValue<{ value: string; label: string }>>('developer');
   const terms = field(false, [validators.required('You must accept the terms to continue')]);
 
   // Step validity — plain `computed`s combining the relevant fields.

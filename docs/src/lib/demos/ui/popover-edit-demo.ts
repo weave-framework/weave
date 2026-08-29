@@ -1,12 +1,13 @@
 import { signal } from '@weave-framework/runtime';
 import { popoverEdit } from '@weave-framework/ui/popover-edit';
+import type { PopoverEditConfig } from '@weave-framework/ui/popover-edit';
 
 // `popoverEdit` is a use: action — it must be in scope for `use:popoverEdit`.
 void popoverEdit;
 
 interface Setup {
   popoverEdit: typeof popoverEdit;
-  editCfg: unknown;
+  editCfg: PopoverEditConfig;
   name: () => string;
 }
 

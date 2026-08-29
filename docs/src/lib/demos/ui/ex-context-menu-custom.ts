@@ -1,5 +1,6 @@
 import { signal } from '@weave-framework/runtime';
 import { contextMenu } from '@weave-framework/ui/context-menu';
+import type { ContextMenuOptions } from '@weave-framework/ui/context-menu';
 
 // `contextMenu` is a use: action — it must be in scope for `use:contextMenu`.
 void contextMenu;
@@ -13,7 +14,7 @@ interface Action {
 
 interface Setup {
   contextMenu: typeof contextMenu;
-  ctxOpts: unknown;
+  ctxOpts: ContextMenuOptions<Action>;
   picked: () => string;
 }
 
@@ -30,7 +31,7 @@ export function setup(): Setup {
     { id: 'star', title: 'Star', hint: 'Add to favourites', blocked: false },
     { id: 'lock', title: 'Lock', hint: 'Requires admin', blocked: true },
   ];
-  const ctxOpts = {
+  const ctxOpts: ContextMenuOptions<Action> = {
     items: actions,
     optionValue: (a: Action) => a.id,
     optionLabel: (a: Action) => a.title,

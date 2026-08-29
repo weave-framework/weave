@@ -17,6 +17,6 @@ interface Setup {
 /** `siblingCount` / `boundaryCount` widen the run of numbers around the current page and at each end. */
 export function setup(): Setup {
   const page = signal(24);
-  const onPage = (e: PageEvent): void => page.set(e.pageIndex);
+  const onPage = (e: PageEvent): void => { page.set(e.pageIndex); };
   return { page, onPage };
 }

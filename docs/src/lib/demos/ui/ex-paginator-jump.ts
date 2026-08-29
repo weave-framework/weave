@@ -17,6 +17,6 @@ interface Setup {
 /** `showJump` keeps the manual go-to-page input; `jumpLabel` renames it. Type a page and press Enter. */
 export function setup(): Setup {
   const page = signal(0);
-  const onPage = (e: PageEvent): void => page.set(e.pageIndex);
+  const onPage = (e: PageEvent): void => { page.set(e.pageIndex); };
   return { page, onPage };
 }

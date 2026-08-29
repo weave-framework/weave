@@ -18,9 +18,9 @@ export function setup(): Setup {
   const count = signal(0);
   return {
     disabled,
-    toggle: (): void => disabled.set((d) => !d),
+    toggle: (): void => { disabled.set((d) => !d); },
     count,
-    hit: (): void => count.set((n) => n + 1),
+    hit: (): void => { count.set((n) => n + 1); },
     label: (): string => (disabled() ? 'Enable it' : 'Disable it'),
   };
 }

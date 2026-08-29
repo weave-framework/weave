@@ -38,6 +38,9 @@ tools/.verify-impact-app-*/
 tools/.verify-devtools-bundle.mjs
 tools/.verify-devtools-app-*/
 tools/.verify-check-outside-*/
+tools/.verify-check-shadowed-*/
+tools/.verify-forms-inference-*/
+tools/.verify-ui-control-*/
 tools/.verify-state-bundle.mjs
 tools/.verify-state-app-*/
 tools/.verify-merge-bundle.mjs

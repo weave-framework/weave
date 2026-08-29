@@ -12,6 +12,6 @@ interface Setup {
 /** Basic usage — a primary <Button> that reacts to clicks. */
 export function setup(): Setup {
   const count = signal(0);
-  const inc = (): void => count.set((n) => n + 1);
+  const inc = (): void => { count.set((n) => n + 1); };
   return { count, inc };
 }

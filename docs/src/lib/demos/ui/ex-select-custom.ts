@@ -16,6 +16,7 @@ interface Setup {
   optName: (c: Country) => string;
   optRegion: (c: Country) => string;
   picked: () => Country | undefined;
+  pickedLabel: () => string;
   setPicked: (v: unknown) => void;
 }
 
@@ -38,6 +39,10 @@ export function setup(): Setup {
     optName: (c) => c.name,
     optRegion: (c) => c.region,
     picked,
+    pickedLabel: (): string => {
+      const c = picked();
+      return c ? `${c.name} (${c.region})` : 'none';
+    },
     setPicked: (v) => picked.set(v as Country),
   };
 }

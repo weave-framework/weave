@@ -1,5 +1,6 @@
 import { signal } from '@weave-framework/runtime';
 import Table from '@weave-framework/ui/table';
+import type { TableColumn } from '@weave-framework/ui/table';
 
 // Capitalized tags in the template resolve to this import.
 void Table;
@@ -15,7 +16,7 @@ interface ColumnResize {
 }
 interface Setup {
   rows: Row[];
-  columns: unknown[];
+  columns: TableColumn<Row>[];
   trackBy: (r: Row) => number;
   widths: () => Record<string, number>;
   onResize: (e: ColumnResize) => void;
@@ -38,6 +39,6 @@ export function setup(): Setup {
     { key: 'role', header: 'Role', width: 160 },
   ];
   const widths = signal<Record<string, number>>({ name: 160, role: 160 });
-  const onResize = (e: ColumnResize): void => widths.set({ ...widths(), [e.key]: e.width });
+  const onResize = (e: ColumnResize): void => { widths.set({ ...widths(), [e.key]: e.width }); };
   return { rows, columns, trackBy: (r) => r.id, widths, onResize };
 }

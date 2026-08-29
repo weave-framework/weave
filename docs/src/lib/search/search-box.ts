@@ -93,7 +93,7 @@ export function setup(): SearchBoxSetup {
   const wireField = (el: HTMLInputElement | HTMLTextAreaElement): void => {
     el.addEventListener('focus', onFocus);
     el.addEventListener('blur', onBlur);
-    el.addEventListener('keydown', onKey);
+    el.addEventListener('keydown', onKey as EventListener);
   };
 
   const isActive = (i: number): boolean => active() === i;

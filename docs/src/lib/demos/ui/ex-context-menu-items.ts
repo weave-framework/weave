@@ -1,12 +1,12 @@
 import { signal } from '@weave-framework/runtime';
-import { contextMenu, type MenuItem } from '@weave-framework/ui/context-menu';
+import { contextMenu, type ContextMenuOptions, type MenuItem } from '@weave-framework/ui/context-menu';
 
 // `contextMenu` is a use: action — it must be in scope for `use:contextMenu`.
 void contextMenu;
 
 interface Setup {
   contextMenu: typeof contextMenu;
-  ctxOpts: unknown;
+  ctxOpts: ContextMenuOptions<MenuItem>;
   picked: () => string;
 }
 
@@ -24,7 +24,7 @@ export function setup(): Setup {
     { value: 'sep', divider: true, label: '' },
     { value: 'delete', label: 'Delete', description: 'Permanent' },
   ];
-  const ctxOpts = {
+  const ctxOpts: ContextMenuOptions<MenuItem> = {
     items,
     onSelect: (v: string | MenuItem) => picked.set(typeof v === 'string' ? v : v.value),
   };

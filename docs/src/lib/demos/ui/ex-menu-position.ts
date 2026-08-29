@@ -30,7 +30,7 @@ export function setup(): Setup {
     { value: 'paste', label: 'Paste' },
   ];
   const onSelect = (v: string | { value: string }): void =>
-    picked.set(typeof v === 'string' ? v : v.value);
+    { picked.set(typeof v === 'string' ? v : v.value); };
   const below: MenuOptions = { items, onSelect, position: 'bottom-end' };
   const above: MenuOptions = { items, onSelect, position: 'top-start' };
   const right: MenuOptions = { items, onSelect, position: 'right-start' };

@@ -16,6 +16,59 @@
 
 ## Unreleased
 
+### Three UI props now accept what their own documentation shows
+
+Pointing `weave check` at the docs site turned up three props whose declared type was narrower than
+what the component actually accepts, so the pattern each one's own example demonstrates did not
+type-check:
+
+- **`<Table dataSource>`** takes any `() => T[]`, not only a `Signal<T[]>` — the implementation calls
+  whatever function it is given, and a `computed` is the natural thing to hand it.
+- **`<Stepper steps>`** takes a getter, which is exactly what the documented `linear` example uses to
+  build steps out of signals.
+- **`<Toolbar role>`** exists. The toolbar documentation has always shown `role="banner"` on it; the
+  prop was never declared and the attribute landed nowhere.
+
+### `lazy()` can load a page that takes props
+
+A routed page declares the props the router hands it (`setup(props: { params: { pkg: string } })`).
+`lazy()` required a `Component`, whose props are optional, so **the module `weave routes` generates
+did not type-check for any app with a dynamic route**. `lazy` now accepts a component whose props
+shape it does not know (it only forwards them).
+
+### `control={{ field }}` on the pickers type-checks
+
+The datepicker, timepicker and date-range picker declared their `control` binding as
+`Signal<X | null | undefined>`. A `Signal` is invariant — read *and* written — so a
+`Signal<X | null>` is not one of those, and the exact line each component's own documentation
+recommends (`field<Date | null>(null)` handed to `control`) did not type-check.
+
+The binding now says what the components actually do, which was measured from them: they read
+tolerantly and write narrowly (`ControlValue<R, W>`, exported from `@weave-framework/ui/cdk`). A
+`Field<Date | null>` fits, a `Field<Date | null | undefined>` still fits, and a value that cannot be
+given `null` is still refused — because `null` is what these components write when cleared.
+
+### A component may name its own types whatever it likes
+
+`weave check` embeds a component's script verbatim into the module it synthesizes around it, and that
+module described the component using the bare global name `Node`. A component that declared its own
+`interface Node` — a tree, a menu, a graph — therefore retyped its own default export, and anything
+that registered or lazily imported it got the memorable **`Type 'Node' is not assignable to type
+'Node'`**. Nine of this site's own demos were in that state.
+
+The synthesized types now reach the DOM type through `globalThis`, which a local declaration cannot
+shadow. The component's own `Node` still means exactly what its author wrote.
+
+### `field()` takes its type from the value, not from its validators
+
+`field('')` gave a `Field<string>`, but `field('', [validators.required()])` — the same line with the
+most ordinary validator on it — gave a **`Field<''>`**: a field that could never hold another string.
+The same happened for `field(false, …)` (`Field<false>`) and `field(0, …)` (`Field<0>`).
+
+The ready-made validators are typed for what they ACCEPT (`required` takes `unknown`), so the validator
+array was a second, contradictory inference site for the value type. The validator and options
+parameters no longer take part in that inference, so the value alone decides.
+
 ### `weave check` stops erroring on components it did not compile
 
 A Weave component's default export is synthesized by the compiler, so the `.ts` on disk really has

@@ -20,7 +20,7 @@ export function setup(): Setup {
   const submitted = signal('');
   return {
     name,
-    onName: (e: Event): void => name.set((e.target as HTMLInputElement).value),
+    onName: (e: Event): void => { name.set((e.target as HTMLInputElement).value); },
     submitted,
     onSubmit: (e: Event): void => {
       e.preventDefault();

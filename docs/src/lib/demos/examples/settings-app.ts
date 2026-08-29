@@ -1,6 +1,7 @@
 import { signal, computed, effect } from '@weave-framework/runtime';
 import Input from '@weave-framework/ui/input';
 import Select from '@weave-framework/ui/select';
+import type { SelectValue } from '@weave-framework/ui/select';
 import RadioGroup from '@weave-framework/ui/radio';
 import SlideToggle from '@weave-framework/ui/slide-toggle';
 import Slider from '@weave-framework/ui/slider';
@@ -61,7 +62,7 @@ interface Setup {
   densityFmt: (v: number) => string;
   setName: (v: string) => void;
   setEmail: (v: string) => void;
-  setLanguage: (v: string | string[]) => void;
+  setLanguage: (v: SelectValue<{ value: string; label: string }>) => void;
   setTheme: (v: string) => void;
   setDensity: (v: number) => void;
   setReduceMotion: (v: boolean) => void;

@@ -20,7 +20,7 @@ export function setup(): Setup {
   return {
     pages: [1, 2, 3, 4],
     page,
-    select: (n: number): void => page.set(n),
+    select: (n: number): void => { page.set(n); },
     // `'page'` on the active button, undefined on the rest → no attribute at all.
     currentOf: (n: number): string | undefined => (page() === n ? 'page' : undefined),
   };
