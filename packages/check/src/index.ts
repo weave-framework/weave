@@ -11,3 +11,4 @@ export { buildVirtualSfc, buildVirtualSeparate, type Virtual, type WeaveMapping,
 export { resolveChildModule } from './children-fs.js';
 export { runCheck, offsetToLineCol, type Diagnostic } from './check.js';
 export { checkProject } from './project.js';
+export { templateOf, templateFindings, type WeaveFileKind } from './template-lint.js';

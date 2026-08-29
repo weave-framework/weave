@@ -32,6 +32,9 @@ knew it meant `@for` — and that answer only ever reached a human, as prose, wi
   was green stays green.
 - **`weave check --fix`** applies every fix a rule is certain of, then re-checks. A rule with more than
   one plausible answer (an unknown binding prefix) offers no fix — a wrong auto-fix is worse than none.
+- **The editor shows them too**, with a quick fix. VS Code and WebStorm underline the mistake where it is
+  and offer "Replace `clik` with `click`". Both editors and `weave check` run the *same* code, so
+  they cannot disagree about the same file. (VS Code `0.6.3`, WebStorm `0.23.3`.)
 
 Measured on real code: **0 new warnings** across the docs site's 446 templates and the demo app — the
 rules stay as narrow as they were. On a deliberately broken template, `--fix` turned three warnings and

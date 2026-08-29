@@ -37,7 +37,7 @@
     "verify:nx": "node packages/nx/test/nx.smoke.mjs",
     "verify:tsplugin": "node packages/typescript-plugin/test/unused-import.smoke.mjs",
     "build:ls": "node packages/language-server/build.mjs",
-    "verify:ls": "node packages/language-server/build.mjs && node tools/verify-language-server.mjs && node tools/verify-ls-push-diagnostics.mjs",
+    "verify:ls": "node packages/language-server/build.mjs && node tools/verify-language-server.mjs && node tools/verify-ls-push-diagnostics.mjs && node tools/verify-ls-template-lint.mjs",
     "verify:editor-plugins": "node tools/verify-editor-plugins.mjs",
     "verify:ui-tokens": "node tools/verify-ui-token-contract.mjs",
     "skills:check": "node tools/skills-sync.mjs --check",

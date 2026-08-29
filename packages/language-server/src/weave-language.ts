@@ -36,6 +36,7 @@ import {
 // The editor has to resolve a child tag the way the build does, or a component that renders shows a red
 // squiggle. Node-only, hence its own entry point — `emit` itself must stay bundleable for a browser.
 import { resolveChildModule } from '@weave-framework/check/children';
+import { templateOf, type WeaveFileKind } from '@weave-framework/check';
 import { parseSfcLoc, type ComponentSourceLoc } from '@weave-framework/compiler';
 
 /** Every mapped region gets the full set of language features. */
@@ -45,6 +46,31 @@ const ALL_FEATURES: CodeInformation = {
   semantic: true,
   navigation: true,
 };
+
+/**
+ * The template as its OWN embedded code, so the lint can be a Volar service.
+ *
+ * Volar collects diagnostics from embedded documents only — never from the root — so a service that
+ * wanted to see the `.html`/`.weave`/`.ts` itself was simply never called. This publishes the
+ * offset-faithful template under its own language id; the mapping is the identity, because every
+ * shape `templateOf` returns is the same length as the file (a `.weave` has its script and style
+ * regions BLANKED in place, an inline template is blanked into its `.ts`, and a sibling `.html` is
+ * the template), so a finding's offset is already the file's offset.
+ *
+ * Nothing else consumes `weave-template`: the TypeScript project only picks up embedded code whose
+ * language id is a TS one, so this is inert to type checking.
+ */
+function templateEmbedded(source: string, kind: WeaveFileKind): VirtualCode | null {
+  const template: string | null = templateOf(source, kind);
+  if (template === null) return null;
+  const length: number = Math.min(template.length, source.length);
+  return {
+    id: 'template',
+    languageId: 'weave-template',
+    snapshot: snapshotOf(template),
+    mappings: [{ sourceOffsets: [0], generatedOffsets: [0], lengths: [length], data: ALL_FEATURES }],
+  };
+}
 
 function snapshotOf(text: string): ts.IScriptSnapshot {
   return {
@@ -150,6 +176,8 @@ function buildSfcRoot(uri: URI, snapshot: ts.IScriptSnapshot): VirtualCode {
   const embeddedCodes: VirtualCode[] = [
     { id: 'ts', languageId: 'typescript', snapshot: snapshotOf(v.text), mappings: tsMappings },
   ];
+  const sfcTemplate: VirtualCode | null = templateEmbedded(source, 'weave');
+  if (sfcTemplate) embeddedCodes.push(sfcTemplate);
 
   const loc: ComponentSourceLoc = parseSfcLoc(source);
   if (loc.styles) {
@@ -204,7 +232,7 @@ function buildTsComponentRoot(uri: URI, snapshot: ts.IScriptSnapshot): VirtualCo
     languageId: 'weave-ts',
     snapshot: snapshotOf(source),
     mappings: [],
-    embeddedCodes: [tsCode],
+    embeddedCodes: withTemplate([tsCode], source, 'ts'),
   };
 }
 
@@ -256,6 +284,12 @@ function buildTemplateRoot(uri: URI, snapshot: ts.IScriptSnapshot, ctx: CodegenC
     languageId: 'weave-html',
     snapshot: snapshotOf(htmlSource),
     mappings: [],
-    embeddedCodes: [tsCode],
+    embeddedCodes: withTemplate([tsCode], htmlSource, 'html'),
   };
+}
+
+/** `codes` plus the template's own embedded code, when the file has one. */
+function withTemplate(codes: VirtualCode[], source: string, kind: WeaveFileKind): VirtualCode[] {
+  const t: VirtualCode | null = templateEmbedded(source, kind);
+  return t ? [...codes, t] : codes;
 }

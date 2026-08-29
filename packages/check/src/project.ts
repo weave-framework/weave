@@ -14,8 +14,6 @@ import {
   faithfulTemplate,
   parseSfc,
   parseSfcLoc,
-  parseTemplate,
-  lintTemplateFindings,
   extensionBase,
   defaultImportSpec,
   hasPatchDeclaration,
@@ -24,9 +22,9 @@ import {
   type ExtractedSources,
   type ComponentSource,
   type PatchOp,
-  type TemplateNode,
   type LintFinding,
 } from '@weave-framework/compiler';
+import { templateFindings } from './template-lint.js';
 import { buildVirtualSfc, buildVirtualSeparate, buildVirtualPatch, type Virtual } from './emit.js';
 // A component tag with no import resolves by convention — the same rule the build loader applies, so
 // the checker agrees with what actually compiles.
@@ -85,13 +83,7 @@ function parseDiagnostic(file: string, source: string, e: ParseError): Diagnosti
  * blanked in place. Linting a raw `.weave` instead would read its `<script>` body as markup.
  */
 function templateWarnings(file: string, template: string): Diagnostic[] {
-  let nodes: TemplateNode[];
-  try {
-    nodes = parseTemplate(template);
-  } catch {
-    return []; // unparseable — the parse error is already reported, and there is nothing to lint
-  }
-  return lintTemplateFindings(nodes).map((f: LintFinding): Diagnostic => {
+  return templateFindings(template).map((f: LintFinding): Diagnostic => {
     const at: { line: number; col: number } =
       f.offset === undefined ? { line: 1, col: 1 } : offsetToLineCol(template, f.offset);
     return {

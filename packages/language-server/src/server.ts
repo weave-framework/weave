@@ -19,6 +19,7 @@ import { create as createTypeScriptServices } from 'volar-service-typescript';
 import { create as createCssService } from 'volar-service-css';
 import { createWeaveLanguagePlugin } from './weave-language.js';
 import { withSetupConstRedirect } from './redirect-definition.js';
+import { createTemplateLintService } from './template-lint-service.js';
 
 const connection: ReturnType<typeof createConnection> = createConnection();
 const server: ReturnType<typeof createServer> = createServer(connection);
@@ -57,7 +58,13 @@ connection.onInitialize((params) => {
     createTypeScriptProject(tsdk.typescript, tsdk.diagnosticMessages, () => ({
       languagePlugins: [createWeaveLanguagePlugin(tsdk.typescript)],
     })),
-    [...withSetupConstRedirect(createTypeScriptServices(tsdk.typescript), tsdk.typescript), createCssService()]
+    [
+      ...withSetupConstRedirect(createTypeScriptServices(tsdk.typescript), tsdk.typescript),
+      createCssService(),
+      // The template mistakes that compile clean and fail silently — same rules and same shared code
+      // as `weave check`, so the editor and the checker cannot disagree about the same file.
+      createTemplateLintService(),
+    ]
   );
 });
 

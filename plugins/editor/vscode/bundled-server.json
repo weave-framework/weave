@@ -1,5 +1,5 @@
 {
-  "vsix": "weave-language-0.6.2.vsix",
-  "serverSha": "159689cac9ccaa9a4f7039f3df5b96a06b11056a794c9293e38f6f57bae2303f",
-  "sourceSha": "fbb80c71641f879fbe028e3a0f0849081df70940248a1eb7d32be3ab106af16a"
+  "vsix": "weave-language-0.6.3.vsix",
+  "serverSha": "f8c9787bc7aa70f96a961537242e388fa84d792d7d0b71b5dc33eac22338c863",
+  "sourceSha": "5e5a7f53934f9960f3b62c269cba9b16853fe7ac8f1059302d7750a1b89764e1"
 }
