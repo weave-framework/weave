@@ -7,14 +7,18 @@
  * adds new capability. The rule: the client SPA core stays flat; new surfaces (SSR resume,
  * local-first sync) get their OWN budget lines and cost 0 bytes for apps that don't import them.
  *
- * Budgets are gzipped bytes, measured against the built dist (run `pnpm build:packages` first).
- * Baseline captured 2026-07-14: reactive 4382 · dom 17048 · SPA core 21430 (20.9 KB).
- * Headroom is deliberate but small — a real regression trips the gate; a minor legit change fits.
+ * Budgets are gzipped bytes of the MINIFIED entry (run `pnpm build:packages` first) — what a
+ * consumer's bundler actually ships. Re-baselined 2026-08-29 when the gate was switched from raw
+ * `tsc` emit to minified: reactive 1503 · dom 5224 · SPA core 6727 · server 3879. Every budget below
+ * is `measured × 1.05`, rounded up to the next 64 bytes — a real regression trips the gate, a minor
+ * legit change fits. The per-entry notes further down are the UNMINIFIED history that produced each
+ * line; they are kept because they record why it moved, and they no longer cost anything to keep.
  *
  * Add a new line to BUDGETS the first time a new shipping entry lands (e.g. runtime/resume,
  * @weave-framework/sync). Never raise a budget to make a red build pass without a conscious call.
  */
 import { gzipSync } from 'node:zlib';
+import { transformSync } from 'esbuild';
 import { readFileSync, existsSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -23,8 +27,8 @@ const repo = fileURLToPath(new URL('..', import.meta.url));
 
 /** Each budget: a label, the dist files it sums (gzipped, together), and the ceiling in bytes. */
 const BUDGETS = [
-  { label: 'runtime/reactive (signal core)', files: ['packages/runtime/dist/reactive.js'], budget: 5_120 },
-  { label: 'runtime/dom (renderer)', files: ['packages/runtime/dist/dom.js'], budget: 18_432 },
+  { label: 'runtime/reactive (signal core)', files: ['packages/runtime/dist/reactive.js'], budget: 1_600 },
+  { label: 'runtime/dom (renderer)', files: ['packages/runtime/dist/dom.js'], budget: 5_504 },
   {
     label: 'SPA core (reactive + dom)',
     files: ['packages/runtime/dist/reactive.js', 'packages/runtime/dist/dom.js'],
@@ -39,11 +43,11 @@ const BUDGETS = [
     // NOTE while raising it: this gate measures the UNMINIFIED dist, so doc comments count against a
     // number that no consumer downloads (their bundler strips them). Worth revisiting — measuring the
     // minified bytes would make every line here mean what it says.
-    budget: 22_784,
+    budget: 7_104,
   },
   // Phase E entries — opt-in, NOT part of the SPA core (0 bytes for apps that don't import them).
   // runtime/serialize (E0.1): the wire-format codec, used by SSR-resume + local-first. Baseline 3.1 KB.
-  { label: 'runtime/serialize (E0.1 codec)', files: ['packages/runtime/dist/serialize.js'], budget: 4_096 },
+  { label: 'runtime/serialize (E0.1 codec)', files: ['packages/runtime/dist/serialize.js'], budget: 1_600 },
   // runtime/resume (E0.2a/b): resumable event dispatch + handler registration. Baseline 2.4 KB; budget
   // 2560 → 3072 (E1.9: with no collecting session a resumable render is a LIVE client render, so it wires a
   // real listener and skips the marker — that is what makes a resumable bundle work under CSR at all: a
@@ -51,7 +55,7 @@ const BUDGETS = [
   // → 3328 (2026-07-19: `once` is now carried across the delegated dispatch. It used to be DROPPED, so
   // `on:click|once` fired on every click in a resumable build and once in an eager one — the same template
   // meaning two different things. Correctness, not a feature, and worth its 70 bytes.)
-  { label: 'runtime/resume (E0.2a/b dispatch)', files: ['packages/runtime/dist/resume.js'], budget: 3_328 },
+  { label: 'runtime/resume (E0.2a/b dispatch)', files: ['packages/runtime/dist/resume.js'], budget: 832 },
   // runtime/adopt (E1.2a/c): DOM-adoption primitives. Server+client, own line — 0 bytes for a plain SPA (I3).
   // Grown across E1.2c (block adopt lands incrementally): E1.2a marker text-bind → E1.2c-1 block-boundary
   // cursor (blockStart/blockEndOf/clearBlock) → E1.2c-2 adoptIsland (@if/@switch island-replay). Budget
@@ -69,7 +73,7 @@ const BUDGETS = [
   // refactor that consolidates all navigation into ONE sequential walk (STAGE-A-PLAN.md). The dead `after` +
   // `adoptIsland` helpers were removed, which clawed most of it back; the net is the cursor class shipping once.
   // A one-time step accepted knowingly, not a trend — headroom is deliberately tight so the next change budgets.)
-  { label: 'runtime/adopt (E1.2a/c DOM adopt)', files: ['packages/runtime/dist/adopt.js'], budget: 5_248 },
+  { label: 'runtime/adopt (E1.2a/c DOM adopt)', files: ['packages/runtime/dist/adopt.js'], budget: 1_344 },
   // runtime/graph (E0.3/E1.2): resume entry — signal codec + snapshot/resume + resumePage (SSG client entry).
   // Budget raised 2048 → 2560 (E1.2 resumePage + SNAPSHOT_ID) → 3072 (E1.2c-6 per-instance state collection:
   // collectStates / registerState / ROOT_ID) → 3584 (E1.2c-6 resume states-map handling + ResumeApp.states)
@@ -81,7 +85,7 @@ const BUDGETS = [
   // → 5120 (E1.9b `finalizeStates`: re-probe every instance AFTER the render, since a signal can be reassigned
   // between registerState and the snapshot — without it the docs build died inside `snapshot()` naming nothing).
   // Deliberate: E1.5–E1.12 turned resume from "flat text only" into real components + routed pages.
-  { label: 'runtime/graph (E0.3/E1.2 resume)', files: ['packages/runtime/dist/graph.js'], budget: 5_120 },
+  { label: 'runtime/graph (E0.3/E1.2 resume)', files: ['packages/runtime/dist/graph.js'], budget: 1_280 },
   // runtime/server (E0.4): headless render — the in-house server DOM + parser + serializer + renderToString.
   // Server-only, its own line — 0 bytes for a client SPA (I3). Baseline 5.8 KB; budget raised 7168 → 7680
   // (E1.3d SSG document-<title> capture) → 8192 (E1.4 the islands capture: `renderPage({ resumable })` wraps
@@ -103,16 +107,30 @@ const BUDGETS = [
     // script was a STORED XSS baked into every statically generated page. Two escapers + the calls; the prose
     // was trimmed first, recovering 335 of the 376 bytes. The remaining 41 are not worth deleting the "why"
     // over, and this entry never reaches a browser.)
-    budget: 9_600,
+    budget: 4_096,
   },
 ];
 
+/**
+ * Gzipped bytes of the MINIFIED entry — what a consumer's bundler actually ships.
+ *
+ * This used to gzip the raw `dist` output, which is plain `tsc` emit: every doc comment counted
+ * against a budget no browser ever downloads. Measured 2026-08-29, that was 70% of the number
+ * (the SPA core read 22.1 KB; the truth is 6.6 KB), with two consequences — the headroom shown was
+ * fiction, so a core change hit a wall that was not there, and explaining WHY a line moved cost
+ * budget, which is exactly backwards. Comments are free now; spend them.
+ *
+ * Each entry is minified on its own and the gzip sizes summed, matching how the budgets are
+ * declared (per file, summed). Not byte-identical to bundling them together, but a consistent
+ * measure — and consistency is what a regression gate needs.
+ */
 function gzBytes(relFiles) {
   let total = 0;
   for (const rel of relFiles) {
     const abs = join(repo, rel);
     if (!existsSync(abs)) return { missing: rel, total: 0 };
-    total += gzipSync(readFileSync(abs)).length;
+    const min = transformSync(readFileSync(abs, 'utf8'), { loader: 'js', format: 'esm', minify: true }).code;
+    total += gzipSync(min).length;
   }
   return { missing: null, total };
 }
