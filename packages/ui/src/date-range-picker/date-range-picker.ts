@@ -26,6 +26,7 @@
  */
 import { signal, effect, computed, untrack, onDispose, type Signal, type Computed } from '@weave-framework/runtime';
 import { createOverlay, connectedPosition, createDateAdapter, type OverlayRef, type DateAdapter } from '../cdk/index.js';
+import type { ControlValue } from '../cdk/control.js';
 import { injectDateTimeDefaults, readDefault, type DateTimeDefaults } from '../date-time-defaults.js';
 import { buildPositions, type MenuPosition } from '../shared/positions.js';
 import { createCalendarView, CALENDAR_LABEL_DEFAULTS, type CalendarView, type CalendarLabels } from '../shared/calendar-view.js';
@@ -38,7 +39,9 @@ export interface DateRange {
 
 /** The subset of a forms `Field<DateRange>` a DateRangePicker binds to. */
 export interface DateRangePickerControl {
-  value: Signal<DateRange | null | undefined>;
+  /** Read/write binding: read tolerantly, written narrowly — so a forms
+   *  `Field<DateRange | null>` fits, and so does a `Field<DateRange | null | undefined>`. */
+  value: ControlValue<DateRange | null | undefined, DateRange | null>;
   touched?: Signal<boolean>;
   error?: () => string | null;
 }

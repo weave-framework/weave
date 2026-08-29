@@ -26,13 +26,16 @@
  */
 import { signal, effect, computed, onDispose, type Signal, type Computed } from '@weave-framework/runtime';
 import { createOverlay, connectedPosition, createDateAdapter, type OverlayRef, type DateAdapter } from '../cdk/index.js';
+import type { ControlValue } from '../cdk/control.js';
 import { injectDateTimeDefaults, readDefault, type DateTimeDefaults } from '../date-time-defaults.js';
 import { buildPositions, type MenuPosition } from '../shared/positions.js';
 import { createCalendarView, CALENDAR_LABEL_DEFAULTS, type CalendarView, type CalendarLabels } from '../shared/calendar-view.js';
 
 /** The subset of a forms `Field<Date>` a Datepicker binds to. */
 export interface DatepickerControl {
-  value: Signal<Date | null | undefined>;
+  /** Read/write binding: read tolerantly, written narrowly — so a forms
+   *  `Field<Date | null>` fits, and so does a `Field<Date | null | undefined>`. */
+  value: ControlValue<Date | null | undefined, Date | null>;
   touched?: Signal<boolean>;
   error?: () => string | null;
 }

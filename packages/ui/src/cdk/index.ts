@@ -8,6 +8,7 @@
  * U1 (foundations) ships Platform + Bidi; this barrel grows as each primitive lands.
  */
 
+export * from './control.js';
 export * from './platform.js';
 export * from './bidi.js';
 export * from './portal.js';

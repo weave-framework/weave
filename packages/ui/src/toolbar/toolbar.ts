@@ -27,16 +27,24 @@ export interface ToolbarProps {
   sticky?: boolean;
   /** Extra classes, forwarded onto the container. */
   class?: string;
+  /**
+   * The container's semantic role — `banner` for a page masthead, `toolbar` for a cluster of
+   * controls. The toolbar is an unopinionated container and does not pick one for you; the
+   * documentation has always shown `role="banner"` here, and until now it landed nowhere.
+   */
+  role?: string;
 }
 
-export const template: string = '<div class={{ toolbarClass() }}><slot></slot></div>';
+export const template: string = '<div class={{ toolbarClass() }} role={{ role() }}><slot></slot></div>';
 
 export interface ToolbarContext {
   toolbarClass: () => string;
+  role: () => string | undefined;
 }
 
 export function setup(props: ToolbarProps): ToolbarContext {
   return {
+    role: (): string | undefined => props.role,
     toolbarClass: (): string => {
       const parts: string[] = ['weave-toolbar'];
       if (props.variant) parts.push(`weave-toolbar--${props.variant}`);

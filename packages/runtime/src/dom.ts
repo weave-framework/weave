@@ -1111,6 +1111,17 @@ export function mountChild(anchorNode: Comment, node: Node | null): void {
 export type Component = (props?: Record<string, unknown>, slots?: Record<string, () => Node>) => Node;
 
 /**
+ * A component whose PROPS SHAPE is not known here — what {@link lazy} loads.
+ *
+ * A routed page legitimately declares required props (`setup(props: { params: { pkg: string } })`),
+ * and the router hands them to it. Typed as {@link Component}, such a page is not assignable, so
+ * `weave routes` generated a module that did not type-check for any app with a dynamic route. `never`
+ * in the props position accepts any props shape (parameters are contravariant); `lazy` only forwards
+ * what it is given, so nothing here reads them.
+ */
+export type LoadedComponent = (props: never, slots?: Record<string, () => Node>) => Node;
+
+/**
  * Glue a compiled `render(ctx, slots)` to a `setup(props)`. The loader emits
  * `export default defineComponent(render, setup)` per component. `ctx` exposes
  * `setup()`'s bindings as own properties over `props` on the prototype, so a
@@ -1331,7 +1342,7 @@ export interface LazyOptions {
  * (`{ path, component: lazy(() => import('./Page')) }`).
  */
 export function lazy(
-  loader: () => Promise<{ default: Component } | Component>,
+  loader: () => Promise<{ default: LoadedComponent } | LoadedComponent>,
   opts: LazyOptions = {}
 ): Component {
   let resolved: Component | null = null;

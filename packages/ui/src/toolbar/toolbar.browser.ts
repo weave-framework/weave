@@ -13,7 +13,7 @@ function mount(props: ToolbarProps, slot?: () => Node): { el: HTMLElement; dispo
   const owner: Owner = createOwner();
   const el: HTMLElement = runInOwner(owner, () => {
     const ctx: ToolbarContext = setup(props);
-    const { code } = compileTemplate(template, { mode: 'function', scope: ['toolbarClass'] });
+    const { code } = compileTemplate(template, { mode: 'function', scope: ['toolbarClass', 'role'] });
     const make: MakeRender = new Function(
       'ctx',
       'rt',
@@ -60,4 +60,16 @@ test('ink + sticky + forwarded class all compose', () => {
   assert.ok(el.classList.contains('weave-toolbar--sticky'), 'sticky kept');
   assert.ok(el.classList.contains('app-bar'), 'consumer class forwarded');
   dispose();
+});
+
+// The toolbar documentation has always shown `role="banner"` on the tag. There was no such prop, so
+// the attribute landed nowhere and every page that followed the docs shipped a toolbar with no role.
+test('role lands on the container, and there is none unless asked for', () => {
+  const plain: { el: HTMLElement; dispose: () => void } = mount({}, content);
+  assert.equal(plain.el.getAttribute('role'), null, 'unopinionated by default');
+  plain.dispose();
+
+  const banner: { el: HTMLElement; dispose: () => void } = mount({ role: 'banner' }, content);
+  assert.equal(banner.el.getAttribute('role'), 'banner', 'the documented role is applied');
+  banner.dispose();
 });

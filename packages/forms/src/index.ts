@@ -85,8 +85,13 @@ interface FieldInternal<T> extends Field<T> {
 /** Create a validated field from an initial value and an ordered validator list. */
 export function field<T>(
   initial: T,
-  validators: Validator<T>[] = [],
-  opts: FieldOptions<T> = {}
+  // `NoInfer` because the value is what decides the type, and nothing else should get a vote. A ready-made
+  // validator is typed for what it accepts (`required` takes `unknown`), so leaving these as inference sites
+  // gave TypeScript a second, contradictory candidate — and the result was that `field('')` widened to
+  // `Field<string>` while `field('', [validators.required()])` froze into `Field<''>`, a field that could
+  // never hold another string. The most ordinary line in any form was the one that broke.
+  validators: Validator<NoInfer<T>>[] = [],
+  opts: FieldOptions<NoInfer<T>> = {}
 ): Field<T> {
   const value: Signal<T> = signal(initial);
   const touched: Signal<boolean> = signal(false);

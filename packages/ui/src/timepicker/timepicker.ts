@@ -17,6 +17,7 @@
  */
 import { signal, effect, onDispose, type Signal } from '@weave-framework/runtime';
 import { createOverlay, connectedPosition, type OverlayRef } from '../cdk/index.js';
+import type { ControlValue } from '../cdk/control.js';
 import { buildPositions, type MenuPosition } from '../shared/positions.js';
 import { activeIcons, type IconRegistry } from '../icon/icons.js';
 import { injectDateTimeDefaults, readDefault, type DateTimeDefaults, type TimepickerDefaults } from '../date-time-defaults.js';
@@ -29,7 +30,9 @@ export interface TimeValue {
 
 /** The subset of a forms `Field<TimeValue>` a Timepicker binds to. */
 export interface TimepickerControl {
-  value: Signal<TimeValue | null | undefined>;
+  /** Read/write binding: read tolerantly, written narrowly — so a forms
+   *  `Field<TimeValue | null>` fits, and so does a `Field<TimeValue | null | undefined>`. */
+  value: ControlValue<TimeValue | null | undefined, TimeValue | null>;
   touched?: Signal<boolean>;
   error?: () => string | null;
 }

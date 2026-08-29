@@ -40,8 +40,12 @@ export interface StepItem {
 }
 
 export interface StepperProps {
-  /** The steps, left to right. */
-  steps: StepItem[];
+  /**
+   * The steps, left to right. A getter is accepted too — the documented `linear` example builds the
+   * steps from signals (`const steps = () => [{ …, completed: done() }]`), and typed as a plain array
+   * that documented pattern did not type-check.
+   */
+  steps: StepItem[] | (() => StepItem[]);
   /** Controlled current index. */
   value?: number;
   /** Called with the next index on navigation. */
@@ -128,7 +132,10 @@ export function setup(props: StepperProps): StepperContext {
   const uid: number = (_uid += 1);
   const uncontrolled: Signal<number> = signal<number>(props.defaultIndex ?? 0);
 
-  const steps = (): StepItem[] => props.steps ?? [];
+  const steps = (): StepItem[] => {
+    const s: StepItem[] | (() => StepItem[]) | undefined = props.steps;
+    return (typeof s === 'function' ? s() : s) ?? [];
+  };
   const current = (): number => (props.value !== undefined ? props.value : uncontrolled());
   const linear = (): boolean => !!props.linear;
   const lastIndex = (): number => steps().length - 1;

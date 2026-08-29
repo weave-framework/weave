@@ -76,7 +76,10 @@ export interface SortState {
 
 export interface TableProps<T = Record<string, unknown>> {
   columns: TableColumn<T>[];
-  dataSource: DataSource<T> | T[] | Signal<T[]>;
+  // A plain getter is accepted, not just a `Signal`: the implementation calls whatever function it
+  // is given, and a `computed` (or any `() => T[]`) is the natural thing to hand it. Typed as
+  // `Signal<T[]>`, the ordinary reactive case did not type-check.
+  dataSource: DataSource<T> | T[] | (() => T[]);
   /** Stable row identity (default: index) — row keys + selection/expansion identity. */
   trackBy?: (row: T) => string | number;
 
