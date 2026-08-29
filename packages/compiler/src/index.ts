@@ -20,7 +20,8 @@ export {
   patchArrayExpr,
   readPatchOps,
 } from './extension.js';
-export { parseTemplate, ParseError } from './parser.js';
+export { parseTemplate, ParseError, type ParseOptions, type NodeSpan, type SpanMap } from './parser.js';
+export { mergeTemplates } from './merge.js';
 export { lintTemplate, lintTemplateFindings, type LintFinding, type LintFix } from './lint.js';
 export { importsBinding } from './children.js';
 export { scopeCss, scopeAttr, hostAttr, hashCss } from './css.js';

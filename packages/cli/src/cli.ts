@@ -76,6 +76,7 @@ commands
   routes [dir]           Regenerate the file-based route module (default dir: src/routes)
   migrate                Assisted migration of an Angular project into Weave
   mcp                    Run the Weave MCP server over stdio (for AI editors)
+  merge --install        Register the template merge driver, so git stops inventing conflicts
 
 options
   --config <file>        Use this weave.config.ts instead of the one found in the current directory
@@ -95,6 +96,7 @@ examples
   weave build --ssg                prerender every route
   weave check src lib              type-check two roots
   weave routes src/pages           regenerate routes from a pages directory
+  weave merge --install            once per clone: git merges templates by structure
 
 docs: https://weaveframework.dev`;
 
@@ -343,6 +345,15 @@ export async function main(argv: string[]): Promise<void> {
       );
       process.exit(1);
     }
+    return;
+  }
+
+  if (cmd === 'merge') {
+    // A git merge driver (and its one-time installer). Lazily imported: it runs once per conflicted
+    // file during a merge, and never during a build.
+    const { runMerge } = await import('./merge-driver.js');
+    const code: number = runMerge(rest);
+    if (code !== 0) process.exit(code);
     return;
   }
 

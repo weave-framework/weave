@@ -657,6 +657,36 @@ The panel updates live with no polling (it reads the graph inside an effect), fi
 
 For programmatic access: `inspect()` snapshots all named nodes, `inspectGraph()` returns nodes **plus edges**, `inspectTrace(limit?)` / `traceFor(id)` read the trigger-trace ring-buffer (bounded via `setTraceLimit`; `clearTrace()` empties it), and `inspectTree()` returns the owner hierarchy. Gate the calls behind a dev flag (e.g. `import.meta.env.DEV`) so nothing ships to production.
 
+## Merging templates without inventing conflicts
+
+Two people work on one template: one wires a handler onto a button, the other rewords its label. Git
+merges lines, and a tag and its text live on the same line, so it stops and asks a human to resolve a
+disagreement that does not exist. `weave merge` teaches git to read the file as a tree instead.
+
+~~~bash
+weave merge --install    # once per clone
+~~~
+
+That registers a merge driver in this clone's git config and adds two lines to `.gitattributes`
+(`*.html merge=weave-template`, `*.weave merge=weave-template`) — commit those, and everyone who runs
+the install command once gets the same behaviour.
+
+From then on, when a merge touches a template:
+
+- **Git tries first.** Anything git merges cleanly is used exactly as git produced it. The tree merge
+  only ever runs on files git could not merge, so installing this can add resolutions but never change
+  one you already had.
+- **Different nodes merge.** An attribute added here and a label reworded there are different things,
+  even on one line. Two different attributes on one tag likewise.
+- **The same node changed twice is still a conflict.** Two people setting the same `href` to different
+  values is a real disagreement, and you get git's normal conflict markers to resolve by hand.
+- **Nothing is reformatted.** The merge splices the original text of each node, so untouched lines come
+  out byte-for-byte unchanged.
+- **Control-flow blocks are one unit.** Two sides editing the same `@if`/`@for` block fall back to
+  git's line merge, which often still handles it.
+
+A file the template parser cannot read — a page with a `<!DOCTYPE>`, say — is simply left to git.
+
 ## AI editor integration (MCP)
 
 `@weave-framework/mcp` is a **Model Context Protocol** server that exposes the Weave toolchain to MCP-capable AI editors as structured tools — so your assistant can compile-check a template, type-check the project, resolve routes, or scaffold a component instead of guessing. It's a small in-house JSON-RPC-over-stdio server (zero third-party deps); the tools thin-wrap the existing compiler/check/router.
@@ -672,7 +702,7 @@ For programmatic access: `inspect()` snapshots all named nodes, `inspectGraph()`
 Equivalently, `weave mcp` starts the same server. The tools are `weave_compile_template` (validate markup → real compiler errors), `weave_check` (project diagnostics), `weave_routes` (file-based route tree), and `weave_scaffold_component` (generate a component's files — returned, never written without you).
 
 :::callout info "What you just learned"
-One `weave` CLI does it all — once `@weave-framework/cli` is a dev dependency you run it as `weave <cmd>` (via `npm run`/`npx`). The commands are `dev` (watch + live-reload), `build` (static `dist/`, plus `--ssg` prerendering), `check` (template + child-prop type-checking), `routes` (file-based route gen), and `mcp` (the AI-editor server). The big idea: a `weave.config.ts` switches `dev`/`build` into the full config-driven pipeline, while no config drops you into a bare legacy flag-driven one — and `dev` behaves quite differently between them (in-memory server vs esbuild's serve, port from config vs `--port`). Flags like `--config`, `--out`, `--serve`, `--port`, `--no-minify`, and `--eager` each belong to a specific command and pipeline. `styleLang` really compiles `css`/`scss`/`sass` differently, and editor support is a shared Volar server behind a VS Code extension and a WebStorm/LSP4IJ plugin.
+One `weave` CLI does it all — once `@weave-framework/cli` is a dev dependency you run it as `weave <cmd>` (via `npm run`/`npx`). The commands are `dev` (watch + live-reload), `build` (static `dist/`, plus `--ssg` prerendering), `check` (template + child-prop type-checking), `routes` (file-based route gen), `merge` (a git merge driver for templates), and `mcp` (the AI-editor server). The big idea: a `weave.config.ts` switches `dev`/`build` into the full config-driven pipeline, while no config drops you into a bare legacy flag-driven one — and `dev` behaves quite differently between them (in-memory server vs esbuild's serve, port from config vs `--port`). Flags like `--config`, `--out`, `--serve`, `--port`, `--no-minify`, and `--eager` each belong to a specific command and pipeline. `styleLang` really compiles `css`/`scss`/`sass` differently, and editor support is a shared Volar server behind a VS Code extension and a WebStorm/LSP4IJ plugin.
 :::
 
 [Next: Recipes →](/learn/recipes) · [Reference: configuration →](/reference/config) · [Installation →](/learn/installation)

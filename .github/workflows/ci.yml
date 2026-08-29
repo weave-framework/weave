@@ -242,3 +242,7 @@ jobs:
       # the flag, and NOTHING appears without it.
       - name: weave dev --devtools shows the reactive graph, and only when asked
         run: pnpm verify:devtools-flag
+      # Played twice, in a plain repo and a driven one: the plain one has to CONFLICT before the
+      # driven one is allowed to merge, or the gate would be proving nothing about git.
+      - name: templates merge by structure
+        run: pnpm verify:merge

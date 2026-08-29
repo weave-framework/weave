@@ -46,6 +46,27 @@ type AttrValue =
   | { kind: 'expr'; expr: string; offset: number }
   | null;
 
+/**
+ * Where a node (or attribute) came from in the source, as a half-open `[start, end)` range.
+ *
+ * Deliberately NOT stored on the AST: only `weave merge` reads spans, and the AST is the compile
+ * path's hot data structure. Recorded into a caller-supplied map instead, so nothing else changes
+ * shape or size.
+ */
+export interface NodeSpan {
+  /** offset of the node's first character */
+  start: number;
+  /** offset one past its last character */
+  end: number;
+  /** elements only: offset one past the `>` of the OPEN tag */
+  openEnd?: number;
+  /** elements only: offset of the `<` of the CLOSE tag (absent when self-closing) */
+  closeStart?: number;
+}
+
+/** Node/attribute → its source span. See {@link NodeSpan}. */
+export type SpanMap = WeakMap<object, NodeSpan>;
+
 /** Options for {@link parseTemplate}. */
 export interface ParseOptions {
   /**
@@ -53,6 +74,13 @@ export interface ParseOptions {
    * compile path (codegen/check) is byte-for-byte unchanged; only the formatter opts in.
    */
   comments?: boolean;
+  /**
+   * When given, every node and attribute the parser produces is recorded into it with its source
+   * span. Pass `comments: true` alongside it if you intend to reassemble the source from spans:
+   * with comments dropped, the children of a node no longer tile their parent's text and a comment
+   * would silently vanish from anything rebuilt out of the pieces.
+   */
+  spans?: SpanMap;
 }
 
 export function parseTemplate(input: string, opts: ParseOptions = {}): TemplateNode[] {
@@ -78,6 +106,16 @@ class Parser {
   }
 
   /**
+   * Record `node`'s source span, unless it already has one: {@link parseElement} registers its own
+   * (it is the only caller that knows where the open tag ends), and the generic record made by
+   * {@link parseChildren} on the way out must not flatten it back to a plain range.
+   */
+  markNode(node: object, start: number, end: number): void {
+    const m: SpanMap | undefined = this.opts.spans;
+    if (m && !m.has(node)) m.set(node, { start, end });
+  }
+
+  /**
    * Parse children until `</closeTag>` (element), `}` (block body when
    * `stopAtBrace`), or EOF. Does not consume the terminator.
    */
@@ -89,22 +127,33 @@ class Parser {
         if (closeTag === null) throw new ParseError(`Unexpected closing tag at ${this.pos}`, this.pos);
         return out; // caller consumes the close tag
       }
+      const nodeStart: number = this.pos;
       if (this.src.startsWith('{{', this.pos)) {
         const it: { expr: string; offset: number } = this.readInterp();
-        out.push({ type: 'interp', expr: it.expr, offset: it.offset });
+        const node: TemplateNode = { type: 'interp', expr: it.expr, offset: it.offset };
+        out.push(node);
+        this.markNode(node, nodeStart, this.pos);
         continue;
       }
       if (this.src.startsWith('<!--', this.pos)) {
         const value: string = this.readComment();
-        if (this.opts.comments) out.push({ type: 'comment', value });
+        if (this.opts.comments) {
+          const node: TemplateNode = { type: 'comment', value };
+          out.push(node);
+          this.markNode(node, nodeStart, this.pos);
+        }
         continue;
       }
       if (this.peek() === '@' && BLOCK_KW.test(this.src.slice(this.pos))) {
-        out.push(this.parseBlock());
+        const node: TemplateNode = this.parseBlock();
+        out.push(node);
+        this.markNode(node, nodeStart, this.pos);
         continue;
       }
       if (this.peek() === '<') {
-        out.push(this.parseElement());
+        const node: TemplateNode = this.parseElement();
+        out.push(node);
+        this.markNode(node, nodeStart, this.pos);
         continue;
       }
       const textStart: number = this.pos;
@@ -120,8 +169,14 @@ class Parser {
           // Coalesced: an index into `value` no longer maps to the source, so drop the position
           // instead of keeping one that is wrong for everything after the join.
           last.offset = undefined;
+          // The SPAN, unlike the offset, stays true: it is a range, and the joined run really does
+          // reach from where the first one started to here (over the skipped comment between them).
+          const span: NodeSpan | undefined = this.opts.spans && this.opts.spans.get(last);
+          if (span) span.end = this.pos;
         } else {
-          out.push({ type: 'text', value: text, offset: textStart });
+          const node: TemplateNode = { type: 'text', value: text, offset: textStart };
+          out.push(node);
+          this.markNode(node, textStart, this.pos);
         }
       }
     }
@@ -517,6 +572,7 @@ class Parser {
   }
 
   parseElement(): ElementNode {
+    const start: number = this.pos;
     this.pos++; // <
     const tagOffset: number = this.pos;
     const tag: string = this.readName();
@@ -536,12 +592,16 @@ class Parser {
     // router's <Link>, which would otherwise collide with the void <link> element),
     // so it always takes children + a close tag.
     const isVoid: boolean = !/^[A-Z]/.test(tag) && VOID.has(tag.toLowerCase());
+    const openEnd: number = this.pos;
     if (selfClosing || isVoid) {
-      return { type: 'element', tag, tagOffset, attrs, children: [], selfClosing: true };
+      const node: ElementNode = { type: 'element', tag, tagOffset, attrs, children: [], selfClosing: true };
+      if (this.opts.spans) this.opts.spans.set(node, { start, end: this.pos, openEnd });
+      return node;
     }
 
     const children: TemplateNode[] = this.parseChildren(tag);
     // consume the matching close tag
+    const closeStart: number = this.pos;
     if (!this.src.startsWith('</', this.pos)) throw new ParseError(`Unclosed <${tag}>`);
     this.pos += 2;
     const closeName: string = this.readName();
@@ -550,17 +610,25 @@ class Parser {
     if (this.peek() !== '>') throw new ParseError(`Expected '>' closing </${tag}>`, this.pos);
     this.pos++;
 
-    return { type: 'element', tag, tagOffset, attrs, children, selfClosing: false };
+    const node: ElementNode = { type: 'element', tag, tagOffset, attrs, children, selfClosing: false };
+    if (this.opts.spans) this.opts.spans.set(node, { start, end: this.pos, openEnd, closeStart });
+    return node;
   }
 
   parseAttrs(tag: string): Attr[] {
     const attrs: Attr[] = [];
     while (!this.eof()) {
+      // The span starts BEFORE the whitespace on purpose: an attribute carries its own separator,
+      // so one lifted out of another revision of the file brings its line break and indentation
+      // with it instead of being jammed against its neighbour.
+      const wsStart: number = this.pos;
       this.skipWs();
       const c: string = this.peek();
       if (c === '>' || c === '/' || c === undefined) break;
       const before: number = this.pos;
-      attrs.push(this.parseAttr());
+      const attr: Attr = this.parseAttr();
+      attrs.push(attr);
+      this.markNode(attr, wsStart, this.pos);
       // Advance guard: `readAttrName` consumes only `[A-Za-z0-9_\-:.|@]`, so a stray char that is
       // neither a terminator nor `=`/quote (e.g. `}`, `(`, `[`, `*`, `#`) yields an empty name
       // WITHOUT moving the cursor — the loop would then spin forever, growing `attrs` until the

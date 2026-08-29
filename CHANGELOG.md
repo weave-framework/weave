@@ -16,6 +16,27 @@
 
 ## Unreleased
 
+### `weave merge` — git stops inventing template conflicts
+
+Two people on one template is the everyday case, and git merges lines. A tag and its text share a line,
+so a handler added to a button and that button's label reworded are one hunk to git: a conflict, with
+nothing actually in disagreement.
+
+`weave merge --install` (once per clone) registers a merge driver that reads the file as a tree.
+Different nodes merge — an attribute here, a label there, two different attributes on one tag. The same
+node changed two ways stays a conflict, because it is one.
+
+Three properties make it safe to install and keep:
+
+- **Git goes first.** Its own merge runs before anything else, and its result is used whenever it is
+  clean. The tree merge only sees files git already failed on, so it can add resolutions and never
+  change one that already worked.
+- **Nothing is reformatted.** The merge splices the original source text of each node; untouched lines
+  come out byte-for-byte unchanged.
+- **It declines loudly rather than guessing.** Control-flow blocks (`@if`, `@for`, …) are opaque units,
+  a result that does not re-parse is thrown away, and a file that is not a template (a page with a
+  `<!DOCTYPE>`) is left to git untouched.
+
 ### A template mistake now says WHERE, and `weave check --fix` repairs the certain ones
 
 The five template lint rules have always produced the right sentence. Three of them even computed the
