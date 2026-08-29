@@ -97,6 +97,21 @@ const run = async (args) => {
   return { said, code };
 };
 
+// 0. The root actually given on the command line is the root that gets checked. This is not a detail:
+// `weave check <path>` used to drop its first path argument, so it checked `src` whatever you asked for
+// -- and in a project with no `src` it checked NOTHING and printed "no type errors". A false green from
+// the quality tool is worse than no quality tool. `lib` here is deliberately not `src`.
+const libDir = join(app, 'lib', 'thing');
+mkdirSync(libDir, { recursive: true });
+writeFileSync(join(libDir, 'thing.ts'), 'export const broken: number = "not a number";' + String.fromCharCode(10));
+const rooted = await run(['check', 'lib']);
+ok(rooted.code === 1, 'a root that is not `src` is really checked (exit ' + rooted.code + ')');
+ok(
+  rooted.said.some((l) => l.includes('thing.ts')),
+  'and the error is reported from it (got ' + JSON.stringify(rooted.said) + ')',
+);
+rmSync(join(app, 'lib'), { recursive: true, force: true });
+
 // 1. Plain `check` must REPORT all three -- before this they were invisible to the checker.
 const first = await run(['check']);
 const reported = first.said.filter((l) => l.includes('app.html') && l.includes('warning'));

@@ -287,7 +287,10 @@ export async function main(argv: string[]): Promise<void> {
   }
   if (cmd === 'check') {
     const flagged: number = rest.indexOf('--impact');
-    const roots: string[] = rest.filter((a, i) => !a.startsWith('-') && i !== flagged + 1);
+    // `indexOf` returns -1 when the flag is absent, and `-1 + 1` is 0 — so the guard against picking up
+    // `--impact`'s argument as a root used to drop the FIRST path instead. `weave check lib` silently
+    // checked `src`, and from a directory with no `src` it checked nothing and reported success.
+    const roots: string[] = rest.filter((a, i) => !a.startsWith('-') && !(flagged !== -1 && i === flagged + 1));
     const where: string[] = roots.length ? roots : ['src'];
     if (flagged !== -1) {
       const target: string | undefined = rest[flagged + 1];
