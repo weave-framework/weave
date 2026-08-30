@@ -3,6 +3,58 @@
 Human-readable highlights, one section per release — everything notable that landed since
 the previous one. For the granular, per-version log see [CHANGELOG.md](CHANGELOG.md).
 
+## 3.3.0 — 2026-08-30
+
+A **minor**, and the useful summary is that two of its three parts are about the tooling refusing to
+guess, while the third is a security fix you would never have noticed until a file made your build hang.
+
+### Two compiler scans could be made to hang on hostile input
+
+Both read text whose length you control — a component's own script, and the prose inside a template —
+and both backtracked polynomially. `import` followed by 8,000 spaces and no `from` took **59 seconds**
+inside the compiler's import scan; 16,000 did not finish in two minutes. 120 KB of `@A(` took 5.7
+seconds inside the text lint. One file was enough to stall a build or an editor.
+
+Both are fixed and held by a gate that asserts the same inputs complete in milliseconds. Reported by
+GitHub code scanning as `js/polynomial-redos`. **No action needed on your side** — nothing about the
+API or the output changed.
+
+### A two-way binding declares its signal
+
+`weave check --fix` and the editor lightbulb could already declare a name your template asks for, when
+the markup left exactly one answer — a name bound to `on:click` can only be `() => void`. `bind:` now
+qualifies too, and for the same kind of reason rather than a looser one: the runtime writes a specific
+type BACK into the signal, and your markup settles which one.
+
+| you wrote | you get |
+| --- | --- |
+| `bind:checked={{ done }}` | `const done = signal(false);` |
+| `bind:value={{ age }}` on `type="number"` or `range` | `const age = signal(0);` |
+| `bind:value={{ tags }}` on `<select multiple>` | `const tags = signal<string[]>([]);` |
+| `bind:value={{ name }}` anywhere else | `const name = signal('');` |
+
+The `signal` import comes with it, in the same single edit — joining your existing
+`@weave-framework/runtime` import if you have one, opening one if you do not.
+
+Two shapes are still refused, and the refusals are deliberate. `bind:group` writes back in whatever type
+the signal already holds, so a fresh declaration has no forced type at all; an `<input>` whose `type` is
+itself a binding is a string one render and a number the next. `{{ total }}` and `@for (t of items())`
+stay refused for the same reason they always were: an element type of `unknown` makes every use of `t`
+an error, which is worse than silence.
+
+### The editor offers it in a `.weave` too
+
+An SFC keeps its script inside the same file, so the edit had to be shifted by where that script begins.
+Without the shift the lightbulb simply declined, and every `.weave` author was left with
+`weave check --fix` in the terminal. Both authoring forms now behave the same.
+
+Editor plugins: VS Code **0.6.7**, WebStorm **0.23.7**.
+
+### Upgrading
+
+Nothing to do. No API moved, no behaviour of a running app changed, and `weave check` reports the same
+set of things it reported in 3.2.0 — it can now repair more of them.
+
 ## 3.2.0 — 2026-08-30
 
 A **minor**, and it has one theme: the two files stop being two files. Everything a template knows about
