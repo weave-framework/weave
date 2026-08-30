@@ -90,6 +90,10 @@ export function parseTemplate(input: string, opts: ParseOptions = {}): TemplateN
 }
 
 class Parser {
+  /** Nesting levels allowed before the parser refuses — see {@link parseChildren}. */
+  static readonly MAX_DEPTH: number = 500;
+  /** Current nesting depth, so the refusal can be a located error rather than a stack overflow. */
+  depth: number = 0;
   pos: number = 0;
   /** Inner start offset of the most recent {@link readParen} — for block-head expr offsets. */
   parenStart: number = 0;
@@ -120,6 +124,26 @@ class Parser {
    * `stopAtBrace`), or EOF. Does not consume the terminator.
    */
   parseChildren(closeTag: string | null, stopAtBrace: boolean = false): TemplateNode[] {
+    // This parser is recursive-descent, so nesting costs stack. Past roughly 2,500 levels the engine
+    // throws a bare `RangeError` with no offset on it — the author is told "Maximum call stack size
+    // exceeded" about a file, with nothing saying where. A file with thousands of unclosed tags is
+    // malformed, not deep, and the cap is what turns that into a located sentence. 500 is twenty
+    // times the deepest template in this repository and five times below where the stack gives out.
+    if (++this.depth > Parser.MAX_DEPTH) {
+      this.depth--;
+      throw new ParseError(
+        `Template nests more than ${Parser.MAX_DEPTH} levels deep. That is almost always an unclosed tag or block above this point.`,
+        this.pos
+      );
+    }
+    try {
+      return this.parseChildrenInner(closeTag, stopAtBrace);
+    } finally {
+      this.depth--;
+    }
+  }
+
+  private parseChildrenInner(closeTag: string | null, stopAtBrace: boolean): TemplateNode[] {
     const out: TemplateNode[] = [];
     while (!this.eof()) {
       if (stopAtBrace && this.peek() === '}') return out;
@@ -542,10 +566,15 @@ class Parser {
 
   /** Consume `<!-- … -->` and return the raw inner text (verbatim). Unterminated ⇒ to EOF. */
   readComment(): string {
+    const start: number = this.pos;
     const inner: number = this.pos + 4; // past `<!--`
     const end: number = this.src.indexOf('-->', inner);
-    const value: string = this.src.slice(inner, end === -1 ? this.src.length : end);
-    this.pos = end === -1 ? this.src.length : end + 3;
+    // An unterminated comment used to swallow the rest of the file in silence. What the author then
+    // saw was codegen's "Empty template fragment" — a true sentence about the wrong thing, with no
+    // position on it. The mistake is here, and it has an offset.
+    if (end === -1) throw new ParseError('Unterminated comment: `<!--` has no matching `-->`.', start);
+    const value: string = this.src.slice(inner, end);
+    this.pos = end + 3;
     return value;
   }
 

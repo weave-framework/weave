@@ -19,6 +19,16 @@ Both are fixed and held by a gate that asserts the same inputs complete in milli
 GitHub code scanning as `js/polynomial-redos`. **No action needed on your side** — nothing about the
 API or the output changed.
 
+### A malformed template tells you where, instead of crashing
+
+Two shapes made the parser fail without saying anything you could act on. Thousands of unclosed tags or
+blocks overflowed the stack — `Maximum call stack size exceeded`, about a file, with no position. And an
+unterminated `<!--` quietly swallowed the rest of the file, surfacing as `Empty template fragment`: a
+true sentence about the wrong thing.
+
+Both are now located errors. Nesting is capped at 500 levels, a bound measured rather than guessed — the
+stack gives out around 2,500, and the deepest template in the Weave repository nests 25.
+
 ### A two-way binding declares its signal
 
 `weave check --fix` and the editor lightbulb could already declare a name your template asks for, when

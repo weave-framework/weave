@@ -160,6 +160,12 @@ jobs:
       # green on a reintroduced backtrack.
       - name: Compiler scans stay linear on hostile input
         run: pnpm verify:redos
+      # The parser is the piece most exposed to input nobody wrote on purpose - a truncated paste, the
+      # intermediate states of a migration. Every tracked template is mutated ~2,600 ways and every
+      # rejection must carry an offset; thousands of unclosed tags used to overflow the stack and an
+      # unterminated comment surfaced as codegen's "Empty template fragment", neither with a position.
+      - name: A malformed template says WHERE, never crashes
+        run: pnpm verify:hostile-input
       - name: weave check
         run: pnpm verify:check
       - name: Prettier plugin

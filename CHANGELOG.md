@@ -16,6 +16,26 @@
 
 ## 3.3.0
 
+### A malformed template says where it went wrong, instead of crashing
+
+The parser is the piece most exposed to input nobody wrote on purpose — a half-finished edit, a
+truncated paste, the intermediate states of a migration — and two shapes made it fail without saying
+anything useful.
+
+Thousands of unclosed tags or blocks overflowed the stack: the author was told `Maximum call stack size
+exceeded` about a file, with nothing about where. Nesting is now capped at 500 levels with a located
+error naming the likely cause. That bound was measured rather than picked: the stack gives out at
+around 2,500 levels, and the deepest template in this repository nests 25.
+
+An unterminated `<!--` swallowed the rest of the file in silence, and what surfaced was codegen's
+`Empty template fragment` — a true sentence about the wrong thing, with no position on it. It is now
+reported at the comment.
+
+Both are held by `pnpm verify:hostile-input`, which mutates every template in the repository about
+2,600 ways — truncated at forty points, single characters removed at twenty more, each structural
+character injected — and requires every rejection to carry an offset. It also requires at least a tenth
+of that corpus to actually be rejected, since otherwise a parser that accepts everything would pass it.
+
 ### A two-way binding declares its signal
 
 `weave check --fix` and the editor lightbulb answered one shape: a name bound to an `on:` handler,

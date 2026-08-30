@@ -27,6 +27,7 @@
     "verify:resume": "node tools/verify-resume.mjs",
     "verify:demo": "node tools/verify-demo.mjs",
     "verify:redos": "node packages/compiler/test/redos.smoke.mjs",
+    "verify:hostile-input": "node packages/compiler/test/hostile-input.smoke.mjs",
     "verify:router-ssr": "node packages/router/test/ssr.smoke.mjs",
     "verify:ui-ssr": "node packages/ui/test/ssr.smoke.mjs",
     "verify:dev-proxy": "node tools/verify-dev-proxy.mjs && node packages/cli/test/dev-proxy-stream.smoke.mjs",
