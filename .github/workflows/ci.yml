@@ -154,6 +154,12 @@ jobs:
       # static root it copies. Both were found by building a real package against a release.
       - name: CLI config surface (library configs, default publicDir)
         run: pnpm verify:cli-config
+      # Two compiler scans read text an author can make arbitrarily long — a component's script and a
+      # template's prose — and both were polynomial: `import` plus 8,000 spaces took 59 seconds, and
+      # 240 KB of `@A(` took 10. Fixed, and guarded here, because the correctness tests alone stay
+      # green on a reintroduced backtrack.
+      - name: Compiler scans stay linear on hostile input
+        run: pnpm verify:redos
       - name: weave check
         run: pnpm verify:check
       - name: Prettier plugin

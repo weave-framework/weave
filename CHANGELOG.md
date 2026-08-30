@@ -16,6 +16,28 @@
 
 ## Unreleased
 
+### Two compiler scans could be made to hang on hostile input
+
+Both read text an author controls and can make arbitrarily long — a component's own script, and the
+prose inside a template — and both backtracked polynomially, so a single file could stall a build or
+an editor for minutes.
+
+`importsBinding` matched `import\s+([^;]*?)\s+from\s+['"][^'"]+['"]`, where a run of whitespace can
+be divided between the two `\s+` and the lazy group in every possible way. The word `import` followed
+by 8,000 spaces and no `from` took **59 seconds**; 16,000 did not finish in two minutes. It now locates
+each `import` in one pass and reads only that statement, bounded by its `;` or by where the next
+`import` begins — the second bound matters, because without it two semicolon-less imports read as one
+and the second binding was invisible.
+
+The text lint matched `@([A-Za-z]+)\s*(\([^{}]*\))?\s*\{`, with the same split available across the
+optional group: 120 KB of `@A(` took 5.7 seconds. The whitespace before `(` now sits inside the
+optional group, and the block head is bounded, so a head longer than 512 characters simply goes
+unremarked — this rule offers a spelling hint, and silence is the right failure for it.
+
+Both are guarded by `pnpm verify:redos`, which asserts the same inputs complete in milliseconds and
+that the scans still find what they are meant to find. Against the previous code its three timing
+claims fail at 71s, 10.3s and 23.8s. Reported by GitHub code scanning as `js/polynomial-redos`.
+
 ### Internal
 
 - **The public-repo private-path gate was weaker than the local hook it backs up.** `verify:no-private`

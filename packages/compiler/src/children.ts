@@ -64,10 +64,27 @@ export function importsBinding(script: string | undefined, name: string): boolea
   if (!script) return false;
   const code: string = stripComments(script);
   const word: RegExp = new RegExp(`\\b${name}\\b`);
-  const IMPORT: RegExp = /import\s+([^;]*?)\s+from\s+['"][^'"]+['"]/g;
+
+  // Located first, then read statement by statement. The single regex this replaces —
+  // `import\s+([^;]*?)\s+from\s+['"][^'"]+['"]` — let a run of whitespace split three ways between its
+  // two `\s+` and the lazy group, so `import` followed by spaces and no `from` was retried over every
+  // split: 8,000 spaces took 59 SECONDS (CodeQL js/polynomial-redos). Each statement below is a slice
+  // that ends where the next one begins, so every scan is over disjoint text and the whole pass is linear.
+  const HEAD: RegExp = /\bimport\b/g;
+  const starts: number[] = [];
   let m: RegExpExecArray | null;
-  while ((m = IMPORT.exec(code)) !== null) {
-    if (word.test(m[1])) return true; // the binding section (before `from`) names it
+  while ((m = HEAD.exec(code)) !== null) starts.push(m.index);
+
+  for (let i: number = 0; i < starts.length; i++) {
+    // A statement ends at its `;` or where the next `import` starts — semicolon-less code is real,
+    // and without the second bound two adjacent imports would read as one and hide the second binding.
+    const stmt: string = code.slice(starts[i], i + 1 < starts.length ? starts[i + 1] : code.length);
+    const semi: number = stmt.indexOf(';');
+    const body: string = semi === -1 ? stmt : stmt.slice(0, semi);
+    const from: number = body.search(/\bfrom\b/);
+    if (from === -1) continue; // `import './side-effect'` and `import(…)` bind nothing
+    if (!/^\s*['"]/.test(body.slice(from + 'from'.length))) continue; // `from` must introduce a path
+    if (word.test(body.slice('import'.length, from))) return true; // the binding section names it
   }
   return false;
 }

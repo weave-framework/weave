@@ -208,9 +208,16 @@ function lintAttr(attr: Attr, out: LintFinding[]): void {
 
 /** An unrecognised `@word (…) {` left in the text — a misspelled block, which renders as literal text. */
 function lintText(text: string, offset: number | undefined, out: LintFinding[]): void {
-  // `[^{}]*` rather than `[^)]*`: a block head holds calls of its own — `@for (t of todos())` — so the
+  // `[^{}]` rather than `[^)]`: a block head holds calls of its own — `@for (t of todos())` — so the
   // scan has to run to the LAST `)` before the brace, not the first one.
-  const RE: RegExp = /@([A-Za-z]+)\s*(\([^{}]*\))?\s*\{/g;
+  //
+  // Two details are load-bearing against backtracking (CodeQL js/polynomial-redos). The whitespace
+  // before `(` sits INSIDE the optional group: written as `\s*(…)?\s*`, one run of spaces could be
+  // split between the two `\s*` in every possible way, and 120 KB of text took 5.7 seconds. And the
+  // head is bounded, so a text full of `@A(` with no closing paren cannot rescan to the end from every
+  // one of them. A block head longer than the bound simply goes unremarked — this rule only offers a
+  // spelling hint, so silence there is the right failure.
+  const RE: RegExp = /@([A-Za-z]+)(?:\s*(\([^{}]{0,512}\)))?\s*\{/g;
   let m: RegExpExecArray | null;
   while ((m = RE.exec(text)) !== null) {
     const word: string = m[1];
