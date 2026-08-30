@@ -14,6 +14,16 @@
 > already left it behind — Phase E ran 94 commits without a bump, and then released as one MINOR. The public
 > promise wins; the habit is retired.)*
 
+## Unreleased
+
+### Internal
+
+- `pnpm verify:all` runs locally exactly what CI runs, by PARSING `.github/workflows/ci.yml` rather than
+  keeping a second list of gates. 3.2.0 shipped with a red CI because the pre-release check was a
+  hand-picked list of about 18 commands and the workflow has 52; the one that failed
+  (`verify:skills` — five new runtime exports were undocumented) was not on the list. A second list
+  drifts; a list read from the first one cannot.
+
 ## 3.2.0
 
 ### A template mistake now says WHERE, and `weave check --fix` repairs the certain ones

@@ -62,6 +62,7 @@
     "verify:dev-state": "node packages/cli/test/dev-state.smoke.mjs",
     "verify:forms-inference": "node packages/forms/test/inference.smoke.mjs",
     "verify:ui-control": "node packages/ui/test/control-binding.smoke.mjs",
+    "verify:all": "node tools/verify-all.mjs",
     "verify:no-private": "node tools/verify-no-private-paths.mjs",
     "verify:authorship": "node tools/verify-authorship.mjs",
     "verify:template-ranges": "node tools/verify-template-ranges.mjs"

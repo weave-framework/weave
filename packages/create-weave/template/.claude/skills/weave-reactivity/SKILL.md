@@ -178,7 +178,19 @@ console.log(inspect());                             // [{ id, name, kind, value 
 | `clearTrace()` / `setTraceLimit(n)` | reset / resize the trace ring buffer (default 500) |
 | `devNodeCount()` | number of registered nodes |
 | `onDevtoolsChange(cb)` | subscribe to registry *membership* changes; returns an unsubscribe fn |
-| `mountDevtoolsPanel(opts?)` | mounts the floating panel; returns a disposer. `DevtoolsPanelOptions = { position?, target? }` |
+| `mountDevtoolsPanel(opts?)` | mounts the floating panel; returns a disposer. `DevtoolsPanelOptions = { position?, target?, states? }` |
+| `captureState()` | `Record<string, unknown>` — every NAMED signal's current value, by name. A `computed` is left out: it is derived, so setting its sources reproduces it |
+| `applyState(state)` | set every named signal the object mentions; returns how many were actually set. Names the app no longer has are skipped, not an error |
+| `devServerStates()` | a `StatesAdapter` talking to `weave dev`'s own endpoints — what the panel's **States** tab uses (`mountDevtoolsPanel({ states: devServerStates() })`) |
+| `startInState(name)` | apply a saved state at start-up; what `weave dev --state <name>` emits after the mount |
+
+`StatesAdapter = { list(): Promise<string[]>; apply(name): Promise<number>; save(name): Promise<void> }` —
+implement it yourself to keep states somewhere other than the dev server.
+
+**Named states** are the save/restore loop over that registry: get the app where you want it, save the
+screen under a name, and reopen it in a second (`weave dev --state empty`). Everything above is dev-only —
+`enableDevtools(true)` must already have run when the signals were created, which is exactly why
+`weave dev --state` switches it on BEFORE the mount.
 
 Types: `DevKind` (`'signal' | 'computed' | 'effect'`), `DevNode`, `DevSnapshot`, `DevEdge`, `DevTrigger`, `DevOwner`, `DevOwnerNode`.
 

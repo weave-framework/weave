@@ -112,7 +112,14 @@ ok(/nothing under src renders/.test(none), 'a component nobody renders says so p
 // It must not type-check when asked this: the question is asked BEFORE editing, often on a red tree.
 ok(!/type error/.test(out), 'and it answers without running the type checker');
 
-rmSync(app, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+// Best-effort: every assertion above has already run. On Windows the just-bundled files can still be
+// held open for a moment, and `rmSync` then throws EPERM *after* a passing test — turning a green gate
+// red for a reason that has nothing to do with what it checks. It happened once, on a release run.
+try {
+  rmSync(app, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+} catch (e) {
+  console.warn('(could not remove the fixture: ' + (e && e.code) + ')');
+}
 
 if (failed) {
   console.error('\nX ' + failed + ' impact check(s) failed\n');
