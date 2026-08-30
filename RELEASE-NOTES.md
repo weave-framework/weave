@@ -3,6 +3,95 @@
 Human-readable highlights, one section per release — everything notable that landed since
 the previous one. For the granular, per-version log see [CHANGELOG.md](CHANGELOG.md).
 
+## 3.2.0 — 2026-08-30
+
+A **minor**, and it has one theme: the two files stop being two files. Everything a template knows about
+its `.ts` — and everything the `.ts` knows about its template — is now something the tooling can act on,
+in the terminal and in the editor, with the same code behind both.
+
+### Upgrading
+
+`weave check` reports more than it used to, so **a project that was green can go red on the first run
+after this upgrade** — nothing about your code's behaviour changed, and nothing in the API moved. Two
+things are new to it: the template mistakes below (warnings, which do not fail the command), and the
+props of a component imported from another package or another directory, which it could not type before
+and therefore never checked. See [VERSIONING.md](VERSIONING.md) — a tool that reports more is a MINOR.
+
+### A template mistake tells you where it is, and offers the fix
+
+The five template lint rules always produced the right sentence. Three of them even computed the exact
+answer — `on:clik` knew it meant `on:click` — and that answer only ever reached you as prose, with no
+position attached, naming the `.ts` rather than the template the mistake is in.
+
+Now a finding is framed at its line in its own file, with the source underlined; `weave check` reports
+these at all (it used to type-check the template and say nothing about markup that compiles clean and
+fails silently); and `weave check --fix` applies the ones with exactly one answer.
+
+The editor shows the same findings as squiggles with the same fix on the lightbulb — the same code, not a
+second implementation.
+
+### The template writes into `setup()`
+
+Write `on:click={{ save }}` with no `save`, and the fix declares it in the `.ts` for you — from the
+terminal or from the editor lightbulb. It declines on anything ambiguous, and every refusal is tested:
+this is the one place where guessing would put code in your file that you did not write.
+
+Renaming follows, in both directions: rename a binding in the template and the `const` behind it and
+everything reading it follow.
+
+### `weave check --impact <file>` — what renders this component
+
+The question everyone asks before editing a component, and the honest answer was never available: grep
+finds a tag's NAME, which is not the same as the components that resolve to this file. Reading the
+composition graph answers it exactly, separating direct users from those reached through them.
+
+### `weave merge` — git stops inventing template conflicts
+
+Two people on one template is the everyday case, and git merges lines. A tag and its text share a line,
+so a handler added to a button and that button's label reworded are one hunk to git: a conflict, with
+nothing actually in disagreement.
+
+`weave merge --install`, once per clone, teaches git to read the file as a tree. Git still runs first and
+its clean results are used as-is, so installing this can add resolutions but never change one you already
+had; nothing is reformatted; and the same node changed two ways is still a conflict, because it is one.
+
+### Any screen, in any state, in one second
+
+Getting a screen into the state you need to look at — no rows, ten thousand rows, the request failed —
+meant driving the app there by hand, every time. `weave dev --devtools` now shows the reactive graph in
+the page, and its **States** tab saves the screen you are on to `.weave/states/<name>.json`. Plain JSON:
+commit it, and the whole team has that screen. `weave dev --state <name>` opens the app already in it.
+
+A state is exactly the values of the signals you **named**. Nothing is predicted, nothing is inferred,
+and none of it exists in a production build.
+
+### Eight APIs that refused their own documented usage
+
+The new tooling was then pointed at the biggest Weave app in this repo — the documentation site, which
+nothing had ever type-checked. It reported **456 errors**, and most of them were the framework's:
+
+- A component imported from **outside the checked roots** was always `has no default export` — 396 of the
+  456 — because a component's default export is synthesized by the compiler. It is compiled as a
+  dependency now, so a wrong prop across a package boundary is caught rather than the import itself.
+- A component that declares its own **`interface Node`** retyped its own default export.
+- **`field('', [validators.required()])`** froze into `Field<''>` — a field that could never hold another
+  string. The validators no longer get a vote on the value type.
+- **`control={{ field }}`** did not type-check on the datepicker, timepicker or date-range picker, which
+  is the exact line each of their own examples shows.
+- **`<Table dataSource>`** and **`<Stepper steps>`** rejected the getter their own examples use.
+- **`<Toolbar role>`** was documented from the start and never existed: the attribute landed nowhere.
+- **`lazy()`** could not load a page that declares the props the router hands it, so the module
+  `weave routes` generates did not type-check for any app with a dynamic route.
+
+`pnpm docs:check` runs in CI now, so the site cannot drift back.
+
+### Also
+
+- Reordering a keyed list reparents its rows (`Element.moveBefore`) instead of removing and re-inserting
+  them, so focus, a running animation and playing media survive a `@for` reorder.
+- The size budget measures the bytes a browser actually downloads (minified, then gzipped). It had been
+  counting doc comments: the SPA core reads **6.6 KB**, not the 22.1 KB the old number claimed.
+
 ## 3.1.0 — 2026-08-29
 
 A **minor**: nothing about writing a Weave app changed, but a great deal about being *told* what you did.

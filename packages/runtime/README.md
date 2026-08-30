@@ -32,7 +32,7 @@ count.set((n) => n + 1); // updater form — logs 2 4
 
 A signal is callable to read (and subscribe); `set` takes a value or an updater, `update` takes an updater, and `peek` reads without subscribing. `effect` re-runs only when something it actually read changes, and returns a stop function.
 
-Also exported from the root entry: `batch`, `untrack`, `tick`, `root`, `onMount`, `onCleanup`, `catchError`, the owner API (`createOwner`, `runInOwner`, `disposeOwner`, `getOwner`, `onDispose`), context (`createContext`, `provide`, `inject`), the extras (`linkedSignal`, `debounced`, `watch`, `fromObservable`, `toObservable`), the transitions (`fade`, `fly`, `slide`, `scale`), and the DevTools hooks (`enableDevtools`, `inspect`, `inspectGraph`, `mountDevtoolsPanel`, …).
+Also exported from the root entry: `batch`, `untrack`, `tick`, `root`, `onMount`, `onCleanup`, `catchError`, the owner API (`createOwner`, `runInOwner`, `disposeOwner`, `getOwner`, `onDispose`), context (`createContext`, `provide`, `inject`), the extras (`linkedSignal`, `debounced`, `watch`, `fromObservable`, `toObservable`), the transitions (`fade`, `fly`, `slide`, `scale`), and the DevTools hooks (`enableDevtools`, `inspect`, `inspectGraph`, `mountDevtoolsPanel`, `captureState`, `applyState`, …).
 
 ## Entry points
 

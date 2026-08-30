@@ -37,6 +37,14 @@ this list is a live intention, not a historical note.
 
 ## Planned — framework
 
+- **An app with no plumbing** ([RFC 0012](rfcs/0012-ambient-scope.md) — Draft, deliberately not started).
+  A component would see the names of the template that lexically contains it, resolved at compile time,
+  so the props that exist only to be passed through stop being written. The design is specced, including
+  the rules that decide whether it is safe. It is **not** started, and the reason is a measurement: across
+  every app we have, exactly **one** prop is only handed to a child, so the problem it removes is not
+  present. The RFC carries the trigger — re-measure on a deep app; single digits means it is not worth its
+  risk.
+
 - **Splitting below the component.** `weave build --ssg` splits per route, and `lazy()` splits per component —
   but an interactive component still carries its whole module. Shipping *one handler* and nothing else, so a
   mostly-static page pays only for the island on it, is sketched in

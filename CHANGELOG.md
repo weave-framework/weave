@@ -14,109 +14,7 @@
 > already left it behind — Phase E ran 94 commits without a bump, and then released as one MINOR. The public
 > promise wins; the habit is retired.)*
 
-## Unreleased
-
-### Three UI props now accept what their own documentation shows
-
-Pointing `weave check` at the docs site turned up three props whose declared type was narrower than
-what the component actually accepts, so the pattern each one's own example demonstrates did not
-type-check:
-
-- **`<Table dataSource>`** takes any `() => T[]`, not only a `Signal<T[]>` — the implementation calls
-  whatever function it is given, and a `computed` is the natural thing to hand it.
-- **`<Stepper steps>`** takes a getter, which is exactly what the documented `linear` example uses to
-  build steps out of signals.
-- **`<Toolbar role>`** exists. The toolbar documentation has always shown `role="banner"` on it; the
-  prop was never declared and the attribute landed nowhere.
-
-### `lazy()` can load a page that takes props
-
-A routed page declares the props the router hands it (`setup(props: { params: { pkg: string } })`).
-`lazy()` required a `Component`, whose props are optional, so **the module `weave routes` generates
-did not type-check for any app with a dynamic route**. `lazy` now accepts a component whose props
-shape it does not know (it only forwards them).
-
-### `control={{ field }}` on the pickers type-checks
-
-The datepicker, timepicker and date-range picker declared their `control` binding as
-`Signal<X | null | undefined>`. A `Signal` is invariant — read *and* written — so a
-`Signal<X | null>` is not one of those, and the exact line each component's own documentation
-recommends (`field<Date | null>(null)` handed to `control`) did not type-check.
-
-The binding now says what the components actually do, which was measured from them: they read
-tolerantly and write narrowly (`ControlValue<R, W>`, exported from `@weave-framework/ui/cdk`). A
-`Field<Date | null>` fits, a `Field<Date | null | undefined>` still fits, and a value that cannot be
-given `null` is still refused — because `null` is what these components write when cleared.
-
-### A component may name its own types whatever it likes
-
-`weave check` embeds a component's script verbatim into the module it synthesizes around it, and that
-module described the component using the bare global name `Node`. A component that declared its own
-`interface Node` — a tree, a menu, a graph — therefore retyped its own default export, and anything
-that registered or lazily imported it got the memorable **`Type 'Node' is not assignable to type
-'Node'`**. Nine of this site's own demos were in that state.
-
-The synthesized types now reach the DOM type through `globalThis`, which a local declaration cannot
-shadow. The component's own `Node` still means exactly what its author wrote.
-
-### `field()` takes its type from the value, not from its validators
-
-`field('')` gave a `Field<string>`, but `field('', [validators.required()])` — the same line with the
-most ordinary validator on it — gave a **`Field<''>`**: a field that could never hold another string.
-The same happened for `field(false, …)` (`Field<false>`) and `field(0, …)` (`Field<0>`).
-
-The ready-made validators are typed for what they ACCEPT (`required` takes `unknown`), so the validator
-array was a second, contradictory inference site for the value type. The validator and options
-parameters no longer take part in that inference, so the value alone decides.
-
-### `weave check` stops erroring on components it did not compile
-
-A Weave component's default export is synthesized by the compiler, so the `.ts` on disk really has
-none. The checker built virtuals only for components under the roots it was given, so importing a
-component from anywhere else — a shared package, a sibling library, a directory the command was not
-pointed at — was reported as **`has no default export`**. Pointed at this repo's own docs site, that
-was 396 errors on correct code.
-
-Such a component is now compiled on demand as a dependency. Nothing is reported *from* it (it is not
-a checked file); what it contributes is its export and its prop types — so a wrong prop handed to a
-component across a package boundary is now caught, where before the import itself was the only thing
-the checker had to say.
-
-### Any screen, in any state, in one second
-
-Getting a screen into the state you need to look at meant driving the app there by hand, every time. The
-DevTools panel now has a **States** tab: get the app where you want it, name the state, save it. It is
-written to `.weave/states/<name>.json` — plain JSON you can commit — and `weave dev --state <name>` opens
-the app already in it. **Apply** in the panel does the same live, with no reload.
-
-A state is exactly the values of the signals you **named**; nothing is predicted, nothing is inferred, and
-a `computed` is not saved because setting its sources reproduces it. Values go through Weave's own
-serialization, so a `Date`/`Map`/`Set` survives the round trip. Names the app no longer has are skipped,
-and the count of signals actually set is reported. Dev-only in every part.
-
-New API: `captureState()` / `applyState()` on the devtools registry, `devServerStates()` and
-`startInState()` for the dev-server protocol, and a `states` option on `mountDevtoolsPanel`.
-
-### `weave merge` — git stops inventing template conflicts
-
-Two people on one template is the everyday case, and git merges lines. A tag and its text share a line,
-so a handler added to a button and that button's label reworded are one hunk to git: a conflict, with
-nothing actually in disagreement.
-
-`weave merge --install` (once per clone) registers a merge driver that reads the file as a tree.
-Different nodes merge — an attribute here, a label there, two different attributes on one tag. The same
-node changed two ways stays a conflict, because it is one.
-
-Three properties make it safe to install and keep:
-
-- **Git goes first.** Its own merge runs before anything else, and its result is used whenever it is
-  clean. The tree merge only sees files git already failed on, so it can add resolutions and never
-  change one that already worked.
-- **Nothing is reformatted.** The merge splices the original source text of each node; untouched lines
-  come out byte-for-byte unchanged.
-- **It declines loudly rather than guessing.** Control-flow blocks (`@if`, `@for`, …) are opaque units,
-  a result that does not re-parse is thrown away, and a file that is not a template (a page with a
-  `<!DOCTYPE>`) is left to git untouched.
+## 3.2.0
 
 ### A template mistake now says WHERE, and `weave check --fix` repairs the certain ones
 
@@ -197,17 +95,6 @@ The const's references are not found by us — they are asked of TypeScript, whi
 matters: renaming a declaration without its references is a silent breakage, and the scaffold's own
 `inc` reads `count`. Renaming *from* the `.ts` is unchanged; `{ count: total }` is already correct there.
 
-### Reordering a list no longer resets the row it moves
-
-`insertBefore` on a node that is already in the document removes it and puts it back, and the removal
-throws away what the DOM never restores: focus and selection, a scrolled position, a playing `<video>`,
-a CSS animation, an `<iframe>`'s whole document. A keyed `@for` did that to every row it moved — so
-sorting a table while someone was typing in it silently took their cursor away.
-
-Keyed-list moves now use `moveBefore`, which reparents without the removal. Feature-detected, with the
-ordinary path kept for browsers that do not have it and for nodes that cannot be moved. Nothing changes
-for anyone; things simply stop being lost.
-
 ### `weave check --impact <file>` — what renders this component
 
 The question asked before editing a component, answered from the composition graph rather than a search:
@@ -228,6 +115,42 @@ probably read; a transitive one is a screen that can change under you without it
 It resolves children both ways — by explicit `import` and by the no-import convention — and it answers
 without type-checking, since the question is usually asked while the tree is red.
 
+### `weave merge` — git stops inventing template conflicts
+
+Two people on one template is the everyday case, and git merges lines. A tag and its text share a line,
+so a handler added to a button and that button's label reworded are one hunk to git: a conflict, with
+nothing actually in disagreement.
+
+`weave merge --install` (once per clone) registers a merge driver that reads the file as a tree.
+Different nodes merge — an attribute here, a label there, two different attributes on one tag. The same
+node changed two ways stays a conflict, because it is one.
+
+Three properties make it safe to install and keep:
+
+- **Git goes first.** Its own merge runs before anything else, and its result is used whenever it is
+  clean. The tree merge only sees files git already failed on, so it can add resolutions and never
+  change one that already worked.
+- **Nothing is reformatted.** The merge splices the original source text of each node; untouched lines
+  come out byte-for-byte unchanged.
+- **It declines loudly rather than guessing.** Control-flow blocks (`@if`, `@for`, …) are opaque units,
+  a result that does not re-parse is thrown away, and a file that is not a template (a page with a
+  `<!DOCTYPE>`) is left to git untouched.
+
+### Any screen, in any state, in one second
+
+Getting a screen into the state you need to look at meant driving the app there by hand, every time. The
+DevTools panel now has a **States** tab: get the app where you want it, name the state, save it. It is
+written to `.weave/states/<name>.json` — plain JSON you can commit — and `weave dev --state <name>` opens
+the app already in it. **Apply** in the panel does the same live, with no reload.
+
+A state is exactly the values of the signals you **named**; nothing is predicted, nothing is inferred, and
+a `computed` is not saved because setting its sources reproduces it. Values go through Weave's own
+serialization, so a `Date`/`Map`/`Set` survives the round trip. Names the app no longer has are skipped,
+and the count of signals actually set is reported. Dev-only in every part.
+
+New API: `captureState()` / `applyState()` on the devtools registry, `devServerStates()` and
+`startInState()` for the dev-server protocol, and a `states` option on `mountDevtoolsPanel`.
+
 ### `weave dev --devtools` — the reactive graph, in the page
 
 The introspection registry and the panel have been in the runtime for a long time, and no app ever saw
@@ -240,6 +163,83 @@ feature — so the gate asserts both that it appears with the flag and that noth
 
 Named nodes only, and only ones with an owner: a signal created at module scope is never registered, so
 it does not appear however early devtools is switched on.
+
+### Reordering a list no longer resets the row it moves
+
+`insertBefore` on a node that is already in the document removes it and puts it back, and the removal
+throws away what the DOM never restores: focus and selection, a scrolled position, a playing `<video>`,
+a CSS animation, an `<iframe>`'s whole document. A keyed `@for` did that to every row it moved — so
+sorting a table while someone was typing in it silently took their cursor away.
+
+Keyed-list moves now use `moveBefore`, which reparents without the removal. Feature-detected, with the
+ordinary path kept for browsers that do not have it and for nodes that cannot be moved. Nothing changes
+for anyone; things simply stop being lost.
+
+### `weave check` stops erroring on components it did not compile
+
+A Weave component's default export is synthesized by the compiler, so the `.ts` on disk really has
+none. The checker built virtuals only for components under the roots it was given, so importing a
+component from anywhere else — a shared package, a sibling library, a directory the command was not
+pointed at — was reported as **`has no default export`**. Pointed at this repo's own docs site, that
+was 396 errors on correct code.
+
+Such a component is now compiled on demand as a dependency. Nothing is reported *from* it (it is not
+a checked file); what it contributes is its export and its prop types — so a wrong prop handed to a
+component across a package boundary is now caught, where before the import itself was the only thing
+the checker had to say.
+
+### A component may name its own types whatever it likes
+
+`weave check` embeds a component's script verbatim into the module it synthesizes around it, and that
+module described the component using the bare global name `Node`. A component that declared its own
+`interface Node` — a tree, a menu, a graph — therefore retyped its own default export, and anything
+that registered or lazily imported it got the memorable **`Type 'Node' is not assignable to type
+'Node'`**. Nine of this site's own demos were in that state.
+
+The synthesized types now reach the DOM type through `globalThis`, which a local declaration cannot
+shadow. The component's own `Node` still means exactly what its author wrote.
+
+### `field()` takes its type from the value, not from its validators
+
+`field('')` gave a `Field<string>`, but `field('', [validators.required()])` — the same line with the
+most ordinary validator on it — gave a **`Field<''>`**: a field that could never hold another string.
+The same happened for `field(false, …)` (`Field<false>`) and `field(0, …)` (`Field<0>`).
+
+The ready-made validators are typed for what they ACCEPT (`required` takes `unknown`), so the validator
+array was a second, contradictory inference site for the value type. The validator and options
+parameters no longer take part in that inference, so the value alone decides.
+
+### `control={{ field }}` on the pickers type-checks
+
+The datepicker, timepicker and date-range picker declared their `control` binding as
+`Signal<X | null | undefined>`. A `Signal` is invariant — read *and* written — so a
+`Signal<X | null>` is not one of those, and the exact line each component's own documentation
+recommends (`field<Date | null>(null)` handed to `control`) did not type-check.
+
+The binding now says what the components actually do, which was measured from them: they read
+tolerantly and write narrowly (`ControlValue<R, W>`, exported from `@weave-framework/ui/cdk`). A
+`Field<Date | null>` fits, a `Field<Date | null | undefined>` still fits, and a value that cannot be
+given `null` is still refused — because `null` is what these components write when cleared.
+
+### Three UI props now accept what their own documentation shows
+
+Pointing `weave check` at the docs site turned up three props whose declared type was narrower than
+what the component actually accepts, so the pattern each one's own example demonstrates did not
+type-check:
+
+- **`<Table dataSource>`** takes any `() => T[]`, not only a `Signal<T[]>` — the implementation calls
+  whatever function it is given, and a `computed` is the natural thing to hand it.
+- **`<Stepper steps>`** takes a getter, which is exactly what the documented `linear` example uses to
+  build steps out of signals.
+- **`<Toolbar role>`** exists. The toolbar documentation has always shown `role="banner"` on it; the
+  prop was never declared and the attribute landed nowhere.
+
+### `lazy()` can load a page that takes props
+
+A routed page declares the props the router hands it (`setup(props: { params: { pkg: string } })`).
+`lazy()` required a `Component`, whose props are optional, so **the module `weave routes` generates
+did not type-check for any app with a dynamic route**. `lazy` now accepts a component whose props
+shape it does not know (it only forwards them).
 
 ### Internal
 

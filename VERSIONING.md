@@ -48,6 +48,10 @@ First applied in `3.1.0`: `weave check` began type-checking the ordinary `.ts` m
 (it had only ever checked components), so a project whose service layer had never been checked can fail on
 the first run after the upgrade.
 
+Again in `3.2.0`: it began reporting template mistakes (as warnings, which do not fail the command), and it
+began typing components imported from outside the checked roots — so the props handed to a component from
+another package are checked for the first time, and a mismatch that was always there is reported now.
+
 ## One version, every package
 
 Every `@weave-framework/*` package (and `create-weave`) shares a **single lockstep version**, released
