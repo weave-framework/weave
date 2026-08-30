@@ -277,6 +277,11 @@ jobs:
       # case: a value that cannot be cleared must still be refused.
       - name: control={{ field }} type-checks
         run: pnpm verify:ui-control
+      # `component(X, props)` - the documented way to put a component in a dialog - refused every
+      # component that declares typed props, because parameters are contravariant. A real app hit it 57
+      # times in one run, at the exact call its own documentation shows.
+      - name: A typed component goes into an overlay
+        run: pnpm verify:ui-overlay
       # The docs site is the biggest Weave app there is, and nothing type-checked it: pointing the
       # checker at it found 456 errors, and several of them were the framework's, not the site's.
       - name: the docs site type-checks

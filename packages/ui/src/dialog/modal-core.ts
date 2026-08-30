@@ -34,11 +34,24 @@ export type ComponentContent = readonly [Component, Record<string, unknown>?];
 export type ModalContent = Node | string | (() => Node) | ComponentContent;
 
 /**
+ * A component this helper may be handed, whatever props it declares.
+ *
+ * {@link Component} takes `props?: Record<string, unknown>`, and a component compiled from a template
+ * with typed props is `(props: TheseProps, …) => Node` — which is NOT assignable to it, because
+ * parameters are contravariant. So the normal case, a dialog whose parts take props, did not
+ * type-check at the exact call the documentation shows; one real app hit it 57 times.
+ *
+ * `never` in the props position accepts any props shape. It is honest here for the same reason it is
+ * in `lazy()`'s `LoadedComponent`: this helper only forwards what it is given and never reads it.
+ */
+export type OverlayComponent = (props: never, slots?: Record<string, () => Node>) => Node;
+
+/**
  * Sugar for the tuple, so a call site reads `content: component(SeasonEditor, { season })` instead
  * of a bare array. Purely a typed pass-through — the tuple form works without it.
  */
-export function component(comp: Component, props?: Record<string, unknown>): ComponentContent {
-  return [comp, props];
+export function component(comp: OverlayComponent, props?: Record<string, unknown>): ComponentContent {
+  return [comp as Component, props];
 }
 
 /** A `[Component, props?]` tuple, told apart from a Node/string/factory by being an array. */

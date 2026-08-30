@@ -115,7 +115,7 @@ function mountIcon(props: IconProps): { el: HTMLElement; dispose: () => void } {
   const owner: Owner = createOwner();
   const el: HTMLElement = runInOwner(owner, () => {
     const ctx: ReturnType<typeof setup> = setup(props);
-    const { code } = compileTemplate(template, { mode: 'function', scope: ['host'] });
+    const { code } = compileTemplate(template, { mode: 'function', scope: ['host', 'iconClass'] });
     const fn: (c: unknown, r: unknown, k: unknown) => HTMLElement = new Function('ctx', 'rt', '_c', code) as (c: unknown, r: unknown, k: unknown) => HTMLElement;
     return fn(ctx, rt, {});
   });
@@ -177,5 +177,22 @@ test('component: an untrusted svg is sanitized — on* / <script> / <foreignObje
   assert.equal(svg!.querySelector('script'), null, '<script> removed');
   assert.equal(svg!.querySelector('foreignObject'), null, '<foreignObject> removed');
   assert.ok(svg!.querySelector('circle'), 'safe geometry kept');
+  dispose();
+});
+
+// 30 of the library's 45 components take a per-instance `class`; this was the one that did not, and an
+// icon is the thing most often sized or coloured differently from its neighbours. A real app hit it.
+test('component: a `class` lands on the host alongside weave-icon', async () => {
+  const { el, dispose } = mountIcon({ name: 'search', class: 'mine' });
+  await tick();
+  assert.ok(el.classList.contains('weave-icon'), 'the block class is still there');
+  assert.ok(el.classList.contains('mine'), 'and the per-instance one is too');
+  dispose();
+});
+
+test('component: with no `class` the host is unchanged', async () => {
+  const { el, dispose } = mountIcon({ name: 'search' });
+  await tick();
+  assert.equal(el.getAttribute('class'), 'weave-icon', 'no stray whitespace, no extra class');
   dispose();
 });

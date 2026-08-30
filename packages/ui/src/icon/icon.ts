@@ -37,6 +37,12 @@ export interface IconProps {
   src?: string;
   /** Accessible label. Present → `role="img"`; absent → decorative (`aria-hidden`). */
   label?: string;
+  /**
+   * Extra class on the host, alongside `weave-icon` — the per-instance styling hook 30 of the
+   * library's other components already take. An icon is the one you most often need to size or
+   * colour differently from its neighbours, and it was the one that did not accept it.
+   */
+  class?: string;
 }
 
 const FORBIDDEN_SVG_TAGS: Set<string> = new Set(['script', 'foreignobject']);
@@ -76,9 +82,9 @@ export function sanitizeSvg(markup: string): string {
   return root.outerHTML;
 }
 
-export const template: string = `<span class="weave-icon" ref={{ host }}></span>`;
+export const template: string = `<span class={{ iconClass() }} ref={{ host }}></span>`;
 
-export function setup(props: IconProps): { host: Signal<Element | null> } {
+export function setup(props: IconProps): { host: Signal<Element | null>; iconClass: () => string } {
   const host: Signal<Element | null> = signal<Element | null>(null);
   const registry: IconRegistry = activeIcons();
 
@@ -119,5 +125,8 @@ export function setup(props: IconProps): { host: Signal<Element | null> } {
     };
   });
 
-  return { host };
+  return {
+    host,
+    iconClass: (): string => (props.class ? `weave-icon ${props.class}` : 'weave-icon'),
+  };
 }

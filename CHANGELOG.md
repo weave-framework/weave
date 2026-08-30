@@ -16,6 +16,28 @@
 
 ## 3.3.0
 
+### A component with typed props goes into a dialog
+
+`component(X, props)` — the documented way to put a component into a dialog or a sheet — took a
+`Component`, which is `(props?: Record<string, unknown>, …) => Node`. A component compiled from a
+template that declares typed props is `(props: TheseProps, …) => Node`, and that is **not** assignable:
+parameters are contravariant, so a function requiring `TheseProps` cannot stand in for one that accepts
+`undefined`. The effect was that the normal case — a dialog whose header, content and actions take
+props — failed to type-check at the exact call its own documentation shows.
+
+The props position is now `never`, which accepts any props shape and is honest because this helper only
+forwards what it is handed. It is the same fix `lazy()` already carries for routed pages that declare
+required props.
+
+Found by running this checker against a real 61-template application, where it accounted for **57 of
+the 59 errors reported**. Neither the docs site, the demo, nor the migrated app has a single typed
+component inside an imperative overlay, which is why none of them could have found it.
+
+### `<Icon>` takes a `class`
+
+Thirty of the library's forty-five components accept a per-instance `class`; the icon — the element most
+often sized or coloured differently from its neighbours — did not. Same application, same run.
+
 ### A malformed template says where it went wrong, instead of crashing
 
 The parser is the piece most exposed to input nobody wrote on purpose — a half-finished edit, a

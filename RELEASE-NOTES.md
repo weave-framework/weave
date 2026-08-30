@@ -19,6 +19,21 @@ Both are fixed and held by a gate that asserts the same inputs complete in milli
 GitHub code scanning as `js/polynomial-redos`. **No action needed on your side** — nothing about the
 API or the output changed.
 
+### A component with typed props goes into a dialog
+
+`component(X, props)` — how you put a component into a dialog or a sheet — refused every component that
+declares typed props. Parameters are contravariant, so a component written as
+`(props: TheseProps) => Node` was not assignable to the general `Component` type the helper asked for,
+and the normal case failed to type-check at the exact call the documentation shows. It now accepts any
+props shape, the same way `lazy()` already did for routed pages.
+
+This was found by pointing `weave check` at a real 61-template application, where it was **57 of the 59
+errors** reported. Nothing in this repository could have found it: no template here puts a typed
+component inside an imperative overlay.
+
+Also from that run: `<Icon>` now takes a `class`, which thirty of the other forty-five components
+already did.
+
 ### A malformed template tells you where, instead of crashing
 
 Two shapes made the parser fail without saying anything you could act on. Thousands of unclosed tags or
