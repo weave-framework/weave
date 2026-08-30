@@ -27,6 +27,17 @@ const PRIVATE = [
   /^internal\//,
   /^\.workspace\//,
   /^\.aigit/,
+  // The local pre-commit hook refused these long before this gate existed, and this gate is the
+  // backstop for a machine where that hook is missing — hooks are never cloned. A backstop weaker
+  // than the thing it backs up is not one, so the two lists say the same thing.
+  /^editor\//,
+  /^publish\//,
+  /^drafts\//,
+  /^archive\//,
+  // `examples/demo` is deliberately public — CI builds and drives it (`pnpm verify:demo`).
+  // Everything else under examples/ is fixture material for the private side.
+  /^examples\/(?!demo\/)/,
+  /^(PHASE-E|STAGE-A|MIGRATE|ADOPTION-|DOCS-UI-|UI-A11Y-|PUBLISH-STEP)/,
 ];
 
 /**

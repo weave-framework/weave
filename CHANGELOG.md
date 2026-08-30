@@ -18,6 +18,13 @@
 
 ### Internal
 
+- **The public-repo private-path gate was weaker than the local hook it backs up.** `verify:no-private`
+  exists precisely for a machine where the pre-commit hook is missing — hooks are never cloned — but it
+  listed fewer paths than the hook refused, so `editor/`, `publish/`, `drafts/`, `archive/`, the
+  private plan documents and the example fixtures could have been committed and CI would have reported
+  "no private paths tracked". Measured, not assumed: with three such files staged, the old gate passed.
+  The two lists now say the same thing, with `examples/demo` carved out of both as deliberately public.
+
 - **One real app is now retained as a CI gate** (`examples/demo`, `pnpm verify:demo`). The Weave Board
   demo — file-based router with code-split lazy chunks, three stores, an optimistic create, a form, an
   overlay modal, `@defer`, an error boundary, a 404, keyed 1,000-row reconcile, transitions and scroll
