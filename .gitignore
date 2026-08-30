@@ -82,3 +82,6 @@ packages/cli/test/.smoke-app-*/
 # `weave migrate` output (written into the target app; only fixture runs could land it here)
 .weave-migrate/
 packages/cli/test/fixtures/**/migration-plan.md
+
+# Tarballs written by tools/link-local.mjs — the published shape of this checkout, for an app to install.
+.packs/

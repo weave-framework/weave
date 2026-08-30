@@ -52,6 +52,29 @@ real CLI and drives it in a real browser, so a change that breaks routing, store
 the error boundary or keyed list reconciliation **in combination** fails CI even when every unit test
 still passes. If you change the runtime, the router or the compiler, run it.
 
+### Testing a fix in a real app without publishing
+
+A framework fix is only proven when a real application runs it, and waiting for an npm release to find
+that out makes every fix cost a version — permanently, since a published `x.y.z` can never be reused.
+
+```bash
+node tools/link-local.mjs /path/to/your-app     # then install in the app
+node tools/link-local.mjs /path/to/your-app --restore
+```
+
+It packs this checkout the way npm would receive it and points the app at those tarballs. **It does not
+use `pnpm link` or a `file:` dependency on `packages/<name>`, and that is deliberate:** in the monorepo
+every package's `main` is `./src/index.ts`, and only `publishConfig` swaps it to `./dist/index.js` at
+publish time — so a linked app would consume TypeScript source rather than the artifact people install,
+and a green result would prove nothing about shipping. `pnpm pack` applies `publishConfig`; the tarball
+has the published shape.
+
+Every Weave package is overridden, not only the ones the app depends on directly: the packed `cli` asks
+for `@weave-framework/mcp` at this checkout's version, which is not on npm, and the install would die
+with `ETARGET` naming a package the app never mentioned.
+
+`--restore` puts the app's version ranges and override blocks back exactly as they were.
+
 ## Making a change
 
 1. **Fork** the repository and create a branch off `main`.
