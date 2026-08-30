@@ -133,6 +133,15 @@ export function realTsForTarget(uri: string): string | undefined {
       return undefined;
     }
   }
+  const p: string | undefined = unwrapEmbedded(uri);
+  if (!p) return undefined;
+  if (p.toLowerCase().endsWith('.ts')) return p;
+  if (p.toLowerCase().endsWith('.html')) return p.replace(/\.html$/i, '.ts'); // separate form: sibling `.ts`
+  return undefined; // an SFC keeps its script inside itself — `realWeaveForTarget` is that case
+}
+
+/** The authored file Volar wrapped in a `volar-embedded-content://…` virtual, if this is one. */
+function unwrapEmbedded(uri: string): string | undefined {
   const m: RegExpMatchArray | null = uri.match(/^volar-embedded-content:\/\/[^/]+\/(.+)$/);
   if (!m) return undefined;
   let inner: string = m[1];
@@ -144,15 +153,33 @@ export function realTsForTarget(uri: string): string | undefined {
     }
   }
   if (!inner.startsWith('file:')) return undefined;
-  let p: string;
   try {
-    p = fileURLToPath(inner);
+    return fileURLToPath(inner);
   } catch {
     return undefined;
   }
-  if (p.toLowerCase().endsWith('.ts')) return p;
-  if (p.toLowerCase().endsWith('.html')) return p.replace(/\.html$/i, '.ts'); // separate form: sibling `.ts`
-  return undefined; // `.weave` SFC virtual differs — leave it
+}
+
+/**
+ * The `.weave` SFC behind a target, when that is what it is — its script lives inside this same file,
+ * which is the whole difference from {@link realTsForTarget}.
+ *
+ * An SFC reaches a code action both ways: as the embedded template Volar publishes, and as the file
+ * itself, so both are unwrapped here.
+ */
+export function realWeaveForTarget(uri: string): string | undefined {
+  const direct: boolean = uri.toLowerCase().startsWith('file:') && uri.toLowerCase().endsWith('.weave');
+  let p: string | undefined;
+  if (direct) {
+    try {
+      p = fileURLToPath(uri);
+    } catch {
+      return undefined;
+    }
+  } else {
+    p = unwrapEmbedded(uri);
+  }
+  return p && p.toLowerCase().endsWith('.weave') ? p : undefined;
 }
 
 /** Rewrite a single definition link to the `const` when it lands on a setup-return shorthand. */

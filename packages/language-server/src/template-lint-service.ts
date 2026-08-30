@@ -14,8 +14,8 @@
 
 import { readFileSync } from 'node:fs';
 import { templateFindings, declarationFor, growSetup, type ScriptEdit } from '@weave-framework/check';
-import { realTsForTarget } from './redirect-definition.js';
-import type { LintFinding } from '@weave-framework/compiler';
+import { realTsForTarget, realWeaveForTarget } from './redirect-definition.js';
+import { parseSfcLoc, type ComponentSourceLoc, type LintFinding } from '@weave-framework/compiler';
 
 /**
  * The language id `weave-language.ts` publishes the offset-faithful template under. Volar collects
@@ -79,17 +79,31 @@ function overlaps(a: Range, b: Range): boolean {
  * imported, or merely mentioned — nothing is offered, because a duplicate declaration would be worse
  * than no offer. The checker, which does have types, catches whatever this leaves.
  *
- * The sibling-`.ts` shape only. A `.weave` keeps its script inside the same file, which needs the edit
- * shifted by the script's offset; it is not handled here and its author still gets `weave check --fix`.
+ * Both authoring forms. A sibling `.ts` is read and edited whole; a `.weave` keeps its script inside
+ * itself, so what is read is the script REGION and every offset `growSetup` returns is shifted by
+ * where that region begins — the same shift `weave check --fix` applies. Reading the whole SFC instead
+ * would also break the "is this name missing" test below, since the name is in the template by
+ * definition and would always look known.
  */
 function declareActions(document: Doc, template: string, range: Range): unknown[] {
   const tsPath: string | undefined = realTsForTarget(document.uri);
-  if (!tsPath) return [];
-  let script: string;
+  const weavePath: string | undefined = tsPath ? undefined : realWeaveForTarget(document.uri);
+  const target: string | undefined = tsPath ?? weavePath;
+  if (!target) return [];
+  let file: string;
   try {
-    script = readFileSync(tsPath, 'utf8');
+    file = readFileSync(target, 'utf8');
   } catch {
     return [];
+  }
+  // For a `.ts` the file IS the script and the shift is zero; for a `.weave` the script is a region of it.
+  let script: string = file;
+  let shift: number = 0;
+  if (weavePath) {
+    const sfc: ComponentSourceLoc = parseSfcLoc(file);
+    if (!sfc.script) return []; // an SFC with no `<script>` has no `setup` to grow
+    script = sfc.script;
+    shift = sfc.scriptOffset;
   }
   const out: unknown[] = [];
   for (const name of handlerNames(template)) {
@@ -109,8 +123,11 @@ function declareActions(document: Doc, template: string, range: Range): unknown[
       kind: 'quickfix',
       edit: {
         changes: {
-          [pathToUri(tsPath)]: [
-            { range: { start: offsetToPos(script, edit.start), end: offsetToPos(script, edit.end) }, newText: edit.text },
+          [pathToUri(target)]: [
+            {
+              range: { start: offsetToPos(file, edit.start + shift), end: offsetToPos(file, edit.end + shift) },
+              newText: edit.text,
+            },
           ],
         },
       },

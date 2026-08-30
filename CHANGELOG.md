@@ -16,6 +16,21 @@
 
 ## Unreleased
 
+### The editor declares into a `.weave` too
+
+"Declare `<name>` in setup()" — the lightbulb that writes a declaration the template asks for — was
+offered only for the two-file form. An SFC keeps its script inside the same file, so the edit
+`growSetup` returns, whose offsets are into the script, had to be shifted by where that script begins;
+without that shift the action was simply declined, and every `.weave` author was left with
+`weave check --fix` in the terminal. The shift is the one the checker already applied, so the two
+sides still cannot offer different things.
+
+Two details the SFC form needs and the sibling form does not: the "is this name already known" test
+reads the script REGION rather than the file, since a name is in the template by definition and reading
+the whole file would make every name look known; and the edit targets the `.weave` itself.
+
+Editor plugins rebuilt around the changed server: VS Code **0.6.6**, WebStorm **0.23.6**.
+
 ### Two compiler scans could be made to hang on hostile input
 
 Both read text an author controls and can make arbitrarily long — a component's own script, and the

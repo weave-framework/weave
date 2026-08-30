@@ -38,6 +38,17 @@ writeFileSync(tsPath, TS);
 writeFileSync(join(dir, 'Card.html'), HTML);
 const uri = pathToFileURL(join(dir, 'Card.html')).toString();
 
+// The SFC form of the same component. Its script lives INSIDE the file, so the edit `growSetup`
+// returns — offsets into the script — has to be shifted by where that script begins before it can be
+// an edit to this document. `weave check --fix` does that shifting; the editor did not, and simply
+// declined on every `.weave` in the project.
+const sfcAround = (script) => ['<script>', script + '</script>', '', '<button on:click={{ save }}>Save</button>', ''].join('\n');
+const SFC = sfcAround(TS);
+const SFC_WANT = sfcAround(WANT);
+const sfcPath = join(dir, 'Panel.weave');
+writeFileSync(sfcPath, SFC);
+const sfcUri = pathToFileURL(sfcPath).toString();
+
 const child = spawn(process.execPath, [serverPath, '--stdio'], { stdio: ['pipe', 'pipe', 'pipe'] });
 let stderr = '';
 child.stderr.on('data', (d) => (stderr += d.toString()));
@@ -131,6 +142,53 @@ const again = (answers.get(id2) ?? []).find((a) => /Declare `save`/.test(a.title
 if (again) fail('it offered to declare a name the script already has — that would duplicate it');
 console.log('✔ and it is not offered once the script already knows the name');
 
-console.log('\n✔ the editor declares a name the template asks for, once\n');
+/* ── The SFC form: one file, script inside it ── */
+
+/** Apply LSP edits to `text`, back to front, by converting each position to an offset. */
+function applyLsp(text, edits) {
+  const offsetOf = (pos) => {
+    let line = 0;
+    let i = 0;
+    while (line < pos.line && i < text.length) {
+      if (text.charCodeAt(i) === 10) line++;
+      i++;
+    }
+    return i + pos.character;
+  };
+  const sorted = [...edits].sort((a, b) => offsetOf(b.range.start) - offsetOf(a.range.start));
+  let out = text;
+  for (const e of sorted) out = out.slice(0, offsetOf(e.range.start)) + e.newText + out.slice(offsetOf(e.range.end));
+  return out;
+}
+
+send('textDocument/didOpen', { textDocument: { uri: sfcUri, languageId: 'weave', version: 1, text: SFC } });
+await wait(4000);
+
+// `<button on:click={{ save }}>` is the last line of the SFC; `save` sits at character 20.
+const sfcLine = SFC.split('\n').findIndex((l) => l.includes('on:click'));
+const sfcCol = SFC.split('\n')[sfcLine].indexOf('save');
+const sfcRange = { start: { line: sfcLine, character: sfcCol }, end: { line: sfcLine, character: sfcCol + 4 } };
+const id3 = send('textDocument/codeAction', { textDocument: { uri: sfcUri }, range: sfcRange, context: { diagnostics: [] } }, true);
+for (let i = 0; i < 40 && !answers.has(id3); i++) await wait(250);
+const sfcActions = answers.get(id3);
+const sfcDeclare = (sfcActions ?? []).find((a) => /Declare `save`/.test(a.title ?? ''));
+if (!sfcDeclare) fail('a `.weave` SFC was offered nothing, got ' + JSON.stringify(sfcActions));
+console.log('✔ a `.weave` SFC is offered the same action');
+
+const sfcChanges = sfcDeclare.edit?.changes ?? {};
+const sfcKey = Object.keys(sfcChanges).find((k) => decodeURIComponent(k).toLowerCase().endsWith('panel.weave'));
+if (!sfcKey) fail('the edit must target the `.weave` itself, got ' + JSON.stringify(Object.keys(sfcChanges)));
+const sfcGot = applyLsp(SFC, sfcChanges[sfcKey]);
+if (sfcGot !== SFC_WANT) {
+  fail(
+    'applying it must grow the script INSIDE the SFC.\n  got:  ' +
+      JSON.stringify(sfcGot) +
+      '\n  want: ' +
+      JSON.stringify(SFC_WANT)
+  );
+}
+console.log('✔ and applying it grows the script inside the file, at the right offset');
+
+console.log('\n✔ the editor declares a name the template asks for, once, in both authoring forms\n');
 child.kill();
 process.exit(0);
