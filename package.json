@@ -44,7 +44,7 @@
     "verify:skills": "npx tsx tools/verify-skills.mjs",
     "skills:install": "node tools/skills-sync.mjs --install",
     "typecheck": "tsc --noEmit -p packages/runtime/tsconfig.json && tsc --noEmit -p packages/compiler/tsconfig.json && tsc --noEmit -p packages/prettier-plugin/tsconfig.json && tsc --noEmit -p packages/check/tsconfig.json && tsc --noEmit -p packages/store/tsconfig.json && tsc --noEmit -p packages/router/tsconfig.json && tsc --noEmit -p packages/forms/tsconfig.json && tsc --noEmit -p packages/i18n/tsconfig.json && tsc --noEmit -p packages/data/tsconfig.json && tsc --noEmit -p packages/cli/tsconfig.json && tsc --noEmit -p packages/language-server/tsconfig.json && tsc --noEmit -p packages/typescript-plugin/tsconfig.json && tsc --noEmit -p packages/ui/tsconfig.json && tsc --noEmit -p packages/mcp/tsconfig.json && tsc --noEmit -p packages/nx/tsconfig.json && tsc --noEmit -p packages/create-weave/template/tsconfig.json",
-    "docs:check": "node packages/cli/bin/weave.mjs check docs/src",
+    "docs:check": "pnpm docs:content && node packages/cli/bin/weave.mjs routes docs/src/pages && node packages/cli/bin/weave.mjs check docs/src",
     "docs:tokens": "node docs/tools/verify-tokens.mjs",
     "verify:dev-overlay": "node packages/cli/test/dev-overlay.smoke.mjs",
     "verify:dev-compiler-error": "node packages/cli/test/dev-compiler-error.smoke.mjs",
