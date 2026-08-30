@@ -16,6 +16,29 @@
 
 ## Unreleased
 
+### A two-way binding declares its signal
+
+`weave check --fix` and the editor lightbulb answered one shape: a name bound to an `on:` handler,
+which can only be `() => void`. They now answer `bind:` as well, and for the same reason rather than a
+looser one — the runtime writes a specific type BACK into the signal, and which one is settled by the
+markup:
+
+| written | declared |
+| --- | --- |
+| `bind:checked` | `signal(false)` — the runtime writes `el.checked` |
+| `bind:value` on `type="number"` or `type="range"` | `signal(0)` — it writes `valueAsNumber` |
+| `bind:value` on `<select multiple>` | `signal<string[]>([])` — it writes the selected option values |
+| `bind:value` anywhere else | `signal('')` — it writes `input.value` |
+
+Two shapes are still refused, because the markup genuinely does not settle them. `bind:group` writes
+back in whatever type the signal already holds, so a fresh declaration has no forced type at all. And
+an input whose `type` is itself a binding is a string one render and a number the next.
+
+A declaration that needs `signal` now brings the import with it, folded into the same single edit —
+joining the existing `@weave-framework/runtime` import where there is one, opening one where there is
+not. The `Signal` type is imported only when the script has an explicit return annotation for it to
+land in, so a component relying on auto-expose does not gain an unused import.
+
 ### The editor declares into a `.weave` too
 
 "Declare `<name>` in setup()" — the lightbulb that writes a declaration the template asks for — was

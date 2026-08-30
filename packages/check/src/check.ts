@@ -9,7 +9,7 @@
  */
 
 import ts from 'typescript';
-import { declarationFor, growSetup, type ScriptEdit } from './grow-setup.js';
+import { declarationFor, growSetup, type Declaration, type ScriptEdit } from './grow-setup.js';
 import { dirname, relative, isAbsolute } from 'node:path';
 import type { Virtual } from './emit.js';
 
@@ -186,8 +186,9 @@ function mapDiagnostic(d: ts.Diagnostic, byPath: Map<string, Virtual>): Diagnost
     // The template named something `setup` does not return. Where the markup says WITHOUT DOUBT what
     // that thing is, the fix declares it — in the `.ts`, not in the file this diagnostic points at.
     const miss: RegExpExecArray | null = MISSING_PROP.exec(ts.flattenDiagnosticMessageText(d.messageText, String.fromCharCode(10)));
-    const decl: { declaration: string; type: string } | null = miss ? declarationFor(v.templateText, miss[1]) : null;
-    const grown: ScriptEdit | null = decl && miss ? growSetup(v.scriptText, miss[1], decl.declaration, decl.type) : null;
+    const decl: Declaration | null = miss ? declarationFor(v.templateText, miss[1]) : null;
+    const grown: ScriptEdit | null =
+      decl && miss ? growSetup(v.scriptText, miss[1], decl.declaration, decl.type, decl.needs) : null;
     return {
       file: v.templateFile,
       line: l,

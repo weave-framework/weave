@@ -126,6 +126,81 @@ const union = await run(['check', '--fix']);
 ok(union.some((l) => l.includes('nothing to repair')), 'a return type that is not a type literal is left alone (got ' + JSON.stringify(union) + ')');
 ok(readFileSync(tsPath, 'utf8') === UNION, 'and it is not mangled');
 
+// ── 5. `bind:` — the DOM decides the type, so there IS exactly one answer ────────────────────────
+// A two-way binding is not a guess: the runtime writes back `box.checked` (boolean), `valueAsNumber`
+// for a number/range input, an array of option values for a multiple select, and `input.value`
+// (string) for everything else. The markup names the element and its `type`, so the signal's type
+// follows from what is written, not from what would be convenient.
+const L = String.fromCharCode(10);
+const bindCase = async (script, markup, want, what) => {
+  writeFileSync(tsPath, script);
+  writeFileSync(htmlPath, markup);
+  const said = await run(['check', '--fix']);
+  const got = readFileSync(tsPath, 'utf8');
+  ok(got === want, what + ':' + L + '     got  ' + JSON.stringify(got) + L + '     want ' + JSON.stringify(want));
+  return said;
+};
+
+const BARE = 'export function setup() {' + L + '  const n = 1;' + L + '}' + L;
+await bindCase(
+  BARE,
+  '<input bind:value={{ name }}>' + L,
+  "import { signal } from '@weave-framework/runtime';" + L + L +
+    'export function setup() {' + L + '  const n = 1;' + L + "  const name = signal('');" + L + '}' + L,
+  'a text input declares a string signal, and brings the import it needs'
+);
+
+const IMPORTED =
+  "import { signal, type Signal } from '@weave-framework/runtime';" + L + L +
+  'export function setup(): { n: Signal<number> } {' + L +
+  '  const n = signal(1);' + L +
+  '  return { n };' + L +
+  '}' + L;
+await bindCase(
+  IMPORTED,
+  '<input type="number" bind:value={{ age }}>' + L,
+  "import { signal, type Signal } from '@weave-framework/runtime';" + L + L +
+    'export function setup(): { n: Signal<number>; age: Signal<number> } {' + L +
+    '  const n = signal(1);' + L +
+    '  const age = signal(0);' + L +
+    '  return { n, age };' + L +
+    '}' + L,
+  'a number input declares a number signal, into the annotation and the mirror'
+);
+
+await bindCase(
+  BARE,
+  '<input type="checkbox" bind:checked={{ done }}>' + L,
+  "import { signal } from '@weave-framework/runtime';" + L + L +
+    'export function setup() {' + L + '  const n = 1;' + L + '  const done = signal(false);' + L + '}' + L,
+  'a checkbox declares a boolean signal'
+);
+
+await bindCase(
+  BARE,
+  '<select multiple bind:value={{ tags }}></select>' + L,
+  "import { signal } from '@weave-framework/runtime';" + L + L +
+    'export function setup() {' + L + '  const n = 1;' + L + '  const tags = signal<string[]>([]);' + L + '}' + L,
+  'a multiple select declares a string[] signal'
+);
+
+// The two that are NOT decided by the markup, and must stay unanswered.
+const grouped = await bindCase(
+  BARE,
+  '<input type="radio" bind:group={{ pick }} value="a">' + L,
+  BARE,
+  'a radio group is left alone — the runtime keeps whatever type the signal already holds'
+);
+ok(grouped.some((l) => l.includes('nothing to repair')), 'and nothing is claimed to be repaired for it');
+
+const dynamic = await bindCase(
+  BARE,
+  '<input type={{ kind() }} bind:value={{ v }}>' + L,
+  BARE,
+  'an input whose `type` is itself a binding is left alone — string or number is not knowable here'
+);
+ok(dynamic.some((l) => l.includes('nothing to repair')), 'and nothing is claimed to be repaired for it either');
+
 rmSync(app, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 
 if (failed) {

@@ -529,13 +529,30 @@ export function setup(): { n: number; save: () => void } {
 }
 ~~~
 
+A two-way binding is settled the same way, and not by guessing what you probably meant: the runtime writes
+a specific type back into the signal, and your markup says which one.
+
+| you wrote | you get |
+| --- | --- |
+| `bind:checked={{ done }}` | `const done = signal(false);` |
+| `bind:value={{ age }}` on `type="number"` (or `range`) | `const age = signal(0);` |
+| `bind:value={{ tags }}` on `<select multiple>` | `const tags = signal<string[]>([]);` |
+| `bind:value={{ name }}` anywhere else | `const name = signal('');` |
+
+The `signal` import comes with it, joining your existing `@weave-framework/runtime` import if you have one.
+
 Your editor offers the same on the lightbulb — *Declare `save` in setup()* — and only once: if the name is
-already anywhere in the script, nothing is proposed.
+already anywhere in the script, nothing is proposed. Both authoring forms are covered: a sibling `.ts` and
+a `.weave`, whose script is grown in place.
 
 The declaration, the return and the declared type move together. It writes **declarations, never logic** —
 the `TODO` is yours — and it declines wherever the shape would be a guess. `{{ total }}` could be a string,
-a number or a signal, so nothing is written and the error stays; a return type that is not written inline
-belongs to another declaration and is left alone. A tool that guesses here is one you would switch off.
+a number or a signal, so nothing is written and the error stays; `@for (t of items())` says only that
+`items` returns something iterable, and an element type of `unknown` makes every use of `t` an error, which
+is worse than silence. `bind:group` writes back in whatever type the signal already holds, and an `<input>`
+whose `type` is itself a binding is a string one render and a number the next — both are left alone. A
+return type that is not written inline belongs to another declaration and is left alone too. A tool that
+guesses here is one you would switch off.
 
 `weave check --fix` repairs the ones with **exactly one** right answer — the three above — and then re-checks.
 The unknown-prefix rule offers no fix: several prefixes could have been meant, and a wrong automatic edit is
@@ -562,8 +579,8 @@ Pass one or more roots; with none, it defaults to `['src']`. Any error makes it 
 Weave has real IDE integration — red squiggles on type errors *inside templates*, hover, completion, go-to-definition, and rename across the `.ts`/`.html` boundary. It's powered by a shared [Volar](https://volarjs.dev) language server, so the same engine backs every editor.
 
 > **Where to get the plugins.** They are **not on the VS Code Marketplace or the JetBrains Marketplace yet** — you install them from a file. Download the latest build from the repo's [`plugins/editor/`](https://github.com/weave-framework/weave/tree/main/plugins/editor) folder:
-> - VS Code → [`plugins/editor/vscode/weave-language-0.6.6.vsix`](https://github.com/weave-framework/weave/tree/main/plugins/editor/vscode)
-> - WebStorm → [`plugins/editor/webstorm/weave-webstorm-0.23.6.zip`](https://github.com/weave-framework/weave/tree/main/plugins/editor/webstorm)
+> - VS Code → [`plugins/editor/vscode/weave-language-0.6.7.vsix`](https://github.com/weave-framework/weave/tree/main/plugins/editor/vscode)
+> - WebStorm → [`plugins/editor/webstorm/weave-webstorm-0.23.7.zip`](https://github.com/weave-framework/weave/tree/main/plugins/editor/webstorm)
 >
 > (Use whatever the newest version in those folders is.)
 
@@ -572,7 +589,7 @@ Weave has real IDE integration — red squiggles on type errors *inside template
 1. Download the `.vsix` file (above).
 2. Install it — either from the terminal:
    ```bash
-   code --install-extension weave-language-0.6.6.vsix
+   code --install-extension weave-language-0.6.7.vsix
    ```
    …or from the UI: open the **Extensions** panel → click the **⋯** menu at the top → **Install from VSIX…** → pick the file.
 3. Reload VS Code (**Developer: Reload Window**, or just restart it).

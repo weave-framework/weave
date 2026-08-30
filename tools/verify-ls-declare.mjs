@@ -189,6 +189,43 @@ if (sfcGot !== SFC_WANT) {
 }
 console.log('✔ and applying it grows the script inside the file, at the right offset');
 
+/* ── A two-way binding: the DOM decides the type, so the editor may offer it too ── */
+
+const BIND_TS = 'export function setup() {\n  const n = 1;\n}\n';
+const BIND_WANT =
+  "import { signal } from '@weave-framework/runtime';\n\n" +
+  'export function setup() {\n  const n = 1;\n  const title = signal(\'\');\n}\n';
+const BIND_HTML = '<article>\n  <input bind:value={{ title }}>\n</article>\n';
+const bindTsPath = join(dir, 'Field.ts');
+writeFileSync(bindTsPath, BIND_TS);
+writeFileSync(join(dir, 'Field.html'), BIND_HTML);
+const bindUri = pathToFileURL(join(dir, 'Field.html')).toString();
+send('textDocument/didOpen', { textDocument: { uri: bindUri, languageId: 'weave-html', version: 1, text: BIND_HTML } });
+await wait(3000);
+
+const bindLine = BIND_HTML.split('\n').findIndex((l) => l.includes('bind:value'));
+const bindCol = BIND_HTML.split('\n')[bindLine].indexOf('title');
+const bindRange = { start: { line: bindLine, character: bindCol }, end: { line: bindLine, character: bindCol + 5 } };
+const id4 = send('textDocument/codeAction', { textDocument: { uri: bindUri }, range: bindRange, context: { diagnostics: [] } }, true);
+for (let i = 0; i < 40 && !answers.has(id4); i++) await wait(250);
+const bindDeclare = (answers.get(id4) ?? []).find((a) => /Declare `title`/.test(a.title ?? ''));
+if (!bindDeclare) fail('a `bind:value` was offered nothing, got ' + JSON.stringify(answers.get(id4)));
+console.log('✔ a two-way binding is offered the action too');
+
+const bindChanges = bindDeclare.edit?.changes ?? {};
+const bindKey = Object.keys(bindChanges).find((k) => decodeURIComponent(k).toLowerCase().endsWith('field.ts'));
+if (!bindKey) fail('the edit must target the component .ts, got ' + JSON.stringify(Object.keys(bindChanges)));
+const bindGot = applyLsp(BIND_TS, bindChanges[bindKey]);
+if (bindGot !== BIND_WANT) {
+  fail(
+    'applying it must declare the signal AND bring its import.\n  got:  ' +
+      JSON.stringify(bindGot) +
+      '\n  want: ' +
+      JSON.stringify(BIND_WANT)
+  );
+}
+console.log('✔ and applying it declares the signal with the import it needs');
+
 console.log('\n✔ the editor declares a name the template asks for, once, in both authoring forms\n');
 child.kill();
 process.exit(0);

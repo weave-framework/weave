@@ -13,7 +13,7 @@
  */
 
 import { readFileSync } from 'node:fs';
-import { templateFindings, declarationFor, growSetup, type ScriptEdit } from '@weave-framework/check';
+import { templateFindings, declarationFor, growSetup, type Declaration, type ScriptEdit } from '@weave-framework/check';
 import { realTsForTarget, realWeaveForTarget } from './redirect-definition.js';
 import { parseSfcLoc, type ComponentSourceLoc, type LintFinding } from '@weave-framework/compiler';
 
@@ -106,13 +106,13 @@ function declareActions(document: Doc, template: string, range: Range): unknown[
     shift = sfc.scriptOffset;
   }
   const out: unknown[] = [];
-  for (const name of handlerNames(template)) {
+  for (const name of declarableNames(template)) {
     const WORD: string = String.fromCharCode(92) + 'w$';
     const known: RegExp = new RegExp('(^|[^' + WORD + '])' + name + '([^' + WORD + ']|$)');  // already declared, imported, or merely mentioned
     if (known.test(script)) continue;
-    const decl: { declaration: string; type: string } | null = declarationFor(template, name);
+    const decl: Declaration | null = declarationFor(template, name);
     if (!decl) continue;
-    const edit: ScriptEdit | null = growSetup(script, name, decl.declaration, decl.type);
+    const edit: ScriptEdit | null = growSetup(script, name, decl.declaration, decl.type, decl.needs);
     if (!edit) continue;
     // Offered wherever the cursor is in the template: the name's own span is the natural anchor.
     const at: number = template.indexOf(name, 0);
@@ -136,14 +136,18 @@ function declareActions(document: Doc, template: string, range: Range): unknown[
   return out;
 }
 
-/** Every name bound on its own to an `on:` handler, in source order, without duplicates. */
-function handlerNames(template: string): string[] {
+/**
+ * Every name bound on its own to an `on:` handler or a `bind:` target, in source order, without
+ * duplicates. Both are shapes `declarationFor` can answer without guessing; it makes the final call,
+ * so a `bind:group` collected here is simply dropped when it declines.
+ */
+function declarableNames(template: string): string[] {
   const BS: string = String.fromCharCode(92);
   const seen: Set<string> = new Set();
   const W: string = BS + 'w';
   const S: string = BS + 's';
   const re: RegExp = new RegExp(
-    S + 'on:[A-Za-z][' + W + '|]*=' + BS + '{' + BS + '{' + S + '*([A-Za-z_$][' + W + '$]*)' + S + '*' + BS + '}' + BS + '}',
+    S + '(?:on|bind):[A-Za-z][' + W + '|]*=' + BS + '{' + BS + '{' + S + '*([A-Za-z_$][' + W + '$]*)' + S + '*' + BS + '}' + BS + '}',
     'g'
   );
   let m: RegExpExecArray | null;

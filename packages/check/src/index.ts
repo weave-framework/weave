@@ -12,5 +12,5 @@ export { resolveChildModule } from './children-fs.js';
 export { runCheck, offsetToLineCol, type Diagnostic } from './check.js';
 export { checkProject } from './project.js';
 export { templateOf, templateFindings, type WeaveFileKind } from './template-lint.js';
-export { declarationFor, growSetup, type ScriptEdit } from './grow-setup.js';
+export { declarationFor, growSetup, type Declaration, type ScriptEdit } from './grow-setup.js';
 export { impactOf, composition, type UsedBy } from './impact.js';

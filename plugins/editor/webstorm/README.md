@@ -15,7 +15,7 @@ hover. Works for both `.weave` single-file components and the separate `.ts` + `
 In WebStorm: **Settings → Plugins → ⚙ (gear) → Install Plugin from Disk…** → pick the
 **latest** `weave-webstorm-*.zip` from this folder → **Restart**.
 
-- **`weave-webstorm-0.23.6.zip`** — current/complete: HTML syntax coloring, go-to-definition,
+- **`weave-webstorm-0.23.7.zip`** — current/complete: HTML syntax coloring, go-to-definition,
   hover, and red-squiggle diagnostics, plus the Weave logo. Built on the M10 unified `{{ }}`
   binding syntax.
   - **0.23.1** — **no `until-build` ceiling.** Identical plugin code to 0.23.0; only the declared
