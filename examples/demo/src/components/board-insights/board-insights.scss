@@ -1,0 +1,38 @@
+:host {
+  display: block;
+  margin-top: 16px;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.insights-title {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.insights-row {
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.insights-row strong { color: var(--text); }
+
+.insights-priorities {
+  display: flex;
+  gap: 8px;
+}
+
+.ip {
+  font-size: 12px;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px 10px;
+}
+.ip.high { border-color: #f85149; }
+.ip.med { border-color: var(--doing); }
+.ip.low { border-color: var(--todo); }

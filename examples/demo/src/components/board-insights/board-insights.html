@@ -1,0 +1,11 @@
+<section class="insights">
+  <h2 class="insights-title">Board insights</h2>
+  <p class="insights-row">
+    Signed in as <strong>{{ user }}</strong> — <strong>{{ mineOpen() }}</strong> open task(s) assigned to you.
+  </p>
+  <div class="insights-priorities">
+    <span class="ip high">High · {{ byPriority().high }}</span>
+    <span class="ip med">Med · {{ byPriority().med }}</span>
+    <span class="ip low">Low · {{ byPriority().low }}</span>
+  </div>
+</section>

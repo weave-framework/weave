@@ -25,6 +25,7 @@
     "verify:ssg": "node packages/cli/test/ssg.smoke.mjs",
     "verify:migrate": "node packages/cli/test/migrate.smoke.mjs",
     "verify:resume": "node tools/verify-resume.mjs",
+    "verify:demo": "node tools/verify-demo.mjs",
     "verify:router-ssr": "node packages/router/test/ssr.smoke.mjs",
     "verify:ui-ssr": "node packages/ui/test/ssr.smoke.mjs",
     "verify:dev-proxy": "node tools/verify-dev-proxy.mjs && node packages/cli/test/dev-proxy-stream.smoke.mjs",

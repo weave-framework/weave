@@ -1,0 +1,89 @@
+<section class="task-form">
+  <h1 class="tf-title">{{ heading }}</h1>
+
+  <form class="tf-form" on:submit={{onSubmit}} novalidate>
+    <!-- `use:control` binds value + touched + aria-invalid in one; the error text is
+         all that's left to place by hand. -->
+    <label class="field">
+      <span class="label">Title</span>
+      <input type="text" autocomplete="off" placeholder="What needs doing?" use:control={{fields.title}} />
+      @if (fields.title.error()) {
+        <span class="msg">{{ fields.title.error() }}</span>
+      }
+    </label>
+
+    <!-- Assignee (async-validated against the team directory) -->
+    <label class="field">
+      <span class="label">
+        Assignee
+        @if (fields.assignee.validating()) {
+          <span class="checking">checking…</span>
+        }
+      </span>
+      <input
+        type="text"
+        autocomplete="off"
+        placeholder="Team member (Aidas, Lina, Marek, Sofia)"
+        use:control={{fields.assignee}}
+      />
+      @if (fields.assignee.error()) {
+        <span class="msg">{{ fields.assignee.error() }}</span>
+      }
+    </label>
+
+    <div class="row">
+      <!-- Status -->
+      <label class="field">
+        <span class="label">Status</span>
+        <select use:control={{fields.status}}>
+          @for (s of statuses; track s) {
+            <option value={{s}}>{{ s }}</option>
+          }
+        </select>
+      </label>
+
+      <!-- Priority -->
+      <label class="field">
+        <span class="label">Priority</span>
+        <select use:control={{fields.priority}}>
+          @for (p of priorities; track p) {
+            <option value={{p}}>{{ p }}</option>
+          }
+        </select>
+      </label>
+    </div>
+
+    <!-- Checklist: a fieldArray of nested {text,done} groups — the form nests
+         form → fieldArray → group → field, with per-item required validation. -->
+    <fieldset class="checklist">
+      <legend>Checklist</legend>
+      @for (item of checklist(); track item) {
+        <div class="check-row">
+          <input type="checkbox" use:control={{item.controls.done}} />
+          <input type="text" class="check-text" placeholder="Acceptance criterion" use:control={{item.controls.text}} />
+          <button type="button" class="rm" on:click={{() => removeItem(item)}} aria-label="Remove item">×</button>
+          @if (item.controls.text.error()) {
+            <span class="msg">{{ item.controls.text.error() }}</span>
+          }
+        </div>
+      } @empty {
+        <p class="muted hint">No items yet.</p>
+      }
+      <button type="button" class="ghost add" on:click={{addItem}}>+ Add item</button>
+    </fieldset>
+
+    @if (form.formError()) {
+      <p class="form-error">{{ form.formError() }}</p>
+    }
+    @if (form.submitError()) {
+      <p class="form-error">Couldn't save: {{ form.submitError() }}</p>
+    }
+
+    <div class="actions">
+      <button type="button" class="ghost" on:click={{onClose}}>Cancel</button>
+      <button type="submit" class="primary" disabled={{form.submitting()}}>
+        {{ form.submitting() ? 'Saving…' : (editId ? 'Save changes' : 'Create task') }}
+      </button>
+    </div>
+  </form>
+</section>

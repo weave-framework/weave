@@ -1,0 +1,48 @@
+// The Portal mounts this at <body>, so the host is fixed to the viewport corner.
+// It's pointer-transparent (so it never blocks the UI under it) while each toast
+// re-enables pointer events for its dismiss button.
+.toast-host {
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  pointer-events: none;
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 220px;
+  max-width: 360px;
+  padding: 10px 12px;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent); // default (info) accent
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  pointer-events: auto;
+}
+.toast.success { border-left-color: var(--done); }
+.toast.error { border-left-color: #f85149; }
+
+.toast-msg { flex: 1; }
+
+.toast-x {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--muted);
+  background: none;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.toast-x:hover { color: var(--text); }

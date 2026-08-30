@@ -122,6 +122,12 @@ jobs:
         run: pnpm verify:ssg
       - name: Resume round-trip (real app, real browser)
         run: pnpm verify:resume
+      # One RETAINED real app, built by the real CLI and driven in a real browser: router with
+      # code-split lazy chunks, stores, optimistic create, forms, an overlay modal, `@defer`, the
+      # error boundary, keyed 1,000-row reconcile, scroll restoration. Every per-fix test guards its
+      # own fix; only a whole app can catch a refactor that breaks them in combination.
+      - name: Retained real app (examples/demo, real browser)
+        run: pnpm verify:demo
       - name: Router SSR
         run: pnpm verify:router-ssr
       - name: UI SSR

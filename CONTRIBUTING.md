@@ -47,6 +47,11 @@ them all; `package.json` lists them.
 The repo is a pnpm workspace under `packages/`. The framework runtime, compiler, CLI,
 router, forms, store, i18n, data layer, and UI library are each their own package.
 
+`examples/demo` is a complete app kept in the repo on purpose. `pnpm verify:demo` builds it with the
+real CLI and drives it in a real browser, so a change that breaks routing, stores, forms, `@defer`,
+the error boundary or keyed list reconciliation **in combination** fails CI even when every unit test
+still passes. If you change the runtime, the router or the compiler, run it.
+
 ## Making a change
 
 1. **Fork** the repository and create a branch off `main`.

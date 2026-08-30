@@ -18,6 +18,19 @@
 
 ### Internal
 
+- **One real app is now retained as a CI gate** (`examples/demo`, `pnpm verify:demo`). The Weave Board
+  demo — file-based router with code-split lazy chunks, three stores, an optimistic create, a form, an
+  overlay modal, `@defer`, an error boundary, a 404, keyed 1,000-row reconcile, transitions and scroll
+  restoration — is built by the real CLI and driven in a real browser. Its end-to-end test existed since
+  June but was never wired to anything, so nothing had run it for two months. Every per-fix test guards
+  its own fix in isolation; only a whole app can catch a refactor that breaks them in combination.
+  Two of its claims turned out not to hold, and were found by mutating the framework under them:
+  the keyed-swap check read the row TEXT, so a reconciler rewritten to rebuild every row still passed
+  (it now checks node identity — what "minimal moves" actually promises); and the scroll-to-top check
+  passed with the router's `scrollTo` deleted, because leaving the 1,000-row page makes the document
+  shorter than the viewport and the browser clamps the scroll itself (the document is now kept tall
+  across the navigation).
+
 - `pnpm verify:all` runs locally exactly what CI runs, by PARSING `.github/workflows/ci.yml` rather than
   keeping a second list of gates. 3.2.0 shipped with a red CI because the pre-release check was a
   hand-picked list of about 18 commands and the workflow has 52; the one that failed

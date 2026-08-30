@@ -1,0 +1,49 @@
+<section class="board">
+  @if (board.loading()) {
+    <p class="muted">Loading tasks…</p>
+  } @else if (board.error()) {
+    <p class="error">Failed to load: {{ board.error() }}</p>
+  } @else {
+    <div class="toolbar">
+      <input class="search" type="search" placeholder="Filter tasks…" bind:value={{query}} />
+      <span class="summary muted">{{ board.counts().done }} / {{ board.counts().total }} done</span>
+      <button type="button" class="new-task" on:click={{() => editor.open()}}>+ New task</button>
+    </div>
+
+    <!-- One reusable column body, rendered once per status (B.8 snippets). -->
+    @snippet column(status, label) {
+      <div class="column">
+        <header class="col-head">
+          <span class="col-title">{{ label }}</span>
+          <span class="col-count">{{ visible(status).length }}</span>
+        </header>
+        <div class="col-body">
+          @for (t of visible(status); track t.id) {
+            <!-- The row root is a real element so it can carry enter/leave transitions
+                 (B.13): `reconcileKeyed` plays `out:fade` and waits before removal. The
+                 Link inside still prefetches the detail chunk on hover (B.15). -->
+            <div class="card-wrap" in:scale={{cardIn}} out:fade={{cardOut}}>
+              <Link to={{'/task/' + t.id}}><TaskCard task={{t}} /></Link>
+            </div>
+          } @empty {
+            <p class="col-empty muted">—</p>
+          }
+        </div>
+      </div>
+    }
+
+    <div class="columns">
+      @render (column('todo', 'To do'))
+      @render (column('doing', 'In progress'))
+      @render (column('done', 'Done'))
+    </div>
+
+    <!-- Non-critical: render the columns first, fill the summary in when the
+         browser is idle (A.4b @defer). The panel injects the shell's session. -->
+    @defer (on idle) {
+      <BoardInsights />
+    } @placeholder {
+      <div class="insights-skeleton" aria-hidden="true">Loading insights…</div>
+    }
+  }
+</section>

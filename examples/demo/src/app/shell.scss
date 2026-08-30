@@ -1,0 +1,74 @@
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 14px 24px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  letter-spacing: 0.2px;
+}
+
+.brand-logo {
+  width: 22px;
+  height: 22px;
+  display: block;
+}
+
+.nav {
+  display: flex;
+  gap: 16px;
+}
+
+// The <a> is rendered by <Link> (a child component), so it never carries the
+// shell's scope attribute — `:global()` lets these rules reach it (Svelte-style).
+.nav :global(a) {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.nav :global(a:hover) {
+  color: var(--text);
+}
+
+// Active route (set by <Link> via `activeClass`): the current nav item.
+.nav :global(a.active) {
+  color: var(--text);
+  font-weight: 600;
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+.main {
+  padding: 24px;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.route-error {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: start;
+  padding: 20px;
+  background: var(--surface);
+  border: 1px solid #5a2a2a;
+  border-radius: var(--radius);
+  color: #f0a0a0;
+}
+.route-error .ghost {
+  padding: 6px 12px;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}

@@ -1,0 +1,27 @@
+.notfound {
+  text-align: center;
+  padding: 3rem 1rem;
+
+  .nf-code {
+    margin: 0;
+    font-size: 4rem;
+    color: var(--accent);
+    line-height: 1;
+  }
+  .nf-msg {
+    color: var(--muted);
+    code {
+      background: var(--surface-2);
+      padding: 0.05em 0.4em;
+      border-radius: 4px;
+      color: var(--text);
+    }
+  }
+  .nf-home {
+    color: var(--accent);
+    text-decoration: none;
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+}

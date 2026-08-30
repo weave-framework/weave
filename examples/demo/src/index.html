@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Weave Board — demo</title>
+    <meta name="theme-color" content="#0f1115" />
+
+    <!-- Favicons (generated from src logo via tools/gen-favicons.mjs). The SVG is
+         preferred by modern browsers; the .ico (16+32) covers older ones. -->
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/icon-32.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+  </head>
+  <body>
+    <div id="app"></div>
+    <!-- No inline CSS, no asset links, no entry <script>: Weave injects the entry
+         module (and, in dev, live-reload) at build/serve time, and the global
+         stylesheet is declared in weave.config.ts (`styles`). Keep this shell clean. -->
+  </body>
+</html>
