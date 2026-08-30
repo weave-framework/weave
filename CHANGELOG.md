@@ -100,11 +100,14 @@ claims fail at 71s, 10.3s and 23.8s. Reported by GitHub code scanning as `js/pol
 
 - **`tools/link-local.mjs` — test a fix in a real app without publishing it.** It packs this checkout
   the way npm would receive it and points an app at those tarballs, with `--restore` to undo. The
-  obvious implementation would have been quietly wrong: `pnpm link` or a `file:` dependency on
-  `packages/<name>` resolves to `./src/index.ts`, because only `publishConfig` swaps `main` to `dist`
-  at publish time — so the app would consume TypeScript source instead of the artifact people install.
-  Proven by installing it into a scaffolded app and watching that app produce a diagnostic that exists
-  in no published version.
+  approach is not new — one consuming app has carried its own version of this since July — but it lived
+  outside the framework, so every other app had to reinvent it, along with the two things that make it
+  work. `pnpm link` or a `file:` dependency on `packages/<name>` resolves to `./src/index.ts`, since
+  only `publishConfig` swaps `main` to `dist` at publish time, so the app would consume TypeScript
+  source rather than the artifact people install. And every Weave package has to be overridden rather
+  than just the app's direct dependencies, or a transitive request escapes to a registry that does not
+  have this version. Proven by installing it into a scaffolded app and watching that app produce a
+  diagnostic that exists in no published version.
 
 - **The public-repo private-path gate was weaker than the local hook it backs up.** `verify:no-private`
   exists precisely for a machine where the pre-commit hook is missing — hooks are never cloned — but it

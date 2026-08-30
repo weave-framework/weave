@@ -56,6 +56,7 @@ still passes. If you change the runtime, the router or the compiler, run it.
 
 A framework fix is only proven when a real application runs it, and waiting for an npm release to find
 that out makes every fix cost a version — permanently, since a published `x.y.z` can never be reused.
+This script lives with the framework so that every consuming app does not have to write its own.
 
 ```bash
 node tools/link-local.mjs /path/to/your-app     # then install in the app
