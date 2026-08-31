@@ -1,0 +1,11 @@
+<div class="ss-wrap">
+  <div class="ss-panels">
+    @for (name of panels; track name) { <Counter where={{ name }} /> }
+  </div>
+
+  <p class="demo-note">
+    The factory has run <strong>{{ runs() }}</strong> time, for
+    <strong>{{ panels.length }}</strong> components that asked for it.
+    <button type="button" on:click={{ cart.clear }}>clear the cart</button>
+  </p>
+</div>

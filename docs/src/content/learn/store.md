@@ -98,6 +98,20 @@ A `clear()` *action* (like `useCart`'s above) resets the *data* inside the store
 The factory doesn't run until the first `useCart()`. A store nobody uses costs nothing, and there's no registration step or provider to mount — import the hook and call it.
 :::
 
+Two lines is easy to read and easy to disbelieve, so here it is doing its job. Three independent
+components below each call `useCart()`. Nothing wires them together and there is no provider above them:
+
+:::demo store-shared
+
+:::callout see "What you should see"
+Add from any panel and **all three** counts move. They are not synchronised — they are reading the same
+signal, so there is nothing to synchronise.
+
+And the line underneath: the factory has run **once**, for three components that asked. That is the
+whole of `store()` — one lazily-filled slot behind a closure. The first caller creates it; everyone
+after gets the same object.
+:::
+
 ## A realistic store
 
 Everything past this point is **application code** — patterns you build *with* the `store` API, not features of it. The `store(...)` wrapper is the only Weave-provided part; the loader, selectors, and mutations below are plain functions and signals you write yourself.
@@ -201,3 +215,34 @@ A useful hybrid: `provide()` a store-like object built in a parent's `setup` —
 :::
 
 [Next: Forms :icon[arrow-right]](/learn/forms) · [Reference: @weave-framework/store :icon[arrow-right]](/reference/store)
+
+## When it goes wrong
+
+A store throws nothing, which is exactly why its two failure modes are worth naming: both are silent,
+and both look like the store "not working".
+
+:::callout trap "State that survives a test it should not"
+The slot is module-level, so it lives as long as the module does. In a browser that is what you want. In
+a test file that imports the same store twice, the second test starts with the first test's state — and
+the symptom is a test that passes alone and fails in the suite, or the other way round.
+
+Export a reset from the store itself and call it in your setup, rather than reaching for a way to
+un-import a module.
+:::
+
+**A store created per component.** `store(factory)` returns a **getter**, and the singleton is the thing
+the getter closes over. Calling `store(...)` inside `setup` builds a fresh getter every time a component
+is created, so every component gets its own state and none of them share. Call `store()` once at module
+level, and call the getter inside components.
+
+**An effect in a store that never stops.** A store outlives every component, so an `effect` created in
+its factory has no component scope to dispose it — it runs for the life of the app. That is usually what
+you want for a store, and a genuine leak if the effect was meant to belong to a screen. Put screen-scoped
+effects in the component, not in the store.
+
+:::callout info "Not everything needs one"
+A value used by one component is a `signal` in that component. A value passed to a subtree is
+[context](/learn/lifecycle-context-di). A store is for state that outlives any single component and is
+read from unrelated places — the cart, the session, the theme. Reaching for a store first is the most
+common way a small app grows a big one.
+:::

@@ -28,6 +28,7 @@ export const demos: Record<string, Component> = {
   'lifecycle-order': lazy(() => import('../demos/learn/lifecycle-order')),
   'router-files': lazy(() => import('../demos/learn/router-files')),
   'forms-live': lazy(() => import('../demos/learn/forms-live')),
+  'store-shared': lazy(() => import('../demos/learn/store-shared')),
   'ex-autocomplete-async': lazy(() => import('../demos/ui/ex-autocomplete-async')),
   'ex-autocomplete-basic': lazy(() => import('../demos/ui/ex-autocomplete-basic')),
   'ex-autocomplete-clearable': lazy(() => import('../demos/ui/ex-autocomplete-clearable')),
