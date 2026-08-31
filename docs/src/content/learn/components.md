@@ -300,7 +300,7 @@ pass the value down as a prop.
 ## When it goes wrong
 
 Everything above is the shape a component takes when it works. Here is what you actually see when it
-does not — the messages, verbatim, because recognising one is most of fixing it.
+does not — the messages, verbatim, because recognizing one is most of fixing it.
 
 ### While you are writing the template
 
@@ -357,10 +357,10 @@ Most component mistakes never reach any of the above, because `weave check` sees
 
 | You wrote | It says |
 | --- | --- |
-| `{{ count }}` where `count` is a signal | ``Signal<number> is a function, and a template renders a function as its own source text. Call it — a signal is read with `()`, as in {{ count() }}.`` |
-| `class:big` on a component tag | ``\`class:big\` is a DOM directive, and <Card> is a component, not an element.`` |
+| `{{ count }}` where `count` is a signal | `Signal<number> is a function, and a template renders a function as its own source text. Call it — a signal is read with () …` |
+| `class:big` on a component tag | `class:big is a DOM directive, and <Card> is a component, not an element.` |
 | a prop the child requires and you did not pass | `Property 'onAdd' is missing in type '{ step: number; }'` |
-| `&mdash;` in a template | ``\`&mdash;\` renders as text, not as `—`… Type the character itself.`` |
+| an HTML entity in a template | `&mdash; renders as text, not as — … Type the character itself.` |
 
 Which is the argument for running `weave check` before you go looking: it turns most of this page into
 something you never read.

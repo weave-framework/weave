@@ -62,7 +62,7 @@ export function inlineText(nodes: Inline[]): string {
  * them in more than one way. This repository has paid for that distinction twice, so it is stated.
  */
 const INLINE_RE =
-  /(:icon\[([\w-]+)\])|(\*\*((?:[^*]|\*(?!\*))+)\*\*)|(\*([^*]+)\*)|(`([^`]+)`)|(\[((?:[^[\]]|\[[^\]]*\])+)\]\(([^)]+)\))/;
+  /(:icon\[([\w-]+)\])|(\*\*((?:[^*]|\*(?!\*))+)\*\*)|(\*([^*]+)\*)|(`([^`]+)`)|(\[((?:[^[\]]|\[[^\]]*\])+)\]\(([^)]+)\))|(``([^\n]+?)``)/;
 
 /** Parse a single line of inline markdown into a token list. */
 export function parseInline(src: string): Inline[] {
@@ -84,6 +84,12 @@ export function parseInline(src: string): Inline[] {
     else if (m[5]) out.push({ t: 'em', c: parseInline(m[6]) });
     else if (m[7]) out.push({ t: 'code', v: m[8] }); // raw — special chars preserved
     else if (m[9]) out.push({ t: 'link', href: m[11], c: parseInline(m[10]) });
+    // ``a `b` c`` — a code span that itself contains a backtick, which every quoted Weave error message
+    // does. Added LAST in the alternation on purpose: the single-backtick rule cannot match at a `` (its
+    // `[^`]+` needs a non-backtick immediately), so order costs nothing, and appending rather than
+    // inserting leaves every existing group number alone. Renumbering is what silently broke `:::tabs`
+    // earlier today, when a new capture group shifted indices a second call site still read by position.
+    else if (m[12]) out.push({ t: 'code', v: m[13] });
     rest = rest.slice(m.index + m[0].length);
   }
   return out;
