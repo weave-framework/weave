@@ -190,6 +190,25 @@ You may write a `template` with backticks for multi-line convenience — but `${
 
 ## Props: data flowing down
 
+Before the rules, the thing itself. The parent below owns `step` and `total`; the child owns nothing but
+its own press count and a function it was handed.
+
+:::demo components-flow
+
+:::callout see "What you should see"
+Press the child's button and the parent's **total** climbs by the step — that is an event going **up**,
+and it happened by the child calling a function, with no emitter and no shared object.
+
+Now change the **step** with the parent's buttons. The child's label follows immediately, and its
+*pressed N times* count **does not reset**. The child was not re-created and its state was not thrown
+away: a prop is a live getter into the parent, and only the bindings that read it reacted.
+
+That second half is the part worth pausing on. There was no re-render, so there was nothing to preserve
+state *against*.
+:::
+
+
+
 A parent passes data to a child as attributes. Static values use quotes; dynamic values use `{{ }}`:
 
 ~~~html
@@ -237,190 +256,74 @@ There are two spellings, and they are **the same prop**:
 Use whichever reads better. The point is the same as everywhere else in UI: data flows down, events flow up. There's no emitter object to declare — a function *is* the channel.
 
 :::callout info "What counts as a child component"
-A tag is a **child component** when its name starts with an **uppercase letter** (`<TaskCard>`, `<Badge>`). A lowercase tag (`<div>`, `<my-widget>`) is a plain DOM element. That single rule is how the compiler decides whether to mount a component or emit an element — there is no registration step.
+A tag is a **child component** when its name starts with an **uppercase letter** — `<TaskCard>`,
+`<Badge>`. A lowercase tag is a plain DOM element: `<div>`, and also `<my-widget>`, which is a custom
+element the browser handles.
 
-And because component tags compile to a function call with a props object, **static, dynamic (`{{ }}`), and `on:` attributes are the props/events surface of a `<Component>`**. A **bare** attribute (`<Button disabled>`) passes the boolean `true`; a quoted one (`label="Go"`, or an explicit empty `hint=""`) passes the string. Two DOM directives are also allowed: **`use:` forwards its action to the component's single root element** (same lifecycle as on an element — see [`use:` on components](/learn/templates#use-on-components)), and **`bind:value={{ sig }}` passes the signal itself** for two-way (sugar for handing a child the writable signal — see below). The other DOM-level directives — `class:`, `transition:`, `ref`, `show`, `.prop` — are compile errors on a component tag (they only mean something on a real element). Pass data as props instead.
+That single rule is the whole decision. There is no registration step and no list to keep in sync.
 :::
 
-You make a child available the ordinary way — `import TaskCard from './task-card'`. If you don't, Weave
-resolves the tag by **convention** before giving up: `<TaskCard>` looks for `../task-card/task-card`,
-`./task-card`, then `./task-card/task-card` (`.ts` or `.weave`), and wires the import for you. `weave check`
-resolves it the same way, so a component that renders is never reported as an unknown name; a tag that
-matches nothing is an error in both. Write the import when you want the module named explicitly — an
-explicit import always wins. It's used only in the template, never elsewhere in the `.ts`, but the [Weave editor tooling](/learn/tooling) recognizes a component-tag usage as a real use — so the import is **not** flagged "unused", and you don't need a `void TaskCard;` keep-alive line. (Without the tooling active, `tsc --noUnusedLocals` may still flag it; that's the only case a `void` line helps.)
+### What you may put on a component tag
 
-## Two-way: pass the signal itself
+A component tag compiles to a function call with a props object, so the attributes on it are that
+component's inputs — not HTML attributes. Four forms are accepted:
 
-Sometimes a child should both read *and* write a parent's value. Don't invent a second event for that — just hand the child the **signal**, and it can read it (`sig()`) and set it (`sig.set(…)`):
+| You write | The child receives |
+| --- | --- |
+| `label="Go"` | the **string** `'Go'`. An explicit empty `hint=""` is the empty string. |
+| `disabled` (bare, no value) | the **boolean** `true`. |
+| `task={{ t }}` | a **live getter** — the child re-reads your expression, so it stays reactive. |
+| `on:close={{ fn }}` | the prop **`onClose`**. See [Events](#events-messages-flowing-up) below. |
 
-:::tabs
-~~~html title="parent"
-<!-- parent passes the writable signal, not its value -->
-<Stepper value={{ count }} />
+And two DOM directives are deliberately allowed through:
+
+- **`use:action={{ arg }}`** is forwarded to the component's single root element, with the same lifecycle
+  it has on an element — see [`use:` on components](/learn/templates#use-on-components).
+- **`bind:value={{ sig }}`** passes the **signal itself**, not a getter, so the child can both read it
+  and write to it. That is the two-way form, and it is sugar for "hand the child your writable signal".
+
+Everything else that looks like a directive — `class:`, `transition:`, `ref`, `show`, `.prop` — is a
+**build error** on a component tag, and deliberately so rather than as a missing feature. Each of those
+describes one DOM element, and a component is a function that may render several. Put the directive on a
+real element inside the component, or pass the value down as a prop. The compiler says exactly that:
+
 ~~~
-~~~ts title="child (Stepper)"
-// child reads and writes the same signal
-export function setup(props: { value: Signal<number> }) {
-  const inc = () => props.value.set((n) => n + 1);
-  return { value: props.value, inc };
-}
-~~~
-:::
-
-You can also write this as **`<Stepper bind:value={{ count }} />`** — `bind:value` on a component is sugar for passing the signal itself (the child receives it as `props.value`). The same `bind:value` binds a DOM `<input>` for form controls — covered in [Templates](/learn/templates#two-way-binding) and [Forms](/learn/forms).
-
-## Slots: content flowing in
-
-Props pass *data*. **Slots** pass *markup* — they let a parent drop content into a hole the child leaves open. This is content projection.
-
-The child marks where content goes with `<slot>`:
-
-~~~html title="card.html"
-<div class="card">
-  <header><slot name="header" /></header>
-  <main><slot /></main>
-  <footer><slot name="footer">© 2026</slot></footer>
-</div>
+`class:big` is a DOM directive, and <Card> is a component, not an element. A component tag
+accepts props (`x={{ v }}`), events (`on:x={{ fn }}`), `bind:` for two-way, and `use:`
+(forwarded to its root element). Put `class:` on a real element inside the component, or
+pass the value down as a prop.
 ~~~
 
-The parent fills them — unmarked content goes to the default slot, `slot="name"` targets a named one:
+### Making a child available
 
-~~~html title="parent.html"
-<Card>
-  <h2 slot="header">Welcome</h2>
-  <p>This lands in the default slot.</p>
-  <small slot="footer">Custom footer</small>
-</Card>
-~~~
-
-- A bare `<slot />` is the **default** slot.
-- `<slot name="header" />` is a **named** slot.
-- Content *between* the `<slot>` tags (`<slot>© 2026</slot>`) is **fallback** — shown when the parent provides nothing for it.
-- Routing content to a named slot needs a **static** `slot="name"` on the parent's fill — it's read at compile time, so it can't be a dynamic `{{ }}` expression.
-- A fill that is only whitespace doesn't count as content: the slot **falls back**. So an empty line in the parent won't suppress a fallback.
-
-:::callout info "Where does slot content's context come from?"
-Slot markup is written by the parent but rendered inside the child. Its `inject()` calls resolve against the **child's** position in the tree. Usually that's exactly what you want; it's worth knowing when a slot needs a value from a provider.
-:::
-
-## Reusable markup with snippets
-
-For repeated chunks *within one component*, you don't always need a whole child component. A `@snippet` is a named, parameterized piece of template you can `@render` as many times as you like:
-
-~~~html
-@snippet column(status, label) {
-  <div class="column">
-    <h3>{{ label }}</h3>
-    @for (t of visible(status); track t.id) {
-      <TaskCard task={{ t }} />
-    } @empty {
-      <p class="muted">Nothing here.</p>
-    }
-  </div>
-}
-
-<div class="columns">
-  @render (column('todo', 'To do'))
-  @render (column('doing', 'In progress'))
-  @render (column('done', 'Done'))
-</div>
-~~~
-
-A parameter may carry a **type annotation** — `@snippet row(ctx: ListRowContext<Task>) { … }` — and the body is then type-checked against it (a typo in `ctx.item` is caught). Without one, a parameter is `any`.
-
-A snippet can even be passed to a child as a prop and `@render`-ed there — the Weave take on render props / scoped slots. Full syntax in [Templates](/learn/templates#snippets).
-
-## When a binding and a prop share a name
-
-The template can read both props and the names `setup` returns. If a returned binding has the **same name** as a prop, the **binding wins** — it shadows the prop for the template. This is deliberate and is exactly how the live-getter idiom works: a prop `task` shadowed by a returned `task = () => props.task` lets the template call `{{ task() }}` and stay reactive, while `setup` still reaches the raw input through `props.task`.
+Import it the ordinary way:
 
 ~~~ts
-export function setup(props: { task: Task }) {
-  const task = () => props.task; // returned `task` shadows the `task` prop in the template
-  return { task };
-}
+import TaskCard from './task-card';
 ~~~
 
-## Extending a component
+If you do not, Weave does not give up immediately — it resolves the tag **by convention** first, trying
+three paths relative to the parent component's own directory, in this order:
 
-Sometimes a component does *almost* what you need — you want to keep all of its behaviour but reshape the data it renders, add an event, or drop in a piece of markup. Instead of forking it, **extend** it: a component file declares `export const extend = Base`, and it reuses the base's whole `setup` context while overriding or adding on top.
+| # | For `<TaskCard>` it tries | The layout that suits |
+| --- | --- | --- |
+| 1 | `../task-card/task-card` | a directory per component (how the UI library is laid out) |
+| 2 | `./task-card` | flat siblings |
+| 3 | `./task-card/task-card` | a nested directory |
 
-:::tabs
-~~~ts title="my-list.ts"
-import List from '@weave-framework/ui/list';
-import { computed } from '@weave-framework/runtime';
+The first one that exists (as `.ts` or `.weave`) wins, and Weave writes the import for you. **An explicit
+import always beats the convention**, so write one whenever you want the module named outright — or when
+two candidates would be ambiguous to a human reading the file.
 
-export const extend = List;                    // this component extends <List>
+`weave check` resolves tags the same way, which is the part that matters: a component that renders is
+never reported as an unknown name, and a tag matching nothing is an error in both places rather than in
+only one of them.
 
-// base = List's setup context. Reuse it, override keys, add new ones.
-export function setup(props, base) {
-  return {
-    ...base,
-    totalCount: computed(() => base.items().length),   // add
-    onRowDblClick: (item) => props.onOpen?.(item.value), // add
-  };
-}
-~~~
-~~~html title="my-list.html"
-<div class={{ listClass() }} role={{ listRole() }} on:keydown={{ onKeydown }}>
-  <div class="count">{{ totalCount() }} total</div>
-  @for (item of items(); track item.value) {
-    <div class="weave-list__row" tabindex={{ tabindexFor(item) }}
-         on:click={{ () => activate(item) }} on:dblclick={{ () => onRowDblClick(item) }}>
-      {{ item.title }}
-    </div>
-  }
-</div>
-~~~
+:::callout trap "Your editor may call that import unused"
+An import used **only** in the template is invisible to plain TypeScript — nothing in the `.ts` mentions
+it. The [Weave editor tooling](/learn/tooling) counts a component tag as a real use, so with it installed
+the import is not flagged.
+
+Without it, `tsc --noUnusedLocals` will flag it. That, and only that, is what a `void TaskCard;` line is
+for. If you have the tooling, you do not need one.
 :::
-
-The template is a **full override** — it reads base-provided names (`listClass`, `items`, `activate`, …) *and* the names you added (`totalCount`, `onRowDblClick`) from the one merged context. Extension composes: `MyList`'s own `setup` runs on top of `List`'s, and an already-extended component can be extended again.
-
-**Reshaping data the base reads.** Overriding a returned key changes what the *template* sees, but the base's internal logic closes over its own `props` — it won't see an override. To change data the base's internals depend on, use the optional `extendProps`, which reshapes props **before** the base setup runs:
-
-~~~ts
-export function extendProps(props) {
-  return { ...props, items: props.items.map(normalize) }; // the base setup reads these
-}
-~~~
-
-### Patching the base template instead of overriding it
-
-Writing a full template just to add one attribute or node is a lot of copying. Instead, an extension can **patch** the base's template: declare `export const patch` — an array of ops — and *don't* write your own template. The loader reads the base's template, applies the ops, and compiles the result, so the patch lands in the compiled output (it applies to every `@for` row, even dynamically-added ones — not just what's on screen at mount):
-
-~~~ts title="my-list.ts (patch form)"
-import List from './list';                 // a LOCAL base component
-
-export const extend = List;
-export const patch = [
-  { op: 'attr',    sel: '.weave-list__row', attr: 'on:dblclick={{ () => onRowDblClick(item) }}' },
-  { op: 'prepend', sel: '[role]',           html: '<div class="count">{{ totalCount() }} total</div>' },
-];
-export function setup(props, base) {
-  return { ...base, totalCount: () => base.items().length, onRowDblClick: (i) => props.onOpen?.(i.value) };
-}
-~~~
-
-Ops: `attr` / `removeAttr`, `prepend` / `append` (children), `before` / `after` (siblings), `replace`, `remove`, `wrap`. Selectors match by tag, `.class`, `[attr]`, or `[attr=value]`; a selector that matches nothing is a **loud build error**. The markup an op inserts and the attribute it adds are ordinary Weave template text — `{{ }}`, `on:`, `use:`, `@if`/`@for`, and nested components all work. The extension compiles with the base's style hash, so the **base's scoped CSS still applies**.
-
-Two constraints: the base must be a **local** component (a published package ships no raw template — patch a local base, or use full override), and a patch extension uses **either** patches **or** a full-override template, never both.
-
-:::callout info "Patch markup is type-checked"
-`weave check` checks the markup inside `patch` ops the same way it checks any other template: a typo in a patched expression (`{{ totalCont() }}`) is an error at the character you wrote it on, in your own file.
-
-It is checked **in place** — patched into the base's template, so an op landing inside the base's `@for` sees that block's local (`{{ pick(item) }}` is valid there and nowhere else), and the context is the base's plus your own, exactly as `extendSetup` builds it at runtime. Errors in the *base's* markup stay the base's: they are reported once, against the base, not repeated against every extension that patches it.
-
-One limit: if the base is outside the roots you pass to `weave check`, its half of the context cannot be typed and expressions reading base bindings go unchecked. Nothing is reported that is not real.
-:::
-
-Full override (write your own `template`) vs patch (`export const patch`) — pick whichever is less work for the change. See [RFC 0008](https://github.com/weave-framework/weave/blob/main/rfcs/0008-component-extension.md).
-
-## A note on privacy
-
-Only the names your template reads are visible to it — whether you return them by hand or let Weave synthesize the return — and only props + `on:` events cross the boundary into a child. A component's internal signals and helpers stay private by construction — there is no mechanism for reaching into a child's internals from outside. When a deeply nested component needs shared state, lift it: a signal passed down, a [context](/learn/lifecycle-context-di) provided to a subtree, or a [store](/learn/store) shared app-wide.
-
-:::callout info "What you just learned"
-A component is an optional `setup` (runs once, exposes the template's names — return them or let Weave synthesize the return; may be omitted, `async`, or expose nothing) + a template. Template and styles can come from a **sibling file**, an **inline string**, an **explicit file**, a **`styles` array**, or a **`.weave`** single file — and Weave fails loud on ambiguity (declaration *and* a sibling), a missing file, `${…}` in a backtick, or a non-static value. A tag is a child component iff it starts **uppercase**, and only static / `{{ }}` / `on:` attributes are legal on it. Props flow **down** as reactive getters (don't destructure); events flow **up** as callback props where `on:x` *is* `onX`; two-way means passing the **signal** itself. Defaults come from a static `export const propDefaults`, or inline inside `setup`. A returned binding **shadows** a like-named prop. Slots project markup in (default, named, static `slot=`, whitespace-only falls back), and `@snippet`/`@render` reuse markup within a component.
-:::
-
-[Next: Templates :icon[arrow-right]](/learn/templates) · [Reference: @weave-framework/runtime :icon[arrow-right]](/reference/runtime)

@@ -7,6 +7,7 @@ export {
   compileTemplateAst,
   pascalToKebab,
   childImportCandidates,
+  onProp,
   type CompileOptions,
   type CompileResult,
 } from './codegen.js';

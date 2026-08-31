@@ -1,0 +1,18 @@
+<div class="cf-parent">
+  <p class="cf-title">Parent</p>
+
+  <div class="cf-row">
+    <span>step:</span>
+    <button type="button" on:click={{ () => setStep(1) }}>1</button>
+    <button type="button" on:click={{ () => setStep(5) }}>5</button>
+    <button type="button" on:click={{ () => setStep(10) }}>10</button>
+    <span class="cf-total">total = <strong>{{ total() }}</strong></span>
+  </div>
+
+  <Counter step={{ step() }} on:add={{ onAdd }} />
+
+  <ol class="cf-log">
+    @for (line of log(); track line) { <li>{{ line }}</li> }
+    @empty { <li class="cf-none">the child has not sent anything yet</li> }
+  </ol>
+</div>

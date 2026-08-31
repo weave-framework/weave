@@ -22,6 +22,7 @@ export const demos: Record<string, Component> = {
   'signals-equal-writes': lazy(() => import('../demos/learn/signals-equal-writes')),
   'reactivity-computed': lazy(() => import('../demos/learn/reactivity-computed')),
   'reactivity-batch': lazy(() => import('../demos/learn/reactivity-batch')),
+  'components-flow': lazy(() => import('../demos/learn/components-flow')),
   'ex-autocomplete-async': lazy(() => import('../demos/ui/ex-autocomplete-async')),
   'ex-autocomplete-basic': lazy(() => import('../demos/ui/ex-autocomplete-basic')),
   'ex-autocomplete-clearable': lazy(() => import('../demos/ui/ex-autocomplete-clearable')),

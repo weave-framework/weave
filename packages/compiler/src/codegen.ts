@@ -959,7 +959,18 @@ function compileFragment(
           uses.push(attr);
           break;
         default:
-          throw new Error(`'${attr.type}' binding on <${node.tag}> is not supported yet (props, on:event, use:, bind: only)`);
+          // "not supported YET" was wrong and it mattered: it reads as a missing feature somebody may
+          // add, when in fact `class:`, `transition:`, `ref` and `show` describe a DOM element, and a
+          // component tag is a function call that may render several. There is nothing to implement.
+          // `ref` and `show` carry no name, so `type:name` would print `ref:undefined` at the author.
+          const named: string = (attr as { name?: string }).name ? `${attr.type}:${(attr as { name?: string }).name}` : attr.type;
+          const bare: string = (attr as { name?: string }).name ? `${attr.type}:` : attr.type;
+          throw new Error(
+            `\`${named}\` is a DOM directive, and <${node.tag}> is a component, not an element. ` +
+              `A component tag accepts props (\`x={{ v }}\`), events (\`on:x={{ fn }}\`), \`bind:\` for two-way, ` +
+              `and \`use:\` (forwarded to its root element). Put \`${bare}\` on a real element inside the ` +
+              `component, or pass the value down as a prop.`
+          );
       }
     }
     if (eventKeys.length) props.push(`'$events': [${eventKeys.map((k) => q(k)).join(', ')}]`);
@@ -1395,8 +1406,14 @@ function inlineHandler(gen: Gen, code: string): string {
   return code;
 }
 
-/** `on:select` → `onSelect` (the prop the child receives). */
-function onProp(event: string): string {
+/**
+ * `on:select` → `onSelect` (the prop the child receives).
+ *
+ * Exported because `@weave-framework/check` needs the SAME mapping. It had its own idea — that events
+ * are not props at all — and so rejected `on:add={{ fn }}` against a child requiring `onAdd`, which is
+ * code that builds and runs. Two copies of this rule is how that happens; one is the fix.
+ */
+export function onProp(event: string): string {
   return 'on' + event.charAt(0).toUpperCase() + event.slice(1);
 }
 

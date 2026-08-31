@@ -35,6 +35,7 @@ import {
   type ComponentSourceLoc,
   type AutoReturnResult,
   bindsName,
+  onProp,
 } from '@weave-framework/compiler';
 
 const FOR_VARS: string[] = ['$index', '$count', '$first', '$last', '$even', '$odd'];
@@ -411,6 +412,10 @@ function emit(nodes: TemplateNode[], ctx: Set<string>): Line[] {
   // its `setup`, exposed via the generated default export). Required/excess/mismatched
   // props all surface, each pinned to its own attribute. Events stay outside the
   // contract (the runtime wires them) but their handler bodies are still checked.
+  // Unique names for the per-event assignments; a template may hold many.
+  let evSeq: number = 0;
+  const evVar = (): string => `__ev${evSeq++}`;
+
   const emitComponent = (node: ElementNode, locals: Set<string>): void => {
     const dataProps: Array<{
       key: string;
@@ -419,6 +424,7 @@ function emit(nodes: TemplateNode[], ctx: Set<string>): Line[] {
       keyOffset?: number;
       staticVal?: string;
     }> = [];
+    const eventProps: Array<{ key: string; expr: string; srcOffset?: number; keyOffset?: number }> = [];
     for (const attr of node.attrs) {
       if (attr.type === 'static') {
         if (attr.name === 'slot') continue; // slot marker, stripped by codegen
@@ -434,8 +440,20 @@ function emit(nodes: TemplateNode[], ctx: Set<string>): Line[] {
       } else if (attr.type === 'bind') {
         // `bind:value={{ sig }}` passes the signal itself — check it against the child's prop.
         dataProps.push({ key: attr.name, expr: attr.expr, srcOffset: attr.offset, keyOffset: attr.nameOffset });
+      } else if (attr.type === 'event') {
+        // `on:add={{ fn }}` IS the prop `onAdd` — codegen puts it in the same object through the same
+        // `onProp`, so a child that DECLARES `onAdd` must see it satisfied and must have the handler's
+        // type checked. But a child that does NOT declare it is equally correct: `defineComponent`
+        // forwards an undeclared `on:x` to the rendered root element as a DOM listener, which is how
+        // `<Button on:click={{ fn }}>` works and why `ButtonProps` has no `onClick`.
+        //
+        // Both at once, via a SPREAD. TypeScript checks a spread member's type against the target and
+        // reports a missing required prop, but skips EXCESS-property checking on it — measured, not
+        // assumed. Emitting events inline instead produced 78 TS2353s across this repository's own docs,
+        // every one of them on markup that builds and runs.
+        eventProps.push({ key: onProp(attr.name), expr: attr.expr, srcOffset: attr.offset, keyOffset: attr.nameOffset });
       } else {
-        emitAttr(attr, locals); // events / stray directives — checked, not part of props
+        emitAttr(attr, locals); // stray directives — checked, not part of props
       }
     }
     const anchor: number | undefined = dataProps.find((p) => p.srcOffset !== undefined)?.srcOffset;
@@ -474,7 +492,34 @@ function emit(nodes: TemplateNode[], ctx: Set<string>): Line[] {
           .push(p.keyOffset);
       }
     }
+    // An `on:x` handler has to do two contradictory-looking things, so it does them in two places.
+    //
+    // In the props object it appears only as its TYPE, via `__WeaveGiven`: if the child declares `onX`,
+    // that satisfies a required handler; if it does not, `Extract` is `never`, `Pick` is `{}`, and
+    // nothing is contributed. Two simpler attempts failed on this repository's own documentation —
+    // emitting the handler inline gave 78 TS2353 "does not exist in type ButtonProps", and spreading the
+    // literal gave 41 TS2559, because `ButtonProps` is all-optional and TypeScript's weak-type rule
+    // rejects an object whose only member is undeclared. Both were markup that builds and runs.
+    for (const e of eventProps) {
+      mk()
+        .lit('    ...__weaveGiven<__WeaveGiven<typeof ')
+        .expr(node.tagOffset, node.tag, locals)
+        .lit(`, '${e.key}'>>(),`)
+        .push(e.keyOffset ?? e.srcOffset);
+    }
     push(`  });`);
+    // And the handler's own type is checked here, where a mismatch can be pinned to the handler rather
+    // than to the whole call. `__WeaveEv` resolves to `unknown` for an event the child does not declare,
+    // which is exactly the forwarding case: `defineComponent` hands it to the root element instead.
+    for (const e of eventProps) {
+      mk()
+        .lit(`  const ${evVar()}: __WeaveEv<typeof `)
+        .expr(node.tagOffset, node.tag, locals)
+        .lit(`, '${e.key}'> = (`)
+        .expr(e.srcOffset, e.expr, locals)
+        .lit(');')
+        .push(e.srcOffset ?? e.keyOffset);
+    }
   };
 
   const walk = (list: TemplateNode[], locals: Set<string>): void => {
@@ -676,6 +721,17 @@ function assemble(
   // rendered it got `Type 'Node' is not assignable to type 'Node'`. Going through `globalThis` is not
   // shadowable: a local type declaration lives in a different declaration space from the global VALUE.
   out.push('type __WeaveNode = typeof globalThis.Node.prototype;');
+  // `on:x` on a component is checked ONLY when the child declares `onX`. If it does, the handler must
+  // match that prop's type; if it does not, `defineComponent` forwards the handler to the rendered root
+  // element as a DOM listener, which is how `<Button on:click={{ fn }}>` works with a `ButtonProps` that
+  // has no `onClick`. `unknown` in the false branch is what makes the second case silent.
+  out.push('type __WeaveProps<F> = F extends (p: infer P, ...rest: never[]) => unknown ? P : never;');
+  out.push("type __WeaveEv<F, K extends string> = K extends keyof __WeaveProps<F> ? __WeaveProps<F>[K] : unknown;");
+  // The child's own declaration of `onX`, or `{}` when it has none. Spread into the props object, this
+  // SATISFIES a required handler without ever being an excess property — `Extract` collapses to `never`
+  // for an undeclared one, and `Pick<P, never>` is `{}`, which contributes nothing.
+  out.push("type __WeaveGiven<F, K extends string> = Pick<__WeaveProps<F>, Extract<K, keyof __WeaveProps<F>>>;");
+  out.push('declare function __weaveGiven<T>(): T;');
   out.push('type __WeavePropsOf<F> = F extends (props: infer P, ...rest: any[]) => any ? P : Record<string, never>;');
   // With `export const propDefaults`, the defaulted keys become optional for a PARENT
   // (setup still sees them as declared); a key in D but not P is ignored.
