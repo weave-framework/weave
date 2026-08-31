@@ -1,0 +1,20 @@
+/* The same class name, deliberately styled nothing like A's. */
+.box {
+  padding: 14px;
+  border-radius: 10px;
+  border: 2px dashed var(--green);
+  background: color-mix(in srgb, var(--green) 8%, transparent);
+}
+
+.label {
+  margin: 0 0 4px;
+  font-weight: 700;
+  color: var(--green);
+}
+
+.attr {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--muted);
+}

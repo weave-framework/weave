@@ -68,6 +68,21 @@ The key rule of the rewrite: **only the rightmost compound selector is scoped.**
 
 This is compile-time, attribute-based scoping: zero runtime cost, SSR-safe, and leak-proof because Weave only marks the DOM **it** generated.
 
+Which is a claim you can watch. Below are two sibling components. **Both stylesheets define `.box`**,
+with different values, and neither knows the other exists. Each prints the real scope attribute the
+compiler stamped on it:
+
+:::demo styling-scope
+
+:::callout see "What you should see"
+Two boxes that look nothing alike, from two rules with the **same selector**. Underneath each, the
+attribute it actually carries — two different six-character hashes, derived from the two filenames.
+
+There is no naming convention holding this together, no BEM prefix, and nothing you had to remember.
+`.box` in one component and `.box` in another are simply different selectors after compilation.
+:::
+
+
 ## Styling the component's own root: `:host`
 
 A component's outermost element is its **host**. Target it with `:host`, and apply conditional host styles with `:host(...)` — exactly like the Shadow DOM convention, but here it works in regular (light) DOM:

@@ -1,0 +1,20 @@
+/* Both components define `.box`. Neither knows about the other. */
+.box {
+  padding: 14px;
+  border-radius: 10px;
+  border: 2px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+.label {
+  margin: 0 0 4px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.attr {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--muted);
+}

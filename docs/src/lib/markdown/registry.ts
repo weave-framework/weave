@@ -24,6 +24,7 @@ export const demos: Record<string, Component> = {
   'reactivity-batch': lazy(() => import('../demos/learn/reactivity-batch')),
   'components-flow': lazy(() => import('../demos/learn/components-flow')),
   'templates-bind': lazy(() => import('../demos/learn/templates-bind')),
+  'styling-scope': lazy(() => import('../demos/learn/styling-scope')),
   'ex-autocomplete-async': lazy(() => import('../demos/ui/ex-autocomplete-async')),
   'ex-autocomplete-basic': lazy(() => import('../demos/ui/ex-autocomplete-basic')),
   'ex-autocomplete-clearable': lazy(() => import('../demos/ui/ex-autocomplete-clearable')),
