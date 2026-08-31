@@ -21,7 +21,7 @@ import { createOwner, runInOwner, disposeOwner, type Owner } from './reactive.js
 import { snapshot, collectStates, finalizeStates, ROOT_ID, SNAPSHOT_ID, type DroppedState } from './graph.js';
 import { collectResumable } from './resume.js';
 import { scriptSafe, type PageArtifact } from './document.js';
-import type { Component } from './dom.js';
+import type { AcceptedComponent, Component } from './dom.js';
 
 // Install on import, so a component module imported afterward parses its `template(...)` strings headlessly.
 installServerDom();
@@ -71,10 +71,10 @@ export function renderToString(node: unknown): string {
  * but emits a string instead of attaching to a container). One-shot: reactive bindings fill their initial
  * values synchronously; `onMount` and live event listeners are inert on the server.
  */
-export function renderComponent(component: Component, props?: Record<string, unknown>): string {
+export function renderComponent(component: AcceptedComponent, props?: Record<string, unknown>): string {
   const owner: Owner = createOwner(null);
   try {
-    const node: unknown = runInOwner(owner, () => component(props ?? {}, {}));
+    const node: unknown = runInOwner(owner, () => (component as Component)(props ?? {}, {}));
     return serializeNode(node as SNode);
   } finally {
     disposeOwner(owner);
@@ -92,7 +92,7 @@ export function renderComponent(component: Component, props?: Record<string, unk
  *    `collectStates` is inert for an eager render, which never calls `registerState`).
  */
 export async function renderPage(
-  component: Component,
+  component: AcceptedComponent,
   options: { props?: Record<string, unknown>; state?: Record<string, unknown>; resumable?: boolean } = {}
 ): Promise<PageArtifact> {
   // Reset the shared title so a prior route's value never leaks; the render may set `document.title`
@@ -116,7 +116,7 @@ export async function renderPage(
       // the client to resume, instead of wiring a live listener (which is what a client-side render of the same
       // resumable build does). The captured id→handler map is discarded — the client rebuilds handlers from the
       // compiled `handlers(ctx)` factory over the resumed ctx.
-      node = collectResumable(() => runInOwner(owner, () => component(props ?? {}, {}))).node;
+      node = collectResumable(() => runInOwner(owner, () => (component as Component)(props ?? {}, {}))).node;
     }, dropped)
   );
   // Settled: every tracked fetch has resolved and its effect has written through into `node`.

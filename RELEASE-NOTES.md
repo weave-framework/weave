@@ -19,6 +19,16 @@ Both are fixed and held by a gate that asserts the same inputs complete in milli
 GitHub code scanning as `js/polynomial-redos`. **No action needed on your side** — nothing about the
 API or the output changed.
 
+### A component with typed props works everywhere a component is accepted
+
+`Component` describes a component being *called*, where props are optional. Used for a *parameter* it
+says the opposite of what is meant, and the ordinary case — a component whose template declares props —
+was refused at five separate doors: a route, `mountComponent` (every app's bootstrap),
+`defineCustomElement`, `lazy`'s `loading` fallback, and `renderComponent` for SSR.
+
+Two of those had already been fixed one at a time. Two real applications hitting the same shape on the
+same day is what turned the third point fix into one shared type used at every entrance.
+
 ### A component with typed props goes into a dialog
 
 `component(X, props)` — how you put a component into a dialog or a sheet — refused every component that

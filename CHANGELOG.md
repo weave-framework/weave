@@ -16,6 +16,31 @@
 
 ## 3.3.0
 
+### Every entry point accepts a component with typed props
+
+`Component` is the type of a component being CALLED — props optional, because the caller may pass
+none. Using it for a PARAMETER is the opposite direction, and parameters are contravariant: a
+component the compiler emitted from a template with typed props is `(props: TheseProps, …) => Node`,
+which is not assignable to one that may be called with `undefined`. So every API that asked for a
+`Component` refused the ordinary case.
+
+This had already been fixed twice, one instance at a time — `lazy()` in 3.2.0, and dialog regions
+earlier in this release. A probe over every author-facing entry point found **all five** refusing it:
+
+| written | before |
+| --- | --- |
+| `route('/doc/:id', { component: Page })` | rejected |
+| `mountComponent(App, '#app')` — every app's bootstrap | rejected |
+| `defineCustomElement('x-page', Page)` | rejected |
+| `lazy(…, { loading: Spinner })` | rejected |
+| `renderComponent(Page, props)` — SSR | rejected |
+
+There is now one `AcceptedComponent` used at all of them, and the framework converts explicitly where
+it calls what it was handed. `LoadedComponent` remains as its earlier name.
+
+Found by a fourth real application, which hit the dialog case 16 more times independently — and
+finding it twice in one day is what turned a third point fix into a sweep of the family.
+
 ### A component that provides a child's name itself keeps it
 
 `weave check` writes an import for every `<Tag>` a template composes, unless the script already

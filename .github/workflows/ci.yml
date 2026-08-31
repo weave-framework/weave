@@ -287,6 +287,11 @@ jobs:
       # times in one run, at the exact call its own documentation shows.
       - name: A typed component goes into an overlay
         run: pnpm verify:ui-overlay
+      # The same defect three times over - `lazy()`, a dialog region, a route - so this checks the
+      # FAMILY: every author-facing entry point that ACCEPTS a component, with one that declares typed
+      # props. All five refused it when this was written.
+      - name: Every entry point accepts a component with typed props
+        run: pnpm verify:typed-props
       # The docs site is the biggest Weave app there is, and nothing type-checked it: pointing the
       # checker at it found 456 errors, and several of them were the framework's, not the site's.
       - name: the docs site type-checks

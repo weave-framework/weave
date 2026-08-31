@@ -20,7 +20,7 @@
 
 import { signal, computed, effect, batch, onCleanup, getOwner, createContext, provide, inject } from '@weave-framework/runtime';
 import type { Signal, Computed, Context } from '@weave-framework/runtime';
-import { ifBlock, transition, type Component, type TransitionFn } from '@weave-framework/runtime/dom';
+import { ifBlock, transition, type AcceptedComponent, type Component, type TransitionFn } from '@weave-framework/runtime/dom';
 
 /** Path parameters matched from the URL, as a string map (`/users/:id` → `{ id: '42' }`). */
 export type RouteParams = Record<string, string>;
@@ -43,7 +43,7 @@ export interface Route {
   /** Path pattern: `/`, `/users`, `/user/:id`, `''` (index child), or `'*'` (fallback). */
   path: string;
   /** Component to render when matched (a layout, if it has `children`). */
-  component?: Component;
+  component?: AcceptedComponent;
   /** Sync guard: `true` allows, `false` blocks (→ fallback), a string redirects. */
   guard?: Guard;
   /** Static redirect target (pathname). When matched, resolve to this path instead. */
@@ -82,7 +82,7 @@ export type RouteParamsOf<Path extends string> =
 
 /** Config for {@link route} — like {@link Route} minus `path`, with a typed `guard`. */
 export interface RouteConfig<Path extends string = string> {
-  component?: Component;
+  component?: AcceptedComponent;
   /** Sync guard with params typed from the path literal. */
   guard?: (ctx: { path: string; params: RouteParamsOf<Path>; query: RouteParams }) => boolean | string;
   /** Data loader with params typed from the path literal (`route('/user/:id', …)` → `params.id`). */
@@ -652,7 +652,8 @@ function resolveLevel(
         // and such a route never reaches here. One that DOES reach here without a component renders
         // a blank outlet, indistinguishable from a mounting problem, so say it out loud once.
         if (!c.route.component) warnViewless(c.route.path);
-        return { view: c.route.component!, params, loader: c.route.loader };
+        // Accepted wide (any props shape may be handed to a route), called narrow by the outlet.
+        return { view: c.route.component! as Component, params, loader: c.route.loader };
       }),
     };
   }
@@ -718,7 +719,7 @@ export function createRouter(routes: Route[], options?: { basename?: string; vie
   const compiled: Compiled[] = compileRoutes(routes);
   const fallback: Route | undefined = routes.find((r) => r.path === '*');
   const fallbackChain = (): Match[] =>
-    fallback?.component ? [{ view: fallback.component, params: {} }] : [];
+    fallback?.component ? [{ view: fallback.component as Component, params: {} }] : [];
 
   const resolution: Computed<{ chain: Match[]; redirectTo: string | null }> = computed<{
     chain: Match[];

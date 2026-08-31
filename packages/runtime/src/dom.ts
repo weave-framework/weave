@@ -1111,15 +1111,26 @@ export function mountChild(anchorNode: Comment, node: Node | null): void {
 export type Component = (props?: Record<string, unknown>, slots?: Record<string, () => Node>) => Node;
 
 /**
- * A component whose PROPS SHAPE is not known here — what {@link lazy} loads.
+ * A component being HANDED to the framework, whatever props it declares.
  *
- * A routed page legitimately declares required props (`setup(props: { params: { pkg: string } })`),
- * and the router hands them to it. Typed as {@link Component}, such a page is not assignable, so
- * `weave routes` generated a module that did not type-check for any app with a dynamic route. `never`
- * in the props position accepts any props shape (parameters are contravariant); `lazy` only forwards
- * what it is given, so nothing here reads them.
+ * {@link Component} is the type of a component being CALLED — props optional, because the caller may
+ * pass none. That makes it the wrong type for a parameter: a component the compiler emitted from a
+ * template with typed props is `(props: TheseProps, …) => Node`, and parameters are contravariant, so
+ * it is not assignable to one that may be called with `undefined`. Every API that asked for a
+ * `Component` therefore refused the ordinary case.
+ *
+ * That was found three separate times, each by a real application and never by this repository:
+ * `lazy()` (a routed page declaring `params`), `component()` for dialog regions, and a route's own
+ * `component`. A probe over every author-facing entry point then showed all five refusing it, so this
+ * type exists to be used at every one of them rather than fixed a fourth time.
+ *
+ * `never` in the props position accepts any props shape, and is honest wherever the framework only
+ * FORWARDS props it was given rather than reading them — which is the case at each of these.
  */
-export type LoadedComponent = (props: never, slots?: Record<string, () => Node>) => Node;
+export type AcceptedComponent = (props: never, slots?: Record<string, () => Node>) => Node;
+
+/** What {@link lazy} loads. The original name for {@link AcceptedComponent}, kept as public API. */
+export type LoadedComponent = AcceptedComponent;
 
 /**
  * Glue a compiled `render(ctx, slots)` to a `setup(props)`. The loader emits
@@ -1214,7 +1225,7 @@ interface ComponentWithSetup extends Component {
  * @internal
  */
 export function extendSetup(
-  base: Component,
+  base: AcceptedComponent,
   own?: (props: Record<string, unknown>, base: Record<string, unknown>) => Record<string, unknown> | void,
   propsFn?: (props: Record<string, unknown>) => Record<string, unknown>
 ): (props: Record<string, unknown>) => Record<string, unknown> {
@@ -1233,14 +1244,16 @@ export function extendSetup(
  * `querySelector` — a non-matching selector throws. Returns an unmount fn.
  */
 export function mountComponent(
-  component: Component,
+  component: AcceptedComponent,
   container: Element | string,
   props?: Record<string, unknown>
 ): () => void {
   const owner: Owner = createOwner(null);
   // Name the scope after the component so devtools' inspectTree() shows a component tree.
   owner.name = (component as { displayName?: string }).displayName || component.name || 'Component';
-  const node: Node = runInOwner(owner, () => component(props, {}));
+  // Accepted wide, called narrow. `AcceptedComponent` exists so any props shape may be HANDED in;
+  // calling it is the other direction, and the props are the caller's own — see its doc comment.
+  const node: Node = runInOwner(owner, () => (component as Component)(props, {}));
   const unmount: () => void = mount(node, container);
   return () => {
     disposeOwner(owner);
@@ -1271,7 +1284,7 @@ const camel = (a: string): string => a.replace(/-([a-z])/g, (_m, c: string) => c
  */
 export function defineCustomElement(
   tag: string,
-  component: Component,
+  component: AcceptedComponent,
   options: CustomElementOptions = {}
 ): void {
   const propNames: string[] = options.props ?? [];
@@ -1327,7 +1340,7 @@ export function defineCustomElement(
 /** Optional fallbacks for {@link lazy} while loading or on failure. */
 export interface LazyOptions {
   /** Rendered while the loader is in flight (e.g. a spinner). */
-  loading?: Component;
+  loading?: AcceptedComponent;
   /** Rendered if the loader rejects; receives the error. */
   error?: (err: unknown) => Node;
 }
@@ -1385,7 +1398,7 @@ export function lazy(
         return () => comp(props, slots);
       }
       if (s === 'error') return opts.error ? () => opts.error!(failed) : null;
-      return opts.loading ? () => opts.loading!(props, slots) : null;
+      return opts.loading ? () => (opts.loading as Component)(props, slots) : null;
     });
     return host;
   }) as unknown as Component & { preload: () => void };
