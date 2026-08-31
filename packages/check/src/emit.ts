@@ -34,7 +34,7 @@ import {
   type SnippetNode,
   type ComponentSourceLoc,
   type AutoReturnResult,
-  importsBinding,
+  bindsName,
 } from '@weave-framework/compiler';
 
 const FOR_VARS: string[] = ['$index', '$count', '$first', '$last', '$even', '$odd'];
@@ -168,7 +168,7 @@ function childImports(
   const dir: string = cut === -1 ? '.' : tsPath.slice(0, cut);
   const out: string[] = [];
   for (const tag of composedTags(nodes)) {
-    if (importsBinding(script, tag)) continue;
+    if (bindsName(script, tag)) continue;
     const spec: string | null = resolveChild(tag, dir);
     // An unresolvable tag is left alone on purpose: TypeScript then reports `Cannot find name '<Tag>'`,
     // which is what the build says about it too, in the same place.

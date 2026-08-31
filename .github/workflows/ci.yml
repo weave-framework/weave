@@ -166,6 +166,11 @@ jobs:
       # unterminated comment surfaced as codegen's "Empty template fragment", neither with a position.
       - name: A malformed template says WHERE, never crashes
         run: pnpm verify:hostile-input
+      # A wrapper component DECLARES the child name it composes rather than importing it, and the
+      # checker synthesized a second binding on top: `TS2440 [generated] Import declaration conflicts
+      # with local declaration`. On a line the author cannot edit, and the build had no such error.
+      - name: A locally declared child name is left alone
+        run: pnpm verify:local-binding
       - name: weave check
         run: pnpm verify:check
       - name: Prettier plugin

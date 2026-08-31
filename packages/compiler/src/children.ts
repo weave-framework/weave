@@ -88,3 +88,43 @@ export function importsBinding(script: string | undefined, name: string): boolea
   }
   return false;
 }
+
+/**
+ * Does the component's own script already provide a binding named `name`, by ANY means?
+ *
+ * This is the question the child-import synthesis actually needs, and {@link importsBinding} answered
+ * only half of it. A wrapper component legitimately DECLARES the name it composes —
+ * `const Chart = (ChartModule as …).default`, re-exported — and synthesizing an import for it produced
+ * `TS2440: Import declaration conflicts with local declaration of 'Chart'` on a line the author cannot
+ * edit. The build had no such error, so the checker and the build disagreed about child components.
+ *
+ * Erring towards "yes, it is provided" is the safe direction: skipping the import when the script does
+ * not in fact bind the name yields `Cannot find name '<Tag>'`, which says what is wrong and where.
+ */
+export function bindsName(script: string | undefined, name: string): boolean {
+  if (!script) return false;
+  if (!/^[A-Za-z_$][\w$]*$/.test(name)) return false; // not an identifier; nothing can bind it
+  if (importsBinding(script, name)) return true;
+  const code: string = stripComments(script);
+  // A declaration of that name, or a rename that lands on it (`import { x as Chart }`,
+  // `export { x as Chart }`). Both patterns are anchored on a keyword and bounded by a word boundary,
+  // so neither can backtrack over the file.
+  // A lone backslash: written as `\b` inside a template literal this would be a BACKSPACE character,
+  // not a word boundary — the same escape mangling that once made `verify-authorship` unable to match
+  // anything while reporting a clean repository.
+  const B: string = String.fromCharCode(92);
+  const w: string = `${B}b`;
+  const s: string = `${B}s`;
+  // Kept as separate alternatives with no optional whitespace between two `\s` quantifiers: that shape
+  // lets a run of spaces be divided every possible way, which is the polynomial backtracking this
+  // release removed from two other scans.
+  for (const p of [
+    `${w}(?:const|let|var|class|enum)${s}+${name}${w}`,
+    `${w}function${s}+${name}${w}`,
+    `${w}function${s}*${B}*${s}*${name}${w}`, // `function* Chart`
+    `${w}as${s}+${name}${w}`, // `import { x as Chart }`, `export { x as Chart }`
+  ]) {
+    if (new RegExp(p).test(code)) return true;
+  }
+  return false;
+}

@@ -34,7 +34,7 @@ import {
   classifyTemplate,
   classifyStyle,
   childImportCandidates,
-  importsBinding,
+  bindsName,
   hashCss,
   ParseError,
   extensionBase,
@@ -243,7 +243,7 @@ function injectChildImports(
 ): string {
   const imports: string[] = [];
   for (const tag of components) {
-    if (importsBinding(script, tag)) continue;
+    if (bindsName(script, tag)) continue;
     const cand: string | null = resolveChildModule(tag, dir);
     if (cand === null) {
       throw new Error(

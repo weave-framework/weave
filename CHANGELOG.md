@@ -16,6 +16,26 @@
 
 ## 3.3.0
 
+### A component that provides a child's name itself keeps it
+
+`weave check` writes an import for every `<Tag>` a template composes, unless the script already
+imports it — and "already imports" was the wrong question. A wrapper component can DECLARE the name
+instead (`const Chart = (ChartModule as …).default`, re-exported, which is how you wrap a child you
+also want to pass along), and the synthesized import then landed on top of the author's own
+declaration:
+
+    error TS2440: [generated] Import declaration conflicts with local declaration of 'Chart'.
+
+The `[generated]` marker is the tell — the error sat on a line the author cannot edit, and the build
+had no such error. `weave check` disagreeing with the build about child components is the failure
+3.2.0 closed once already, in the other direction.
+
+The question is now whether the script provides the name at all, by import or by declaration. Erring
+towards "it does" is the safe direction: skipping an import the script did not in fact provide yields
+`Cannot find name '<Tag>'`, which says what is missing and where, while a collision says neither.
+
+Found by running the checker against a third real application.
+
 ### A component with typed props goes into a dialog
 
 `component(X, props)` — the documented way to put a component into a dialog or a sheet — took a

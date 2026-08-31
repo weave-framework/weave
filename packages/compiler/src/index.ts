@@ -23,7 +23,7 @@ export {
 export { parseTemplate, ParseError, type ParseOptions, type NodeSpan, type SpanMap } from './parser.js';
 export { mergeTemplates } from './merge.js';
 export { lintTemplate, lintTemplateFindings, type LintFinding, type LintFix } from './lint.js';
-export { importsBinding } from './children.js';
+export { importsBinding, bindsName } from './children.js';
 export { scopeCss, scopeAttr, hostAttr, hashCss } from './css.js';
 export { inferCtxNames } from './infer.js';
 export { injectAutoReturn, type AutoReturnResult } from './auto-return.js';

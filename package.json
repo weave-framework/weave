@@ -59,6 +59,7 @@
     "verify:lint-location": "node packages/cli/test/lint-location.smoke.mjs",
     "verify:check-fix": "node packages/cli/test/check-fix.smoke.mjs",
     "verify:grow-setup": "node packages/cli/test/grow-setup.smoke.mjs",
+    "verify:local-binding": "node packages/check/test/local-binding.smoke.mjs",
     "verify:impact": "node packages/cli/test/impact.smoke.mjs",
     "verify:devtools-flag": "node packages/cli/test/devtools-flag.smoke.mjs",
     "verify:merge": "node packages/cli/test/merge.smoke.mjs",
