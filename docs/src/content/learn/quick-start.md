@@ -21,7 +21,7 @@ So what you copy from this page keeps working. Two majors have shipped since —
 [Is Weave safe to bet on?](/enterprise/safe-to-bet-on) if you want the receipts rather than the promise.
 :::
 
-## The shape of a project
+## What a project looks like
 
 A Weave app is a handful of plain files plus one config. Here's the smallest useful layout:
 
@@ -76,17 +76,23 @@ Right — you don't write `<script src=…>` yourself. With `root` set, Weave ge
 
 ## 2. Write your first component
 
-The logic lives in `app.ts`. `setup` runs once when the component is created; it owns the component's state and returns the names the template can use.
+The logic lives in `app.ts`. `setup` runs **once**, when the component is created, and it owns the
+component's state. Its local values are what the template can read.
 
 ~~~ts title="src/app/app.ts"
 import { signal } from '@weave-framework/runtime';
 
 export function setup() {
   const count = signal(0);
-  const inc = () => count.set((n) => n + 1);
-  return { count, inc };
+  const inc = (): void => {
+    count.set((n) => n + 1);
+  };
 }
 ~~~
+
+No `return` — the compiler reads the template, sees it uses `count` and `inc`, and writes
+`return { count, inc }` for you. Write one yourself when you want to expose something under a different
+name or keep a value private; it is then used exactly as written.
 
 The markup lives in `app.html`. Read a signal with `{{ count() }}`; wire an event with `on:click={{ inc }}`. (Every binding in a Weave template uses double braces — more in [Templates](/learn/templates).)
 
@@ -131,20 +137,40 @@ weave check    # type-check your templates and components
 weave routes   # generate file-based routes (see the Router page)
 ~~~
 
-Run `weave dev`, open the printed URL, and edit `app.html` — the page reloads on save. Change `count.set((n) => n + 1)` to `+ 2` and watch the counter jump by twos.
+Run `weave dev`, open the printed URL, and edit `app.html` — the page reloads on save. Change
+`count.set((n) => n + 1)` to `+ 2` and watch the counter jump by twos.
+
+:::callout see "What a working first run looks like"
+The terminal prints a URL (`http://localhost:5173` unless the port was taken — it steps to the next free
+one and says so). The page shows your heading and a button. Clicking it counts up. Saving any of the
+three files reloads the page within a second, and the terminal stays quiet.
+
+If the terminal is quiet but the page is blank, the next box is almost certainly why.
+:::
+
+:::callout trap "The two things that go wrong first"
+**A blank page and `weave: mount target "#app" matched no element` in the browser console.** The `mount`
+selector in `weave.config.ts` has to match an element that exists in `src/index.html`. If you renamed
+`<div id="app">`, rename it in both places — they are two files that have to agree, and nothing checks
+that for you until the page runs.
+
+**The button renders as `() => …` instead of a number.** A signal is read by *calling* it:
+`{{ count() }}`, not `{{ count }}`. This is the single most common first mistake in Weave and it never
+throws — it just prints the function.
+:::
 
 :::callout tip "Running the CLI"
 With `@weave-framework/cli` installed, the `weave` command is available through your package scripts (`npm run dev`) or `npx weave dev`. The scaffold sets up the `dev`/`build`/`check` scripts for you. See [Installation](/learn/installation) for the full setup.
 :::
 
 :::callout info "What you just learned"
-A Weave app is `weave.config.ts` + components. A **component** is a `setup` function (`.ts`) plus a sibling template (`.html`) and optional scoped styles (`.scss`). `root` in the config bootstraps everything; `weave dev` runs it with live reload. Read a signal in a template with `{{ … }}`, wire events with `on:…={{ … }}`.
+A Weave app is `weave.config.ts` plus components. A **component** is a `setup` function (`.ts`) beside a template (`.html`) and optional scoped styles (`.scss`). `root` in the config bootstraps everything; `weave dev` runs it with live reload. Read a signal in a template by calling it — `{{ count() }}` — and wire events with `on:click={{ inc }}`. You do not write `setup`'s `return`; the compiler writes it from what the template uses.
 :::
 
 ## Where to next
 
-- The one idea everything is built on → [Thinking in signals](/learn/signals)
-- How components talk to each other → [Components](/learn/components)
-- The full template language → [Templates](/learn/templates)
+- The one idea everything is built on — [Thinking in signals :icon[arrow-right]](/learn/signals)
+- How components talk to each other — [Components :icon[arrow-right]](/learn/components)
+- The full template language — [Templates :icon[arrow-right]](/learn/templates)
 
 [Next: Thinking in signals :icon[arrow-right]](/learn/signals)
