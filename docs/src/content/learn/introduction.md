@@ -6,9 +6,15 @@ Welcome to Weave. This is the gentle path — no prior framework experience is a
 If you can read a line of JavaScript like `let name = "Ada"`, you already know enough to start. Everything else is explained as we go, in the order you need it.
 :::
 
-## Start with something alive
+## What is Weave?
 
-Before any explanation, here is a real Weave component running on this page. Type your name into the box.
+Weave is a tool for building user interfaces — the buttons, lists, forms and pages people click through in a web app. You describe what the screen should look like, and Weave keeps it in sync with your data as that data changes. You write plain HTML and plain functions; there is no separate language to learn.
+
+What makes it different is **how** it keeps things in sync, and that part is easier to watch than to read about.
+
+## So watch it
+
+Here is a real Weave component running on this page. Type your name into the box.
 
 :::demo intro-alive
 
