@@ -35,6 +35,19 @@ const PKGS = [
   // page named them — focus trapping, portals, overlays, virtual scroll, input masking, drag, breakpoints,
   // the live announcer. A whole subsystem, published under `exports['./cdk']`, invisible in the docs.
   { key: 'ui-cdk', title: '@weave-framework/ui/cdk', entry: 'packages/ui/src/cdk/index.ts' },
+  // The rest of the published NON-component entries. Each is a `package.json` export with its own
+  // surface, and none of them had a reference page: the resume/SSR family that Phase E shipped, the
+  // file-based route builder, schema-driven forms, and the testing helpers. Individual UI components are
+  // deliberately absent — every one has a prose page under /ui with its own prop table.
+  { key: 'runtime-serialize', title: '@weave-framework/runtime/serialize', entry: 'packages/runtime/src/serialize.ts' },
+  { key: 'runtime-resume', title: '@weave-framework/runtime/resume', entry: 'packages/runtime/src/resume.ts' },
+  { key: 'runtime-adopt', title: '@weave-framework/runtime/adopt', entry: 'packages/runtime/src/adopt.ts' },
+  { key: 'runtime-graph', title: '@weave-framework/runtime/graph', entry: 'packages/runtime/src/graph.ts' },
+  { key: 'runtime-server', title: '@weave-framework/runtime/server', entry: 'packages/runtime/src/server.ts' },
+  { key: 'runtime-document', title: '@weave-framework/runtime/document', entry: 'packages/runtime/src/document.ts' },
+  { key: 'router-files', title: '@weave-framework/router/files', entry: 'packages/router/src/files.ts' },
+  { key: 'forms-schema', title: '@weave-framework/forms/schema', entry: 'packages/forms/src/schema.ts' },
+  { key: 'ui-testing', title: '@weave-framework/ui/testing', entry: 'packages/ui/src/testing/index.ts' },
 ];
 
 const compilerOptions = {

@@ -103,6 +103,25 @@ const reference: NavSection = {
         { label: '@weave-framework/i18n', path: '/reference/i18n' },
         { label: '@weave-framework/data', path: '/reference/data' },
         { label: '@weave-framework/ui/cdk', path: '/reference/ui-cdk' },
+        { label: '@weave-framework/ui/testing', path: '/reference/ui-testing' },
+      ],
+    },
+    {
+      label: 'Server rendering & resume',
+      items: [
+        { label: '@weave-framework/runtime/server', path: '/reference/runtime-server' },
+        { label: '@weave-framework/runtime/document', path: '/reference/runtime-document' },
+        { label: '@weave-framework/runtime/serialize', path: '/reference/runtime-serialize' },
+        { label: '@weave-framework/runtime/resume', path: '/reference/runtime-resume' },
+        { label: '@weave-framework/runtime/adopt', path: '/reference/runtime-adopt' },
+        { label: '@weave-framework/runtime/graph', path: '/reference/runtime-graph' },
+      ],
+    },
+    {
+      label: 'More surfaces',
+      items: [
+        { label: '@weave-framework/router/files', path: '/reference/router-files' },
+        { label: '@weave-framework/forms/schema', path: '/reference/forms-schema' },
       ],
     },
     {
