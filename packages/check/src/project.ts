@@ -157,7 +157,16 @@ function collect(path: string, out: Virtual[], diags: Diagnostic[], patchers: Pa
     // regions in place — so offsets map 1:1 back to the raw `.weave` source.
     const source: string = readFileSync(path, 'utf8');
     tryBuild(() => buildVirtualSfc(path, source, resolveChildModule), path, source, out, diags, parseSfcLoc(source).template);
-  } else if (path.endsWith('.ts') && !path.endsWith('.d.ts')) {
+  } else if (path.endsWith('.d.ts')) {
+    // A declaration file is never a component — no template, no setup — but it MUST be a root of the
+    // program. An ambient `declare module 'untyped-package'` or `declare global` only takes effect when
+    // its file is in the program, which is exactly what `tsconfig`'s `include` does for `tsc`.
+    //
+    // It was skipped outright, so the checker reported TS7016 on an untyped import and printed
+    // TypeScript's own advice — "add a new declaration (.d.ts) file" — at an author who had already
+    // added one. `tsc --noEmit` went green on the identical tree.
+    plain.push(resolve(path));
+  } else if (path.endsWith('.ts')) {
     if (!collectTs(path, out, diags, patchers)) plain.push(resolve(path));
   }
 }
