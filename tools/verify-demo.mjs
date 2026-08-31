@@ -13,7 +13,7 @@
 import { chromium } from 'playwright';
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
-import { extname, join, normalize } from 'node:path';
+import { extname, join, resolve, sep } from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
@@ -54,9 +54,21 @@ const MIME = {
   '.webmanifest': 'application/manifest+json',
 };
 
+// Everything this server may read. A request path is joined onto it and then CHECKED to still be
+// inside it: `normalize` alone resolves `..` without refusing it, so `/../../secrets` used to escape
+// `dist/` entirely. It only ever serves a build on a developer's own machine, which is the reason it
+// was written loosely and not a reason to leave it that way — the file is public now, and this is the
+// kind of shape that gets copied.
+const served = resolve(dist);
+
 const server = createServer(async (req, res) => {
   const p = decodeURIComponent(req.url.split('?')[0]);
-  const file = normalize(join(dist, p === '/' ? 'index.html' : p));
+  const file = resolve(served, '.' + (p === '/' ? '/index.html' : p));
+  if (file !== served && !file.startsWith(served + sep)) {
+    res.writeHead(403);
+    res.end('outside the served directory');
+    return;
+  }
   try {
     const data = await readFile(file);
     res.writeHead(200, { 'content-type': MIME[extname(file)] || 'application/octet-stream' });
@@ -76,6 +88,26 @@ const port = 5193;
 await new Promise((r) => server.listen(port, r));
 const base = `http://localhost:${port}`;
 console.log(`serving dist at ${base}\n`);
+
+/* ── 2b. The server may not be talked out of its own directory ── */
+// `normalize` resolves `..` without refusing it, so this used to read anything on the machine. It is a
+// local test server, which is why nobody looked; making the file public is what made CodeQL look
+// (js/path-injection). Asserted through a real request, not by reading the code.
+{
+  // A plain `../` never reaches the server: fetch resolves it in the URL first, so what arrives is
+  // `/package.json` — inside dist, absent, 404. The encoded form is the one that arrives intact, and
+  // it is the one that used to be served.
+  // Three levels: dist is <repo>/examples/demo/dist, so this names the repository's own package.json
+  // — a file that EXISTS. Two levels landed on examples/, where nothing does, and the 404 that came
+  // back looked like a refusal while proving nothing.
+  const climb = '..%2f..%2f..%2fpackage.json';
+  const plain = await fetch(`${base}/../../../package.json`);
+  ok(plain.status !== 200, `a climbing path yields nothing (got ${plain.status})`);
+  const encoded = await fetch(`${base}/${climb}`);
+  ok(encoded.status === 403, `an ENCODED climb to a file that EXISTS is refused (got ${encoded.status})`);
+  const normal = await fetch(`${base}/index.html`);
+  ok(normal.status === 200, `while an ordinary file is still served (got ${normal.status})`);
+}
 
 const browser = await chromium.launch();
 try {

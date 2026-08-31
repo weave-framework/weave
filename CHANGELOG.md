@@ -165,6 +165,15 @@ claims fail at 71s, 10.3s and 23.8s. Reported by GitHub code scanning as `js/pol
 
 ### Internal
 
+- **The retained app's test server could be talked out of its own directory.** It joined the request
+  path onto `dist/` and called `normalize`, which RESOLVES `..` without refusing it, so an encoded
+  `..%2f..%2f..%2fpackage.json` was served from outside the build. It only ever runs on a developer's
+  machine, which is why nobody looked — and making the file public is what made GitHub look
+  (`js/path-injection`). The resolved path must now stay inside the served directory.
+  The first version of the test proved nothing: two levels up from `examples/demo/dist` is `examples/`,
+  where no `package.json` exists, so the 404 that came back looked like a refusal. Three levels names a
+  file that exists, and without the containment that request returns 200.
+
 - **`tools/link-local.mjs` — test a fix in a real app without publishing it.** It packs this checkout
   the way npm would receive it and points an app at those tarballs, with `--restore` to undo. The
   approach is not new — one consuming app has carried its own version of this since July — but it lived
