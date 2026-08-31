@@ -115,13 +115,21 @@ async function copyTreeExcept(srcDir: string, destDir: string, exclude: string):
   }
 }
 
-export async function build(config: BuildConfig): Promise<void> {
+/** What a build wrote, by the names it chose — both carry a content hash, so neither is guessable. */
+export interface BuiltAssets {
+  /** The entry module's filename, e.g. `main-6NRCV4ZM.js`. */
+  script: string;
+  /** The stylesheet's filename, e.g. `app-1ys8lxz.css`. */
+  css: string;
+}
+
+export async function build(config: BuildConfig): Promise<BuiltAssets> {
   const { outDir } = config;
   if (config.clean) await rm(outDir, { recursive: true, force: true });
 
   const state: WeaveState = { css: [] };
   const ve: { code: string; resolveDir: string } | undefined = config.virtualEntry;
-  await esbuild({
+  const bundled: Awaited<ReturnType<typeof esbuild>> = await esbuild({
     // A virtual entry (Level C) is emitted as `main.js`; else the hand-written entry.
     entryPoints: ve ? [{ in: VIRTUAL_ENTRY, out: 'main' }] : [config.entry!],
     bundle: true,
@@ -129,6 +137,15 @@ export async function build(config: BuildConfig): Promise<void> {
     // Code-split dynamic import()s into separate chunks, so `lazy()` routes are
     // actually their own files and <Link> prefetch (B.15) has something to warm.
     splitting: true,
+    // Content hashes in the FILENAME, not in a query. `?v=…` busts a cache correctly but the file is
+    // still called `main.js`, so a host can never answer `immutable` — every repeat visit re-asks
+    // whether it changed. A hashed name is a different file each build, so that question disappears.
+    // Split chunks were already named this way; the entry was the odd one out.
+    entryNames: '[name]-[hash]',
+    // The emitted name is then READ from the metafile rather than composed here. Guessing it is how a
+    // page ends up loading nothing while reporting nothing — the browser 404s the module and the mount
+    // simply never happens.
+    metafile: true,
     outdir: outDir,
     minify: config.minify ?? true,
     // Linked maps (a separate .js.map) so a production stack trace resolves to the author's source. Opt
@@ -139,6 +156,15 @@ export async function build(config: BuildConfig): Promise<void> {
       ...(ve ? [entryPlugin(ve.code, ve.resolveDir)] : []),
     ],
   });
+
+  // What esbuild actually wrote for the entry. Read, never composed: with `[hash]` in the name there is
+  // no way to know it in advance, and a guess that misses produces a page that loads and renders
+  // nothing, with no error anywhere.
+  const entryFile: string =
+    Object.entries(bundled.metafile?.outputs ?? {})
+      .find(([file, out]) => out.entryPoint !== undefined && file.endsWith('.js'))?.[0]
+      .split(/[\/]/)
+      .pop() ?? 'main.js';
 
   // Copy the static web root (favicons, manifest, the raw index.html) into the output;
   // the injected index.html below overwrites the raw copy.
@@ -154,7 +180,11 @@ export async function build(config: BuildConfig): Promise<void> {
   const globalCss: string = compiledStyles.map((s) => s.css).join('\n');
   await mkdir(outDir, { recursive: true });
   const css: string = [globalCss, ...state.css].filter(Boolean).join('\n');
-  await writeFile(join(outDir, 'app.css'), css);
+  // Hashed for the same reason as the entry: a stable name can never be served as immutable.
+  // Hashed unconditionally, empty content included: a build whose stylesheet is sometimes hashed and
+  // sometimes not is a rule with an exception, and the exception is what a caller forgets.
+  const cssFile: string = `app-${contentVersion(css)}.css`;
+  await writeFile(join(outDir, cssFile), css);
 
   // Emit each referenced url() asset (deduped by served path) next to app.css.
   const seen: Set<string> = new Set();
@@ -170,10 +200,9 @@ export async function build(config: BuildConfig): Promise<void> {
   // (and stripping any dev live-reload) so dist/ is self-contained + deployable.
   if (config.index) {
     const base: string = normalizeBase(config.base);
-    const jsVersion: string = contentVersion(await readFile(join(outDir, 'main.js'), 'utf8').catch(() => ''));
     const html: string = injectHtml(await readFile(config.index, 'utf8'), {
-      script: `${base}/main.js?v=${jsVersion}`,
-      css: `${base}/app.css?v=${contentVersion(css)}`,
+      script: `${base}/${entryFile}`,
+      css: `${base}/${cssFile}`,
       base,
     });
     await writeFile(join(outDir, 'index.html'), html);
@@ -182,6 +211,7 @@ export async function build(config: BuildConfig): Promise<void> {
     // same document there costs one file and turns a broken refresh into a working one.
     if (config.spaFallback) await writeFile(join(outDir, '404.html'), html);
   }
+  return { script: entryFile, css: cssFile };
 }
 
 /** Config for {@link buildSsg} — the SPA client bundle plus a server entry to render each route headlessly. */
@@ -277,7 +307,7 @@ async function loadServerEntry(
 export async function buildSsg(config: SsgBuildConfig): Promise<void> {
   // 1. The client bundle + app.css + public root — same output as a normal build, minus the HTML shell
   //    (we generate the documents below instead of injecting into a hand-written index).
-  await build({
+  const assets: BuiltAssets = await build({
     virtualEntry: config.virtualEntry,
     outDir: config.outDir,
     minify: config.minify,
@@ -297,12 +327,14 @@ export async function buildSsg(config: SsgBuildConfig): Promise<void> {
   const shell: DocumentShell = config.index
     ? documentShell(await readFile(config.index, 'utf8'))
     : { htmlAttrs: '', head: '' };
+  // The names the build chose, not the names this file would have guessed. A prerendered page that
+  // points at `/app.css` when the build wrote `app-1ys8lxz.css` renders unstyled and says nothing.
   const cssLink: string =
-    `<link rel="stylesheet" href="${base}/app.css">` +
+    `<link rel="stylesheet" href="${base}/${assets.css}">` +
     // Published from the document, before the entry module: `import` hoists, so a base assigned inside
     // the bundle would land after the router had already read it.
     (base ? `<script>window.__WEAVE_BASE__=${JSON.stringify(base)}</script>` : '');
-  const head: string = /<link[^>]+href=["']\/app\.css["']/i.test(shell.head)
+  const head: string = new RegExp(`<link[^>]+href=["']/${assets.css}["']`, 'i').test(shell.head)
     ? shell.head
     : shell.head
       ? `${shell.head}\n${cssLink}`
@@ -327,7 +359,7 @@ export async function buildSsg(config: SsgBuildConfig): Promise<void> {
       document: (): DocumentOptions => ({
         title: config.title,
         head,
-        entry: `${base}/main.js`,
+        entry: `${base}/${assets.script}`,
         lang: config.lang,
         // `lang` stays as the fallback for an app with no index.html of its own.
         ...(shell.htmlAttrs ? { htmlAttrs: shell.htmlAttrs } : {}),

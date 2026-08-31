@@ -69,21 +69,26 @@ async function buildApp(base, existing, template = '<p>{{ n() }}</p>\n', spaFall
 // 1. No base: exactly what it always emitted, plus a version marker.
 {
   const html = await buildApp(undefined);
-  ok(/src="\/main\.js\?v=[a-z0-9]+"/.test(html), `the entry carries a content version (got ${(/src="[^"]*"/.exec(html) ?? [])[0]})`);
-  ok(/href="\/app\.css\?v=[a-z0-9]+"/.test(html), `the stylesheet does too (got ${(/href="[^"]*\.css[^"]*"/.exec(html) ?? [])[0]})`);
+  // The version lives in the NAME now, not in a query: a stable name can never be served as
+  // immutable, however correct its `?v=` is.
+  ok(/src="\/main-[A-Za-z0-9]+\.js"/.test(html), `the entry name carries its content version (got ${(/src="[^"]*"/.exec(html) ?? [])[0]})`);
+  ok(/href="\/app-[A-Za-z0-9]+\.css"/.test(html), `the stylesheet's does too (got ${(/href="[^"]*\.css[^"]*"/.exec(html) ?? [])[0]})`);
 }
 
 // 2. A base prefixes every framework-injected URL.
 {
   const html = await buildApp('/my-app/');
-  ok(/src="\/my-app\/main\.js\?v=/.test(html), `the entry is served from the base (got ${(/src="[^"]*"/.exec(html) ?? [])[0]})`);
-  ok(/href="\/my-app\/app\.css\?v=/.test(html), `so is the stylesheet (got ${(/href="[^"]*\.css[^"]*"/.exec(html) ?? [])[0]})`);
-  ok(!/src="\/main\.js/.test(html), 'and nothing is left at the root');
+  // Asset names carry a content hash now, so these assert the SHAPE — served from the base, and a
+  // hashed name rather than a stable one with a query. Spelling `main.js` out was asserting a
+  // coincidence, and it broke the day the build stopped choosing that name.
+  ok(/src="\/my-app\/main-[A-Za-z0-9]+\.js"/.test(html), `the entry is served from the base (got ${(/src="[^"]*"/.exec(html) ?? [])[0]})`);
+  ok(/href="\/my-app\/app-[A-Za-z0-9]+\.css"/.test(html), `so is the stylesheet (got ${(/href="[^"]*\.css[^"]*"/.exec(html) ?? [])[0]})`);
+  ok(!/src="\/main-/.test(html), 'and nothing is left at the root');
 
   // The router reads the base at module init, and `import` declarations hoist — so the declaration has
   // to come from the DOCUMENT, before the entry module tag. Order is the whole point of this assertion.
   const declared = html.indexOf('__WEAVE_BASE__');
-  const entry = html.indexOf('src="/my-app/main.js');
+  const entry = html.search(/src="\/my-app\/main-/);
   ok(declared !== -1, 'the page declares the base for the router');
   ok(declared < entry, `and declares it BEFORE the entry module (${declared} < ${entry})`);
   ok(/__WEAVE_BASE__="\/my-app"/.test(html), `with no trailing slash (got ${(/__WEAVE_BASE__=[^<]*/.exec(html) ?? [])[0]})`);
@@ -93,7 +98,7 @@ async function buildApp(base, existing, template = '<p>{{ n() }}</p>\n', spaFall
 //    for no reason), and different once the sources change (or the whole mechanism is decoration).
 {
   const dir = mkdtempSync(join(repo, 'tools', '.verify-base-path-app-'));
-  const version = (html) => /main\.js\?v=([a-z0-9]+)/.exec(html)?.[1];
+  const version = (html) => /main-([A-Za-z0-9]+)\.js/.exec(html)?.[1];
 
   const first = version(await buildApp(undefined, dir));
   const again = version(await buildApp(undefined, dir));

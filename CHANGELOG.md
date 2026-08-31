@@ -16,6 +16,25 @@
 
 ## 3.3.0
 
+### Built assets carry their version in the name
+
+`weave build` wrote `main.js` and `app.css` and pointed at them with a content query
+(`/main.js?v=1a2b3c`). That busts a cache correctly, but the filename never changes — so a host can
+never serve them as immutable, and every repeat visit re-asks whether they changed. The split chunks
+were already named `[name]-[hash]`; the entry and the stylesheet were the ones left out.
+
+They are now `main-<hash>.js` and `app-<hash>.css`, and the injected URLs are **read from what the
+build wrote** rather than composed — with a hash in the name there is no way to know it in advance, and
+a guess that misses gives a page that loads, renders nothing and reports nothing.
+
+`pnpm verify:injected-assets` holds that: every URL in the built HTML must name a file the build
+actually wrote, in the ordinary build and in a prerendered page. It was written before the change and
+earned it immediately — the `--ssg` path composed its own URLs separately and would have pointed all
+113 prerendered documents at files that no longer existed.
+
+**If you referenced the built filenames** — a hand-written preload, a service worker, a CSP hash, a
+deploy rule naming `main.js` — read them from the emitted `index.html` instead.
+
 ### A comment in `setup`'s return no longer costs you resumability
 
 The reader that works out what a component hands out answered "nothing" whenever the returned object

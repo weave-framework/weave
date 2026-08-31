@@ -18,6 +18,7 @@ import { build as esbuild } from 'esbuild';
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { builtAssets } from '../../../tools/built-assets.mjs';
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 let failed = 0;
@@ -91,7 +92,7 @@ template(broken);
 rmSync(join(app, 'dist'), { recursive: true, force: true });
 const plain = await run(['build']);
 ok(plain.exited === null, 'a plain build still succeeds on code the checker refuses');
-ok(existsSync(join(app, 'dist', 'main.js')), 'and still writes its bundle');
+ok(existsSync(join(app, 'dist', builtAssets(join(app, 'dist')).script)), 'and still writes its bundle');
 ok(
   /not type-checked/i.test(plain.said),
   'but it SAYS it was not type-checked: ' + JSON.stringify(plain.said.slice(-160))
@@ -103,7 +104,7 @@ const checked = await run(['build', '--check']);
 ok(checked.exited === 1, 'build --check fails on the same code (exit ' + checked.exited + ')');
 ok(/missingName/.test(checked.said), 'and names what is wrong: ' + JSON.stringify(checked.said.slice(0, 160)));
 ok(
-  !existsSync(join(app, 'dist', 'main.js')),
+  !existsSync(join(app, 'dist', builtAssets(join(app, 'dist')).script)),
   'and writes NO bundle — an artifact from code known to be broken is worse than none'
 );
 
@@ -112,7 +113,7 @@ template(sound);
 rmSync(join(app, 'dist'), { recursive: true, force: true });
 const good = await run(['build', '--check']);
 ok(good.exited === null, 'build --check passes a sound app (' + JSON.stringify(good.said.slice(-120)) + ')');
-ok(existsSync(join(app, 'dist', 'main.js')), 'and it writes its bundle');
+ok(existsSync(join(app, 'dist', builtAssets(join(app, 'dist')).script)), 'and it writes its bundle');
 ok(!/not type-checked/i.test(good.said), 'and it does not claim to be unchecked, because it was');
 
 rmSync(app, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });

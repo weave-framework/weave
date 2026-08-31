@@ -14,6 +14,7 @@ import { mkdirSync, mkdtempSync, writeFileSync, rmSync, existsSync, readFileSync
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { builtAssetPaths } from '../../../tools/built-assets.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repo = join(here, '..', '..', '..');
@@ -84,7 +85,7 @@ const outDir = join(fix, 'dist');
 writeFileSync(join(fix, 'main.ts'), 'export {};\n');
 await build({ entry: join(fix, 'main.ts'), outDir, styles: [cssPath], minify: false });
 
-const appCss = readFileSync(join(outDir, 'app.css'), 'utf8');
+const appCss = readFileSync(builtAssetPaths(outDir).css, 'utf8');
 ok(/url\(\/assets\/[0-9a-f]{8}-font\.woff2\)/.test(appCss), 'build: app.css carries the rewritten font url()');
 ok(!appCss.includes('url(./files/font.woff2)'), 'build: the original relative url() is gone (the bug)');
 const m = appCss.match(/\/assets\/([0-9a-f]{8}-font\.woff2)/);

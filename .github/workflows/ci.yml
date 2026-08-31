@@ -187,6 +187,11 @@ jobs:
       # type-check - and `--check` refuses to emit an artifact from code known to be broken.
       - name: The build says what it checked
         run: pnpm verify:build-check
+      # Every URL the build writes into the HTML must name a file it actually wrote. Nothing checked
+      # this, and the names now carry content hashes - a composed URL that misses gives a page that
+      # loads, renders nothing and reports nothing. It caught the `--ssg` path on the first run.
+      - name: Injected asset URLs name real files
+        run: pnpm verify:injected-assets
       - name: weave check
         run: pnpm verify:check
       - name: Prettier plugin

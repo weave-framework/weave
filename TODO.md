@@ -23,14 +23,6 @@ this list is a live intention, not a historical note.
   writer and the output layout are language-level and already shared, so a second source framework is a module,
   not a second tool. React is the next one intended.
 
-## Planned — tooling
-
-- **Content-hashed output filenames.** `weave build` versions its injected URLs (`/main.js?v=1a2b3c`), which
-  busts a cache correctly. Hashed *filenames* (`main-a1b2c3.js`) would additionally let a host serve the
-  bundle as immutable. It is a rename of the build's outputs, so it lands as its own change rather than
-  riding along with something else.
----
-
 ## Deliberately out of scope
 
 Not planned — these are conscious design choices, not omissions:

@@ -41,6 +41,15 @@ on any return containing a note beside a value, with the same consequence.
 
 Together, across four real applications, they account for resumable refusals falling from 29 to 12.
 
+### Built assets carry their version in the name
+
+`main-<hash>.js` and `app-<hash>.css` instead of `main.js?v=…`. A query busts a cache correctly, but a
+file whose name never changes can never be served as immutable — every repeat visit still asks. The
+split chunks were already named this way; the entry and the stylesheet have caught up.
+
+**If you referenced those filenames** — a preload, a service worker, a CSP hash, a deploy rule — read
+them from the emitted `index.html`, which is what the browser does.
+
 ### The build tells you it did not type-check
 
 `weave check` is the gate and `weave build` never ran it, so a build could succeed on code the checker

@@ -11,6 +11,7 @@ import { build as esbuild } from 'esbuild';
 import { mkdirSync, mkdtempSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { builtAssets } from '../../../tools/built-assets.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repo = join(here, '..', '..', '..');
@@ -140,7 +141,7 @@ try {
 
   const index = join(outDir, 'index.html');
   ok(existsSync(index), 'index.html was written');
-  ok(existsSync(join(outDir, 'main.js')), 'client bundle main.js was written');
+  ok(existsSync(join(outDir, builtAssets(outDir).script)), `client bundle ${builtAssets(outDir).script} was written`);
 
   const doc = existsSync(index) ? readFileSync(index, 'utf8') : '';
   ok(doc.startsWith('<!DOCTYPE html>'), 'index.html is a complete document');
@@ -151,8 +152,8 @@ try {
   ok(/clicked 0<!---->\s*times/.test(doc), 'server render evaluated the template bindings (count() → 0)');
   // The server HTML sits inside the #app mount target so the client CSR mounts over it.
   ok(/<div id="app"><main[^>]*class="app"/.test(doc), 'server HTML wraps inside the #app mount target');
-  ok(doc.includes('<script type="module" src="/main.js">'), 'client entry script is linked');
-  ok(doc.includes('<link rel="stylesheet" href="/app.css">'), 'app.css is linked');
+  ok(/<script type="module" src="\/main-[A-Za-z0-9]+\.js">/.test(doc), 'client entry script is linked');
+  ok(/<link rel="stylesheet" href="\/app-[A-Za-z0-9]+\.css">/.test(doc), 'the stylesheet is linked');
   // The data-w-* scope attribute proves the loader style-scoped the component (not raw markup).
   ok(/<main data-w-[a-z0-9]+ class="app"/.test(doc), 'component compiled + style-scoped through the weave loader');
 } finally {
@@ -202,7 +203,7 @@ try {
   // Each file carries ONLY its route's component — proof the injected path drove per-route resolution headlessly.
   ok(/<h1[^>]*>Home page<\/h1>/.test(homeDoc) && !/About page/.test(homeDoc), 'index.html has Home (not About)');
   ok(/<h1[^>]*>About page<\/h1>/.test(aboutDoc) && !/Home page/.test(aboutDoc), 'about/index.html has About (not Home)');
-  ok(/<div id="app">/.test(homeDoc) && homeDoc.includes('<script type="module" src="/main.js">'), 'routed docs carry the #app shell + client entry');
+  ok(/<div id="app">/.test(homeDoc) && /<script type="module" src="\/main-[A-Za-z0-9]+\.js">/.test(homeDoc), 'routed docs carry the #app shell + client entry');
 } finally {
   rmSync(rapp, { recursive: true, force: true });
   rmSync(rout, { recursive: true, force: true });
@@ -402,7 +403,7 @@ try {
 
   // (c) the client bundle is the RESUME entry (adopts). It also bundles mountComponent for the E1.9 CSR
   // fallback, so presence of `resumePage` — not absence of mountComponent — is what proves the resume entry.
-  const mainJs = readFileSync(join(iout, 'main.js'), 'utf8');
+  const mainJs = readFileSync(join(iout, builtAssets(iout).script), 'utf8');
   ok(mainJs.includes('resumePage'), 'islands: client bundle resumes (resumePage) rather than plain CSR-mounting');
 } finally {
   rmSync(iapp, { recursive: true, force: true });

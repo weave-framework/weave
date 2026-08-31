@@ -20,6 +20,7 @@ import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, writeFileSync, rmSync, existsSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { builtAssets } from '../../../tools/built-assets.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repo = join(here, '..', '..', '..');
@@ -127,7 +128,7 @@ for (const outSpec of ['dist', 'build/dist']) {
   const run = runBuild(dir);
   ok(run.status === 0, `[outDir: ${outSpec}] \`weave build\` with the default publicDir succeeds — ${(run.stdout + run.stderr).trim()}`);
   ok(existsSync(join(outDir, 'index.html')), `[outDir: ${outSpec}] the shell is written`);
-  ok(existsSync(join(outDir, 'main.js')), `[outDir: ${outSpec}] the bundle is written`);
+  ok(existsSync(join(outDir, builtAssets(outDir).script)), `[outDir: ${outSpec}] the bundle is written`);
   ok(!existsSync(join(outDir, '.env')), `[outDir: ${outSpec}] the project's .env is NOT shipped`);
   ok(!existsSync(join(outDir, 'weave.config.ts')), `[outDir: ${outSpec}] the config is NOT shipped`);
   ok(!existsSync(join(outDir, 'src')), `[outDir: ${outSpec}] the sources are NOT shipped`);

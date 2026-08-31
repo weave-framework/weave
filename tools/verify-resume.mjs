@@ -34,6 +34,7 @@ import { mkdirSync, mkdtempSync, writeFileSync, readFileSync, readdirSync, exist
 import { gzipSync } from 'node:zlib';
 import { dirname, join, extname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { builtAssets } from './built-assets.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repo = join(here, '..');
@@ -339,8 +340,9 @@ export default defineConfig({
       stdio: 'pipe',
     });
 
-    const mainJs = readFileSync(join(rout, 'main.js'), 'utf8');
-    const chunks = readdirSync(rout).filter((f) => f.endsWith('.js') && f !== 'main.js');
+    const entry = builtAssets(rout).script;
+    const mainJs = readFileSync(join(rout, entry), 'utf8');
+    const chunks = readdirSync(rout).filter((f) => f.endsWith('.js') && f !== entry);
     ok(chunks.length >= 2, `each page is its own chunk (got ${chunks.length}: ${chunks.join(', ')})`);
     // THE assertion: a route's code must not sit in the bundle EVERY page downloads. Before this, `--ssg`
     // generated the manifest with static imports for both bundles — because the synchronous headless render

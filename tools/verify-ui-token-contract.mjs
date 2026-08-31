@@ -29,9 +29,10 @@
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { builtAssetPaths } from './built-assets.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
-const builtCss = join(root, 'docs', 'dist', 'app.css');
+const builtCss = builtAssetPaths(join(root, 'docs', 'dist')).css;
 const snapshotPath = join(root, 'packages', 'ui', 'token-contract.json');
 const update = process.argv.includes('--update');
 
