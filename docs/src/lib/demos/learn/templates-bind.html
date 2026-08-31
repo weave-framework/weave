@@ -1,0 +1,58 @@
+<div class="tb">
+  <label class="tb-row">
+    <span>text</span>
+    <input bind:value={{ name }} />
+    <code>{{ shape(name()) }}</code>
+  </label>
+
+  <label class="tb-row">
+    <span>number</span>
+    <input type="number" bind:value={{ age }} />
+    <code>{{ shape(age()) }}</code>
+  </label>
+
+  <label class="tb-row">
+    <span>range</span>
+    <input type="range" min="0" max="100" bind:value={{ volume }} />
+    <code>{{ show(volume()) }} · {{ shape(volume()) }}</code>
+  </label>
+
+  <label class="tb-row">
+    <span>checkbox</span>
+    <input type="checkbox" bind:checked={{ agreed }} />
+    <code>{{ show(agreed()) }} · {{ shape(agreed()) }}</code>
+  </label>
+
+  <div class="tb-row">
+    <span>radio group</span>
+    <span class="tb-radios">
+      <label><input type="radio" name="tb-size" value="S" bind:group={{ size }} /> S</label>
+      <label><input type="radio" name="tb-size" value="M" bind:group={{ size }} /> M</label>
+      <label><input type="radio" name="tb-size" value="L" bind:group={{ size }} /> L</label>
+    </span>
+    <code>{{ size() }}</code>
+  </div>
+
+  <label class="tb-row">
+    <span>select</span>
+    <select bind:value={{ choice }}>
+      <option value="a">Apple</option>
+      <option value="b">Banana</option>
+      <option value="c">Cherry</option>
+    </select>
+    <code>{{ choice() }}</code>
+  </label>
+
+  <label class="tb-row">
+    <span>multi-select</span>
+    <select multiple size="3" bind:value={{ picks }}>
+      <option value="x">X</option>
+      <option value="y">Y</option>
+      <option value="z">Z</option>
+    </select>
+    <code>{{ shape(picks()) }}</code>
+  </label>
+
+  <p class="demo-note">The signals right now: <code>{{ summary() }}</code></p>
+  <button class="tb-reset" type="button" on:click={{ reset }}>write every signal back</button>
+</div>

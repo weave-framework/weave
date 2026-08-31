@@ -26,6 +26,24 @@ reads `() => { … }`. `weave check` reports it (*"is a function, and a template
 source text"*), because this is the one position where a function is never what you meant.
 :::
 
+### An HTML entity is text, not an entity
+
+A template is **text**, not HTML. `&` is escaped on the way into the page, so `&mdash;` arrives at the
+reader as those seven characters — it never becomes an em dash.
+
+That is the same rule that makes `{{ "<b>" }}` safe: nothing in a template is reinterpreted as markup,
+in either direction. Type the character you want.
+
+:::callout trap "The compiler tells you, since nothing else would"
+~~~
+`&mdash;` renders as text, not as `—` — a Weave template is text, so entities are never decoded.
+Type the character itself: `—`.
+~~~
+
+It carries a fix, so `weave check --fix` replaces it for you. An ampersand in ordinary prose —
+`Tall & scrolling`, `a && b`, `?a=1&b=2` — says nothing, because those are text and mean it.
+:::
+
 ### Escaping a literal `@`
 
 The `@` character starts a control-flow block. To write a literal `@` in text — for example to document the block keywords themselves — double it: `@@`. The parser emits a single `@` and does not treat what follows as a block.
@@ -122,6 +140,21 @@ The **guard** modifiers wrap your handler in a tiny function that runs the guard
   <option value="y">Y</option>
 </select>
 ~~~
+
+All of them, live. The third column is a real `typeof` on the signal's current value, not a promise
+about it:
+
+:::demo templates-bind
+
+:::callout see "What you should see"
+Type in the text box and its signal follows. Change the number and the type stays **number** — the DOM
+would have handed you the string `"31"`, and `bind:` reads `valueAsNumber` instead. The multi-select
+holds a **string[]**, growing and shrinking as you pick.
+
+Then press **write every signal back**. Every control snaps to the value the signal now holds. That is
+the direction people forget exists: the signal is the source of truth, and the control is the view of
+it, not the other way round.
+:::
 
 The compiler picks the mechanism from the binding name; the runtime then specializes further based on the element and its `type`:
 
