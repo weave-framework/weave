@@ -40,21 +40,52 @@ A **component** is a `.ts` file that exports a `setup` function, paired with a s
 
 ## 1. Configure the build
 
-`weave.config.ts` tells the CLI where your app starts and how to build it. The most important field is `root`: point it at your top component and Weave generates the entry, mounts it, and wires everything up for you.
+`weave.config.ts` is the one file that tells the CLI where your app starts and how to build it. Nothing
+here is magic and nothing is required except a starting point — every line below is either a path or a
+plain string.
 
 ~~~ts title="weave.config.ts"
 import { defineConfig } from '@weave-framework/cli';
 
 export default defineConfig({
-  root: 'src/app/app',   // the root component (no extension)
-  index: 'src/index.html', // the HTML shell to inject into
-  mount: '#app',           // where the root component mounts (default '#app')
-  styleLang: 'scss',       // component styles are .scss (default 'css')
+  root: 'src/app/app',
+  index: 'src/index.html',
+  mount: '#app',
+  styleLang: 'scss',
   dev: { port: 5173 },
 });
 ~~~
 
-The HTML shell just needs a mount point — Weave injects the script and stylesheet for you:
+Line by line, because every one of them is a question a newcomer actually has:
+
+| Line | What it means |
+| --- | --- |
+| `root: 'src/app/app'` | **Which component is the top of your app.** A path with **no extension** — Weave pairs `app.ts` with `app.html` and `app.scss` itself. Setting this is what makes Weave generate the startup code for you. |
+| `index: 'src/index.html'` | **The HTML page your app is injected into.** Weave adds the `<script>` and the stylesheet `<link>`; you write the rest. |
+| `mount: '#app'` | **Which element on that page the app is put inside.** It is a **CSS selector**, so `#app` means *the element with `id="app"`* — the same `#` you would write in a stylesheet. `.app` would mean a class instead, and `main` would mean the `<main>` tag. It must match something in your `index.html`. |
+| `styleLang: 'scss'` | **Which style language your components use.** Weave then looks for `app.scss` beside `app.ts`. Leave it out and it looks for `app.css`. It does not try both — one language, no guessing. |
+| `dev: { port: 5173 }` | **Which port `weave dev` listens on.** If it is taken, Weave steps to the next free one and prints which. |
+
+:::callout see "What the defaults already do for you"
+Every field except a starting point is optional. With just `root` and `index`, you get `#app` as the
+mount, `css` as the style language, `dist` as the output directory, and an automatically chosen port.
+The config above spells three of those out only because it is easier to change a line you can see.
+:::
+
+There are eight more options — static assets, a global stylesheet, file-based routing, a dev-server
+proxy, a deploy sub-path, static generation. Each is one line, and [Configuration](/reference/config)
+lists all thirteen with types and defaults.
+
+:::callout trap "`root` and `entry` cannot both be set"
+`root` hands the startup code to Weave. `entry` is the opposite — you write the bootstrap module
+yourself, and Weave stops generating one. They are mutually exclusive, and `mount` only means anything
+alongside `root`, because with `entry` it is your own code that decides where to mount. Reach for
+`entry` when you need something unusual at startup; see
+[Custom elements & bootstrap](/learn/custom-elements).
+:::
+
+The HTML shell just needs a mount point — the element `mount` points at. Weave injects the script and
+stylesheet for you:
 
 ~~~html title="src/index.html"
 <!doctype html>
@@ -69,6 +100,9 @@ The HTML shell just needs a mount point — Weave injects the script and stylesh
   </body>
 </html>
 ~~~
+
+Notice `<div id="app">` — that is what `mount: '#app'` selects. Rename one and you must rename the
+other; nothing checks that they agree until the page runs, and the symptom is a blank screen.
 
 :::callout tip "No script tag?"
 Right — you don't write `<script src=…>` yourself. With `root` set, Weave generates the entry module, registers any custom elements, and mounts the root into `mount`. (Need a hand-written entry instead? Use `entry` rather than `root` — see [Custom elements & bootstrap](/learn/custom-elements).)

@@ -55,6 +55,7 @@ All relative paths in the config are resolved against the **directory containing
 | `index` | `string` | — | HTML shell template. Weave injects the entry `<script>` and the stylesheet `<link>` at build/dev time. |
 | `publicDir` | `string` | the config-file directory | Static web root — served as-is in dev, and copied verbatim into the build output **when you declare it** (see below). |
 | `outDir` | `string` | `'dist'` | Output directory for `weave build`. |
+| `base` | `string` | `''` (the domain root) | Where the app is **served** from when that is not `/` — `/my-app/` for a project site, `/docs/` behind a reverse proxy. Every URL Weave injects is prefixed with it, the dev server answers under it, and the router adopts it as its basename. Normalized to `''` or `/prefix`, never with a trailing slash. |
 | `styleLang` | `'css' \| 'scss' \| 'sass'` | `'css'` | Component style language. The loader pairs each component with its sibling `<base>.<styleLang>` — no probing of other extensions. |
 | `routesDir` | `string` | — (off) | File-based routing directory. When set, `weave build`/`dev` regenerate `routes.gen.ts` from it before bundling. |
 | `styles` | `string[]` | `[]` | Global entry stylesheets, compiled and concatenated in order (first = base) **before** component CSS. |
