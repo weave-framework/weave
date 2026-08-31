@@ -739,6 +739,43 @@ From then on, when a merge touches a template:
 
 A file the template parser cannot read — a page with a `<!DOCTYPE>`, say — is simply left to git.
 
+## Testing components
+
+`@weave-framework/ui/testing` drives a component the way the library's own suite does — and exists for
+the parts you cannot reasonably write yourself.
+
+~~~ts
+import { mount, press, overlay, focused, tick } from '@weave-framework/ui/testing';
+import Menu from './menu.js';
+
+const { el, dispose } = mount(Menu, { items: () => ['a', 'b'] });
+press(el.querySelector('button')!, 'ArrowDown');
+await tick();
+
+// A menu, dialog or picker renders into the overlay container, not under `el`.
+const panel = overlay();
+assert(panel?.contains(focused()));
+
+dispose(); // disposes the owner and detaches the element
+~~~
+
+`mount` takes either form — the built default export, or a `{ template, setup }` module. For the source
+form it **derives** which names the template reads, the same inference the real build uses, so a
+component that gains a binding does not also need its tests edited.
+
+`overlay()` / `overlays()` reach the container the library renders overlays into; `focused()` is
+`document.activeElement`, for asserting that focus was trapped, moved, or handed back.
+
+There is no query language and no assertions here: your test runner already has both, and a second
+vocabulary to learn would cost more than it saves.
+
+:::callout info "It is a testing module, and it never ships"
+It is a subpath of the library rather than a package of its own because it needs the library's
+internals — the overlay container, the focus machinery — and a separate package would force those into
+the public API. Importing it from a production module would pull the compiler in with it, so keep it to
+your tests. `pnpm verify:ui-testing` measures that an ordinary bundle carries none of it.
+:::
+
 ## AI editor integration (MCP)
 
 `@weave-framework/mcp` is a **Model Context Protocol** server that exposes the Weave toolchain to MCP-capable AI editors as structured tools — so your assistant can compile-check a template, type-check the project, resolve routes, or scaffold a component instead of guessing. It's a small in-house JSON-RPC-over-stdio server (zero third-party deps); the tools thin-wrap the existing compiler/check/router.

@@ -68,6 +68,7 @@
     "verify:forms-inference": "node packages/forms/test/inference.smoke.mjs",
     "verify:ui-control": "node packages/ui/test/control-binding.smoke.mjs",
     "verify:ui-overlay": "node packages/ui/test/overlay-component.smoke.mjs",
+    "verify:ui-testing": "node packages/ui/test/testing-subpath.smoke.mjs",
     "verify:typed-props": "node packages/runtime/test/typed-props-component.smoke.mjs",
     "verify:all": "node tools/verify-all.mjs",
     "verify:no-private": "node tools/verify-no-private-paths.mjs",

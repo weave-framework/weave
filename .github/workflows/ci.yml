@@ -292,6 +292,11 @@ jobs:
       # times in one run, at the exact call its own documentation shows.
       - name: A typed component goes into an overlay
         run: pnpm verify:ui-overlay
+      # The testing harness lives inside the library because it needs its internals, and a separate
+      # package would force those into a frozen public API. The cost of that choice is test-only code
+      # in a production package, and the whole argument rests on it tree-shaking away - so measure it.
+      - name: The testing subpath never lands in a production bundle
+        run: pnpm verify:ui-testing
       # The same defect three times over - `lazy()`, a dialog region, a route - so this checks the
       # FAMILY: every author-facing entry point that ACCEPTS a component, with one that declares typed
       # props. All five refused it when this was written.

@@ -19,6 +19,15 @@ Both are fixed and held by a gate that asserts the same inputs complete in milli
 GitHub code scanning as `js/polynomial-redos`. **No action needed on your side** — nothing about the
 API or the output changed.
 
+### Testing your components
+
+`@weave-framework/ui/testing` gives you `mount`, `press`, `click`, `overlay()`, `focused()` and `tick` —
+the parts of driving a Weave component that are awkward to write yourself, chiefly finding what a
+dialog or menu rendered into the overlay container rather than under your element.
+
+`mount` derives which names your template reads, so a component that gains a binding does not also need
+its tests edited. There is no query language and no assertions; your test runner has those.
+
 ### The build tells you it did not type-check
 
 `weave check` is the gate and `weave build` never ran it, so a build could succeed on code the checker

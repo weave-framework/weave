@@ -1,4 +1,5 @@
 import { test, assert } from '../../../../tools/harness.js';
+import { mount } from '../testing/index.js';
 import {
   signal,
   effect,
@@ -9,8 +10,6 @@ import {
   type Signal,
   type Owner,
 } from '@weave-framework/runtime';
-import * as dom from '@weave-framework/runtime/dom';
-import { compileTemplate } from '@weave-framework/compiler';
 import {
   setup,
   template,
@@ -23,9 +22,6 @@ import {
   type IconProps,
   type IconRegistry,
 } from '@weave-framework/ui/icon';
-
-// The runtime object the compiled (function-mode) template references as `rt`.
-const rt: typeof dom & { signal: typeof signal; effect: typeof effect } = { ...dom, signal, effect };
 
 /** Let queued effects / microtasks flush. */
 const tick = (): Promise<void> => new Promise<void>((r) => queueMicrotask(r));
@@ -110,17 +106,15 @@ test('registry: an async sprite source fills a reactive cache', async () => {
 
 /* ─────────────────────────── component ─────────────────────────── */
 
-/** Instantiate `<Icon>` (setup + template) in a fresh owner and attach it. */
+/**
+ * Instantiate `<Icon>` through the shipped harness.
+ *
+ * This used to spell out `scope: ['host', 'iconClass']`, and that list is why these tests failed the
+ * moment the component grew a binding — with `iconClass is not defined`, which says nothing about
+ * icons. `mount` derives the scope from the template, the same way the real build does.
+ */
 function mountIcon(props: IconProps): { el: HTMLElement; dispose: () => void } {
-  const owner: Owner = createOwner();
-  const el: HTMLElement = runInOwner(owner, () => {
-    const ctx: ReturnType<typeof setup> = setup(props);
-    const { code } = compileTemplate(template, { mode: 'function', scope: ['host', 'iconClass'] });
-    const fn: (c: unknown, r: unknown, k: unknown) => HTMLElement = new Function('ctx', 'rt', '_c', code) as (c: unknown, r: unknown, k: unknown) => HTMLElement;
-    return fn(ctx, rt, {});
-  });
-  document.body.appendChild(el);
-  return { el, dispose: () => { disposeOwner(owner); el.remove(); } };
+  return mount<HTMLElement>({ template, setup } as never, props as unknown as Record<string, unknown>);
 }
 
 test('component: renders the named icon inline as an <svg>, decorative by default', async () => {

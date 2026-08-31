@@ -15,8 +15,6 @@ this list is a live intention, not a historical note.
 ## Planned — UI library
 
 - **Permanent live component gallery.** A hosted, always-current gallery of every component and its variants.
-- **UI testing harnesses** (`@weave-framework/ui/testing`). Ready-made utilities for consumers to drive and
-  assert Weave components in their own tests (open an overlay, exercise the keyboard map, check focus return).
 
 ## Planned — migration
 

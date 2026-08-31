@@ -16,6 +16,25 @@
 
 ## 3.3.0
 
+### `@weave-framework/ui/testing` — driving components in a test
+
+The parts a consumer cannot reasonably write: `mount` (either the built default export or a
+`{ template, setup }` module), `press` / `click`, `overlay()` / `overlays()` for what a component
+rendered into the overlay container, `focused()`, and `tick`.
+
+Its shape came from measuring this library's own suite rather than from imagining one. Across 61
+browser-test files there were ~95 hand-rolled owner/mount pairs and 63 `compileTemplate` calls, each
+carrying a **hand-written list of the names its `setup` returns** — duplication of something the
+compiler already computes, and one that goes stale in silence. Adding a binding to a component makes
+its own tests fail with `<name> is not defined`, a message about the harness rather than the component.
+That happened twice in a single day while writing this release.
+
+There is no query language and no assertions: a test runner has both already.
+
+It is a subpath rather than a package because it needs the library's internals, and a separate package
+would force those into a frozen public API. `pnpm verify:ui-testing` measures that an ordinary bundle
+carries none of it — 11,923 bytes without, 26,023 with.
+
 ### The build says what it did not check
 
 `weave check` is the gate, and `weave build` never ran it — so a build succeeded on code the checker

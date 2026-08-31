@@ -216,7 +216,11 @@
       "types": "./src/cdk/mask.ts",
       "import": "./src/cdk/mask.ts"
     },
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./testing": {
+      "types": "./src/testing/index.ts",
+      "import": "./src/testing/index.ts"
+    }
   },
   "files": [
     "dist",
@@ -444,7 +448,11 @@
         "types": "./dist/cdk/mask.d.ts",
         "import": "./dist/cdk/mask.js"
       },
-      "./package.json": "./package.json"
+      "./package.json": "./package.json",
+      "./testing": {
+        "types": "./dist/testing/index.d.ts",
+        "import": "./dist/testing/index.js"
+      }
     }
   },
   "dependencies": {
