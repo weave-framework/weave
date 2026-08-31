@@ -1,0 +1,33 @@
+<div class="sig-track">
+  <div class="st-controls">
+    <button type="button" on:click={{ bump }}>count.set(n =&gt; n + 1)</button>
+    <span class="st-value">count is <strong>{{ count() }}</strong></span>
+    <button type="button" on:click={{ rename }}>change the other signal</button>
+    <span class="st-value">label is <strong>{{ label() }}</strong></span>
+  </div>
+
+  <table class="st-table">
+    <thead>
+      <tr><th>This effect does</th><th>Subscribed?</th><th>Times it has run</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>count()</code></td>
+        <td>yes &mdash; the call is the subscription</td>
+        <td class="st-runs">{{ callerRuns() }}</td>
+      </tr>
+      <tr>
+        <td><code>count.peek()</code></td>
+        <td>no &mdash; peek never subscribes</td>
+        <td class="st-runs">{{ peekerRuns() }}</td>
+      </tr>
+      <tr>
+        <td><code>label()</code></td>
+        <td>to <code>label</code>, not to <code>count</code></td>
+        <td class="st-runs">{{ otherRuns() }}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p class="demo-note">The first effect last saw count = {{ lastSeen() }}.</p>
+</div>

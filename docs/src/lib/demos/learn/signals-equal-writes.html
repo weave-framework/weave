@@ -1,0 +1,20 @@
+<div class="sig-eq">
+  <div class="eq-row">
+    <span class="eq-label">n is <strong>{{ n() }}</strong></span>
+    <button type="button" on:click={{ setSame }}>n.set(3) &mdash; the same value</button>
+    <button type="button" on:click={{ setNext }}>n.set(v =&gt; v + 1)</button>
+    <span class="eq-runs">effect ran {{ numberRuns() }}&times;</span>
+  </div>
+
+  <div class="eq-row">
+    <span class="eq-label">user.name is <strong>{{ user().name }}</strong></span>
+    <button type="button" on:click={{ mutateInPlace }}>mutate, then set the same object</button>
+    <button type="button" on:click={{ setFreshObject }}>set a fresh object</button>
+    <span class="eq-runs">effect ran {{ userRuns() }}&times;</span>
+  </div>
+
+  <p class="demo-note">
+    Press &ldquo;mutate, then set the same object&rdquo; twice and watch the name go stale: the value in
+    memory changed and the screen did not, because nothing was ever told.
+  </p>
+</div>

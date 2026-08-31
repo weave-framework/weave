@@ -1,0 +1,56 @@
+.sig-track {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.st-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.st-controls button {
+  font: inherit;
+  font-size: 0.9rem;
+  padding: 6px 12px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--fg);
+  cursor: pointer;
+}
+
+.st-controls button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.st-value {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.st-table {
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+
+.st-table th,
+.st-table td {
+  text-align: left;
+  padding: 6px 14px 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.st-table th {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.st-runs {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+}

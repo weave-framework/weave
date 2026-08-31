@@ -19,8 +19,14 @@ count.set((n) => n + 1); // update → returns 6
 count.peek();            // read WITHOUT subscribing → 6
 ~~~
 
-:::callout tip "Why the parentheses?"
-You read a signal by *calling* it: `count()`, not `count`. The call is what subscribes you to future changes — Weave needs that function call to know "this spot depends on count." It's a small habit that buys you automatic updates everywhere.
+:::callout trap "The parentheses are not decoration"
+You read a signal by **calling** it: `count()`, never `count`. The call is what subscribes you — it is
+how Weave learns that this spot depends on this value.
+
+Forget them and nothing throws. In a template you get the function printed at the reader, which looks
+like `() => { track(node); return node.value; }`. In a comparison you get a function compared to a
+number, which is always false. `weave check` does not catch either. The demo below is this rule made
+visible.
 :::
 
 ## Creating one: `signal(initial, opts?)`
@@ -42,6 +48,21 @@ The optional second argument is an options object with two fields: `equals`, cov
 
 1. It returns the current value.
 2. If you're inside a tracking context — an [`effect` or a `computed`](/learn/reactivity) — it **subscribes** that context to this signal, so it re-runs when the value changes.
+
+Which is easier to watch than to read about. Below, three effects sit over the **same** signal and differ
+only in how they touch it. Press the button.
+
+:::demo signals-tracking
+
+:::callout see "What you should see"
+Only the first row's number moves. The effect that **called** `count()` re-runs; the one that peeked
+does not, and neither does the one that never mentioned `count`. Press the second button and the
+opposite happens — the third row moves and the first two sit still.
+
+Nothing declared those dependencies. Weave learned them by watching which signals were called while
+each effect ran, which is why forgetting the parentheses does not just print the wrong thing: it also
+subscribes you to nothing.
+:::
 
 Outside of any effect or computed, calling `count()` is just a plain read — there's nobody to subscribe, so nothing is tracked. That's fine; it's not an error. If you want to read the value *without* subscribing even when you are inside an effect, use [`.peek()`](#peek-read-without-subscribing).
 
@@ -112,6 +133,21 @@ const count = signal(0);
 count.set(0); // value is already 0 → no-op, nothing re-runs
 count.set(1); // different → announces, effects re-run
 ~~~
+
+Both halves of that rule are in one demo. The right-hand number is how many times an effect watching the
+signal has run — press each button and watch which ones move it.
+
+:::demo signals-equal-writes
+
+:::callout see "What you should see"
+`n.set(3)` when `n` is already 3 does **nothing**: the number on the right does not move. `n.set(v =>
+v + 1)` moves it every time.
+
+The second row is the one that bites. **Mutate, then set the same object** upper-cases the name in
+memory and moves nothing — the screen keeps showing the old name while the data says otherwise. **Set a
+fresh object** changes both, every time. Press the first button and you are looking at a bug with no
+error, no warning and no stack trace: the value is right and the screen is wrong.
+:::
 
 The catch: `Object.is` compares by **identity** for objects and arrays. A brand-new object is never equal to the old one, even with identical contents — so mutating in place and re-setting the *same* reference is a no-op, while building a fresh object always fires:
 
