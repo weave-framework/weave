@@ -127,6 +127,46 @@ ok(readFileSync(html, 'utf8') === FIXED, 'and the file is byte-identical to the 
 const third = await run(['check', '--fix']);
 ok(third.said.some((l) => l.includes('nothing to repair')), 'a second run has nothing to repair');
 ok(readFileSync(html, 'utf8') === FIXED, 'and leaves the file exactly as it was');
+/* 4. SEVERAL missing names must all be declared by ONE `--fix`.
+      `grow-setup` inserts every declaration at the same offset — the end of `setup`'s body — so they all
+      overlap, and `applyFixes` skips a fix overlapping one already applied. With a single apply-then-
+      recheck round that meant a template naming four missing things got two of them, printed the rest as
+      errors, and looked broken. Measured before the loop landed: `save` and `done` on the first run,
+      `name` and `age` only on a second. */
+{
+  const many = mkdtempSync(join(repo, 'tools', '.verify-check-fix-many-'));
+  const d2 = join(many, 'src', 'app');
+  mkdirSync(d2, { recursive: true });
+  const NL = String.fromCharCode(10);
+  writeFileSync(join(d2, 'app.ts'), ['export function setup() {', '  const n = 1;', '  void n;', '}', ''].join(NL));
+  writeFileSync(
+    join(d2, 'app.html'),
+    [
+      '<div>',
+      '  <button type="button" on:click={{ save }}>save</button>',
+      '  <input type="checkbox" bind:checked={{ done }} />',
+      '  <input type="number" bind:value={{ age }} />',
+      '  <input bind:value={{ label }} />',
+      '</div>',
+      '',
+    ].join(NL)
+  );
+  // `run` chdirs into the FIRST fixture, so this one is reached by an explicit path rather than by cwd.
+  const r = await run(['check', d2, '--fix']);
+  const grown = readFileSync(join(d2, 'app.ts'), 'utf8');
+  for (const [name, decl] of [
+    ['save', 'const save = (): void =>'],
+    ['done', "const done = signal(false)"],
+    ['age', 'const age = signal(0)'],
+    ['label', "const label = signal('')"],
+  ]) {
+    ok(grown.includes(decl), `one --fix run declares ${name} (${decl})`);
+  }
+  ok(grown.includes("import { signal } from '@weave-framework/runtime'"), 'and brings the signal import with it');
+  void r;
+  rmSync(many, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+}
+
 rmSync(app, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 
 if (failed) {

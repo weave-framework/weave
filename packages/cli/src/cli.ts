@@ -341,14 +341,25 @@ weave build --check: ${errors} error${errors === 1 ? '' : 's'} — nothing was w
     }
     let diags: Diagnostic[] = checkProject(where);
     if (rest.includes('--fix')) {
-      const applied: number = applyFixes(diags);
-      if (applied) {
-        console.log(`weave check --fix: repaired ${applied} mistake${applied === 1 ? '' : 's'}`);
-        // The files changed, so the earlier diagnostics describe a state that no longer exists.
-        diags = checkProject(where);
-      } else {
-        console.log('weave check --fix: nothing to repair');
+      // Repeat until a round changes nothing. One round was not enough, and the reason is structural:
+      // every declaration `grow-setup` offers is inserted at the SAME offset — the end of `setup`'s body
+      // — so they all overlap each other, and `applyFixes` skips a fix that overlaps one already applied.
+      // A template naming four missing things therefore got two, printed the other two as errors, and
+      // looked broken; running the same command again finished the job. Measured, not reasoned: `save`
+      // and `done` landed on the first run, `age` and `label` only on the second.
+      //
+      // Bounded, because a fix that does not reduce the diagnostic it came from would otherwise spin. The
+      // bound is generous: each round applies at least one fix or the loop ends, so ten rounds is ten
+      // declarations in one file, and real templates do not out-run it.
+      let total: number = 0;
+      for (let round: number = 0; round < 10; round++) {
+        const applied: number = applyFixes(diags);
+        if (!applied) break;
+        total += applied;
+        diags = checkProject(where); // the files changed; the old diagnostics describe a state that is gone
       }
+      if (total) console.log(`weave check --fix: repaired ${total} mistake${total === 1 ? '' : 's'}`);
+      else console.log('weave check --fix: nothing to repair');
     }
     for (const d of diags) console.error(formatDiagnostic(d));
     const errors: number = diags.filter((d) => d.category === 'error').length;

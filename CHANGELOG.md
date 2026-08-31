@@ -16,6 +16,15 @@
 
 ## Unreleased
 
+- **fix(cli):** `weave check --fix` now repairs everything it is certain of in **one run**. Every
+  declaration `grow-setup` offers is inserted at the same offset — the end of `setup`'s body — so they
+  all overlap, and `applyFixes` skips a fix overlapping one already applied. With a single
+  apply-then-recheck round, a template naming four missing names got two of them and printed the other
+  two as errors; running the identical command again finished the job. It now loops until a round
+  changes nothing, bounded at ten. Measured before and after on the same fixture: `save` + `done` on the
+  first run and `age` + `label` only on a second, against all four in one. Pinned by a fourth case in
+  `packages/cli/test/check-fix.smoke.mjs`.
+
 - **feat(compiler):** the template linter warns on an **HTML entity in a template**. A Weave template is
   TEXT — `escapeText` writes `&` as `&amp;` on the way into the emitted `<template>`, which is exactly
   what lets a template hold `<`, `{` and a code sample verbatim — so `&mdash;` reaches the reader as
