@@ -18,6 +18,16 @@
   --callout-color: var(--green);
 }
 
+// `see` and `tip` share the green: both are the reassuring tone, and the icon (an eye vs a check)
+// carries the difference. The palette is the four logo colours and there is no fifth to invent.
+.callout[data-kind='see'] {
+  --callout-color: var(--green);
+}
+
+.callout[data-kind='trap'] {
+  --callout-color: var(--red);
+}
+
 .callout[data-kind='warn'] {
   --callout-color: var(--orange);
 }
