@@ -133,4 +133,4 @@ Use the compiled form inside Weave (it's lighter and fully typed); reach for the
 The config declares exactly one of `root` (Weave generates the entry, mounts at `mount`, and auto-registers discovered custom elements) or `entry` (you hand-write the bootstrap with `mountComponent`, and `mount` is ignored). Export `const tag` (a hyphenated name) plus an optional `const props` to expose a component as a custom element that renders into light DOM and keeps scoped styles; each declared prop is a kebab-cased observed attribute **and** a camelCase JS property, both feeding one reactive signal. Auto-registration is fail-loud on duplicate or hyphen-less tags; `defineCustomElement` registers one by hand and is a no-op if the tag already exists. Use `<Badge/>` inside Weave, `<weave-badge>` at the boundary.
 :::
 
-[Next: Tooling & CLI →](/learn/tooling) · [Reference: @weave-framework/runtime →](/reference/runtime)
+[Next: Tooling & CLI :icon[arrow-right]](/learn/tooling) · [Reference: @weave-framework/runtime :icon[arrow-right]](/reference/runtime)

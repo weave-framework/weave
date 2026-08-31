@@ -453,4 +453,4 @@ The `|| false` makes an empty query a "not ready" source, so `resource` skips th
 - These all compose: a store full of `resource`s, an `action` behind a `form.submit`, an `ErrorBoundary` around a lazy route. When a pattern repeats, lift it into a composable. Everything is just signals underneath.
 :::
 
-[Back to the start: Introduction →](/learn/introduction) · [Reference: @weave-framework/data →](/reference/data)
+[Back to the start: Introduction :icon[arrow-right]](/learn/introduction) · [Reference: @weave-framework/data :icon[arrow-right]](/reference/data)

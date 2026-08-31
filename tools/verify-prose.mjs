@@ -1,17 +1,30 @@
 /**
- * Gate: the public prose spells things one way.
+ * Gate: the docs may only name things that exist, and may only say them one way.
  *
- * Why this exists: a survey of 145 public markdown files found 80 American spellings and 35 British
- * ones — `sanitised` five times on the Icon pages while `sanitizes` stood in the CHANGELOG, `organised`
- * and `organized` inside one document. Nothing was wrong in any single file, which is exactly why it
- * lasted: an inconsistency spread thin over a corpus is invisible to whoever is editing one page.
+ * Four passes, one failure shape between them. A name that does not resolve produces ABSENCE, and
+ * absence is the single thing a reader cannot notice is missing — every instance below was found by
+ * eye, late, by accident, and each had been sitting in the tree for months.
  *
- * It was found only because a rewrite happened to add one more `organised` and someone asked whether
- * that matched. That is not a process. So the majority won by count, the 35 were rewritten, and this
- * keeps it that way — the next `normalises` fails here rather than surviving for a year.
+ *   1. SPELLING. 80 American spellings against 35 British ones across 145 files: `sanitised` five
+ *      times on the Icon pages while `sanitizes` stood in the CHANGELOG, `organised` and `organized`
+ *      inside one document. No single file was wrong, which is why nobody editing one page could see
+ *      it. Only words with both spellings are listed — `advise`, `promise` and `analysis` have no
+ *      `-ize` form, and a check that flags those teaches people to ignore it.
  *
- * Only words that genuinely have BOTH spellings are listed. `advise`, `revise`, `promise`, `analysis`
- * and `optimistic` have no `-ize` form, and a check that flags those teaches people to ignore it.
+ *   2. CALLOUT KINDS. `:::callout note` appeared three times; `note` is not a kind, so it fell back
+ *      to `info` and drew an ordinary box. Three authors got a flavor they never asked for.
+ *
+ *   3. ICON NAMES. `<Icon name="more-vertical">` on the Toolbar pages: Lucide renamed that glyph, so
+ *      the registry resolved nothing and a button labelled "More" rendered with no picture in it.
+ *
+ *   4. SYMBOLS TYPED AS CHARACTERS. `Get started →` on the landing page, `[Next: … →](…)` closing
+ *      every Learn page. The house rule is that a symbol is drawn with `<Icon>`, never a Unicode
+ *      glyph and never CSS.
+ *
+ * Each pass reads its ground truth from the thing that renders — the callout component, the icon set —
+ * rather than a list kept here, because a hand-kept copy is the next thing to drift. Each refuses to
+ * run if it cannot find that ground truth, so none can pass vacuously. All four are proven by
+ * mutation, not trusted for being green.
  *
  * Run: `node tools/verify-prose.mjs` (wired into `pnpm verify:prose`).
  */
@@ -169,6 +182,41 @@ if (badIcons.length) {
 }
 
 console.log(`  ${iconNames.size} built-in icons, ${docSrc.length} docs source files scanned for icon names`);
+
+/* ── Pass 4: an arrow the reader CLICKS must be an icon, never a typed character. ──
+   The landing page said `Get started →` and `Live demo ↗`, and every Learn page ended in
+   `[Next: … →](…)`. The house rule is that a symbol is drawn with `<Icon>` — never a Unicode glyph,
+   never CSS — and 28 link labels plus 4 templates had quietly opted out. The markdown ones had a
+   reason: link text could not contain `:icon[…]` until the parser learned nested brackets, so the
+   character was the only thing that parsed. The reason is gone, so the exemption is too.
+
+   Scoped to where a glyph is an AFFORDANCE. `asc → desc → none` in a sentence, `// read → 0` in a
+   comment, and an arrow inside a code fence are notation — an <svg> cannot go in any of them, and a
+   check that flags all 295 of those is a check somebody switches off. Measured before scoping. */
+const AFFORDANCE = [
+  { what: 'a docs template', files: docSrc.filter((f) => f.endsWith('.html')), re: /[←-⇿➔-➿■-◿]/g },
+  // Only the pages the docs site renders. README and CHANGELOG are read on GitHub, which has no
+  // `:icon[]` — there a typed arrow is the only arrow available, so requiring an icon would be a rule
+  // nobody could satisfy.
+  { what: 'a link label', files: files.filter((f) => f.split(sep).join('/').startsWith('docs/src/content')), re: /[←-⇿➔-➿]\s*\]\(/g },
+];
+const drawn = [];
+for (const { what, files: set, re } of AFFORDANCE) {
+  for (const f of set) {
+    readFileSync(f, 'utf8')
+      .split(/\r?\n/)
+      .forEach((line, i) => {
+        re.lastIndex = 0;
+        if (re.test(line)) drawn.push({ file: f.split(sep).join('/'), line: i + 1, what, text: line.trim().slice(0, 90) });
+      });
+  }
+}
+if (drawn.length) {
+  console.error(`\n✖ symbols typed as characters where an icon belongs (${drawn.length}):\n`);
+  for (const d of drawn) console.error(`  ${d.file}:${d.line}  in ${d.what}\n      ${d.text}`);
+  console.error(`\n  Use <Icon name={{ 'arrow-right' }} /> in a template, or :icon[arrow-right] in markdown.\n`);
+  process.exit(1);
+}
 
 if (hits.length) {
   console.error(`\n✖ the public prose mixes spellings (${hits.length}); this corpus uses the American form:\n`);

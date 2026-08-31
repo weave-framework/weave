@@ -257,4 +257,4 @@ export function setup() {
 The **owner tree** underpins all three. `onMount` runs on the next microtask in the scope active at registration, is skipped if that scope is already gone, and its returned cleanup runs once on unmount. The trap: **`onCleanup` needs a running computation** (and re-runs on every recompute), **`onDispose` needs an owner scope** (and runs once at unmount) — each is a *silent no-op* in the wrong place. **Context**: `provide` **throws** with no owner, `inject` **never throws** (it returns the default — and with no default + no provider you get `undefined` typed as `T`, so guard it); inject walks the parent chain, which is why it survives `@defer`. **DI** is just scope choice: `store()` for app-wide singletons, `provide`/`inject` for per-subtree instances. And inheritance becomes composition — factories, spreads, parameters, and composables.
 :::
 
-[Next: Router →](/learn/router) · [Reference: @weave-framework/runtime →](/reference/runtime)
+[Next: Router :icon[arrow-right]](/learn/router) · [Reference: @weave-framework/runtime :icon[arrow-right]](/reference/runtime)

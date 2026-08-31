@@ -15,7 +15,7 @@ Edit any field and watch the preview on the right update instantly. Switch the p
   [`RadioGroup`](/ui/radio), [`Slider`](/ui/slider), and [`SlideToggle`](/ui/slide-toggle) each bind a `signal`
   with a `value`/`checked` in and a change handler out. Learn one, you've learned them all.
 - **A single derived model** — one `settings` computed gathers the whole form into an object; the preview reads
-  only that. [Reactivity →](/learn/reactivity)
+  only that. [Reactivity :icon[arrow-right]](/learn/reactivity)
 - **Arbitrary tab content** — the preview [`Tabs`](/ui/tabs) render live nodes (a definition list, a JSON dump)
   via each tab's `content` factory, kept in sync by an `effect`.
 - **Imperative feedback** — [`snackbar()`](/ui/snackbar) is called from the save handler; no component to place.

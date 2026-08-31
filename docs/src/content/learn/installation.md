@@ -236,4 +236,4 @@ file itself, so a host or CDN cannot answer today's HTML with yesterday's bundle
 the same marker, so nothing re-downloads for no reason.
 :::
 
-[Next: Quick start →](/learn/quick-start)
+[Next: Quick start :icon[arrow-right]](/learn/quick-start)

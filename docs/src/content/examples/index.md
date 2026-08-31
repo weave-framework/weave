@@ -20,7 +20,7 @@ Want a full, standalone app rather than a page-sized example? **[Weave Analytics
 is a live dashboard deployed on its own — KPIs, a chart, a filterable data table, an activity feed, and five
 distinct sidebar views including a real settings form — around a dozen `@weave-framework/ui` components wired
 together. Its entire dark-violet look comes from **one `@include weave.theme((…))`**, so it doubles as a
-demonstration of token re-skinning. **[Open the live demo ↗](https://demo.weaveframework.dev)**
+demonstration of token re-skinning. **[Open the live demo :icon[arrow-right]](https://demo.weaveframework.dev)**
 
 ## The apps
 

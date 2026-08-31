@@ -132,4 +132,4 @@ A Weave app is `weave.config.ts` + components. A **component** is a `setup` func
 - How components talk to each other → [Components](/learn/components)
 - The full template language → [Templates](/learn/templates)
 
-[Next: Thinking in signals →](/learn/signals)
+[Next: Thinking in signals :icon[arrow-right]](/learn/signals)

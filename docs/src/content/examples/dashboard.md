@@ -12,7 +12,7 @@ paginator, or change the page size.
 ## What it shows
 
 - **A derived pipeline** — `filtered → sorted → paginated`, three `computed` stages where each recomputes only
-  when its own input changes. [Reactivity in depth →](/learn/reactivity)
+  when its own input changes. [Reactivity in depth :icon[arrow-right]](/learn/reactivity)
 - **Owning the data, not the widget** — the `Table` renders; *you* decide the order and the page. `clientSort` is
   turned off and `onSort` feeds back into a signal, so sorting spans all pages, not just the visible one.
 - **Custom cells** — the Status and Progress columns render real DOM nodes (a pill, a meter) via each column's

@@ -11,12 +11,12 @@ Add a task, tick a few off, switch the filter, reload the page — the list is s
 ## What it shows
 
 - **State as signals** — the task list is a `signal`; the "N left" counter and the filtered view are `computed`
-  values derived from it. [Thinking in signals →](/learn/signals)
+  values derived from it. [Thinking in signals :icon[arrow-right]](/learn/signals)
 - **A global store** — the list lives in a [`store`](/learn/store), a lazily-created singleton, so state and
   actions sit in one place, separate from the view.
 - **Persistence with an `effect`** — one effect writes the list to `localStorage` on every change, automatically.
 - **Keyed lists & conditionals** — `@for (… track id)` renders a row per task; `@if / @else` handles the empty
-  state. [Templates →](/learn/templates)
+  state. [Templates :icon[arrow-right]](/learn/templates)
 - **Real components** — [`Input`](/ui/input), [`Button`](/ui/button), [`Checkbox`](/ui/checkbox),
   [`ButtonToggle`](/ui/button-toggle), [`Badge`](/ui/badge), and [`Icon`](/ui/icon), all from
   `@weave-framework/ui`.

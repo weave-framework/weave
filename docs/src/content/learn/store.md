@@ -200,4 +200,4 @@ A useful hybrid: `provide()` a store-like object built in a parent's `setup` —
 `store<T extends object>(factory)` is the whole API: a lazy, app-wide singleton of signals + actions — no selectors, no reducers, no dispatch. The factory and the returned hook both take no arguments, and the factory must return an object. It runs once and caches via `instance ??= factory()` — so a factory that returns `null`/`undefined` will run again until it returns a real object. There's no reset or teardown; the instance lives for the module's lifetime (mind that in tests and HMR). Everything else — loaders, selectors, optimistic update + rollback — is plain signal code you write inside the factory. Reach for a store for app-wide state, `provide`/`inject` for per-subtree, and a local signal for one component.
 :::
 
-[Next: Forms →](/learn/forms) · [Reference: @weave-framework/store →](/reference/store)
+[Next: Forms :icon[arrow-right]](/learn/forms) · [Reference: @weave-framework/store :icon[arrow-right]](/reference/store)

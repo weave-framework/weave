@@ -84,4 +84,4 @@ Weave asks you to bet on a foundation you can fully own, that can't rot out from
 *not breaking your app* as its first job. If it vanished tomorrow, you'd still have everything you shipped. That's
 about as safe as a bet on a young framework gets.
 
-> Building something real on Weave and want to talk it through? [Commercial support is available →](/enterprise/support)
+> Building something real on Weave and want to talk it through? [Commercial support is available :icon[arrow-right]](/enterprise/support)

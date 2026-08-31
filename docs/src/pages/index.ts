@@ -1,10 +1,12 @@
 import { navigate } from '@weave-framework/router';
 import Button from '@weave-framework/ui/button';
 import Card from '@weave-framework/ui/card';
+import Icon from '@weave-framework/ui/icon';
 
 // Capitalized tags in index.html resolve to these imports.
 void Button;
 void Card;
+void Icon;
 
 interface HomeSetup {
   /** Navigate to the Learn intro (primary CTA). */

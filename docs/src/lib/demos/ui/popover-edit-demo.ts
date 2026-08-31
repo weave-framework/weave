@@ -1,9 +1,11 @@
 import { signal } from '@weave-framework/runtime';
 import { popoverEdit } from '@weave-framework/ui/popover-edit';
 import type { PopoverEditConfig } from '@weave-framework/ui/popover-edit';
+import Icon from '@weave-framework/ui/icon';
 
 // `popoverEdit` is a use: action — it must be in scope for `use:popoverEdit`.
 void popoverEdit;
+void Icon;
 
 interface Setup {
   popoverEdit: typeof popoverEdit;

@@ -116,4 +116,4 @@ Every Learn page links out to the matching Reference, and back.
 
 If you want to understand *why* before *how*, read [Why Weave?](/learn/why-weave) next. If you would rather get something running on your own machine first, go to [Installation](/learn/installation) and then the [Quick start](/learn/quick-start). And if you only have ten minutes and want the idea everything rests on, go straight to [Thinking in signals](/learn/signals).
 
-[Next: Why Weave? →](/learn/why-weave)
+[Next: Why Weave? :icon[arrow-right]](/learn/why-weave)

@@ -189,4 +189,4 @@ That's all you need here. The full story on effects — cleanup functions, batch
 A **signal** holds a value and announces changes. Create it with `signal(initial)`, read it by calling `count()` (which subscribes you), and write it with `.set(value)` or `.set(fn)` — `.update(fn)` is the same thing. `.peek()` reads without subscribing, `.set` returns the resulting value, and equal writes (by `Object.is`, or your own `equals`) are skipped. An **effect** runs once immediately and re-runs when its reads change, handing you a `stop()` to tear it down.
 :::
 
-[Next: Reactivity — effects, cleanup, and how updates stay glitch-free →](/learn/reactivity)
+[Next: Reactivity — effects, cleanup, and how updates stay glitch-free :icon[arrow-right]](/learn/reactivity)

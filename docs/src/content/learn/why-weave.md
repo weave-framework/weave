@@ -46,4 +46,4 @@ Reach for Weave when you want **one coherent, dependency-free toolkit** with the
 
 Ready? The fastest way to understand a loom is to weave something.
 
-[Next: Quick start →](/learn/quick-start) · [Or start with the core idea: Thinking in signals →](/learn/signals)
+[Next: Quick start :icon[arrow-right]](/learn/quick-start) · [Or start with the core idea: Thinking in signals :icon[arrow-right]](/learn/signals)

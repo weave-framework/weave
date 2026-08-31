@@ -246,4 +246,4 @@ The runtime sets the **start frame in a microtask, before paint** — so an ente
 `transition:`/`in:`/`out:` attach animations to an element; Weave plays the intro on mount and **awaits** the outro before removal — so `@if`/`@key`/`@for` removals animate out. Built-ins are `fade`/`scale` (`start`)/`fly` (`x`,`y`)/`slide` (height, measured at play time), all sharing `delay`/`duration`/`easing`. Params are a one-time **snapshot**, not reactive. A node holds **one** outro; an `in:`-only node leaves instantly. Animate routes via `<RouterView transition>` — **enter-only**; author a page `out:` for leaves. `<Portal>` renders modals/toasts outside the layout while keeping them logically in the tree (`to` resolves once, falling back to `body`). Write a custom transition as `(node, params) => { delay?, duration?, easing?, css?, tick? }`; prefer `css`, and `duration <= 0` is instant.
 :::
 
-[Next: Custom elements & bootstrap →](/learn/custom-elements) · [Reference: @weave-framework/runtime →](/reference/runtime)
+[Next: Custom elements & bootstrap :icon[arrow-right]](/learn/custom-elements) · [Reference: @weave-framework/runtime :icon[arrow-right]](/reference/runtime)

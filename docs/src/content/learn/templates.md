@@ -471,4 +471,4 @@ Every dynamic value uses `{{ }}` (and a literal `@` is escaped as `@@`). Bind at
 
 Keep your templates consistently formatted with the [Prettier plugin](/learn/tooling#formatting-templates-prettier) — it understands `{{ }}`, the `@`-blocks, and every binding kind, so you can stop `.prettierignore`-ing them.
 
-[Next: Reactivity in depth →](/learn/reactivity) · [Reference: template syntax →](/reference/template-syntax)
+[Next: Reactivity in depth :icon[arrow-right]](/learn/reactivity) · [Reference: template syntax :icon[arrow-right]](/reference/template-syntax)
