@@ -33,13 +33,22 @@ no breaking change to the code you write. New capability landed additively, behi
 generation and resume arrived in 1.6.0 as a whole new rendering mode, and existing code did not change by a
 character.
 
-**2.0.0 is the one major so far, and it is worth being precise about what it was.** Nothing was removed, nothing
+**Two majors have shipped, and both are worth being precise about.** The first, 2.0.0: nothing was removed, nothing
 was renamed, and no signature changed — code written against 1.x still compiles. It is a major because four bug
 fixes make existing code *behave* differently: a reactive update that used to be silently dropped is now
 delivered, `@await` re-renders when its data changes instead of showing a stale value, store effects live for the
 app's lifetime instead of dying with the first component that used one, and the formatter stopped altering the
 markup it formatted. Each of those was a defect; fixing a defect can still change behaviour, and the version
 number says so rather than hiding it. That is the promise working, not the promise breaking.
+
+**3.0.0 is the second, and it broke exactly one thing: a type.** `<Select>` and `<Autocomplete>` now
+require `optionValue` and `optionLabel` when the option type is not self-describing. The type used to
+call those optional while the runtime went on reading `.value` and `.label` — so passing an API row
+type-checked clean and then rendered `undefined` in every row. The fix makes the compiler ask for what
+the runtime always needed. It is a major because a type that stops accepting previously-accepted code is
+a break whether or not the old behaviour was any good, and `VERSIONING.md` does not grade breaks by that.
+
+Two majors, and between them one removed API: none. That is what the freeze buys.
 
 (Before 1.0, Weave was on a `0.x` line where the shape of things was still settling — that's what a `0.x` is for.
 The commitment below starts from the 1.0 freeze, which is the version you'd be adopting.)

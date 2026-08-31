@@ -2,8 +2,23 @@
 
 Let's get something on screen. By the end of this page you'll have a running app, a component you wrote, and a feel for the loop: edit a file, see it live.
 
-:::callout info "First, get Weave running"
-This page assumes you've already got a project. If not, the quickest start is `npm create weave@latest my-app` (or pnpm/yarn) — see [Installation](/learn/installation), which also covers adding Weave to an existing project. Weave is past **1.0** (published on npm under the `@weave-framework/*` scope) with a frozen API, so the shapes on this page are stable.
+:::callout info "You need a project first"
+This page assumes you have one. If you do not, that is one command:
+
+`npm create weave@latest my-app` — or `pnpm create weave my-app`, or `yarn create weave my-app`.
+
+[Installation](/learn/installation) walks through it properly, and also covers adding Weave to a project
+you already have.
+:::
+
+:::callout see "The code below will not go stale on you"
+Weave's public API was frozen at 1.0, and freezing it means a specific thing: **an existing function
+cannot change what it takes or what it returns.** New capability may be added beside it, never on top of
+it. Anything that would break code you have already written waits for the next major version, and gets
+one full release of deprecation warnings before it lands.
+
+So what you copy from this page keeps working. Two majors have shipped since — read what they changed in
+[Is Weave safe to bet on?](/enterprise/safe-to-bet-on) if you want the receipts rather than the promise.
 :::
 
 ## The shape of a project
