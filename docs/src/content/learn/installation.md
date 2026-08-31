@@ -2,8 +2,14 @@
 
 This page takes you from an **empty computer** to a running Weave app. No prior framework experience needed — we'll name every step.
 
-:::callout info "Stable, frozen API"
-Weave has been 1.0 since its first stable release — the public API is frozen. The packages are published on npm under the **`@weave-framework/*`** scope (`@weave-framework/runtime`, `@weave-framework/cli`, …). Breaking changes only ever land in a major version, deprecated-first.
+:::callout info "The names, and what is promised about them"
+Everything you import lives under the **`@weave-framework/`** scope — `@weave-framework/runtime`,
+`@weave-framework/router`, `@weave-framework/ui`, and so on. The command that creates an app is
+different on purpose: `npm create weave@latest` follows npm's `create-` convention and fetches the
+package named `create-weave`.
+
+The public API has been frozen since 1.0. A breaking change may only land in a major version, and only
+after being deprecated in a release before it — so upgrading within a major is meant to be dull.
 :::
 
 :::callout tip "Can't find it via npm search?"

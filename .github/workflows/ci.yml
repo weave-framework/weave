@@ -172,6 +172,14 @@ jobs:
       # rendered as an ordinary info box, giving the author a flavor they never asked for, in silence.
       - name: The public prose spells things one way
         run: pnpm verify:prose
+      # A reader found this before any tool did: the Installation page published the literal text
+      # `*`@weave-framework/**` scope (…` — stray asterisks, stray backticks, code spans around the wrong
+      # words. Bold could not contain an asterisk, so ``**`@weave-framework/*`**`` never matched and the
+      # `*em*` rule ate it instead; and a fence indented inside a list was not recognised at all, so three
+      # backticks and a shell command rendered as text on /learn/tooling. Every page is now parsed with the
+      # REAL parser and checked for markup that survived into what the reader sees.
+      - name: Every page renders with no markup left over
+        run: pnpm verify:markdown
       # Two compiler scans read text an author can make arbitrarily long — a component's script and a
       # template's prose — and both were polynomial: `import` plus 8,000 spaces took 59 seconds, and
       # 240 KB of `@A(` took 10. Fixed, and guarded here, because the correctness tests alone stay

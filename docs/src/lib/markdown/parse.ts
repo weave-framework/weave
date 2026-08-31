@@ -62,7 +62,7 @@ export function inlineText(nodes: Inline[]): string {
  * them in more than one way. This repository has paid for that distinction twice, so it is stated.
  */
 const INLINE_RE =
-  /(:icon\[([\w-]+)\])|(\*\*([^*]+)\*\*)|(\*([^*]+)\*)|(`([^`]+)`)|(\[((?:[^[\]]|\[[^\]]*\])+)\]\(([^)]+)\))/;
+  /(:icon\[([\w-]+)\])|(\*\*((?:[^*]|\*(?!\*))+)\*\*)|(\*([^*]+)\*)|(`([^`]+)`)|(\[((?:[^[\]]|\[[^\]]*\])+)\]\(([^)]+)\))/;
 
 /** Parse a single line of inline markdown into a token list. */
 export function parseInline(src: string): Inline[] {
@@ -89,7 +89,10 @@ export function parseInline(src: string): Inline[] {
   return out;
 }
 
-const FENCE_RE = /^(```|~~~)(.*)$/;
+// The marker may be indented: inside a numbered list, a fenced block sits under its item. Anchored at
+// column 0 it was not recognised at all, so three backticks and the shell command under them rendered
+// as literal text on /learn/tooling — twice.
+const FENCE_RE = /^(\s*)(```|~~~)(.*)$/;
 const HEADING_RE = /^(#{1,6})\s+(.*)$/;
 const HR_RE = /^(-{3,}|\*{3,}|_{3,})\s*$/;
 const UL_RE = /^\s*[-*]\s+(.*)$/;
@@ -126,12 +129,14 @@ export function parse(src: string): Block[] {
     // Fenced code (``` or ~~~).
     const fence = FENCE_RE.exec(line);
     if (fence) {
-      const marker = fence[1];
-      const lang = fence[2].trim().split(/\s+/)[0] || 'text';
+      const indent = fence[1];
+      const marker = fence[2];
+      const lang = fence[3].trim().split(/\s+/)[0] || 'text';
       const body: string[] = [];
       i++;
-      while (i < lines.length && lines[i].trimEnd() !== marker) {
-        body.push(lines[i]);
+      // The closing fence carries the same indent; strip it from the body so the code reads flush.
+      while (i < lines.length && lines[i].trim() !== marker) {
+        body.push(lines[i].startsWith(indent) ? lines[i].slice(indent.length) : lines[i]);
         i++;
       }
       i++; // consume closing fence

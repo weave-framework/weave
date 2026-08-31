@@ -27,6 +27,7 @@
     "verify:resume": "node tools/verify-resume.mjs",
     "verify:demo": "node tools/verify-demo.mjs",
     "verify:prose": "node tools/verify-prose.mjs",
+    "verify:markdown": "node docs/tools/verify-markdown.mjs",
     "verify:redos": "node packages/compiler/test/redos.smoke.mjs",
     "verify:hostile-input": "node packages/compiler/test/hostile-input.smoke.mjs",
     "verify:resume-expose": "node packages/compiler/test/resume-auto-expose.smoke.mjs",
