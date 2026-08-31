@@ -1,4 +1,4 @@
-import { signal, computed, type Signal, type Computed } from '@weave-framework/runtime';
+import { signal, computed } from '@weave-framework/runtime';
 
 /**
  * The first live thing a newcomer meets, and it exists to make ONE claim checkable.
@@ -10,25 +10,20 @@ import { signal, computed, type Signal, type Computed } from '@weave-framework/r
  *
  * The counter is module-level rather than a signal on purpose: a signal would be the component telling
  * you about itself, and this has to be a fact from outside it.
+ *
+ * There is no `return` here, and that is deliberate — the page prints this file verbatim, so it has to
+ * be the thing it teaches. The compiler writes `return { name, typed, runs, onName }` from the names the
+ * template reads. (A return-type annotation would switch that off, which is why this one has none.)
  */
 let setupRuns: number = 0;
 
-interface IntroAliveSetup {
-  name: Signal<string>;
-  typed: Computed<number>;
-  runs: number;
-  onName: (e: Event) => void;
-}
-
-export function setup(): IntroAliveSetup {
+export function setup() {
   setupRuns += 1;
-  const name: Signal<string> = signal('');
-  return {
-    name,
-    typed: computed(() => name().length),
-    runs: setupRuns,
-    onName: (e: Event): void => {
-      name.set((e.target as HTMLInputElement).value);
-    },
+
+  const name = signal('');
+  const typed = computed((): number => name().length);
+  const runs = setupRuns;
+  const onName = (e: Event): void => {
+    name.set((e.target as HTMLInputElement).value);
   };
 }

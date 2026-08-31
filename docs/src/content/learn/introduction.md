@@ -35,9 +35,8 @@ import { signal } from '@weave-framework/runtime';
 export function setup() {
   const name = signal('');
 
-  return {
-    name,
-    onName: (e: Event) => name.set((e.target as HTMLInputElement).value),
+  const onName = (e: Event): void => {
+    name.set((e.target as HTMLInputElement).value);
   };
 }
 ~~~
@@ -50,9 +49,22 @@ Read it once more, slowly — every line is doing something you can name:
 - **`name.set(…)`** writes a new value. Everything that read it hears about it immediately.
 - **`{{ … }}`** in the template is a live slot. Whatever is inside is re-evaluated when — and only when — a signal it read changes.
 - **`on:input={{ … }}`** attaches an event handler. The name after `on:` is any DOM event: `click`, `submit`, `keydown`.
-- **`setup()`** runs **once**, when the component is created. What it returns is what the template can see.
+- **`setup()`** runs **once**, when the component is created. Its local values are what the template can see.
 
-The demo above is this plus two extra counters, so you could watch the numbers and check the claim for yourself.
+You may have noticed what is *not* there: nothing hands `name` and `onName` to the template. You do not
+write that. The compiler reads your template, sees that it names `name` and `onName`, and writes
+`return { name, onName }` into `setup` for you. Declare a value, use it in the template, done.
+
+:::callout info "What if I want to choose myself?"
+Write a `return` and it is used exactly as written — the compiler adds nothing. That is the escape hatch
+for exposing something under a different name, or for keeping a value private that the template happens to
+mention. One more rule worth knowing: if you annotate the return type (`export function setup(): Foo`),
+the compiler steps back and writes nothing, so an annotated `setup` must return by hand. TypeScript
+refuses the mistake (`TS2355`), so it cannot slip past you quietly.
+:::
+
+The demo above is this file plus two counters, so you could watch the numbers and check the claim for
+yourself — and it, too, has no `return`.
 
 :::callout info "Why the parentheses?"
 `name` is the signal. `name()` is its current value. Forgetting the `()` is the single most common first mistake — you get the function itself rendered instead of the text, or a comparison that is always false. If something on screen looks like `() => …`, a missing pair of parentheses is almost always why.
@@ -70,7 +82,7 @@ Three kinds of file, and you have already seen two of them:
 
 | File | What it holds |
 | --- | --- |
-| `thing.ts` | The logic — a `setup` function that returns what the template needs |
+| `thing.ts` | The logic — a `setup` function holding the values the template uses |
 | `thing.html` | The template — plain HTML with `{{ }}` slots and `on:` handlers |
 | `thing.scss` | The styles for that component (optional) |
 
