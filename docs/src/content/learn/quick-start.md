@@ -189,8 +189,9 @@ selector in `weave.config.ts` has to match an element that exists in `src/index.
 that for you until the page runs.
 
 **The button renders as `() => …` instead of a number.** A signal is read by *calling* it:
-`{{ count() }}`, not `{{ count }}`. This is the single most common first mistake in Weave and it never
-throws — it just prints the function.
+`{{ count() }}`, not `{{ count }}`. This is the single most common first mistake in Weave. Nothing
+throws — the page just prints the function — but `weave check` names it precisely, which is the argument
+for running it before you go hunting.
 :::
 
 :::callout tip "Running the CLI"

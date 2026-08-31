@@ -25,8 +25,17 @@ how Weave learns that this spot depends on this value.
 
 Forget them and nothing throws. In a template you get the function printed at the reader, which looks
 like `() => { track(node); return node.value; }`. In a comparison you get a function compared to a
-number, which is always false. `weave check` does not catch either. The demo below is this rule made
-visible.
+number, which is always false.
+
+The good news is that **`weave check` catches it**, and says exactly what to do:
+
+~~~
+app.html:1:7 - error TS2345: Signal<number> is a function, and a template renders a function as its
+own source text. Call it — a signal is read with `()`, as in {{ count() }}.
+~~~
+
+Nothing *throws*, though, so a page that is never type-checked will happily show you the function. The
+demo below is this rule made visible.
 :::
 
 ## Creating one: `signal(initial, opts?)`
