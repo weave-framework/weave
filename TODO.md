@@ -29,22 +29,6 @@ this list is a live intention, not a historical note.
   busts a cache correctly. Hashed *filenames* (`main-a1b2c3.js`) would additionally let a host serve the
   bundle as immutable. It is a rename of the build's outputs, so it lands as its own change rather than
   riding along with something else.
-## Planned — framework
-
-- **An app with no plumbing** ([RFC 0012](rfcs/0012-ambient-scope.md) — Draft, deliberately not started).
-  A component would see the names of the template that lexically contains it, resolved at compile time,
-  so the props that exist only to be passed through stop being written. The design is specced, including
-  the rules that decide whether it is safe. It is **not** started, and the reason is a measurement: across
-  every app we have, exactly **one** prop is only handed to a child, so the problem it removes is not
-  present. The RFC carries the trigger — re-measure on a deep app; single digits means it is not worth its
-  risk.
-
-- **Splitting below the component.** `weave build --ssg` splits per route, and `lazy()` splits per component —
-  but an interactive component still carries its whole module. Shipping *one handler* and nothing else, so a
-  mostly-static page pays only for the island on it, is sketched in
-  [RFC 0009](rfcs/0009-resumable-signal-core.md) and not built. Zero JS is reachable today, but you draw the
-  line yourself.
-
 ---
 
 ## Deliberately out of scope
@@ -56,3 +40,16 @@ Not planned — these are conscious design choices, not omissions:
   real need, not a checklist.
 - **A full animation system** beyond the transition callbacks above — CSS covers the rest.
 - **RxJS interop** — the reactive model is signal-native by design.
+
+- **An implicit lexical scope for props** ([RFC 0012](rfcs/0012-ambient-scope.md) — Declined). The idea
+  removed props that exist only to be passed to a child. The RFC set its own threshold — single digits
+  and it is not worth the risk — and named the trigger: re-measure on a deep real application. Measured
+  across **585 components and 170 props in five applications, including two deep business ones: zero**.
+  Not close to the line. A component would have started resolving names from wherever it was placed,
+  which is a large change in what code means, to remove a problem that does not occur.
+
+- **Splitting below the component.** Shipping *one handler* and nothing else, so a mostly-static page
+  pays only for the island on it. Measured before building: handler bodies are **0–3% of a compiled
+  component** across four real applications — the rest is the render path, the templates and the adopt
+  walk. Splitting out the handlers alone would save almost nothing, and the machinery it would need
+  sits on a resumable target that still declines a fraction of real components.

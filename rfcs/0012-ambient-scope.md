@@ -1,6 +1,7 @@
 # RFC 0012: An app with no plumbing — ambient scope, resolved at compile time
 
-- **Status:** Draft — deliberately not started; see "Measured before building"
+- **Status:** **Declined** — 2026-08-30, on the measurement this RFC named as its own trigger: zero
+  pass-through props across 585 components in five applications. See "The trigger fired" below.
 - **Author(s):** Aidas Josas (@aidasjosas)
 - **Discussion:** —
 
@@ -116,9 +117,9 @@ was structurally blind to what it was counting. Rewritten to read prop names fro
 checked on every run against a fixture built to contain exactly one — and it aborts rather than report a zero
 it cannot justify.
 
-**On this evidence the design should be Declined, not merely deferred.** The threshold is the RFC's own, the
-apps are the ones it asked for, and the answer is not close to the line. It is left Draft only because
-retiring a design is the maintainer's call, not a measurement's.
+**Declined on this evidence.** The threshold is the RFC's own, the applications are the ones it asked
+for, and the answer is not close to the line. The design is sound and the problem is absent; reopening
+it needs a new measurement, not a new argument.
 
 ## Staging
 

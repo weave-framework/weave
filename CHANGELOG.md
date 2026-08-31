@@ -228,6 +228,13 @@ claims fail at 71s, 10.3s and 23.8s. Reported by GitHub code scanning as `js/pol
 
 ### Internal
 
+- **Two planned framework features were declined on their own measurements, and say so.** RFC 0012
+  ("an app with no plumbing") named its trigger — re-measure on a deep real application, single digits
+  and it is not worth its risk — and the answer across 585 components in five applications was **zero**.
+  "Splitting below the component" would have shipped one handler instead of a module; handler bodies
+  measure **0–3%** of a compiled component, so it would have saved almost nothing. Both moved from the
+  roadmap to the out-of-scope list, with the numbers, so neither is proposed again from intuition.
+
 - **The retained app's test server could be talked out of its own directory.** It joined the request
   path onto `dist/` and called `normalize`, which RESOLVES `..` without refusing it, so an encoded
   `..%2f..%2f..%2fpackage.json` was served from outside the build. It only ever runs on a developer's
