@@ -19,21 +19,28 @@
 import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { join, dirname, sep } from 'node:path';
 
-/** Learn page → the source it documents. */
+/**
+ * Learn page → the source it documents.
+ *
+ * Mapped to MODULE FILES, not to a package barrel. The first version pointed `reactivity` at
+ * `runtime/src/index.ts` and duly reported that the page never names `fade`, `provide` and
+ * `mountDevtoolsPanel` — which is true and meaningless, because those belong to Motion, to Lifecycle and
+ * to Tooling. An audit that attributes another page's API to this one produces a work list of phantoms.
+ */
 const SUBSYSTEMS = [
-  { page: 'signals', entries: ['packages/runtime/src/signal.ts'], sources: ['packages/runtime/src/signal.ts'] },
-  { page: 'reactivity', entries: ['packages/runtime/src/index.ts'], sources: ['packages/runtime/src'] },
+  { page: 'signals', entries: ['packages/runtime/src/reactive.ts'], sources: ['packages/runtime/src/reactive.ts'] },
+  { page: 'reactivity', entries: ['packages/runtime/src/reactive.ts', 'packages/runtime/src/extras.ts'], sources: ['packages/runtime/src/reactive.ts', 'packages/runtime/src/extras.ts'] },
   { page: 'components', entries: [], sources: ['packages/compiler/src', 'packages/cli/src/plugin.ts'] },
   { page: 'templates', entries: [], sources: ['packages/compiler/src/parser.ts', 'packages/compiler/src/codegen.ts'] },
-  { page: 'styling', entries: [], sources: ['packages/compiler/src/styles.ts', 'packages/cli/src/styles.ts'] },
-  { page: 'lifecycle-context-di', entries: ['packages/runtime/src/owner.ts'], sources: ['packages/runtime/src/owner.ts'] },
-  { page: 'router', entries: ['packages/router/src/index.ts'], sources: ['packages/router/src'] },
+  { page: 'styling', entries: [], sources: ['packages/compiler/src/styles.ts'] },
+  { page: 'lifecycle-context-di', entries: ['packages/runtime/src/context.ts'], sources: ['packages/runtime/src/context.ts'] },
+  { page: 'router', entries: ['packages/router/src/index.ts'], sources: ['packages/router/src/index.ts'] },
   { page: 'store', entries: ['packages/store/src/index.ts'], sources: ['packages/store/src'] },
   { page: 'forms', entries: ['packages/forms/src/index.ts', 'packages/forms/src/dom.ts'], sources: ['packages/forms/src'] },
   { page: 'i18n', entries: ['packages/i18n/src/index.ts'], sources: ['packages/i18n/src'] },
-  { page: 'motion', entries: [], sources: ['packages/runtime/src/transition.ts'] },
-  { page: 'static-generation', entries: ['packages/runtime/src/server.ts'], sources: ['packages/runtime/src/server.ts'] },
-  { page: 'tooling', entries: [], sources: ['packages/cli/src/cli.ts'] },
+  { page: 'motion', entries: ['packages/runtime/src/transitions.ts'], sources: ['packages/runtime/src/transitions.ts'] },
+  { page: 'static-generation', entries: ['packages/runtime/src/server.ts', 'packages/runtime/src/resume.ts'], sources: ['packages/runtime/src/server.ts', 'packages/runtime/src/resume.ts'] },
+  { page: 'tooling', entries: ['packages/runtime/src/devtools.ts'], sources: ['packages/cli/src/cli.ts', 'packages/runtime/src/dev-states.ts'] },
 ];
 
 /** A message an AUTHOR can cause, as opposed to an invariant that means the framework broke. */
@@ -117,8 +124,19 @@ for (const s of SUBSYSTEMS) {
   const apiMissing = [...api].filter((n) => !words.has(n));
 
   const msgs = messagesIn(s.sources);
+  // The probe is the longest run of literal words at the start, AFTER dropping the `weave:` / `Weave:`
+  // prefix most messages carry. Splitting on the first colon made every one of those probe the single
+  // word "weave", which is under the length floor, so a page quoting the message verbatim still counted
+  // as not showing it.
+  const probeOf = (m) =>
+    m
+      .replace(/^\s*\[?weave\]?:\s*/i, '')
+      .replace(/\$\{[^}]*\}/g, '…')
+      .split(/[.,—]|…/)[0]
+      .trim()
+      .slice(0, 34);
   const shown = msgs.filter((m) => {
-    const probe = m.replace(/\$\{[^}]*\}/g, '').split(/[.,—:]/)[0].trim().slice(0, 30);
+    const probe = probeOf(m);
     return probe.length > 12 && text.includes(probe);
   });
 

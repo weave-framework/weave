@@ -1,0 +1,48 @@
+.lc {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.lc-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.lc button {
+  font: inherit;
+  font-size: 0.88rem;
+  padding: 6px 12px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--fg);
+  cursor: pointer;
+}
+
+.lc button:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.lc button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.lc-log {
+  margin: 0;
+  padding-left: 1.5em;
+  font-family: var(--mono);
+  font-size: 0.84rem;
+  color: var(--fg-soft);
+  line-height: 1.7;
+}
+
+.lc-none {
+  list-style: none;
+  margin-left: -1.5em;
+  font-family: var(--sans);
+  color: var(--muted);
+}

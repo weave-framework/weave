@@ -1,0 +1,12 @@
+<div class="lc">
+  <div class="lc-controls">
+    <button type="button" on:click={{ start }} disabled={{ alive() }}>create the scope</button>
+    <button type="button" on:click={{ bump }} disabled={{ !alive() }}>change what the effect reads</button>
+    <button type="button" on:click={{ teardown }} disabled={{ !alive() }}>dispose it</button>
+  </div>
+
+  <ol class="lc-log">
+    @for (line of log(); track $index) { <li>{{ line }}</li> }
+    @empty { <li class="lc-none">nothing has run yet</li> }
+  </ol>
+</div>

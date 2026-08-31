@@ -6,6 +6,27 @@ Three related ideas that all flow from one mechanism — the **owner tree**. Whe
 
 There is no set of lifecycle methods to override. `setup` *is* the "created" hook — it runs once, synchronously, *before* your component's nodes are in the document. For everything after that, you need just three functions: `onMount`, `onCleanup`, and `onDispose`. The catch is that they're easy to mix up, and when you reach for the wrong one nothing yells at you — it just quietly does nothing. So let's nail down exactly what each one does, and where each one goes silent.
 
+Which is a claim about **order**, and order is the one thing prose cannot show. Create the scope, poke it,
+then throw it away, and read the lines in the order they were written:
+
+:::demo lifecycle-order
+
+:::callout see "What you should see"
+On **create**: `setup` first, then the effect, then `onMount` — in that order, always. `setup` runs
+synchronously; `onMount` waits for the DOM.
+
+On **change what the effect reads**: `onCleanup` fires *before* the effect runs again. It is not a
+teardown hook, it is a "before the next one" hook, and that is why it can fire many times.
+
+On **dispose**: both fire, and the order is worth reading twice — `onDispose` first, then `onCleanup`.
+The owner tears itself down before it stops the computations it owns, so a disposal hook sees a scope that
+is still intact.
+
+The difference between the two is therefore not "which is last" but **how many times**: `onCleanup` ran on
+every change and once more at the end; `onDispose` ran exactly once, ever. Count the lines rather than
+trusting the paragraph — the first draft of this box said the opposite, and the demo corrected it.
+:::
+
 ### onMount — after the DOM is live
 
 When you need the real, mounted DOM — to focus an input, measure a box, start a chart library, or kick off a fetch — use `onMount`. It does **not** run synchronously inside `setup`. It schedules your callback on the next **microtask**, after the whole synchronous construct-and-mount pass has finished, so by the time it fires the nodes are in the document:
@@ -258,3 +279,32 @@ The **owner tree** underpins all three. `onMount` runs on the next microtask in 
 :::
 
 [Next: Router :icon[arrow-right]](/learn/router) · [Reference: @weave-framework/runtime :icon[arrow-right]](/reference/runtime)
+
+## When it goes wrong
+
+Three things go wrong here, and two of them are silent — which is what makes them worth naming.
+
+:::callout trap "`provide()` outside a scope throws"
+~~~
+weave: provide() must be called within a component setup or owner scope
+~~~
+
+This is the loud one, and it is loud on purpose: a value provided with nobody to own it would be
+unreachable and never disposed. Call `provide` inside `setup`, or inside a `root(…)` you created.
+:::
+
+**`onCleanup` outside a running computation is a silent no-op.** It attaches to the computation that is
+executing *right now* — an `effect`, a `computed`, a `watch`. Call it anywhere else and nothing happens,
+no error. If a cleanup you wrote never seems to run, check that it is inside the effect rather than beside
+it.
+
+**`inject` with nothing provided returns the default, and never throws.** That is deliberate — a missing
+provider is a normal state for an optional dependency — but it means a typo in the context object reads
+as "nobody provided it" rather than as a mistake. If an injected value is unexpectedly the default,
+suspect the identity of the context before you suspect the provider.
+
+:::callout trap "The one that catches everyone once"
+`onDispose` inside an `effect` attaches to the **owner**, not to the effect — so it runs once at unmount,
+not on every re-run. If you want the before-each-run behaviour, you want `onCleanup`. The two names are
+one letter apart in intent and a whole lifetime apart in timing.
+:::
