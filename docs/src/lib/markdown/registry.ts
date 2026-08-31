@@ -17,6 +17,7 @@ import { lazy } from '@weave-framework/runtime/dom';
 export const demos: Record<string, Component> = {
   counter: lazy(() => import('../demos/counter-demo')),
   'intro-alive': lazy(() => import('../demos/learn/intro-alive')),
+  'why-fine-grained': lazy(() => import('../demos/learn/why-fine-grained')),
   'ex-autocomplete-async': lazy(() => import('../demos/ui/ex-autocomplete-async')),
   'ex-autocomplete-basic': lazy(() => import('../demos/ui/ex-autocomplete-basic')),
   'ex-autocomplete-clearable': lazy(() => import('../demos/ui/ex-autocomplete-clearable')),

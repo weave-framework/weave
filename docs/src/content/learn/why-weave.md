@@ -6,21 +6,97 @@ Before you spend an afternoon learning it, here's an honest answer to the only q
 
 Weave is a particular set of trade-offs, pulled tight:
 
-> **Signals all the way down, a compiler that disappears, and everything you need already in the box — with zero third-party dependencies.**
+> **Signals all the way down, a compiler that disappears, and everything you need already in the box — with nothing third-party reaching the browser.**
 
-Everything below is what that sentence costs and what it buys.
+Four claims. Each one below is stated, then shown, then measured — in that order, because a claim you cannot check is just a slogan.
 
-## The trade-offs, stated plainly
+## Fine-grained: see it, do not take my word for it
 
-**Fine-grained reactivity, no virtual DOM.** When a value changes, Weave updates the one piece of the page that depends on it — not the component, not a diffed copy of the tree. You get this without thinking about it: no memoization, no manual dependency lists, no opt-in change detection. (This is the [signals](/learn/signals) idea, and it's the foundation of everything.)
+The claim is that changing one value updates the one place that depends on it. Every row below counts
+its own re-renders the same way the framework counts them — an effect subscribed to exactly one value.
+Press **add one** on a single row and watch which numbers move.
 
-**A compiler that gets out of the way.** Your templates compile to direct DOM operations at build time. There's no template interpreter shipping to the browser, and unused features tree-shake away — a tiny counter app stays tiny.
+:::demo why-fine-grained
 
-**Batteries included, zero dependencies.** Routing, a store, forms, i18n, data fetching, motion — all official, all built in-house, all designed to fit together. Nothing here pulls a third-party package into your `node_modules`. That's a deliberate rule, not an accident: fewer moving parts you didn't choose, fewer supply-chain surprises.
+:::callout see "What you should see"
+The row you pressed goes up by one. The other two rows do not move at all. The **Total** does move —
+and that is the point, not an exception: the total genuinely reads all three values, so it genuinely
+depends on all three. Fine-grained does not mean "nothing else updates". It means **exactly what
+depends on it updates, and nothing else** — which is a promise you can check, one row at a time.
+:::
 
-**Functions, not classes.** Components and services are plain functions. Which deserves its own section.
+There is no memoization to add, no dependency array to keep in step, and no change detection to opt
+into. You read a value; the place that read it is the place that updates.
 
-## Why functions, not classes?
+## A compiler that gets out of the way
+
+Your template is not shipped and interpreted at runtime. It is read at build time and turned into the
+DOM calls it describes. Below is a real component and the real output — not a sketch of it; this is
+what `compileComponent` printed for exactly these two files.
+
+:::tabs
+~~~html title="you write this"
+<p>Hello, {{ name() }}!</p>
+~~~
+~~~ts title="and this"
+import { signal } from '@weave-framework/runtime';
+
+export function setup() {
+  const name = signal('world');
+}
+~~~
+~~~js title="the browser gets this"
+const _t0 = template("<p data-w-10c1kl>Hello, <!---->!</p>");
+
+function render(ctx, slots) {
+  const _r = clone(_t0);
+  const _n0 = child(_r, 1);
+  bindText(_n0, () => ctx.name());
+  return _r;
+}
+~~~
+:::
+
+Four things are worth noticing, because each one is a decision rather than an accident:
+
+- The markup became **one `<template>` string**, cloned per instance. Cloning is the fastest way a
+  browser can produce a subtree, and the parse happens once for every instance ever created.
+- `<!---->` is a **placeholder comment** marking where the text goes. `child(_r, 1)` walks straight to
+  it — no query, no selector, no scan.
+- `bindText(_n0, () => ctx.name())` is the **entire** subscription. That one call is what "fine-grained"
+  means in the emitted code: a function tied to a single node.
+- `data-w-10c1kl` is the **style scope** — the marker that keeps this component's CSS from leaking
+  into anyone else's. It is derived from the file, so it is the same on every build.
+
+And notice what is *not* there. No `{{ }}` survived — nothing at runtime ever parses that syntax. There
+is no diff, no previous tree to compare against, and no table of features the runtime must understand in
+case you used one. A feature you did not write emits nothing, so it costs nothing.
+
+Which is why the SPA core — signals plus the renderer — is **6.6 KB gzipped**. That figure comes from
+`pnpm verify:size`, a gate that fails the build when it moves, not a number somebody typed once and
+stopped checking.
+
+## Batteries included, and nothing third-party in the browser
+
+Routing, a store, forms, translations, data fetching and motion are all official, all built in-house,
+and all designed against the same reactive core. That is a deliberate rule: fewer moving parts you did
+not choose, and a much smaller surface for a supply-chain surprise.
+
+:::callout trap "Said precisely, because the loose version is not true"
+**Nothing third-party reaches the browser.** Every package that ships code to a page —
+`runtime`, `router`, `store`, `forms`, `i18n`, `data`, `ui` — declares zero third-party dependencies.
+
+Your **build tools are a different question**, and the honest answer is that `@weave-framework/cli`
+depends on esbuild and TypeScript, and `@weave-framework/nx` depends on Nx's own devkit. Those run on
+your machine, never in your user's browser. Anyone who tells you a framework has "zero dependencies"
+full stop is either counting only one of those two things or not counting.
+:::
+
+## Functions, not classes
+
+Components and services are plain functions. Which deserves its own section.
+
+### Why, though?
 
 Weave is built on functions rather than classes — and that isn't a style preference, it falls out of signals.
 
@@ -31,18 +107,15 @@ Weave is built on functions rather than classes — and that isn't a style prefe
 
 Classes aren't forbidden — if you have one (a parser, a state machine, an SDK you depend on), wrap an instance in a [store](/learn/store) or [provide](/learn/lifecycle-context-di) it. You just won't *need* one to write idiomatic Weave. (Looking for what replaces class inheritance? [Lifecycle, context & DI](/learn/lifecycle-context-di) shows the functional equivalents of `extends`, `implements`, `super`, and abstract methods — it's composition all the way down.)
 
-## Two ways to read these docs
-
-However deep you want to go, there's a path for it:
-
-- :icon[graduation-cap] **Learn** — the section you're in. Friendly, narrative guides that build up one idea at a time, each with a live example you can click and copy. No prior framework experience assumed.
-- :icon[book-open] **Reference** — the exhaustive catalog: every package, every export, every option and type, with examples. When you know *what* you want and just need the exact signature, start here.
-
-You can jump between them freely — every Learn page links out to the relevant Reference, and back.
-
 ## So, is Weave for you?
 
-Reach for Weave when you want **one coherent, dependency-free toolkit** with the ergonomics of signals and the output size of a compiler — and you'd rather learn one set of ideas than wire five libraries together.
+Reach for Weave when you want **one coherent toolkit** with the ergonomics of signals and the output
+size of a compiler, and you would rather learn one set of ideas well than assemble your own stack.
+
+Be honest with yourself about the other side of that. Everything is first-party, which means the
+answers come from one place — and it also means there is no ecosystem of alternatives to reach for when
+you dislike one of them. That trade is the whole design, and it is the right one for some teams and the
+wrong one for others.
 
 Ready? The fastest way to understand a loom is to weave something.
 

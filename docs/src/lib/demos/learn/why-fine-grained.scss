@@ -1,0 +1,59 @@
+.why-fg {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.fg-row,
+.fg-total {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.fg-total {
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.fg-label {
+  min-width: 74px;
+  color: var(--fg-soft);
+}
+
+.fg-value {
+  min-width: 32px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+}
+
+.fg-bump,
+.fg-reset {
+  font: inherit;
+  font-size: 0.9rem;
+  padding: 5px 12px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--fg);
+  cursor: pointer;
+}
+
+.fg-bump:hover,
+.fg-reset:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.fg-reset {
+  align-self: flex-start;
+  margin-top: 6px;
+}
+
+.fg-writes {
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+}

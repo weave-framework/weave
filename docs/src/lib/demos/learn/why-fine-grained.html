@@ -1,0 +1,18 @@
+<div class="why-fg">
+  @for (r of rows; track r.label) {
+    <div class="fg-row">
+      <span class="fg-label">{{ r.label }}</span>
+      <span class="fg-value">{{ r.value() }}</span>
+      <button class="fg-bump" type="button" on:click={{ r.bump }}>add one</button>
+      <span class="fg-writes">re-rendered <strong>{{ r.writes() }}</strong>&times;</span>
+    </div>
+  }
+
+  <div class="fg-total">
+    <span class="fg-label">Total</span>
+    <span class="fg-value">{{ total() }}</span>
+    <span class="demo-note">{{ totalWrites() }} re-renders in the whole component so far</span>
+  </div>
+
+  <button class="fg-reset" type="button" on:click={{ reset }}>reset the counters</button>
+</div>
