@@ -18,6 +18,7 @@
 // the docs NAME, prose included, is checked against the vars the library actually emits.
 
 import { readFileSync } from 'node:fs';
+import { builtAssetPaths } from '../../tools/built-assets.mjs';
 import { readdir } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 
@@ -75,12 +76,15 @@ const broken = [...used.entries()].filter(([name]) => !defined.has(name));
 
 /* ── Pass 2: every `--weave-*` name the docs mention must be one the library emits. ──
    Ground truth is the built stylesheet, not a list I keep in step by hand. */
-const CSS = join(ROOT, 'dist', 'app.css');
+// The stylesheet carries a content hash, so its name cannot be spelled out here. It was spelled out
+// here, and the day the build started hashing, this pass began skipping in silence — the ENOENT branch
+// below reads as "you have not built yet", which was no longer true. Ask the built document instead.
+const CSS = builtAssetPaths(join(ROOT, 'dist')).css;
 let weaveBroken = [];
 try {
   const built = readFileSync(CSS, 'utf8');
   const real = new Set([...built.matchAll(/(--weave-[a-z0-9-]+)\s*:/gi)].map((m) => m[1]));
-  if (real.size < 50) throw new Error(`only ${real.size} --weave-* vars in dist/app.css — stale or partial build`);
+  if (real.size < 50) throw new Error(`only ${real.size} --weave-* vars in ${CSS} — stale or partial build`);
 
   const mentioned = new Map();
   for (const f of (await walk(SRC)).filter((f) => /\.(scss|css|html|ts|md)$/.test(f) && !f.endsWith('.gen.ts'))) {
