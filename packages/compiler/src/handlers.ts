@@ -19,6 +19,7 @@
  */
 
 import { freeIdentifiers, isJsGlobal } from './scope.js';
+import { stripComments } from './children.js';
 import { matchDelimited, skipOpaque, skipWs, startsWithWord } from './auto-return.js';
 import { unresolvedRefsTs, type TsLike } from './ts-refs.js';
 
@@ -304,8 +305,19 @@ export function extractReturnedNames(script: string): Set<string> | null {
   return null; // no explicit return → auto-return synthesizes `{ …templateScope }`, so scope is the truth
 }
 
-/** Keys of an object-literal body (`a, b: x, [k]: y, ...s`). Null if a spread or computed key makes it unknown. */
-function objectKeys(body: string): Set<string> | null {
+/**
+ * Keys of an object-literal body (`a, b: x, [k]: y, ...s`). Null if a spread or computed key makes it
+ * unknown — the caller reads null as "assume nothing is returned", which for the resumable target means
+ * refusing to adopt the component.
+ *
+ * Comments are removed FIRST. Without that, a note beside a value made the whole return unreadable: the
+ * entry `// what this is for` matches no identifier, and the conservative `return null` below then threw
+ * away every real name with it. Being conservative about a spread is right; being conservative about
+ * somebody explaining their code is a tax on writing it well, and it silently cost four real
+ * applications their resumability.
+ */
+function objectKeys(rawBody: string): Set<string> | null {
+  const body: string = stripComments(rawBody);
   const out: Set<string> = new Set();
   for (const raw of splitTopLevel(body)) {
     const entry: string = raw.trim();

@@ -28,6 +28,19 @@ dialog or menu rendered into the overlay container rather than under your elemen
 `mount` derives which names your template reads, so a component that gains a binding does not also need
 its tests edited. There is no query language and no assertions; your test runner has those.
 
+### Two things that quietly cost you resumability
+
+Neither was a feature you asked for and both were taxes on writing ordinary code.
+
+**Omitting `setup`'s return.** The compiler writes that return for you — but the resumable analysis read
+the raw file, so a component relying on it looked like it returned nothing, and a `use:` action could
+not be shown to survive to the client. The subtree was client-rendered instead.
+
+**A comment inside the returned object.** The reader that works out what a component hands out gave up
+on any return containing a note beside a value, with the same consequence.
+
+Together, across four real applications, they account for resumable refusals falling from 29 to 12.
+
 ### The build tells you it did not type-check
 
 `weave check` is the gate and `weave build` never ran it, so a build could succeed on code the checker

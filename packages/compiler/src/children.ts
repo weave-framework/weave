@@ -18,7 +18,7 @@
  * read as an actual import or the auto-resolver would skip wiring the composed child (it
  * would then mount to a swallowed ReferenceError → blank render).
  */
-function stripComments(code: string): string {
+export function stripComments(code: string): string {
   let out: string = '';
   let i: number = 0;
   const n: number = code.length;

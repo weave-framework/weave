@@ -16,6 +16,23 @@
 
 ## 3.3.0
 
+### A comment in `setup`'s return no longer costs you resumability
+
+The reader that works out what a component hands out answered "nothing" whenever the returned object
+contained a **comment** — a note on its own line, a block comment, or one trailing a value. It tests
+each entry against an identifier pattern and gives up on anything else, which is the right instinct for
+a spread or a computed key and the wrong one for somebody explaining their code.
+
+What it cost was not small: with the return unreadable, the resumable target cannot show that a module
+import handed straight out — a `use:` action, typically — survives to the client, so the whole subtree
+is refused and client-rendered. Silently, and as a tax on writing clearly.
+
+Comments are now removed before the keys are read. A spread and a computed key still yield "unknown",
+because those genuinely are.
+
+Across four real applications this and the auto-expose fix above take resumable refusals from **29 to
+12**; one application went from 12 to 5, another from 10 to 1.
+
 ### Omitting `setup`'s return no longer costs you resumability
 
 A component may leave out `setup`'s `return` — the compiler writes it, from the names the template

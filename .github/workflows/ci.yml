@@ -128,6 +128,11 @@ jobs:
       # client-rendered, silently, for writing less. 18 of 29 refusals across 574 real components.
       - name: Auto-expose and an explicit return resume alike
         run: pnpm verify:resume-expose
+      # A note beside a value in `setup`'s returned object made the whole return unreadable, so the
+      # resumable target assumed the component returned nothing and refused to adopt it. Being
+      # conservative about a spread is right; being conservative about a comment taxes writing clearly.
+      - name: A comment in the return does not hide it
+        run: pnpm verify:returned-names
       # One RETAINED real app, built by the real CLI and driven in a real browser: router with
       # code-split lazy chunks, stores, optimistic create, forms, an overlay modal, `@defer`, the
       # error boundary, keyed 1,000-row reconcile, scroll restoration. Every per-fix test guards its
