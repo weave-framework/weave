@@ -192,7 +192,140 @@ Add these scripts to your `package.json` and you're set:
 
 Run `npm run dev` (or `pnpm dev` / `yarn dev`), open the printed URL, and edit `app.html` — it reloads on save. The full CLI (every command and flag) is on the [Tooling & CLI](/learn/tooling) page.
 
-## 4. Build for production
+## 4. Using a package from npm
+
+Weave ships with zero third-party dependencies. **That is a rule Weave keeps for itself, not one it
+puts on you.** Your `node_modules` is yours: if npm has something you need and Weave does not have it,
+install it and import it. There is nothing to register, no plugin to write, and no configuration to
+add.
+
+~~~bash
+npm install nanoid
+~~~
+
+~~~ts title="src/app/ids/ids.ts"
+import { signal } from '@weave-framework/runtime';
+import { nanoid } from 'nanoid';
+
+export function setup() {
+  const ids = signal<string[]>([nanoid()]);
+  const add = (): void => {
+    ids.set((list) => [...list, nanoid()]);
+  };
+}
+~~~
+
+That is the whole integration. `weave build` runs esbuild with `bundle: true` and no externals for your
+code, so it follows your `import` graph into `node_modules` exactly as it follows it into `src/`. A
+package from npm is not a special case — it is just another module on the path.
+
+:::callout see "How to confirm it really landed"
+Build, then search the output for something only that library could have written:
+
+~~~bash
+npm run build
+grep -c "useandom" dist/main.js      # nanoid's alphabet → 1
+~~~
+
+Search for the *export name* and you may well get `0` and think it failed: minification renames
+identifiers. Look for a string literal the library owns instead — those survive.
+:::
+
+Which of the three kinds you are dealing with decides how much care it needs.
+
+### A library that is pure logic
+
+Date maths, validation, parsing, formatting, ids, currency. Install, import, call. Nothing else applies
+— the example above is the whole story.
+
+### A library that draws into the DOM
+
+Charts, maps, rich-text editors, drag-and-drop. These want a real element to own, and Weave has a
+purpose-built place to give them one: a **`use:` action**.
+
+~~~ts title="src/app/lib/chart-action.ts"
+import type { ChartLib } from 'some-chart-library';
+import { create } from 'some-chart-library';
+
+/** A Weave `use:` action is `(element, argument) => cleanup | { update, destroy }`. */
+export function chart(el: HTMLElement, data: number[]) {
+  const instance: ChartLib = create(el, { data });
+  return {
+    update: (next: number[]): void => instance.setData(next),
+    destroy: (): void => instance.destroy(),
+  };
+}
+~~~
+
+~~~html title="src/app/dashboard/dashboard.html"
+<div class="chart" use:chart={{ points() }}></div>
+~~~
+
+Three things are handled for you, and each is a thing people usually write by hand:
+
+- The action runs at **`onMount`** — the element is already in the document, so measuring, focusing and
+  library initialization all work on the first try.
+- `update(next)` re-runs **whenever the argument changes**, because `{{ points() }}` is a live
+  expression. The library gets new data without you wiring a watcher.
+- `destroy()` runs when the element is removed, so the library's listeners and timers go with it. This
+  is where memory leaks usually come from, and it is the part you do not have to remember.
+
+`use:` actions and the full `{ update, destroy }` contract are covered on
+[Templates](/learn/templates#directives-use).
+
+### A library that touches `window` when it is imported
+
+Some packages read `window`, `document` or `navigator` at module scope, the moment they are imported
+rather than when you call them.
+
+:::callout trap "This is the one that breaks a static build"
+It works in `weave dev` and fails in `weave build --ssg`, which is the worst way to find out. During
+static generation your components render on **Node**, inside Weave's own headless DOM, which
+deliberately implements the parts a component needs and not the whole browser.
+
+Two ways out, and both are one line. Import it lazily, inside the code that runs only in a browser:
+
+~~~ts
+onMount(async () => {
+  const { thing } = await import('browser-only-library');
+  thing(el);
+});
+~~~
+
+Or put it behind a `use:` action, which **never runs on the server at all** — that is not a workaround,
+it is what the action boundary is for.
+:::
+
+### What it costs you
+
+Two honest things to know before you add one.
+
+**Bytes.** The library goes into your bundle. Every Weave package declares `"sideEffects": false`, so
+anything you do not import is dropped — but a third-party package makes its own promises about that,
+and some make none. Check your bundle after adding something large.
+
+**Types.** If the package ships no TypeScript types, you get this, because the scaffold's
+`tsconfig.json` is `strict`:
+
+~~~
+src/app/ids/ids.ts:1:28 - error TS7016: Could not find a declaration file for module 'thing'.
+  Try `npm i --save-dev @types/thing` if it exists or add a new declaration (.d.ts) file
+  containing `declare module 'thing';`
+~~~
+
+Take the first option when the community types exist. Otherwise write the declaration yourself —
+anywhere under `src`, and `weave check` picks it up along with everything else:
+
+~~~ts title="src/types/thing.d.ts"
+declare module 'thing' {
+  export function doTheThing(el: HTMLElement): void;
+}
+~~~
+
+The same file is where a global belongs — `declare const __APP_VERSION__: string;` for something your
+host page injects, for instance.
+
+## 5. Build for production
 
 When you're ready to ship:
 
@@ -202,7 +335,7 @@ npm run build      # → weave build
 
 This writes a clean, minified, self-contained folder to **`dist/`** (override with `outDir` in the config). It's plain `.html`, `.js`, and `.css` — no server runtime.
 
-## 5. Deploy
+## 6. Deploy
 
 `dist/` is **static files**. Host it anywhere that serves static content:
 

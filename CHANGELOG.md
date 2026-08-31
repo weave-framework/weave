@@ -14,6 +14,23 @@
 > already left it behind — Phase E ran 94 commits without a bump, and then released as one MINOR. The public
 > promise wins; the habit is retired.)*
 
+## Unreleased
+
+- **fix(check):** `weave check` now reads the project's own `.d.ts` files. `collect()` skipped every
+  declaration file outright — right to skip as a COMPONENT, wrong to drop from the program, since an
+  ambient `declare module` or `declare global` only takes effect when its file is a root of it. So an
+  untyped npm import reported `TS7016` and printed TypeScript's own advice ("add a new declaration
+  (.d.ts) file") at an author who had already added one, while `tsc --noEmit` went green on the same
+  tree. `declare global`, module augmentation, and an app's asset shims were all invisible for the same
+  reason. Pinned by `packages/check/test/ambient-dts.smoke.mjs` (4 cases, wired into `pnpm verify:check`),
+  which includes a control case asserting the error still fires WITHOUT a shim — otherwise the fix would
+  be indistinguishable from checking nothing.
+- **docs(learn):** a new **Using a package from npm** section on Installation — Weave's zero-dependency
+  rule is one it keeps for itself, not one it puts on your `node_modules`. Covers the three cases that
+  behave differently: pure logic (install and import), a library that draws into the DOM (a `use:`
+  action, whose `{ update, destroy }` handle is the lifecycle you would otherwise write by hand), and
+  one that touches `window` at import time (which works in `weave dev` and breaks in `--ssg`).
+
 ## 3.3.0
 
 ### Four security fixes, found by auditing rather than by a report
