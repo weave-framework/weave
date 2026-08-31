@@ -1,0 +1,38 @@
+.intro-alive {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.ia-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 260px;
+}
+
+.ia-label {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.ia-field input {
+  font: inherit;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.ia-field input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.ia-greeting {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--accent);
+}

@@ -1,0 +1,14 @@
+<div class="intro-alive">
+  <label class="ia-field">
+    <span class="ia-label">Type your name</span>
+    <input value={{ name() }} on:input={{ onName }} placeholder="Ada" autocomplete="off" />
+  </label>
+
+  <p class="ia-greeting">Hello, {{ name() || 'stranger' }}!</p>
+
+  <p class="demo-note">
+    You have typed <strong>{{ typed() }}</strong> character(s), and this component's setup has run
+    <strong>{{ runs }}</strong> time. It will still say 1 after a hundred keystrokes — Weave changed the
+    greeting, not the component.
+  </p>
+</div>
