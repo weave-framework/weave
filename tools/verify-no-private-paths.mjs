@@ -50,6 +50,28 @@ const PRIVATE = [
  * nobody thought to list, and needs no evasion.
  */
 const PUBLIC_DOT_DIRS = /^\.(github|vscode|husky|changeset|editorconfig|gitattributes|gitignore|npmrc|nvmrc)/;
+
+/**
+ * Top-level `.md` files that BELONG to the public repository. Anything else at that level is working
+ * context and must not be tracked here.
+ *
+ * Written as an allow-list for the same reason the dot-directories above are: naming the private files
+ * would put those names in a public file, which is the leak the rule exists to prevent. This gate was
+ * first written listing one of them by name and the commit hook refused it — correctly.
+ */
+const PUBLIC_ROOT_DOCS = new Set([
+  'README.md',
+  'CHANGELOG.md',
+  'RELEASE-NOTES.md',
+  'TODO.md',
+  'VERSIONING.md',
+  'GOVERNANCE.md',
+  'CONTRIBUTING.md',
+  'CODE_OF_CONDUCT.md',
+  'SECURITY.md',
+  'LICENSE.md',
+]);
+const ROOT_DOC = /^[^/]+\.md$/i;
 const PRIVATE_DOT_DIR = /^\.[a-z0-9_-]+\//i;
 
 const r = spawnSync('git', ['ls-files'], { encoding: 'utf8' });
@@ -60,7 +82,10 @@ if (r.status !== 0) {
 
 const tracked = r.stdout.split('\n').map((l) => l.trim()).filter(Boolean);
 const leaked = tracked.filter(
-  (f) => PRIVATE.some((re) => re.test(f)) || (PRIVATE_DOT_DIR.test(f) && !PUBLIC_DOT_DIRS.test(f))
+  (f) =>
+    PRIVATE.some((re) => re.test(f)) ||
+    (PRIVATE_DOT_DIR.test(f) && !PUBLIC_DOT_DIRS.test(f)) ||
+    (ROOT_DOC.test(f) && !PUBLIC_ROOT_DOCS.has(f))
 );
 
 console.log('\ntools/verify-no-private-paths.mjs');
