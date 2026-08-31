@@ -241,7 +241,14 @@ export function deserialize(wire: Wire, options?: SerializeOptions): unknown {
         built[i] = obj;
         done[i] = true;
         const map: Record<string, number> = node[1] as Record<string, number>;
-        for (const key of Object.keys(map)) obj[key] = resolve(map[key]);
+        // `defineProperty`, not assignment: `obj.__proto__ = …` REPLACES the prototype, so a wire graph
+        // carrying that key chose every property the application had not set itself — and invisibly,
+        // since `Object.keys` and `JSON.stringify` show nothing. `serialize`/`deserialize` are public,
+        // so any app that stores or transmits state feeds this path from whatever it was handed.
+        // Defining keeps the DATA (a round trip loses nothing) while the prototype stays ours.
+        for (const key of Object.keys(map)) {
+          Object.defineProperty(obj, key, { value: resolve(map[key]), writable: true, enumerable: true, configurable: true });
+        }
         return obj;
       }
       case 'map': {

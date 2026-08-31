@@ -16,6 +16,32 @@
 
 ## 3.3.0
 
+### Four security fixes, found by auditing rather than by a report
+
+**A snapshot could choose an object's prototype.** `deserialize` rebuilt plain objects with
+`obj[key] = value`, and `__proto__` is not an ordinary key — assigning it replaces the prototype. A wire
+graph carrying it therefore decided every property the application had not set itself, and invisibly:
+`Object.keys` and `JSON.stringify` show nothing, so `if (state.user.isAdmin)` passes with nothing in the
+state to explain why. `serialize`/`deserialize` are public, so any app that stores or transmits state
+feeds this path from whatever it was handed. The key is now defined rather than assigned — the data
+survives a round trip, the prototype stays the runtime's.
+
+**`weave migrate` could be made to run a command by the repository it was migrating.** The install it
+offers is a single shell line, so the grammar every spec is checked against is the only thing keeping
+it safe — and that grammar allowed `|`, spaces and redirects, because semver ranges use them. A spec
+like `pkg@|| calc` passed the check, so it never appeared in the refused list, so the prompt looked
+ordinary. Shell operators are gone from the accepted set; a range that needs `||` is refused rather
+than quoted.
+
+**Two SVG sanitizer bypasses.** `<Icon svg={…}>` scrubbed `javascript:` with a pattern that spelled the
+scheme out, but browsers strip tabs and control characters from a URL *before* reading its scheme, so
+`java<TAB>script:` survived. And `<animate attributeName="href" to="javascript:…">` writes the
+attribute after the scrub has finished. URLs are now checked against an allow-list of schemes
+(http/https/mailto/tel, or no scheme at all), and an animation that targets a URL attribute is removed.
+
+Each is held by a gate that was proven able to fail first: `verify:deserialize-proto`,
+`verify:install-spec`, `verify:dev-traversal`, and two browser tests for the sanitizer.
+
 ### Built assets carry their version in the name
 
 `weave build` wrote `main.js` and `app.css` and pointed at them with a content query

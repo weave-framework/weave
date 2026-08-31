@@ -190,3 +190,28 @@ test('component: with no `class` the host is unchanged', async () => {
   assert.equal(el.getAttribute('class'), 'weave-icon', 'no stray whitespace, no extra class');
   dispose();
 });
+
+// Sanitizer vectors that a reader would not think of. Each is a documented SVG XSS shape; the point is
+// to learn what the scrubber actually does with them rather than to assume the list it checks is the
+// list that matters.
+test('component: sanitizer — a scheme split by a tab is still removed', async () => {
+  const tab: string = String.fromCharCode(9);
+  const { el, dispose } = mountIcon({ svg: `<svg id="v"><a href="java${tab}script:alert(1)"><circle r="1"/></a></svg>` });
+  await tick();
+  const a: Element | null = el.querySelector('a');
+  assert.ok(a, 'the link survives (only the URL is in question)');
+  const href: string = a!.getAttribute('href') ?? a!.getAttribute('xlink:href') ?? '';
+  assert.ok(!/script:/i.test(href), `no script URL survives (got ${JSON.stringify(href)})`);
+  dispose();
+});
+
+test('component: sanitizer — an <animate> cannot smuggle a javascript: href', async () => {
+  const { el, dispose } = mountIcon({
+    svg: '<svg id="v"><a><animate attributeName="href" to="javascript:alert(1)"/><circle r="1"/></a></svg>',
+  });
+  await tick();
+  const anim: Element | null = el.querySelector('animate');
+  const to: string = anim?.getAttribute('to') ?? '';
+  assert.ok(!/javascript:/i.test(to), `no javascript: survives an animate (got ${JSON.stringify(to)})`);
+  dispose();
+});

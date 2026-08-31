@@ -3590,7 +3590,15 @@ export function installVerb(pm: PackageManager): string {
  * run a command, so anything outside this grammar is refused rather than escaped — there is no legitimate
  * package spec containing a space, a quote, or a shell metacharacter.
  */
-const SAFE_SPEC: RegExp = /^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*(?:@[A-Za-z0-9.\-+^~><= |*]{1,64})?$/;
+// The version part carried `|`, a space, `<` and `>` because semver ranges use them — and so does a
+// shell. `pkg@|| calc` therefore PASSED, so it never reached the refused list, so the user saw an
+// ordinary install prompt and one `y` ran the command. A spec here comes from the repository being
+// migrated, which is the one thing this check exists to distrust.
+//
+// A range needing `||` or a space is now refused rather than quoted. Refusing is a sentence the user
+// reads; quoting is a thing that has to stay correct forever, in a line assembled for cmd.exe and for
+// sh alike. `weave migrate` writes exact and caret specs, so nothing it produces is lost.
+const SAFE_SPEC: RegExp = /^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*(?:@[A-Za-z0-9.\-+^~=*]{1,64})?$/;
 
 /** The specs that are safe to hand a shell. Anything else is returned separately so the caller can name it. */
 export function checkSpecs(packages: string[]): { safe: string[]; refused: string[] } {

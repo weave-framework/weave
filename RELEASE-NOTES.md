@@ -41,6 +41,19 @@ on any return containing a note beside a value, with the same consequence.
 
 Together, across four real applications, they account for resumable refusals falling from 29 to 12.
 
+### Four security fixes
+
+Found by auditing the codebase, not by a report — and none of them needed a novel trick.
+
+- **A state snapshot could choose an object's prototype.** `deserialize` assigned keys, and `__proto__`
+  is not an ordinary key. The result was invisible: `Object.keys` and `JSON.stringify` showed nothing
+  while a property nobody serialized read back as `true`. If your app stores or transmits state, this
+  one mattered to you.
+- **`weave migrate` could be made to run a command by the repository being migrated.** Its install
+  grammar allowed shell operators, because semver ranges use the same characters.
+- **Two `<Icon svg={…}>` sanitizer bypasses** — a scheme split by a tab, and a `javascript:` URL
+  installed by an `<animate>` after the scrub.
+
 ### Built assets carry their version in the name
 
 `main-<hash>.js` and `app-<hash>.css` instead of `main.js?v=…`. A query busts a cache correctly, but a

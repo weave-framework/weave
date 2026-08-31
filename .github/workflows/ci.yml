@@ -192,6 +192,20 @@ jobs:
       # loads, renders nothing and reports nothing. It caught the `--ssg` path on the first run.
       - name: Injected asset URLs name real files
         run: pnpm verify:injected-assets
+      # The dev server binds to 127.0.0.1, which is the first defence and not the only one needed: a
+      # page open in the developer's browser can still address it. Asserted over a RAW socket, because
+      # `fetch` resolves `../` before sending and a guard tested through it is never reached.
+      - name: The dev server stays inside the directory it serves
+        run: pnpm verify:dev-traversal
+      # `deserialize` rebuilt objects with assignment, and `__proto__` is not an ordinary key: a
+      # snapshot could choose an object's prototype, invisibly to `Object.keys` and `JSON.stringify`.
+      - name: A snapshot cannot choose an object's prototype
+        run: pnpm verify:deserialize-proto
+      # `weave migrate` offers to install what the converted app needs, and those specs come from the
+      # repository being migrated - code the user did not write. The install is a single shell line, so
+      # the grammar is the only thing keeping it safe, and it used to admit `|`, spaces and redirects.
+      - name: An install spec cannot carry a shell operator
+        run: pnpm verify:install-spec
       - name: weave check
         run: pnpm verify:check
       - name: Prettier plugin
