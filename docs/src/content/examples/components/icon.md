@@ -49,7 +49,7 @@ text with no per-icon colour.
 ## Inline SVG — svg
 
 `svg` renders a complete `<svg>…</svg>` string directly, bypassing the registry — use it for one-off
-markup you already have. The string is sanitised before it hits the DOM (`<script>`, `<foreignObject>`,
+markup you already have. The string is sanitized before it hits the DOM (`<script>`, `<foreignObject>`,
 `on*` handlers and `javascript:` URLs are stripped), and it still draws in `currentColor`.
 
 :::demo ex-icon-svg
@@ -73,7 +73,7 @@ export function setup() {
 ## Remote file — src
 
 `src` fetches a standalone `.svg` file and renders it, reactively (a new `src` cancels the last fetch).
-Remote markup is untrusted, so it's sanitised on the way in. The example below uses a `data:` URL so it's
+Remote markup is untrusted, so it's sanitized on the way in. The example below uses a `data:` URL so it's
 self-contained; in an app you'd point at a path like `'/icons/brand.svg'`.
 
 :::demo ex-icon-src

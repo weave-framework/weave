@@ -165,6 +165,13 @@ jobs:
       # static root it copies. Both were found by building a real package against a release.
       - name: CLI config surface (library configs, default publicDir)
         run: pnpm verify:cli-config
+      # A survey of the 145 public markdown files found 80 American spellings against 35 British ones —
+      # `sanitised` five times on the Icon pages while `sanitizes` stood in the CHANGELOG, `organised`
+      # and `organized` inside one document. No single file was wrong, which is why it lasted a year.
+      # The same pass catches `:::callout note`: `note` is not a kind, so it fell back to `info` and
+      # rendered as an ordinary info box, giving the author a flavor they never asked for, in silence.
+      - name: The public prose spells things one way
+        run: pnpm verify:prose
       # Two compiler scans read text an author can make arbitrarily long — a component's script and a
       # template's prose — and both were polynomial: `import` plus 8,000 spaces took 59 seconds, and
       # 240 KB of `@A(` took 10. Fixed, and guarded here, because the correctness tests alone stay

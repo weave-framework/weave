@@ -64,7 +64,7 @@ const pageRows = computed(() => {
 ~~~
 :::
 
-:::callout note "Why turn off the Table's own sort?"
+:::callout info "Why turn off the Table's own sort?"
 `Table` will happily sort an array you hand it — but only the rows it was *given*. If you also paginate, that's
 just the current page, so the sort would be wrong across page boundaries. By setting `clientSort={{ false }}` and
 handling `onSort` yourself, the sort runs over the **whole** filtered set *before* it's sliced into pages.

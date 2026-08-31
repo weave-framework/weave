@@ -613,7 +613,7 @@ check, and a broken app. Every item below was measured on that app, not on this 
   `outDir`) instead of printing anything. There is now real help — commands, options, examples — printed on
   `--help`/`-h`/`help`/no command, and an unknown command says so before printing it.
 - **A finished build reports what it produced** — elapsed time, then each emitted file with its size, source
-  maps summarised in one line. `weave build → dist/` alone said only that the command had run.
+  maps summarized in one line. `weave build → dist/` alone said only that the command had run.
 
 ### Changed — `weave check`
 - **It agrees with the build about child components.** The loader resolves a PascalCase tag by convention
@@ -1122,7 +1122,7 @@ check, and a broken app. Every item below was measured on that app, not on this 
   them. `this.el.nativeElement` becomes the element, since being handed it is what `ElementRef` was for.
 
   A camelCase CSS name is kebab-cased wherever it appears — `[style.backgroundColor]` and
-  `@HostBinding('style.outlineWidth.px')` alike. Angular normalises the name; Weave passes it to `setProperty`,
+  `@HostBinding('style.outlineWidth.px')` alike. Angular normalizes the name; Weave passes it to `setProperty`,
   which only knows `background-color`, so the binding compiled, ran, and set nothing.
 
   **`Router.navigate([…])`** takes an array of commands; Weave's `navigate` takes the path. That is the only
@@ -1402,7 +1402,7 @@ check, and a broken app. Every item below was measured on that app, not on this 
   - **Empty stays empty** (`''`, not `'0.00'`) — "no price set" and "free" are different states. A typed
     `0` is a value and yields `'0.00'`.
   - **Separators are props; the ambient locale is never read** — no `navigator.language`, no `Intl`
-    default. The displayed format belongs to the organisation, not the viewer. Grouping is inserted
+    default. The displayed format belongs to the organization, not the viewer. Grouping is inserted
     directly rather than through `Intl.NumberFormat`, which always wants a locale and in some of them
     emits non-ASCII digits.
   - `maxIntegerDigits` **refuses** a digit past the bound and leaves the caret alone rather than dropping
@@ -1760,7 +1760,7 @@ compiler's own emitted output.
   server inside the shipped archive to a fresh local build byte for byte, and esbuild is not
   byte-reproducible across platforms — the Linux runner's bundle was 76 bytes larger than the
   Windows one from the same commit. Now pinned to two platform-stable hashes (the shipped bytes,
-  and the language-server sources with line endings normalised) in a committed manifest per plugin.
+  and the language-server sources with line endings normalized) in a committed manifest per plugin.
   Renamed `verify:webstorm-plugin` → **`verify:editor-plugins`**; it covers both editors, and
   additionally asserts the `.vsix` carries a correctly scoped tsserver plugin.
 
@@ -1891,7 +1891,7 @@ app pays **zero bytes** for any of it.
 - **1.5.27 — release:** documentation reconcile + lockstep version bump (1.5.23 → 1.5.27) for the FW-17 batch; this is the published `[publish]` commit.
 - **1.5.26 — docs(ui):** `<DateRangePicker>` **reference page** (`/ui/date-range-picker` — prose + API table + live basic demo) and **examples gallery** (`/examples/components/date-range-picker` — basic, bounds+filter, forms control), both registered in nav. Mirrors the Datepicker docs surface.
 - **1.5.25 — feat(ui):** `<DateRangePicker>` — a new `@weave-framework/ui/date-range-picker` for picking a start/end **date range** (FW-17). An underline trigger field shows `start – end` and opens the shared calendar popover (day → year grid → month grid, one month at a time). Range selection is **two clicks**: the first sets the anchor (accent-filled), the second completes it with the ends auto-ordered (click before the anchor and it becomes the new start); while picking the end, **hovering previews** the span (a `--in-range`-style tinted band + a dashed `--preview-edge` ring on the tentative end). The value is a `DateRange` (`{ start: Date | null, end: Date | null }`) bound via `value` + `onChange` or a forms `control` (`Field<DateRange>`); it commits only on the second click and a half-picked range is discarded on close. Supports `min`/`max`/`dateFilter`, `firstDayOfWeek` (default Monday), `labels` (translatable chrome), `separator` (default `' – '`), `clearable`, `required`, `disabled`, `position`, and full keyboard nav. Pinned by 13 `date-range-picker.browser.ts` tests (two-click commit, order swap, hover preview, keyboard, discard-on-Escape, bounds, clear, value/onChange, shared drill-down) + verified live in the docs. Docs: new *UI → DateRangePicker* reference + *Examples → Components → DateRangePicker* gallery.
-- **1.5.24 — refactor(ui):** extracted the three-view calendar engine out of `<Datepicker>` into a shared, prefix-parameterised **`createCalendarView`** core (`src/shared/calendar-view.ts`) + a matching **`calendar($name, $range)`** SCSS mixin (`src/styles/_calendar.scss`), consumed by both `<Datepicker>` and `<DateRangePicker>` — zero calendar duplication (UI RULE #1). `<Datepicker>` delegates its popover to the core with identical class names/CSS/behaviour; all 32 `datepicker.browser.ts` tests stay green (the guardrail). The `$range` flag emits the range-only day modifiers (in-between band, rounded ends, hover preview).
+- **1.5.24 — refactor(ui):** extracted the three-view calendar engine out of `<Datepicker>` into a shared, prefix-parameterized **`createCalendarView`** core (`src/shared/calendar-view.ts`) + a matching **`calendar($name, $range)`** SCSS mixin (`src/styles/_calendar.scss`), consumed by both `<Datepicker>` and `<DateRangePicker>` — zero calendar duplication (UI RULE #1). `<Datepicker>` delegates its popover to the core with identical class names/CSS/behaviour; all 32 `datepicker.browser.ts` tests stay green (the guardrail). The `$range` flag emits the range-only day modifiers (in-between band, rounded ends, hover preview).
 
 ## 1.5.23 — 2026-07-10
 - **1.5.23 — feat(ui):** `<Datepicker>` **year + month drill-down views**, **configurable first day of week**, and **translatable chrome** (FW-16). The popover is now three views in one panel: clicking the day-view header ("June 2026" — now a button, aria `chooseYear`) opens a **year grid** (24 years, 4×6; ‹/› page ±24; range label "2016 – 2039"); picking a year opens a **month grid** (Jan–Dec, 3×4, no paging; its header year switches back to the year grid); picking a month opens that month's day calendar — so navigating across decades is a couple of clicks instead of dozens of month steps. Each grid is a `role="grid"` with full keyboard nav (Arrows within the page — year row = 4, month row = 3; PageUp/Down jump a 24-year page; Home/End to edges; Enter/Space drills down or commits; Esc closes). Years/months entirely outside `min`/`max` are disabled in their grids. New **`firstDayOfWeek`** prop (`0` Sun … `6` Sat) defaulting to **Monday (1)** — a component default, not the locale's — overridable per instance. New **`labels`** prop (`Partial<DatepickerLabels>`) translates every chrome string (nav aria-labels, year switch, dialog name, clear, open-calendar) with English defaults; being reactive props they can carry `t('…')` from i18n. Month/weekday/year *text* stays locale-driven (Intl). The imperative panel was refactored to a single `renderPanel()` dispatching per view (day/year/month), each with its own keyboard handler; the day view keeps its exact classes/structure so it is fully back-compatible. Pinned by 13 new `datepicker.browser.ts` tests (drill-down chain, year paging, per-view keyboard, first-day default + override + lead-blank shift, label overrides, year/month min-max disabling) + verified live in the docs. Docs: *UI → Datepicker* updated (new views, first day, `labels`, keyboard, props).
@@ -2360,7 +2360,7 @@ the auto-memory. U4 + U5 complete; next is U6. Not published, not mirrored.
 ### UI (`@weave-framework/ui`) — `./datepicker`
 - **`<Datepicker editable>`** — swaps the design's button trigger for a typeable **input-as-combobox** (role
   moves to the input; the wrapper drops its role). Typing + Enter/blur **parses via the CDK `adapter.parse`** →
-  commits (clamped + normalised to the display format), OR flags **`aria-invalid`** + `--invalid` and keeps the
+  commits (clamped + normalized to the display format), OR flags **`aria-invalid`** + `--invalid` and keeps the
   text. The calendar icon becomes a toggle button; ArrowDown opens the calendar; clear × empties. Default
   (non-editable, the design's button) is unchanged. New `__input` + `__icon-button` styles.
 - Gates: **926 tests (+6); verify:ui-sass 284 (+1);** typecheck + `eslint .` clean.
@@ -2519,7 +2519,7 @@ Checkbox test never exercised the runtime forward loop) — so the fix was not a
 ## 0.2.31 — 2026-07-02 (unpublished; on `main`, ahead of the 0.2.0 npm release)
 
 Framework fix — composed-component event handlers no longer double-fire. This removes the
-Table selection workaround (idempotent select + bool-or-Event normalisation) and is the
+Table selection workaround (idempotent select + bool-or-Event normalization) and is the
 correct foundation for every future component that passes a data-callback prop to a child.
 
 ### Compiler (`@weave-framework/compiler`)

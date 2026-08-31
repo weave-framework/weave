@@ -41,7 +41,7 @@ export function setup() {
 
 ## Multiple
 
-`multiple` lets you pick several — the panel stays open, options show a check, the field summarises as
+`multiple` lets you pick several — the panel stays open, options show a check, the field summarizes as
 `"N selected"`, and the value becomes an **array**.
 
 :::demo ex-select-multiple

@@ -69,7 +69,7 @@ If you set more than one they don't merge — the most direct wins: `src` (once 
 <Icon src={{ '/icons/brand.svg' }} />
 ```
 
-:::callout tip "Untrusted SVG is sanitised"
+:::callout tip "Untrusted SVG is sanitized"
 Both `svg` and `src` are cleaned before they hit the DOM (zero-dep, native `DOMParser`): `<script>`,
 `<foreignObject>`, every `on*` handler, and `javascript:` URLs are stripped — so a remote `<svg onload=…>` can't run.
 :::
@@ -114,7 +114,7 @@ Changing `name` (or an async source's cache filling in) re-renders the icon in p
 For a registry scoped to one subtree rather than the whole app, pass `global: false` and provide it via the
 exported `IconContext`; a context-provided registry beats the global one.
 
-## Customising
+## Customizing
 
 Size and stroke come from the icon token schema:
 
@@ -134,8 +134,8 @@ those custom properties on a container.
 | Prop | Type | Default | Description |
 | --- | --- | --- | --- |
 | `name` | `string` | — | Look up this name in the active registry. |
-| `svg` | `string` | — | A complete `<svg>…</svg>` to render directly (sanitised). |
-| `src` | `string` | — | URL of an `.svg` file to fetch and render (sanitised). |
+| `svg` | `string` | — | A complete `<svg>…</svg>` to render directly (sanitized). |
+| `src` | `string` | — | URL of an `.svg` file to fetch and render (sanitized). |
 | `label` | `string` | — | Accessible name → `role="img"` + `aria-label`. Omit for decorative (`aria-hidden`). |
 
 ### Slots

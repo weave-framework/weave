@@ -87,7 +87,7 @@ export function setup() {
 
 ## removeLabel + class
 
-`removeLabel(chip)` customises each remove button's `aria-label` (default `Remove <chip>`), and `class`
+`removeLabel(chip)` customizes each remove button's `aria-label` (default `Remove <chip>`), and `class`
 forwards extra classes onto the group element.
 
 :::demo ex-chips-remove-label

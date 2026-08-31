@@ -72,7 +72,7 @@ value emitted is the option's *value*; pass `emit="object"` to get the whole sel
 ## Multiple
 
 `multiple` lets you pick several — the panel stays open, selected options are check-marked, and the value becomes
-an **array**. The field shows the one label while a single option is picked, and summarises as `"N selected"` once
+an **array**. The field shows the one label while a single option is picked, and summarizes as `"N selected"` once
 there's more than one:
 
 :::demo select-multiple

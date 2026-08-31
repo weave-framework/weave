@@ -56,7 +56,7 @@ A bound `control` drives the array two-way and marks `touched` when a chip is re
 
 - `removable` (default `true`) — show the remove button on each chip; set `false` for read-only tags.
 - `onAdd` + `addLabel` — the trailing add chip and its text (default `'Add'`).
-- `removeLabel(chip)` — customise each remove button's `aria-label` (default `Remove <chip>`).
+- `removeLabel(chip)` — customize each remove button's `aria-label` (default `Remove <chip>`).
 - `disabled` — no focus, no removal.
 
 ## Accessibility

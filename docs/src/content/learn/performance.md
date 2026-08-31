@@ -12,7 +12,7 @@ Comparing raw milliseconds across machines is meaningless, and a framework's own
 the **slowdown factor over a hand-written vanilla-DOM baseline on the same machine**.
 That is exactly how the independent
 [js-framework-benchmark](https://krausest.github.io/js-framework-benchmark/current.html)
-normalises every framework, so Weave's ratio can be lined up against its published
+normalizes every framework, so Weave's ratio can be lined up against its published
 results.
 
 The harness lives in [`benchmarks/`](https://github.com/weave-framework/weave/tree/main/benchmarks)
@@ -26,7 +26,7 @@ node benchmarks/bench.mjs
 
 ## Results
 
-:::callout note "Run it on your own hardware"
+:::callout info "Run it on your own hardware"
 These are one representative run — headless Chromium, Windows 11, 2026-07-04. Absolute
 times depend on the machine; the **ratio** is the portable part. Sub-millisecond
 operations (like *select*) fall below the timer's resolution, so their ratio is left

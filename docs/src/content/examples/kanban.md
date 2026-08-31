@@ -76,7 +76,7 @@ onMount(() => {
 ~~~
 :::
 
-:::callout note "Reordering within a lane vs. moving between lanes"
+:::callout info "Reordering within a lane vs. moving between lanes"
 `dropList` reorders *one* container. Moving a card to a **different** lane is a separate action — here, the
 chevron buttons, which splice the ticket out of one lane's array and push it onto the next:
 

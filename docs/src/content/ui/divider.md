@@ -43,7 +43,7 @@ A divider is decorative, so a plain `<div>` (no role) is correct — it stays ou
 separator is *semantically* meaningful in your layout (say, between groups in a menu), put the class on an element
 with `role="separator"` instead so assistive tech announces the break.
 
-## Customising
+## Customizing
 
 Every value comes from the divider's token schema — `line` (the rule's colour), `thickness`, and `height` (the
 vertical rule's length) — so you can retint or resize it without touching markup:

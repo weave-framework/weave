@@ -70,7 +70,7 @@ element so assistive tech announces it.
 ~~~
 :::
 
-## Customising
+## Customizing
 
 Every value comes from the divider's token schema — `--weave-divider-thickness`, `--weave-divider-line`, and
 `--weave-divider-height` (vertical length). Retint or resize a single rule inline, or reskin every divider

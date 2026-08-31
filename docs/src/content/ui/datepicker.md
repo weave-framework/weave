@@ -80,7 +80,7 @@ a deliberate component default, independent of the locale — so override it per
 
 ## Translating the chrome (`labels`)
 
-Month, weekday and year *text* is localised by `locale` (Intl). The **chrome strings** — the nav buttons' accessible
+Month, weekday and year *text* is localized by `locale` (Intl). The **chrome strings** — the nav buttons' accessible
 names, the year-switch header, the dialog name, and the clear / open-calendar buttons — are English by default and
 overridden via `labels` (a partial object; unset keys keep their default). Because props are reactive, the values can
 be `t('…')` from [@weave-framework/i18n](/reference/i18n) and re-render on a locale change:

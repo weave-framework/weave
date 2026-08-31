@@ -97,7 +97,7 @@ Template tokens: `9` digit · `a` letter · `*` either · `\` escapes the next c
 - Digits fill from the **right**: `1`,`0`,`5`,`0` → `0,01` → `0,10` → `1,05` → `10,50`. Integer part unbounded unless `maxIntegerDigits` is set (a digit past it is refused, not dropped).
 - The model is a **canonical decimal string** (`'10.50'`) — always `.`, never grouped, never the prefix. Note this differs from positional mode, where the model is the typed characters.
 - Empty → `''`, not `'0.00'` ("no price" ≠ "free"); a typed `0` → `'0.00'`.
-- Separators come from **props, never the locale** — the format belongs to the organisation, not the viewer.
+- Separators come from **props, never the locale** — the format belongs to the organization, not the viewer.
 - `template` and `numeric` are mutually exclusive; passing both throws. `matchesMask` is positional-only — bound an amount with ordinary validators.
 
 ### Component composition mechanics

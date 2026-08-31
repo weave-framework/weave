@@ -32,7 +32,7 @@ Columns auto-fill to the container width (`repeat(auto-fill, minmax(96px, 1fr))`
 Add `weave-grid-list__tile--accent` to fill a single tile with the accent colour. The tile's *content* is yours —
 an image, a label, a link or button if it should be clickable.
 
-## Customising
+## Customizing
 
 Everything comes from the grid-list token schema, so you can resize the cells or retint them globally:
 

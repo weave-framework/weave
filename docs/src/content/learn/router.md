@@ -15,7 +15,7 @@ export default defineConfig({
 });
 ~~~
 
-A page file can be any of `.weave`, `.ts`, `.tsx`, `.js`, or `.jsx` — the file matcher recognises those five extensions (it does **not** match `.html`; an `.html` template is a *sibling* of its `.ts`/`.weave` page, not a route file on its own). The filename (minus extension) becomes a route segment:
+A page file can be any of `.weave`, `.ts`, `.tsx`, `.js`, or `.jsx` — the file matcher recognizes those five extensions (it does **not** match `.html`; an `.html` template is a *sibling* of its `.ts`/`.weave` page, not a route file on its own). The filename (minus extension) becomes a route segment:
 
 | File | Route | Notes |
 |------|-------|-------|
@@ -60,7 +60,7 @@ The CLI scans the directory; the actual transform is two pure, zero-dep function
 
 **`fileToRoutes(files: string[]): FileRoute[]`** maps a flat list of file specifiers (relative, slash-separated, e.g. `task/[id].ts`) to a nested manifest. A `FileRoute` is `{ path: string; file?: string; children?: FileRoute[] }` — `file` is the page's source specifier (the emitter turns it into a component import). The folder/specificity rules above are applied here.
 
-**`emitRoutesModule(routes: FileRoute[], opts?): string`** serialises a manifest into an importable ES module that exports `const routes`. Options:
+**`emitRoutesModule(routes: FileRoute[], opts?): string`** serializes a manifest into an importable ES module that exports `const routes`. Options:
 
 | Option | Default | Effect |
 |--------|---------|--------|
@@ -489,7 +489,7 @@ const router = createRouter(routes, { basename: '/app' });
 setBasename('/app');
 ~~~
 
-`setBasename(base)` normalises the base (a trailing slash is stripped; `''` and `'/'` both mean "no base") and resyncs the path signal from the current location. Use the standalone form when you set the base outside of `createRouter`; otherwise the option is the convenient path.
+`setBasename(base)` normalizes the base (a trailing slash is stripped; `''` and `'/'` both mean "no base") and resyncs the path signal from the current location. Use the standalone form when you set the base outside of `createRouter`; otherwise the option is the convenient path.
 
 ## Types reference
 

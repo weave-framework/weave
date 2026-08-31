@@ -923,7 +923,7 @@ code changes.
 
 - **Shared headless calendar engine.** The three drill-down calendar views (day/year/month grids, ‹/› nav,
   view-switch header, roving focus, full keyboard) were pulled out of `<Datepicker>` into a reusable
-  `createCalendarView` core + a prefix-parameterised `calendar()` SCSS mixin, so `<Datepicker>` and
+  `createCalendarView` core + a prefix-parameterized `calendar()` SCSS mixin, so `<Datepicker>` and
   `<DateRangePicker>` share **one** engine and one visual with zero duplication. `<Datepicker>` is behaviourally
   unchanged (its full test suite stays green).
 
@@ -1136,7 +1136,7 @@ single **minor** — new public API across `ui`, `runtime` and `i18n`).
 - **Object spread/rest is scope-rewritten.** `{ ...opts, … }` inside a template expression left
   `opts` as a bare global (the `...` was mistaken for a member `.`), so
   `use:menu={{ { ...menuOpts, itemTemplate: row } }}` silently lost its options. Both the rewriter
-  and auto-scope inference now recognise a spread argument as a data reference.
+  and auto-scope inference now recognize a spread argument as a data reference.
 - **Self-closing SVG tags stay siblings (FW-8).** A self-closing foreign-content element
   (`<path/>`, `<circle/>`) is serialized with an explicit close tag, so following siblings no
   longer nest inside it.
@@ -1419,7 +1419,7 @@ nothing you already wrote changes.
 land in a major version, deprecated-first, per [VERSIONING.md](VERSIONING.md). Everything you build on the
 documented surface won't change out from under you.
 
-This release is the freeze itself; the features it stabilises shipped across the `0.2.x` line (see `0.2.162`
+This release is the freeze itself; the features it stabilizes shipped across the `0.2.x` line (see `0.2.162`
 below and [CHANGELOG.md](CHANGELOG.md) for the full history): the signal-native runtime with no Virtual DOM,
 the compiler + template syntax, Router v2, Forms v2 (incl. schema-driven forms), i18n, the data layer,
 DevTools, the full `@weave-framework/ui` component library, and the `mcp` + `nx` toolchain packages.
