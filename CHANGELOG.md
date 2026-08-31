@@ -39,6 +39,12 @@ scheme out, but browsers strip tabs and control characters from a URL *before* r
 attribute after the scrub has finished. URLs are now checked against an allow-list of schemes
 (http/https/mailto/tel, or no scheme at all), and an animation that targets a URL attribute is removed.
 
+**`weave migrate` silently removed a sanitizer.** Angular's `[innerHTML]` runs through `DomSanitizer`;
+Weave's `.innerHTML` assigns raw. The binding converted cleanly and the SAFETY did not, so an app that
+relied on Angular to scrub that value lost the scrubbing without a word. The conversion now carries a
+`TODO` saying exactly that. This is the failure mode a migration tool has and a compiler does not: the
+output looks right.
+
 Each is held by a gate that was proven able to fail first: `verify:deserialize-proto`,
 `verify:install-spec`, `verify:dev-traversal`, and two browser tests for the sanitizer.
 

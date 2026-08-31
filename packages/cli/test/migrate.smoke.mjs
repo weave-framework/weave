@@ -555,7 +555,14 @@ const tr = conv('<span>{{ crumb.text | translate }}</span>');
 ok(tr.includes('{{ t(crumb.text) }}'), 'convertTemplate: a pipe inside text interpolation is converted');
 const dt = conv('<span>{{ d | date }}</span>');
 ok(dt.includes('TODO(weave migrate)'), 'convertTemplate: an unmapped pipe in text is flagged (never left looking converted)');
-ok(conv('<span [innerHTML]="c.text | translate"></span>').includes('.innerHTML={{ t(c.text) }}'), 'convertTemplate: a pipe inside a binding is converted too');
+const ih = conv('<span [innerHTML]="c.text | translate"></span>');
+ok(ih.includes('.innerHTML={{ t(c.text) }}'), 'convertTemplate: a pipe inside a binding is converted too');
+// Angular sanitizes `[innerHTML]`; Weave's `.innerHTML` assigns raw. The markup converts cleanly and the
+// SAFETY does not, so converting it in silence would quietly remove a sanitizer the app relied on.
+ok(
+  /TODO\(weave migrate\)/.test(ih) && /innerHTML/.test(ih) && /sanitiz/i.test(ih),
+  `convertTemplate: [innerHTML] carries a TODO saying Angular sanitized it and Weave does not (got ${JSON.stringify(ih.slice(0, 200))})`
+);
 
 // routerLink is a DIRECTIVE — `.routerLink` would be a silently broken invention
 const rl = conv('<a [routerLink]="c.path">x</a>');

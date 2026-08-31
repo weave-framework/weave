@@ -341,7 +341,19 @@ export function convertAttr(attr: Attr, tag: string): { out: string | null; todo
     if (target === 'ngClass') return { out: null, todo: `[ngClass]="${v}" — Weave toggles one class at a time: \`class:name={{ expr }}\`` };
     if (target === 'ngStyle') return { out: null, todo: `[ngStyle]="${v}" — Weave sets one property at a time: \`style:prop={{ expr }}\`` };
     if (target === 'ngSwitch') return { out: null, todos: exprTodos }; // handled structurally by the caller
-    if (target === 'innerHTML') return { out: `.innerHTML={{ ${v} }}`, todos: exprTodos };
+    // Angular's `[innerHTML]` runs through DomSanitizer and strips scripts and handlers; Weave's
+    // `.innerHTML` assigns raw. The markup is equivalent and the SAFETY is not — converting silently
+    // would remove a sanitizer the source app was relying on, which is precisely the kind of change a
+    // human has to see.
+    if (target === 'innerHTML') {
+      return {
+        out: `.innerHTML={{ ${v} }}`,
+        todo:
+          '[innerHTML] → `.innerHTML` assigns RAW html. Angular sanitized this binding for you; Weave does not. ' +
+          'Sanitize the value yourself, or render text instead — if any of it can come from a user, this is an XSS.',
+        todos: exprTodos,
+      };
+    }
     // routerLink is a DIRECTIVE, not a property — `.routerLink` would be a silently broken invention.
     if (target === 'routerLink') {
       return { out: `href={{ ${v} }}`, todo: 'routerLink → use `<Link href={{ … }}>` from @weave-framework/router for client-side navigation', todos: exprTodos };
