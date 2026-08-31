@@ -122,6 +122,12 @@ jobs:
         run: pnpm verify:ssg
       - name: Resume round-trip (real app, real browser)
         run: pnpm verify:resume
+      # Omitting `setup`'s return is documented as a convenience with no other consequence. It had one:
+      # the resumable analysis read the raw script, so a component relying on it looked like it returned
+      # nothing and an imported `use:` action could not be shown to survive - the whole subtree was
+      # client-rendered, silently, for writing less. 18 of 29 refusals across 574 real components.
+      - name: Auto-expose and an explicit return resume alike
+        run: pnpm verify:resume-expose
       # One RETAINED real app, built by the real CLI and driven in a real browser: router with
       # code-split lazy chunks, stores, optimistic create, forms, an overlay modal, `@defer`, the
       # error boundary, keyed 1,000-row reconcile, scroll restoration. Every per-fix test guards its

@@ -156,7 +156,18 @@ function resumableSetup(script: string, scope: string[], ts?: TsLike): Resumable
   // but the template never references (mutated only by a handler, shown only via a computed) — it's serialized
   // regardless, so it resolves. Without it, such a handler is wrongly refused and any warning blames a name
   // that is actually fine. A function (handler/computed) doesn't survive, so it's not added here.
-  const returned: Set<string> | null = extractReturnedNames(script);
+  // Read the return the AUTHOR would have written if they had not been told they need not.
+  //
+  // `injectAutoReturn` writes `setup`'s return from the names the template uses, and it runs later, on
+  // the way to emit. Reading the raw script here meant a component that relies on that convenience
+  // looked like it returned NOTHING — so an imported `use:` action could not be shown to survive to the
+  // client, and the whole subtree was refused and client-rendered. Silently, and only for writing less:
+  // the identical component with the return spelled out adopted fine. Measured across 574 real
+  // components, `use:` actions were 18 of 29 refusals, and every one of them used auto-expose.
+  //
+  // With an explicit return this is a no-op — `injectAutoReturn` leaves a script that already has one
+  // untouched — so the form that worked is unchanged.
+  const returned: Set<string> | null = extractReturnedNames(injectAutoReturn(script, scope).code);
   const ctxNames: Set<string> = new Set(scope);
   if (returned) for (const n of returned) if (!found.handlers.has(n) && !found.computeds.has(n)) ctxNames.add(n);
   const sc: Scope = ctxScope(ctxNames);

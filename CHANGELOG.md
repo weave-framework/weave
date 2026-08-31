@@ -16,6 +16,18 @@
 
 ## 3.3.0
 
+### Omitting `setup`'s return no longer costs you resumability
+
+A component may leave out `setup`'s `return` — the compiler writes it, from the names the template
+uses. That is documented as a convenience with no other consequence, and it had one: the resumable
+analysis read the raw script, so a component relying on it looked like it returned nothing. An imported
+`use:` action could then not be shown to survive to the client, and the whole subtree was refused and
+client-rendered instead — silently, for writing less. The identical component with the return spelled
+out adopted fine.
+
+Measured across 574 components in four real applications: `use:` actions were **18 of 29** resumable
+refusals, and the fix clears 9 of them. One application went from 10 refusals to 1.
+
 ### `@weave-framework/ui/testing` — driving components in a test
 
 The parts a consumer cannot reasonably write: `mount` (either the built default export or a
