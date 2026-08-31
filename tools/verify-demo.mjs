@@ -12,7 +12,7 @@
  */
 import { chromium } from 'playwright';
 import { createServer } from 'node:http';
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 import { extname, join, resolve, sep } from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -61,15 +61,39 @@ const MIME = {
 // kind of shape that gets copied.
 const served = resolve(dist);
 
+/**
+ * Every file the build wrote, by the URL path that names it. Listed ONCE, before the server starts.
+ *
+ * A request is looked up in here rather than joined onto a directory, so nothing from the request ever
+ * reaches `readFile` — which is both the honest fix and the only one an analyser can see. A containment
+ * check on a resolved path did not satisfy `js/path-injection`, and arguing with the query would have
+ * been the wrong instinct: an allow-list is stronger than a sanitiser, because it cannot be reasoned
+ * around.
+ */
+const files = new Map();
+const listInto = async (abs, prefix) => {
+  for (const entry of await readdir(abs, { withFileTypes: true })) {
+    const child = join(abs, entry.name);
+    if (entry.isDirectory()) await listInto(child, `${prefix}/${entry.name}`);
+    else files.set(`${prefix}/${entry.name}`, child);
+  }
+};
+await listInto(served, '');
+
 const server = createServer(async (req, res) => {
   const p = decodeURIComponent(req.url.split('?')[0]);
-  const file = resolve(served, '.' + (p === '/' ? '/index.html' : p));
-  if (file !== served && !file.startsWith(served + sep)) {
+  const wanted = p === '/' ? '/index.html' : p;
+  // Still answered separately from "absent", so a climb out of the directory is distinguishable in the
+  // test from a path that simply is not there — a 404 for both would make that check meaningless.
+  const climbs = resolve(served, '.' + wanted);
+  if (climbs !== served && !climbs.startsWith(served + sep)) {
     res.writeHead(403);
     res.end('outside the served directory');
     return;
   }
+  const file = files.get(wanted);
   try {
+    if (!file) throw new Error('not in the build');
     const data = await readFile(file);
     res.writeHead(200, { 'content-type': MIME[extname(file)] || 'application/octet-stream' });
     res.end(data);
@@ -77,7 +101,7 @@ const server = createServer(async (req, res) => {
     // SPA fallback: a path with no file extension is a client route → serve the shell.
     if (!extname(p)) {
       res.writeHead(200, { 'content-type': 'text/html' });
-      res.end(await readFile(join(dist, 'index.html')));
+      res.end(await readFile(files.get('/index.html')));
     } else {
       res.writeHead(404);
       res.end('not found');

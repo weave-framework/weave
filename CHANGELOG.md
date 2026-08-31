@@ -173,6 +173,10 @@ claims fail at 71s, 10.3s and 23.8s. Reported by GitHub code scanning as `js/pol
   The first version of the test proved nothing: two levels up from `examples/demo/dist` is `examples/`,
   where no `package.json` exists, so the 404 that came back looked like a refusal. Three levels names a
   file that exists, and without the containment that request returns 200.
+  The first FIX did not hold either — a containment check on the resolved path left the alert open,
+  because the request still reached `readFile`. The server now lists the build once and looks a request
+  up in that list, so nothing from the request reaches the filesystem at all. An allow-list beats a
+  sanitiser: it cannot be reasoned around, by an analyser or by anyone else.
 
 - **`tools/link-local.mjs` — test a fix in a real app without publishing it.** It packs this checkout
   the way npm would receive it and points an app at those tarballs, with `--restore` to undo. The
