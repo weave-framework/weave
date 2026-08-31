@@ -18,7 +18,6 @@ export function setup(props: { task: Task }) {
   const editor: EditorStore = useEditor();
   const session: Session = inject(SessionContext);
   const mine = () => !!props.task.assignee && props.task.assignee === session.currentUser;
-  return { task, editor, mine };
 }
 ~~~
 ~~~html title="task-card.html"
@@ -36,7 +35,11 @@ The rules are short:
 
 - **`setup` runs once**, when the component is created. It's the constructor and the body rolled into one.
 - **It receives `props`** — the inputs from the parent.
-- **It exposes names to the template** — either by returning an object, or, if you write no `return`, Weave synthesizes one for you ([see below](#you-can-skip-the-return)). Functions, signals, computeds, plain values: all fair game.
+- **It exposes names to the template** — you write no `return`; the compiler reads the template and
+  writes one. For the component above it emits `return { editor, mine, task }`, and **not** `session`,
+  which the template never names and which therefore stays private. Functions, signals, computeds, plain
+  values: all fair game. ([You may write one yourself](#you-can-skip-the-return) when you want to rename
+  or reshape.)
 - **The template reads those names.** Call signals/getters with `()` to read (and subscribe).
 
 Because `setup` runs once, you don't memoize anything or guard against re-renders — there are none. State you create lives for the life of the component, and reactivity updates the DOM in place.
@@ -293,6 +296,74 @@ accepts props (`x={{ v }}`), events (`on:x={{ fn }}`), `bind:` for two-way, and 
 (forwarded to its root element). Put `class:` on a real element inside the component, or
 pass the value down as a prop.
 ~~~
+
+## When it goes wrong
+
+Everything above is the shape a component takes when it works. Here is what you actually see when it
+does not — the messages, verbatim, because recognising one is most of fixing it.
+
+### While you are writing the template
+
+The parser stops at the first thing it cannot make sense of, and says where. Every message below is the
+real output, produced by feeding the compiler the mistake:
+
+| You wrote | It says |
+| --- | --- |
+| `<p>` opened and never closed | `Mismatched </div>, expected </p>` |
+| a closing tag with nothing open | `Unexpected closing tag at 11` |
+| `@else` with no `@if` above it | `Unexpected @else at 5 (no matching block)` |
+| `@let = 1;` | `Expected name after @let at 10` |
+| something other than `@case` inside `@switch` | `Expected @case/@default or '}' in @switch at 21` |
+| `<!--` with no `-->` | ``Unterminated comment: `<!--` has no matching `-->`.`` |
+
+:::callout trap "One mistake, reported somewhere else"
+An unclosed tag is the one that reads strangely, because the parser cannot know you meant to close `<p>`
+until it meets a `</div>` that does not fit. The error names the line it **noticed** on, not the line
+you have to edit — that one is above it.
+
+If you ever see `Template nests more than 500 levels deep`, this is the same mistake wearing a bigger
+hat: nothing was closed for a long time, so everything after it became a child of everything before it.
+:::
+
+### While the component is being assembled
+
+These come from the loader — they are about the files, not the markup:
+
+| Situation | It says |
+| --- | --- |
+| a `template` export **and** a sibling `.html` | ``weave: card.ts declares `template` and also has a sibling .html — remove one`` |
+| `template` pointing at a file that is not there | `weave: template file not found: ./missing.html (from card.ts)` |
+| the same for styles | `weave: style file not found: …` |
+| a `<Missing>` tag with no import and no file at any conventional path | ``weave: card.ts composes <Missing> but no import for it was found. Import it in the component's script, or place its module at ../missing/missing.`` |
+| two components claiming one custom-element tag | `weave: custom element tag declared twice` |
+| a custom-element tag with no hyphen | `weave: custom element tag must contain a hyphen (Custom Elements spec)` |
+
+Each of these is a **build error**, not a warning. That is the deliberate part: an ambiguous declaration
+is refused rather than guessed at, so a component never quietly gets a template you did not mean.
+
+### While it runs
+
+Two you can meet at runtime, both from putting a thing where it cannot go:
+
+- **`use: on <Card>: actions attach to a single root element, but <Card> renders 3 nodes.`** A `use:`
+  action needs one element to own. A component that renders a fragment has no single root, so there is
+  nothing to attach to. Wrap it, or move the action onto a real element inside.
+- **`<w:element> refuses to create a <script> element (it would execute).`** A dynamic tag name is data,
+  and data that can name `<script>` is a way to run code. Refused, always.
+
+### The ones the type checker catches first
+
+Most component mistakes never reach any of the above, because `weave check` sees them:
+
+| You wrote | It says |
+| --- | --- |
+| `{{ count }}` where `count` is a signal | ``Signal<number> is a function, and a template renders a function as its own source text. Call it — a signal is read with `()`, as in {{ count() }}.`` |
+| `class:big` on a component tag | ``\`class:big\` is a DOM directive, and <Card> is a component, not an element.`` |
+| a prop the child requires and you did not pass | `Property 'onAdd' is missing in type '{ step: number; }'` |
+| `&mdash;` in a template | ``\`&mdash;\` renders as text, not as `—`… Type the character itself.`` |
+
+Which is the argument for running `weave check` before you go looking: it turns most of this page into
+something you never read.
 
 ### Making a child available
 
