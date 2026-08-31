@@ -50,8 +50,19 @@ export function inlineText(nodes: Inline[]): string {
   return s;
 }
 
+/**
+ * Link text allows ONE level of nested brackets, so `[Read on :icon[arrow-right]](/next)` parses.
+ *
+ * It could not before: `[^\]]+` stops at the first `]`, which is the one closing `:icon[…]`, so the
+ * link fell apart into literal text. That is why every "next page" link in the docs ended in a typed
+ * `→` — an arrow drawn with a character because the only alternative would not parse.
+ *
+ * `(?:[^[\]]|\[[^\]]*\])+` is linear despite the nested quantifiers: the two branches are disjoint on
+ * their first character (one excludes `[`, the other requires it), so no input can be split between
+ * them in more than one way. This repository has paid for that distinction twice, so it is stated.
+ */
 const INLINE_RE =
-  /(:icon\[([\w-]+)\])|(\*\*([^*]+)\*\*)|(\*([^*]+)\*)|(`([^`]+)`)|(\[([^\]]+)\]\(([^)]+)\))/;
+  /(:icon\[([\w-]+)\])|(\*\*([^*]+)\*\*)|(\*([^*]+)\*)|(`([^`]+)`)|(\[((?:[^[\]]|\[[^\]]*\])+)\]\(([^)]+)\))/;
 
 /** Parse a single line of inline markdown into a token list. */
 export function parseInline(src: string): Inline[] {
