@@ -16,6 +16,21 @@
 
 ## 3.3.0
 
+### The build says what it did not check
+
+`weave check` is the gate, and `weave build` never ran it — so a build succeeded on code the checker
+refuses, and nothing in its output said so. A template calling a name `setup` does not return bundles
+cleanly and throws in the browser; the build's silence looked like a verdict.
+
+Two changes, and the default is deliberately not one of them:
+
+- A build that did not type-check now **says so**, in its summary.
+- `weave build --check` runs the checker first and writes **nothing** when it finds errors. An artifact
+  built from code known to be broken is worse than no artifact.
+
+Making the check mandatory would turn a green pipeline red on unchanged code, which `VERSIONING.md`
+grades as a break however right the new answer is. It stays opt-in until a major.
+
 ### Every entry point accepts a component with typed props
 
 `Component` is the type of a component being CALLED — props optional, because the caller may pass

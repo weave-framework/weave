@@ -19,6 +19,15 @@ Both are fixed and held by a gate that asserts the same inputs complete in milli
 GitHub code scanning as `js/polynomial-redos`. **No action needed on your side** — nothing about the
 API or the output changed.
 
+### The build tells you it did not type-check
+
+`weave check` is the gate and `weave build` never ran it, so a build could succeed on code the checker
+refuses — and say nothing. Now it says so, and `weave build --check` runs the checker first and writes
+nothing if it finds errors.
+
+The default is unchanged on purpose: making the check mandatory would turn a green pipeline red on
+code nobody touched.
+
 ### A component with typed props works everywhere a component is accepted
 
 `Component` describes a component being *called*, where props are optional. Used for a *parameter* it

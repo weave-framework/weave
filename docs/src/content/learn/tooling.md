@@ -74,6 +74,7 @@ Produces a static bundle you can deploy. Both pipelines minify by default and co
 | `[entry]` (positional) | legacy | `src/main.ts` | The hand-written entry module. Ignored in config mode. |
 | `--out <dir>` | both | `dist` (legacy) / config `outDir` | Output directory. In config mode an explicit `--out` **overrides** the config's `outDir` (this is how `@weave-framework/nx` redirects the build to the workspace-root `dist/<project>`); with no flag the config's `outDir` stands. |
 | `--no-minify` | legacy | minified | Skip minification (handy for inspecting output). In config mode, control this with `build.minify` in the config. |
+| `--check` | both | off | Type-check the project first and write **nothing** if it finds errors. Off by default: making it mandatory would turn a green pipeline red on unchanged code. Without it, the build summary says it was not type-checked. |
 | `--ssg` | config only | off | Prerender each route to real HTML at build time. Requires a config `root` (it renders the root headlessly); `entry` mode opts out. Pair with `ssg.resume` to adopt that HTML on the client — see [Static generation & resume](/learn/static-generation). |
 
 ### weave check

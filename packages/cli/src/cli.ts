@@ -88,6 +88,7 @@ options
   --port <n>             Dev server port; steps to the next free one when taken
   --serve <dir>          Dev server web root (config-less mode)
   --no-minify            Leave the build unminified
+  --check                Type-check first, and write nothing if it finds errors (build)
   --fix                  Apply the fixes check is certain of, then re-check (check)
   --impact <file>        List what renders this component, directly and transitively (check)
   --devtools             Show the reactive-graph panel in the page (dev)
@@ -117,7 +118,7 @@ function fileSize(bytes: number): string {
  * bundle reasonable?") needed a separate `ls`. Source maps are summarised in one line rather than listed:
  * they are not shipped to a browser, and they are usually the biggest files in the directory.
  */
-function summarizeBuild(outDir: string, startedAt: number): void {
+function summarizeBuild(outDir: string, startedAt: number, checked: boolean = false): void {
   console.log(`weave build → ${outDir}/ (${Date.now() - startedAt} ms)`);
   let entries: Dirent[];
   try {
@@ -140,6 +141,10 @@ function summarizeBuild(outDir: string, startedAt: number): void {
   const width: number = files.reduce((w, f) => Math.max(w, f.name.length), 0);
   for (const f of files) console.log(`  ${f.name.padEnd(width)}  ${fileSize(f.size).padStart(9)}`);
   if (maps) console.log(`  ${'(source maps)'.padEnd(width)}  ${fileSize(maps).padStart(9)}`);
+  // A build that did not type-check must not be mistaken for a verdict. `weave check` is the gate and
+  // the build does not run it, so a template naming something `setup` never returns bundles cleanly
+  // and throws in the browser — with nothing in this output to say the silence meant nothing.
+  if (!checked) console.log('  (not type-checked — run `weave check`, or build with `--check`)');
 }
 
 export { defineConfig } from './config.js';
@@ -162,6 +167,22 @@ export async function main(argv: string[]): Promise<void> {
 
   if (cmd === 'build') {
     const startedAt: number = Date.now();
+    // `--check` runs the checker BEFORE bundling and refuses to emit anything if it finds errors: an
+    // artifact built from code known to be broken is worse than no artifact. It is opt-in on purpose —
+    // making it the default would turn a green pipeline red on unchanged code, which VERSIONING.md
+    // grades as a break regardless of how right the new answer is.
+    const wantsCheck: boolean = rest.includes('--check');
+    if (wantsCheck) {
+      const roots: string[] = [config?.root ?? 'src'];
+      const diags: Diagnostic[] = checkProject(roots);
+      for (const d of diags) console.error(formatDiagnostic(d));
+      const errors: number = diags.filter((d) => d.category === 'error').length;
+      if (errors) {
+        console.error(`
+weave build --check: ${errors} error${errors === 1 ? '' : 's'} — nothing was written.`);
+        process.exit(1);
+      }
+    }
     try {
       if (config) {
         requireAppEntry(config, 'build');
@@ -229,12 +250,12 @@ export async function main(argv: string[]): Promise<void> {
           index: config.index,
           clean: true, // a fresh, self-contained artifact each prod build
         });
-        summarizeBuild(outDir, startedAt);
+        summarizeBuild(outDir, startedAt, wantsCheck);
         return;
       }
       // `weave build` is the production bundle → minify by default; `--no-minify` opts out.
       await build({ entry, outDir: outdir, minify: !rest.includes('--no-minify') });
-      summarizeBuild(outdir, startedAt);
+      summarizeBuild(outdir, startedAt, wantsCheck);
       return;
     } catch (e) {
       // esbuild already prints each error framed at `file:line:col` (including template parse errors

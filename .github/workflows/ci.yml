@@ -171,6 +171,11 @@ jobs:
       # with local declaration`. On a line the author cannot edit, and the build had no such error.
       - name: A locally declared child name is left alone
         run: pnpm verify:local-binding
+      # `weave check` is the gate and the build did not run it, so a build succeeded on code the
+      # checker refuses and said nothing about it. The default is unchanged - it now SAYS it did not
+      # type-check - and `--check` refuses to emit an artifact from code known to be broken.
+      - name: The build says what it checked
+        run: pnpm verify:build-check
       - name: weave check
         run: pnpm verify:check
       - name: Prettier plugin
