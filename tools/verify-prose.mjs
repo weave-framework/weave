@@ -125,6 +125,51 @@ if (badKinds.length) {
   process.exit(1);
 }
 
+/* ── Pass 3: every icon the docs name must be one the registry can actually resolve. ──
+   `<Icon name="more-vertical">` sat on the Toolbar pages. Lucide renamed that glyph to
+   `ellipsis-vertical`, so the registry returned nothing and the component rendered an empty <svg>: a
+   button labelled "More" with no picture in it, on a page whose subject is that toolbar. Same failure
+   shape as the token and callout ones — a name that does not resolve produces absence, and absence is
+   the one thing a reader cannot notice is missing. The docs register no extra icon sources, so the
+   built-in set is the whole ground truth here. */
+const ICON_SET = 'packages/ui/src/icon/lucide-icons.ts';
+const iconNames = new Set([...readFileSync(ICON_SET, 'utf8').matchAll(/^ {2}'([a-z0-9-]+)':/gm)].map((m) => m[1]));
+if (iconNames.size < 20) {
+  console.error(`\n✖ could not read the icon set from ${ICON_SET} — this pass would pass vacuously.\n`);
+  process.exit(1);
+}
+const docSrc = [];
+const walkSrc = (dir) => {
+  for (const e of readdirSync(dir, { withFileTypes: true })) {
+    const f = join(dir, e.name);
+    if (e.isDirectory()) walkSrc(f);
+    else if (/\.(md|html)$/.test(e.name)) docSrc.push(f);
+  }
+};
+walkSrc('docs/src');
+const badIcons = [];
+for (const f of docSrc) {
+  readFileSync(f, 'utf8')
+    .split(/\r?\n/)
+    .forEach((line, i) => {
+      const names = [
+        ...[...line.matchAll(/:icon\[([a-z0-9-]+)\]/g)].map((m) => m[1]),
+        ...[...line.matchAll(/<Icon[^>]*\bname=\{\{\s*'([a-z0-9-]+)'/g)].map((m) => m[1]),
+      ];
+      for (const n of names) {
+        if (!iconNames.has(n)) badIcons.push({ file: f.split(sep).join('/'), line: i + 1, name: n });
+      }
+    });
+}
+if (badIcons.length) {
+  console.error(`\n✖ icons the docs name that the built-in set does not have (${badIcons.length}) — each renders as nothing:\n`);
+  for (const b of badIcons) console.error(`  ${b.file}:${b.line}  "${b.name}"`);
+  console.error('');
+  process.exit(1);
+}
+
+console.log(`  ${iconNames.size} built-in icons, ${docSrc.length} docs source files scanned for icon names`);
+
 if (hits.length) {
   console.error(`\n✖ the public prose mixes spellings (${hits.length}); this corpus uses the American form:\n`);
   for (const h of hits) console.error(`  ${h.file}:${h.line}  ${h.found} → ${h.want}`);

@@ -79,7 +79,7 @@ bar holds while the content moves under it.
     <div class="weave-toolbar__start"><strong>Sticky header</strong></div>
     <span class="weave-toolbar__spacer"></span>
     <div class="weave-toolbar__end">
-      <Button variant={{ 'icon' }} label={{ 'More' }}><Icon name={{ 'more-vertical' }} /></Button>
+      <Button variant={{ 'icon' }} label={{ 'More' }}><Icon name={{ 'ellipsis-vertical' }} /></Button>
     </div>
   </Toolbar>
   <!-- … scrolling content … -->
