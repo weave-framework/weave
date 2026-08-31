@@ -170,6 +170,33 @@ Because `touched` is a writable signal, you can drive a non-standard control you
 
 ## The validation timing model
 
+Three rules, all about **when** — which is exactly what a table cannot show. So here is a real form with
+every one of its signals printed beside it. Type in it, blur it, submit it empty:
+
+:::demo forms-live
+
+:::callout see "What you should see"
+**Type one letter into Username.** `dirty` flips to true immediately, `valid` is already false — and
+**no error is displayed**, because `touched` is still false. The check ran; the message is simply not
+shown yet.
+
+**Click away.** `touched` flips, and the message you were already failing appears. Nothing re-ran; the
+error was there all along.
+
+**Type `ada`.** The sync validators pass, so `valid` goes true and the async check is allowed to start.
+`validating` turns true **immediately** — it covers the quiet debounce window too, not just the request —
+and about a second later the answer arrives: `valid` back to false, with *"ada" is taken*.
+
+Watch that pair rather than the spinner. A field can be `valid` and `validating` at the same time, which
+is precisely the state "the sync rules pass and we are still asking", and it is why a Submit button
+disabled on `!valid()` alone will happily submit mid-check.
+
+**Press Submit with the form empty.** `touchAll()` runs, every message appears at once, and nothing is
+sent. That is the one line most forms need on submit.
+:::
+
+
+
 This is the part that trips people up, so here it is as one clear model. Three things happen at three different moments:
 
 1. **Sync validators run on *every* value change.** The moment `field.value` changes, the sync layer recomputes. `valid()` is always up to date.
@@ -392,3 +419,37 @@ Everything is a `Control` (value/valid/validating/touched/reset/touchAll), so `f
 :::
 
 [Next: Internationalization :icon[arrow-right]](/learn/i18n) · [Reference: @weave-framework/forms :icon[arrow-right]](/reference/forms)
+
+## When it goes wrong
+
+Forms are unusual here: almost nothing throws. The mistakes are quiet ones, and each has a tell.
+
+:::callout trap "The error is right, and nobody sees it"
+`error()` is set from the first keystroke; `touched` decides whether you **show** it. Render the message
+without checking `touched` and a fresh, untouched form shouts "Required" at somebody who has not typed
+anything yet.
+
+The reverse is the more common bug: checking `touched` and then never calling `touchAll()` on submit, so
+pressing Submit on an empty form does nothing visible at all. If Submit "does not work", that is almost
+always why — the form is correctly invalid and silently so.
+:::
+
+**`validating` never turns true.** The async check runs **only when the sync validators pass**. If a
+required field is empty, there is nothing to ask the server about, and the debounce timer never starts.
+Fill the field before concluding that the async validator is broken.
+
+**A field that will not accept a new value.** `field('')` gives you `Field<string>`. If you see a type
+error assigning to it, check that the validators went in as the **second positional argument** —
+`field('', [validators.required()])`. That is the shape the declaration takes, and the type is narrower
+than you expect if it is passed some other way.
+
+:::callout trap "An unknown field type, in a schema form"
+~~~
+[weave/forms] unknown field type "…". Register it with fieldType({ name: "…", … }) or pass it via
+schemaForm(schema, { types })
+~~~
+
+Schema-driven forms only know the field types they have been told about. A typo in a schema's `type`
+reads as a type nobody registered — which is the same message, so check the spelling before writing a
+custom type.
+:::

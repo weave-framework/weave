@@ -1,0 +1,93 @@
+.fl {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.fl-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.fl-field > span {
+  min-width: 78px;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.fl input {
+  font: inherit;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--bg);
+  color: var(--fg);
+  min-width: 190px;
+}
+
+.fl input[aria-invalid='true'] {
+  border-color: var(--red);
+}
+
+.fl-err {
+  color: var(--red);
+  font-size: 0.84rem;
+  font-style: normal;
+}
+
+.fl-busy {
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-style: normal;
+}
+
+.fl-state {
+  border-collapse: collapse;
+  font-size: 0.84rem;
+  font-family: var(--mono);
+}
+
+.fl-state th,
+.fl-state td {
+  text-align: left;
+  padding: 4px 12px 4px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.fl-state th {
+  color: var(--muted);
+  font-family: var(--sans);
+  font-weight: 600;
+}
+
+.fl-total td {
+  color: var(--accent);
+}
+
+.fl-cell-err {
+  color: var(--muted);
+}
+
+.fl-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.fl-actions button {
+  font: inherit;
+  font-size: 0.88rem;
+  padding: 6px 14px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--fg);
+  cursor: pointer;
+}
+
+.fl-actions button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}

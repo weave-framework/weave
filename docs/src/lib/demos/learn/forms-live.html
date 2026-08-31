@@ -1,0 +1,44 @@
+<form class="fl" on:submit={{ onSubmit }}>
+  <label class="fl-field">
+    <span>Username</span>
+    <input use:control={{ username }} placeholder="try 'ada'" />
+    @if (username.touched() && username.error()) { <em class="fl-err">{{ username.error() }}</em> }
+    @if (username.validating()) { <em class="fl-busy">checking…</em> }
+  </label>
+
+  <label class="fl-field">
+    <span>Email</span>
+    <input use:control={{ email }} placeholder="you@example.com" />
+    @if (email.touched() && email.error()) { <em class="fl-err">{{ email.error() }}</em> }
+  </label>
+
+  <table class="fl-state">
+    <thead><tr><th>field</th><th>valid</th><th>touched</th><th>dirty</th><th>validating</th><th>error</th></tr></thead>
+    <tbody>
+      @for (r of rows(); track r.name) {
+        <tr>
+          <td>{{ r.name }}</td>
+          <td>{{ show(r.f.valid()) }}</td>
+          <td>{{ show(r.f.touched()) }}</td>
+          <td>{{ show(r.f.dirty()) }}</td>
+          <td>{{ show(r.f.validating()) }}</td>
+          <td class="fl-cell-err">{{ r.f.error() ?? '—' }}</td>
+        </tr>
+      }
+      <tr class="fl-total">
+        <td>the form</td>
+        <td>{{ show(signup.valid()) }}</td>
+        <td>{{ show(signup.touched()) }}</td>
+        <td>{{ show(signup.dirty()) }}</td>
+        <td>{{ show(signup.validating()) }}</td>
+        <td>—</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="fl-actions">
+    <button type="submit">Submit</button>
+    <button type="button" on:click={{ reset }}>Reset</button>
+    <span class="demo-note">{{ submitted() }}</span>
+  </div>
+</form>
