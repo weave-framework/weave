@@ -38,6 +38,12 @@ const rel = (f) => f.split(sep).join('/');
 const docs = docFiles.map((f) => ({ file: rel(f), text: readFileSync(f, 'utf8') }));
 const corpusWords = new Set();
 for (const d of docs) for (const t of d.text.split(/[^A-Za-z0-9_$]+/)) corpusWords.add(t);
+// The generated reference is documentation a reader reads, so it counts. Leaving it out reported the CDK
+// as 27% covered on the same day its 102 exports were published to /reference/ui-cdk with signatures.
+// Prose pages and the reference answer different questions, but "does any page name this" is one bar.
+for (const gen of ['docs/src/content/api.gen.ts']) {
+  if (existsSync(gen)) for (const t of readFileSync(gen, 'utf8').split(/[^A-Za-z0-9_$]+/)) corpusWords.add(t);
+}
 
 /* ─── every export of every package, read from its source index ─── */
 
@@ -67,6 +73,12 @@ function namesFrom(entry) {
       }
     }
     for (const m of src.matchAll(/export\s+(?:declare\s+)?(?:async\s+)?(?:function|const|class|interface|type|enum)\s+([A-Za-z_$][\w$]*)/g)) {
+      // `@internal` is not a documentation gap, it is a declaration that this is not for readers — the
+      // API generator already honours it. Without this the audit demanded pages for `ifBlock`,
+      // `adoptText` and `AdoptCursor`, which only the compiler's own output ever calls.
+      const before = src.slice(Math.max(0, m.index - 400), m.index);
+      const doc = before.lastIndexOf('/**');
+      if (doc !== -1 && before.slice(doc).includes('@internal') && !before.slice(doc).includes('*/\n\n')) continue;
       names.set(m[1], f);
     }
     for (const m of src.matchAll(/export\s*\*\s*from\s*'([^']+)'/g)) {
@@ -181,7 +193,11 @@ if (want('coverage')) {
   console.log('\n=== 2. Public API an app author can use, and whether any page names it ===\n');
   let missTotal = 0;
   for (const p of APP_FACING) {
+    // The package root AND every sub-path it publishes. Root-only was a real blind spot: it reported
+    // `@weave-framework/ui` as 5 exports, because its 52 CDK primitives live behind `./cdk`, and the CDK
+    // is 87% undocumented. The audit was under-reporting the largest gap in the documentation.
     const names = [...api.get(p).keys()];
+    for (const [, sub] of subpathExports(p)) for (const n of sub.keys()) if (n !== 'default' && !names.includes(n)) names.push(n);
     const missing = names.filter((n) => !corpusWords.has(n));
     missTotal += missing.length;
     const pct = names.length ? Math.round(((names.length - missing.length) / names.length) * 100) : 100;

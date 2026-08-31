@@ -102,6 +102,7 @@ const reference: NavSection = {
         { label: '@weave-framework/forms/dom', path: '/reference/forms-dom' },
         { label: '@weave-framework/i18n', path: '/reference/i18n' },
         { label: '@weave-framework/data', path: '/reference/data' },
+        { label: '@weave-framework/ui/cdk', path: '/reference/ui-cdk' },
       ],
     },
     {

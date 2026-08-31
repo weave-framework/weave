@@ -31,6 +31,10 @@ const PKGS = [
   { key: 'forms-dom', title: '@weave-framework/forms/dom', entry: 'packages/forms/src/dom.ts' },
   { key: 'i18n', title: '@weave-framework/i18n', entry: 'packages/i18n/src/index.ts' },
   { key: 'data', title: '@weave-framework/data', entry: 'packages/data/src/index.ts' },
+  // The CDK. It was never in this list, so 45 of its 52 callable exports had no reference entry and no
+  // page named them — focus trapping, portals, overlays, virtual scroll, input masking, drag, breakpoints,
+  // the live announcer. A whole subsystem, published under `exports['./cdk']`, invisible in the docs.
+  { key: 'ui-cdk', title: '@weave-framework/ui/cdk', entry: 'packages/ui/src/cdk/index.ts' },
 ];
 
 const compilerOptions = {
