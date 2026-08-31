@@ -207,6 +207,28 @@ function lintAttr(attr: Attr, out: LintFinding[]): void {
 }
 
 /** An unrecognised `@word (…) {` left in the text — a misspelled block, which renders as literal text. */
+/**
+ * The named entities worth naming, mapped to the character an author meant. Kept short on purpose: the
+ * rule only fires when it can say "type this instead", and a list of every HTML entity would be a list
+ * of things nobody writes into a Weave template by accident.
+ */
+const ENTITIES: Readonly<Record<string, string>> = {
+  mdash: '—', ndash: '–', hellip: '…', times: '×', divide: '÷',
+  ldquo: '“', rdquo: '”', lsquo: '‘', rsquo: '’', laquo: '«', raquo: '»',
+  nbsp: ' ', amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", copy: '©', reg: '®',
+  trade: '™', deg: '°', plusmn: '±', bull: '•', dagger: '†', para: '¶',
+  larr: '←', rarr: '→', uarr: '↑', darr: '↓', harr: '↔', hArr: '⇔',
+  euro: '€', pound: '£', yen: '¥', cent: '¢', sect: '§', middot: '·',
+  frac12: '½', frac14: '¼', sup2: '²', sup3: '³', micro: 'µ',
+  alpha: 'α', beta: 'β', pi: 'π', infin: '∞', ne: '≠', le: '≤', ge: '≥',
+};
+
+/** `&#8212;` / `&#x2014;` → the character, or undefined when it is out of range. */
+function numericEntity(body: string): string | undefined {
+  const code: number = body[0] === 'x' || body[0] === 'X' ? parseInt(body.slice(1), 16) : parseInt(body, 10);
+  return Number.isFinite(code) && code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : undefined;
+}
+
 function lintText(text: string, offset: number | undefined, out: LintFinding[]): void {
   // `[^{}]` rather than `[^)]`: a block head holds calls of its own — `@for (t of todos())` — so the
   // scan has to run to the LAST `)` before the brace, not the first one.
@@ -217,6 +239,30 @@ function lintText(text: string, offset: number | undefined, out: LintFinding[]):
   // head is bounded, so a text full of `@A(` with no closing paren cannot rescan to the end from every
   // one of them. A block head longer than the bound simply goes unremarked — this rule only offers a
   // spelling hint, so silence there is the right failure.
+  // An HTML entity is not decoded in a Weave template: `escapeText` writes `&` as `&amp;` on the way
+  // into the emitted `<template>`, so `&mdash;` reaches the reader as those seven characters. That
+  // escaping is what makes a template safe to hold `<`, `{` and a code sample verbatim, so the entity
+  // is the thing that has to give.
+  //
+  // Narrow on purpose, like every rule here: only a NAMED entity that resolves to a different character
+  // (or a numeric one) warns. `Tall & scrolling`, `a && b` and `?a=1&b=2` are ordinary text and stay
+  // silent — a rule that also fires on correct markup is how the next real warning gets ignored.
+  const ENT: RegExp = /&(#x?[0-9a-fA-F]{1,6}|[a-zA-Z][a-zA-Z0-9]{1,9});/g;
+  let e: RegExpExecArray | null;
+  while ((e = ENT.exec(text)) !== null) {
+    const body: string = e[1];
+    const ch: string | undefined = body[0] === '#' ? numericEntity(body.slice(1)) : ENTITIES[body];
+    if (ch === undefined || ch === e[0]) continue; // not one we can name a replacement for
+    const at: number | undefined = offset === undefined ? undefined : offset + e.index;
+    out.push({
+      message:
+        `\`${e[0]}\` renders as text, not as \`${ch}\` — a Weave template is text, so entities are never ` +
+        `decoded. Type the character itself: \`${ch}\`.`,
+      offset: at,
+      fix: at === undefined ? undefined : { start: at, end: at + e[0].length, text: ch },
+    });
+  }
+
   const RE: RegExp = /@([A-Za-z]+)(?:\s*(\([^{}]{0,512}\)))?\s*\{/g;
   let m: RegExpExecArray | null;
   while ((m = RE.exec(text)) !== null) {

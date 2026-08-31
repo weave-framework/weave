@@ -180,6 +180,13 @@ jobs:
       # REAL parser and checked for markup that survived into what the reader sees.
       - name: Every page renders with no markup left over
         run: pnpm verify:markdown
+      # A Weave template is TEXT: `escapeText` writes `&` as `&amp;` on the way into the emitted
+      # `<template>`, which is what lets a template hold `<`, `{` and a code sample verbatim — and means
+      # `&mdash;` reaches the reader as those seven characters. Nothing said so, and ten of them went into
+      # three demos in one afternoon; `effect ran 2&times;` came back from a browser measurement and was
+      # read straight past. A reader caught it. The compiler now warns, so every app gets the same help.
+      - name: An HTML entity in a template says it renders as text
+        run: pnpm verify:entity-text
       # Two compiler scans read text an author can make arbitrarily long — a component's script and a
       # template's prose — and both were polynomial: `import` plus 8,000 spaces took 59 seconds, and
       # 240 KB of `@A(` took 10. Fixed, and guarded here, because the correctness tests alone stay

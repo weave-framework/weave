@@ -204,7 +204,7 @@ viewport; when the body overflows the fixed height, only the content region scro
 :::tabs
 ~~~html title="app.html"
 <Button on:click={{ openWide }}>Wide</Button>
-<Button on:click={{ openTall }}>Tall &amp; scrolling</Button>
+<Button on:click={{ openTall }}>Tall & scrolling</Button>
 ~~~
 ~~~ts title="app.ts"
 openDialog({ title: 'Wide (860px)', content: '…', width: 860 });

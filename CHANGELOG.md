@@ -16,6 +16,16 @@
 
 ## Unreleased
 
+- **feat(compiler):** the template linter warns on an **HTML entity in a template**. A Weave template is
+  TEXT — `escapeText` writes `&` as `&amp;` on the way into the emitted `<template>`, which is exactly
+  what lets a template hold `<`, `{` and a code sample verbatim — so `&mdash;` reaches the reader as
+  those seven characters, never as an em dash. Nothing said so anywhere. Narrow like the other rules:
+  only a named entity that resolves to a different character, or a numeric one, warns; `Tall & scrolling`,
+  `a && b` and `?a=1&b=2` stay silent, and the message names the character to type instead (with a fix,
+  so `weave check --fix` applies it). Pinned by `packages/compiler/test/entity-text.smoke.mjs`
+  (14 cases including a control that the linter fires at all, wired into `pnpm verify:entity-text`), and
+  confirmed to surface in a real `weave build` with the offending line framed.
+
 - **fix(check):** `weave check` now reads the project's own `.d.ts` files. `collect()` skipped every
   declaration file outright — right to skip as a COMPONENT, wrong to drop from the program, since an
   ambient `declare module` or `declare global` only takes effect when its file is a root of it. So an

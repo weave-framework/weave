@@ -1,6 +1,6 @@
 <div class="sig-track">
   <div class="st-controls">
-    <button type="button" on:click={{ bump }}>count.set(n =&gt; n + 1)</button>
+    <button type="button" on:click={{ bump }}>count.set(n => n + 1)</button>
     <span class="st-value">count is <strong>{{ count() }}</strong></span>
     <button type="button" on:click={{ rename }}>change the other signal</button>
     <span class="st-value">label is <strong>{{ label() }}</strong></span>
@@ -13,12 +13,12 @@
     <tbody>
       <tr>
         <td><code>count()</code></td>
-        <td>yes &mdash; the call is the subscription</td>
+        <td>yes — the call is the subscription</td>
         <td class="st-runs">{{ callerRuns() }}</td>
       </tr>
       <tr>
         <td><code>count.peek()</code></td>
-        <td>no &mdash; peek never subscribes</td>
+        <td>no — peek never subscribes</td>
         <td class="st-runs">{{ peekerRuns() }}</td>
       </tr>
       <tr>
