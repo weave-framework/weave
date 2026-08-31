@@ -95,6 +95,31 @@ speculative building; a milestone waits for a real pull from a real app.
 dogfooding app. If "props only handed to a child" is still in the single digits, the feature is not worth its
 risk. If it is in the dozens, build stage 1 and measure again.
 
+### The trigger fired, 2026-08-30 — the answer is zero
+
+Two deep business applications became available, and the measurement was re-run across everything reachable:
+
+| tree | components | props | passed only to a child |
+| --- | --- | --- | --- |
+| a 60-component admin app | 60 | 80 | **0** |
+| a 61-component archiving app | 61 | 67 | **0** |
+| this repository's docs site, demo, and migrated app | 464 | 23 | **0** |
+| **total** | **585** | **170** | **0** |
+
+Not single digits. Zero. A prop is counted as plumbing only when the component's own script never reads it
+and every use in its template sits inside a child component's attribute — the exact shape this design would
+remove.
+
+The first version of that measurement also reported zero, and was worthless: it collected prop names from
+`props.x` occurrences in the script, when a pass-through prop is by definition one the script never reads. It
+was structurally blind to what it was counting. Rewritten to read prop names from the declared type, it is
+checked on every run against a fixture built to contain exactly one — and it aborts rather than report a zero
+it cannot justify.
+
+**On this evidence the design should be Declined, not merely deferred.** The threshold is the RFC's own, the
+apps are the ones it asked for, and the answer is not close to the line. It is left Draft only because
+retiring a design is the maintainer's call, not a measurement's.
+
 ## Staging
 
 There is no safe partial per name: a name either resolves and is wired, or it is an error. But the work stages:
