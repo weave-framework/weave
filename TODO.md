@@ -29,10 +29,6 @@ this list is a live intention, not a historical note.
   busts a cache correctly. Hashed *filenames* (`main-a1b2c3.js`) would additionally let a host serve the
   bundle as immutable. It is a rename of the build's outputs, so it lands as its own change rather than
   riding along with something else.
-- **Type-checking as part of `weave build`.** `weave check` is the gate and the build does not run it, so a
-  build can succeed on code the checker refuses. Making the build type-check (or say that it did not) is a
-  decision about how loud a build should be, not a missing capability.
-
 ## Planned — framework
 
 - **An app with no plumbing** ([RFC 0012](rfcs/0012-ambient-scope.md) — Draft, deliberately not started).
