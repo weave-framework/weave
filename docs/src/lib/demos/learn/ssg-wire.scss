@@ -1,0 +1,61 @@
+.sw {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sw button {
+  align-self: flex-start;
+  font: inherit;
+  font-size: 0.88rem;
+  padding: 6px 14px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--fg);
+  cursor: pointer;
+}
+
+.sw button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.sw-table {
+  border-collapse: collapse;
+  font-size: 0.84rem;
+  width: 100%;
+}
+
+.sw-table th,
+.sw-table td {
+  text-align: left;
+  padding: 5px 12px 5px 0;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+.sw-table th {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.sw-ok {
+  color: var(--green);
+  font-weight: 700;
+}
+
+.sw-no {
+  color: var(--red);
+  font-weight: 700;
+}
+
+.sw-out {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--fg-soft);
+}
+
+.sw-none {
+  color: var(--muted);
+}
