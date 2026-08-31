@@ -193,12 +193,17 @@ console.log(`  ${iconNames.size} built-in icons, ${docSrc.length} docs source fi
    Scoped to where a glyph is an AFFORDANCE. `asc → desc → none` in a sentence, `// read → 0` in a
    comment, and an arrow inside a code fence are notation — an <svg> cannot go in any of them, and a
    check that flags all 295 of those is a check somebody switches off. Measured before scoping. */
+const rendered = files.filter((f) => f.split(sep).join('/').startsWith('docs/src/content'));
 const AFFORDANCE = [
   { what: 'a docs template', files: docSrc.filter((f) => f.endsWith('.html')), re: /[←-⇿➔-➿■-◿]/g },
   // Only the pages the docs site renders. README and CHANGELOG are read on GitHub, which has no
   // `:icon[]` — there a typed arrow is the only arrow available, so requiring an icon would be a rule
   // nobody could satisfy.
-  { what: 'a link label', files: files.filter((f) => f.split(sep).join('/').startsWith('docs/src/content')), re: /[←-⇿➔-➿]\s*\]\(/g },
+  // Both sides of a link. The trailing form (`… →](href)`) was the one this caught first; the LEADING
+  // form (`… → [label](href)`) slipped past it and was still a typed arrow in a navigation list on three
+  // Quick start lines, on /learn/tooling and on /ui/installation. Same affordance, other side.
+  { what: 'a link label', files: rendered, re: /[←-⇿➔-➿]\s*\]\(/g },
+  { what: 'a link lead-in', files: rendered, re: /[←-⇿➔-➿]\s*\[[^\]]*\]\(/g },
 ];
 const drawn = [];
 for (const { what, files: set, re } of AFFORDANCE) {

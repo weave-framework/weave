@@ -580,8 +580,8 @@ Pass one or more roots; with none, it defaults to `['src']`. Any error makes it 
 Weave has real IDE integration — red squiggles on type errors *inside templates*, hover, completion, go-to-definition, and rename across the `.ts`/`.html` boundary. It's powered by a shared [Volar](https://volarjs.dev) language server, so the same engine backs every editor.
 
 > **Where to get the plugins.** They are **not on the VS Code Marketplace or the JetBrains Marketplace yet** — you install them from a file. Download the latest build from the repo's [`plugins/editor/`](https://github.com/weave-framework/weave/tree/main/plugins/editor) folder:
-> - VS Code → [`plugins/editor/vscode/weave-language-0.6.7.vsix`](https://github.com/weave-framework/weave/tree/main/plugins/editor/vscode)
-> - WebStorm → [`plugins/editor/webstorm/weave-webstorm-0.23.7.zip`](https://github.com/weave-framework/weave/tree/main/plugins/editor/webstorm)
+> - VS Code — [`plugins/editor/vscode/weave-language-0.6.7.vsix`](https://github.com/weave-framework/weave/tree/main/plugins/editor/vscode)
+> - WebStorm — [`plugins/editor/webstorm/weave-webstorm-0.23.7.zip`](https://github.com/weave-framework/weave/tree/main/plugins/editor/webstorm)
 >
 > (Use whatever the newest version in those folders is.)
 

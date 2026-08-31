@@ -101,6 +101,6 @@ what you use, pull the components' Sass entries individually instead:
 
 ## Where to next
 
-- Every token and knob → [Styling & theming](/ui/theming)
+- Every token and knob — [Styling & theming](/ui/theming)
 - The components themselves → start with [Button](/ui/button)
-- How scoping works in your own styles → [Styling](/learn/styling)
+- How scoping works in your own styles — [Styling](/learn/styling)
