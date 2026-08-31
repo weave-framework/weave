@@ -1,0 +1,70 @@
+.mo {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.mo-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+}
+
+.mo button {
+  font: inherit;
+  font-size: 0.88rem;
+  padding: 6px 14px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--fg);
+  cursor: pointer;
+}
+
+.mo button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.mo-speed {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.mo code {
+  font-family: var(--mono);
+  color: var(--accent);
+}
+
+.mo-stage {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  min-height: 92px;
+  align-content: start;
+}
+
+.mo-box {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--bg-soft);
+}
+
+.mo-box strong {
+  font-family: var(--mono);
+  font-size: 0.84rem;
+  color: var(--accent);
+}
+
+.mo-box span {
+  font-size: 0.8rem;
+  color: var(--muted);
+}

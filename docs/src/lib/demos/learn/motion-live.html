@@ -1,0 +1,37 @@
+<div class="mo">
+  <div class="mo-controls">
+    <button type="button" on:click={{ toggle }}>{{ shown() ? 'remove them' : 'bring them back' }}</button>
+    <label class="mo-speed">
+      duration
+      <input type="range" min="150" max="1500" step="50" value={{ ms() }} on:input={{ setMs }} />
+      <code>{{ ms() }}ms</code>
+    </label>
+  </div>
+
+  <div class="mo-stage">
+    @if (shown()) {
+      <div class="mo-box" transition:fade={{ params() }}>
+        <strong>transition:fade</strong>
+        <span>in and out</span>
+      </div>
+    }
+    @if (shown()) {
+      <div class="mo-box" transition:fly={{ flyParams() }}>
+        <strong>transition:fly</strong>
+        <span>in and out</span>
+      </div>
+    }
+    @if (shown()) {
+      <div class="mo-box" in:scale={{ params() }}>
+        <strong>in:scale</strong>
+        <span>in only — leaves instantly</span>
+      </div>
+    }
+    @if (shown()) {
+      <div class="mo-box" out:slide={{ params() }}>
+        <strong>out:slide</strong>
+        <span>appears instantly</span>
+      </div>
+    }
+  </div>
+</div>

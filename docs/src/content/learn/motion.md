@@ -21,6 +21,23 @@ A transition directive names a function and picks *when* it plays. The prefix is
 - An **intro** (`transition:`/`in:`) runs once, on mount.
 - An **outro** (`transition:`/`out:`) is *registered on the node* so that whatever removes the element later — an `@if` going false, a `@for` row dropping out — can play it and wait for it before pulling the node. `in:` registers nothing, so an `in:`-only element disappears instantly when removed.
 
+All four built-ins, and the difference between the three directives, in one toggle. Slow it down first
+if you want to watch the edges:
+
+:::demo motion-live
+
+:::callout see "What you should see"
+Bringing them back, all four animate in — except the `out:slide` one, which simply appears. `out:`
+registers no intro, so there is nothing to play.
+
+Removing them is the half worth watching. Three of the boxes animate away and the row waits for them.
+The **`in:scale`** box vanishes instantly, in the same frame you press the button, because `in:`
+registers no outro — there is nothing for the removal to wait on.
+
+That is the entire difference between the three prefixes, and it is invisible in the markup: all four
+lines look equally animated until something is removed.
+:::
+
 ### Passing params
 
 Params go in `{{ }}` — the object is handed straight to the transition function:
@@ -247,3 +264,30 @@ The runtime sets the **start frame in a microtask, before paint** — so an ente
 :::
 
 [Next: Custom elements & bootstrap :icon[arrow-right]](/learn/custom-elements) · [Reference: @weave-framework/runtime :icon[arrow-right]](/reference/runtime)
+
+## When it goes wrong
+
+Motion fails quietly — nothing throws, an animation simply does not happen. Four reasons, in the order
+they actually occur.
+
+:::callout trap "It leaves instantly, and you wrote a transition"
+You used `in:`. It plays on enter and registers **nothing** for the removal, so an `@if` going false
+pulls the node in the same frame. Use `transition:` for both directions, or `out:` for the leave alone.
+:::
+
+**Nothing plays at all.** A transition runs when an element **enters or leaves**, not when it changes. A
+box that is always in the DOM and merely gains a class has nothing to animate — that is a CSS
+transition's job, not this one.
+
+**The duration ignores your signal.** Params are read **once, at play time**. `{{ { duration: dur() } }}`
+uses whatever `dur()` returned the instant the animation started; changing the signal mid-flight does
+nothing, and changing it before the next play does. This is the one behaviour people report as a bug.
+
+**It works, and nobody sees it.** The built-ins respect `prefers-reduced-motion`. On a machine with that
+setting on, transitions are reduced deliberately — check the OS setting before debugging the code.
+
+:::callout info "Leaving really does wait"
+An outro is registered on the node, so `@if`, `@for` and `@key` all await it before removing. That is
+why a list row can fade out rather than disappearing mid-fade — and why a slow duration delays the
+actual removal by exactly that long.
+:::
