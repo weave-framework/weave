@@ -1,0 +1,17 @@
+<div class="i18">
+  <div class="i18-row">
+    <span>language</span>
+    @for (l of langs; track l) {
+      <button type="button" class={{ l === active() ? 'i18-on' : '' }} on:click={{ () => pick(l) }}>{{ l }}</button>
+    }
+  </div>
+
+  <div class="i18-row">
+    <span>items</span>
+    <input type="range" min="0" max="25" value={{ n() }} on:input={{ setN }} />
+    <code>n = {{ n() }}</code>
+  </div>
+
+  <p class="i18-out">{{ cart() }}</p>
+  <p class="i18-sub">{{ greeting() }}</p>
+</div>

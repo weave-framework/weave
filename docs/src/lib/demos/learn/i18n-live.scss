@@ -1,0 +1,52 @@
+.i18 {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.i18-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.i18-row > span {
+  min-width: 72px;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.i18 button {
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 4px 12px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--fg);
+  cursor: pointer;
+}
+
+.i18 button.i18-on {
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.i18 code {
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.i18-out {
+  margin: 4px 0 0;
+  font-size: 1.35rem;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.i18-sub {
+  margin: 0;
+  color: var(--fg-soft);
+}
