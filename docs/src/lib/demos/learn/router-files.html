@@ -1,0 +1,17 @@
+<div class="rf">
+  <div class="rf-pane">
+    <p class="rf-head">your files, under the pages directory</p>
+    <textarea class="rf-input" rows="8" bind:value={{ text }}></textarea>
+    <button type="button" on:click={{ reset }}>reset the list</button>
+  </div>
+
+  <div class="rf-pane">
+    <p class="rf-head">the routes Weave generates</p>
+    <ul class="rf-out">
+      @for (r of rows(); track $index) {
+        <li><span class="rf-path">{{ indent(r.depth) }}{{ r.path }}</span><span class="rf-file">{{ r.file }}</span></li>
+      }
+      @empty { <li class="rf-none">add a file on the left</li> }
+    </ul>
+  </div>
+</div>

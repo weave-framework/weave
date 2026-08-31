@@ -24,6 +24,22 @@ A page file can be any of `.weave`, `.ts`, `.tsx`, `.js`, or `.jsx` — the file
 | `task/[id].ts` | `task/:id` | A dynamic param |
 | `[...rest].ts` | `*` | Catch-all (404), honoured at the top level |
 
+Easier to try than to read. The list on the left is a pages directory; the table on the right is what
+`fileToRoutes` — the same pure function the CLI calls — turns it into. Edit the files:
+
+:::demo router-files
+
+:::callout see "What you should see"
+`index.ts` becomes the empty path, `[slug].ts` becomes `:slug`, and `[...rest].ts` becomes `*`.
+
+The two folder rules are the ones worth playing with. **`blog/` has a `_layout.ts`**, so it stays a
+nested route and its pages are indented underneath it. **`docs/` has none**, so it is flattened — its
+page appears at the top level as `docs/guide`, with no wrapper.
+
+Delete `blog/_layout.ts` and watch the blog routes flatten out beside it. That single file is the whole
+difference between a folder that wraps its children and a folder that is just a prefix.
+:::
+
 ### Folders: nested vs flattened
 
 A folder's behaviour depends on whether it contains a `_layout` file:
@@ -516,3 +532,53 @@ Routes are an ordered tree of `{ path, component?, guard?, redirect?, children? 
 :::
 
 [Next: Store :icon[arrow-right]](/learn/store) · [Reference: @weave-framework/router :icon[arrow-right]](/reference/router)
+
+## When it goes wrong
+
+Four things the router will tell you about, and one it deliberately will not.
+
+:::callout trap "A blank page where a route should be"
+~~~
+[weave router] route "/settings" matched but has no `component`, so it renders nothing
+(and any nested <RouterView> under it never mounts). Give it a component, or make it a
+`redirect` route.
+~~~
+
+`component` is optional because a `redirect`-only route legitimately has none — so the type cannot catch
+this, and a blank outlet is the only symptom. The warning appears once per offending route, not once per
+navigation.
+:::
+
+**A redirect that never settles.**
+
+~~~
+[weave router] redirect loop, gave up after 16 hops
+~~~
+
+Each hop redirected to a path that redirected again. The message lists the chain it visited, and the
+loop is almost always two guards disagreeing — one sending signed-out users to `/login`, another sending
+users away from `/login`.
+
+**`useRouter()` outside a view.**
+
+~~~
+useRouter() must be called within a <RouterView> subtree
+~~~
+
+There is no global "current router" to fall back on, and that is deliberate: a page can host more than
+one. Call it inside a component that a `<RouterView>` rendered.
+
+**`useLoaderData()` with no loader.**
+
+~~~
+useLoaderData() requires the current route to define a loader
+~~~
+
+The route matched, but it declares no `loader`, so there is nothing to hand you. Add one to the route, or
+read the data where it is actually fetched.
+
+:::callout info "The one it will not warn about"
+A route that matches nothing is **not** an error — it renders your catch-all if you wrote one, and
+nothing if you did not. That is why `[...rest].ts` is worth adding on day one: without it, a typo in a
+URL is indistinguishable from a broken app.
+:::

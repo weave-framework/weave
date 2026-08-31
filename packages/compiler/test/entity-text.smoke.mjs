@@ -1,5 +1,10 @@
 /**
- * An HTML entity in a template is text, and the author almost never means that.
+ * Two rules about template TEXT that were silent, and both bit inside a day.
+ *
+ * 1. An HTML entity in a template is text, and the author almost never means that.
+ * 2. A `{{ }}` inside <textarea> or <title> cannot work at all — those elements' content is RCDATA, so
+ *    the `<!---->` marker the runtime writes there becomes six literal characters in the value. Found by
+ *    a docs demo reading its own textarea back and parsing `[...rest].ts<!---->` as a filename.
  *
  * Weave templates are TEXT, not HTML: `escapeText` turns `&` into `&amp;` on the way into the emitted
  * `<template>` string. That is deliberate and load-bearing — it is what lets a template hold `<`, `{`
@@ -80,6 +85,29 @@ ok(
   warnings('<button on:clik={{ go }}>x</button>').length === 1,
   'the linter itself still fires on a known mistake (control)'
 );
+
+/* ── RCDATA: a marker cannot live inside text-only content ── */
+for (const [tpl, tag] of [
+  ['<textarea>{{ draft() }}</textarea>', 'textarea'],
+  ['<title>{{ name() }}</title>', 'title'],
+]) {
+  const w = warnings(tpl).filter((m) => m.includes(`inside <${tag}>`));
+  ok(w.length === 1, `warns on an interpolation inside <${tag}> (got ${JSON.stringify(warnings(tpl))})`);
+}
+ok(
+  warnings('<textarea>{{ draft() }}</textarea>')[0].includes('bind:value'),
+  'and points a textarea at the form that does work'
+);
+
+/* ── and stays quiet where the markup is fine ── */
+for (const [what, tpl] of [
+  ['a textarea bound the right way', '<textarea bind:value={{ draft }}></textarea>'],
+  ['a textarea with static text', '<textarea>plain text</textarea>'],
+  ['an interpolation anywhere else', '<div>{{ x() }}</div>'],
+]) {
+  const w = warnings(tpl).filter((m) => m.includes('cannot update'));
+  ok(w.length === 0, `${what} stays silent (got ${JSON.stringify(w)})`);
+}
 
 rmSync(bundle, { force: true });
 

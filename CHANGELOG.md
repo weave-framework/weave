@@ -16,6 +16,16 @@
 
 ## Unreleased
 
+- **feat(compiler):** the template linter warns on `{{ … }}` inside **`<textarea>` or `<title>`**. A
+  browser reads those elements' content as RCDATA — text, not markup — so the `<!---->` placeholder the
+  runtime writes for a dynamic text position is not parsed as a comment: it becomes six literal
+  characters in the value. `<textarea>{{ draft() }}</textarea>` showed `<!---->` to the user and handed
+  it back through `.value`; `<title>{{ name() }}</title>` put it in the browser tab. Neither warned.
+  Found by a documentation demo that read its own textarea back and parsed `[...rest].ts<!---->` as a
+  filename. The message names the form that does work (`bind:value` for a textarea, an `effect` writing
+  `document.title`). Pinned by six cases in `packages/compiler/test/entity-text.smoke.mjs`, three of
+  them asserting silence on markup that is fine.
+
 - **fix(cli):** `weave check --fix` now repairs everything it is certain of in **one run**. Every
   declaration `grow-setup` offers is inserted at the same offset — the end of `setup`'s body — so they
   all overlap, and `applyFixes` skips a fix overlapping one already applied. With a single

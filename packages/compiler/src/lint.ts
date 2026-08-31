@@ -38,6 +38,17 @@ const BLOCKS: readonly string[] = [
   'catch', 'snippet', 'render', 'key',
 ];
 
+/**
+ * Elements whose content the HTML parser reads as TEXT, not as markup.
+ *
+ * A `{{ }}` inside one of these cannot work the way it works everywhere else: the runtime marks a
+ * dynamic text position with a `<!---->` placeholder, and inside RCDATA a browser does not parse that as
+ * a comment — it becomes six literal characters in the value. `<textarea>{{ draft() }}</textarea>` shows
+ * `<!---->` to the user and hands it back through `.value`; `<title>{{ name() }}</title>` puts it in the
+ * browser tab. Reproduced in isolation before this rule existed, and neither warned.
+ */
+const RCDATA: ReadonlySet<string> = new Set(['textarea', 'title']);
+
 /** XML namespace prefixes that are attribute names, not Weave bindings. */
 const NAMESPACES: ReadonlySet<string> = new Set(['xlink', 'xml', 'xmlns']);
 
@@ -133,10 +144,26 @@ function walk(nodes: TemplateNode[] | undefined, out: LintFinding[]): void {
   if (!nodes) return;
   for (const node of nodes) {
     switch (node.type) {
-      case 'element':
-        for (const attr of (node as ElementNode).attrs) lintAttr(attr, out);
-        walk((node as ElementNode).children, out);
+      case 'element': {
+        const el: ElementNode = node as ElementNode;
+        for (const attr of el.attrs) lintAttr(attr, out);
+        if (RCDATA.has(el.tag.toLowerCase())) {
+          for (const child of el.children ?? []) {
+            if (child.type !== 'interp') continue;
+            out.push({
+              message:
+                `\`{{ … }}\` inside <${el.tag}> cannot update: the browser reads this element's content as ` +
+                `TEXT, so the marker the runtime needs becomes literal characters in the value. ` +
+                (el.tag.toLowerCase() === 'textarea'
+                  ? 'Use `bind:value={{ signal }}` for a textarea.'
+                  : 'Set the title from code instead — an `effect` writing `document.title`.'),
+              offset: (child as { offset?: number }).offset,
+            });
+          }
+        }
+        walk(el.children, out);
         break;
+      }
       case 'text':
         lintText(node.value, node.offset, out);
         break;
