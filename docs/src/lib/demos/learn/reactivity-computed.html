@@ -1,0 +1,18 @@
+<div class="rx-computed">
+  <p class="rxc-source">
+    <button type="button" on:click={{ bump }}>n.set(v => v + 1)</button>
+    <span>n is <strong>{{ n() }}</strong></span>
+  </p>
+
+  <p class="rxc-source">
+    <button type="button" on:click={{ read }}>read doubled()</button>
+    <span>it gave <strong>{{ lastValue() }}</strong></span>
+  </p>
+
+  <dl class="rxc-counts">
+    <div><dt>times you read it</dt><dd>{{ reads() }}</dd></div>
+    <div><dt>times the body actually ran</dt><dd class="rxc-runs">{{ runs() }}</dd></div>
+  </dl>
+
+  <button class="rxc-reset" type="button" on:click={{ reset }}>reset both counters</button>
+</div>

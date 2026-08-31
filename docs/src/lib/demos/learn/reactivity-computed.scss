@@ -1,0 +1,58 @@
+.rx-computed {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.rxc-source {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  color: var(--fg-soft);
+  font-size: 0.92rem;
+}
+
+.rx-computed button {
+  font: inherit;
+  font-size: 0.88rem;
+  padding: 6px 12px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--fg);
+  cursor: pointer;
+}
+
+.rx-computed button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.rxc-counts {
+  display: flex;
+  gap: 28px;
+  margin: 6px 0 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.rxc-counts dt {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.rxc-counts dd {
+  margin: 2px 0 0;
+  font-size: 1.3rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.rxc-runs {
+  color: var(--accent);
+}
+
+.rxc-reset {
+  align-self: flex-start;
+}

@@ -1,0 +1,18 @@
+<div class="rx-batch">
+  <div class="rxb-controls">
+    <button type="button" on:click={{ writeLoose }}>three writes, loose</button>
+    <button type="button" on:click={{ writeBatched }}>the same three, in batch()</button>
+    <button type="button" on:click={{ reset }}>reset</button>
+  </div>
+
+  <p class="rxb-state">
+    x = <strong>{{ x() }}</strong> · y = <strong>{{ y() }}</strong> ·
+    the effect has run <strong class="rxb-runs">{{ runs() }}</strong> time(s)
+  </p>
+
+  <p class="demo-note">Every state the effect actually observed, newest last:</p>
+  <ol class="rxb-trail">
+    @for (seen of trail(); track seen) { <li>{{ seen }}</li> }
+    @empty { <li class="rxb-none">nothing yet</li> }
+  </ol>
+</div>

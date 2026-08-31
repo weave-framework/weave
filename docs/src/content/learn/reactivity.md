@@ -94,6 +94,21 @@ This is the same machinery that makes a `signal`'s `equals` work — same option
 
 ### Lazy means lazy — side effects may never fire
 
+Both halves are invisible until something counts them. The number on the right is how many times the
+derivation's body has actually executed — counted inside the body itself.
+
+:::demo reactivity-computed
+
+:::callout see "What you should see"
+Press **read doubled()** several times without touching `n`: the left number climbs and the right one
+stays put. That is the **cache** — the body ran once and every later read got the stored value.
+
+Now press **n.set(v => v + 1)** on its own, as many times as you like. Neither number moves. The
+computed knows it is stale and does not care, because nobody has asked. Press **read** once and the body
+runs — exactly once, no matter how many times you bumped `n`.
+:::
+
+
 A computed only runs its function **when something reads it**. Never read it, and it never runs. That's a feature for performance, but it's a trap if you smuggle side effects into a computed:
 
 ~~~ts title="Don't do this"
@@ -229,6 +244,22 @@ batch(() => {
   y.set(20);
 }); // the effect logs ONCE: "moved to 10 20", not twice
 ~~~
+
+Which matters more than "it runs less often". Press both buttons below and read the trail underneath:
+
+:::demo reactivity-batch
+
+:::callout see "What you should see"
+**Three writes, loose** takes the effect from 0 to 3 runs, and the trail shows every position it passed
+through — including `loose: (10, 0)`, a moment when `x` had moved and `y` had not. That state was never
+one you meant; it existed because each `.set` flushed on its own.
+
+**The same three, in batch()** adds exactly **one** line to the trail, and it is the finished state. The
+half-applied moments do not appear because, for anything downstream, they never happened.
+
+So `batch` is not really about doing less work. It is about not publishing a state you were only
+passing through.
+:::
 
 Three details that trip people up:
 

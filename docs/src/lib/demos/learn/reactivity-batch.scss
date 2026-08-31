@@ -1,0 +1,57 @@
+.rx-batch {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.rxb-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.rx-batch button {
+  font: inherit;
+  font-size: 0.88rem;
+  padding: 6px 12px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--fg);
+  cursor: pointer;
+}
+
+.rx-batch button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.rxb-state {
+  margin: 0;
+  color: var(--fg-soft);
+  font-size: 0.95rem;
+}
+
+.rxb-runs {
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.rxb-trail {
+  margin: 0;
+  padding-left: 1.4em;
+  font-family: var(--mono);
+  font-size: 0.86rem;
+  color: var(--fg-soft);
+}
+
+.rxb-trail li {
+  padding: 1px 0;
+}
+
+.rxb-none {
+  font-family: var(--sans);
+  color: var(--muted);
+  list-style: none;
+  margin-left: -1.4em;
+}
