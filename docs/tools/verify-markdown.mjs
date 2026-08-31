@@ -77,7 +77,21 @@ const LEFTOVER = /\*\*|`/;
 const bad = [];
 function scan(blocks, file) {
   for (const b of blocks) {
-    if (b.type === 'code' || b.type === 'tabs') continue; // verbatim by design
+    // A tab group is verbatim INSIDE, but the group itself must have parsed. When the fence regex grew a
+    // capture group, `parseTabs` kept reading the old indices, `marker` became the indent, and every tab
+    // group on the site rendered as raw `~~~` text. This gate was green throughout, because it skipped
+    // tabs entirely — a reader had to send a screenshot. So the group is checked even though its code is
+    // not: it must contain at least one tab, and no tab's body may still hold a fence marker.
+    if (b.type === 'tabs') {
+      if (!b.tabs?.length) bad.push({ file, text: 'a :::tabs group parsed to zero tabs' });
+      for (const t of b.tabs ?? []) {
+        if (/^\s*(```|~~~)/m.test(t.code)) {
+          bad.push({ file, text: `tab "${t.label}" still contains a fence marker — the group did not split` });
+        }
+      }
+      continue;
+    }
+    if (b.type === 'code') continue; // verbatim by design
     if (b.children) scan(b.children, file);
     const runs = [];
     if (b.inline) runs.push(b.inline);

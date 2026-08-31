@@ -267,14 +267,18 @@ function parseTabs(lines: string[]): CodeTabData[] {
       i++;
       continue;
     }
-    const marker = fence[1];
-    const info = fence[2].trim();
+    // FENCE_RE captures (indent, marker, info) — adding the indent group shifted every index by one,
+    // and this call site was missed. `marker` became the leading whitespace, which matches nothing, so
+    // every tab group on the site rendered as raw `~~~` text until a reader sent a screenshot.
+    const indent = fence[1];
+    const marker = fence[2];
+    const info = fence[3].trim();
     const lang = info.split(/\s+/)[0] || 'text';
     const label = TITLE_RE.exec(info)?.[1] ?? lang;
     const body: string[] = [];
     i++;
-    while (i < lines.length && lines[i].trimEnd() !== marker) {
-      body.push(lines[i]);
+    while (i < lines.length && lines[i].trim() !== marker) {
+      body.push(lines[i].startsWith(indent) ? lines[i].slice(indent.length) : lines[i]);
       i++;
     }
     i++;
