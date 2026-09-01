@@ -9,10 +9,10 @@
  * and any template locals), keeping every block's effects in its own scope.
  */
 
-import { parseTemplate, VOID } from './parser.js';
+import { parseTemplate, ParseError, VOID } from './parser.js';
 import type {
   TemplateNode, ElementNode, InterpNode, Attr, StaticAttr, EventAttr, UseAttr, IfNode, IfBranch, ForNode,
-  SwitchNode, DeferNode, DeferTrigger, AwaitNode, SnippetNode, RenderNode, KeyNode,
+  SwitchNode, DeferNode, DeferTrigger, AwaitNode, SnippetNode, RenderNode, KeyNode, Offset,
 } from './ast.js';
 import { rewrite, ctxScope, childScope, type Scope, type Binding } from './scope.js';
 
@@ -461,10 +461,22 @@ function compileFragment(
   param: string = '',
   isHost: boolean = false,
   variant: 'create' | 'adopt' = 'create',
-  preamble: string = ''
+  preamble: string = '',
+  at: Offset = undefined
 ): string {
   const top: TemplateNode[] = trimTop(nodes);
-  if (top.length === 0) throw new Error('Empty template fragment');
+  // An empty body — `@if (cond) { }`, or a template that renders nothing — used to throw a bare `Error`
+  // with no offset. That is the same failure class as the unterminated comment fixed in the parser: a true
+  // sentence about the wrong thing, with nothing to point at. A stray `}` in any real template lands here,
+  // because it closes a block early and leaves the body empty, so the author was shown a message about
+  // fragments while the mistake was a brace. Every block knows its own expression's offset; the root
+  // fragment reports 0.
+  if (top.length === 0)
+    throw new ParseError(
+      'Nothing to render here — this block body (or the template itself) is empty. Put a node inside it, ' +
+        'or delete the block. A stray `}` produces this too: it closes the block before its content.',
+      at ?? 0
+    );
   gen.fragmentDepth++; // 1 == this (root render) fragment; a nested block body compiles at depth ≥ 2
   const adopt: boolean = variant === 'adopt';
   // A component/slot compiles to a bare `<!---->`, so it can't be the clone root —
@@ -1129,7 +1141,7 @@ function compileFragment(
       const bScope: Scope = i === 0 && head.alias && aliasVar
         ? childScope(sc, { [head.alias]: aliasVar })
         : sc;
-      childDecls.push(compileFragment(gen, br.children, bScope, branchNames[i]));
+      childDecls.push(compileFragment(gen, br.children, bScope, branchNames[i], '', false, 'create', '', br.condOffset));
     });
 
     const lines: string[] = [];
@@ -1147,7 +1159,7 @@ function compileFragment(
   function emitSwitch(node: SwitchNode, path: number[], sc: Scope): void {
     blockAnchor(path); // adopt-navigable like @if (island-replay); emitChildren gates positional adoptability
     const names: string[] = node.cases.map(() => gen.fn());
-    node.cases.forEach((c, i) => childDecls.push(compileFragment(gen, c.children, sc, names[i])));
+    node.cases.forEach((c, i) => childDecls.push(compileFragment(gen, c.children, sc, names[i], '', false, 'create', '', c.testOffset ?? node.exprOffset)));
 
     const lines: string[] = [`const _v = ${rewrite(node.expr, sc).code};`];
     node.cases.forEach((c, i) => {
@@ -1233,12 +1245,12 @@ function compileFragment(
       $even: `${rowVar}.even`,
       $odd: `${rowVar}.odd`,
     });
-    childDecls.push(compileFragment(gen, node.children, forScope, rowFn, rowVar));
+    childDecls.push(compileFragment(gen, node.children, forScope, rowFn, rowVar, false, 'create', '', node.listOffset));
 
     let emptyArg: string = '';
     if (node.empty) {
       const emptyFn: string = gen.fn();
-      childDecls.push(compileFragment(gen, node.empty, sc, emptyFn));
+      childDecls.push(compileFragment(gen, node.empty, sc, emptyFn, '', false, 'create', '', node.listOffset));
       emptyArg = `, ${emptyFn}`;
     }
 

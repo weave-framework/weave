@@ -71,7 +71,11 @@ const RULES = PAIRS.flatMap(([bad, good]) =>
   })
 );
 
-const ROOTS = ['docs/src/content', 'README.md', 'CHANGELOG.md', 'RELEASE-NOTES.md', 'ROADMAP.md', 'TODO.md', 'packages'];
+// `skills/` is here because the copy under packages/create-weave/template is GENERATED from it by
+// tools/sync-skills.mjs. Both British spellings this gate found were fixed in that copy and left in
+// the source, so the next build wrote them straight back — the gate passed twice in between. A
+// corpus that holds a generated file and not its input measures the wrong thing.
+const ROOTS = ['docs/src/content', 'README.md', 'CHANGELOG.md', 'RELEASE-NOTES.md', 'ROADMAP.md', 'TODO.md', 'packages', 'skills'];
 const files = [];
 const walk = (dir) => {
   for (const e of readdirSync(dir, { withFileTypes: true })) {
