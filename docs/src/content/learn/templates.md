@@ -557,6 +557,11 @@ stretch, so everything after became a child of everything before.
 | `title={ name() }` — one brace | `Attribute bindings use double braces: write {{ expr }}, not { expr } (at 11)` |
 | `{{ name()` with no closing braces | `Unclosed {{ expression` |
 | `transition:fade="fast"` — a string, not an expression | `transition:fade needs {expr} params, got a string` |
+| `use:tooltip="hi"` — a string, not an expression | `use:tooltip needs {expr}, got a string` |
+| `use:` with nothing after it | `'use:' requires an action name, e.g. use:tooltip` |
+| `transition:` with nothing after it | `'transition:' requires a transition function, e.g. transition:fade` |
+| `<div class="a>` — a quote never closed | `Expected '>' for <div> at 22` |
+| `<   >` — a `<` with no tag after it | `Expected tag name at 6` |
 
 The single-brace one is worth knowing by sight. It is the most common thing to carry in from another
 template language, and the message tells you the whole rule: **everything reactive in Weave is `{{ }}`**,

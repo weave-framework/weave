@@ -353,6 +353,16 @@ the compiler cannot see by reading the text is refused rather than guessed at:
 | `` export const template = `<p>${name}</p>`; `` | `weave: inline template/styles cannot use ${…} — Weave binds with {expr}, not JS interpolation` |
 | `export const template = ['<p>a</p>'];` | ``weave: `template` must be a single string, not an array`` |
 | a quote that is never closed | `weave: unterminated string literal in template/styles declaration` |
+| `export const template = '<p>' + x;` | ``weave: `template`/`styles` must be a static string — `+` may only join string literals`` |
+| a `styles` array that is never closed | `weave: unterminated array in styles declaration` |
+
+Two more come from the extension forms rather than from a plain component:
+
+- **`extends` pointing at a package.** A `#3` extension reads the base's raw template, and a published
+  package ships compiled output with no template to read — so the base has to be a **local** module.
+  The message names the import it could not follow.
+- **A `patch` extension whose base has no readable template.** Same cause, said at the other end: there
+  is markup to patch only if there is markup on disk.
 
 :::callout info "Why static, and why that is worth the restriction"
 A template that could be computed is a template no tool can read. Static declarations are what let
