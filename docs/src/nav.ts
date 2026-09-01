@@ -76,7 +76,6 @@ const learn: NavSection = {
         { label: 'Custom elements & bootstrap', path: '/learn/custom-elements' },
         { label: 'Tooling & CLI', path: '/learn/tooling' },
         { label: 'Static generation & resume', path: '/learn/static-generation' },
-        { label: 'Performance', path: '/learn/performance' },
         { label: 'Recipes', path: '/learn/recipes' },
       ],
     },

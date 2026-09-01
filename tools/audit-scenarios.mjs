@@ -30,7 +30,10 @@ import { join, dirname, sep } from 'node:path';
 const SUBSYSTEMS = [
   { page: 'signals', entries: ['packages/runtime/src/reactive.ts'], sources: ['packages/runtime/src/reactive.ts'] },
   { page: 'reactivity', entries: ['packages/runtime/src/reactive.ts', 'packages/runtime/src/extras.ts'], sources: ['packages/runtime/src/reactive.ts', 'packages/runtime/src/extras.ts'] },
-  { page: 'components', entries: [], sources: ['packages/compiler/src', 'packages/cli/src/plugin.ts'] },
+  // The COMPONENT sources only. Pointing this at all of `compiler/src` gave it the template parser's
+  // messages too, so 38 parser errors were reported as missing from Components while Templates — whose
+  // subject they are — quotes sixteen of them.
+  { page: 'components', entries: [], sources: ['packages/compiler/src/sources.ts', 'packages/compiler/src/component.ts', 'packages/cli/src/plugin.ts'] },
   { page: 'templates', entries: [], sources: ['packages/compiler/src/parser.ts', 'packages/compiler/src/codegen.ts'] },
   { page: 'styling', entries: [], sources: ['packages/compiler/src/styles.ts'] },
   { page: 'lifecycle-context-di', entries: ['packages/runtime/src/context.ts'], sources: ['packages/runtime/src/context.ts'] },
@@ -125,6 +128,12 @@ for (const f of readdirSync('docs/src/content/learn')) {
   if (f.endsWith('.md')) for (const t of readFileSync(join('docs/src/content/learn', f), 'utf8').split(/[^A-Za-z0-9_$]+/)) learnWords.add(t);
 }
 
+const learnFlat = readdirSync('docs/src/content/learn')
+  .filter((f) => f.endsWith('.md'))
+  .map((f) => readFileSync(join('docs/src/content/learn', f), 'utf8'))
+  .join(' ')
+  .replace(/\s+/g, ' ');
+
 const only = process.argv[2];
 let totalApi = 0, totalErr = 0;
 console.log('\npage                  API named        errors shown     page shape');
@@ -165,9 +174,11 @@ for (const s of SUBSYSTEMS) {
   // is one string in the source is a string with a newline in it on the page — and `includes` said no to
   // messages the page quotes in full.
   const flat = text.replace(/\s+/g, ' ');
+  // Shown on this page, or anywhere in Learn — the same reasoning as the API column. A reader who meets
+  // `Unexpected @else` and finds it on Templates has been served, whichever page the audit files it under.
   const shown = msgs.filter((m) => {
     const runs = runsOf(m);
-    return runs.length > 0 && runs.some((r) => flat.includes(r));
+    return runs.length > 0 && runs.some((r) => flat.includes(r) || learnFlat.includes(r));
   });
 
   const shape = SECTIONS.filter((x) => x.re.test(text)).length;
