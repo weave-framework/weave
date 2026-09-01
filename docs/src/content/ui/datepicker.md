@@ -141,6 +141,17 @@ Every picker below then needs nothing but its binding:
 `provideDateTimeDefaults` is called in any ancestor scope (normally the root component's `setup`) and reaches every
 picker mounted under it, including inside dialogs and lazily-loaded routes.
 
+The three types behind it, if you are typing a settings object of your own:
+
+~~~ts
+import type { DateTimeDefaults, DatepickerLabelDefaults, TimepickerDefaults } from '@weave-framework/ui';
+~~~
+
+`DateTimeDefaults` is what the call above takes — every field optional, every field allowed to be a getter.
+`DatepickerLabelDefaults` is the chrome both date pickers share, and `TimepickerDefaults` (`use24`, `step`,
+`clearLabel`) is the part only `<Timepicker>` reads. Typing your own settings object as `DateTimeDefaults` is
+what keeps a renamed key from silently doing nothing.
+
 ## Typeable field
 
 By default the field is a button that only opens the calendar. Set `editable={{ true }}` to swap in a typeable
@@ -197,6 +208,14 @@ All optional; each defaults to the English string shown. `prevMonth` (`'Previous
 (`'Next month'`), `prevYearRange` (`'Previous years'`), `nextYearRange` (`'Next years'`), `chooseYear`
 (`'Choose year'` — the year-switch header), `calendarLabel` (`'Choose date'` — the dialog name), `clear`
 (`'Clear'`), `openCalendar` (`'Open calendar'` — editable mode icon button).
+
+<!-- gen-ui-types:begin -->
+### Types
+
+~~~ts
+import type { DatepickerControl, DatepickerLabels, DatepickerProps, DatepickerContext } from '@weave-framework/ui/datepicker';
+~~~
+<!-- gen-ui-types:end -->
 
 ## When it goes wrong
 

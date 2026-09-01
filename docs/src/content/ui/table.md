@@ -162,6 +162,14 @@ tri-state checkbox. Name the table with `ariaLabel`.
 | `emptyText` | `string` | `'No data'` | Shown when there are no rows. |
 | `class` | `string` | — | Extra classes forwarded onto the root. |
 
+<!-- gen-ui-types:begin -->
+### Types
+
+~~~ts
+import type { SortDirection, TableColumn, ColumnResize, SortState, TableProps, TableContext } from '@weave-framework/ui/table';
+~~~
+<!-- gen-ui-types:end -->
+
 ## When it goes wrong
 
 Two of these are **build-time refusals** rather than bad rendering, and both are refusals on purpose:

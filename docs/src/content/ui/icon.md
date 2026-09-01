@@ -114,6 +114,24 @@ Changing `name` (or an async source's cache filling in) re-renders the icon in p
 For a registry scoped to one subtree rather than the whole app, pass `global: false` and provide it via the
 exported `IconContext`; a context-provided registry beats the global one.
 
+Three more exports round the subpath out, and each answers a question the block above leaves open:
+
+- **`createIconRegistry(config)`** builds a registry and returns it **without** installing it globally —
+  `configureIcons` is this plus the install. Use it when you want to hand a registry to `IconContext`
+  yourself, or hold two of them.
+- **`activeIcons()`** returns the registry an `<Icon>` would use right here: the context one if a parent
+  provided it, otherwise the global. This is what to call when you are debugging "why did that name not
+  resolve" — ask the registry that is actually in play, not the one you configured.
+- **`sanitizeSvg(markup)`** is the scrub every source's output goes through before it reaches the DOM.
+  It is exported because a source of your own may want to run it early, on markup you have just fetched.
+
+:::callout trap "A source of your own is still your responsibility"
+`sanitizeSvg` strips scripts, event-handler attributes and executable URL schemes — including the
+variants that hide behind a tab or an `<animate>`, which is a bypass this library has had and fixed. It
+runs on every source's output, so you get it for free. What it cannot do is vouch for **where** your
+markup came from: a sprite URL you do not control is a place someone else can put a file.
+:::
+
 ## Customizing
 
 Size and stroke come from the icon token schema:
@@ -141,6 +159,14 @@ those custom properties on a container.
 ### Slots
 
 `<Icon>` takes no slotted content — the glyph comes from `name` / `svg` / `src`.
+
+<!-- gen-ui-types:begin -->
+### Types
+
+~~~ts
+import type { IconProps, IconRegistry, IconConfig, IconSource } from '@weave-framework/ui/icon';
+~~~
+<!-- gen-ui-types:end -->
 
 ## When it goes wrong
 

@@ -143,6 +143,14 @@ arrows (or **typeahead** — start typing a label), select with Enter/Space, clo
 | `position` | `MenuPosition` | `'bottom-start'` | Panel position relative to the trigger. |
 | `class` | `string` | — | Extra classes forwarded onto the root. |
 
+<!-- gen-ui-types:begin -->
+### Types
+
+~~~ts
+import type { SelectValue, SelectControl, SelectProps, SelectContext, OptionAccessors, RequiredAccessors, SelfDescribingOption } from '@weave-framework/ui/select';
+~~~
+<!-- gen-ui-types:end -->
+
 ## When it goes wrong
 
 :::callout trap "Every row renders `undefined`"

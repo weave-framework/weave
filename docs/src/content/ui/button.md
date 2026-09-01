@@ -254,6 +254,14 @@ Any other native `<button>` event (`on:focus`, `on:blur`, `on:pointerdown`, …)
 | --- | --- |
 | *(default)* | The button's contents — label text, an `<Icon>`, or both. |
 
+<!-- gen-ui-types:begin -->
+### Types
+
+~~~ts
+import type { ButtonVariant, ButtonProps, ButtonContext } from '@weave-framework/ui/button';
+~~~
+<!-- gen-ui-types:end -->
+
 ## When it goes wrong
 
 :::callout trap "Correct markup, no styling"

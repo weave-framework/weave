@@ -47,6 +47,14 @@ instead, and `aria-valuenow` is omitted (per WAI-ARIA, only min/max remain):
 | `label` | `string` | — | Accessible name for the bar. |
 | `class` | `string` | — | Extra classes forwarded onto the container. |
 
+<!-- gen-ui-types:begin -->
+### Types
+
+~~~ts
+import type { ProgressBarProps, ProgressBarContext } from '@weave-framework/ui/progress-bar';
+~~~
+<!-- gen-ui-types:end -->
+
 ## When it goes wrong
 
 :::callout trap "Correct markup, no styling"

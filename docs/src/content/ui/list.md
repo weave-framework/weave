@@ -102,6 +102,14 @@ The snippet receives a `ListRowContext<T>`:
 | `selected` | `boolean` | True when this row is `aria-selected` (re-renders when it flips). |
 | `disabled` | `boolean` | True when this row is disabled. |
 
+<!-- gen-ui-types:begin -->
+### Types
+
+~~~ts
+import type { ListItem, ListRowContext, ListProps, ListContext } from '@weave-framework/ui/list';
+~~~
+<!-- gen-ui-types:end -->
+
 ## When it goes wrong
 
 :::callout trap "Correct markup, no styling"

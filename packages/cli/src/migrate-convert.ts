@@ -610,7 +610,7 @@ export function convertBlockSyntax(text: string): ConvertedExpr {
 }
 
 /** Wraps an alias rename in the template text between the block pass and the whole-template pass. */
-const ALIAS_MARK: string = 'weave-alias';
+const ALIAS_MARK: string = '\u0001weave-alias\u0001';
 
 /**
  * Apply each `@for` alias rename inside the block it belongs to, and remove the marker.

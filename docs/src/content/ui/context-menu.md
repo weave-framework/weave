@@ -83,6 +83,14 @@ A right-click menu is a shortcut, not the only way to reach an action — make s
 through a visible control (a Menu button, a toolbar) for discoverability and touch.
 :::
 
+<!-- gen-ui-types:begin -->
+### Types
+
+~~~ts
+import type { ContextMenuOptions, MenuItem, MenuPosition, MenuRowContext, OptionAccessors } from '@weave-framework/ui/context-menu';
+~~~
+<!-- gen-ui-types:end -->
+
 ## When it goes wrong
 
 :::callout trap "There is no `<ContextMenu>` tag — it is a `use:` action"

@@ -178,6 +178,14 @@ All optional; each defaults to the English string shown. `prevMonth` (`'Previous
 (`'Next month'`), `prevYearRange` (`'Previous years'`), `nextYearRange` (`'Next years'`), `chooseYear`
 (`'Choose year'`), `calendarLabel` (`'Choose date range'` — the dialog name), `clear` (`'Clear'`).
 
+<!-- gen-ui-types:begin -->
+### Types
+
+~~~ts
+import type { DateRange, DateRangePickerControl, DateRangePickerLabels, DateRangePickerProps, DateRangePickerContext } from '@weave-framework/ui/date-range-picker';
+~~~
+<!-- gen-ui-types:end -->
+
 ## When it goes wrong
 
 :::callout trap "Two pickers, two date formats"

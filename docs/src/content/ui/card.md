@@ -86,6 +86,14 @@ button so keyboard and screen-reader users can reach it.
 | --- | --- |
 | *(default)* | The card's content — compose it from the part classes above. |
 
+<!-- gen-ui-types:begin -->
+### Types
+
+~~~ts
+import type { CardProps, CardContext } from '@weave-framework/ui/card';
+~~~
+<!-- gen-ui-types:end -->
+
 ## When it goes wrong
 
 :::callout trap "Correct markup, no styling"

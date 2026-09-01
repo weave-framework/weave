@@ -43,6 +43,14 @@ readers announce what's loading.
 | `label` | `string` | — | Accessible name for the spinner. |
 | `class` | `string` | — | Extra classes forwarded onto the ring. |
 
+<!-- gen-ui-types:begin -->
+### Types
+
+~~~ts
+import type { ProgressSpinnerProps, ProgressSpinnerContext } from '@weave-framework/ui/progress-spinner';
+~~~
+<!-- gen-ui-types:end -->
+
 ## When it goes wrong
 
 :::callout trap "Correct markup, no styling"

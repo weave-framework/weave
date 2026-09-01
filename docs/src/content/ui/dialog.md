@@ -110,6 +110,14 @@ It's a real modal: `role="dialog"` (or `alertdialog`) with `aria-modal="true"`. 
 **restored to the opener** on close, Tab is trapped within, and the background is marked `inert` so assistive tech
 can't wander out. Esc and backdrop-click close it (unless `dismissable: false`).
 
+<!-- gen-ui-types:begin -->
+### Types
+
+~~~ts
+import type { DialogContent, DialogOptions, DialogRef, ComponentContent } from '@weave-framework/ui/dialog';
+~~~
+<!-- gen-ui-types:end -->
+
 ## When it goes wrong
 
 :::callout trap "`<Dialog>` in a template renders nothing"

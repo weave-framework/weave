@@ -71,6 +71,14 @@ pause, `'assertive'` interrupts. Keep messages short and non-essential: a snackb
 anything the user *must* act on only there. The action button is keyboard-reachable while the bar is shown, and the
 auto-dismiss timer pauses while the bar is hovered or holds focus — so a slower reader doesn't lose the Undo.
 
+<!-- gen-ui-types:begin -->
+### Types
+
+~~~ts
+import type { SnackbarAction, SnackbarOptions, SnackbarRef } from '@weave-framework/ui/snackbar';
+~~~
+<!-- gen-ui-types:end -->
+
 ## When it goes wrong
 
 :::callout trap "`<Snackbar>` in a template renders nothing"

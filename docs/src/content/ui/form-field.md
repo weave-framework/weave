@@ -110,6 +110,14 @@ to the same forms field, say).
 | --- | --- |
 | *(default)* | The control to frame (an Input, Select, Checkbox…). |
 
+<!-- gen-ui-types:begin -->
+### Types
+
+~~~ts
+import type { FormFieldControl, FormFieldProps, FormFieldContext } from '@weave-framework/ui/form-field';
+~~~
+<!-- gen-ui-types:end -->
+
 ## When it goes wrong
 
 :::callout trap "It shows a value and your form never hears about it"

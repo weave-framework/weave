@@ -83,6 +83,14 @@ restored to the host on commit or cancel. Esc always cancels.
 Give the host its own keyboard reachability — `use:popoverEdit` wires the key handler, but a non-interactive
 element such as a `<span>` or `<td>` still needs a `tabindex` of your own to receive focus.
 
+<!-- gen-ui-types:begin -->
+### Types
+
+~~~ts
+import type { PopoverEditor, PopoverEditConfig, PopoverEditRef } from '@weave-framework/ui/popover-edit';
+~~~
+<!-- gen-ui-types:end -->
+
 ## When it goes wrong
 
 :::callout trap "There is no `<PopoverEdit>` tag — it is a `use:` action"

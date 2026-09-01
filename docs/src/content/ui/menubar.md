@@ -61,6 +61,14 @@ for its accessible name.
 | `label` | `string` | — | Accessible name for the menubar. |
 | `class` | `string` | — | Extra classes forwarded onto the container. |
 
+<!-- gen-ui-types:begin -->
+### Types
+
+~~~ts
+import type { MenubarMenu, MenubarProps, MenubarContext } from '@weave-framework/ui/menubar';
+~~~
+<!-- gen-ui-types:end -->
+
 ## When it goes wrong
 
 :::callout trap "It renders, but nothing is inside it"

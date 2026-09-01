@@ -131,6 +131,14 @@ Open with typing or ↓, move with ↑/↓, select with Enter, close with Esc.
 | `noResultsText` | `string` | `'No results'` | Text for the empty-results row. |
 | `position` | `MenuPosition` | `'bottom-start'` | Panel position relative to the field. |
 
+<!-- gen-ui-types:begin -->
+### Types
+
+~~~ts
+import type { AutocompleteControl, AutocompleteProps, AutocompleteContext, OptionAccessors, RequiredAccessors, SelfDescribingOption } from '@weave-framework/ui/autocomplete';
+~~~
+<!-- gen-ui-types:end -->
+
 ## When it goes wrong
 
 :::callout trap "Every suggestion reads `undefined`"

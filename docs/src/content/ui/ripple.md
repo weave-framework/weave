@@ -101,6 +101,14 @@ The ripple is purely decorative: each circle is `aria-hidden` and carries no mea
 tech. It's feedback for the eye only — make sure the host itself is a real, focusable control (a `<button>`, a link)
 so the interaction is reachable by keyboard.
 
+<!-- gen-ui-types:begin -->
+### Types
+
+~~~ts
+import type { RippleOptions } from '@weave-framework/ui/ripple';
+~~~
+<!-- gen-ui-types:end -->
+
 ## When it goes wrong
 
 :::callout trap "Correct markup, no styling"

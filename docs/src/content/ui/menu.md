@@ -99,6 +99,14 @@ first item; opening by click highlights none.
 - **[Menubar](/ui/menubar)** — a row of always-visible top-level menus (File / Edit / View).
 - **[Context Menu](/ui/context-menu)** — the same list, opened on right-click.
 
+<!-- gen-ui-types:begin -->
+### Types
+
+~~~ts
+import type { MenuOptions, MenuItem, MenuPosition, MenuRowContext, OptionAccessors } from '@weave-framework/ui/menu';
+~~~
+<!-- gen-ui-types:end -->
+
 ## When it goes wrong
 
 :::callout trap "There is no `<Menu>` tag — it is a `use:` action"

@@ -94,6 +94,14 @@ The snippet receives a `TabRowContext<T>`:
 | `selected` | `boolean` | True when this is the active tab (re-renders when it flips). |
 | `disabled` | `boolean` | True when this tab is disabled. |
 
+<!-- gen-ui-types:begin -->
+### Types
+
+~~~ts
+import type { TabContent, TabItem, TabRowContext, TabsProps, TabsContext } from '@weave-framework/ui/tabs';
+~~~
+<!-- gen-ui-types:end -->
+
 ## When it goes wrong
 
 :::callout trap "It renders, but nothing is inside it"

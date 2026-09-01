@@ -187,6 +187,18 @@ jobs:
       # never mentioned once. The count is checked too, so a twelfth reason cannot ship undocumented.
       - name: Every reason a component refuses to resume is documented
         run: pnpm verify:resume-reasons
+      # A component page had the prop TABLE and never the type: an author writing `function IconButton(props:
+      # ButtonProps)` had no way to learn the name existed. 98 of the UI package's exports were named nowhere
+      # in the documentation for that reason. The block is generated from the source the `exports` map points
+      # at, so it cannot drift; this checks it rather than writing it.
+      - name: Every UI page names the types its subpath exports
+        run: pnpm verify:ui-types
+      # An escape typed into a shell heredoc is INTERPRETED on the way to disk, so the file ends up holding
+      # the character instead of the escape — and then every text tool refuses to read the file, `grep`
+      # included, which is why five of them survived. One was reader-facing: a published page showed a
+      # Windows path with its form-feed and backspace escapes eaten.
+      - name: No source file holds a raw control byte
+        run: pnpm verify:no-control-bytes
       # A Weave template is TEXT: `escapeText` writes `&` as `&amp;` on the way into the emitted
       # `<template>`, which is what lets a template hold `<`, `{` and a code sample verbatim — and means
       # `&mdash;` reaches the reader as those seven characters. Nothing said so, and ten of them went into

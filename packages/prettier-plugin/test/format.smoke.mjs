@@ -214,7 +214,7 @@ const  count=signal(0)
   const f2 = await fmt(spaced, 'inline.html');
 
   // Collapse exactly as HTML does: any whitespace run between inline elements becomes one space.
-  const rendered = (s) => s.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').split(' ').join('').trim();
+  const rendered = (s) => s.replace(/<[^>]+>/g, '\u0000').replace(/\s+/g, ' ').split('\u0000').join('').trim();
 
   ok(rendered(f1) === 'ab', `tight inline run still renders "ab" (got ${JSON.stringify(rendered(f1))})`);
   ok(rendered(f2) === 'a b', `spaced inline run still renders "a b" (got ${JSON.stringify(rendered(f2))})`);

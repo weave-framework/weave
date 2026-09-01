@@ -320,7 +320,7 @@ asked for:
 ~~~text
 Where should the converted code go? [Enter = D:\my-app\src, or a folder under it]
 > features/breadcrumbs
-  → D:\my-app\srceaturesreadcrumbs
+  → D:\my-app\src\features\breadcrumbs
 ~~~
 
 Enter keeps the root. A typed folder puts the whole converted tree under it, and the symbol table follows, so the

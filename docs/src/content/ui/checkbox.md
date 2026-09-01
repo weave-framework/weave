@@ -102,6 +102,14 @@ It *is* a checkbox — Space toggles it, it's in the tab order, and the state is
 | `name` | `string` | — | Native `name` for form submission. |
 | `class` | `string` | — | Extra classes forwarded onto the `<label>` root. |
 
+<!-- gen-ui-types:begin -->
+### Types
+
+~~~ts
+import type { CheckboxControl, CheckboxProps, CheckboxContext } from '@weave-framework/ui/checkbox';
+~~~
+<!-- gen-ui-types:end -->
+
 ## When it goes wrong
 
 :::callout trap "It shows a value and your form never hears about it"

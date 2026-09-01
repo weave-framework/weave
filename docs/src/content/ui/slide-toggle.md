@@ -75,6 +75,14 @@ are the native attributes.
 | `name` | `string` | — | Native `name` for form submission. |
 | `class` | `string` | — | Extra classes forwarded onto the `<label>` root. |
 
+<!-- gen-ui-types:begin -->
+### Types
+
+~~~ts
+import type { SlideToggleControl, SlideToggleProps, SlideToggleContext } from '@weave-framework/ui/slide-toggle';
+~~~
+<!-- gen-ui-types:end -->
+
 ## When it goes wrong
 
 :::callout trap "It shows a value and your form never hears about it"

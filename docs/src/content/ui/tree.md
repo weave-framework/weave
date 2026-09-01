@@ -107,6 +107,14 @@ End** jump, **Enter / Space** activate, with typeahead. Under `dir="rtl"` the tw
 | `ariaLabel` | `string` | — | Accessible name for the tree. |
 | `class` | `string` | — | Extra classes forwarded onto the container. |
 
+<!-- gen-ui-types:begin -->
+### Types
+
+~~~ts
+import type { TreeNodeContent, TreeProps, TreeContext } from '@weave-framework/ui/tree';
+~~~
+<!-- gen-ui-types:end -->
+
 ## When it goes wrong
 
 :::callout trap "It renders, but nothing is inside it"

@@ -885,7 +885,7 @@ function createLoaderResource(match: Match, router: Router, depth: number): Load
   effect(() => {
     const params: RouteParams = router.params(depth);
     const query: RouteParams = router.query();
-    const key: string = JSON.stringify(params) + ' ' + JSON.stringify(query);
+    const key: string = JSON.stringify(params) + '\u0000' + JSON.stringify(query);
     if (key === lastKey) return; // same inputs → don't re-run on an unrelated navigation
     lastKey = key;
 

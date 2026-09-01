@@ -108,6 +108,14 @@ popover (click-away also closes).
 | `position` | `MenuPosition` | `'bottom-start'` | Popover position relative to the field. |
 | `class` | `string` | — | Extra classes forwarded onto the root. |
 
+<!-- gen-ui-types:begin -->
+### Types
+
+~~~ts
+import type { TimeValue, TimepickerControl, TimepickerProps, TimepickerContext } from '@weave-framework/ui/timepicker';
+~~~
+<!-- gen-ui-types:end -->
+
 ## When it goes wrong
 
 :::callout trap "It shows a value and your form never hears about it"

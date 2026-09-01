@@ -518,6 +518,7 @@ the mistake.
 | --- | --- |
 | `<p>` opened and never closed | `Mismatched </div>, expected </p>` |
 | a closing tag with nothing open | `Unexpected closing tag at 11` |
+| `<a href="/" @>` — a character no attribute can start with | `Unexpected character "@" in attributes of <a>` |
 | `<!--` with no `-->` | ``Unterminated comment: `<!--` has no matching `-->`.`` |
 
 :::callout trap "The line it names is below the line you must edit"
@@ -549,6 +550,21 @@ stretch, so everything after became a child of everything before.
 | `@render row(1)` written without parentheses | `Expected '(' after @render at 13` |
 | a block opened and never closed | `Expected '}' closing block at 25` |
 | `@switch (n())` with no body | `Expected '{' after @switch at 18` |
+| `@if (ok()) { }` — a block with nothing in it | `Nothing to render here …` (in full below) |
+
+:::callout trap "A stray `}` reports as an empty block"
+The message in full:
+
+~~~text
+Nothing to render here — this block body (or the template itself) is empty. Put a node inside it, or
+delete the block. A stray `}` produces this too: it closes the block before its content.
+~~~
+
+That last sentence is the one that saves the time. A stray brace closes the block **before** its content,
+so what the compiler sees is `@if (ok()) { }` followed by orphaned markup — and it reports an empty body,
+which is true and nowhere near where you would look. If you get this on a block you can see content
+inside, count the braces above it.
+:::
 
 ### Bindings
 

@@ -85,6 +85,14 @@ along.
 | `jumpLabel` | `string` | `'Go to'` | Text of the label before the jump input. |
 | `class` | `string` | — | Extra classes forwarded onto the `<nav>`. |
 
+<!-- gen-ui-types:begin -->
+### Types
+
+~~~ts
+import type { PageEvent, PaginatorProps, PaginatorContext } from '@weave-framework/ui/paginator';
+~~~
+<!-- gen-ui-types:end -->
+
 ## When it goes wrong
 
 :::callout trap "It renders, but nothing is inside it"

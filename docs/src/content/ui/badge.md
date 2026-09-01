@@ -101,6 +101,14 @@ A `tag` badge is just its own text, so it needs no extra labelling.
 | --- | --- |
 | *(default)* | The host for `count`/`dot` (an icon, button…); the label text for `tag`. |
 
+<!-- gen-ui-types:begin -->
+### Types
+
+~~~ts
+import type { BadgeVariant, BadgePosition, BadgeProps, BadgeContext } from '@weave-framework/ui/badge';
+~~~
+<!-- gen-ui-types:end -->
+
 ## When it goes wrong
 
 :::callout trap "Correct markup, no styling"

@@ -94,6 +94,14 @@ unopinionated layout shell.
 | `drawer` | The drawer's content (navigation, etc.). |
 | *(default)* | The main page content. |
 
+<!-- gen-ui-types:begin -->
+### Types
+
+~~~ts
+import type { SidenavMode, SidenavApi, SidenavProps, SidenavContext } from '@weave-framework/ui/sidenav';
+~~~
+<!-- gen-ui-types:end -->
+
 ## When it goes wrong
 
 :::callout trap "It renders, but nothing is inside it"

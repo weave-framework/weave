@@ -78,6 +78,14 @@ on close, Tab is trapped, and the background is `inert` (+ `aria-hidden`). A `ti
 panel's `aria-labelledby`. Esc and backdrop-click close it (unless `dismissable` is `false`). The grab-handle is
 `aria-hidden` — drag-to-dismiss is a pointer convenience, never the only way out.
 
+<!-- gen-ui-types:begin -->
+### Types
+
+~~~ts
+import type { BottomSheetContent, BottomSheetOptions, BottomSheetRef, ComponentContent } from '@weave-framework/ui/bottom-sheet';
+~~~
+<!-- gen-ui-types:end -->
+
 ## When it goes wrong
 
 :::callout trap "`<BottomSheet>` in a template renders nothing"

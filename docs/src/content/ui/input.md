@@ -154,6 +154,14 @@ prop or, better, wrap it in a [FormField](/ui/form-field), which wires the `<lab
 | `prefix` | Content before the field, inside the underline (an icon, text). |
 | `suffix` | Content after the field, inside the underline. |
 
+<!-- gen-ui-types:begin -->
+### Types
+
+~~~ts
+import type { InputControl, InputProps, InputContext } from '@weave-framework/ui/input';
+~~~
+<!-- gen-ui-types:end -->
+
 ## When it goes wrong
 
 :::callout trap "It shows a value and your form never hears about it"

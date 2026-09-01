@@ -80,6 +80,14 @@ yourself; the component won't guess.
 | --- | --- |
 | *(default)* | The bar's content — compose it from the part classes above. |
 
+<!-- gen-ui-types:begin -->
+### Types
+
+~~~ts
+import type { ToolbarVariant, ToolbarProps, ToolbarContext } from '@weave-framework/ui/toolbar';
+~~~
+<!-- gen-ui-types:end -->
+
 ## When it goes wrong
 
 :::callout trap "Correct markup, no styling"

@@ -3,10 +3,49 @@
 Human-readable highlights, one section per release — everything notable that landed since
 the previous one. For the granular, per-version log see [CHANGELOG.md](CHANGELOG.md).
 
-## 3.3.0 — 2026-08-30
+## 3.4.0 — 2026-09-01
 
-A **minor**, and the useful summary is that two of its three parts are about the tooling refusing to
-guess, while the third is a security fix you would never have noticed until a file made your build hang.
+A **minor**. If you are coming from 3.2.0 — which is everyone, because **3.3.0 was prepared in the
+repository and never published**; everything written for it ships here — this release has three parts:
+the documentation was rebuilt from the ground up, a handful of things the framework did in silence now
+say something, and two compiler scans stopped being a way to hang your build.
+
+### The documentation was rebuilt, not edited
+
+Every Learn page now has the same four things: what the thing is, something running you can press, the
+situations you will actually meet, and what to do when it breaks. That last one was the gap — a page
+could describe a happy path at length and carry a single warning at the end, which is not what using a
+framework feels like.
+
+- **Live demos in Learn went from 2 to 36.** Not screenshots of code: components that run on the page.
+- **Failure sections everywhere** — all 19 Learn pages, all 41 UI pages, 45 Examples pages, both
+  Reference guides — quoting the real message, not a paraphrase of it.
+- **The generated API reference grew from 174 to 349 exports.** The CDK's 102 and nine published entry
+  points (`runtime/serialize`, `/resume`, `/adopt`, `/graph`, `/server`, `/document`, `router/files`,
+  `forms/schema`, `ui/testing`) had no page at all.
+- **Static generation now lists every reason a component can refuse to resume** — eleven of them, with
+  what to write instead. It named three, and four of the seven real refusals measured across 622
+  components were caused by constructs it never mentioned.
+- The Performance page was removed. It compared by proxy against a standing rule not to, and its
+  numbers came from a single dated run.
+
+Three instruments keep it that way, and they are in CI: `audit-docs.mjs` (dead imports, API coverage,
+template and CLI surface), `audit-scenarios.mjs` (per page: API named, messages shown, page shape), and
+`verify-prose` / `verify-markdown` / `verify-resume-reasons`, which caught a broken markdown parser, one
+spelling used two ways across 145 files, and eleven refusal reasons against three documented ones.
+
+### Things the framework used to do in silence
+
+- **A URL that executes code reaching a link.** `href={{ url }}` reads like any other attribute, so an
+  author can write it without knowing that a `javascript:` value runs on click. Weave now says so and
+  still sets the attribute — the value is normalized first, because a browser strips tabs and control
+  characters before reading a scheme, which is the same bypass the `<Icon>` sanitizer had below.
+- **An HTML entity in a template.** A template is text: `&mdash;` reaches the reader as those seven
+  characters. Ten of them went into three demos in one afternoon before anyone noticed.
+- **`{{ … }}` inside `<textarea>` or `<title>`.** A browser reads those as text, so the placeholder the
+  runtime writes became six literal characters in the value and in the browser tab.
+- **`weave check` reads your project's own `.d.ts` files**, resolves `on:x` on a component to its `onX`
+  prop, and `--fix` finishes the job in one run instead of one repair per invocation.
 
 ### Two compiler scans could be made to hang on hostile input
 
@@ -106,6 +145,11 @@ true sentence about the wrong thing.
 
 Both are now located errors. Nesting is capped at 500 levels, a bound measured rather than guessed — the
 stack gives out around 2,500, and the deepest template in the Weave repository nests 25.
+
+A third shape joined them here: an **empty block body**. `@if (cond) { }` — and any template a stray `}`
+turns into one, because the brace closes the block before its content — threw the same
+`Empty template fragment`, so the message described fragments while the mistake was a brace. It now
+carries the offset of the block it is about.
 
 ### A two-way binding declares its signal
 

@@ -72,6 +72,14 @@ default 3); its body is a `role="region"` labelled by the header, and a closed r
 | `headingLevel` | `number` | `3` | ARIA heading level for the headers. |
 | `class` | `string` | — | Extra classes forwarded onto the container. |
 
+<!-- gen-ui-types:begin -->
+### Types
+
+~~~ts
+import type { ExpansionContent, ExpansionPanel, ExpansionProps, ExpansionContext } from '@weave-framework/ui/expansion';
+~~~
+<!-- gen-ui-types:end -->
+
 ## When it goes wrong
 
 :::callout trap "It renders, but nothing is inside it"

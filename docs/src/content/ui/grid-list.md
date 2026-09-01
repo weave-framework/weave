@@ -65,6 +65,14 @@ The keys are `min-tile` (96px), `gap` (1px), `radius`, and the colours `border`,
 | --- | --- |
 | *(default)* | The grid's tiles. |
 
+<!-- gen-ui-types:begin -->
+### Types
+
+~~~ts
+import type { GridListProps, GridListContext } from '@weave-framework/ui/grid-list';
+~~~
+<!-- gen-ui-types:end -->
+
 ## When it goes wrong
 
 :::callout trap "Correct markup, no styling"

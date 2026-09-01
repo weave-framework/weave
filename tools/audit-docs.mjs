@@ -45,6 +45,28 @@ for (const gen of ['docs/src/content/api.gen.ts']) {
   if (existsSync(gen)) for (const t of readFileSync(gen, 'utf8').split(/[^A-Za-z0-9_$]+/)) corpusWords.add(t);
 }
 
+/**
+ * Runtime helpers the compiler writes into generated modules — `H('deferBlock')`, `Ha('adoptText')`,
+ * `Hr('resumableHandler')` and the names the component emitter writes by hand. They are exported so the
+ * generated code can import them, not so an author can call them.
+ */
+const emittedByCompiler = new Set();
+{
+  const src = readFileSync('packages/compiler/src/codegen.ts', 'utf8') + readFileSync('packages/compiler/src/component.ts', 'utf8');
+  // Matched by plain string search rather than a pattern: the helper call is always a quoted literal,
+  // and a regex here would only be a place for an escape to go wrong.
+  for (const tag of ["H('", "Ha('", "Hr('"]) {
+    for (let i = src.indexOf(tag); i !== -1; i = src.indexOf(tag, i + tag.length)) {
+      const close = src.indexOf("'", i + tag.length);
+      if (close !== -1) emittedByCompiler.add(src.slice(i + tag.length, close));
+    }
+  }
+  // `extendSetup` is written by name rather than through the helper table. `defineComponent` is NOT
+  // excluded: the compiler emits it too, but an author writing a component by hand calls it, and the
+  // reference documents it — excluding it would shrink the denominator without any gap behind it.
+  emittedByCompiler.add('extendSetup');
+}
+
 /* ─── every export of every package, read from its source index ─── */
 
 const packages = readdirSync('packages').filter((p) => existsSync(`packages/${p}/package.json`));
@@ -76,9 +98,19 @@ function namesFrom(entry) {
       // `@internal` is not a documentation gap, it is a declaration that this is not for readers — the
       // API generator already honours it. Without this the audit demanded pages for `ifBlock`,
       // `adoptText` and `AdoptCursor`, which only the compiler's own output ever calls.
-      const before = src.slice(Math.max(0, m.index - 400), m.index);
-      const doc = before.lastIndexOf('/**');
-      if (doc !== -1 && before.slice(doc).includes('@internal') && !before.slice(doc).includes('*/\n\n')) continue;
+      // The window used to be 400 characters, which is shorter than a real doc block: `reconcileKeyed`
+      // carries `@internal` sixteen lines up and was reported as an undocumented app-facing API for it.
+      // Take the whole comment instead — from its `/**` to the `*/` that ends immediately before the
+      // declaration — so the length of the prose cannot change the answer.
+      const before = src.slice(0, m.index);
+      const close = before.lastIndexOf('*/');
+      const doc = close === -1 ? -1 : before.lastIndexOf('/**', close);
+      const attached = close !== -1 && before.slice(close + 2).trim() === '';
+      if (attached && doc !== -1 && before.slice(doc, close).includes('@internal')) continue;
+      // A runtime helper the COMPILER emits is not an API either. An author never types `applyAction`
+      // or `deferBlock`; the build writes them into the module it generates, which is exactly why they
+      // are exported. Read from codegen rather than listed here, so the two cannot drift apart.
+      if (emittedByCompiler.has(m[1])) continue;
       names.set(m[1], f);
     }
     for (const m of src.matchAll(/export\s*\*\s*from\s*'([^']+)'/g)) {

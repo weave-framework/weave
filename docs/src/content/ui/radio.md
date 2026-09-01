@@ -95,6 +95,14 @@ don't pass one.
 | `label` | `string` | — | Accessible name for the group. |
 | `class` | `string` | — | Extra classes forwarded onto the group container. |
 
+<!-- gen-ui-types:begin -->
+### Types
+
+~~~ts
+import type { RadioControl, RadioOption, RadioGroupProps, RadioGroupContext } from '@weave-framework/ui/radio';
+~~~
+<!-- gen-ui-types:end -->
+
 ## When it goes wrong
 
 :::callout trap "It shows a value and your form never hears about it"

@@ -97,6 +97,14 @@ Don't hide anything the user *must* have inside a tooltip — it's transient and
 helpful extras, not required content.
 :::
 
+<!-- gen-ui-types:begin -->
+### Types
+
+~~~ts
+import type { TooltipOptions } from '@weave-framework/ui/tooltip';
+~~~
+<!-- gen-ui-types:end -->
+
 ## When it goes wrong
 
 :::callout trap "There is no `<Tooltip>` tag — it is a `use:` action"

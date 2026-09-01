@@ -92,6 +92,25 @@ overlays and portals · connected positioning · scroll strategies · focus trap
 
 Everything is in-house and zero-dep, RTL-aware, and honours `prefers-reduced-motion`.
 
+## Testing your components
+
+`@weave-framework/ui/testing` drives a component the way a person does — it opens the overlay, moves the
+focus, presses the key — so a test asserts what the user gets rather than what the implementation did.
+
+```ts
+import { mount, click, press, overlay, focused, tick } from '@weave-framework/ui/testing';
+
+const { el, dispose } = mount(Select, { options });
+click(el.querySelector('.weave-select__field')!);
+await tick();
+
+// A dialog, menu, tooltip or picker renders OUTSIDE the component — `overlay()` is where the
+// library puts it, which is the one thing a consumer cannot work out on their own.
+press(overlay('.weave-select__panel')!, 'ArrowDown');
+console.log(focused());
+dispose();
+```
+
 📚 **Guides + per-component API:** [Component docs](https://weaveframework.dev/ui/button) · [Styling & theming](https://weaveframework.dev/ui/theming) · [Live examples](https://weaveframework.dev/examples)
 
 ## License

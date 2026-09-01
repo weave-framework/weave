@@ -337,9 +337,16 @@ These come from the loader — they are about the files, not the markup:
 | a `<Missing>` tag with no import and no file at any conventional path | ``weave: card.ts composes <Missing> but no import for it was found. Import it in the component's script, or place its module at ../missing/missing.`` |
 | two components claiming one custom-element tag | `weave: custom element tag declared twice` |
 | a custom-element tag with no hyphen | `weave: custom element tag must contain a hyphen (Custom Elements spec)` |
+| `extend` naming a component the file never imports | ``weave: card.ts — extends 'Base' but no matching `import Base from '…'` was found.`` |
+| a declarative `patch` whose base is a published package | ``weave: card.ts — a `#3` (patch) extension needs a LOCAL base with a readable template; '@acme/ui/card' did not resolve.`` |
 
 Each of these is a **build error**, not a warning. That is the deliberate part: an ambiguous declaration
 is refused rather than guessed at, so a component never quietly gets a template you did not mean.
+
+The last one is worth a sentence, because it looks like a bug and is not: a declarative `patch` edits the
+base's **template**, and a published package ships compiled output with no raw template in it. There is
+nothing to patch. Extend a local component instead, or write your own `template` and compose the
+published one inside it.
 
 ### When the declaration is not static
 

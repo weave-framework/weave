@@ -80,6 +80,14 @@ pointer capture, so the drag survives leaving the track). Give it a `label` for 
 | `format` | `(value: number) => string` | *the number* | Formats the value for `aria-valuetext`. |
 | `class` | `string` | — | Extra classes forwarded onto the container. |
 
+<!-- gen-ui-types:begin -->
+### Types
+
+~~~ts
+import type { SliderControl, SliderProps, SliderContext } from '@weave-framework/ui/slider';
+~~~
+<!-- gen-ui-types:end -->
+
 ## When it goes wrong
 
 :::callout trap "It shows a value and your form never hears about it"

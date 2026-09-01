@@ -82,6 +82,14 @@ The chips are a roving-tabindex `role="group"`: Arrow / Home / End move focus be
 | `removeLabel` | `(chip: string) => string` | `Remove <chip>` | aria-label for a chip's remove button. |
 | `class` | `string` | — | Extra classes forwarded onto the group. |
 
+<!-- gen-ui-types:begin -->
+### Types
+
+~~~ts
+import type { ChipsControl, ChipsProps, ChipsContext } from '@weave-framework/ui/chips';
+~~~
+<!-- gen-ui-types:end -->
+
 ## When it goes wrong
 
 :::callout trap "It shows a value and your form never hears about it"

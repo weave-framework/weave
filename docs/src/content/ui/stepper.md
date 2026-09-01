@@ -82,6 +82,14 @@ linear mode) carries `aria-disabled="true"`. The built-in nav are real Buttons. 
 | `label` | `string` | — | Accessible name for the step list. |
 | `class` | `string` | — | Extra classes forwarded onto the container. |
 
+<!-- gen-ui-types:begin -->
+### Types
+
+~~~ts
+import type { StepContent, StepItem, StepperProps, StepperContext } from '@weave-framework/ui/stepper';
+~~~
+<!-- gen-ui-types:end -->
+
 ## When it goes wrong
 
 :::callout trap "It renders, but nothing is inside it"
