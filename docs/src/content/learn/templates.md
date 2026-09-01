@@ -505,3 +505,71 @@ Every dynamic value uses `{{ }}` (and a literal `@` is escaped as `@@`). Bind at
 Keep your templates consistently formatted with the [Prettier plugin](/learn/tooling#formatting-templates-prettier) — it understands `{{ }}`, the `@`-blocks, and every binding kind, so you can stop `.prettierignore`-ing them.
 
 [Next: Reactivity in depth :icon[arrow-right]](/learn/reactivity) · [Reference: template syntax :icon[arrow-right]](/reference/template-syntax)
+
+## When it goes wrong
+
+A template is compiled, so almost every mistake is a **build error with a position** rather than
+something you discover at runtime. Every message below is real output, produced by feeding the compiler
+the mistake.
+
+### Tags
+
+| You wrote | It says |
+| --- | --- |
+| `<p>` opened and never closed | `Mismatched </div>, expected </p>` |
+| a closing tag with nothing open | `Unexpected closing tag at 11` |
+| `<!--` with no `-->` | ``Unterminated comment: `<!--` has no matching `-->`.`` |
+
+:::callout trap "The line it names is below the line you must edit"
+An unclosed tag cannot be detected where it happens — only where something later fails to fit. So the
+position points at the `</div>` that did not match, and the `<p>` you forgot is somewhere above it.
+
+`Template nests more than 500 levels deep` is the same mistake at scale: nothing was closed for a long
+stretch, so everything after became a child of everything before.
+:::
+
+### Blocks
+
+| You wrote | It says |
+| --- | --- |
+| `@else` with no `@if` | `Unexpected @else at 5 (no matching block)` |
+| `@let = 1;` | `Expected name after @let at 10` |
+| `@snippet { … }` | `Expected a snippet name after @snippet at 14` |
+| `@key () { … }` | `@key () needs an expression` |
+| `@render ()` | `@render () needs an expression` |
+| `@defer (on whenever)` | `Unknown @defer trigger 'on whenever'` |
+| `@then (1+1)` | `Expected an identifier alias in @then/@catch, got '1+1'` |
+| `@if (a() { … }` — one paren short | `Unclosed ( in block head` |
+| something other than `@case` in `@switch` | `Expected @case/@default or '}' in @switch at 21` |
+
+### Bindings
+
+| You wrote | It says |
+| --- | --- |
+| `title={ name() }` — one brace | `Attribute bindings use double braces: write {{ expr }}, not { expr } (at 11)` |
+| `{{ name()` with no closing braces | `Unclosed {{ expression` |
+| `transition:fade="fast"` — a string, not an expression | `transition:fade needs {expr} params, got a string` |
+
+The single-brace one is worth knowing by sight. It is the most common thing to carry in from another
+template language, and the message tells you the whole rule: **everything reactive in Weave is `{{ }}`**,
+with no exceptions to remember.
+
+### Things that compile and then do nothing
+
+These are the ones worth memorising, because nothing stops you:
+
+- **`{{ count }}` instead of `{{ count() }}`** — renders the function's source. `weave check` reports it;
+  the browser does not.
+- **`onclick={{ fn }}`** instead of `on:click` — that is an HTML attribute set to a function's source
+  text, not a listener. The linter warns.
+- **`&mdash;`** — seven characters, not an em dash, because a template is text.
+- **`{{ }}` inside `<textarea>` or `<title>`** — cannot work at all; those elements' content is read as
+  text, so the marker the runtime needs lands in the value. Use `bind:value`, or set the title from code.
+- **`class:`, `transition:`, `ref`, `show` on a `<Component>`** — a build error, and deliberately: they
+  describe one element, and a component may render several.
+
+:::callout info "Why so much of this is caught before you run it"
+The template is not interpreted at runtime — it is compiled. A parser that has to produce DOM
+instructions cannot skip past a construct it does not understand, so it stops and tells you where. That
+is the trade the compile step buys you, and it is why so few things on this page fail silently.
+:::
