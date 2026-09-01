@@ -3,7 +3,7 @@
 import { build as esbuild } from 'esbuild';
 import { mkdir, mkdtemp, writeFile, readFile, readdir, rm, cp } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
-import { join, relative, isAbsolute } from 'node:path';
+import { basename, join, relative, isAbsolute } from 'node:path';
 import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
 import { weave, type WeaveState } from './plugin.js';
@@ -160,11 +160,28 @@ export async function build(config: BuildConfig): Promise<BuiltAssets> {
   // What esbuild actually wrote for the entry. Read, never composed: with `[hash]` in the name there is
   // no way to know it in advance, and a guess that misses produces a page that loads and renders
   // nothing, with no error anywhere.
-  const entryFile: string =
-    Object.entries(bundled.metafile?.outputs ?? {})
-      .find(([file, out]) => out.entryPoint !== undefined && file.endsWith('.js'))?.[0]
-      .split(/[\/]/)
-      .pop() ?? 'main.js';
+  //
+  // Matched by WHICH entry point, not by "has one". esbuild sets `entryPoint` on every code-split
+  // chunk it names after a module, so a `lazy()` route is an entry point in the metafile exactly like
+  // the real one — this app has 90 of them. Taking the first match therefore returned whichever route
+  // the map happened to yield first, and the built `index.html` loaded a UI component's page module
+  // instead of the app. The page fetched, parsed, ran, and mounted nothing: the exact failure the
+  // paragraph above was written to prevent, arrived at from the other side.
+  const entryIn: string = ve ? `weave-entry:${VIRTUAL_ENTRY}` : config.entry!;
+  const outputs: Array<[string, { entryPoint?: string }]> = Object.entries(bundled.metafile?.outputs ?? {});
+  const entryOut: string | undefined = outputs.find(
+    ([file, out]) => file.endsWith('.js') && out.entryPoint === entryIn
+  )?.[0];
+  // A hand-written entry is reported by its path as esbuild resolved it — RELATIVE, with forward
+  // slashes — while the config gave an absolute Windows path. Comparing the two directly can only fail
+  // there, so the fallback compares basenames, and uses `basename` rather than a split on `/`: splitting
+  // an absolute Windows path on `/` returns the whole path, and the fallback then matched nothing.
+  const byName: string | undefined = outputs.find(
+    ([file, out]) => file.endsWith('.js') && out.entryPoint !== undefined && basename(out.entryPoint) === basename(entryIn)
+  )?.[0];
+  const resolved: string | undefined = entryOut ?? byName;
+  if (!resolved) throw new Error('weave build: esbuild wrote no output for the entry — nothing to put in index.html.');
+  const entryFile: string = basename(resolved);
 
   // Copy the static web root (favicons, manifest, the raw index.html) into the output;
   // the injected index.html below overwrites the raw copy.

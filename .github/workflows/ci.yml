@@ -312,6 +312,14 @@ jobs:
       # white page, and nothing versioned the bundle a CDN was holding.
       - name: Sub-path deploys resolve, and assets carry a content version
         run: pnpm verify:base-path
+      # esbuild sets `entryPoint` on every code-split chunk it names after a module, so a `lazy()` route is
+      # an entry point in the metafile exactly like the real one. The build read "the first output that has
+      # one", and the documentation site shipped with index.html loading a UI component's page module: it
+      # fetched, parsed, ran, and mounted nothing. No 404, no console error, no failing build — a blank page.
+      # base-path already asserted the injected name and stayed green, because its fixture app has ONE
+      # module. This one has forty lazy routes, which is what makes the ordering reproduce.
+      - name: The injected entry script is the entry, not a lazy route
+        run: pnpm verify:entry-name
       # The other half of `base`: a real routed app, built and served from a sub-path in a real browser,
       # navigating and surviving a deep-link refresh through the emitted 404.html.
       - name: A routed app navigates under a sub-path

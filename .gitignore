@@ -13,6 +13,10 @@ build/
 packages/ui/.compiled/
 # Transient bundles + fixture apps emitted by the verify smokes (each cleans up after itself; the
 # patterns are here so an interrupted run leaves nothing to commit by accident).
+# Every smoke test's scratch bundle and fixture app. Listed one pattern at a time below, which is how a
+# NEW test's fixture leaks: `tools/.verify-entry-name-app-*` was staged into a release commit before
+# anyone noticed the list had not grown with it. One rule for the whole convention instead.
+tools/.verify-*
 tools/.verify-dev-proxy-bundle.mjs
 tools/.verify-dev-compiler-error-bundle.mjs
 tools/.verify-dev-compiler-app-*/

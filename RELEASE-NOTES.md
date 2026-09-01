@@ -3,6 +3,28 @@
 Human-readable highlights, one section per release — everything notable that landed since
 the previous one. For the granular, per-version log see [CHANGELOG.md](CHANGELOG.md).
 
+## 3.4.1 — 2026-09-01
+
+A **patch**, and if your app has `lazy()` routes you want it: `3.4.0`'s `weave build` wrote the wrong
+script into `index.html`.
+
+### `weave build` injected a lazy route instead of the entry
+
+esbuild sets `entryPoint` on every code-split chunk it names after a module, so a `lazy()` route is an
+entry point in the build's metafile exactly like the real one. The build took the first output that had
+one. With enough routes that is a route — and the page then fetches it, parses it, runs it, and mounts
+nothing.
+
+There is no symptom to search for. No 404, no console error, no failing build; the page is simply blank.
+This release exists because it happened to the Weave documentation site on the `3.4.0` deploy.
+
+**If you built with `3.4.0`, rebuild with this.** Nothing in your code needs to change. An app with no
+`lazy()` routes was never affected: with one module in the bundle there was only one entry point to pick.
+
+### Upgrading
+
+Nothing to do beyond the version. No API moved, and no behaviour of a running app changed.
+
 ## 3.4.0 — 2026-09-01
 
 A **minor**. If you are coming from 3.2.0 — which is everyone, because **3.3.0 was prepared in the

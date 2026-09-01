@@ -1,6 +1,6 @@
 {
   "name": "weave-monorepo",
-  "version": "3.4.0",
+  "version": "3.4.1",
   "description": "Weave — fine-grained reactive, signal-native UI framework. Compiled, TypeScript-first, no Virtual DOM.",
   "type": "module",
   "private": true,
@@ -63,6 +63,7 @@
     "verify:cli-help": "node packages/cli/test/cli-help.smoke.mjs",
     "verify:dev-runtime-error": "node packages/cli/test/dev-runtime-error.smoke.mjs",
     "verify:base-path": "node packages/cli/test/base-path.smoke.mjs",
+    "verify:entry-name": "node packages/cli/test/entry-name.smoke.mjs",
     "verify:base-router": "node packages/cli/test/base-router.smoke.mjs",
     "verify:lint-location": "node packages/cli/test/lint-location.smoke.mjs",
     "verify:check-fix": "node packages/cli/test/check-fix.smoke.mjs",

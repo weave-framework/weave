@@ -14,6 +14,17 @@
 > already left it behind — Phase E ran 94 commits without a bump, and then released as one MINOR. The public
 > promise wins; the habit is retired.)*
 
+## 3.4.1
+
+- **fix(cli):** the `<script>` the build injects into `index.html` is the **entry**, not one of the app's
+  lazy routes. esbuild sets `entryPoint` on every code-split chunk it names after a module, so a
+  `lazy()` route is an entry point in the metafile exactly like the real one; the build read "the first
+  output that has one". For an app with enough routes that is a route, and the page then fetches,
+  parses, runs, and mounts nothing — no 404, no console error, no failing build, a blank page. **This
+  shipped:** the 3.4.0 documentation deploy was blank until this fix. `verify:entry-name` builds an app
+  with forty lazy routes and asserts the injected script is the entry; the count is the point, because
+  `verify:base-path` had asserted the same name for a year against a fixture with one module.
+
 ## 3.4.0
 
 - **fix(compiler):** an empty block body says **where**. `@if (cond) { }` — and every template a stray
