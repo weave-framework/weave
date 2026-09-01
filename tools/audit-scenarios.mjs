@@ -93,7 +93,14 @@ function messagesIn(paths) {
   for (const f of paths.flatMap(filesUnder)) {
     const src = readFileSync(f, 'utf8');
     for (const m of src.matchAll(/(?:throw new (?:Error|ParseError|TypeError)|console\.(?:error|warn))\(([\s\S]{0,320}?)\);/g)) {
-      const text = [...m[1].matchAll(/[`'"]([^`'"]{20,200})[`'"]/g)].map((x) => x[1]).join(' ').replace(/\s+/g, ' ').trim();
+      // A backtick inside a template literal is written `\``, and that backslash survived into the
+      // extracted text — so a page quoting the message with real backticks never matched. Unescape it.
+      const text = [...m[1].matchAll(/[`'"]([^`'"]{20,200})[`'"]/g)]
+        .map((x) => x[1])
+        .join(' ')
+        .replace(/\`/g, '`')
+        .replace(/\s+/g, ' ')
+        .trim();
       if (!text || INTERNAL.test(text)) continue;
       out.push(text);
     }
@@ -124,20 +131,29 @@ for (const s of SUBSYSTEMS) {
   const apiMissing = [...api].filter((n) => !words.has(n));
 
   const msgs = messagesIn(s.sources);
-  // The probe is the longest run of literal words at the start, AFTER dropping the `weave:` / `Weave:`
-  // prefix most messages carry. Splitting on the first colon made every one of those probe the single
-  // word "weave", which is under the length floor, so a page quoting the message verbatim still counted
-  // as not showing it.
-  const probeOf = (m) =>
+  // A message counts as SHOWN when any literal run of it appears on the page.
+  //
+  // Two earlier versions were both wrong in the same direction — they picked ONE run and asked about
+  // that. Leading-run probing failed on `Unclosed <${closeTag}>`, whose literal head is too short to
+  // test; longest-run probing failed where a page quotes a message's first half and not its longest.
+  // A message is a sentence with holes in it, so the honest question is whether the page shows any of
+  // the parts between the holes.
+  const runsOf = (m) =>
     m
       .replace(/^\s*\[?weave\]?:\s*/i, '')
-      .replace(/\$\{[^}]*\}/g, '…')
-      .split(/[.,—]|…/)[0]
-      .trim()
-      .slice(0, 34);
+      // Split on the holes AND on a stray backslash: an escaped backtick inside a template literal ends
+      // the extractor's char class, leaving a lone `\` where `\`component\`` was. A run carrying that
+      // matches nothing, and it was swallowing the whole message as one unusable run.
+      .split(/\$\{[^}]*\}|\\n|\\/)
+      .map((part) => part.replace(/\s+/g, ' ').trim())
+      .filter((part) => part.length >= 14);
+  // Both sides get their whitespace collapsed. A page wraps a quoted message across lines, so a run that
+  // is one string in the source is a string with a newline in it on the page — and `includes` said no to
+  // messages the page quotes in full.
+  const flat = text.replace(/\s+/g, ' ');
   const shown = msgs.filter((m) => {
-    const probe = probeOf(m);
-    return probe.length > 12 && text.includes(probe);
+    const runs = runsOf(m);
+    return runs.length > 0 && runs.some((r) => flat.includes(r));
   });
 
   const shape = SECTIONS.filter((x) => x.re.test(text)).length;
