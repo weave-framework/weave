@@ -239,3 +239,36 @@ Component styles can live in a sibling file, an inline string, an explicit file,
 :::
 
 [Next: Lifecycle, context & DI :icon[arrow-right]](/learn/lifecycle-context-di)
+
+## When it goes wrong
+
+Styling almost never errors. It just does not apply, and the reason is nearly always the same one.
+
+:::callout trap "The rule is right and nothing changes"
+Your selector matched an element **this component did not create**. Scoping only marks the DOM Weave
+generated from your template, so a child component's root, an element built in JavaScript (a `<Link>`'s
+`<a>`), and anything a third-party library inserted all lack the scope attribute.
+
+The fix is the `:global()` pattern above — scope a container you own, then reach through it. And the
+symptom is worth memorizing: a rule that is correct in DevTools' "Styles" pane but crossed out, or simply
+absent from the element you expected.
+:::
+
+**A style file that is not picked up at all.** The loader pairs `app.ts` with `app.<styleLang>` — one
+extension, decided by your config, with no probing. An `app.scss` in a project configured for `css` is
+not a broken stylesheet, it is a file nothing looks for.
+
+**`:host` doing nothing.** `:host` is the component's outermost element. A component that renders a
+fragment — several top-level nodes — has no single host for it to mean, so the rule matches nothing.
+Wrap the component in one element if you need it.
+
+**A global that leaked.** `:global()` turns scoping off for that compound, which is exactly what it is
+for and exactly why `:global(.card)` on its own is a rule that now applies to every `.card` in the app.
+Keep a scoped ancestor in front of it.
+
+:::callout info "How to tell in ten seconds"
+Inspect the element and look for `data-w-<hash>`. If it is missing, the element is not yours and no
+scoped rule will ever match it. If it is present and your rule still does not apply, it is ordinary CSS
+specificity — scoping adds one attribute selector's worth, and nothing more.
+:::
+

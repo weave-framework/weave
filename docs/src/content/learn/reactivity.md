@@ -497,3 +497,39 @@ const count$ = toObservable(() => count()); // hand to any Observable consumer
 :::
 
 [Next: Components :icon[arrow-right]](/learn/components) · [Full reactive API in the Reference :icon[arrow-right]](/reference/runtime)
+
+## When it goes wrong
+
+Reactivity is where the silent failures live, because nothing here throws — an effect that never runs
+looks exactly like an effect whose work was not needed.
+
+:::callout trap "An effect that runs once and never again"
+It read nothing reactive. Subscription happens by **calling** a signal during the run, so an effect whose
+body only reads `.peek()`, or reads a plain variable captured in `setup`, has no sources and will never
+re-run.
+
+The same shape with a delay: reads made **after** an `await` are not tracked. Only the synchronous part
+of the first run establishes the dependencies, so `const x = await load(); count();` subscribes to
+nothing at all.
+:::
+
+**A computed whose body never runs.** It is lazy: nothing reads it, it never executes. Put a
+`console.log` or an HTTP call in one and it may simply never happen. Use an `effect` for work that must
+occur, and a `computed` for a value you are going to read.
+
+**An effect that re-runs forever.** It writes a signal it also reads. `untrack` around the write is the
+fix, and the demos on this page use it for exactly that reason — a counter incremented by the effect
+that reads it is an infinite loop on the second frame.
+
+**Cleanup that never runs.** `onCleanup` attaches to the computation executing *right now*. Called
+outside one — at the top of `setup`, or inside a callback — it is a silent no-op. If a subscription is
+leaking, check that the cleanup is inside the effect and not beside it.
+
+:::callout info "The error routes are opposite, and that is deliberate"
+A `computed` that throws re-throws **to whoever read it** — it surfaces at the call site, like any
+function. An `effect` that throws goes **up the owner chain** to the nearest `catchError` boundary,
+because there is no caller to hand it to.
+
+Same machinery, opposite directions, and it decides where you put the `try`.
+:::
+

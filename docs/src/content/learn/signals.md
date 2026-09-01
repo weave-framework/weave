@@ -235,3 +235,37 @@ A **signal** holds a value and announces changes. Create it with `signal(initial
 :::
 
 [Next: Reactivity — effects, cleanup, and how updates stay glitch-free :icon[arrow-right]](/learn/reactivity)
+
+## When it goes wrong
+
+A signal is small enough that there is not much to break — but the three ways it does break are all
+**silent**, and that is what makes them worth knowing by name.
+
+:::callout trap "You forgot the `()`"
+Covered at the top, and it is genuinely most of the mistakes on this page. `weave check` names it:
+
+~~~
+Signal<number> is a function, and a template renders a function as its own source text.
+Call it — a signal is read with `()`, as in {{ count() }}.
+~~~
+
+Nothing throws, so a page that is never type-checked will show you the function instead.
+:::
+
+**A write that changes nothing.** `count.set(0)` when the value is already `0` does not announce. That is
+the no-op rule working — and with an object it bites, because "already" means the **same reference**.
+Mutate an object and set it back and the screen keeps the old value while memory holds the new one. The
+demo above makes it visible; the fix is always a new object.
+
+**A read that does not subscribe.** `.peek()` never subscribes, on purpose. Reach for it and forget you
+did, and you get a value that is correct once and never updates again. If something is stale and nothing
+looks wrong, search for `peek` first.
+
+:::callout info "What a signal will not do"
+It will not deep-watch. `signal({ a: 1 })` announces when the OBJECT is replaced, not when `a` changes
+inside it — there is no proxy and nothing observing the properties. That is a deliberate floor on the
+cost of every write, and the reason a signal is a few dozen bytes.
+
+If you want per-field reactivity, use a signal per field, or replace the object.
+:::
+
