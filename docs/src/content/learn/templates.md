@@ -556,7 +556,7 @@ with no exceptions to remember.
 
 ### Things that compile and then do nothing
 
-These are the ones worth memorising, because nothing stops you:
+These are the ones worth memorizing, because nothing stops you:
 
 - **`{{ count }}` instead of `{{ count() }}`** — renders the function's source. `weave check` reports it;
   the browser does not.
