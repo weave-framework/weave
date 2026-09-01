@@ -82,3 +82,27 @@ restored to the host on commit or cancel. Esc always cancels.
 
 Give the host its own keyboard reachability — `use:popoverEdit` wires the key handler, but a non-interactive
 element such as a `<span>` or `<td>` still needs a `tabindex` of your own to receive focus.
+
+## When it goes wrong
+
+:::callout trap "There is no `<PopoverEdit>` tag — it is a `use:` action"
+This one attaches to an element you already have, rather than being placed as a component:
+
+~~~ts title="in your .ts"
+import { popoverEdit } from '@weave-framework/ui/popover-edit';
+~~~
+~~~html title="in your template"
+<button use:popoverEdit={{ editCfg }}>Edit</button>
+~~~
+
+`use:` is what gives it the element to own. Writing `<PopoverEdit>` is a build error naming a component that
+was never meant to exist.
+:::
+
+**It attaches to nothing.** A `use:` action needs **one** element. Put it on a component that renders
+several top-level nodes and you get: `use: on <X>: actions attach to a single root element, but <X>
+renders N nodes.` Move it onto a real element inside.
+
+**It never appears.** Two usual causes: the stylesheet is a separate import
+(`@use 'pkg:@weave-framework/ui/popover-edit';`), and the action returns a cleanup that Weave calls on unmount —
+so an element removed and re-added gets a fresh one, which is correct and occasionally surprising.

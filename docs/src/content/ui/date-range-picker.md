@@ -177,3 +177,21 @@ returns focus. It's a non-modal popover (click-away also closes and discards a h
 All optional; each defaults to the English string shown. `prevMonth` (`'Previous month'`), `nextMonth`
 (`'Next month'`), `prevYearRange` (`'Previous years'`), `nextYearRange` (`'Next years'`), `chooseYear`
 (`'Choose year'`), `calendarLabel` (`'Choose date range'` — the dialog name), `clear` (`'Clear'`).
+
+## When it goes wrong
+
+:::callout trap "Two pickers, two date formats"
+Like `<Datepicker>`, this is configured **per instance** — adapter, locale, first day of week, display
+format, translated chrome. Configure one field and forget the next and the app grows two date formats.
+
+`provideDateTimeDefaults()` at the app root supplies them once, and resolution is always **instance prop
+→ context default → built-in**, so a single field can still opt out. Pass getters rather than values: a
+plain value is accepted and simply never changes.
+:::
+
+**A range that comes back in the wrong order.** The two clicks are anchor-then-end and are ordered for
+you, so a "backwards" range is not a thing you have to guard against — if you are seeing one, the value
+was set from code rather than from the calendar.
+
+**It shows a range and your form never hears about it.** It takes a `control`. See
+[Forms](/learn/forms).

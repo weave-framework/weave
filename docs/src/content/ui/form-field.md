@@ -109,3 +109,24 @@ to the same forms field, say).
 | Slot | Content |
 | --- | --- |
 | *(default)* | The control to frame (an Input, Select, Checkbox…). |
+
+## When it goes wrong
+
+:::callout trap "It shows a value and your form never hears about it"
+Every input-like component takes a `control`. Without one it is an ordinary uncontrolled element: it
+displays, it accepts typing, and it reports nothing — so `valid()` stays true and Submit sends an empty
+field.
+
+~~~html
+<FormField control={{ email }} />
+~~~
+
+See [Forms](/learn/forms) for what a control carries: value, touched, dirty, error and the validation
+timing that decides when a message is shown.
+:::
+
+**It renders unstyled.** The stylesheet is a separate import per component —
+`@use 'pkg:@weave-framework/ui/form-field';` in your Sass. Correct markup with no styling is always this.
+
+**The error message never appears.** An error is set from the first keystroke; `touched` decides whether
+it is *shown*. If Submit seems to do nothing on an empty form, call `touchAll()` on the group first.

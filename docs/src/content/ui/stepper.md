@@ -81,3 +81,21 @@ linear mode) carries `aria-disabled="true"`. The built-in nav are real Buttons. 
 | `disabled` | `boolean` | `false` | Disable the whole stepper. |
 | `label` | `string` | — | Accessible name for the step list. |
 | `class` | `string` | — | Extra classes forwarded onto the container. |
+
+## When it goes wrong
+
+:::callout trap "It renders, but nothing is inside it"
+This component **projects** what you put in it. If the slot is empty — or the data it iterates is still
+loading — you get the frame with nothing in it, which looks like a broken component and is an empty one.
+
+Check the data first: an `@for` over an array that is `[]` until a fetch resolves renders exactly
+nothing, correctly.
+:::
+
+**It renders unstyled.** `@use 'pkg:@weave-framework/ui/stepper';` is a separate import from the component.
+
+**State that resets when the list changes.** Give any `@for` a stable `track`. Keyed by index, a row is a
+different row the moment the list is filtered or sorted, and anything it held goes with it.
+
+**A style of yours that will not reach inside.** Its root carries its own scope attribute, so use
+`:global()` from a container you own — see [Styling](/learn/styling#the-one-gotcha-worth-knowing).

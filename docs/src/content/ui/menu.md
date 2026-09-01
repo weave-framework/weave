@@ -98,3 +98,27 @@ first item; opening by click highlights none.
 
 - **[Menubar](/ui/menubar)** — a row of always-visible top-level menus (File / Edit / View).
 - **[Context Menu](/ui/context-menu)** — the same list, opened on right-click.
+
+## When it goes wrong
+
+:::callout trap "There is no `<Menu>` tag — it is a `use:` action"
+This one attaches to an element you already have, rather than being placed as a component:
+
+~~~ts title="in your .ts"
+import { menu } from '@weave-framework/ui/menu';
+~~~
+~~~html title="in your template"
+<button use:menu={{ { items: items() } }}>Actions</button>
+~~~
+
+`use:` is what gives it the element to own. Writing `<Menu>` is a build error naming a component that
+was never meant to exist.
+:::
+
+**It attaches to nothing.** A `use:` action needs **one** element. Put it on a component that renders
+several top-level nodes and you get: `use: on <X>: actions attach to a single root element, but <X>
+renders N nodes.` Move it onto a real element inside.
+
+**It never appears.** Two usual causes: the stylesheet is a separate import
+(`@use 'pkg:@weave-framework/ui/menu';`), and the action returns a cleanup that Weave calls on unmount —
+so an element removed and re-added gets a fresh one, which is correct and occasionally surprising.

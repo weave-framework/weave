@@ -107,3 +107,24 @@ popover (click-away also closes).
 | `label` | `string` | — | Accessible name (when not wrapped by a FormField). |
 | `position` | `MenuPosition` | `'bottom-start'` | Popover position relative to the field. |
 | `class` | `string` | — | Extra classes forwarded onto the root. |
+
+## When it goes wrong
+
+:::callout trap "It shows a value and your form never hears about it"
+Every input-like component takes a `control`. Without one it is an ordinary uncontrolled element: it
+displays, it accepts typing, and it reports nothing — so `valid()` stays true and Submit sends an empty
+field.
+
+~~~html
+<Timepicker control={{ startsAt }} />
+~~~
+
+See [Forms](/learn/forms) for what a control carries: value, touched, dirty, error and the validation
+timing that decides when a message is shown.
+:::
+
+**It renders unstyled.** The stylesheet is a separate import per component —
+`@use 'pkg:@weave-framework/ui/timepicker';` in your Sass. Correct markup with no styling is always this.
+
+**The error message never appears.** An error is set from the first keystroke; `touched` decides whether
+it is *shown*. If Submit seems to do nothing on an empty form, call `touchAll()` on the group first.

@@ -153,3 +153,24 @@ prop or, better, wrap it in a [FormField](/ui/form-field), which wires the `<lab
 | --- | --- |
 | `prefix` | Content before the field, inside the underline (an icon, text). |
 | `suffix` | Content after the field, inside the underline. |
+
+## When it goes wrong
+
+:::callout trap "It shows a value and your form never hears about it"
+Every input-like component takes a `control`. Without one it is an ordinary uncontrolled element: it
+displays, it accepts typing, and it reports nothing — so `valid()` stays true and Submit sends an empty
+field.
+
+~~~html
+<Input control={{ email }} />
+~~~
+
+See [Forms](/learn/forms) for what a control carries: value, touched, dirty, error and the validation
+timing that decides when a message is shown.
+:::
+
+**It renders unstyled.** The stylesheet is a separate import per component —
+`@use 'pkg:@weave-framework/ui/input';` in your Sass. Correct markup with no styling is always this.
+
+**The error message never appears.** An error is set from the first keystroke; `touched` decides whether
+it is *shown*. If Submit seems to do nothing on an empty form, call `touchAll()` on the group first.

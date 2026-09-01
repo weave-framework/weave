@@ -192,3 +192,27 @@ first-class citizen of the same engine.
 | `focus-ring($color?, $width?, $offset?)` | The shared accent focus ring. Defaults: accent, `2px`, `1px`. |
 | `truncate()` / `visually-hidden()` | Shared helpers the components use themselves. |
 | `reduced-motion()` | Honour `prefers-reduced-motion` (already inside `all-styles()`). |
+
+## When it goes wrong
+
+:::callout trap "A `--weave-*` variable you set that nothing reads"
+Every token the library emits has an exact name, and a name that is one character out is not an error —
+CSS answers an undefined variable with its fallback and says nothing.
+
+This page itself once offered two worked examples whose names did not exist — a button one ending in
+*fill* and an input one ending in *underline*, where the real tokens end in `background` and `border`. A
+reader following that advice set a variable nothing reads and watched nothing happen. The wrong names are
+described rather than printed here on purpose: the site refuses any `--weave-*` name the library does not
+emit, in prose as much as in code, and that rule is what stops this page teaching a typo again.
+
+The site now checks every `--weave-*` name it prints against the built stylesheet, which is why that
+cannot recur here — but in your own app, the test is the same: inspect the element and look for the
+variable in the computed styles.
+:::
+
+**A theme that applies to one component only.** The theme emit belongs in a **global** stylesheet. Inside
+a component's `.scss` its tokens are scoped to that component, and everything else falls back.
+
+**A token that works in light and not in dark.** Define the value on the base selector and override only
+what changes per theme. A colour whose only definition sits inside a dark-mode block does not exist in
+light.

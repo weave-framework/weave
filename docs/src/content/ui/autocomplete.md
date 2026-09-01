@@ -130,3 +130,23 @@ Open with typing or ↓, move with ↑/↓, select with Enter, close with Esc.
 | `label` | `string` | — | Accessible name (when not wrapped by a FormField). |
 | `noResultsText` | `string` | `'No results'` | Text for the empty-results row. |
 | `position` | `MenuPosition` | `'bottom-start'` | Panel position relative to the field. |
+
+## When it goes wrong
+
+:::callout trap "Every suggestion reads `undefined`"
+Like `<Select>`, `<Autocomplete>` reads `.value` and `.label` from an option unless told otherwise — so
+an API row with `{ id, name }` has neither. Since **3.0.0** the type asks for the accessors, which turns
+a silent page into a compile error:
+
+~~~html
+<Autocomplete options={{ users() }} optionValue={{ (u) => u.id }} optionLabel={{ (u) => u.name }} />
+~~~
+:::
+
+**It shows a value and your form never hears about it.** It takes a `control`; without one it is
+uncontrolled. See [Forms](/learn/forms).
+
+**The list never opens.** Suggestions are what you pass in. If `options` is empty until a fetch resolves,
+nothing opens until it does — that is a data question, not a component one.
+
+**It renders unstyled.** `@use 'pkg:@weave-framework/ui/autocomplete';` is a separate import.
