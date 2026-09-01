@@ -198,3 +198,19 @@ In template **text**, a literal block keyword is escaped by doubling the `@`: wr
 :::callout info "See also"
 [Templates (guide)](/learn/templates) · [Components](/learn/components) · [Styling](/learn/styling) · [Motion](/learn/motion) · [@weave-framework/runtime reference](/reference/runtime)
 :::
+
+## When it goes wrong
+
+This page is the grammar. The failures each construct produces — with the real messages, and the ones
+that compile and then quietly do nothing — are worked through on
+[Templates: When it goes wrong](/learn/templates#when-it-goes-wrong).
+
+The three worth knowing before you write a line:
+
+- **`{ expr }` is not a binding.** Everything reactive is `{{ }}`, with no exceptions:
+  `Attribute bindings use double braces: write {{ expr }}, not { expr }`.
+- **A signal is read by calling it.** `{{ count }}` renders the function's source text; `weave check`
+  says so and the browser does not.
+- **A template is text, not HTML.** `&mdash;` is seven characters, and `{{ }}` inside `<textarea>` or
+  `<title>` cannot work at all.
+

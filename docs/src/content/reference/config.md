@@ -190,3 +190,37 @@ The toolchain emits `*.gen.ts` files that regenerate on each build and should be
 :::callout info "See also"
 [Quick start](/learn/quick-start) · [Tooling & CLI](/learn/tooling) · [Router](/learn/router) (file-based routing) · [Styling](/learn/styling) (global vs scoped styles)
 :::
+
+## When it goes wrong
+
+Every one of these is refused **before anything is written**, which is the design: a config that could
+mean two things is refused rather than resolved to whichever the code happened to check first.
+
+:::callout trap "Neither `root` nor `entry`"
+~~~
+weave <cmd>: this config declares neither `root` (generated bootstrap) nor `entry` (hand-written),
+so there is no app to build
+~~~
+
+One of the two is required and they are mutually exclusive. `root` hands the bootstrap to Weave; `entry`
+keeps it yours. Setting both is the same error from the other side.
+:::
+
+**`weave build --ssg needs a config component`** — static generation renders the root on Node, so an
+`entry`-only config gives it nothing to render.
+
+**`weave build --ssg: mount selector must be an #id`** — the SSG shell wraps the app in an element the
+client finds again by identity. A class or tag selector cannot guarantee one match, so it is refused.
+
+**A `styleLang` that does not match your files.** The loader pairs `app.ts` with `app.<styleLang>` — one
+extension, no probing. An `app.scss` in a project configured for `css` is a file nothing looks for, and
+nothing reports it, because a component without styles is perfectly legal.
+
+**A `base` that half-works.** It is normalized to `''` or `/prefix`, never with a trailing slash. Set it
+for a sub-path deployment and the dev server, injected URLs and the router's basename all follow — set
+it in only one of those places by hand and they disagree.
+
+**`publicDir` copied nothing.** In `dev` it defaults to the project directory; in `build` it is copied
+**only when you declare it**. That asymmetry is deliberate — copying an undeclared project directory into
+`dist/` would ship `node_modules`, the config, and `.env`.
+
