@@ -554,6 +554,44 @@ The single-brace one is worth knowing by sight. It is the most common thing to c
 template language, and the message tells you the whole rule: **everything reactive in Weave is `{{ }}`**,
 with no exceptions to remember.
 
+### A URL that can execute code
+
+Text interpolation is safe by construction — `{{ "<b>" }}` is text, never markup. **An attribute is a
+different question**, and one attribute in particular: a `href` is not just data, it is something the
+browser will act on when clicked.
+
+~~~html
+<!-- fine -->
+<a href={{ profileUrl() }}>Profile</a>
+
+<!-- if profileUrl() can be `javascript:steal()`, that runs on click -->
+~~~
+
+Weave says so when it happens:
+
+~~~
+weave: <a href> was given a URL that executes code — "javascript:alert(1)".
+It is set as written; if this value can come from a user, that is an XSS.
+Check the scheme before binding it.
+~~~
+
+:::callout trap "It warns, it does not block — and the scope is deliberate"
+The attribute is still set. Refusing would be safer and would be a behaviour change on a frozen API, so
+it waits for a major; saying so costs nothing and closes the part that actually bites, which is not
+knowing.
+
+It fires only on elements that **navigate** — `<a href>`, `<area>`, `<form action>`, `<iframe src>`,
+`<button formaction>`. Not on `<img src>`, where a script scheme cannot execute: of twenty-six dynamic
+URL bindings measured across four real applications, seventeen were exactly that, and warning there
+would have been pure noise.
+
+The check reads the scheme the way a browser does — stripping tabs and control characters first — so
+`java	script:` is recognized too.
+:::
+
+If the URL can come from a user, check the scheme before you bind it. An allow-list of `http`, `https`,
+`mailto` and a leading `/` covers almost every real case.
+
 ### Things that compile and then do nothing
 
 These are the ones worth memorizing, because nothing stops you:
