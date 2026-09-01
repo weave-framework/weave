@@ -2,7 +2,7 @@
   <Icon name={{ iconName() }} />
   <div class="callout-main">
     @if (hasTitle()) {
-      <p class="callout-title">{{ title() }}</p>
+      <p class="callout-title"><slot name="title">{{ title() }}</slot></p>
     }
     <div class="callout-body"><slot/></div>
   </div>

@@ -10,7 +10,7 @@
  */
 
 import { navigate } from '@weave-framework/router';
-import { inlineText, type Block, type Inline } from './parse';
+import { inlineText, parseInline, type Block, type Inline } from './parse';
 import { slugify } from '../util/slug';
 import { demos } from './registry';
 import CodeTabs from '../code-tabs/code-tabs';
@@ -115,9 +115,14 @@ function renderBlock(b: Block): Node {
     case 'tabs':
       return CodeTabs({ tabs: b.tabs });
     case 'callout':
+      // The title goes through the same inline parse as any other line. It used to be handed over as a
+      // string and set as text, so ``It works in `weave dev` `` published its backticks — on 25 pages.
       return Callout(
         { kind: b.kind, title: b.title },
-        { default: () => renderBlocks(b.children) },
+        {
+          default: () => renderBlocks(b.children),
+          ...(b.title ? { title: (): DocumentFragment => renderInline(parseInline(b.title)) } : {}),
+        },
       );
     case 'demo': {
       const Comp = demos[b.component];

@@ -106,6 +106,29 @@ function scan(blocks, file) {
 }
 for (const f of files) scan(parse(readFileSync(f, 'utf8')), f.split(sep).join('/').replace(/.*\/docs\//, 'docs/'));
 
+
+/*
+ * A callout TITLE is markdown too — and for a year it was not rendered as any.
+ *
+ * `title` is a string prop set as text, so ``It works in `weave dev` `` published its own backticks. 34
+ * titles on 25 pages did. The fix is a `title` slot the markdown renderer fills; both halves are checked
+ * here, because either one alone silently restores the literal text.
+ */
+const titled = [];
+for (const f of files) {
+  const src = readFileSync(f, 'utf8');
+  for (const m of src.matchAll(/^:::callout\s+\w+\s+"([^"]*)"/gm))
+    if (/[`*_]/.test(m[1])) titled.push({ file: f.split(sep).join('/').replace(/.*\/docs\//, 'docs/'), title: m[1] });
+}
+if (titled.length) {
+  const tpl = readFileSync('docs/src/lib/callout/callout.html', 'utf8');
+  const render = readFileSync('docs/src/lib/markdown/render.ts', 'utf8');
+  if (!/<slot\s+name="title"/.test(tpl))
+    bad.push({ file: 'docs/src/lib/callout/callout.html', text: `no <slot name="title"> — the ${titled.length} formatted callout titles render their own markup as text` });
+  if (!/title:\s*\(\):\s*DocumentFragment/.test(render))
+    bad.push({ file: 'docs/src/lib/markdown/render.ts', text: `the callout is built without a title slot — the ${titled.length} formatted callout titles render their own markup as text` });
+}
+
 rmSync(bundle, { force: true });
 
 console.log(`\ndocs/tools/verify-markdown.mjs — ${files.length} pages parsed with the real parser`);

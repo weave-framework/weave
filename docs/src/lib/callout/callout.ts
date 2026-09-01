@@ -26,7 +26,13 @@ const ICONS: Record<string, string> = {
 interface CalloutProps {
   /** Visual flavor: 'info' (default), 'tip', 'see', 'trap', or 'warn'. */
   kind?: string;
-  /** Optional bold heading above the body. */
+  /**
+   * Optional bold heading above the body — PLAIN TEXT.
+   *
+   * A title written with markdown in it reaches the reader literally: 34 titles across 25 pages
+   * published their own backticks, because this is set as text. Pass a `title` slot to format one
+   * (the markdown renderer does); this string stays the fallback.
+   */
   title?: string;
 }
 

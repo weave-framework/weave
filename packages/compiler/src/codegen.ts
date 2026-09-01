@@ -643,7 +643,7 @@ function compileFragment(
       if (!adopt && isBlockNode(node)) {
         // Only the KIND decides eligibility: a block island-replays (@if/@switch/@for) and a component
         // nested-resumes; a slot adopts (E1.17). A `w:element`/@defer/@await has no adopt path at any position.
-        if (!(isAdoptableBlock(node) || isComponentNode(node))) gen.cannotAdopt(`\`${describe(node)}\` cannot be adopted in place`);
+        if (!(isAdoptableBlock(node) || isComponentNode(node))) gen.cannotAdopt(`\`${describe(node)}\` in a position resume cannot adopt`);
       }
       emitNode(node, [...basePath, dom], cur, isHost);
       dom++;

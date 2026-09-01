@@ -180,6 +180,13 @@ jobs:
       # REAL parser and checked for markup that survived into what the reader sees.
       - name: Every page renders with no markup left over
         run: pnpm verify:markdown
+      # A refusal to resume is not a failure — the component client-renders and the page works — but it
+      # throws away what an `--ssg` build is for, and the author learns of it only from a warning naming a
+      # construct. The compiler can refuse for ELEVEN reasons; the page that teaches resume named THREE, and
+      # four of the seven real refusals across 622 components on this machine were caused by constructs it
+      # never mentioned once. The count is checked too, so a twelfth reason cannot ship undocumented.
+      - name: Every reason a component refuses to resume is documented
+        run: pnpm verify:resume-reasons
       # A Weave template is TEXT: `escapeText` writes `&` as `&amp;` on the way into the emitted
       # `<template>`, which is what lets a template hold `<`, `{` and a code sample verbatim — and means
       # `&mdash;` reaches the reader as those seven characters. Nothing said so, and ten of them went into

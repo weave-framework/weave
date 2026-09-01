@@ -16,6 +16,25 @@
 
 ## Unreleased
 
+- **docs:** the Static generation page now lists **every** reason a component can refuse to resume. The
+  compiler refuses for eleven distinct constructs; the page named three, and four of the seven real
+  refusals measured across 622 components (`bind:` twice, a `fade`, a `fly`) were caused by constructs it
+  never mentioned once — so a build warning naming one had nowhere to lead. Each row says why the resume
+  walk cannot adopt it and what to write instead, and the page shows the warning as it actually arrives.
+  `tools/verify-resume-reasons.mjs` holds both sides together: every reason must exist in the compiler
+  and be named on the page, and the count of refusal sites must match, so a twelfth reason cannot ship
+  undocumented.
+
+- **fix(compiler):** the refusal for a block the resume walk cannot adopt in place reads as a sentence.
+  It was joined into ``its template uses `@defer` cannot be adopted in place.`` — the reason was a clause
+  where every other one is a noun phrase. Now: ``its template uses `@defer` in a position resume cannot
+  adopt.``
+
+- **fix(docs):** a `:::callout` title renders its markdown instead of publishing it. `title` is a string
+  prop set as text, so a title written as ``It works in `weave dev` `` reached the reader with its
+  backticks intact — 34 titles on 25 pages did. The title is now a slot the markdown renderer fills,
+  with the plain string as fallback; `docs/tools/verify-markdown.mjs` fails if either half is removed.
+
 - **docs:** the whole site rebuilt around one shape — what a thing is, something live, the scenarios you
   will meet, and what to do when it breaks. Every Learn page now has all four (`tools/audit-scenarios.mjs`
   measures it); live demos in Learn went 2 → 36; all 41 UI pages, 44 of 45 Examples pages and both

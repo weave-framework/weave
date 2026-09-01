@@ -109,9 +109,50 @@ return { router };
 return { router: createRouter(routes) };
 ~~~
 
-**A `use:` action or a non-reactive interpolation** in the template. The build message names the construct and the file.
+### The other half: what your template does
 
-Each of these is a warning in your build output, with the component and the reason. Read them: a warning here means a subtree you thought was resumed is quietly being rebuilt.
+A value has to survive the wire. A **template** has to survive something else — a walk. Resume does not
+rebuild your DOM; it walks the DOM the server already wrote, node by node, and hooks your signals onto
+what it finds. That walk needs to know, before it starts, exactly what shape it will meet.
+
+Eleven constructs break that promise, and for each one the compiler refuses **out loud** rather than
+adopting the wrong node and leaving you with a page that looks right and does nothing.
+
+| in your template | why resume cannot walk it | what to do instead |
+| --- | --- | --- |
+| `use:action` | an action is a function, and a function cannot cross the snapshot — after resume there is nothing left to call | import the action at module scope, so the client rebuilds it |
+| `use:action` on a `<Component>` | the same, on a component tag | the same |
+| `bind:value` (any `bind:`) | two-way means the DOM writes back into a signal the server never saw write | `value={{ name() }}` with `on:input` — one direction each, both adoptable |
+| `transition:fade`, `in:fly`, `out:…` | a transition is a lifecycle effect, and the adopt walk does not stage lifecycle | keep transitions below the fold, where a client render costs nothing |
+| a non-reactive interpolation `{{ user }}` | text written once carries no marker, so it merges with the static text beside it and the cursor loses count | call it — `{{ user() }}` — or give it its own element |
+| `on:click\|capture`, `on:scroll\|passive` | resume dispatches every event through one delegated listener, and those two modifiers cannot be expressed there | drop the modifier, or add that listener yourself in `onMount` |
+| `@defer` | its content does not exist yet when the snapshot is written | fine below the fold; that is what `@defer` is for |
+| `@await` | the page was written before the promise settled | prerender the data instead — see [Data](#data) above |
+| `<w:element this={{ tag }}>` | the tag is decided at run time, so the walk cannot know what it will meet | `@if` over the two or three real tags |
+| `@defer` / `@await` in a nested position | reported as **`in a position resume cannot adopt`** — the same limits, seen from the walk instead of the block | as above |
+| an `effect()` or `onMount()` in `setup()` reading a local | it reads something `setup()` does not return, so the client has nothing to rebuild it from | return that value (or use it in the template, and let auto-return expose it) |
+
+:::callout trap "Fix one, and a second may appear"
+The compiler keeps the **first** cause it meets and stops recording. That is deliberate — once a
+component is client-rendered, every later reason is noise — but it means a template with two problems
+tells you about one. Rebuild after each fix until the warning is gone.
+:::
+
+### What the warning looks like
+
+It arrives as an ordinary build warning, framed at the component's file:
+
+~~~
+▲ [WARNING] this component cannot be resumed — its template uses a `fade` transition. The whole subtree
+will be client-rendered instead (setup re-runs). Remove or move that construct to make the component
+adoptable.
+
+    src/components/notification-panel/notification-panel.html
+~~~
+
+Nothing is broken. That panel simply renders the way it would without `--ssg`: its `setup()` runs again in
+the browser. Whether that matters depends on the component — a notification panel, no; the article body
+the reader came for, very much yes.
 
 ## Effects and mount hooks
 
@@ -175,10 +216,11 @@ The fix is the same in each case — move it into `onMount`, which by definition
 import it lazily inside one.
 :::
 
-**A subtree that quietly client-renders.** Weave never fails silently here, but it does *degrade*
-silently unless you read the build output: when a component cannot resume, it says so, names the
-component and the reason, and client-renders that subtree. The page still works. It just re-runs that
-`setup()`, which is the thing you were avoiding. Warnings in an `--ssg` build are not noise.
+**A subtree that quietly client-renders.** This is the one failure here that never shows up on screen.
+Weave does not fail silently — it names the component and the reason — but it does *degrade* silently
+unless you read the build output. The page looks right; it just re-runs that `setup()`, which is the
+thing you were avoiding. The eleven causes are listed under [what cannot resume](#what-cannot-resume);
+warnings in an `--ssg` build are not noise around the output, they are part of it.
 
 **A mount selector that is not an `#id`.**
 
