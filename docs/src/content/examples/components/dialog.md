@@ -5,6 +5,13 @@ your project. The prose lives on the [Dialog reference page](/ui/dialog); this p
 covering the full service surface. A Dialog is opened **imperatively** — you call `openDialog(options)` from an
 event handler, not by placing a tag in the template.
 
+
+:::callout info "If it does not work"
+The failures specific to this component — and the five that apply to every Weave UI component — are on
+[dialog: When it goes wrong](/ui/dialog#when-it-goes-wrong). Nearly every "it renders but does
+nothing" is one of them.
+:::
+
 ```ts
 import { openDialog } from '@weave-framework/ui/dialog';
 ```

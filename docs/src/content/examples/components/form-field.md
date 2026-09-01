@@ -6,6 +6,13 @@ examples, covering the full component surface. FormField is the lean frame aroun
 the control in the default slot, a hint or error line below — and it auto-wires the accessibility (`id`,
 `label for`, `aria-describedby`, `aria-invalid`) to whatever control you slot in.
 
+
+:::callout info "If it does not work"
+The failures specific to this component — and the five that apply to every Weave UI component — are on
+[form-field: When it goes wrong](/ui/form-field#when-it-goes-wrong). Nearly every "it renders but does
+nothing" is one of them.
+:::
+
 ```ts
 import FormField from '@weave-framework/ui/form-field';
 ```

@@ -156,3 +156,17 @@ const previewTabs = [
 
 Next: real validation. The [Sign-up wizard](/examples/signup) walks a multi-step form with per-field rules and a
 blocked "Next" button.
+
+## When it goes wrong
+
+:::callout trap "Saved, and the form still says it is dirty"
+`dirty` compares against the value the control was **reset to**, not against your server. After a
+successful save, call `reset()` on the group with the saved values — otherwise the form is correct and
+looks unsaved forever.
+:::
+
+**A toggle that shows but never reaches the form.** Every control needs a `control`; without one it is
+an ordinary uncontrolled element. See [Forms](/learn/forms).
+
+**A setting that does not survive a language change.** Read the label through `t()` inside the component
+rather than computing it once in `setup` — a value computed once is a value that never updates.

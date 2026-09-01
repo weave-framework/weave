@@ -4,6 +4,13 @@ Every feature of `<SlideToggle>`, each as a live, self-contained example you can
 your project. The prose lives on the [Slide Toggle reference page](/ui/slide-toggle); this page is just the
 examples, covering the full component surface.
 
+
+:::callout info "If it does not work"
+The failures specific to this component — and the five that apply to every Weave UI component — are on
+[slide-toggle: When it goes wrong](/ui/slide-toggle#when-it-goes-wrong). Nearly every "it renders but does
+nothing" is one of them.
+:::
+
 ```ts
 import SlideToggle from '@weave-framework/ui/slide-toggle';
 ```

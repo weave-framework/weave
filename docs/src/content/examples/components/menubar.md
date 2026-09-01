@@ -4,6 +4,13 @@ Every feature of `<Menubar>`, each as a live, self-contained example you can rea
 your project. The prose lives on the [Menubar reference page](/ui/menubar); this page is just the examples,
 covering the full component surface.
 
+
+:::callout info "If it does not work"
+The failures specific to this component — and the five that apply to every Weave UI component — are on
+[menubar: When it goes wrong](/ui/menubar#when-it-goes-wrong). Nearly every "it renders but does
+nothing" is one of them.
+:::
+
 ```ts
 import Menubar from '@weave-framework/ui/menubar';
 ```

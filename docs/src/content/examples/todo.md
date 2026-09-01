@@ -229,3 +229,22 @@ You wrote none of that wiring. You changed a value; the graph did the rest.
 
 Ready for something with more moving parts? The [Data dashboard](/examples/dashboard) puts a sortable, paginated
 table through its paces.
+
+## When it goes wrong
+
+Three things bite in an app this shape, and none of them is about the components.
+
+:::callout trap "A row that loses its state when the list is filtered"
+`@for` needs a stable `track`. Keyed by index, row three is a different row the moment anything is
+filtered or sorted — so an open editor, a focus, or a half-typed change moves to whichever item is now
+third.
+
+Track by an id that belongs to the item, not by its position.
+:::
+
+**A list that updates in memory and not on screen.** Mutating the array and setting the same reference
+back announces nothing — `Object.is` sees one identity. Build a new array: `items.set(l => [...l, next])`.
+
+**A filter that recomputes on every keystroke and feels slow.** That is a `computed`, and it is doing
+exactly what you asked. If the source is a text input, `debounced` is the tool — see
+[Reactivity](/learn/reactivity).

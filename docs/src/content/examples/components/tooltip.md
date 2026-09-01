@@ -5,6 +5,13 @@ into your project. The prose lives on the [Tooltip reference page](/ui/tooltip);
 covering the full option surface. Tooltip isn't a component — it's a Weave **`use:` action** you attach to any
 element, so return it from `setup` and apply it with `use:tooltip`.
 
+
+:::callout info "If it does not work"
+The failures specific to this component — and the five that apply to every Weave UI component — are on
+[tooltip: When it goes wrong](/ui/tooltip#when-it-goes-wrong). Nearly every "it renders but does
+nothing" is one of them.
+:::
+
 ```ts
 import { tooltip } from '@weave-framework/ui/tooltip';
 ```

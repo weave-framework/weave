@@ -148,3 +148,17 @@ are identical bar their title and lane id; here's one:
 
 That's the tour. Head back to [the overview](/examples) for the full list, or jump into the
 [component reference](/ui/button) to go deeper on any piece.
+
+## When it goes wrong
+
+:::callout trap "A card that snaps back after a drop"
+The drop handler has to move the item in **your** data. `dropList` reports where it went; it does not own
+the list. If nothing writes the new order to the signal, the next render puts the card back where the
+data still says it belongs — which looks like a broken drag and is a missing assignment.
+:::
+
+**A drag that works with a mouse and not with a keyboard.** `dropList` ships Space-to-lift, arrows,
+Space-to-drop — but only if the handle is focusable. A `<div>` grip needs a `tabindex` and a role.
+
+**Cards that jump between lanes when a lane is filtered.** Track by the card's own id. Index keys make
+every card in a lane a different card the moment the lane's contents change.

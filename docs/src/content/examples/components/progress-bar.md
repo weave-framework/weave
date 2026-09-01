@@ -4,6 +4,13 @@ Every feature of `<ProgressBar>`, each as a live, self-contained example you can
 into your project. The prose lives on the [Progress Bar reference page](/ui/progress-bar); this page is
 just the examples, covering the full component surface.
 
+
+:::callout info "If it does not work"
+The failures specific to this component — and the five that apply to every Weave UI component — are on
+[progress-bar: When it goes wrong](/ui/progress-bar#when-it-goes-wrong). Nearly every "it renders but does
+nothing" is one of them.
+:::
+
 ```ts
 import ProgressBar from '@weave-framework/ui/progress-bar';
 ```

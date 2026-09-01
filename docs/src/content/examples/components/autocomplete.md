@@ -5,6 +5,13 @@ your project. The prose lives on the [Autocomplete reference page](/ui/autocompl
 examples, covering the full component surface. Autocomplete **composes** the real `<Input>`, so the field,
 underline, clear button and value binding are Input's by construction.
 
+
+:::callout info "If it does not work"
+The failures specific to this component — and the five that apply to every Weave UI component — are on
+[autocomplete: When it goes wrong](/ui/autocomplete#when-it-goes-wrong). Nearly every "it renders but does
+nothing" is one of them.
+:::
+
 ```ts
 import Autocomplete from '@weave-framework/ui/autocomplete';
 ```

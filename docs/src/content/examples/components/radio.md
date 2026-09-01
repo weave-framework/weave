@@ -4,6 +4,13 @@ Every feature of `<RadioGroup>`, each as a live, self-contained example you can 
 your project. The prose lives on the [Radio Group reference page](/ui/radio); this page is just the examples,
 covering the full component surface.
 
+
+:::callout info "If it does not work"
+The failures specific to this component — and the five that apply to every Weave UI component — are on
+[radio: When it goes wrong](/ui/radio#when-it-goes-wrong). Nearly every "it renders but does
+nothing" is one of them.
+:::
+
 ```ts
 import RadioGroup from '@weave-framework/ui/radio';
 ```

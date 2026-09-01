@@ -4,6 +4,13 @@ Every feature of `<GridList>`, each as a live, self-contained example you can re
 your project. The prose lives on the [Grid List reference page](/ui/grid-list); this page is just the examples,
 covering the full component surface.
 
+
+:::callout info "If it does not work"
+The failures specific to this component — and the five that apply to every Weave UI component — are on
+[grid-list: When it goes wrong](/ui/grid-list#when-it-goes-wrong). Nearly every "it renders but does
+nothing" is one of them.
+:::
+
 ```ts
 import GridList from '@weave-framework/ui/grid-list';
 ```

@@ -4,6 +4,13 @@ Every feature of `<ProgressSpinner>`, each as a live, self-contained example you
 into your project. The prose lives on the [Progress Spinner reference page](/ui/progress-spinner); this page
 is just the examples, covering the full component surface.
 
+
+:::callout info "If it does not work"
+The failures specific to this component — and the five that apply to every Weave UI component — are on
+[progress-spinner: When it goes wrong](/ui/progress-spinner#when-it-goes-wrong). Nearly every "it renders but does
+nothing" is one of them.
+:::
+
 ```ts
 import ProgressSpinner from '@weave-framework/ui/progress-spinner';
 ```

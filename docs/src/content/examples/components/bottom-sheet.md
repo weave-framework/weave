@@ -5,6 +5,13 @@ into your project. The prose lives on the [Bottom Sheet reference page](/ui/bott
 the examples, covering the full option surface. A Bottom Sheet is opened **imperatively** with a service call
 (not a `<Tag>`), so each demo wires a `<Button>` trigger to a handler that calls `openBottomSheet()`.
 
+
+:::callout info "If it does not work"
+The failures specific to this component — and the five that apply to every Weave UI component — are on
+[bottom-sheet: When it goes wrong](/ui/bottom-sheet#when-it-goes-wrong). Nearly every "it renders but does
+nothing" is one of them.
+:::
+
 ```ts
 import { openBottomSheet } from '@weave-framework/ui/bottom-sheet';
 ```

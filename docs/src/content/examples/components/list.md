@@ -4,6 +4,13 @@ Every feature of `<List>`, each as a live, self-contained example you can read a
 your project. The prose lives on the [List reference page](/ui/list); this page is just the examples,
 covering the full component surface.
 
+
+:::callout info "If it does not work"
+The failures specific to this component — and the five that apply to every Weave UI component — are on
+[list: When it goes wrong](/ui/list#when-it-goes-wrong). Nearly every "it renders but does
+nothing" is one of them.
+:::
+
 ```ts
 import List from '@weave-framework/ui/list';
 ```

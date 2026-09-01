@@ -4,6 +4,13 @@ Every feature of `use:popoverEdit`, each as a live, self-contained example you c
 into your project. The prose lives on the [Popover Edit reference page](/ui/popover-edit); this page is just
 the examples, covering the full action surface.
 
+
+:::callout info "If it does not work"
+The failures specific to this component — and the five that apply to every Weave UI component — are on
+[popover-edit: When it goes wrong](/ui/popover-edit#when-it-goes-wrong). Nearly every "it renders but does
+nothing" is one of them.
+:::
+
 ```ts
 import { popoverEdit } from '@weave-framework/ui/popover-edit';
 ```

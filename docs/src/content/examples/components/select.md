@@ -4,6 +4,13 @@ Every feature of `<Select>`, each as a live, self-contained example you can read
 your project. The prose lives on the [Select reference page](/ui/select); this page is just the examples,
 covering the full component surface.
 
+
+:::callout info "If it does not work"
+The failures specific to this component — and the five that apply to every Weave UI component — are on
+[select: When it goes wrong](/ui/select#when-it-goes-wrong). Nearly every "it renders but does
+nothing" is one of them.
+:::
+
 ```ts
 import Select from '@weave-framework/ui/select';
 ```

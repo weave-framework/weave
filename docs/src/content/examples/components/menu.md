@@ -8,6 +8,13 @@ Menu is a Weave **`use:` action**, not a `<Tag>` — attach it to a trigger with
 where `opts` is returned from `setup`. Never inline the options object: `use:menu={{ { items: … } }}`
 compiles to `() => { … }`, which JS reads as a block, so the options are silently lost.
 
+
+:::callout info "If it does not work"
+The failures specific to this component — and the five that apply to every Weave UI component — are on
+[menu: When it goes wrong](/ui/menu#when-it-goes-wrong). Nearly every "it renders but does
+nothing" is one of them.
+:::
+
 ```ts
 import { menu } from '@weave-framework/ui/menu';
 ```

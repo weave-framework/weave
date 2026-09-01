@@ -175,3 +175,19 @@ page 3 of a list that no longer has one.
   pipeline downstream is identical, because it only ever reads through `filtered()`.
 
 Next up: forms. The [Settings panel](/examples/settings) puts every form control on one screen.
+
+## When it goes wrong
+
+:::callout trap "Numbers that are right and a chart that is stale"
+A derived value updates when the signals it **reads** change. A chart drawn inside `onMount` from a
+snapshot of the data is drawn once — it is not wrong, it is simply not subscribed.
+
+Draw from an `effect`, which re-runs when its sources change, or hand the library new data from one.
+:::
+
+**A `virtual` table that refuses to build.** It needs a `maxHeight`, and it cannot be combined with
+`expandable` — both are refused at setup rather than rendered wrongly. See
+[Table: When it goes wrong](/ui/table#when-it-goes-wrong).
+
+**Sorting that does nothing on a derived column.** A column sorts on its `key`. Anything computed needs
+its own `compare`.

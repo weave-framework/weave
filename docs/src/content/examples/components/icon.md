@@ -4,6 +4,13 @@ Every feature of `<Icon>`, each as a live, self-contained example you can read a
 your project. The prose lives on the [Icon reference page](/ui/icon); this page is just the examples,
 covering the full component surface.
 
+
+:::callout info "If it does not work"
+The failures specific to this component — and the five that apply to every Weave UI component — are on
+[icon: When it goes wrong](/ui/icon#when-it-goes-wrong). Nearly every "it renders but does
+nothing" is one of them.
+:::
+
 ```ts
 import Icon from '@weave-framework/ui/icon';
 ```

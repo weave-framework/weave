@@ -4,6 +4,13 @@ Live, self-contained examples of `<DateRangePicker>` you can read and lift strai
 on the [DateRangePicker reference page](/ui/date-range-picker); this page is just the examples. The value is a plain
 `DateRange | null` — `{ start: Date | null, end: Date | null }`.
 
+
+:::callout info "If it does not work"
+The failures specific to this component — and the five that apply to every Weave UI component — are on
+[date-range-picker: When it goes wrong](/ui/date-range-picker#when-it-goes-wrong). Nearly every "it renders but does
+nothing" is one of them.
+:::
+
 ```ts
 import DateRangePicker from '@weave-framework/ui/date-range-picker';
 ```

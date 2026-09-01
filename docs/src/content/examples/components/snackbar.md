@@ -5,6 +5,13 @@ your project. The prose lives on the [Snackbar reference page](/ui/snackbar); th
 covering the full option surface. Unlike most components, a snackbar is shown **imperatively** — you call
 `snackbar(message, options?)` from a handler, not by rendering a tag.
 
+
+:::callout info "If it does not work"
+The failures specific to this component — and the five that apply to every Weave UI component — are on
+[snackbar: When it goes wrong](/ui/snackbar#when-it-goes-wrong). Nearly every "it renders but does
+nothing" is one of them.
+:::
+
 ```ts
 import { snackbar } from '@weave-framework/ui/snackbar';
 ```

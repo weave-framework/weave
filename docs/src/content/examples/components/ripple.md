@@ -5,6 +5,13 @@ into your project. The prose lives on the [Ripple reference page](/ui/ripple); t
 covering the full option surface. Ripple isn't a component — it's a Weave **`use:` action** you attach to any
 surface, so return it from `setup` and reference it in the template with `use:ripple`.
 
+
+:::callout info "If it does not work"
+The failures specific to this component — and the five that apply to every Weave UI component — are on
+[ripple: When it goes wrong](/ui/ripple#when-it-goes-wrong). Nearly every "it renders but does
+nothing" is one of them.
+:::
+
 ```ts
 import { ripple } from '@weave-framework/ui/ripple';
 ```

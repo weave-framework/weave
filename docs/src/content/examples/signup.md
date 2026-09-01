@@ -136,3 +136,18 @@ to surface its error and return early; only proceed when it's valid.
   directly — no copying into a separate object, because the fields *are* the source of truth.
 
 Last one, and it's the most tactile: the [Kanban board](/examples/kanban) is pure drag, drop, and reorder.
+
+## When it goes wrong
+
+:::callout trap "Next does nothing, and nothing says why"
+The step is invalid and its errors are not shown, because the fields have not been touched. `touchAll()`
+on the step's group before advancing is the missing line — it turns a silent refusal into the messages
+the user needs.
+:::
+
+**A field that is valid and still submitting.** A field can be `valid` and `validating` at the same time:
+the sync rules passed and the async check is still running. Gate the final submit on
+`!validating() && valid()`, not on `valid()` alone.
+
+**A step that loses what was typed when you go back.** The group lives in `setup`, so it survives step
+changes — unless the step component itself is destroyed and re-created. Hold the form above the steps.

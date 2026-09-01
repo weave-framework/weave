@@ -4,6 +4,13 @@ Every feature of `<Table>`, each as a live, self-contained example you can read 
 your project. The prose lives on the [Table reference page](/ui/table); this page is just the examples,
 covering the full component surface.
 
+
+:::callout info "If it does not work"
+The failures specific to this component — and the five that apply to every Weave UI component — are on
+[table: When it goes wrong](/ui/table#when-it-goes-wrong). Nearly every "it renders but does
+nothing" is one of them.
+:::
+
 ```ts
 import Table from '@weave-framework/ui/table';
 ```

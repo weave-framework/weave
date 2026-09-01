@@ -4,6 +4,13 @@ Every feature of `<Chips>`, each as a live, self-contained example you can read 
 your project. The prose lives on the [Chips reference page](/ui/chips); this page is just the examples,
 covering the full component surface.
 
+
+:::callout info "If it does not work"
+The failures specific to this component — and the five that apply to every Weave UI component — are on
+[chips: When it goes wrong](/ui/chips#when-it-goes-wrong). Nearly every "it renders but does
+nothing" is one of them.
+:::
+
 ```ts
 import Chips from '@weave-framework/ui/chips';
 ```

@@ -4,6 +4,13 @@ Every feature of `<Datepicker>`, each as a live, self-contained example you can 
 into your project. The prose lives on the [Datepicker reference page](/ui/datepicker); this page is just
 the examples, covering the full component surface. The value is a plain local-midnight `Date | null`.
 
+
+:::callout info "If it does not work"
+The failures specific to this component — and the five that apply to every Weave UI component — are on
+[datepicker: When it goes wrong](/ui/datepicker#when-it-goes-wrong). Nearly every "it renders but does
+nothing" is one of them.
+:::
+
 ```ts
 import Datepicker from '@weave-framework/ui/datepicker';
 ```

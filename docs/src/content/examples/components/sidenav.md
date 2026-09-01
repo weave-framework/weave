@@ -4,6 +4,13 @@ Every feature of `<Sidenav>`, each as a live, self-contained example you can rea
 your project. The prose lives on the [Sidenav reference page](/ui/sidenav); this page is just the examples,
 covering the full component surface.
 
+
+:::callout info "If it does not work"
+The failures specific to this component — and the five that apply to every Weave UI component — are on
+[sidenav: When it goes wrong](/ui/sidenav#when-it-goes-wrong). Nearly every "it renders but does
+nothing" is one of them.
+:::
+
 ```ts
 import Sidenav from '@weave-framework/ui/sidenav';
 ```

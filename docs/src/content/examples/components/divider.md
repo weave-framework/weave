@@ -7,6 +7,13 @@ the examples, covering the full component surface.
 A Divider isn't a JavaScript component — it's a **CSS class**, so there's nothing to import in TypeScript.
 Pull in the styles once:
 
+
+:::callout info "If it does not work"
+The failures specific to this component — and the five that apply to every Weave UI component — are on
+[divider: When it goes wrong](/ui/divider#when-it-goes-wrong). Nearly every "it renders but does
+nothing" is one of them.
+:::
+
 ```scss
 @use 'pkg:@weave-framework/ui/divider';
 ```

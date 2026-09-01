@@ -7,6 +7,13 @@ page is just the examples, covering the full option surface.
 `contextMenu` is a Weave **`use:` action** — attach it to the surface it should apply to. Right-click the
 bordered box in each demo (or focus it and press the context-menu key / Shift+F10).
 
+
+:::callout info "If it does not work"
+The failures specific to this component — and the five that apply to every Weave UI component — are on
+[context-menu: When it goes wrong](/ui/context-menu#when-it-goes-wrong). Nearly every "it renders but does
+nothing" is one of them.
+:::
+
 ```ts
 import { contextMenu } from '@weave-framework/ui/context-menu';
 ```

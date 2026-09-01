@@ -5,6 +5,13 @@ your project. The prose lives on the [Timepicker reference page](/ui/timepicker)
 covering the full component surface. The value is always a neutral `{ hours, minutes }` (24-hour internally), so
 it stays unambiguous regardless of how it's displayed.
 
+
+:::callout info "If it does not work"
+The failures specific to this component — and the five that apply to every Weave UI component — are on
+[timepicker: When it goes wrong](/ui/timepicker#when-it-goes-wrong). Nearly every "it renders but does
+nothing" is one of them.
+:::
+
 ```ts
 import Timepicker from '@weave-framework/ui/timepicker';
 ```
