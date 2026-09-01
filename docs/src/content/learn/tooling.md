@@ -693,6 +693,23 @@ weave dev --state empty     # open the app already in that state
 **Apply** in the panel does the same thing live, without a reload, which is the fast way to flip between
 states while you work on the screen.
 
+The mechanism is small enough to run on this page. These are the same functions the panel calls —
+`enableDevtools`, `captureState`, `applyState` — and the third row is the control:
+
+:::demo tooling-states
+
+:::callout see "What you should see"
+Press **Save**, then **Change everything**, then **Apply the saved state**. `rows` and `filter` snap back
+to what they were. **`draft` does not** — it has no `name`, so it was never in the state, and applying one
+cannot touch it.
+
+That is the whole rule, and it is a feature rather than a limitation: a half-typed note is not screen
+state you want restored, and deciding which is which is what naming a signal does.
+
+The line underneath is honest about the machinery too — how many nodes introspection is tracking, and how
+many signals the last apply actually set.
+:::
+
 What is captured is exactly the signals you **named**:
 
 ~~~ts
@@ -795,3 +812,64 @@ One `weave` CLI does it all — once `@weave-framework/cli` is a dev dependency 
 :::
 
 [Next: Recipes :icon[arrow-right]](/learn/recipes) · [Reference: configuration :icon[arrow-right]](/reference/config) · [Installation :icon[arrow-right]](/learn/installation)
+
+## The DevTools API, if you want it directly
+
+The panel is the usual way in, and everything it does is a published function you can call:
+
+| Function | What it does |
+| --- | --- |
+| `enableDevtools(on?)` · `isDevtoolsEnabled()` | turn introspection on, and ask whether it is. Off by default — which is why a production build pays nothing |
+| `captureState()` | every **named** signal's current value, as a plain object |
+| `applyState(state)` | set them back, returning **how many it actually set** — names the app no longer has are skipped |
+| `devNodeCount()` · `onDevtoolsChange(fn)` | how many nodes are tracked, and a subscription for when that changes |
+| `inspect`, `inspectGraph`, `inspectTree`, `traceFor` | the graph itself — what a panel is built out of |
+
+`applyState`'s return value is the useful one in a test: it tells you a state you saved before a rename
+still set most of what it named, instead of silently setting nothing.
+
+## When it goes wrong
+
+Almost everything the CLI refuses, it refuses **loudly and before writing anything**. These are the
+messages, and each one is a decision rather than a failure.
+
+:::callout trap "A config that declares neither `root` nor `entry`"
+~~~
+weave <cmd>: this config declares neither `root` (generated bootstrap) nor `entry` (hand-written),
+so there is no app to build
+~~~
+
+The two are mutually exclusive and one is required. This is the most common first-config mistake, and it
+is refused rather than defaulted, because guessing an entry point is how a build silently produces
+something nobody asked for.
+:::
+
+**`weave build --check` found errors.**
+
+~~~
+weave build --check: 3 errors — nothing was written.
+~~~
+
+The point is the second half. With `--check`, a failing type-check writes **no output at all**, so a
+broken build cannot be mistaken for a stale one. Without it, the build summary tells you it was not
+type-checked — silence is never the answer either way.
+
+**`weave build --ssg needs a config component`** — static generation renders the root headlessly, so
+there has to be a root to render. An `entry`-only config has a bootstrap Weave never sees inside.
+
+**`weave check --impact needs a file`** — `--impact` answers "what renders this component", which is a
+question about one file.
+
+**`weave: unknown command`** — the CLI does not guess. Run `weave --help` for the seven it has.
+
+**`no saved state named …`** and **`weave: could not apply state …`** — `weave dev --state x` looks for
+`.weave/states/x.json`. The second one means the file exists and could not be read as a state, which
+usually means it was hand-edited.
+
+:::callout info "The MCP one is a missing install, not a bug"
+~~~
+weave mcp: could not start the MCP server — is @weave-framework/mcp installed?
+~~~
+
+`weave mcp` is a thin launcher for a separate, optional package. The message says the fix.
+:::

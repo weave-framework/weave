@@ -1,0 +1,22 @@
+<div class="ts">
+  <table class="ts-table">
+    <thead><tr><th>signal</th><th>name</th><th>value now</th></tr></thead>
+    <tbody>
+      <tr><td>rows</td><td><code>demo.rows</code></td><td class="ts-val">{{ rows() }}</td></tr>
+      <tr><td>filter</td><td><code>demo.filter</code></td><td class="ts-val">{{ filter() }}</td></tr>
+      <tr><td>draft</td><td class="ts-unnamed">no name</td><td class="ts-val">{{ draft() || '(empty)' }}</td></tr>
+    </tbody>
+  </table>
+
+  <div class="ts-controls">
+    <button type="button" on:click={{ save }}>Save this state</button>
+    <button type="button" on:click={{ scramble }}>Change everything</button>
+    <button type="button" on:click={{ apply }}>Apply the saved state</button>
+  </div>
+
+  <p class="demo-note">
+    saved: <code>{{ savedText() }}</code><br />
+    devtools on: <strong>{{ on() }}</strong> · tracked nodes: <strong>{{ nodes() }}</strong>
+    @if (lastApplied() >= 0) { · last apply set <strong>{{ lastApplied() }}</strong> signal(s) }
+  </p>
+</div>

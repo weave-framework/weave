@@ -1,0 +1,61 @@
+.ts {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ts-table {
+  border-collapse: collapse;
+  font-size: 0.86rem;
+}
+
+.ts-table th,
+.ts-table td {
+  text-align: left;
+  padding: 5px 16px 5px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.ts-table th {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.ts code {
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  color: var(--accent);
+}
+
+.ts-unnamed {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.ts-val {
+  font-family: var(--mono);
+  font-weight: 700;
+  color: var(--fg);
+}
+
+.ts-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.ts button {
+  font: inherit;
+  font-size: 0.88rem;
+  padding: 6px 13px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--fg);
+  cursor: pointer;
+}
+
+.ts button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
