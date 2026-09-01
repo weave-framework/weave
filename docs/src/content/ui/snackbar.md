@@ -70,3 +70,25 @@ The message is announced to screen readers through a live region — `politeness
 pause, `'assertive'` interrupts. Keep messages short and non-essential: a snackbar is transient, so never put
 anything the user *must* act on only there. The action button is keyboard-reachable while the bar is shown, and the
 auto-dismiss timer pauses while the bar is hovered or holds focus — so a slower reader doesn't lose the Undo.
+
+## When it goes wrong
+
+:::callout trap "`<Snackbar>` in a template renders nothing"
+This one is **imperative**. There is no component to place — you call `snackbar` from an event handler and
+it mounts itself into an overlay above your app.
+
+~~~ts
+import { snackbar } from '@weave-framework/ui/snackbar';
+const open = (): void => { snackbar('Saved'); };
+~~~
+
+A capitalized tag that matches no import is a build error, so this fails loudly — but the error names a
+missing component rather than the real problem, which is that there was never a component to import.
+:::
+
+**It opens and is unstyled.** The stylesheet is a separate import, per component:
+`@use 'pkg:@weave-framework/ui/snackbar';` in your Sass. See [Installation](/ui/installation).
+
+**It opens behind something.** Overlays render into the body, above the app, on purpose — so a
+`z-index` war with an ancestor cannot clip them. If one is hidden, the thing covering it is also an
+overlay, and the later one wins.

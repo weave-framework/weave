@@ -161,3 +161,35 @@ tri-state checkbox. Name the table with `ariaLabel`.
 | `ariaLabel` | `string` | — | Accessible name for the table. |
 | `emptyText` | `string` | `'No data'` | Shown when there are no rows. |
 | `class` | `string` | — | Extra classes forwarded onto the root. |
+
+## When it goes wrong
+
+Two of these are **build-time refusals** rather than bad rendering, and both are refusals on purpose:
+the alternative is a table that shows the wrong rows.
+
+:::callout trap "`virtual` needs `maxHeight`"
+~~~
+weave Table: `virtual` needs `maxHeight` — without one the body has no viewport to window.
+~~~
+
+A virtual body renders only the rows inside a scrolling window. Without a height the box grows to fit
+its content, so there is no window and nothing to virtualize. Give it a `maxHeight`, or drop `virtual`.
+:::
+
+**`virtual` and `expandable` together.**
+
+~~~
+weave Table: `virtual` and `expandable` are not compatible — the fixed-size window maps scroll
+position to a row index, and a detail row of unknown height breaks that mapping. Render the
+detail in a dialog or a side panel, or drop `virtual`.
+~~~
+
+The message names the fix because there are two good ones. This is refused rather than approximated: a
+detail row of unknown height would not merely misplace the scrollbar, it would show the **wrong rows**.
+
+**Sorting that does nothing.** A column sorts on its `key` by default. A column whose value is derived,
+or is an object, needs a `compare` — without one there is nothing sensible to order by and the rows stay
+as they were.
+
+**Rows that re-render when they should not.** Give `@for` over your rows a stable `track`. A row keyed by
+index is a different row every time the list is filtered.

@@ -142,3 +142,26 @@ arrows (or **typeahead** — start typing a label), select with Enter/Space, clo
 | `clearLabel` | `string` | `'Clear'` | Accessible name for the clear button. |
 | `position` | `MenuPosition` | `'bottom-start'` | Panel position relative to the trigger. |
 | `class` | `string` | — | Extra classes forwarded onto the root. |
+
+## When it goes wrong
+
+:::callout trap "Every row renders `undefined`"
+Your options are objects the defaults cannot read. `<Select>` reads `.value` and `.label` unless told
+otherwise, so an API row — `{ id, name }` — has neither.
+
+Since **3.0.0** the type asks for the two accessors, so this is a compile error rather than a silent
+page. If you are upgrading from 2.x, that error is this bug, found at last:
+
+~~~html
+<Select options={{ users() }} optionValue={{ (u) => u.id }} optionLabel={{ (u) => u.name }} />
+~~~
+
+An option type that IS self-describing — a plain string, or `{ value }` — needs neither accessor.
+:::
+
+**The panel opens somewhere unexpected.** It is an overlay: it escapes to the body so an
+`overflow: hidden` ancestor cannot clip it. If it is positioned oddly, that is a scroll container
+question, not a Select one.
+
+**A value that will not stick.** `<Select>` is a form control. Without a `control` it is uncontrolled —
+it will show a selection and report nothing to your form. See [Forms](/learn/forms).

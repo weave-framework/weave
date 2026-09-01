@@ -197,3 +197,31 @@ All optional; each defaults to the English string shown. `prevMonth` (`'Previous
 (`'Next month'`), `prevYearRange` (`'Previous years'`), `nextYearRange` (`'Next years'`), `chooseYear`
 (`'Choose year'` — the year-switch header), `calendarLabel` (`'Choose date'` — the dialog name), `clear`
 (`'Clear'`), `openCalendar` (`'Open calendar'` — editable mode icon button).
+
+## When it goes wrong
+
+:::callout trap "The date reads in a format that appears nowhere else in your app"
+The pickers are configured **per instance** — adapter, locale, first day of week, display format,
+translated chrome. Configure one field and forget the next and the app grows two date formats.
+
+The fix is not to repeat yourself. `provideDateTimeDefaults()` at the app root supplies all of them
+once, and resolution is always **instance prop → context default → built-in**:
+
+~~~ts
+provideDateTimeDefaults({
+  locale: () => locale(),                  // a getter, so a language change flows through
+  firstDayOfWeek: () => weekStartIndex(),
+  datepickerLabels: () => ({ prevMonth: t('datepicker.prevMonth') }),
+});
+~~~
+
+Pass getters rather than values: a plain value is accepted and simply never changes. Labels merge
+shallowly at each step, so supplying three of eight keys never blanks the other five.
+:::
+
+**English chrome inside a translated UI.** The same cause, and the most visible symptom of it — the
+calendar's own labels come from `datepickerLabels`, not from your `t()` calls, unless you connect them.
+
+**A date the field will not accept.** The picker parses through its **adapter**, not through
+`new Date(string)`. A format your users type but the adapter does not read is rejected silently rather
+than guessed at.

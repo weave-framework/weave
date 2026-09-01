@@ -109,3 +109,25 @@ It's a real modal: `role="dialog"` (or `alertdialog`) with `aria-modal="true"`. 
 `aria-describedby`. Focus moves inside on open and is
 **restored to the opener** on close, Tab is trapped within, and the background is marked `inert` so assistive tech
 can't wander out. Esc and backdrop-click close it (unless `dismissable: false`).
+
+## When it goes wrong
+
+:::callout trap "`<Dialog>` in a template renders nothing"
+This one is **imperative**. There is no component to place — you call `openDialog` from an event handler and
+it mounts itself into an overlay above your app.
+
+~~~ts
+import { openDialog } from '@weave-framework/ui/dialog';
+const open = (): void => { openDialog({ title: 'Welcome', content: '…' }); };
+~~~
+
+A capitalized tag that matches no import is a build error, so this fails loudly — but the error names a
+missing component rather than the real problem, which is that there was never a component to import.
+:::
+
+**It opens and is unstyled.** The stylesheet is a separate import, per component:
+`@use 'pkg:@weave-framework/ui/dialog';` in your Sass. See [Installation](/ui/installation).
+
+**It opens behind something.** Overlays render into the body, above the app, on purpose — so a
+`z-index` war with an ancestor cannot clip them. If one is hidden, the thing covering it is also an
+overlay, and the later one wins.

@@ -141,3 +141,21 @@ those custom properties on a container.
 ### Slots
 
 `<Icon>` takes no slotted content — the glyph comes from `name` / `svg` / `src`.
+
+## When it goes wrong
+
+:::callout trap "The icon is simply not there"
+An unknown name resolves to nothing and renders an empty `<svg>` — an icon-shaped hole, no error. The
+built-in set is 54 curated Lucide icons, and Lucide has **renamed** some of them: `more-vertical` is now
+`ellipsis-vertical`, and a name from an older tutorial can be gone.
+
+This exact bug shipped on this site: a button labelled "More" with no picture in it, for months.
+:::
+
+**A name that exists in Lucide but not here.** The built-in set is a curated subset, not all of Lucide.
+Register what you need with `configureIcons({ sources: [...] })` rather than hoping — an extra source is
+consulted before the built-ins.
+
+**SVG that renders as text, or not at all.** Icon markup from a source is **sanitized**: script schemes,
+event attributes and SMIL animation are removed before it reaches the page. That is not negotiable and it
+is why an arbitrary SVG from the internet may come out plainer than it went in.
