@@ -51,3 +51,32 @@ fixes for the issues that block you.
 guarantee is already built in: you own the code outright, with no third-party packages that can rot out from under
 you. Commercial support makes Weave *faster and easier* to run in production — it's never the thing standing between
 you and shipping. [Is Weave safe to bet on? :icon[arrow-right]](/enterprise/safe-to-bet-on)
+
+## When you are stuck
+
+Before support of any kind, three checks close most problems faster than a reply could — and doing them
+first is also what makes a report answerable.
+
+:::callout see "The three that solve it most often"
+**Run `weave check`.** It reads your templates as well as your `.ts`, and most "it does not work" turns
+out to be something it already names — an uncalled signal, a prop a child requires, a directive on a
+component tag.
+
+**Read the build output.** Weave warns rather than failing for things that still run: a component that
+cannot resume, an entity that renders as text, a URL that executes code. A warning here is a subtree
+behaving differently from how you think it does.
+
+**Check the stylesheet.** If something renders correctly and looks wrong, it is almost always the missing
+`@use` or a theme emitted from the wrong file. See [UI installation](/ui/installation#when-it-goes-wrong).
+:::
+
+**A report that gets answered quickly** names the version (`weave --help` prints it alongside the
+commands), says whether it reproduces with `weave build` as well as `weave dev`, and includes the exact
+message rather than a description of it. A component that fails in your app and not in a fresh scaffold
+is a different bug from one that fails in both, and knowing which halves the work.
+
+:::callout info "What support cannot do"
+None of the tiers reviews your application's business logic or takes on your deadline. Priority support
+is faster access to the people who wrote the framework, about the framework. Consulting is where somebody
+works inside your codebase — they are different things, and the difference is which of them you need.
+:::

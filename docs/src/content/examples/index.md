@@ -52,4 +52,30 @@ that binds to them. That's the whole model: **state is signals, the template rea
 itself.** You'll see the same three files (`app.html`, `app.ts`, and sometimes `app.scss`) on every page, because
 that's all a Weave component ever is.
 
+## When it goes wrong
+
+Lifting an example into your own project fails in three predictable ways, and none of them is about the
+code you copied.
+
+:::callout trap "It renders, and it looks like nothing"
+The examples run inside this site, which already imports every component's stylesheet. Your project does
+not. Each component needs **two** lines in two different files — the import in your `.ts` and
+`@use 'pkg:@weave-framework/ui/<name>';` in your Sass — plus the theme emitted once from a **global**
+stylesheet.
+
+Copy an example and get correct, accessible, completely unstyled markup, and this is always why. See
+[UI installation](/ui/installation#when-it-goes-wrong).
+:::
+
+**A package you have not installed.** These pages import from `@weave-framework/ui`, `/forms`, `/router`
+and `/data`. Importing one you have not installed fails loudly at build with `Could not resolve` — which
+is the good case; add it and move on.
+
+**The example is one component and your app is not.** Every page here is a single component on purpose,
+so nothing is hidden behind a file you cannot see. Splitting it up is the first thing you will do, and
+the moment you do, a value that was a local becomes something to pass down as a prop or lift into a
+[store](/learn/store) — which is the real work the examples deliberately skip.
+
+Each app's own page ends with the failures specific to it.
+
 Pick any app above and dive in — [the Todo list](/examples/todo) is the gentlest starting point.

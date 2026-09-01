@@ -116,4 +116,16 @@ Every Learn page links out to the matching Reference, and back.
 
 If you want to understand *why* before *how*, read [Why Weave?](/learn/why-weave) next. If you would rather get something running on your own machine first, go to [Installation](/learn/installation) and then the [Quick start](/learn/quick-start). And if you only have ten minutes and want the idea everything rests on, go straight to [Thinking in signals](/learn/signals).
 
+## If something does not work
+
+You have not written anything yet, so there is not much that can. Two things, both worth knowing before
+they happen:
+
+**Something on screen reads `() => …`.** You wrote `{{ name }}` where `{{ name() }}` belongs. A signal is
+read by calling it, and the parentheses are the subscription — the box above says why.
+
+**Every page in this section ends with a section like this one.** They are not filler: each names the
+mistakes that construct actually produces, with the real message. When something breaks, that is the
+place to look first, and it is usually faster than searching.
+
 [Next: Why Weave? :icon[arrow-right]](/learn/why-weave)

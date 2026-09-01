@@ -331,6 +331,31 @@ declare module 'thing' {
 The same file is where a global belongs — `declare const __APP_VERSION__: string;` for something your
 host page injects, for instance.
 
+## When setup goes wrong
+
+Four things account for nearly every failed first install, and each has a message that says so.
+
+:::callout trap "`Ignored build scripts` / `ERR_PNPM_IGNORED_BUILDS`"
+pnpm 10 and newer block a dependency's install scripts by default, so `esbuild` — pulled in by the CLI —
+never finishes setting itself up. The scaffold ships a `pnpm-workspace.yaml` that pre-approves it; an
+existing project needs the approval once:
+
+~~~bash
+pnpm approve-builds
+~~~
+:::
+
+**`Could not resolve '@weave-framework/…'`** — you imported a package you have not installed. Loud on
+purpose: every Weave package is separate and tree-shaken, so the build tells you rather than silently
+shipping nothing.
+
+**`weave: command not found`** — the CLI is a **dev dependency**, so it lives in your project rather than
+on your PATH. Run it through a package script (`npm run dev`) or `npx weave dev`.
+
+**Nothing on the page, and the console says `mount target "#app" matched no element`.** The `mount`
+selector in `weave.config.ts` and the element in `src/index.html` have to agree, and nothing checks that
+until the page runs.
+
 ## 5. Build for production
 
 When you're ready to ship:

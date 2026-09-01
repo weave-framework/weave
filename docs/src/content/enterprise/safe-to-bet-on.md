@@ -94,3 +94,37 @@ Weave asks you to bet on a foundation you can fully own, that can't rot out from
 about as safe as a bet on a young framework gets.
 
 > Building something real on Weave and want to talk it through? [Commercial support is available :icon[arrow-right]](/enterprise/support)
+
+## When the bet goes wrong
+
+A page arguing that something is safe owes you the other half. These are the ways adopting Weave can
+actually hurt, stated plainly, with what each one costs to escape.
+
+:::callout trap "You need request-time SSR"
+This is the sharpest one, and it is a design decision rather than a backlog item. Static generation
+covers SEO and first paint with no server in the request path; **rendering per request is not built and
+is not planned**.
+
+If your product needs per-request HTML — personalised pages behind a login, content that cannot be
+prerendered — that gap does not close by waiting. Weigh it before you start, not after.
+:::
+
+**You need a library nobody has written yet.** The ecosystem is small, and the honest consequence is not
+"you cannot do it" but "you will write it". The CDK covers the hard primitives — overlays, focus, drag,
+virtual scroll — and third-party code works normally. But a niche integration that exists ready-made
+elsewhere may not exist here, and that is time you are choosing to spend.
+
+**You need to hire for it.** Nobody has Weave on their CV. What they do have is signals, TypeScript and
+the DOM, which is most of what this is — but a job posting cannot ask for experience that does not exist
+yet, and a team lead should know that before the first hire, not during it.
+
+**The project stalls.** The mitigation is real and worth checking rather than believing: everything is
+MIT, the whole toolchain is in one repository, there are no third-party runtime dependencies to go stale,
+and the output is ordinary DOM code. What you shipped keeps running whatever happens next. That is not
+the same as "you would be fine" — it is "you would still own it".
+
+:::callout info "What would make this bet worse, and has not happened"
+Two things would change the argument on this page: a breaking change landing without deprecation, or the
+zero-dependency guarantee quietly ending. Both are checkable rather than promised — the release history
+is public, and every package's dependency list is one command away.
+:::

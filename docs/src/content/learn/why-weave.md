@@ -120,3 +120,22 @@ wrong one for others.
 Ready? The fastest way to understand a loom is to weave something.
 
 [Next: Quick start :icon[arrow-right]](/learn/quick-start) · [Or start with the core idea: Thinking in signals :icon[arrow-right]](/learn/signals)
+
+## Where it goes wrong for people
+
+The trade this page describes has costs, and they land in predictable places.
+
+:::callout trap "You need request-time rendering"
+Static generation covers SEO and first paint with no server in the request path. **Rendering per request
+is deliberately not built.** If your product needs per-request HTML, that gap does not close by waiting —
+weigh it now. [Is Weave safe to bet on?](/enterprise/safe-to-bet-on#when-the-bet-goes-wrong) states the
+rest of the honest case.
+:::
+
+**You reach for a library that does not exist here.** Third-party code works normally, and the CDK covers
+the hard primitives. But a ready-made niche integration may simply not exist, and that is time you are
+choosing to spend rather than a problem to solve later.
+
+**You expect a component to re-render.** It never does — there is nothing to re-render. Most of what
+people find surprising in the first week comes from that one fact, and the pages ahead take it apart:
+[signals](/learn/signals), then [reactivity](/learn/reactivity).
