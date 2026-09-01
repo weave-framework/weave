@@ -454,3 +454,24 @@ The `|| false` makes an empty query a "not ready" source, so `resource` skips th
 :::
 
 [Back to the start: Introduction :icon[arrow-right]](/learn/introduction) · [Reference: @weave-framework/data :icon[arrow-right]](/reference/data)
+
+## When a recipe does not work
+
+Every recipe here is ordinary Weave, so its failures are the ordinary ones — and three account for
+nearly all of them.
+
+:::callout trap "It ran once and never again"
+The effect or computed read nothing reactive. Subscription happens by **calling** a signal during the
+run, so a body that reads `.peek()`, or a value captured in `setup`, has no sources.
+
+The delayed version catches more people: reads made **after** an `await` are not tracked, because only
+the synchronous part of the first run establishes dependencies.
+:::
+
+**The data changed and the screen did not.** An object mutated and set back is the same reference, and
+an equal write announces nothing. Build a new object or array.
+
+**It works and then leaks.** A subscription started in a recipe needs a cleanup on the same scope —
+`onCleanup` inside the effect for something that restarts, `onDispose` for something that ends with the
+component. See [Lifecycle](/learn/lifecycle-context-di#when-it-goes-wrong) for which is which.
+

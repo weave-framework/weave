@@ -125,3 +125,30 @@ If two plugins try to infer the same target name (e.g. both another plugin and W
 ~~~
 
 Run `nx show project my-app --web` to see exactly which plugin each target comes from. Once the project declares Weave (the three files above) and no longer declares its previous targets, its `.html` files are Weave templates — a `.ts` + `.html` pair whose `.ts` exports `setup`, with no decorator metadata pointing at them as a template — so the editor's Weave support (the VS Code extension or the WebStorm plugin) owns them and the previous template checker stops flagging them. If the templates still show unexpected errors after this, the project is still being classified the old way somewhere — re-check its `project.json` targets and that its `.ts` files carry no component decorators.
+
+## When it goes wrong
+
+Adopting into an existing app has its own failures, and they are all about the boundary rather than about
+Weave.
+
+:::callout trap "The custom element is on the page and inert"
+A custom element upgrades when its definition registers. If your host page writes the tag into the DOM
+**before** Weave's bundle has run, the element sits there doing nothing until it does — no error, no
+warning, ordinary platform timing.
+
+Load the bundle earlier, or accept that the element fills in when it upgrades. It is not a race you can
+lose permanently, only one you can watch.
+:::
+
+**Attributes arrive as strings.** `count="3"` reaches the component as `"3"`. Anything that is not a
+string — an object, a callback — is set as a **property** from code, not written as an attribute in
+markup.
+
+**Two bundles, two runtimes.** Mounting Weave twice from two separately-built bundles gives you two
+copies of the runtime, and signals from one are invisible to the other. If shared state between islands
+is silently not shared, count your bundles.
+
+**Styles that arrive without their theme.** A component's own stylesheet is scoped and self-contained,
+but the tokens are not — they come from the global theme emit. An island in a host page that never
+emitted it renders with every token falling back.
+

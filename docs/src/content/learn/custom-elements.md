@@ -134,3 +134,36 @@ The config declares exactly one of `root` (Weave generates the entry, mounts at 
 :::
 
 [Next: Tooling & CLI :icon[arrow-right]](/learn/tooling) · [Reference: @weave-framework/runtime :icon[arrow-right]](/reference/runtime)
+
+## When it goes wrong
+
+Two build-time refusals, and two things the browser decides for you.
+
+:::callout trap "A tag with no hyphen"
+~~~
+weave: custom element tag "widget" in src/app/widget.ts must contain a hyphen (Custom Elements spec)
+~~~
+
+Not a Weave rule — the platform requires it, so that a custom element can never collide with a future
+built-in tag. `my-widget`, `acme-card`, anything with a dash.
+:::
+
+**The same tag declared twice.**
+
+~~~
+weave: custom element tag "my-widget" declared twice — src/a.ts and src/b.ts
+~~~
+
+`customElements.define` throws on a duplicate at runtime and cannot be undone, so this is caught at build
+instead, naming both files.
+
+**The element renders nothing, and the console is quiet.** A custom element only upgrades once its
+definition is registered. Weave registers everything it found at startup, so an element written into the
+page **before** the bundle runs stays inert until then — which looks like nothing happening and is
+ordinary platform timing.
+
+**An attribute arrives as a string, always.** HTML attributes have no types. `count="3"` reaches your
+component as `"3"`, not `3` — that is the boundary you are choosing when you expose a component this way,
+and it is why a prop that must be an object is passed as a property from code rather than as an
+attribute in markup.
+
