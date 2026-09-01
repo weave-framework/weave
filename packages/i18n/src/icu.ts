@@ -18,7 +18,8 @@
  * ICU apostrophe quoting (`'{'`, `''`) escapes literal braces.
  */
 
-/** A value bag passed to {@link formatMessage} — keyed by placeholder name. */
+/** A value bag passed to {@link formatMessage} — keyed by placeholder name. The type of `t()`'s second
+ *  argument, so it is named wherever a reader meets it: `t('greeting', { name })`. */
 export type FormatParams = Record<string, unknown>;
 
 const WS: RegExp = /\s/;

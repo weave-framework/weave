@@ -80,7 +80,11 @@ function exportsOf(entry) {
     for (const m of src.matchAll(/export\s+(?:declare\s+)?(?:async\s+)?(?:function|const|class|enum)\s+([A-Za-z_$][\w$]*)/g)) {
       const before = src.slice(Math.max(0, m.index - 400), m.index);
       const doc = before.lastIndexOf('/**');
-      if (doc !== -1 && before.slice(doc).includes('@internal') && !before.slice(doc).includes('*/\n\n')) continue;
+      // `@internal` counts when it sits in the doc block that ends immediately before this declaration.
+      // The old test rejected any block containing a blank line, which is most real doc comments; what
+      // actually matters is that nothing but whitespace separates the comment from the declaration.
+      const tail = before.slice(before.lastIndexOf('*/') + 2);
+      if (doc !== -1 && before.slice(doc).includes('@internal') && tail.trim() === '') continue;
       names.add(m[1]);
     }
     for (const m of src.matchAll(/export\s*\*\s*from\s*'([^']+)'/g)) walk(join(dirname(f), m[1].replace(/\.js$/, '') + '.ts'));
@@ -115,6 +119,12 @@ const SECTIONS = [
   { name: 'when it goes wrong', re: /^#+ .*(goes wrong|what can go wrong|errors)/im },
 ];
 
+/** Every word in the whole Learn section — the corpus a reader actually moves through. */
+const learnWords = new Set();
+for (const f of readdirSync('docs/src/content/learn')) {
+  if (f.endsWith('.md')) for (const t of readFileSync(join('docs/src/content/learn', f), 'utf8').split(/[^A-Za-z0-9_$]+/)) learnWords.add(t);
+}
+
 const only = process.argv[2];
 let totalApi = 0, totalErr = 0;
 console.log('\npage                  API named        errors shown     page shape');
@@ -128,7 +138,11 @@ for (const s of SUBSYSTEMS) {
 
   const api = new Set();
   for (const e of s.entries) for (const n of exportsOf(e)) api.add(n);
-  const apiMissing = [...api].filter((n) => !words.has(n));
+  // Named on THIS page, or anywhere in Learn. `onMount`, `batch` and `root` all live in `reactive.ts`
+  // and are taught on Lifecycle and Reactivity — asking only about the page a module maps to reported
+  // twelve gaps on the Signals intro for API that is thoroughly documented one page over. The question
+  // a reader has is "would I ever meet this", and Learn is the unit that answers it.
+  const apiMissing = [...api].filter((n) => !words.has(n) && !learnWords.has(n));
 
   const msgs = messagesIn(s.sources);
   // A message counts as SHOWN when any literal run of it appears on the page.

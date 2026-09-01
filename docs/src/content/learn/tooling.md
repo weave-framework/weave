@@ -824,6 +824,7 @@ The panel is the usual way in, and everything it does is a published function yo
 | `applyState(state)` | set them back, returning **how many it actually set** — names the app no longer has are skipped |
 | `devNodeCount()` · `onDevtoolsChange(fn)` | how many nodes are tracked, and a subscription for when that changes |
 | `inspect`, `inspectGraph`, `inspectTree`, `traceFor` | the graph itself — what a panel is built out of |
+| `registerDevNode` | what the primitives call to put a NAMED node in the graph — you never call it, and it is why an unnamed signal is invisible to all of the above |
 
 `applyState`'s return value is the useful one in a test: it tells you a state you saved before a rename
 still set most of what it named, instead of silently setting nothing.

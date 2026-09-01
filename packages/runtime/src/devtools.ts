@@ -85,6 +85,9 @@ export function isDevtoolsEnabled(): boolean {
  * Register a named reactive node. Called by the primitives; a no-op (returning a no-op
  * disposer) when devtools are off or the node is unnamed. Returns an unregister fn the
  * primitive ties to its owner's disposal so the graph doesn't leak.
+ *
+ * @internal — the reactive primitives call this; an application never does. Exported because
+ * `reactive.ts` imports it across the module boundary, not because it is part of the API.
  */
 export function registerDevNode(
   kind: DevKind,
@@ -217,6 +220,8 @@ export function setTraceLimit(n: number): void {
  * Core hook: record that a value change in `fromNode` dirtied `toNode`. A no-op unless
  * devtools are on AND both ends are registered named nodes — so an unnamed graph, or a
  * production build, records nothing. Called from the reactive propagation path.
+ *
+ * @internal — called from propagation, never by an application.
  */
 export function recordTrigger(fromNode: object, toNode: object): void {
   if (!enabled) return;
