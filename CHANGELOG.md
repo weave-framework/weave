@@ -16,6 +16,16 @@
 
 ## Unreleased
 
+- **docs:** the whole site rebuilt around one shape — what a thing is, something live, the scenarios you
+  will meet, and what to do when it breaks. Every Learn page now has all four (`tools/audit-scenarios.mjs`
+  measures it); live demos in Learn went 2 → 36; all 41 UI pages, 44 of 45 Examples pages and both
+  Reference guides gained a failure section quoting the real messages. Two new instruments keep it
+  honest: `tools/audit-docs.mjs` (dead imports, API coverage, template and CLI surface) and
+  `tools/audit-scenarios.mjs` (per page: API named, messages shown, page shape). The generated API
+  reference grew from 174 to 349 exports — the CDK's 102 and nine published entries had no page at all.
+  The Performance page was removed: it compared by proxy, against a standing rule not to, and its numbers
+  were a single dated run.
+
 - **feat(compiler):** the template linter warns on `{{ … }}` inside **`<textarea>` or `<title>`**. A
   browser reads those elements' content as RCDATA — text, not markup — so the `<!---->` placeholder the
   runtime writes for a dynamic text position is not parsed as a comment: it becomes six literal
