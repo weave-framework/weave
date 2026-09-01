@@ -863,6 +863,16 @@ question about one file.
 
 **`weave: unknown command`** — the CLI does not guess. Run `weave --help` for the seven it has.
 
+**`weave build --ssg needs a config component — it renders the root headlessly.`** Static generation has
+to render something on Node, and only a `root` gives it one. An `entry`-only config hands the bootstrap
+to your code, which Weave cannot see inside.
+
+**`weave build failed — N errors`** and **`weave check: N errors`** are the summaries; the lines above
+them are the real messages, each with a file and a position. The count exists so a script can act on it.
+
+**`weave: could not apply state — …`** means `.weave/states/<name>.json` was found and could not be read
+as a state. Usually a hand-edit; delete it and re-save from the panel.
+
 **`no saved state named …`** and **`weave: could not apply state …`** — `weave dev --state x` looks for
 `.weave/states/x.json`. The second one means the file exists and could not be read as a state, which
 usually means it was hand-edited.

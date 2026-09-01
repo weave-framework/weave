@@ -541,6 +541,14 @@ stretch, so everything after became a child of everything before.
 | `@then (1+1)` | `Expected an identifier alias in @then/@catch, got '1+1'` |
 | `@if (a() { … }` — one paren short | `Unclosed ( in block head` |
 | something other than `@case` in `@switch` | `Expected @case/@default or '}' in @switch at 21` |
+| `@snippet row(1)` — not an identifier | `Invalid @snippet parameter` |
+| `@defer (on idle, on whenever)` | `Invalid @defer trigger — on idle\|viewport\|interaction\|hover` |
+| a block opened and never closed | `Unclosed <tag>` at the point the parser gave up |
+| `@let n = 1` with no `;` | `Expected ';' ending @let n` |
+| `@snippet row(x)` with no `{` | `Expected '{' at 20` |
+| `@render row(1)` written without parentheses | `Expected '(' after @render at 13` |
+| a block opened and never closed | `Expected '}' closing block at 25` |
+| `@switch (n())` with no body | `Expected '{' after @switch at 18` |
 
 ### Bindings
 

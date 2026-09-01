@@ -14,6 +14,17 @@
  *   SHAPE    — does the page have the four sections every page is meant to have: what it is, something
  *              live, the scenarios, and what to do when it breaks.
  *
+ * The ERRORS column is APPROXIMATE, and knowing why matters more than the number.
+ *
+ * A Weave message is mostly placeholders — `Unclosed <${closeTag}>` has one literal word — so matching a
+ * page's prose against it can only compare the fragments between the holes. Five matchers were tried:
+ * leading-run, longest-run, any-run, whitespace-flattened, and finally word sequences, and each traded
+ * one class of false report for another. Six of the survivors were hand-checked and every one was on the
+ * page.
+ *
+ * So read a NON-ZERO number as "look at these", never as a score. Zero would be a lie; the residual is
+ * mostly message variants a page covers in one form and not another.
+ *
  * Read-only. Run: `node tools/audit-scenarios.mjs [page]`
  */
 import { readdirSync, readFileSync, existsSync } from 'node:fs';
@@ -143,7 +154,7 @@ for (const s of SUBSYSTEMS) {
   const file = `docs/src/content/learn/${s.page}.md`;
   if (!existsSync(file)) continue;
   const text = readFileSync(file, 'utf8');
-  const words = new Set(text.split(/[^A-Za-z0-9_$]+/));
+  const pageWords = new Set(text.split(/[^A-Za-z0-9_$]+/));
 
   const api = new Set();
   for (const e of s.entries) for (const n of exportsOf(e)) api.add(n);
@@ -151,7 +162,7 @@ for (const s of SUBSYSTEMS) {
   // and are taught on Lifecycle and Reactivity — asking only about the page a module maps to reported
   // twelve gaps on the Signals intro for API that is thoroughly documented one page over. The question
   // a reader has is "would I ever meet this", and Learn is the unit that answers it.
-  const apiMissing = [...api].filter((n) => !words.has(n) && !learnWords.has(n));
+  const apiMissing = [...api].filter((n) => !pageWords.has(n) && !learnWords.has(n));
 
   const msgs = messagesIn(s.sources);
   // A message counts as SHOWN when any literal run of it appears on the page.
@@ -161,24 +172,25 @@ for (const s of SUBSYSTEMS) {
   // test; longest-run probing failed where a page quotes a message's first half and not its longest.
   // A message is a sentence with holes in it, so the honest question is whether the page shows any of
   // the parts between the holes.
+  // Compared as WORD SEQUENCES, not as substrings.
+  //
+  // Every earlier version compared characters, and every one of them reported messages the pages quote
+  // in full. The extracted text carries debris from the source — a stray backslash where an escaped
+  // backtick ended the char class, a colon or a quote left behind by a `${…}` that contained one — and
+  // one wrong character is enough for `includes` to say no. Six were checked by hand and all six were on
+  // the page. Reducing both sides to lowercase words removes the debris and keeps the sentence.
+  const words = (t) => (t.toLowerCase().match(/[a-z0-9]+/g) ?? []).join(' ');
   const runsOf = (m) =>
     m
-      .replace(/^\s*\[?weave\]?:\s*/i, '')
-      // Split on the holes AND on a stray backslash: an escaped backtick inside a template literal ends
-      // the extractor's char class, leaving a lone `\` where `\`component\`` was. A run carrying that
-      // matches nothing, and it was swallowing the whole message as one unusable run.
+      .replace(/^\s*\[?weave[/a-z]*\]?:\s*/i, '')
       .split(/\$\{[^}]*\}|\\n|\\/)
-      .map((part) => part.replace(/\s+/g, ' ').trim())
-      .filter((part) => part.length >= 14);
-  // Both sides get their whitespace collapsed. A page wraps a quoted message across lines, so a run that
-  // is one string in the source is a string with a newline in it on the page — and `includes` said no to
-  // messages the page quotes in full.
-  const flat = text.replace(/\s+/g, ' ');
-  // Shown on this page, or anywhere in Learn — the same reasoning as the API column. A reader who meets
-  // `Unexpected @else` and finds it on Templates has been served, whichever page the audit files it under.
+      .map(words)
+      .filter((r) => r.split(' ').length >= 3);
+  const flatWords = words(text);
+  const learnWordSeq = words(learnFlat);
   const shown = msgs.filter((m) => {
     const runs = runsOf(m);
-    return runs.length > 0 && runs.some((r) => flat.includes(r) || learnFlat.includes(r));
+    return runs.length > 0 && runs.some((r) => flatWords.includes(r) || learnWordSeq.includes(r));
   });
 
   const shape = SECTIONS.filter((x) => x.re.test(text)).length;

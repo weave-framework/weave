@@ -341,6 +341,29 @@ These come from the loader — they are about the files, not the markup:
 Each of these is a **build error**, not a warning. That is the deliberate part: an ambiguous declaration
 is refused rather than guessed at, so a component never quietly gets a template you did not mean.
 
+### When the declaration is not static
+
+`template` and `styles` are read **statically** at build time — the file is never executed — so anything
+the compiler cannot see by reading the text is refused rather than guessed at:
+
+| You wrote | It says |
+| --- | --- |
+| `export const template = x;` | ``weave: `template` must be a static string`` |
+| `export const styles = someList;` | ``weave: `styles` must be a static string or array of strings`` |
+| `` export const template = `<p>${name}</p>`; `` | `weave: inline template/styles cannot use ${…} — Weave binds with {expr}, not JS interpolation` |
+| `export const template = ['<p>a</p>'];` | ``weave: `template` must be a single string, not an array`` |
+| a quote that is never closed | `weave: unterminated string literal in template/styles declaration` |
+
+:::callout info "Why static, and why that is worth the restriction"
+A template that could be computed is a template no tool can read. Static declarations are what let
+`weave check` type-check your markup, the editor jump from a tag to its component, and the formatter
+format a file it has never executed.
+
+The `${…}` one is the common surprise: a backtick string is fine for multi-line convenience, but
+JavaScript interpolation would run *before* Weave ever saw the markup. Weave's own binding is `{{ }}`,
+resolved by the compiler — keeping them separate is what makes the markup analyzable.
+:::
+
 ### While it runs
 
 Two you can meet at runtime, both from putting a thing where it cannot go:
