@@ -194,15 +194,13 @@ tbody tr:last-child td {
 tbody tr.picked {
   background: color-mix(in srgb, var(--accent) 7%, transparent);
 }
-td.pick {
-  width: 2rem;
-}
 input[type='checkbox'] {
   accent-color: var(--accent);
   width: 15px;
   height: 15px;
 }
-.unit {
+/* The checkbox carries the project name as its label, so this cell is the whole identity of the row. */
+.unit .weave-checkbox {
   font-weight: 600;
 }
 .kind {

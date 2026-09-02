@@ -211,7 +211,6 @@
           <table>
             <thead>
               <tr>
-                <th scope="col"><span class="sr-only">Pick</span></th>
                 <th scope="col">Project</th>
                 <th scope="col">Type</th>
                 <th scope="col">Declared by</th>
@@ -221,21 +220,16 @@
             <tbody>
               @for (u of shown(); track u.root) {
                 <tr class:picked={{ isPicked(u) }}>
-                  <td class="pick">
-                    <Checkbox
-                      checked={{ isPicked(u) }}
-                      onChange={{ () => toggle(u) }}
-                      label={{ 'Migrate ' + u.name }}
-                    />
+                  <td class="unit">
+                    <Checkbox checked={{ isPicked(u) }} onChange={{ () => toggle(u) }} label={{ u.name }} />
                   </td>
-                  <td class="unit">{{ u.name }}</td>
                   <td><span class="kind" class:unstated={{ u.type === null }}>{{ typeLabel(u) }}</span></td>
                   <td class="declared">{{ u.declaredBy }}</td>
                   <td class="loc">{{ relative(u) }}</td>
                 </tr>
               } @empty {
                 <tr>
-                  <td colspan="5" class="no-match">Nothing matches that filter.</td>
+                  <td colspan="4" class="no-match">Nothing matches that filter.</td>
                 </tr>
               }
             </tbody>
