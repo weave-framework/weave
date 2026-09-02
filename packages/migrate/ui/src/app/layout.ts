@@ -160,6 +160,19 @@ export function layout(graph: Graph): Layout {
     }
   }
 
+  /* ── components, beside the route that renders them ──
+     Reported: "vien routai ir viskas" — the graph drew a route tree and stopped, while components, services and
+     everything they depend on stayed in the data. A route card said `(default) · LoginComponent` and there was
+     no LoginComponent anywhere to look at.
+     A component sits one column right of its route, on the same line, so the pairing needs no tracing. */
+  const renders: Edge[] = graph.edges.filter((e: Edge): boolean => e.kind === 'renders');
+  for (const e of renders) {
+    const from: PlacedNode | undefined = placed.get(e.from);
+    const node: GraphNode | undefined = byId.get(e.to);
+    if (!from || !node || placed.has(e.to)) continue;
+    placed.set(e.to, { ...node, x: from.x + LEVEL_GAP, y: from.y, r: radius(node.weight), level: from.level + 1 });
+  }
+
   /* ── guards ──
      Routes are not the whole story: a guard decides whether a route can be entered at all, and in one real app
      the two heaviest things in the whole graph are guards (54 and 52 references). Drawing them only in the
@@ -168,11 +181,20 @@ export function layout(graph: Graph): Layout {
      which is exactly what they are. */
   const rightmost: number = Math.max(...[...placed.values()].map((n: PlacedNode): number => n.x), PAD);
   const guardEdges: Edge[] = graph.edges.filter((e: Edge): boolean => e.kind === 'guards');
-  const guardIds: string[] = [...new Set(guardEdges.map((e: Edge): string => e.to))];
-  guardIds.forEach((gid: string, i: number): void => {
-    const node: GraphNode | undefined = byId.get(gid);
+  const injectEdges: Edge[] = graph.edges.filter((e: Edge): boolean => e.kind === 'injects');
+
+  /* Everything injected — guards and services alike — goes in one column past the drawing, heaviest first.
+     They are shared by design: one ThemeService behind ten components. Placing them among the tree would drag
+     lines across everything; placing them together makes the column itself the list of what this app leans on.
+     Their edges stay hidden until a card is selected, for the same reason the guard edges do. */
+  const sideIds: string[] = [...new Set([...guardEdges, ...injectEdges].map((e: Edge): string => e.to))]
+    .filter((nodeId: string): boolean => !placed.has(nodeId))
+    .sort((a: string, b: string): number => (byId.get(b)?.weight ?? 0) - (byId.get(a)?.weight ?? 0));
+
+  sideIds.forEach((nodeId: string, i: number): void => {
+    const node: GraphNode | undefined = byId.get(nodeId);
     if (!node) return;
-    placed.set(gid, {
+    placed.set(nodeId, {
       ...node,
       x: rightmost + SIDE_GAP,
       y: PAD + i * (CARD_H + 22),
@@ -183,7 +205,7 @@ export function layout(graph: Graph): Layout {
 
   const nodes: PlacedNode[] = [...placed.values()];
   const edges: PlacedEdge[] = [];
-  for (const e of [...structural, ...guardEdges]) {
+  for (const e of [...structural, ...renders, ...guardEdges, ...injectEdges]) {
     const a: PlacedNode | undefined = placed.get(e.from);
     const b: PlacedNode | undefined = placed.get(e.to);
     if (a && b) edges.push({ ...e, x1: a.x, y1: a.y, x2: b.x, y2: b.y });
@@ -226,9 +248,16 @@ export function pathThrough(graph: Graph, nodeId: string): Set<string> {
   walk(nodeId, forward);
   walk(nodeId, backward);
 
-  // Guards hang off the selected node itself rather than off its path — they are why it can be entered.
+  /* Everything the selected node touches directly, in either direction: what it renders, what it injects, what
+     guards it, and who injects IT.
+
+     Structural edges alone were not enough, and it showed: selecting a component dimmed the entire canvas
+     except that one card, because a component hangs off the tree by a `renders` edge and has no `child` or
+     `loads` of its own. The card with twelve dependencies looked like the card with none. */
   for (const e of graph.edges) {
-    if (e.kind === 'guards' && e.from === nodeId) out.add(e.to);
+    if (e.kind === 'child' || e.kind === 'loads') continue;
+    if (e.from === nodeId) out.add(e.to);
+    if (e.to === nodeId) out.add(e.from);
   }
   return out;
 }

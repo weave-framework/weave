@@ -851,3 +851,42 @@ td.loc {
   font-size: 0.75rem;
   color: var(--muted);
 }
+
+/* An injected dependency is shared by design; its lines only appear when a card is selected. */
+.edge.injects {
+  stroke: var(--red);
+  stroke-width: 1;
+  opacity: 0.45;
+}
+
+.ext-list li {
+  align-items: baseline;
+}
+.ext-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.0625rem;
+  min-width: 0;
+}
+.ext-name {
+  font-family: var(--mono);
+  font-size: 0.8125rem;
+  color: var(--fg);
+}
+.ext-from {
+  font-family: var(--sans);
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.ext-from code {
+  font-family: var(--mono);
+  color: var(--accent);
+}
+.ext-unknown {
+  color: var(--orange);
+}
+.ext-users {
+  font-family: var(--sans);
+  font-size: 0.75rem;
+  color: var(--muted);
+}

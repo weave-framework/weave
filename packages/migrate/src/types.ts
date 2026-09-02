@@ -104,6 +104,12 @@ export interface GraphNode {
   component?: string;
   /** How many OTHER routes render the same component — a shared screen, reached with different parameters. */
   sharedWith?: number;
+  /** For an external: the library it comes from (`@sps-services/layout`), when that can be traced. */
+  library?: string;
+  /** For an external: where that library resolves on disk, when the workspace says. */
+  libraryPath?: string;
+  /** For an external: the classes that inject it — who would break if it were left behind. */
+  usedBy?: string[];
   /** True when no structural edge points at this node: it is a way IN, or nothing opens it. */
   root?: boolean;
   /** True when this route absorbed the module it alone loads — the card is both. */

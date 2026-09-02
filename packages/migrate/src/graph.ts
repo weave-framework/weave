@@ -13,7 +13,17 @@
 
 import ts from 'typescript';
 import { sep } from 'node:path';
-import { parseFile, resolveRelative, type ComponentFact, type MigrationFacts, type RouteFact, type ServiceFact } from './analyze.js';
+import {
+  outOfReach,
+  parseFile,
+  resolveRelative,
+  type ComponentFact,
+  type DiEdge,
+  type MigrationFacts,
+  type Reach,
+  type RouteFact,
+  type ServiceFact,
+} from './analyze.js';
 import type { Edge, Graph, GraphNode, NodeKind } from './types.js';
 
 /** A stable id for a node. Ids are opaque to the UI; only their equality matters. */
@@ -291,6 +301,24 @@ export function buildGraph(facts: MigrationFacts): Graph {
     node.component = route.component;
     node.sharedWith = (rendersOf.get(route.component) ?? 1) - 1;
   });
+
+  /* ── say what an external actually IS ──
+     Reported, and fair: a list reading "10 LayoutService" names a thing with no origin and no purpose — where
+     is it from, who needs it, why does it matter. All three are already known: `outOfReach` traces most of
+     these to a library and the DI edges say who injects them. Carrying that onto the node turns a number into
+     a decision someone can actually make. */
+  const reach: Reach[] = outOfReach(facts);
+  for (const node of nodes.values()) {
+    if (node.kind !== 'external') continue;
+    const injectors: string[] = [...new Set(facts.di.filter((e: DiEdge): boolean => e.to === node.label).map((e: DiEdge): string => e.from))];
+    if (injectors.length) node.usedBy = injectors;
+    const from: Reach | undefined = reach.find((r: Reach): boolean => r.uses.includes(node.label));
+    if (from) {
+      node.library = from.name;
+      if (from.path) node.libraryPath = from.path;
+      node.detail = `from ${from.name}`;
+    }
+  }
 
   /* ── mark what nothing points at ──
      A card with no incoming edge was reported as "I don't know where this comes from, I looked in the code and

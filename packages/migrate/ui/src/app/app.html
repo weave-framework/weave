@@ -305,7 +305,8 @@
             @for (e of view().edges; track e.from + '>' + e.to) {
               <path class="edge" class:cut={{ e.kind === 'loads' }} class:guard={{ e.kind === 'guards' }}
                     class:dim={{ !edgeLit(e.from, e.to) }}
-                    class:hidden={{ e.kind === 'guards' && !guardEdgeVisible(e.from, e.to) }}
+                    class:injects={{ e.kind === 'injects' }}
+                    class:hidden={{ (e.kind === 'guards' || e.kind === 'injects') && !guardEdgeVisible(e.from, e.to) }}
                     d={{ 'M ' + (e.x1 + CARD_W) + ' ' + (e.y1 + CARD_H / 2) +
                          ' C ' + (e.x1 + CARD_W + 60) + ' ' + (e.y1 + CARD_H / 2) +
                          ', ' + (e.x2 - 60) + ' ' + (e.y2 + CARD_H / 2) +
@@ -368,7 +369,20 @@
             </p>
             <ul class="ext-list">
               @for (x of externals().slice(0, 12); track x.id) {
-                <li><span class="ext-weight">{{ x.weight }}</span> {{ x.label }}</li>
+                <li>
+                  <span class="ext-weight">{{ x.weight }}</span>
+                  <span class="ext-body">
+                    <span class="ext-name">{{ x.label }}</span>
+                    @if (x.library) {
+                      <span class="ext-from">from <code>{{ x.library }}</code></span>
+                    } @else {
+                      <span class="ext-from ext-unknown">no library found for it — an injected type with no definition in reach</span>
+                    }
+                    @if (x.usedBy?.length) {
+                      <span class="ext-users">injected by {{ (x.usedBy ?? []).slice(0, 3).join(', ') }}@if ((x.usedBy ?? []).length > 3) { , +{{ (x.usedBy ?? []).length - 3 }} more }</span>
+                    }
+                  </span>
+                </li>
               }
             </ul>
           </div>
