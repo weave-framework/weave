@@ -99,6 +99,9 @@ export function setup(): {
   const elapsed: Signal<number> = signal(0);
   const picked: Signal<string[]> = signal<string[]>([]);
 
+  /** Whether the folder picker is open. Declared here because `scan` closes it. */
+  const browsing: Signal<boolean> = signal(false);
+
   /**
    * Ask the service what is at `path`.
    *
@@ -108,6 +111,10 @@ export function setup(): {
   const scan = (): void => {
     const target: string = path().trim();
     if (!target) return;
+    // Scanning answers the question the picker was open to ask, so the picker closes. Leaving it open pushed
+    // the result below it and read as "nothing happened" — the scan had run, the signals had updated, and none
+    // of it was on screen.
+    browsing.set(false);
     phase.set('scanning');
     error.set('');
     workspace.set(null);
@@ -186,7 +193,6 @@ export function setup(): {
      NAME, and `<input webkitdirectory>` gives paths relative to whatever was chosen. So the picker is ours,
      reading the filesystem through the service. It costs a panel and buys something a native dialog cannot
      give: the markers are visible while choosing, so you see where the Angular projects are before scanning. */
-  const browsing: Signal<boolean> = signal(false);
   const listing: Signal<Listing> = signal<Listing>(NO_LISTING);
   const listingError: Signal<string> = signal('');
   const recent: Signal<string[]> = signal<string[]>(readRecent());
