@@ -314,7 +314,8 @@
               <path class="edge" class:cut={{ e.kind === 'loads' }} class:guard={{ e.kind === 'guards' }}
                     class:dim={{ !edgeLit(e.from, e.to) }}
                     class:injects={{ e.kind === 'injects' }}
-                    class:hidden={{ (e.kind === 'guards' || e.kind === 'injects') && !guardEdgeVisible(e.from, e.to) }}
+                    class:decided={{ edgeDecided(e.from, e.to) }}
+                    class:hidden={{ (e.kind === 'guards' || e.kind === 'injects') && !guardEdgeVisible(e.from, e.to) && !edgeDecided(e.from, e.to) }}
                     d={{ 'M ' + (e.x1 + CARD_W) + ' ' + (e.y1 + CARD_H / 2) +
                          ' C ' + (e.x1 + CARD_W + 60) + ' ' + (e.y1 + CARD_H / 2) +
                          ', ' + (e.x2 - 60) + ' ' + (e.y2 + CARD_H / 2) +
@@ -322,7 +323,7 @@
             }
             @for (n of view().nodes; track n.id) {
               <g class="card" class:is-selected={{ selected() === n.id }} class:dim={{ !isLit(n.id) }}
-                 on:click={{ () => pick(n.id) }}>
+                 class:kept={{ isKept(n.id) }} on:click={{ () => pick(n.id) }}>
                 <rect class="card-body" x={{ n.x }} y={{ n.y }} width={{ CARD_W }} height={{ CARD_H }} rx="6" />
                 <path class={{ 'card-head card-head--' + n.kind }} class:lazy={{ n.lazy }}
                       d={{ 'M ' + n.x + ' ' + (n.y + 6) + ' a 6 6 0 0 1 6 -6 h ' + (CARD_W - 12) +
@@ -349,65 +350,72 @@
                 }
               </g>
             }
+            @if (hasSelection()) {
+              <foreignObject x={{ expandedX() }} y={{ expandedY() }} width={{ EXPANDED_W }} height={{ EXPANDED_H }}>
+                <div class="expanded" on:click={{ stopClick }}>
+                  <div class={{ 'expanded-head expanded-head--' + sel().kind }}>
+                    <span class="expanded-tag">{{ cardTag(sel()) }}</span>
+                    <button type="button" class="expanded-close" aria-label="Close" on:click={{ clearSelection }}>✕</button>
+                  </div>
+
+                  <h3 class="expanded-title">{{ sel().label }}</h3>
+                  @if (sel().detail) {
+                    <p class="expanded-detail">{{ sel().detail }}</p>
+                  }
+
+                  <div class="expanded-actions">
+                    @if (sel().kind === 'external') {
+                      <label class="tick">
+                        <input type="checkbox" .checked={{ decisionFor(sel().id) === 'open' }}
+                               on:change={{ () => decide(sel().id, 'open') }} />
+                        Open and migrate
+                      </label>
+                      <label class="tick">
+                        <input type="checkbox" .checked={{ decisionFor(sel().id) === 'leave' }}
+                               on:change={{ () => decide(sel().id, 'leave') }} />
+                        Leave behind
+                      </label>
+                      <p class="expanded-note">Its own dependencies are unknown until it is opened.</p>
+                    } @else {
+                      <label class="tick">
+                        <input type="checkbox" .checked={{ decisionFor(sel().id) === 'migrate' }}
+                               on:change={{ () => decide(sel().id, 'migrate') }} />
+                        Migrate this
+                      </label>
+                      <label class="tick">
+                        <input type="checkbox" .checked={{ decisionFor(sel().id) === 'skip' }}
+                               on:change={{ () => decide(sel().id, 'skip') }} />
+                        Leave out
+                      </label>
+                      <button type="button" class="expanded-all" on:click={{ () => migrateWithDependencies(sel().id) }}>
+                        Take everything it needs ({{ closureSize(sel().id) }})
+                      </button>
+                    }
+                  </div>
+
+                  <div class="expanded-links">
+                    @for (grp of linkGroups(); track grp.title) {
+                      <div class="expanded-group">
+                        <h4>{{ grp.title }}</h4>
+                        <ul>
+                          @for (item of grp.items; track item.kind + item.id) {
+                            <li>
+                              <span class="expanded-kind">{{ item.kind }}</span>
+                              <button type="button" class="expanded-jump" class:ext={{ item.external }}
+                                      on:click={{ () => selected.set(item.id) }}>{{ item.label }}</button>
+                            </li>
+                          }
+                        </ul>
+                      </div>
+                    } @empty {
+                      <p class="expanded-note">Nothing else connects to this one.</p>
+                    }
+                  </div>
+                </div>
+              </foreignObject>
+            }
           </svg>
         </div>
-
-        @if (hasSelection()) {
-          <div class="inspector">
-            <div class="inspector-head">
-              <div>
-                <h3>{{ sel().label }}</h3>
-                <p class="inspector-meta">
-                  {{ sel().kind }}@if (sel().detail) { · {{ sel().detail }} }@if (sel().lazy) { · <b>lazy boundary</b> }
-                </p>
-              </div>
-              <span class="decision-badge" class:on={{ decisionFor(sel().id) }}>
-                {{ decisionFor(sel().id) || 'not decided' }}
-              </span>
-            </div>
-
-            <div class="actions">
-              @if (sel().kind === 'external') {
-                <Button variant={{ decisionFor(sel().id) === 'open' ? 'primary' : 'outline' }}
-                        on:click={{ () => decide(sel().id, 'open') }}>Open and migrate</Button>
-                <Button variant={{ decisionFor(sel().id) === 'leave' ? 'primary' : 'outline' }}
-                        on:click={{ () => decide(sel().id, 'leave') }}>Leave behind</Button>
-                <span class="action-note">Never read — its calls arrive as TODOs unless you open it.</span>
-              } @else {
-                <Button variant={{ decisionFor(sel().id) === 'migrate' ? 'primary' : 'outline' }}
-                        on:click={{ () => decide(sel().id, 'migrate') }}>Migrate this</Button>
-                <Button variant="outline" on:click={{ () => migrateWithDependencies(sel().id) }}>
-                  Migrate with everything it needs ({{ closureSize(sel().id) }})
-                </Button>
-                <Button variant={{ decisionFor(sel().id) === 'skip' ? 'primary' : 'outline' }}
-                        on:click={{ () => decide(sel().id, 'skip') }}>Leave out</Button>
-              }
-            </div>
-
-            @if (linkGroups().length) {
-              <div class="link-groups">
-                @for (grp of linkGroups(); track grp.title) {
-                  <div class="link-group">
-                    <h4>{{ grp.title }}</h4>
-                    <ul class="links">
-                      @for (item of grp.items; track item.kind + item.id) {
-                        <li>
-                          <span class="link-kind">{{ item.kind }}</span>
-                          <button type="button" class="link-jump" class:ext={{ item.external }}
-                                  on:click={{ () => selected.set(item.id) }}>{{ item.label }}</button>
-                        </li>
-                      }
-                    </ul>
-                  </div>
-                }
-              </div>
-            } @else {
-              <p class="inspector-meta">Nothing else connects to this one.</p>
-            }
-          </div>
-        } @else {
-          <p class="inspector-meta">Click a card to see what it needs, what needs it, and to decide what happens to it.</p>
-        }
 
         @if (externals().length) {
           <div class="externals">

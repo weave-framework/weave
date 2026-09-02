@@ -231,6 +231,11 @@ export function buildGraph(facts: MigrationFacts): Graph {
     if (!known.has(edge.to)) {
       add({ id: id('external', edge.to), kind: 'external', label: edge.to, detail: 'not read yet', weight: 0 });
     }
+    // The SOURCE may be external too — once a library is opened its own classes start injecting things, and
+    // those edges were being dropped because `link` only ever tried component and service ids for the source.
+    if (!known.has(edge.from) && nodes.has(id('external', edge.from))) {
+      link(id('external', edge.from), known.has(edge.to) ? id('service', edge.to) : id('external', edge.to), 'injects');
+    }
     const to: string = known.has(edge.to) ? id('service', edge.to) : id('external', edge.to);
     link(id('component', edge.from), to, 'injects');
     link(id('service', edge.from), to, 'injects');

@@ -130,6 +130,13 @@ export function setup(): {
   summaryLine: Computed<string>;
   lazyCount: Computed<number>;
   selectedNode: Computed<PlacedNode | null>;
+  EXPANDED_W: number;
+  EXPANDED_H: number;
+  expandedX: Computed<number>;
+  expandedY: Computed<number>;
+  stopClick: (event: MouseEvent) => void;
+  edgeDecided: (from: string, to: string) => boolean;
+  isKept: (nodeId: string) => boolean;
   linkGroups: Computed<Array<{ title: string; items: Array<{ label: string; kind: string; external: boolean; id: string }> }>>;
   selectedLinks: Computed<Array<{ dir: 'uses' | 'used by'; kind: string; label: string; external: boolean }>>;
   externals: Computed<PlacedNode[]>;
@@ -841,6 +848,43 @@ export function setup(): {
     return count ? `⛨${count}` : '';
   };
 
+  /* ── the expanded card ──
+     Reported: the panel below the canvas meant scrolling away from the thing being looked at, to a list whose
+     purpose was not obvious. Everything about a card belongs ON the card. Selecting one opens it in place,
+     over the drawing, with its connections and its decision inside it. */
+  const EXPANDED_W: number = 340;
+  const EXPANDED_H: number = 300;
+
+  /** Keep the opened card inside the drawing, so it never hangs off the right or bottom edge. */
+  const expandedX: Computed<number> = computed<number>(() => {
+    const node: PlacedNode = sel();
+    return Math.max(8, Math.min(node.x - 8, Math.max(0, view().width - EXPANDED_W - 8)));
+  });
+  const expandedY: Computed<number> = computed<number>(() => {
+    const node: PlacedNode = sel();
+    return Math.max(8, Math.min(node.y - 8, Math.max(0, view().height - EXPANDED_H - 8)));
+  });
+
+  /** Keep a click inside the opened card from reaching the canvas, which would close it immediately. */
+  const stopClick = (event: MouseEvent): void => {
+    event.stopPropagation();
+  };
+
+  /** An edge between two things both marked for migration — the path someone has already committed to. */
+  const edgeDecided = (from: string, to: string): boolean => {
+    const map: Record<string, string> = decisions();
+    const a: string | undefined = map[from];
+    const b: string | undefined = map[to];
+    const kept = (v: string | undefined): boolean => v === 'migrate' || v === 'open';
+    return kept(a) && kept(b);
+  };
+
+  /** Is this node marked to be carried over, either way of being carried over? */
+  const isKept = (nodeId: string): boolean => {
+    const d: string = decisionFor(nodeId);
+    return d === 'migrate' || d === 'open';
+  };
+
   /** What a card's header says: the kind, and the count that matters for it. */
   const cardTag = (node: PlacedNode): string => {
     // "Nothing points here" is worth its own word: a way into the app, or something orphaned. Either way the
@@ -934,6 +978,13 @@ export function setup(): {
     selectedNode,
     selectedLinks,
     linkGroups,
+    EXPANDED_W,
+    EXPANDED_H,
+    expandedX,
+    expandedY,
+    stopClick,
+    edgeDecided,
+    isKept,
     externals,
     query,
     setKind,

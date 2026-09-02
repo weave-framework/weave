@@ -988,3 +988,159 @@ td.loc {
 .tally--migrate { color: var(--green); }
 .tally--open { color: var(--accent); }
 .tally--skip { color: var(--muted); }
+
+/* ── the opened card ──
+   Everything about a node lives on the node. The panel that used to sit below the canvas meant scrolling away
+   from the thing you were looking at, to a list whose purpose was not obvious. */
+.expanded {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--raised);
+  border: 1px solid var(--fg);
+  border-radius: 8px;
+  box-shadow: 0 8px 28px #0000002e;
+  overflow: hidden;
+  font-family: var(--sans);
+}
+.expanded-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.25rem 0.5rem 0.25rem 0.625rem;
+}
+.expanded-head--module { background: var(--accent); }
+.expanded-head--route { background: var(--muted); }
+.expanded-head--component { background: var(--green); }
+.expanded-head--service { background: var(--orange); }
+.expanded-head--external { background: var(--red); }
+.expanded-tag {
+  font-family: var(--mono);
+  font-size: 0.5625rem;
+  letter-spacing: 0.07em;
+  color: #fff;
+}
+.expanded-close {
+  font: inherit;
+  font-size: 0.75rem;
+  color: #fff;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0 0.25rem;
+}
+.expanded-title {
+  margin: 0.5rem 0.75rem 0;
+  font-family: var(--mono);
+  font-size: 0.875rem;
+  color: var(--fg);
+  word-break: break-word;
+}
+.expanded-detail {
+  margin: 0.125rem 0.75rem 0;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.expanded-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.875rem;
+  align-items: center;
+  margin: 0.5rem 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+.tick {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3125rem;
+  font-size: 0.78125rem;
+  color: var(--fg-soft);
+  cursor: pointer;
+}
+.tick input {
+  accent-color: var(--accent);
+  width: 14px;
+  height: 14px;
+}
+.expanded-all {
+  font: inherit;
+  font-size: 0.75rem;
+  color: #fff;
+  background: var(--accent);
+  border: none;
+  border-radius: 5px;
+  padding: 0.25rem 0.5rem;
+  cursor: pointer;
+}
+.expanded-note {
+  margin: 0;
+  font-size: 0.71875rem;
+  color: var(--muted);
+  flex-basis: 100%;
+}
+
+.expanded-links {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 0.75rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+}
+.expanded-group h4 {
+  margin: 0 0 0.25rem;
+  font-size: 0.625rem;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.expanded-group ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+.expanded-group li {
+  display: flex;
+  gap: 0.4375rem;
+  align-items: baseline;
+}
+.expanded-kind {
+  font-size: 0.625rem;
+  color: var(--muted);
+  min-width: 3.25rem;
+}
+.expanded-jump {
+  font: inherit;
+  font-family: var(--mono);
+  font-size: 0.71875rem;
+  color: var(--fg-soft);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+}
+.expanded-jump:hover {
+  color: var(--accent);
+}
+.expanded-jump.ext {
+  color: var(--red);
+}
+
+/* A committed path is thicker and solid — the route someone has already decided on reads at a glance. */
+.edge.decided {
+  stroke: var(--green);
+  stroke-width: 2.5;
+  opacity: 0.85;
+  stroke-dasharray: none;
+}
+.card.kept .card-body {
+  stroke: var(--green);
+  stroke-width: 2;
+}
