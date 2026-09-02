@@ -1243,3 +1243,15 @@ td.loc {
   color: var(--muted);
   max-width: 64ch;
 }
+
+/* A component putting another on screen is structure, not a dependency to reveal on demand — it is drawn. */
+.edge.uses {
+  stroke: var(--green);
+  stroke-width: 1.25;
+  opacity: 0.5;
+}
+.swatch--uses {
+  border-radius: 0;
+  height: 0;
+  border-top: 2px solid color-mix(in srgb, var(--green) 60%, transparent);
+}

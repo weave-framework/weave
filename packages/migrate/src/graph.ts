@@ -12,7 +12,8 @@
  */
 
 import ts from 'typescript';
-import { sep } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { dirname, resolve as resolvePath, sep } from 'node:path';
 import {
   outOfReach,
   parseFile,
@@ -84,6 +85,41 @@ function reexportSpecifiers(file: string): string[] {
     if (!ts.isExportDeclaration(statement)) continue;
     const from: ts.Expression | undefined = statement.moduleSpecifier;
     if (from && ts.isStringLiteral(from)) out.push(from.text);
+  }
+  return out;
+}
+
+/**
+ * Which components a component's template puts on screen.
+ *
+ * Reported, and it was the biggest hole left: the graph knew which component a ROUTE renders and nothing about
+ * what that component renders in turn. An application is mostly components using other components, and none of
+ * those edges existed.
+ *
+ * Read from the markup rather than guessed: every tag in the template is looked up in the map of declared
+ * selectors, so `<app-header>` becomes an edge only if some component actually declares `app-header`. A
+ * standalone component's `imports: [...]` is taken too — it names its dependencies directly, which catches the
+ * ones a template builds dynamically.
+ */
+function templateOf(component: ComponentFact): string {
+  if (component.templateText) return component.templateText;
+  if (!component.templateUrl) return '';
+  try {
+    return readFileSync(resolvePath(dirname(component.file), component.templateUrl), 'utf8');
+  } catch {
+    // A template that cannot be read is a fact about that component, not a reason to stop.
+    return '';
+  }
+}
+
+/** Every element name a piece of markup uses. Deliberately loose: it is matched against declared selectors. */
+function tagsIn(markup: string): Set<string> {
+  const out: Set<string> = new Set<string>();
+  const pattern: RegExp = /<([a-zA-Z][a-zA-Z0-9_-]*)/g;
+  let match: RegExpExecArray | null = pattern.exec(markup);
+  while (match) {
+    out.add(match[1].toLowerCase());
+    match = pattern.exec(markup);
   }
   return out;
 }
@@ -287,6 +323,29 @@ export function buildGraph(facts: MigrationFacts): Graph {
     }
     edges.length = 0;
     edges.push(...kept);
+  }
+
+  /* ── components using components ──
+     The shape of the app below the routes. Without it a component card was a leaf, however much markup it
+     actually pulls in. */
+  const bySelector: Map<string, string> = new Map<string, string>();
+  for (const component of facts.components) {
+    if (component.selector) bySelector.set(component.selector.toLowerCase(), component.className);
+  }
+  const byClassName: Set<string> = new Set<string>(facts.components.map((c: ComponentFact): string => c.className));
+
+  for (const component of facts.components) {
+    const from: string = id('component', component.className);
+    const used: Set<string> = new Set<string>();
+    for (const tag of tagsIn(templateOf(component))) {
+      const owner: string | undefined = bySelector.get(tag);
+      if (owner && owner !== component.className) used.add(owner);
+    }
+    // A standalone component names what it uses outright, which covers markup this cannot see.
+    for (const imported of component.declaredImports) {
+      if (byClassName.has(imported) && imported !== component.className) used.add(imported);
+    }
+    for (const target of used) link(from, id('component', target), 'uses');
   }
 
   /* ── what a route actually opens ──

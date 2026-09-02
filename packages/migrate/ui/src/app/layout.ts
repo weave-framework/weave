@@ -147,11 +147,37 @@ export function layout(graph: Graph): Layout {
      no LoginComponent anywhere to look at.
      A component sits one column right of its route, on the same line, so the pairing needs no tracing. */
   const renders: Edge[] = graph.edges.filter((e: Edge): boolean => e.kind === 'renders');
+  const uses: Edge[] = graph.edges.filter((e: Edge): boolean => e.kind === 'uses');
+
+  /* A component's own children follow it, column by column. Placing only what a ROUTE renders left most of the
+     application off the canvas — 11 of 31 components on one real app, while the other 20 existed in the data
+     and nowhere on screen. */
+  const usedBy: Map<string, string[]> = new Map<string, string[]>();
+  for (const e of uses) usedBy.set(e.from, [...(usedBy.get(e.from) ?? []), e.to]);
+
+  const placeComponent = (nodeId: string, x: number, level: number, depth: number): void => {
+    const node: GraphNode | undefined = byId.get(nodeId);
+    if (!node || placed.has(nodeId) || depth > 8) return;
+    placed.set(nodeId, { ...node, x, y: PAD + row * ROW_GAP, r: radius(node.weight), level });
+    row += 1;
+    for (const child of usedBy.get(nodeId) ?? []) placeComponent(child, x + LEVEL_GAP, level + 1, depth + 1);
+  };
+
   for (const e of renders) {
     const from: PlacedNode | undefined = placed.get(e.from);
     const node: GraphNode | undefined = byId.get(e.to);
     if (!from || !node || placed.has(e.to)) continue;
     placed.set(e.to, { ...node, x: from.x + LEVEL_GAP, y: from.y, r: radius(node.weight), level: from.level + 1 });
+    // and everything that component puts on screen, after it
+    for (const child of usedBy.get(e.to) ?? []) placeComponent(child, from.x + LEVEL_GAP * 2, from.level + 2, 1);
+  }
+
+  // A component no route reaches is still part of the app — a shared widget, a layout piece. It gets a column
+  // of its own rather than being dropped, because a diagram that quietly omits things cannot be trusted.
+  const rightOfTree: number = Math.max(...[...placed.values()].map((n: PlacedNode): number => n.x), PAD) + LEVEL_GAP;
+  for (const node of graph.nodes) {
+    if (node.kind !== 'component' || placed.has(node.id)) continue;
+    placeComponent(node.id, rightOfTree, 0, 1);
   }
 
   /* ── separate anything that landed on the same spot ──
@@ -209,7 +235,7 @@ export function layout(graph: Graph): Layout {
 
   const nodes: PlacedNode[] = [...placed.values()];
   const edges: PlacedEdge[] = [];
-  for (const e of [...structural, ...renders, ...guardEdges, ...injectEdges]) {
+  for (const e of [...structural, ...renders, ...uses, ...guardEdges, ...injectEdges]) {
     const a: PlacedNode | undefined = placed.get(e.from);
     const b: PlacedNode | undefined = placed.get(e.to);
     if (a && b) edges.push({ ...e, x1: a.x, y1: a.y, x2: b.x, y2: b.y });

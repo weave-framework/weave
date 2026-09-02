@@ -81,7 +81,7 @@ export interface Peek {
 export type NodeKind = 'module' | 'route' | 'component' | 'service' | 'external';
 
 /** How one node depends on another. */
-export type EdgeKind = 'child' | 'loads' | 'renders' | 'guards' | 'injects';
+export type EdgeKind = 'child' | 'loads' | 'renders' | 'guards' | 'injects' | 'uses';
 
 /** One thing in the graph. */
 export interface GraphNode {
