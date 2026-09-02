@@ -23,3 +23,6 @@ export {
 
 export { serve, type MigrateServer, type ServeOptions } from './server.js';
 export { browse, peek, type Entry, type Listing, type Peek } from './browse.js';
+export { buildGraph } from './graph.js';
+export { assembleFacts, outOfReach, type MigrationFacts, type Reach, type RouteFact } from './analyze.js';
+export type { Edge, EdgeKind, Graph, GraphNode, NodeKind } from './types.js';

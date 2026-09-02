@@ -74,3 +74,47 @@ export interface Peek {
   /** The marker files it carries — the same ones the picker shows beside a folder. */
   markers: string[];
 }
+
+/* ─────────────────────────── the dependency graph ─────────────────────────── */
+
+/** What a node stands for. The kind decides how it is drawn and what it can connect to. */
+export type NodeKind = 'module' | 'route' | 'component' | 'service' | 'external';
+
+/** How one node depends on another. */
+export type EdgeKind = 'child' | 'loads' | 'renders' | 'guards' | 'injects';
+
+/** One thing in the graph. */
+export interface GraphNode {
+  /** Opaque, stable within one graph. */
+  id: string;
+  kind: NodeKind;
+  /** What to draw on it. */
+  label: string;
+  /** A second line: a selector, a redirect target, a route count. May be empty. */
+  detail: string;
+  /** How many edges point AT this node — size on screen, so importance needs no reading. */
+  weight: number;
+  /** True on a route that is a lazy boundary: the line a migration can be cut along. */
+  lazy?: boolean;
+  /** Guard class names, when this is a route. */
+  guards?: string[];
+  /** A named outlet, when this route targets one. */
+  outlet?: string | null;
+  /** The node this one is drawn inside, when it belongs to a group. */
+  parent?: string;
+}
+
+/** One dependency. */
+export interface Edge {
+  from: string;
+  to: string;
+  kind: EdgeKind;
+}
+
+/** A whole graph, ready to lay out. */
+export interface Graph {
+  /** The analysed unit's directory — paths are shown relative to it. */
+  root: string;
+  nodes: GraphNode[];
+  edges: Edge[];
+}
