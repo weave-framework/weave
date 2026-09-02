@@ -4,9 +4,31 @@ import type { Unit, Workspace } from '../../../src/detect.js';
 /** What the screen is doing. `scanning` is the only state that makes the reader wait. */
 export type Phase = 'idle' | 'scanning' | 'done' | 'failed';
 
-/** The session token the service printed into the URL. Every `/api/*` call carries it. */
-function sessionToken(): string {
+/** Whether this page is talking to the service it belongs to. `unknown` only until the first answer. */
+export type Session = 'unknown' | 'ok' | 'denied';
+
+/**
+ * The session token, when it is still in the URL.
+ *
+ * It arrives there once, on the link the service prints. The server then parks it in an HttpOnly cookie, this
+ * page wipes it from the address bar, and every later request rides the cookie — so this returns empty on a
+ * reload, and that is the normal case rather than a failure.
+ */
+function urlToken(): string {
   return new URLSearchParams(location.search).get('token') ?? '';
+}
+
+/** Build an API URL, carrying the token only while it is still in ours. */
+function apiUrl(path: string): string {
+  const t: string = urlToken();
+  return t ? `${path}?token=${encodeURIComponent(t)}` : path;
+}
+
+/** Drop the token from the address bar once the cookie holds it — a URL with a key in it gets pasted. */
+function tidyAddressBar(): void {
+  if (!urlToken()) return;
+  const clean: string = location.pathname + location.hash;
+  history.replaceState(null, '', clean);
 }
 
 /** Stand-in for "nothing scanned yet", so the template never handles null. */
@@ -15,6 +37,7 @@ const EMPTY: Workspace = { root: '', signals: [], units: [], scannedDepth: 0 };
 export function setup(): {
   path: Signal<string>;
   phase: Signal<Phase>;
+  session: Signal<Session>;
   found: Computed<Workspace>;
   hasResult: Computed<boolean>;
   error: Signal<string>;
@@ -53,7 +76,7 @@ export function setup(): {
     picked.set([]);
     const started: number = performance.now();
 
-    void fetch(`/api/inspect?token=${encodeURIComponent(sessionToken())}`, {
+    void fetch(apiUrl('/api/inspect'), {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ path: target }),
@@ -94,9 +117,24 @@ export function setup(): {
   /** `null` means no file declared a type. Say that, rather than filling the column with a guess. */
   const typeLabel = (unit: Unit): string => unit.type ?? 'unstated';
 
+  /**
+   * Ask once, on load, whether this page is allowed to talk to the service. The cookie is HttpOnly, so script
+   * cannot look for it — reaching the endpoint at all IS the answer. On success the address bar is tidied, which
+   * is safe precisely because the cookie has by then been set by the very response that answered this.
+   */
+  const session: Signal<Session> = signal<Session>('unknown');
+  void fetch(apiUrl('/api/session'))
+    .then((res: Response): void => {
+      session.set(res.ok ? 'ok' : 'denied');
+      if (res.ok) tidyAddressBar();
+    })
+    .catch((): void => {
+      session.set('denied');
+    });
+
   /** The result, never null — `hasResult()` says whether it means anything yet. */
   const found: Computed<Workspace> = computed<Workspace>(() => workspace() ?? EMPTY);
   const hasResult: Computed<boolean> = computed<boolean>(() => workspace() !== null);
 
-  return { path, phase, error, elapsed, picked, scan, toggle, isPicked, relative, typeLabel, found, hasResult };
+  return { path, phase, error, elapsed, picked, scan, toggle, isPicked, relative, typeLabel, found, hasResult, session };
 }

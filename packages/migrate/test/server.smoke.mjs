@@ -113,6 +113,43 @@ try {
   const unknownRoute = await api(`/api/nope?token=${server.token}`);
   ok(unknownRoute.status === 404, `an unknown API route is a 404 (got ${unknownRoute.status})`);
 
+  /* ── the token arrives in the URL once, then lives in a cookie ──
+     Without this the reader is one reload, one bookmark or one half-copied URL away from a service that
+     answers 403 to everything and looks broken. */
+  const firstVisit = await api(`/?token=${server.token}`);
+  const setCookie = firstVisit.headers.get('set-cookie') ?? '';
+  ok(setCookie.includes(server.token), 'the first visit with the token in the URL parks it in a cookie');
+  ok(setCookie.includes('HttpOnly'), 'the cookie is HttpOnly, so no script can read the key back out');
+  ok(setCookie.includes('SameSite=Strict'), 'SameSite=Strict, so a request started elsewhere never carries it');
+  ok(!setCookie.includes('Secure'), 'no Secure flag — this is plain-http loopback, and it would stop the cookie being set');
+
+  const wrongTokenVisit = await api('/?token=nope');
+  ok(!(wrongTokenVisit.headers.get('set-cookie') ?? ''), 'a wrong token in the URL sets no cookie');
+
+  // Node's fetch keeps no cookie jar, so the header is passed by hand — which is also clearer about what
+  // is being tested: the cookie ALONE, with nothing in the URL.
+  const jar = { cookie: `weave_migrate_session=${server.token}` };
+  const viaCookie = await api('/api/inspect', {
+    ...inspectBody(join(fx, 'multi')),
+    headers: { 'content-type': 'application/json', ...jar },
+  });
+  ok(viaCookie.status === 200, `the cookie alone authorizes a request (got ${viaCookie.status})`);
+
+  // `?token=` with nothing after it parses as '' — not null. With `??` the lookup would stop there and the
+  // cookie would never be consulted, locking out the page that just tidied its own address bar.
+  const emptyParam = await api('/api/inspect?token=', {
+    ...inspectBody(join(fx, 'multi')),
+    headers: { 'content-type': 'application/json', ...jar },
+  });
+  ok(emptyParam.status === 200, `an empty token parameter falls through to the cookie (got ${emptyParam.status})`);
+
+  /* ── the page asks whether it is still connected; it cannot look, the cookie is HttpOnly ── */
+  const sessionOk = await api('/api/session', { headers: jar });
+  ok(sessionOk.status === 200, `/api/session confirms a live session (got ${sessionOk.status})`);
+
+  const sessionDenied = await api('/api/session');
+  ok(sessionDenied.status === 403, `/api/session refuses with no token and no cookie (got ${sessionDenied.status})`);
+
   /* ── bound to loopback, so the network cannot reach it at all ── */
   ok(server.url.startsWith('http://127.0.0.1:'), 'the printed URL is loopback, not a hostname that could resolve outward');
   ok(server.url.includes(server.token), 'the printed URL carries the token, so opening it just works');

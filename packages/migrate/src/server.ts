@@ -80,6 +80,42 @@ function json(res: ServerResponse, status: number, body: unknown): void {
   res.end(text);
 }
 
+/** The cookie the session token is parked in after the first visit. */
+const COOKIE: string = 'weave_migrate_session';
+
+/**
+ * Read one cookie by name. Written out rather than pulled in, per the zero-dependency rule, and kept deliberately
+ * strict: split on `;`, take the first `=`, and do not decode — the token is hex, so nothing needs decoding, and
+ * a value that needed it would not be ours.
+ */
+function cookieValue(header: string | undefined, name: string): string | null {
+  if (!header) return null;
+  for (const part of header.split(';')) {
+    const eq: number = part.indexOf('=');
+    if (eq === -1) continue;
+    if (part.slice(0, eq).trim() === name) return part.slice(eq + 1).trim();
+  }
+  return null;
+}
+
+/**
+ * Where a request's token may come from, most durable first.
+ *
+ * The URL is how the token ARRIVES — the service prints it, the reader opens it, once. The cookie is how it
+ * stays: a reload, a bookmark, or an address bar the page has since tidied all still work, and the token stops
+ * being visible in a URL somebody might paste to a colleague along with the key to their machine.
+ */
+function requestToken(req: IncomingMessage, url: URL): string | null {
+  // `||`, not `??`: `?token=` with nothing after it parses as the empty string, not null, and `??` would stop
+  // there — the cookie would never be consulted and a page that dropped the parameter would lock itself out.
+  return (
+    url.searchParams.get('token') ||
+    cookieValue(req.headers.cookie, COOKIE) ||
+    req.headers['x-migrate-token']?.toString() ||
+    null
+  );
+}
+
 /**
  * Is this request allowed to reach the API?
  *
@@ -220,6 +256,13 @@ export async function serve(options: ServeOptions = {}): Promise<MigrateServer> 
     const url: URL = new URL(req.url ?? '/', `http://${req.headers.host ?? '127.0.0.1'}`);
 
     if (!url.pathname.startsWith('/api/')) {
+      // The token arrives in the URL exactly once. Park it in a cookie so a reload, a bookmark, or the tidied
+      // address bar keeps working — HttpOnly so no script can read it back out, SameSite=Strict so a request
+      // started from another site never carries it, and no `Secure` because this is plain-http loopback and the
+      // flag would stop the cookie being set at all.
+      if (url.searchParams.get('token') === token) {
+        res.setHeader('set-cookie', `${COOKIE}=${token}; HttpOnly; SameSite=Strict; Path=/`);
+      }
       if (!uiDir) {
         res.writeHead(503, { 'content-type': 'text/plain; charset=utf-8' });
         res.end('The migration UI is not built yet. The API is up.');
@@ -233,9 +276,16 @@ export async function serve(options: ServeOptions = {}): Promise<MigrateServer> 
       json(res, 403, { error: 'cross-origin request refused' });
       return;
     }
-    const given: string | null = url.searchParams.get('token') ?? req.headers['x-migrate-token']?.toString() ?? null;
+    const given: string | null = requestToken(req, url);
     if (given !== token) {
       json(res, 403, { error: 'bad or missing session token' });
+      return;
+    }
+
+    // How the page asks "am I still allowed?" without being able to see the cookie — it is HttpOnly, so script
+    // cannot read it. Reaching here at all is the answer.
+    if (url.pathname === '/api/session') {
+      json(res, 200, { ok: true });
       return;
     }
 

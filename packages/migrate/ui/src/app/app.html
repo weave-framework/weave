@@ -4,6 +4,18 @@
     <span class="note">Reads your source app. Never writes to it.</span>
   </header>
 
+  @if (session() === 'denied') {
+    <section class="locked" role="alert">
+      <h2>This page is not connected to a migration session</h2>
+      <p>
+        The <code>weave migrate</code> command prints a link with a one-time key in it. Open that link — the key
+        is what stops any other website reaching this service and reading your machine.
+      </p>
+      <p class="hint">If the terminal has scrolled away, stop the command and run it again for a fresh link.</p>
+    </section>
+  }
+
+  @if (session() !== 'denied') {
   <ol class="steps" aria-label="Progress">
     <li aria-current="step">What to migrate</li>
     <li>What to open</li>
@@ -121,5 +133,6 @@
         </p>
       }
     </section>
+  }
   }
 </main>
