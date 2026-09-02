@@ -1,0 +1,1 @@
+{ "name": "thing", "targets": { "build": { "executor": "@nx/angular:package" } } }

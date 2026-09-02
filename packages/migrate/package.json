@@ -1,0 +1,26 @@
+{
+  "name": "@weave-framework/migrate",
+  "version": "3.4.1",
+  "private": true,
+  "description": "Assisted migration into Weave — a local web service with a UI. PRIVATE until the UI ships: `private: true` keeps it out of the publish run, and it is removed the release this package is ready for.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./detect": "./src/detect.ts",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/weave-framework/weave.git",
+    "directory": "packages/migrate"
+  },
+  "license": "MIT"
+}

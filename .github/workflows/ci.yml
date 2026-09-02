@@ -255,6 +255,8 @@ jobs:
         run: pnpm verify:mcp
       - name: migrate
         run: pnpm verify:migrate
+      - name: migrate detection
+        run: pnpm verify:detect
       - name: Nx plugin
         run: pnpm verify:nx
       - name: TypeScript plugin

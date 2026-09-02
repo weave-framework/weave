@@ -1,0 +1,86 @@
+/**
+ * Node smoke for `@weave-framework/migrate` detection — what kind of workspace is this, and what is inside it.
+ *
+ * Every case here is one the PREVIOUS detection got wrong, measured before this module was written:
+ *   pnpm-ws  — `looksLikeMonorepo` returned false for a pnpm workspace (it knew nx.json / apps/ / workspaces only)
+ *   npm-ws   — an Nx project declared through the root `workspaces` field, with no `project.json`, was returned
+ *              as NONE: nothing was found at all, because the walk required angular.json or project.json
+ *   untyped  — a project was found, but as a bare path: no name, no type, nowhere to put `projectType`
+ *
+ * The nx-mono case is a REGRESSION guard borrowed from the old fixture tree: whatever changes, the units that
+ * detection already found must keep being found.
+ *
+ * Run: `node packages/migrate/test/detect.smoke.mjs` (wired as `pnpm verify:detect`).
+ */
+import { build as esbuild } from 'esbuild';
+import { dirname, join } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { rmSync } from 'node:fs';
+
+const here = dirname(fileURLToPath(import.meta.url));
+const repo = join(here, '..', '..', '..');
+const fx = join(here, 'fixtures');
+const nxMono = join(repo, 'packages', 'cli', 'test', 'fixtures', 'migrate', 'nx-mono');
+
+let failures = 0;
+const ok = (cond, msg) => {
+  console.log(`${cond ? '  ✔' : '  ✖'} ${msg}`);
+  if (!cond) failures++;
+};
+
+console.log('\nverify:detect — workspace detection for the migration UI\n');
+
+// Bundle to a path inside the repo so `node_modules` resolves for anything left external.
+const out = join(repo, 'node_modules', '.weave-detect-smoke.mjs');
+await esbuild({
+  entryPoints: [join(here, '..', 'src', 'detect.ts')],
+  bundle: true,
+  format: 'esm',
+  platform: 'node',
+  packages: 'external',
+  outfile: out,
+});
+const d = await import(pathToFileURL(out).href);
+
+const names = (w) => w.units.map((u) => u.name).sort();
+const signal = (w, file) => w.signals.find((s) => s.file === file)?.found;
+
+/* ── pnpm workspace: the marker the old detection had never heard of ── */
+const pnpmWs = d.inspect(join(fx, 'pnpm-ws'));
+ok(signal(pnpmWs, 'pnpm-workspace.yaml') === true, 'pnpm-ws: pnpm-workspace.yaml is reported as found');
+ok(signal(pnpmWs, 'nx.json') === false, 'pnpm-ws: nx.json is reported as ABSENT (an absence is information)');
+ok(names(pnpmWs).includes('shop'), 'pnpm-ws: the Angular app inside is found');
+
+/* ── an Nx project declared only by package.json — previously invisible ── */
+const npmWs = d.inspect(join(fx, 'npm-ws'));
+ok(npmWs.units.length === 1, `npm-ws: the package.json-declared project is found (got ${npmWs.units.length})`);
+ok(names(npmWs)[0] === '@acme/data', `npm-ws: it carries the name from package.json (got ${names(npmWs)[0]})`);
+ok(npmWs.units[0]?.type === null, 'npm-ws: package.json states no type, so type is null — not guessed');
+ok(npmWs.units[0]?.declaredBy === 'package.json', 'npm-ws: the UI can say where the name came from');
+
+/* ── a project.json with no projectType: found, and honest about the gap ── */
+const untyped = d.inspect(join(fx, 'untyped'));
+ok(names(untyped)[0] === 'thing', 'untyped: the Nx Angular project is found by name');
+ok(untyped.units[0]?.type === null, 'untyped: a missing projectType reads as null, never as "application"');
+ok(untyped.units[0]?.declaredBy === 'project.json', 'untyped: declared by project.json');
+
+/* ── regression: everything the old walk found must still be found, now with names and types ── */
+const mono = d.inspect(nxMono);
+ok(names(mono).join(',') === 'admin,shop,ui', `nx-mono: still finds admin, shop and ui (got ${names(mono).join(',')})`);
+const byName = Object.fromEntries(mono.units.map((u) => [u.name, u]));
+ok(byName.shop?.type === 'application', 'nx-mono: shop carries projectType application');
+ok(byName.ui?.type === 'library', 'nx-mono: ui carries projectType library');
+ok(!names(mono).includes('secondary'), 'nx-mono: the non-Angular @nx/js library is still left out');
+
+/* ── the root is never a unit, however Angular-looking its own package.json is ──
+   npm-ws's root declares @angular/core, the way a real monorepo root does. Asked about directly it answers
+   "yes, a unit"; the walk must still never offer it, or the whole repository becomes a migration target. */
+ok(d.unitAt(join(fx, 'npm-ws')) !== null, 'a monorepo root LOOKS like a unit when asked directly');
+ok(
+  !d.findUnits(join(fx, 'npm-ws')).some((u) => u.root === join(fx, 'npm-ws')),
+  'the walk never offers the root itself as a migration target',
+);
+
+rmSync(out, { force: true });
+console.log(`\n${failures ? `${failures} failing` : 'all green'}\n`);
+process.exit(failures ? 1 : 0);

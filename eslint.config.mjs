@@ -30,6 +30,9 @@ export default tseslint.config(
       // smoke. Linting them applies this project's Weave rules (explicit annotations) to code that is
       // deliberately written the way a real Angular app writes it — which is the whole point of the fixture.
       'packages/cli/test/fixtures/migrate/**',
+      // The same, for the new migration package: these trees stand in for someone else's repository — a pnpm
+      // workspace, an Nx project declared only by its package.json — so they must look like one, not like ours.
+      'packages/migrate/test/fixtures/**',
       '**/*.mjs',
       '**/*.js',
     ],

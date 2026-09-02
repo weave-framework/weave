@@ -1,0 +1,6 @@
+{
+  "name": "npm-ws-root",
+  "private": true,
+  "workspaces": ["libs/*"],
+  "dependencies": { "@angular/core": "^17.0.0" }
+}
