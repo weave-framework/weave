@@ -23,7 +23,7 @@ import { randomBytes } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { extname, isAbsolute, join, relative, sep } from 'node:path';
-import { browse, type Listing } from './browse.js';
+import { browse, peek, type Listing } from './browse.js';
 import { inspect, type Workspace } from './detect.js';
 
 /** A running migration service. */
@@ -54,7 +54,7 @@ const PORT_ATTEMPTS: number = 20;
  * is the one it was built against. Add a route, add it here — the pairing is what makes a stale service
  * announce itself instead of answering 404 to a page that has every reason to expect otherwise.
  */
-const ROUTES: string[] = ['/api/session', '/api/inspect', '/api/browse'];
+const ROUTES: string[] = ['/api/session', '/api/inspect', '/api/browse', '/api/peek'];
 
 /** Largest request body accepted, in bytes. A path is short; anything larger is not a path. */
 const MAX_BODY: number = 64 * 1024;
@@ -318,6 +318,16 @@ export async function serve(options: ServeOptions = {}): Promise<MigrateServer> 
         // That is a fact about that folder, not a broken service, so it answers 403 and says which one.
         json(res, 403, { error: `cannot read ${at || 'the filesystem roots'}: ${e instanceof Error ? e.message : String(e)}` });
       }
+      return;
+    }
+
+    if (url.pathname === '/api/peek' && req.method === 'GET') {
+      const at: string = url.searchParams.get('path') ?? '';
+      if (!at.trim()) {
+        json(res, 400, { error: 'give a path to look at' });
+        return;
+      }
+      json(res, 200, peek(at));
       return;
     }
 

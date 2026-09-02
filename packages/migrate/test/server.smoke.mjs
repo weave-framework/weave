@@ -193,6 +193,23 @@ try {
   const browseNoToken = await api('/api/browse');
   ok(browseNoToken.status === 403, `browsing needs the token like everything else (got ${browseNoToken.status})`);
 
+  /* ── peek: the field has to say something before Scan is pressed ── */
+  const peekOk = await (await api(`/api/peek?token=${server.token}&path=${encodeURIComponent(join(fx, 'npm-ws'))}`)).json();
+  ok(peekOk.exists === true && peekOk.directory === true, 'peek confirms a real folder');
+  ok(peekOk.markers.includes('nx.json'), `peek reports the same markers the picker shows (got ${peekOk.markers.join(',')})`);
+
+  const peekMissing = await (await api(`/api/peek?token=${server.token}&path=${encodeURIComponent(join(fx, 'nope'))}`)).json();
+  ok(peekMissing.exists === false, 'peek says so when nothing is there, rather than erroring');
+
+  const aFile = join(fx, 'npm-ws', 'package.json');
+  const peekFile = await (await api(`/api/peek?token=${server.token}&path=${encodeURIComponent(aFile)}`)).json();
+  ok(peekFile.exists === true && peekFile.directory === false, 'peek separates a file from a folder');
+
+  const peekBlank = await api(`/api/peek?token=${server.token}&path=`);
+  ok(peekBlank.status === 400, `peek with no path is a 400 (got ${peekBlank.status})`);
+
+  ok(routes?.includes('/api/peek'), 'and it is announced in the route list');
+
   /* ── bound to loopback, so the network cannot reach it at all ── */
   ok(server.url.startsWith('http://127.0.0.1:'), 'the printed URL is loopback, not a hostname that could resolve outward');
   ok(server.url.includes(server.token), 'the printed URL carries the token, so opening it just works');

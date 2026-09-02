@@ -22,4 +22,4 @@ export {
 } from './detect.js';
 
 export { serve, type MigrateServer, type ServeOptions } from './server.js';
-export { browse, type Entry, type Listing } from './browse.js';
+export { browse, peek, type Entry, type Listing, type Peek } from './browse.js';

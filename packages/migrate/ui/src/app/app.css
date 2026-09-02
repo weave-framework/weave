@@ -493,3 +493,27 @@ td.loc {
   border-top: 1px solid var(--border);
   background: var(--surface);
 }
+
+.field-hint {
+  margin: 0.625rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+.field-hint b {
+  color: var(--fg-soft);
+  font-weight: 600;
+}
+.field-hint code {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--fg-soft);
+}
+.field-hint.good {
+  color: var(--fg-soft);
+}
+.field-hint.good code {
+  color: var(--accent);
+}
+.field-hint.bad {
+  color: var(--red);
+}

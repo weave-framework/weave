@@ -63,3 +63,14 @@ export interface Listing {
   /** Handy starting points, sent with every listing so the UI never has to guess them. */
   shortcuts: Entry[];
 }
+
+/** A quick look at one path — enough to say whether scanning it is worth the wait. */
+export interface Peek {
+  /** The path, resolved. */
+  path: string;
+  exists: boolean;
+  /** False for a file: a migration target is always a folder. */
+  directory: boolean;
+  /** The marker files it carries — the same ones the picker shows beside a folder. */
+  markers: string[];
+}

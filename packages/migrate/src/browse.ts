@@ -14,7 +14,7 @@
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, parse, resolve } from 'node:path';
-import type { Entry, Listing } from './types.js';
+import type { Entry, Listing, Peek } from './types.js';
 
 /** Files whose presence says something about a folder, in the order the UI shows them. */
 const MARKERS: string[] = ['angular.json', 'project.json', 'nx.json', 'package.json', 'pnpm-workspace.yaml'];
@@ -95,4 +95,24 @@ export function browse(path: string): Listing {
   return { path: dir, parent, entries, shortcuts: shortcuts() };
 }
 
-export type { Entry, Listing } from './types.js';
+/**
+ * What is at `path`, without listing anything.
+ *
+ * The source field is silent until Scan is pressed, so a typed or pasted path gives no sign of being right until
+ * after the wait. This answers that in one call: does it exist, is it a folder, and what markers does it carry —
+ * the same markers the picker shows, so both halves of the screen say the same thing about the same folder.
+ *
+ * `browse()` could answer it too, but only by reading the entire directory, which is a lot of work to learn
+ * whether a path is worth scanning.
+ */
+export function peek(path: string): Peek {
+  const dir: string = resolve(path);
+  try {
+    if (!statSync(dir).isDirectory()) return { path: dir, exists: true, directory: false, markers: [] };
+  } catch {
+    return { path: dir, exists: false, directory: false, markers: [] };
+  }
+  return { path: dir, exists: true, directory: true, markers: markersAt(dir) };
+}
+
+export type { Entry, Listing, Peek } from './types.js';

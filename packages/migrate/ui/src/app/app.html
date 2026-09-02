@@ -69,6 +69,32 @@
       </button>
     </form>
 
+    @if (!browsing()) {
+      @switch (hint()) {
+        @case ('ask') {
+          <p class="field-hint">
+            Paste the path to an Angular project and press <b>Scan</b>, or use <b>Browse…</b> to find it.
+          </p>
+        }
+        @case ('missing') {
+          <p class="field-hint bad">No folder at that path.</p>
+        }
+        @case ('file') {
+          <p class="field-hint bad">That is a file. Point at the folder it sits in.</p>
+        }
+        @case ('markers') {
+          <p class="field-hint good">
+            Folder found — <code>{{ hintMarkers() }}</code>. Press <b>Scan</b> to look inside.
+          </p>
+        }
+        @case ('bare') {
+          <p class="field-hint">
+            Folder found, but it carries none of the usual project files. Scanning still looks inside it.
+          </p>
+        }
+      }
+    }
+
     @if (recent().length && !browsing()) {
       <div class="recent">
         <span class="recent-label">Recent</span>

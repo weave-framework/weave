@@ -1,5 +1,5 @@
-import { computed, signal, type Computed, type Signal } from '@weave-framework/runtime';
-import type { Entry, Listing, Unit, Workspace } from '../../../src/types.js';
+import { computed, debounced, effect, signal, type Computed, type Signal } from '@weave-framework/runtime';
+import type { Entry, Listing, Peek, Unit, Workspace } from '../../../src/types.js';
 
 /** What the screen is doing. `scanning` is the only state that makes the reader wait. */
 export type Phase = 'idle' | 'scanning' | 'done' | 'failed';
@@ -12,7 +12,7 @@ export type Session = 'unknown' | 'ok' | 'denied' | 'stale';
  * started before the UI was rebuilt hands out the NEW page and then 404s the routes it asks for. Without this
  * the reader sees `no route GET /api/browse` and has no way to guess that a second, older server is the reason.
  */
-const NEEDED_ROUTES: string[] = ['/api/inspect', '/api/browse'];
+const NEEDED_ROUTES: string[] = ['/api/inspect', '/api/browse', '/api/peek'];
 
 /**
  * The session token, when it is still in the URL.
@@ -65,6 +65,8 @@ export function setup(): {
   path: Signal<string>;
   phase: Signal<Phase>;
   session: Signal<Session>;
+  hint: Computed<'ask' | 'missing' | 'file' | 'markers' | 'bare'>;
+  hintMarkers: Computed<string>;
   missingRoutes: Signal<string[]>;
   browsing: Signal<boolean>;
   listing: Signal<Listing>;
@@ -98,6 +100,57 @@ export function setup(): {
   const error: Signal<string> = signal('');
   const elapsed: Signal<number> = signal(0);
   const picked: Signal<string[]> = signal<string[]>([]);
+
+  /**
+   * What is at the typed path, looked up as you stop typing.
+   *
+   * The field used to say nothing until Scan was pressed, so a pasted path gave no sign of being right until
+   * after the wait — and a wrong one gave no sign at all. This makes the field answer the same way the picker
+   * does: exists or not, and which markers it carries.
+   *
+   * 400 ms because that is roughly the pause after pasting; shorter fires mid-keystroke, longer feels broken.
+   */
+  const probe: Signal<Peek | null> = signal<Peek | null>(null);
+  const typed: Computed<string> = debounced((): string => path().trim(), 400);
+  effect((): void => {
+    const target: string = typed();
+    if (!target) {
+      probe.set(null);
+      return;
+    }
+    void fetch(apiUrl('/api/peek', { path: target }))
+      .then(async (res: Response): Promise<void> => {
+        if (!res.ok) {
+          probe.set(null);
+          return;
+        }
+        const body: Peek = (await res.json()) as Peek;
+        // A slow answer for a path already replaced is not an answer about the current one.
+        if (body.path && path().trim() && target === path().trim()) probe.set(body);
+      })
+      .catch((): void => {
+        probe.set(null);
+      });
+  });
+
+  /**
+   * What the field should say right now, as one value.
+   *
+   * Decided here rather than in the template because `@if (expr; as alias)` binds only on the LEADING branch —
+   * an `@else if` cannot see the alias at all — and the alias does not narrow under `weave check` anyway. A
+   * template that has to work around both stops being readable; a named state does not.
+   */
+  const hint: Computed<'ask' | 'missing' | 'file' | 'markers' | 'bare'> = computed(() => {
+    if (!path().trim()) return 'ask';
+    const p: Peek | null = probe();
+    if (!p) return 'ask';
+    if (!p.exists) return 'missing';
+    if (!p.directory) return 'file';
+    return p.markers.length ? 'markers' : 'bare';
+  });
+
+  /** The markers of the folder currently in the field, ready to print. */
+  const hintMarkers: Computed<string> = computed<string>(() => (probe()?.markers ?? []).join(' · '));
 
   /** Whether the folder picker is open. Declared here because `scan` closes it. */
   const browsing: Signal<boolean> = signal(false);
@@ -266,6 +319,8 @@ export function setup(): {
     hasResult,
     session,
     missingRoutes,
+    hint,
+    hintMarkers,
     browsing,
     listing,
     listingError,
