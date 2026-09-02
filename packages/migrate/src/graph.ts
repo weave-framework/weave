@@ -348,6 +348,30 @@ export function buildGraph(facts: MigrationFacts): Graph {
     for (const target of used) link(from, id('component', target), 'uses');
   }
 
+  /* ── NgModules ──
+     Reported with a component sitting alone on the canvas: JsonViewerComponent, which its author knew was
+     reachable because SaveModule imports JsonViewerModule. Checking it settled where the relationship lives —
+     SaveDialogComponent's template never mentions json-viewer at all, so no amount of template reading would
+     have found it. The connection is at the module level, and 37 NgModules with 35 sets of imports and 21 sets
+     of declarations were being collected and then ignored.
+
+     A module is what makes a component reachable in a non-standalone app, which is most Angular code. Without
+     this the graph shows a component with no way in and no explanation for it. */
+  for (const ngModule of facts.ngModules) {
+    add({
+      id: id('ngmodule', ngModule.className),
+      kind: 'ngmodule',
+      label: ngModule.className,
+      detail: `${ngModule.declarations.length} declared · ${ngModule.imports.length} imported`,
+      weight: 0,
+    });
+  }
+  for (const ngModule of facts.ngModules) {
+    const from: string = id('ngmodule', ngModule.className);
+    for (const declared of ngModule.declarations) link(from, id('component', declared), 'declares');
+    for (const imported of ngModule.imports) link(from, id('ngmodule', imported), 'imports');
+  }
+
   /* ── what a route actually opens ──
      A card reading `(default)` says nothing: the component is the thing that route shows, and the reader asked
      the obvious question — these empty defaults have their own components. It goes on the card.

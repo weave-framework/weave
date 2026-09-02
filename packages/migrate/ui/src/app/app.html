@@ -291,6 +291,7 @@
           <li><span class="swatch swatch--external"></span>not read yet — a class the code uses that the walk never opened</li>
           <li><span class="swatch swatch--cut"></span>lazy boundary</li>
           <li><span class="swatch swatch--uses"></span>renders inside</li>
+          <li><span class="swatch swatch--ngmodule"></span>NgModule — declares and imports</li>
           <li><span class="mark">⛨2</span>guarded — select the card to see which</li>
         </ul>
 
@@ -324,6 +325,7 @@
                     class:dim={{ !edgeLit(e.from, e.to) }}
                     class:injects={{ e.kind === 'injects' }}
                     class:uses={{ e.kind === 'uses' }}
+                    class:ngmod={{ e.kind === 'declares' || e.kind === 'imports' }}
                     class:decided={{ edgeDecided(e.from, e.to) }}
                     class:hidden={{ (e.kind === 'guards' || e.kind === 'injects') && !guardEdgeVisible(e.from, e.to) && !edgeDecided(e.from, e.to) }}
                     d={{ 'M ' + (e.x1 + CARD_W) + ' ' + (e.y1 + CARD_H / 2) +

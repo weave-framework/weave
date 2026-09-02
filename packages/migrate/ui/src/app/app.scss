@@ -1255,3 +1255,20 @@ td.loc {
   height: 0;
   border-top: 2px solid color-mix(in srgb, var(--green) 60%, transparent);
 }
+
+/* An NgModule is Angular's own answer to "how is this component reachable" — a distinct thing, drawn as one. */
+.card-head--ngmodule {
+  fill: #7c5cbf;
+}
+.swatch--ngmodule {
+  background: #7c5cbf;
+}
+.expanded-head--ngmodule {
+  background: #7c5cbf;
+}
+.edge.ngmod {
+  stroke: #7c5cbf;
+  stroke-width: 1;
+  opacity: 0.45;
+  stroke-dasharray: 2 3;
+}

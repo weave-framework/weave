@@ -172,12 +172,29 @@ export function layout(graph: Graph): Layout {
     for (const child of usedBy.get(e.to) ?? []) placeComponent(child, from.x + LEVEL_GAP * 2, from.level + 2, 1);
   }
 
-  // A component no route reaches is still part of the app — a shared widget, a layout piece. It gets a column
-  // of its own rather than being dropped, because a diagram that quietly omits things cannot be trusted.
+  /* An NgModule is how a component becomes reachable in a non-standalone app, so a module goes beside what it
+     declares — and a component nothing else reaches finally has something pointing at it. */
+  const declares: Edge[] = graph.edges.filter((e: Edge): boolean => e.kind === 'declares');
   const rightOfTree: number = Math.max(...[...placed.values()].map((n: PlacedNode): number => n.x), PAD) + LEVEL_GAP;
+
+  for (const e of declares) {
+    const ngModule: GraphNode | undefined = byId.get(e.from);
+    if (!ngModule || placed.has(e.from)) continue;
+    placed.set(e.from, { ...ngModule, x: rightOfTree, y: PAD + row * ROW_GAP, r: radius(ngModule.weight), level: 0 });
+    row += 1;
+    // and everything it declares, in the column after it
+    for (const owned of declares.filter((d: Edge): boolean => d.from === e.from)) {
+      placeComponent(owned.to, rightOfTree + LEVEL_GAP, 1, 1);
+    }
+  }
+
+  // Anything still unplaced — a component no module declares, a module that declares nothing — is part of the
+  // app too. A diagram that quietly omits things cannot be trusted about the things it does show.
+  const farRight: number = Math.max(...[...placed.values()].map((n: PlacedNode): number => n.x), PAD) + LEVEL_GAP;
   for (const node of graph.nodes) {
-    if (node.kind !== 'component' || placed.has(node.id)) continue;
-    placeComponent(node.id, rightOfTree, 0, 1);
+    if (placed.has(node.id)) continue;
+    if (node.kind !== 'component' && node.kind !== 'ngmodule') continue;
+    placeComponent(node.id, farRight, 0, 1);
   }
 
   /* ── separate anything that landed on the same spot ──
@@ -235,7 +252,8 @@ export function layout(graph: Graph): Layout {
 
   const nodes: PlacedNode[] = [...placed.values()];
   const edges: PlacedEdge[] = [];
-  for (const e of [...structural, ...renders, ...uses, ...guardEdges, ...injectEdges]) {
+  const moduleEdges: Edge[] = graph.edges.filter((e: Edge): boolean => e.kind === 'declares' || e.kind === 'imports');
+  for (const e of [...structural, ...renders, ...uses, ...moduleEdges, ...guardEdges, ...injectEdges]) {
     const a: PlacedNode | undefined = placed.get(e.from);
     const b: PlacedNode | undefined = placed.get(e.to);
     if (a && b) edges.push({ ...e, x1: a.x, y1: a.y, x2: b.x, y2: b.y });
