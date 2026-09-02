@@ -141,10 +141,27 @@ export function layout(graph: Graph): Layout {
     row += 1;
   }
 
+  /* ── components, beside the route that renders them ──
+     Reported: "vien routai ir viskas" — the graph drew a route tree and stopped, while components, services and
+     everything they depend on stayed in the data. A route card said `(default) · LoginComponent` and there was
+     no LoginComponent anywhere to look at.
+     A component sits one column right of its route, on the same line, so the pairing needs no tracing. */
+  const renders: Edge[] = graph.edges.filter((e: Edge): boolean => e.kind === 'renders');
+  for (const e of renders) {
+    const from: PlacedNode | undefined = placed.get(e.from);
+    const node: GraphNode | undefined = byId.get(e.to);
+    if (!from || !node || placed.has(e.to)) continue;
+    placed.set(e.to, { ...node, x: from.x + LEVEL_GAP, y: from.y, r: radius(node.weight), level: from.level + 1 });
+  }
+
   /* ── separate anything that landed on the same spot ──
      A parent takes the average of its children's rows, so several routes loading the SAME module all inherit
-     that module's y and stack invisibly: measured, six nodes on one point. Nudging them apart within their own
-     column keeps the tree's shape while making every node visible, which is the whole job of a diagram. */
+     that module's y and stack invisibly. Nudging them apart within their own column keeps the tree's shape
+     while making every node visible, which is the whole job of a diagram.
+
+     This runs AFTER components are placed, and that ordering is the fix for a second report of overlapping
+     cards: components are put beside their route at the same y, which lands them straight on top of whatever
+     already occupied that column. Separating before they exist could only ever tidy half the canvas. */
   const columns: Map<number, PlacedNode[]> = new Map<number, PlacedNode[]>();
   for (const node of placed.values()) {
     const list: PlacedNode[] = columns.get(node.x) ?? [];
@@ -158,19 +175,6 @@ export function layout(graph: Graph): Layout {
       if (node.y - lastY < MIN_SEPARATION) node.y = lastY + MIN_SEPARATION;
       lastY = node.y;
     }
-  }
-
-  /* ── components, beside the route that renders them ──
-     Reported: "vien routai ir viskas" — the graph drew a route tree and stopped, while components, services and
-     everything they depend on stayed in the data. A route card said `(default) · LoginComponent` and there was
-     no LoginComponent anywhere to look at.
-     A component sits one column right of its route, on the same line, so the pairing needs no tracing. */
-  const renders: Edge[] = graph.edges.filter((e: Edge): boolean => e.kind === 'renders');
-  for (const e of renders) {
-    const from: PlacedNode | undefined = placed.get(e.from);
-    const node: GraphNode | undefined = byId.get(e.to);
-    if (!from || !node || placed.has(e.to)) continue;
-    placed.set(e.to, { ...node, x: from.x + LEVEL_GAP, y: from.y, r: radius(node.weight), level: from.level + 1 });
   }
 
   /* ── guards ──
