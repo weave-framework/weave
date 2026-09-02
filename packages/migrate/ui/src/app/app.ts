@@ -1,5 +1,16 @@
 import { computed, debounced, effect, signal, type Computed, type Signal } from '@weave-framework/runtime';
+import Button from '@weave-framework/ui/button';
+import ButtonToggle from '@weave-framework/ui/button-toggle';
+import Checkbox from '@weave-framework/ui/checkbox';
+import Input from '@weave-framework/ui/input';
 import type { Entry, Listing, Peek, Unit, Workspace } from '../../../src/types.js';
+
+// Capitalized tags in the template resolve to these imports. The editor tooling understands that; eslint,
+// running without it, sees three unused bindings — so the repo's convention is to name them here.
+void Button;
+void ButtonToggle;
+void Checkbox;
+void Input;
 
 /** What the screen is doing. `scanning` is the only state that makes the reader wait. */
 export type Phase = 'idle' | 'scanning' | 'done' | 'failed';
@@ -66,6 +77,10 @@ export function setup(): {
   phase: Signal<Phase>;
   session: Signal<Session>;
   query: Signal<string>;
+  setKind: (v: string | string[]) => void;
+  kindOptions: Computed<Array<{ value: string; label: string; disabled?: boolean }>>;
+  sourceOptions: Array<{ value: string; label: string; disabled?: boolean }>;
+  source: Signal<string>;
   kind: Signal<'all' | 'application' | 'library' | 'unstated'>;
   shown: Computed<Unit[]>;
   counts: Computed<{ all: number; application: number; library: number; unstated: number }>;
@@ -336,6 +351,40 @@ export function setup(): {
     };
   });
 
+  /**
+   * The type filter as a toggle group. Built here because the counts belong on the labels — a filter that says
+   * "Libraries 105" tells you what pressing it will do; one that just says "Libraries" makes you press it to
+   * find out.
+   */
+  const kindOptions: Computed<Array<{ value: string; label: string; disabled?: boolean }>> = computed(() => {
+    const c: { all: number; application: number; library: number; unstated: number } = counts();
+    const list: Array<{ value: string; label: string; disabled?: boolean }> = [
+      { value: 'all', label: `All ${c.all}` },
+      { value: 'application', label: `Applications ${c.application}`, disabled: c.application === 0 },
+      { value: 'library', label: `Libraries ${c.library}`, disabled: c.library === 0 },
+    ];
+    // Only worth a segment when some project actually lacks a declared type.
+    if (c.unstated) list.push({ value: 'unstated', label: `Unstated ${c.unstated}` });
+    return list;
+  });
+
+  /**
+   * Narrow the toggle's answer before it reaches the signal. `onChange` speaks `string | string[]` because the
+   * component also serves multi-select; taking that on trust would put an arbitrary string into a typed union.
+   */
+  const setKind = (v: string | string[]): void => {
+    const value: string = Array.isArray(v) ? (v[0] ?? 'all') : v;
+    if (value === 'all' || value === 'application' || value === 'library' || value === 'unstated') kind.set(value);
+  };
+
+  /** Which source framework is selected. Only Angular is built, so the others are disabled segments. */
+  const sourceOptions: Array<{ value: string; label: string; disabled?: boolean }> = [
+    { value: 'angular', label: 'Angular' },
+    { value: 'react', label: 'React', disabled: true },
+    { value: 'vue', label: 'Vue', disabled: true },
+  ];
+  const source: Signal<string> = signal('angular');
+
   /** Pick every unit currently shown — the filter is the selection tool, so this respects it. */
   const pickShown = (): void => {
     const roots: string[] = shown().map((u: Unit): string => u.root);
@@ -372,6 +421,10 @@ export function setup(): {
     session,
     missingRoutes,
     query,
+    setKind,
+    kindOptions,
+    sourceOptions,
+    source,
     kind,
     shown,
     counts,

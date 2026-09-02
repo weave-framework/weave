@@ -37,36 +37,29 @@
 
   <section>
     <h2>Migrate from</h2>
-    <div class="sources">
-      <button type="button" class="source" aria-pressed="true">
-        <span class="name">Angular</span>
-        <span class="state">Supported</span>
-      </button>
-      <button type="button" class="source" disabled>
-        <span class="name">React</span>
-        <span class="state">Not built yet</span>
-      </button>
-      <button type="button" class="source" disabled>
-        <span class="name">Vue</span>
-        <span class="state">Not built yet</span>
-      </button>
-    </div>
+    <ButtonToggle
+      label="Source framework"
+      options={{ sourceOptions }}
+      value={{ source() }}
+      onChange={{ (v) => source.set(String(v)) }}
+    />
+    <p class="sources-note">React and Vue are not built yet.</p>
   </section>
 
   <section>
     <h2>Source</h2>
     <form class="finder" on:submit|preventDefault={{ scan }}>
-      <input
+      <Input
         class="path"
-        type="text"
+        label="Path to your Angular project"
         placeholder="Path to your Angular project"
-        aria-label="Path to your Angular project"
-        bind:value={{ path }}
+        value={{ path() }}
+        onInput={{ (v) => path.set(v) }}
       />
-      <button type="button" class="browse" on:click={{ openBrowser }}>Browse…</button>
-      <button type="submit" class="go" disabled={{ phase() === 'scanning' || !path().trim() }}>
+      <Button variant="outline" on:click={{ openBrowser }}>Browse…</Button>
+      <Button type="submit" disabled={{ phase() === 'scanning' || !path().trim() }}>
         {{ phase() === 'scanning' ? 'Scanning…' : 'Scan' }}
-      </button>
+      </Button>
     </form>
 
     @if (!browsing()) {
@@ -107,9 +100,9 @@
     @if (browsing()) {
       <div class="picker">
         <div class="picker-bar">
-          <button type="button" class="up" on:click={{ goUp }}>↑ Up</button>
+          <Button variant="outline" class="up" on:click={{ goUp }}>↑ Up</Button>
           <code class="here">{{ listing().path || 'This computer' }}</code>
-          <button type="button" class="close" on:click={{ closeBrowser }} aria-label="Close the folder picker">✕</button>
+          <Button variant="icon" label="Close the folder picker" on:click={{ closeBrowser }}>✕</Button>
         </div>
 
         @if (listing().shortcuts.length) {
@@ -133,7 +126,7 @@
                   <span class="folder-markers">{{ markerLabel(e) }}</span>
                 }
               </button>
-              <button type="button" class="use" on:click={{ () => useFolder(e.path) }}>Use</button>
+              <Button variant="ghost" class="use" on:click={{ () => useFolder(e.path) }}>Use</Button>
             </li>
           } @empty {
             <li class="folder-empty">No sub-folders here.</li>
@@ -142,9 +135,7 @@
 
         @if (listing().path) {
           <div class="picker-foot">
-            <button type="button" class="go" on:click={{ () => useFolder(listing().path) }}>
-              Use this folder
-            </button>
+            <Button on:click={{ () => useFolder(listing().path) }}>Use this folder</Button>
           </div>
         }
       </div>
@@ -183,38 +174,29 @@
 
       @if (found().units.length) {
         <div class="filters">
-          <input
+          <Input
             class="filter-text"
             type="search"
+            label="Filter projects by name or folder"
             placeholder="Filter by name or folder"
-            aria-label="Filter projects by name or folder"
-            bind:value={{ query }}
+            value={{ query() }}
+            onInput={{ (v) => query.set(v) }}
           />
-          <div class="kinds" role="group" aria-label="Filter by type">
-            <button type="button" class="kind-btn" aria-pressed={{ kind() === 'all' }} on:click={{ () => kind.set('all') }}>
-              All {{ counts().all }}
-            </button>
-            <button type="button" class="kind-btn" aria-pressed={{ kind() === 'application' }} on:click={{ () => kind.set('application') }}>
-              Applications {{ counts().application }}
-            </button>
-            <button type="button" class="kind-btn" aria-pressed={{ kind() === 'library' }} on:click={{ () => kind.set('library') }}>
-              Libraries {{ counts().library }}
-            </button>
-            @if (counts().unstated) {
-              <button type="button" class="kind-btn" aria-pressed={{ kind() === 'unstated' }} on:click={{ () => kind.set('unstated') }}>
-                Unstated {{ counts().unstated }}
-              </button>
-            }
-          </div>
+          <ButtonToggle
+            label="Filter by type"
+            options={{ kindOptions() }}
+            value={{ kind() }}
+            onChange={{ setKind }}
+          />
         </div>
 
         <div class="bulk">
-          <button type="button" class="linkish" disabled={{ allShownPicked() || !shown().length }} on:click={{ pickShown }}>
+          <Button variant="ghost" disabled={{ allShownPicked() || !shown().length }} on:click={{ pickShown }}>
             Select {{ shown().length === counts().all ? 'all' : 'these ' + shown().length }}
-          </button>
-          <button type="button" class="linkish" disabled={{ !picked().length }} on:click={{ clearPicked }}>
+          </Button>
+          <Button variant="ghost" disabled={{ !picked().length }} on:click={{ clearPicked }}>
             Clear selection
-          </button>
+          </Button>
           <span class="bulk-count">
             {{ shown().length }} shown{{ shown().length === counts().all ? '' : ' of ' + counts().all }} ·
             {{ picked().length }} picked
@@ -236,11 +218,10 @@
               @for (u of shown(); track u.root) {
                 <tr class:picked={{ isPicked(u) }}>
                   <td class="pick">
-                    <input
-                      type="checkbox"
-                      .checked={{ isPicked(u) }}
-                      on:change={{ () => toggle(u) }}
-                      aria-label={{ 'Migrate ' + u.name }}
+                    <Checkbox
+                      checked={{ isPicked(u) }}
+                      onChange={{ () => toggle(u) }}
+                      label={{ 'Migrate ' + u.name }}
                     />
                   </td>
                   <td class="unit">{{ u.name }}</td>
@@ -259,9 +240,9 @@
 
         <div class="foot">
           <p>{{ found().units.length }} project(s) found in {{ found().root }}</p>
-          <button type="button" class="go" disabled={{ picked().length === 0 }}>
+          <Button disabled={{ picked().length === 0 }}>
             {{ picked().length === 0 ? 'Pick at least one' : 'Continue with ' + picked().length + ' project(s)' }}
-          </button>
+          </Button>
         </div>
       } @else {
         <p class="empty">

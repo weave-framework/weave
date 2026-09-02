@@ -10,8 +10,8 @@ export default defineConfig({
   root: 'src/app/app',
   index: 'src/index.html',
   outDir: 'dist',
-  styleLang: 'css',
-  styles: ['src/styles/main.css'], // tokens + reset — scoped component styles cannot reach :root/body
+  styleLang: 'scss',
+  styles: ['src/styles/main.scss'], // tokens + reset — scoped component styles cannot reach :root/body
   build: { minify: true },
   dev: { port: 4280 },
 });

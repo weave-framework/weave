@@ -14,6 +14,10 @@
   "files": [
     "dist"
   ],
+  "dependencies": {
+    "@weave-framework/runtime": "workspace:*",
+    "@weave-framework/ui": "workspace:*"
+  },
   "engines": {
     "node": ">=18"
   },

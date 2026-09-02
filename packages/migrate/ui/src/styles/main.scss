@@ -5,6 +5,9 @@
  * letting the rules compile into selectors that match nothing.
  */
 
+// SCSS requires every `@use` before any other rule, so the import sits here and the mixins below.
+@use 'pkg:@weave-framework/ui' as weave;
+
 /* Tokens lifted from the docs site (docs/src/styles/_tokens.scss) so the tool reads as part of Weave. */
 :root {
   color-scheme: light;
@@ -55,3 +58,24 @@ body {
   line-height: 1.55;
 }
 
+// The real @weave-framework/ui component styles, themed off the tokens above — the same wiring the docs site
+// uses. Binding the library's colour tokens to ours means one palette drives both the hand-written parts of
+// this screen and every library component on it, and both follow the light/dark switch together.
+
+@include weave.all-styles();
+
+@include weave.theme(
+  (
+    color: (
+      canvas: var(--bg),
+      surface: var(--surface),
+      ink: var(--fg),
+      sub: var(--muted),
+      line: var(--border),
+      field: var(--code-bg),
+      accent: var(--accent),
+      error: var(--red),
+      neutral: var(--muted),
+    ),
+  )
+);
