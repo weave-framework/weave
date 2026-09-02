@@ -1184,3 +1184,13 @@ td.loc {
   color: var(--muted);
   cursor: not-allowed;
 }
+
+/* Widening keeps the drawing up and dims it, rather than blanking the canvas — a graph that vanishes on every
+   click reads as a crash, and takes the reader's place on the page with it. */
+.canvas.busy {
+  opacity: 0.55;
+  pointer-events: none;
+}
+.canvas-bar .read-marked {
+  margin-left: 0.25rem;
+}

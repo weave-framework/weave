@@ -95,7 +95,8 @@ export function setup(): {
   selected: Signal<string>;
   decisions: Signal<Record<string, 'migrate' | 'skip' | 'open' | 'leave'>>;
   openedLibs: Signal<string[]>;
-  openLibrary: (nodeId: string) => void;
+  pendingOpens: Computed<string[]>;
+  openMarked: () => void;
   decisionFor: (nodeId: string) => string;
   decide: (nodeId: string, value: 'migrate' | 'skip' | 'open' | 'leave') => void;
   migrateWithDependencies: (nodeId: string) => void;
@@ -492,14 +493,20 @@ export function setup(): {
   /** The path last analysed, so re-opening can re-run against the same unit. */
   const analysedPath: Signal<string> = signal('');
 
-  const analyse = (target: string): void => {
+  const analyse = (target: string, keepView: boolean = false): void => {
     analysedPath.set(target);
     step.set(2);
     analysing.set(true);
     graphError.set('');
-    graph.set(null);
-    selected.set('');
-    expanded.set('');
+    // Widening keeps the drawing on screen: blanking it read as a crash and lost the reader's place. Only a
+    // fresh analysis of a different project starts from nothing.
+    if (!keepView) {
+      graph.set(null);
+      selected.set('');
+      expanded.set('');
+    }
+    const host: HTMLElement | null = canvasEl();
+    const keepScroll: { x: number; y: number } | null = keepView && host ? { x: host.scrollLeft, y: host.scrollTop } : null;
     void fetch(apiUrl('/api/analyze'), {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -518,6 +525,16 @@ export function setup(): {
         };
         graph.set(payload.graph);
         summary.set(payload.summary);
+        // Put the view back exactly where it was — a widened graph is the same drawing with more in it, and
+        // being thrown back to the top left after every open is most of what made this unusable.
+        if (keepScroll) {
+          requestAnimationFrame((): void => {
+            const el: HTMLElement | null = canvasEl();
+            if (!el) return;
+            el.scrollLeft = keepScroll.x;
+            el.scrollTop = keepScroll.y;
+          });
+        }
       })
       .catch((e: unknown): void => {
         analysing.set(false);
@@ -795,14 +812,31 @@ export function setup(): {
    * never grow past its first level, and a service marked "open and migrate" still showed zero dependencies.
    * Opening one is what makes the next level exist.
    */
-  const openLibrary = (nodeId: string): void => {
+  /**
+   * The libraries marked to open that have not been read yet.
+   *
+   * Reported: opening one at a time meant a full re-analysis per click, and "I need five of these but I am not
+   * sure which" turned into five waits. Marking is now free; reading happens once, for everything marked.
+   */
+  const pendingOpens: Computed<string[]> = computed<string[]>(() => {
     const g: Graph | null = graph();
-    const node: GraphNode | undefined = g?.nodes.find((n: GraphNode): boolean => n.id === nodeId);
-    const lib: string | undefined = node?.library;
-    if (!lib) return;
-    if (!openedLibs().includes(lib)) openedLibs.set((current: string[]): string[] => [...current, lib]);
+    const map: Record<string, string> = decisions();
+    if (!g) return [];
+    const libs: string[] = [];
+    for (const node of g.nodes) {
+      if (map[node.id] !== 'open' || !node.library) continue;
+      if (!openedLibs().includes(node.library) && !libs.includes(node.library)) libs.push(node.library);
+    }
+    return libs;
+  });
+
+  /** Read everything marked, in one pass, and redraw in place. */
+  const openMarked = (): void => {
+    const libs: string[] = pendingOpens();
+    if (!libs.length) return;
+    openedLibs.set((current: string[]): string[] => [...current, ...libs]);
     const target: string = analysedPath();
-    if (target) analyse(target);
+    if (target) analyse(target, true);
   };
 
   const decide = (nodeId: string, value: 'migrate' | 'skip' | 'open' | 'leave'): void => {
@@ -1010,7 +1044,8 @@ export function setup(): {
     selected,
     decisions,
     openedLibs,
-    openLibrary,
+    pendingOpens,
+    openMarked,
     decisionFor,
     decide,
     migrateWithDependencies,

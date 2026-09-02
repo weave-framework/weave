@@ -257,7 +257,7 @@
     <section class="graph-section">
       <h2>What it depends on</h2>
 
-      @if (analysing()) {
+      @if (analysing() && !hasGraph()) {
         <p class="scanning" role="status">
           <span class="spinner" aria-hidden="true"></span>
           Reading every file the entry point reaches — a real app takes a second or two.
@@ -295,6 +295,11 @@
           @if (selected()) {
             <Button variant="ghost" class="clear-sel" on:click={{ clearSelection }}>Clear selection</Button>
           }
+          @if (pendingOpens().length) {
+            <Button class="read-marked" disabled={{ analysing() }} on:click={{ openMarked }}>
+              {{ analysing() ? 'Reading…' : 'Read marked (' + pendingOpens().length + ')' }}
+            </Button>
+          }
           @if (openedLibs().length) {
             <span class="opened-count">{{ openedLibs().length }} opened</span>
           }
@@ -308,7 +313,7 @@
           }
         </div>
 
-        <div class="canvas" ref={{ canvasRef }} on:click={{ onCanvasClick }}>
+        <div class="canvas" ref={{ canvasRef }} on:click={{ onCanvasClick }} class:busy={{ analysing() }}>
           <svg viewBox={{ '0 0 ' + view().width + ' ' + view().height }}
                width={{ Math.round(view().width * zoom()) }} height={{ Math.round(view().height * zoom()) }}
                role="img" aria-label="Route tree with lazy boundaries">
@@ -374,10 +379,11 @@
                   <div class="expanded-actions">
                     @if (sel().kind === 'external') {
                       @if (sel().library) {
-                        <button type="button" class="expanded-all" disabled={{ analysing() }}
-                                on:click={{ () => openLibrary(sel().id) }}>
-                          {{ analysing() ? 'Reading…' : 'Open ' + sel().library }}
-                        </button>
+                        <label class="tick">
+                          <input type="checkbox" .checked={{ decisionFor(sel().id) === 'open' }}
+                                 on:change={{ () => decide(sel().id, 'open') }} />
+                          Open and migrate
+                        </label>
                       }
                       <label class="tick">
                         <input type="checkbox" .checked={{ decisionFor(sel().id) === 'leave' }}
@@ -386,8 +392,9 @@
                       </label>
                       @if (sel().library) {
                         <p class="expanded-note">
-                          Not read yet, so its own dependencies are unknown. Opening it reads
-                          <code>{{ sel().library }}</code> and redraws — expect new unread things underneath.
+                          Not read yet, so its own dependencies are unknown. Ticking marks
+                          <code>{{ sel().library }}</code> to be read — mark as many as you like, then press
+                          <b>Read marked</b> above to do them all in one pass.
                         </p>
                       } @else {
                         <p class="expanded-note">
