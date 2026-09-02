@@ -11,8 +11,9 @@
  * hang off that spine, and are meant to be revealed under one node at a time — not all at once.
  */
 
-import { dirname, resolve, sep } from 'node:path';
-import type { ComponentFact, MigrationFacts, RouteFact, ServiceFact } from './analyze.js';
+import ts from 'typescript';
+import { sep } from 'node:path';
+import { parseFile, resolveRelative, type ComponentFact, type MigrationFacts, type RouteFact, type ServiceFact } from './analyze.js';
 import type { Edge, Graph, GraphNode, NodeKind } from './types.js';
 
 /** A stable id for a node. Ids are opaque to the UI; only their equality matters. */
@@ -44,18 +45,37 @@ function shortPath(file: string, root: string): string {
  */
 function resolveLazy(route: RouteFact, files: string[]): string | null {
   if (!route.lazyTarget) return null;
-  const base: string = resolve(dirname(route.file), route.lazyTarget);
 
-  // `./app-modules/accounting/index` names a BARREL, and a barrel holds no routes — the routes are in
-  // `accounting.module.ts` beside it. Matching only on the specifier left that module unattached: a card
-  // floating with nothing pointing at it, which is exactly how it was reported. So an `/index` tail is also
-  // tried as the folder it sits in.
-  const folder: string = base.endsWith(`${sep}index`) ? dirname(base) : base;
+  // Step one: where does the specifier actually point? Asked of the analysis's own resolver — the one that
+  // followed every other import in this codebase — rather than guessed at here. An earlier version of this
+  // function had three hand-written rules and got a barrel wrong, which is what guessing at file layout buys
+  // you: it works on the projects you happened to look at.
+  const entry: string | null = resolveRelative(route.lazyTarget, route.file);
+  if (!entry) return null;
+  if (files.includes(entry)) return entry;
 
-  const inFolder = (dir: string): string | undefined =>
-    files.find((f: string): boolean => dirname(f) === dir) ?? files.find((f: string): boolean => f.startsWith(dir + sep));
+  /* Step two: that file holds no routes, which is normal — `index.ts` is a barrel, and the routes live in
+     whatever it re-exports. Follow those exports, once, and take the first that does declare routes.
+     One hop, not a full graph walk: a barrel re-exporting a barrel is rare, and an unbounded chase through
+     someone else's re-export web is a good way to be slow and still wrong. */
+  for (const spec of reexportSpecifiers(entry)) {
+    const next: string | null = resolveRelative(spec, entry);
+    if (next && files.includes(next)) return next;
+  }
+  return null;
+}
 
-  return files.find((f: string): boolean => f === `${base}.ts`) ?? inFolder(base) ?? inFolder(folder) ?? null;
+/** The specifiers a file re-exports (`export * from './x'`, `export { A } from './x'`). */
+function reexportSpecifiers(file: string): string[] {
+  const source: ts.SourceFile | null = parseFile(file);
+  if (!source) return [];
+  const out: string[] = [];
+  for (const statement of source.statements) {
+    if (!ts.isExportDeclaration(statement)) continue;
+    const from: ts.Expression | undefined = statement.moduleSpecifier;
+    if (from && ts.isStringLiteral(from)) out.push(from.text);
+  }
+  return out;
 }
 
 /**

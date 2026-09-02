@@ -111,8 +111,14 @@ function fileFor(base: string): string | null {
   return null;
 }
 
-/** Resolve a relative import specifier to a file, or null. */
-function resolveRelative(spec: string, fromFile: string): string | null {
+/**
+ * Resolve a relative import specifier to a file, or null.
+ *
+ * Exported because anything downstream that needs to follow a specifier must follow it the SAME way this walk
+ * does. The graph originally guessed at it with its own rules and got a barrel wrong; every project spells
+ * these paths differently, and the only spelling that generalises is the one TypeScript itself accepts.
+ */
+export function resolveRelative(spec: string, fromFile: string): string | null {
   return fileFor(join(dirname(fromFile), spec));
 }
 
@@ -625,7 +631,7 @@ export function analyzeComponents(files: string[]): ComponentFact[] {
 }
 
 /** Read + parse a `.ts` file to a SourceFile (parents set, for `getText`), or null when unreadable. */
-function parseFile(filePath: string): ts.SourceFile | null {
+export function parseFile(filePath: string): ts.SourceFile | null {
   try {
     return ts.createSourceFile(filePath, readFileSync(filePath, 'utf8'), ts.ScriptTarget.Latest, true);
   } catch {
