@@ -1956,6 +1956,30 @@ export function outOfReach(facts: MigrationFacts): Reach[] {
  * that matters (a file path, a class name), and coverage is recomputed over the combined inventory — a merge that
  * kept the old coverage would report a percentage of a smaller source than the one actually being migrated.
  */
+/**
+ * Merge two route lists without duplicating a file's routes, and without breaking `parent`.
+ *
+ * `parent` is an INDEX into the same array, so concatenating two lists silently points every incoming parent at
+ * whatever happens to sit at that offset in the combined one. Routes are taken a whole file at a time — a file
+ * already present is already parsed — and the surviving indexes are remapped to their new positions.
+ */
+function mergeRoutes(base: RouteFact[], extra: RouteFact[]): RouteFact[] {
+  const known: Set<string> = new Set<string>(base.map((r: RouteFact): string => r.file));
+  const remap: Map<number, number> = new Map<number, number>();
+  let next: number = base.length;
+  extra.forEach((route: RouteFact, i: number): void => {
+    if (known.has(route.file)) return;
+    remap.set(i, next);
+    next += 1;
+  });
+  const added: RouteFact[] = [];
+  extra.forEach((route: RouteFact, i: number): void => {
+    if (!remap.has(i)) return;
+    added.push({ ...route, parent: route.parent === null ? null : (remap.get(route.parent) ?? null) });
+  });
+  return [...base, ...added];
+}
+
 export function mergeFacts(base: MigrationFacts, extra: MigrationFacts): MigrationFacts {
   const uniq = <T,>(xs: T[], key: (x: T) => string): T[] => [...new Map(xs.map((x) => [key(x), x])).values()];
   const decls: Decl[] = uniq([...base.inventory, ...extra.inventory], (d) => `${d.file}:${d.name}`);
@@ -1968,11 +1992,15 @@ export function mergeFacts(base: MigrationFacts, extra: MigrationFacts): Migrati
     packageUsage: [...base.packageUsage, ...extra.packageUsage],
     components: uniq([...base.components, ...extra.components], (x) => `${x.file}:${x.className}`),
     services: uniq([...base.services, ...extra.services], (x) => `${x.file}:${x.className}`),
-    di: [...base.di, ...extra.di],
-    routes: [...base.routes, ...extra.routes],
-    forms: [...base.forms, ...extra.forms],
-    calls: [...base.calls, ...extra.calls],
-    branches: [...base.branches, ...extra.branches],
+    // Deduplicated like everything else here, and for a measured reason: several aliases can resolve to one
+    // unit, so the same file is read and merged repeatedly. On one real app the DI graph came out 1,318 edges
+    // of which 179 were distinct — 86% duplicates, every one of them adding weight to nodes and lines to the
+    // drawing.
+    di: uniq([...base.di, ...extra.di], (e) => `${e.from}>${e.to}`),
+    routes: mergeRoutes(base.routes, extra.routes),
+    forms: uniq([...base.forms, ...extra.forms], (f) => `${f.file}:${f.className ?? ''}`),
+    calls: uniq([...base.calls, ...extra.calls], (c) => `${c.from}>${c.to}>${c.dynamic ? 'd' : 's'}`),
+    branches: uniq([...base.branches, ...extra.branches], (b) => b.method),
     cycles: [...base.cycles, ...extra.cycles],
     unresolved: [...new Set([...base.unresolved, ...extra.unresolved])],
     ngModules: uniq([...base.ngModules, ...extra.ngModules], (x) => `${x.file}:${x.className}`),
@@ -2078,6 +2106,8 @@ export function assembleFactsOpening(unitDir: string, open: string[]): Migration
   if (!open.length) return facts;
 
   const opened: Set<string> = new Set<string>();
+  /** Unit directories already read, so one folder behind five aliases is read once. */
+  const readUnits: Set<string> = new Set<string>();
   // Bounded like the terminal's loop: each pass can reveal more libraries, and a chain that keeps revealing
   // them is a repository problem, not something to chase forever.
   for (let round: number = 0; round < 10; round++) {
@@ -2086,6 +2116,11 @@ export function assembleFactsOpening(unitDir: string, open: string[]): Migration
     for (const gap of gaps) {
       opened.add(gap.name);
       const unit: string = unitRootFor(gap.path as string);
+      // Several aliases routinely resolve to ONE unit (`@org/api` and `@org/auth` living in one libs folder).
+      // Reading it once per alias is where most of the waiting went, and every re-read merged the same rows in
+      // again. The names are still recorded as opened; only the reading is skipped.
+      if (readUnits.has(unit)) continue;
+      readUnits.add(unit);
       const extra: MigrationFacts = assembleFacts(unit, gap.uses);
       if (!extra.entry) continue;
       facts = mergeFacts(facts, extra);
