@@ -190,7 +190,18 @@ export function inspect(dir: string): Workspace {
   const root: string = resolve(dir);
   const signals: Signal[] = readSignals(root);
   const declared: Unit[] = angularJsonUnits(root);
-  const units: Unit[] = declared.length > 1 ? declared : findUnits(root);
+
+  // A multi-project `angular.json` at the root declares its own units, and those win: they carry names and types
+  // the walk cannot know. Otherwise look inside.
+  let units: Unit[] = declared.length > 1 ? declared : findUnits(root);
+
+  // And if there is nothing inside, the path may BE the project. The walk deliberately never considers its own
+  // root — a monorepo root carries `@angular/core` while being no project at all — but that rule is about
+  // searching, not about a path the user typed. Pointing straight at an app is the most ordinary thing to do,
+  // and it answered "No Angular projects here" for an app whose own angular.json names it, which is worse than
+  // useless: it is the tool contradicting something the reader can see.
+  if (!units.length) units = unitsAt(root);
+
   return { root, signals, units, scannedDepth: MAX_DEPTH };
 }
 

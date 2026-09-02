@@ -80,6 +80,23 @@ ok(
   'multi: the three units are three different folders, not three names for one',
 );
 
+/* ── a path pointing straight AT an app, which is the most ordinary thing to do ──
+   Reported from the screen: C:\_WORK\...\tsb-angular-v9, whose own angular.json declares one project with
+   root "", answered "No Angular projects here". The walk never considers its own root — right for searching a
+   monorepo, wrong for a path somebody typed on purpose. Every fixture missed it because every fixture pointed
+   at a workspace root. */
+const direct = d.inspect(join(fx, 'pnpm-ws', 'projects', 'shop'));
+ok(direct.units.length === 1, `a path naming the app itself finds it (got ${direct.units.length})`);
+ok(names(direct)[0] === 'shop', `and by its declared name (got ${names(direct)[0]})`);
+ok(direct.units[0]?.declaredBy === 'angular.json', 'read from its own angular.json');
+
+// The rule it must not break: a root that only LOOKS like a unit still loses to what is inside it.
+const stillInside = d.inspect(join(fx, 'npm-ws'));
+ok(
+  stillInside.units.length === 1 && names(stillInside)[0] === '@acme/data',
+  `a monorepo root still yields what is inside, not itself (got ${names(stillInside).join(',')})`,
+);
+
 /* ── regression: everything the old walk found must still be found, now with names and types ── */
 const mono = d.inspect(nxMono);
 ok(names(mono).join(',') === 'admin,shop,ui', `nx-mono: still finds admin, shop and ui (got ${names(mono).join(',')})`);
