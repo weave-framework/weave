@@ -147,11 +147,21 @@ export function buildGraph(facts: MigrationFacts): Graph {
     });
   }
 
-  // A route renders a component; a guard is a service the route depends on to be entered or left.
+  /* A route renders a component; a guard is a service it depends on to be entered or left.
+     Guards hit the same wall DI does: `AuthGuardIfLogedInService` and friends are rarely in `facts.services`,
+     so every guard edge was dropped and a route with three guards inspected as having no connections at all.
+     An unread guard is still a dependency — and a rather important one, since it decides whether the route can
+     be reached — so it becomes an external node rather than nothing. */
+  const knownServices: Set<string> = new Set<string>(facts.services.map((x: ServiceFact): string => x.className));
   facts.routes.forEach((route: RouteFact, index: number): void => {
     const self: string = id('route', `${route.file}#${index}`);
     if (route.component) link(self, id('component', route.component), 'renders');
-    for (const guard of new Set(route.guards)) link(self, id('service', guard), 'guards');
+    for (const guard of new Set(route.guards)) {
+      if (!knownServices.has(guard)) {
+        add({ id: id('external', guard), kind: 'external', label: guard, detail: 'guard, not read yet', weight: 0 });
+      }
+      link(self, knownServices.has(guard) ? id('service', guard) : id('external', guard), 'guards');
+    }
   });
 
   /* ── dependency injection ──
@@ -159,10 +169,7 @@ export function buildGraph(facts: MigrationFacts): Graph {
      node — and most injected classes are not in `facts.services` at all. They live behind the out-of-reach
      libraries this whole step exists to ask about (216 of them in one real app). Dropping them hid precisely
      what is worth seeing, so they become `external` nodes: named, weighted, and visibly not read yet. */
-  const known: Set<string> = new Set<string>([
-    ...facts.services.map((x: ServiceFact): string => x.className),
-    ...facts.components.map((x: ComponentFact): string => x.className),
-  ]);
+  const known: Set<string> = new Set<string>([...knownServices, ...facts.components.map((x: ComponentFact): string => x.className)]);
   for (const edge of facts.di) {
     if (!known.has(edge.to)) {
       add({ id: id('external', edge.to), kind: 'external', label: edge.to, detail: 'not read yet', weight: 0 });

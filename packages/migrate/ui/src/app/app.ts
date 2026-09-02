@@ -3,7 +3,8 @@ import Button from '@weave-framework/ui/button';
 import ButtonToggle from '@weave-framework/ui/button-toggle';
 import Checkbox from '@weave-framework/ui/checkbox';
 import Input from '@weave-framework/ui/input';
-import type { Entry, Listing, Peek, Unit, Workspace } from '../../../src/types.js';
+import type { Edge, Entry, Graph, GraphNode, Listing, Peek, Unit, Workspace } from '../../../src/types.js';
+import { layout, relatedEdges, type Layout, type PlacedNode } from './layout.js';
 
 // Capitalized tags in the template resolve to these imports. The editor tooling understands that; eslint,
 // running without it, sees three unused bindings — so the repo's convention is to name them here.
@@ -76,6 +77,22 @@ export function setup(): {
   path: Signal<string>;
   phase: Signal<Phase>;
   session: Signal<Session>;
+  analysing: Signal<boolean>;
+  pickedLabel: Computed<string>;
+  graphError: Signal<string>;
+  summary: Signal<Record<string, number | string> | null>;
+  selected: Signal<string>;
+  analyseSelection: () => void;
+  placed: Computed<Layout | null>;
+  view: Computed<Layout>;
+  hasGraph: Computed<boolean>;
+  sel: Computed<PlacedNode>;
+  hasSelection: Computed<boolean>;
+  summaryLine: Computed<string>;
+  lazyCount: Computed<number>;
+  selectedNode: Computed<PlacedNode | null>;
+  selectedLinks: Computed<Array<{ dir: 'uses' | 'used by'; kind: string; label: string; external: boolean }>>;
+  externals: Computed<PlacedNode[]>;
   query: Signal<string>;
   setKind: (v: string | string[]) => void;
   kindOptions: Computed<Array<{ value: string; label: string; disabled?: boolean }>>;
@@ -401,6 +418,119 @@ export function setup(): {
     return list.length > 0 && list.every((u: Unit): boolean => picked().includes(u.root));
   });
 
+  /* ── step two: the dependency graph ──
+     Analysis is a full TypeScript walk — measured at 1-2 s on a real app, against 150 ms for the shallow scan
+     of step one — so it runs only when asked, and says it is running. */
+  const analysing: Signal<boolean> = signal(false);
+  const graph: Signal<Graph | null> = signal<Graph | null>(null);
+  const graphError: Signal<string> = signal('');
+  const summary: Signal<Record<string, number | string> | null> = signal<Record<string, number | string> | null>(null);
+  const selected: Signal<string> = signal('');
+
+  const analyse = (target: string): void => {
+    analysing.set(true);
+    graphError.set('');
+    graph.set(null);
+    selected.set('');
+    void fetch(apiUrl('/api/analyze'), {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ path: target }),
+    })
+      .then(async (res: Response): Promise<void> => {
+        const body: unknown = await res.json();
+        analysing.set(false);
+        if (!res.ok) {
+          graphError.set(String((body as { error?: string }).error ?? `analysis failed (${res.status})`));
+          return;
+        }
+        const payload: { graph: Graph; summary: Record<string, number | string> } = body as {
+          graph: Graph;
+          summary: Record<string, number | string>;
+        };
+        graph.set(payload.graph);
+        summary.set(payload.summary);
+      })
+      .catch((e: unknown): void => {
+        analysing.set(false);
+        graphError.set(e instanceof Error ? e.message : String(e));
+      });
+  };
+
+  /** Just the folder name of the first pick — a full Windows path on a button reads as a bug. */
+  const pickedLabel: Computed<string> = computed<string>(() => {
+    const first: string = picked()[0] ?? '';
+    // Split on both separators without a regex: an escaped backslash inside one has been mangled twice today
+    // by the tooling writing this file, and a literal pair of characters cannot be.
+    const parts: string[] = first.split('\\').join('/').split('/').filter(Boolean);
+    return parts[parts.length - 1] ?? '';
+  });
+
+  /** Analyse the first project that was picked — the graph answers about one unit at a time. */
+  const analyseSelection = (): void => {
+    const first: string | undefined = picked()[0];
+    if (first) analyse(first);
+  };
+
+  /** The laid-out graph, recomputed only when the graph itself changes. */
+  const placed: Computed<Layout | null> = computed<Layout | null>(() => {
+    const g: Graph | null = graph();
+    return g ? layout(g) : null;
+  });
+
+  /** The node currently selected, if any. */
+  const selectedNode: Computed<PlacedNode | null> = computed<PlacedNode | null>(() => {
+    const l: Layout | null = placed();
+    const id: string = selected();
+    return l && id ? (l.nodes.find((n: PlacedNode): boolean => n.id === id) ?? null) : null;
+  });
+
+  /**
+   * What the selected node depends on, and what depends on it — the 227 injection edges, revealed one node at a
+   * time instead of drawn all at once.
+   */
+  const selectedLinks: Computed<Array<{ dir: 'uses' | 'used by'; kind: string; label: string; external: boolean }>> = computed(() => {
+    const g: Graph | null = graph();
+    const id: string = selected();
+    if (!g || !id) return [];
+    const label = (nodeId: string): { label: string; external: boolean } => {
+      const n: GraphNode | undefined = g.nodes.find((x: GraphNode): boolean => x.id === nodeId);
+      return { label: n?.label ?? nodeId, external: n?.kind === 'external' };
+    };
+    return relatedEdges(g, id).map((e: Edge) => {
+      const other: { label: string; external: boolean } = e.from === id ? label(e.to) : label(e.from);
+      return { dir: e.from === id ? ('uses' as const) : ('used by' as const), kind: e.kind, label: other.label, external: other.external };
+    });
+  });
+
+  /** The heaviest external nodes — the decisions this step exists to collect, ordered by how much rides on them. */
+  const externals: Computed<PlacedNode[]> = computed<PlacedNode[]>(() => {
+    const l: Layout | null = placed();
+    const g: Graph | null = graph();
+    if (!g) return [];
+    const known: Set<string> = new Set((l?.nodes ?? []).map((n: PlacedNode): string => n.id));
+    void known;
+    return g.nodes
+      .filter((n): boolean => n.kind === 'external')
+      .sort((a, b) => b.weight - a.weight)
+      .map((n): PlacedNode => ({ ...n, x: 0, y: 0, r: 0, level: 0 }));
+  });
+
+  /* Non-null projections, for the same reason as `found`: `@if (x; as y)` does not narrow under `weave check`,
+     and its alias binds only on the leading branch. Named states read better than working around both. */
+  const EMPTY_LAYOUT: Layout = { nodes: [], edges: [], width: 0, height: 0 };
+  const view: Computed<Layout> = computed<Layout>(() => placed() ?? EMPTY_LAYOUT);
+  const hasGraph: Computed<boolean> = computed<boolean>(() => placed() !== null);
+  const sel: Computed<PlacedNode> = computed<PlacedNode>(
+    () => selectedNode() ?? { id: '', kind: 'module', label: '', detail: '', weight: 0, x: 0, y: 0, r: 0, level: 0 },
+  );
+  const hasSelection: Computed<boolean> = computed<boolean>(() => selectedNode() !== null);
+  const summaryLine: Computed<string> = computed<string>(() => {
+    const sm: Record<string, number | string> | null = summary();
+    return sm ? `${sm.files} files · ${sm.components} components · ${sm.routes} routes` : '';
+  });
+  const lazyCount: Computed<number> = computed<number>(() => Number(summary()?.lazy ?? 0));
+
   /** The result, never null — `hasResult()` says whether it means anything yet. */
   const found: Computed<Workspace> = computed<Workspace>(() => workspace() ?? EMPTY);
   const hasResult: Computed<boolean> = computed<boolean>(() => workspace() !== null);
@@ -420,6 +550,22 @@ export function setup(): {
     hasResult,
     session,
     missingRoutes,
+    analysing,
+    pickedLabel,
+    graphError,
+    summary,
+    selected,
+    analyseSelection,
+    placed,
+    view,
+    hasGraph,
+    sel,
+    hasSelection,
+    summaryLine,
+    lazyCount,
+    selectedNode,
+    selectedLinks,
+    externals,
     query,
     setKind,
     kindOptions,

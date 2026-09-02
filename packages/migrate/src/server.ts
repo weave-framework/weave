@@ -23,7 +23,10 @@ import { randomBytes } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { extname, isAbsolute, join, relative, sep } from 'node:path';
+import { assembleFacts, type MigrationFacts } from './analyze.js';
 import { browse, peek, type Listing } from './browse.js';
+import { buildGraph } from './graph.js';
+import type { Graph } from './types.js';
 import { inspect, type Workspace } from './detect.js';
 
 /** A running migration service. */
@@ -54,7 +57,7 @@ const PORT_ATTEMPTS: number = 20;
  * is the one it was built against. Add a route, add it here — the pairing is what makes a stale service
  * announce itself instead of answering 404 to a page that has every reason to expect otherwise.
  */
-const ROUTES: string[] = ['/api/session', '/api/inspect', '/api/browse', '/api/peek'];
+const ROUTES: string[] = ['/api/session', '/api/inspect', '/api/browse', '/api/peek', '/api/analyze'];
 
 /** Largest request body accepted, in bytes. A path is short; anything larger is not a path. */
 const MAX_BODY: number = 64 * 1024;
@@ -328,6 +331,46 @@ export async function serve(options: ServeOptions = {}): Promise<MigrateServer> 
         return;
       }
       json(res, 200, peek(at));
+      return;
+    }
+
+    if (url.pathname === '/api/analyze' && req.method === 'POST') {
+      const body: BodyResult = await readBody(req);
+      if (!body.ok) {
+        json(res, body.reason === 'too-large' ? 413 : 400, { error: 'could not read the request body' });
+        return;
+      }
+      let target: unknown;
+      try {
+        target = (JSON.parse(body.text) as { path?: unknown }).path;
+      } catch {
+        json(res, 400, { error: 'body must be JSON' });
+        return;
+      }
+      if (typeof target !== 'string' || !target.trim() || !existsSync(target)) {
+        json(res, 404, { error: `nothing at ${String(target)}` });
+        return;
+      }
+      // The expensive one: a full TypeScript walk of the unit, measured at 1-2 s on a real app. The UI shows a
+      // spinner for it rather than pretending it is instant.
+      const facts: MigrationFacts = assembleFacts(target);
+      if (!facts.entry) {
+        json(res, 422, { error: 'no entry file (main.ts / index.ts) — point at the project folder itself' });
+        return;
+      }
+      const graph: Graph = buildGraph(facts);
+      json(res, 200, {
+        graph,
+        summary: {
+          files: facts.files.length,
+          components: facts.components.length,
+          services: facts.services.length,
+          routes: facts.routes.length,
+          lazy: facts.routes.filter((r): boolean => r.lazy).length,
+          forms: facts.forms.length,
+          entry: facts.entry,
+        },
+      });
       return;
     }
 

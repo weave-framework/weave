@@ -240,8 +240,8 @@
 
         <div class="foot">
           <p>{{ found().units.length }} project(s) found in {{ found().root }}</p>
-          <Button disabled={{ picked().length === 0 }}>
-            {{ picked().length === 0 ? 'Pick at least one' : 'Continue with ' + picked().length + ' project(s)' }}
+          <Button disabled={{ picked().length === 0 || analysing() }} on:click={{ analyseSelection }}>
+            {{ analysing() ? 'Analysing…' : picked().length === 0 ? 'Pick at least one' : 'Analyse ' + pickedLabel() }}
           </Button>
         </div>
       } @else {
@@ -249,6 +249,82 @@
           No Angular projects here. That is an answer, not a failure — this may simply not be an Angular
           repository, or the projects may sit deeper than {{ found().scannedDepth }} levels.
         </p>
+      }
+    </section>
+  }
+
+  @if (analysing() || graphError() || placed()) {
+    <section class="graph-section">
+      <h2>What it depends on</h2>
+
+      @if (analysing()) {
+        <p class="scanning" role="status">
+          <span class="spinner" aria-hidden="true"></span>
+          Reading every file the entry point reaches — a real app takes a second or two.
+        </p>
+      }
+
+      @if (graphError()) {
+        <p class="failed" role="alert">{{ graphError() }}</p>
+      }
+
+      @if (summaryLine()) {
+        <p class="verdict">
+          {{ summaryLine() }} · <b>{{ lazyCount() }} lazy boundaries</b> — each one a piece you can migrate on its own.
+        </p>
+      }
+
+      @if (hasGraph()) {
+        <div class="canvas">
+          <svg viewBox={{ '0 0 ' + view().width + ' ' + view().height }} width={{ view().width }} height={{ view().height }} role="img"
+               aria-label="Route tree with lazy boundaries">
+            @for (e of view().edges; track e.from + '>' + e.to) {
+              <line class="edge" class:cut={{ e.kind === 'loads' }}
+                    x1={{ e.x1 }} y1={{ e.y1 }} x2={{ e.x2 }} y2={{ e.y2 }} />
+            }
+            @for (n of view().nodes; track n.id) {
+              <g class="node" class:is-selected={{ selected() === n.id }} on:click={{ () => selected.set(n.id) }}>
+                <circle class={{ 'dot dot--' + n.kind }} class:lazy={{ n.lazy }} cx={{ n.x }} cy={{ n.y }} r={{ n.r }} />
+                <text class="node-label" x={{ n.x + n.r + 6 }} y={{ n.y + 4 }}>{{ n.label }}</text>
+              </g>
+            }
+          </svg>
+        </div>
+
+        @if (hasSelection()) {
+          <div class="inspector">
+            <h3>{{ sel().label }}</h3>
+            <p class="inspector-meta">
+              {{ sel().kind }}@if (sel().detail) { · {{ sel().detail }} }@if (sel().lazy) { · <b>lazy boundary</b> }
+            </p>
+            @if (selectedLinks().length) {
+              <ul class="links">
+                @for (l2 of selectedLinks(); track l2.dir + l2.kind + l2.label) {
+                  <li><span class="dir">{{ l2.dir }}</span> <span class="link-kind">{{ l2.kind }}</span>
+                    <span class="link-label" class:ext={{ l2.external }}>{{ l2.label }}</span></li>
+                }
+              </ul>
+            } @else {
+              <p class="inspector-meta">Nothing else connects to this one.</p>
+            }
+          </div>
+        } @else {
+          <p class="inspector-meta">Click a node to see what it uses and what uses it.</p>
+        }
+
+        @if (externals().length) {
+          <div class="externals">
+            <h3>Not read yet — {{ externals().length }} to decide on</h3>
+            <p class="inspector-meta">
+              Classes the code injects that the walk never opened. Ordered by how much rides on them.
+            </p>
+            <ul class="ext-list">
+              @for (x of externals().slice(0, 12); track x.id) {
+                <li><span class="ext-weight">{{ x.weight }}</span> {{ x.label }}</li>
+              }
+            </ul>
+          </div>
+        }
       }
     </section>
   }

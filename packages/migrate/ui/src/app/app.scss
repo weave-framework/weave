@@ -541,3 +541,160 @@ td.loc {
   font-size: 0.875rem;
   color: var(--muted);
 }
+
+/* ── the dependency graph ── */
+.graph-section h3 {
+  margin: 1.25rem 0 0.375rem;
+  font-size: 0.8125rem;
+  font-weight: 650;
+  color: var(--fg);
+}
+
+.canvas {
+  margin-top: 0.875rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  overflow: auto;
+  max-height: 32rem;
+}
+.canvas svg {
+  display: block;
+}
+
+.edge {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+/* A lazy boundary is where Angular already cut the app — the most useful line on the canvas, so it looks it. */
+.edge.cut {
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-dasharray: 5 3;
+}
+
+.node {
+  cursor: pointer;
+}
+.dot {
+  stroke: var(--bg);
+  stroke-width: 1.5;
+}
+.dot--module {
+  fill: var(--accent);
+}
+.dot--route {
+  fill: var(--muted);
+}
+.dot--component {
+  fill: var(--green);
+}
+.dot--service {
+  fill: var(--orange);
+}
+.dot--external {
+  fill: var(--red);
+}
+.dot.lazy {
+  stroke: var(--accent);
+  stroke-width: 2.5;
+}
+.node:hover .dot {
+  stroke: var(--fg);
+}
+.node.is-selected .dot {
+  stroke: var(--fg);
+  stroke-width: 3;
+}
+
+.node-label {
+  font-family: var(--mono);
+  font-size: 11px;
+  fill: var(--fg-soft);
+  pointer-events: none;
+}
+.node.is-selected .node-label {
+  fill: var(--fg);
+  font-weight: 600;
+}
+
+.inspector {
+  margin-top: 0.875rem;
+  padding: 0.75rem 0.875rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+}
+.inspector h3 {
+  margin: 0 0 0.25rem;
+  font-family: var(--mono);
+  font-size: 0.875rem;
+}
+.inspector-meta {
+  margin: 0.375rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+.links {
+  list-style: none;
+  margin: 0.625rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1875rem;
+  max-height: 14rem;
+  overflow-y: auto;
+}
+.links li {
+  font-size: 0.8125rem;
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+}
+.dir {
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  min-width: 4.5rem;
+}
+.link-kind {
+  font-size: 0.6875rem;
+  color: var(--muted);
+  min-width: 3.5rem;
+}
+.link-label {
+  font-family: var(--mono);
+  font-size: 0.78125rem;
+  color: var(--fg-soft);
+}
+.link-label.ext {
+  color: var(--red);
+}
+
+.externals {
+  margin-top: 1rem;
+}
+.ext-list {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1875rem;
+}
+.ext-list li {
+  font-family: var(--mono);
+  font-size: 0.8125rem;
+  color: var(--fg-soft);
+  display: flex;
+  gap: 0.625rem;
+  align-items: baseline;
+}
+.ext-weight {
+  display: inline-block;
+  min-width: 2rem;
+  text-align: right;
+  color: var(--red);
+  font-weight: 600;
+}
