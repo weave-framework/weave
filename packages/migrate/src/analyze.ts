@@ -2040,6 +2040,62 @@ function narrowTo(walk: DependencyWalk, names: string[]): DependencyWalk {
  * `only` narrows the unit to the names actually wanted from it — see `narrowTo`. Without it a library is taken
  * whole, which is right when the user pointed AT that library and wrong when they merely import one type from it.
  */
+/**
+ * The project a path belongs to. A user may point at a file, at `src/`, or at the project folder; all three mean
+ * the same unit. Climbs until it finds a project marker, never past the filesystem root, and never treats `src`
+ * or `lib` as a unit of its own — that named a "library" `src`, whose output then landed in `src/src/`.
+ *
+ * Moved here from the terminal command because opening a library is no longer a terminal-only act: the UI needs
+ * exactly the same answer to widen the walk.
+ */
+export function unitRootFor(input: string): string {
+  let dir: string = existsSync(input) && statSync(input).isDirectory() ? resolve(input) : resolve(input, '..');
+  for (let up: number = 0; up < 6; up++) {
+    const base: string = dir.split(/[\/]/).filter(Boolean).pop() ?? '';
+    const marked: boolean = ['project.json', 'package.json', 'angular.json', 'ng-package.json'].some((f) => existsSync(join(dir, f)));
+    if (marked && base !== 'src' && base !== 'lib') return dir;
+    if (base !== 'src' && base !== 'lib' && existsSync(join(dir, 'src'))) return dir;
+    const parent: string = resolve(dir, '..');
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return dir;
+}
+
+/**
+ * Analyse a unit, then widen the walk into each library the caller chose to open.
+ *
+ * This is the loop the terminal ran as up to ten rounds of `[y/N]`: opening a library brings its own code in,
+ * and that code has its own unreachable edges. Measured on one real app, opening a single service library added
+ * 4 files, 2 services and 3 DI edges — and 7 new decisions of its own. Widening has to be iterative or the
+ * second level never appears.
+ *
+ * Only the names actually USED are pulled in. Analysing a whole library to satisfy an import of one symbol once
+ * migrated 200 interfaces to get at one.
+ */
+export function assembleFactsOpening(unitDir: string, open: string[]): MigrationFacts {
+  let facts: MigrationFacts = assembleFacts(unitDir);
+  if (!open.length) return facts;
+
+  const opened: Set<string> = new Set<string>();
+  // Bounded like the terminal's loop: each pass can reveal more libraries, and a chain that keeps revealing
+  // them is a repository problem, not something to chase forever.
+  for (let round: number = 0; round < 10; round++) {
+    const gaps: Reach[] = outOfReach(facts).filter((g: Reach): boolean => open.includes(g.name) && !opened.has(g.name) && !!g.path);
+    if (!gaps.length) break;
+    for (const gap of gaps) {
+      opened.add(gap.name);
+      const unit: string = unitRootFor(gap.path as string);
+      const extra: MigrationFacts = assembleFacts(unit, gap.uses);
+      if (!extra.entry) continue;
+      facts = mergeFacts(facts, extra);
+      // It is no longer an unfollowed edge, so it must stop being listed as one.
+      facts = { ...facts, internal: facts.internal.filter((i: string): boolean => i !== gap.name) };
+    }
+  }
+  return facts;
+}
+
 export function assembleFacts(unitDir: string, only?: string[]): MigrationFacts {
   const entry: string | null = findEntryPoint(unitDir);
   const empty: MigrationFacts = {

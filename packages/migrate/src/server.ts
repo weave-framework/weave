@@ -23,7 +23,7 @@ import { randomBytes } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { extname, isAbsolute, join, relative, sep } from 'node:path';
-import { assembleFacts, type MigrationFacts } from './analyze.js';
+import { assembleFactsOpening, type MigrationFacts } from './analyze.js';
 import { browse, peek, type Listing } from './browse.js';
 import { buildGraph } from './graph.js';
 import type { Graph } from './types.js';
@@ -341,8 +341,12 @@ export async function serve(options: ServeOptions = {}): Promise<MigrateServer> 
         return;
       }
       let target: unknown;
+      let open: string[] = [];
       try {
-        target = (JSON.parse(body.text) as { path?: unknown }).path;
+        const parsed: { path?: unknown; open?: unknown } = JSON.parse(body.text) as { path?: unknown; open?: unknown };
+        target = parsed.path;
+        // Which libraries the reader chose to open. Each one widens the walk, and may reveal more.
+        if (Array.isArray(parsed.open)) open = parsed.open.filter((x: unknown): x is string => typeof x === 'string');
       } catch {
         json(res, 400, { error: 'body must be JSON' });
         return;
@@ -353,7 +357,7 @@ export async function serve(options: ServeOptions = {}): Promise<MigrateServer> 
       }
       // The expensive one: a full TypeScript walk of the unit, measured at 1-2 s on a real app. The UI shows a
       // spinner for it rather than pretending it is instant.
-      const facts: MigrationFacts = assembleFacts(target);
+      const facts: MigrationFacts = assembleFactsOpening(target, open);
       if (!facts.entry) {
         json(res, 422, { error: 'no entry file (main.ts / index.ts) — point at the project folder itself' });
         return;
@@ -369,6 +373,7 @@ export async function serve(options: ServeOptions = {}): Promise<MigrateServer> 
           lazy: facts.routes.filter((r): boolean => r.lazy).length,
           forms: facts.forms.length,
           entry: facts.entry,
+          opened: open.length,
         },
       });
       return;

@@ -1169,3 +1169,18 @@ td.loc {
 .card.dropped .card-body {
   stroke-dasharray: 4 3;
 }
+
+.opened-count {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--accent);
+}
+.expanded-note code {
+  font-family: var(--mono);
+  color: var(--accent);
+}
+.expanded-all[disabled] {
+  background: var(--surface);
+  color: var(--muted);
+  cursor: not-allowed;
+}

@@ -295,6 +295,9 @@
           @if (selected()) {
             <Button variant="ghost" class="clear-sel" on:click={{ clearSelection }}>Clear selection</Button>
           }
+          @if (openedLibs().length) {
+            <span class="opened-count">{{ openedLibs().length }} opened</span>
+          }
           @if (decisionCounts().total) {
             <span class="tally">
               <span class="tally-item tally--migrate">{{ decisionCounts().migrate }} migrate</span>
@@ -370,17 +373,28 @@
 
                   <div class="expanded-actions">
                     @if (sel().kind === 'external') {
-                      <label class="tick">
-                        <input type="checkbox" .checked={{ decisionFor(sel().id) === 'open' }}
-                               on:change={{ () => decide(sel().id, 'open') }} />
-                        Open and migrate
-                      </label>
+                      @if (sel().library) {
+                        <button type="button" class="expanded-all" disabled={{ analysing() }}
+                                on:click={{ () => openLibrary(sel().id) }}>
+                          {{ analysing() ? 'Reading…' : 'Open ' + sel().library }}
+                        </button>
+                      }
                       <label class="tick">
                         <input type="checkbox" .checked={{ decisionFor(sel().id) === 'leave' }}
                                on:change={{ () => decide(sel().id, 'leave') }} />
                         Leave behind
                       </label>
-                      <p class="expanded-note">Its own dependencies are unknown until it is opened.</p>
+                      @if (sel().library) {
+                        <p class="expanded-note">
+                          Not read yet, so its own dependencies are unknown. Opening it reads
+                          <code>{{ sel().library }}</code> and redraws — expect new unread things underneath.
+                        </p>
+                      } @else {
+                        <p class="expanded-note">
+                          An injected type with no definition in reach — there is no library to open, so its
+                          calls will arrive as TODOs.
+                        </p>
+                      }
                     } @else {
                       <label class="tick">
                         <input type="checkbox" .checked={{ decisionFor(sel().id) === 'migrate' }}

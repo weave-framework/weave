@@ -94,6 +94,8 @@ export function setup(): {
   summary: Signal<Record<string, number | string> | null>;
   selected: Signal<string>;
   decisions: Signal<Record<string, 'migrate' | 'skip' | 'open' | 'leave'>>;
+  openedLibs: Signal<string[]>;
+  openLibrary: (nodeId: string) => void;
   decisionFor: (nodeId: string) => string;
   decide: (nodeId: string, value: 'migrate' | 'skip' | 'open' | 'leave') => void;
   migrateWithDependencies: (nodeId: string) => void;
@@ -485,16 +487,23 @@ export function setup(): {
   const summary: Signal<Record<string, number | string> | null> = signal<Record<string, number | string> | null>(null);
   const selected: Signal<string> = signal('');
 
+  /** Libraries the reader chose to open. Each one widens the next analysis. */
+  const openedLibs: Signal<string[]> = signal<string[]>([]);
+  /** The path last analysed, so re-opening can re-run against the same unit. */
+  const analysedPath: Signal<string> = signal('');
+
   const analyse = (target: string): void => {
+    analysedPath.set(target);
     step.set(2);
     analysing.set(true);
     graphError.set('');
     graph.set(null);
     selected.set('');
+    expanded.set('');
     void fetch(apiUrl('/api/analyze'), {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ path: target }),
+      body: JSON.stringify({ path: target, open: openedLibs() }),
     })
       .then(async (res: Response): Promise<void> => {
         const body: unknown = await res.json();
@@ -779,6 +788,23 @@ export function setup(): {
 
   const decisionFor = (nodeId: string): string => decisions()[nodeId] ?? '';
 
+  /**
+   * Open a library for real: record the decision, then widen the walk and redraw.
+   *
+   * Marking `open` used to change a colour and nothing else — the analysis never re-ran, so the graph could
+   * never grow past its first level, and a service marked "open and migrate" still showed zero dependencies.
+   * Opening one is what makes the next level exist.
+   */
+  const openLibrary = (nodeId: string): void => {
+    const g: Graph | null = graph();
+    const node: GraphNode | undefined = g?.nodes.find((n: GraphNode): boolean => n.id === nodeId);
+    const lib: string | undefined = node?.library;
+    if (!lib) return;
+    if (!openedLibs().includes(lib)) openedLibs.set((current: string[]): string[] => [...current, lib]);
+    const target: string = analysedPath();
+    if (target) analyse(target);
+  };
+
   const decide = (nodeId: string, value: 'migrate' | 'skip' | 'open' | 'leave'): void => {
     decisions.set((current: Record<string, 'migrate' | 'skip' | 'open' | 'leave'>) => {
       const next: Record<string, 'migrate' | 'skip' | 'open' | 'leave'> = { ...current };
@@ -983,6 +1009,8 @@ export function setup(): {
     summary,
     selected,
     decisions,
+    openedLibs,
+    openLibrary,
     decisionFor,
     decide,
     migrateWithDependencies,
