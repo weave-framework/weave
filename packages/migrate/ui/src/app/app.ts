@@ -839,6 +839,28 @@ export function setup(): {
     if (target) analyse(target, true);
   };
 
+  /**
+   * Ticking is the only action: marking a library reads it, on its own.
+   *
+   * The read is DEFERRED rather than immediate, and the difference is the whole point. Firing on each tick
+   * meant five services were five full re-analyses — reported, and it was as slow as it sounds. Firing when
+   * ticking stops means five ticks in a row are one pass, while a single tick still reads by itself with no
+   * second button to find.
+   *
+   * 700 ms: long enough to tick through a list without triggering, short enough that one tick does not feel
+   * like it was ignored.
+   */
+  const marked: Computed<string> = debounced((): string => pendingOpens().join('|'), 1200);
+  effect((): void => {
+    const waiting: string = marked();
+    // Subscribed on purpose, not read through `untrack`: anything ticked WHILE a read is running has to be
+    // picked up when that read finishes. Skipping without subscribing left them queued forever — measured,
+    // "1 opened" with "About to read 2…" sitting there permanently.
+    const busy: boolean = analysing();
+    if (!waiting || busy) return;
+    openMarked();
+  });
+
   const decide = (nodeId: string, value: 'migrate' | 'skip' | 'open' | 'leave'): void => {
     decisions.set((current: Record<string, 'migrate' | 'skip' | 'open' | 'leave'>) => {
       const next: Record<string, 'migrate' | 'skip' | 'open' | 'leave'> = { ...current };

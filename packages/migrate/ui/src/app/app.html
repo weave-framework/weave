@@ -295,10 +295,16 @@
           @if (selected()) {
             <Button variant="ghost" class="clear-sel" on:click={{ clearSelection }}>Clear selection</Button>
           }
-          @if (pendingOpens().length) {
-            <Button class="read-marked" disabled={{ analysing() }} on:click={{ openMarked }}>
-              {{ analysing() ? 'Reading…' : 'Read marked (' + pendingOpens().length + ')' }}
-            </Button>
+          @if (analysing() && hasGraph()) {
+            <span class="reading" role="status">
+              <span class="spinner" aria-hidden="true"></span>
+              Reading{{ pendingOpens().length ? ' ' + pendingOpens().length + ' more' : '' }}…
+            </span>
+          } @else if (pendingOpens().length) {
+            <span class="reading" role="status">
+              <span class="spinner" aria-hidden="true"></span>
+              About to read {{ pendingOpens().length }}…
+            </span>
           }
           @if (openedLibs().length) {
             <span class="opened-count">{{ openedLibs().length }} opened</span>
@@ -392,9 +398,9 @@
                       </label>
                       @if (sel().library) {
                         <p class="expanded-note">
-                          Not read yet, so its own dependencies are unknown. Ticking marks
-                          <code>{{ sel().library }}</code> to be read — mark as many as you like, then press
-                          <b>Read marked</b> above to do them all in one pass.
+                          Not read yet, so its own dependencies are unknown. Ticking reads
+                          <code>{{ sel().library }}</code> and draws what it finds — tick several and they are
+                          read together.
                         </p>
                       } @else {
                         <p class="expanded-note">
