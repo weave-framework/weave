@@ -104,6 +104,8 @@ export interface GraphNode {
   component?: string;
   /** How many OTHER routes render the same component — a shared screen, reached with different parameters. */
   sharedWith?: number;
+  /** True when no structural edge points at this node: it is a way IN, or nothing opens it. */
+  root?: boolean;
   /** True when this route absorbed the module it alone loads — the card is both. */
   folded?: boolean;
   /** The node this one is drawn inside, when it belongs to a group. */

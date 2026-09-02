@@ -45,12 +45,17 @@ function shortPath(file: string, root: string): string {
 function resolveLazy(route: RouteFact, files: string[]): string | null {
   if (!route.lazyTarget) return null;
   const base: string = resolve(dirname(route.file), route.lazyTarget);
-  return (
-    files.find((f: string): boolean => f === `${base}.ts`) ??
-    files.find((f: string): boolean => dirname(f) === base) ??
-    files.find((f: string): boolean => f.startsWith(base + sep)) ??
-    null
-  );
+
+  // `./app-modules/accounting/index` names a BARREL, and a barrel holds no routes — the routes are in
+  // `accounting.module.ts` beside it. Matching only on the specifier left that module unattached: a card
+  // floating with nothing pointing at it, which is exactly how it was reported. So an `/index` tail is also
+  // tried as the folder it sits in.
+  const folder: string = base.endsWith(`${sep}index`) ? dirname(base) : base;
+
+  const inFolder = (dir: string): string | undefined =>
+    files.find((f: string): boolean => dirname(f) === dir) ?? files.find((f: string): boolean => f.startsWith(dir + sep));
+
+  return files.find((f: string): boolean => f === `${base}.ts`) ?? inFolder(base) ?? inFolder(folder) ?? null;
 }
 
 /**
@@ -266,6 +271,18 @@ export function buildGraph(facts: MigrationFacts): Graph {
     node.component = route.component;
     node.sharedWith = (rendersOf.get(route.component) ?? 1) - 1;
   });
+
+  /* ── mark what nothing points at ──
+     A card with no incoming edge was reported as "I don't know where this comes from, I looked in the code and
+     couldn't find it" — and it was a real defect underneath (a barrel specifier that failed to resolve). Now
+     that those resolve, the ones left are genuinely ways in, and the card says so rather than leaving the
+     reader to wonder whether it is a bug. */
+  const pointedAt: Set<string> = new Set<string>(
+    edges.filter((e: Edge): boolean => e.kind === 'child' || e.kind === 'loads').map((e: Edge): string => e.to),
+  );
+  for (const node of nodes.values()) {
+    if ((node.kind === 'module' || node.kind === 'route') && !pointedAt.has(node.id)) node.root = true;
+  }
 
   /* ── weight: how many things point at this ── */
   for (const edge of edges) {

@@ -593,6 +593,9 @@ export function setup(): {
 
   /** What a card's header says: the kind, and the count that matters for it. */
   const cardTag = (node: PlacedNode): string => {
+    // "Nothing points here" is worth its own word: a way into the app, or something orphaned. Either way the
+    // reader should not have to wonder whether the card is a bug.
+    if (node.root) return node.kind === 'module' ? 'ROOT MODULE' : 'ROOT ROUTE';
     if (node.kind === 'module') return 'MODULE';
     if (node.kind === 'external') return 'NOT READ';
     if (node.kind === 'component') return 'COMPONENT';
