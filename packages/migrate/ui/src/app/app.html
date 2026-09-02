@@ -182,6 +182,45 @@
       </p>
 
       @if (found().units.length) {
+        <div class="filters">
+          <input
+            class="filter-text"
+            type="search"
+            placeholder="Filter by name or folder"
+            aria-label="Filter projects by name or folder"
+            bind:value={{ query }}
+          />
+          <div class="kinds" role="group" aria-label="Filter by type">
+            <button type="button" class="kind-btn" aria-pressed={{ kind() === 'all' }} on:click={{ () => kind.set('all') }}>
+              All {{ counts().all }}
+            </button>
+            <button type="button" class="kind-btn" aria-pressed={{ kind() === 'application' }} on:click={{ () => kind.set('application') }}>
+              Applications {{ counts().application }}
+            </button>
+            <button type="button" class="kind-btn" aria-pressed={{ kind() === 'library' }} on:click={{ () => kind.set('library') }}>
+              Libraries {{ counts().library }}
+            </button>
+            @if (counts().unstated) {
+              <button type="button" class="kind-btn" aria-pressed={{ kind() === 'unstated' }} on:click={{ () => kind.set('unstated') }}>
+                Unstated {{ counts().unstated }}
+              </button>
+            }
+          </div>
+        </div>
+
+        <div class="bulk">
+          <button type="button" class="linkish" disabled={{ allShownPicked() || !shown().length }} on:click={{ pickShown }}>
+            Select {{ shown().length === counts().all ? 'all' : 'these ' + shown().length }}
+          </button>
+          <button type="button" class="linkish" disabled={{ !picked().length }} on:click={{ clearPicked }}>
+            Clear selection
+          </button>
+          <span class="bulk-count">
+            {{ shown().length }} shown{{ shown().length === counts().all ? '' : ' of ' + counts().all }} ·
+            {{ picked().length }} picked
+          </span>
+        </div>
+
         <div class="tablewrap">
           <table>
             <thead>
@@ -194,7 +233,7 @@
               </tr>
             </thead>
             <tbody>
-              @for (u of found().units; track u.root) {
+              @for (u of shown(); track u.root) {
                 <tr class:picked={{ isPicked(u) }}>
                   <td class="pick">
                     <input
@@ -208,6 +247,10 @@
                   <td><span class="kind" class:unstated={{ u.type === null }}>{{ typeLabel(u) }}</span></td>
                   <td class="declared">{{ u.declaredBy }}</td>
                   <td class="loc">{{ relative(u) }}</td>
+                </tr>
+              } @empty {
+                <tr>
+                  <td colspan="5" class="no-match">Nothing matches that filter.</td>
                 </tr>
               }
             </tbody>

@@ -65,6 +65,13 @@ export function setup(): {
   path: Signal<string>;
   phase: Signal<Phase>;
   session: Signal<Session>;
+  query: Signal<string>;
+  kind: Signal<'all' | 'application' | 'library' | 'unstated'>;
+  shown: Computed<Unit[]>;
+  counts: Computed<{ all: number; application: number; library: number; unstated: number }>;
+  pickShown: () => void;
+  clearPicked: () => void;
+  allShownPicked: Computed<boolean>;
   hint: Computed<'ask' | 'missing' | 'file' | 'markers' | 'bare'>;
   hintMarkers: Computed<string>;
   missingRoutes: Signal<string[]>;
@@ -300,6 +307,51 @@ export function setup(): {
   /** What a folder's markers say, in one short phrase — or nothing, which is also an answer. */
   const markerLabel = (entry: Entry): string => entry.markers.join(' · ');
 
+  /* ── narrowing a long list ──
+     A real workspace answers with 98 or 108 projects, and 105 of the 108 are libraries. Scrolling that to find
+     three applications is not a task anyone should be given, and it is the one thing a terminal could never
+     offer at all. */
+  const query: Signal<string> = signal('');
+  const kind: Signal<'all' | 'application' | 'library' | 'unstated'> = signal<'all' | 'application' | 'library' | 'unstated'>('all');
+
+  /** The units currently on screen — the filters applied, nothing else. */
+  const shown: Computed<Unit[]> = computed<Unit[]>(() => {
+    const q: string = query().trim().toLowerCase();
+    const k: 'all' | 'application' | 'library' | 'unstated' = kind();
+    return found().units.filter((u: Unit): boolean => {
+      if (k === 'unstated' ? u.type !== null : k !== 'all' && u.type !== k) return false;
+      // Match the path as well as the name: in a monorepo the folder is often how you remember a project.
+      return !q || u.name.toLowerCase().includes(q) || u.root.toLowerCase().includes(q);
+    });
+  });
+
+  /** How many of each kind, so the filter buttons say what they will do before you press them. */
+  const counts: Computed<{ all: number; application: number; library: number; unstated: number }> = computed(() => {
+    const units: Unit[] = found().units;
+    return {
+      all: units.length,
+      application: units.filter((u: Unit): boolean => u.type === 'application').length,
+      library: units.filter((u: Unit): boolean => u.type === 'library').length,
+      unstated: units.filter((u: Unit): boolean => u.type === null).length,
+    };
+  });
+
+  /** Pick every unit currently shown — the filter is the selection tool, so this respects it. */
+  const pickShown = (): void => {
+    const roots: string[] = shown().map((u: Unit): string => u.root);
+    picked.set((current: string[]): string[] => [...new Set([...current, ...roots])]);
+  };
+
+  /** Clear the whole selection, including anything a filter is currently hiding — otherwise "clear" lies. */
+  const clearPicked = (): void => {
+    picked.set([]);
+  };
+
+  const allShownPicked: Computed<boolean> = computed<boolean>(() => {
+    const list: Unit[] = shown();
+    return list.length > 0 && list.every((u: Unit): boolean => picked().includes(u.root));
+  });
+
   /** The result, never null — `hasResult()` says whether it means anything yet. */
   const found: Computed<Workspace> = computed<Workspace>(() => workspace() ?? EMPTY);
   const hasResult: Computed<boolean> = computed<boolean>(() => workspace() !== null);
@@ -319,6 +371,13 @@ export function setup(): {
     hasResult,
     session,
     missingRoutes,
+    query,
+    kind,
+    shown,
+    counts,
+    pickShown,
+    clearPicked,
+    allShownPicked,
     hint,
     hintMarkers,
     browsing,
