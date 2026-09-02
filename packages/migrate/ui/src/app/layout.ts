@@ -266,6 +266,34 @@ export function pathThrough(graph: Graph, nodeId: string): Set<string> {
   return out;
 }
 
+/**
+ * Everything reachable from `nodeId` by following what it depends ON — the closure a person means by
+ * "migrate this and everything it needs".
+ *
+ * Follows renders, injects, loads, child and guards in the FORWARD direction only. Backwards would drag in
+ * every route that happens to render the same component, which is the opposite of what was asked: picking a
+ * screen should not silently pick the whole application because one shared service leads back to it.
+ */
+export function dependencyClosure(graph: Graph, nodeId: string): Set<string> {
+  const out: Set<string> = new Set<string>();
+  if (!nodeId) return out;
+
+  const forward: Map<string, string[]> = new Map<string, string[]>();
+  for (const e of graph.edges) forward.set(e.from, [...(forward.get(e.from) ?? []), e.to]);
+
+  const stack: string[] = [nodeId];
+  out.add(nodeId);
+  while (stack.length) {
+    const current: string = stack.pop() as string;
+    for (const next of forward.get(current) ?? []) {
+      if (out.has(next)) continue;
+      out.add(next);
+      stack.push(next);
+    }
+  }
+  return out;
+}
+
 /** The non-structural edges touching one node — what to reveal when it is selected. */
 export function relatedEdges(graph: Graph, nodeId: string): Edge[] {
   return graph.edges.filter(

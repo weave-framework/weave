@@ -295,6 +295,14 @@
           @if (selected()) {
             <Button variant="ghost" class="clear-sel" on:click={{ clearSelection }}>Clear selection</Button>
           }
+          @if (decisionCounts().total) {
+            <span class="tally">
+              <span class="tally-item tally--migrate">{{ decisionCounts().migrate }} migrate</span>
+              <span class="tally-item tally--open">{{ decisionCounts().open }} open</span>
+              <span class="tally-item tally--skip">{{ decisionCounts().skip + decisionCounts().leave }} left out</span>
+              <button type="button" class="linkish" on:click={{ clearDecisions }}>reset</button>
+            </span>
+          }
         </div>
 
         <div class="canvas" ref={{ canvasRef }} on:click={{ onCanvasClick }}>
@@ -329,6 +337,10 @@
                     shared with {{ n.sharedWith }} other route(s)
                   </text>
                 }
+                @if (decisionFor(n.id)) {
+                  <rect class={{ 'decision-strip decision-strip--' + decisionFor(n.id) }}
+                        x={{ n.x }} y={{ n.y + CARD_H - 4 }} width={{ CARD_W }} height="4" />
+                }
                 @if (guardMark(n)) {
                   <text class="card-guards" x={{ n.x + CARD_W - 9 }} y={{ n.y + CARD_H - 8 }}>{{ guardMark(n) }}</text>
                 }
@@ -342,23 +354,59 @@
 
         @if (hasSelection()) {
           <div class="inspector">
-            <h3>{{ sel().label }}</h3>
-            <p class="inspector-meta">
-              {{ sel().kind }}@if (sel().detail) { · {{ sel().detail }} }@if (sel().lazy) { · <b>lazy boundary</b> }
-            </p>
-            @if (selectedLinks().length) {
-              <ul class="links">
-                @for (l2 of selectedLinks(); track l2.dir + l2.kind + l2.label) {
-                  <li><span class="dir">{{ l2.dir }}</span> <span class="link-kind">{{ l2.kind }}</span>
-                    <span class="link-label" class:ext={{ l2.external }}>{{ l2.label }}</span></li>
+            <div class="inspector-head">
+              <div>
+                <h3>{{ sel().label }}</h3>
+                <p class="inspector-meta">
+                  {{ sel().kind }}@if (sel().detail) { · {{ sel().detail }} }@if (sel().lazy) { · <b>lazy boundary</b> }
+                </p>
+              </div>
+              <span class="decision-badge" class:on={{ decisionFor(sel().id) }}>
+                {{ decisionFor(sel().id) || 'not decided' }}
+              </span>
+            </div>
+
+            <div class="actions">
+              @if (sel().kind === 'external') {
+                <Button variant={{ decisionFor(sel().id) === 'open' ? 'primary' : 'outline' }}
+                        on:click={{ () => decide(sel().id, 'open') }}>Open and migrate</Button>
+                <Button variant={{ decisionFor(sel().id) === 'leave' ? 'primary' : 'outline' }}
+                        on:click={{ () => decide(sel().id, 'leave') }}>Leave behind</Button>
+                <span class="action-note">Never read — its calls arrive as TODOs unless you open it.</span>
+              } @else {
+                <Button variant={{ decisionFor(sel().id) === 'migrate' ? 'primary' : 'outline' }}
+                        on:click={{ () => decide(sel().id, 'migrate') }}>Migrate this</Button>
+                <Button variant="outline" on:click={{ () => migrateWithDependencies(sel().id) }}>
+                  Migrate with everything it needs ({{ closureSize(sel().id) }})
+                </Button>
+                <Button variant={{ decisionFor(sel().id) === 'skip' ? 'primary' : 'outline' }}
+                        on:click={{ () => decide(sel().id, 'skip') }}>Leave out</Button>
+              }
+            </div>
+
+            @if (linkGroups().length) {
+              <div class="link-groups">
+                @for (grp of linkGroups(); track grp.title) {
+                  <div class="link-group">
+                    <h4>{{ grp.title }}</h4>
+                    <ul class="links">
+                      @for (item of grp.items; track item.kind + item.id) {
+                        <li>
+                          <span class="link-kind">{{ item.kind }}</span>
+                          <button type="button" class="link-jump" class:ext={{ item.external }}
+                                  on:click={{ () => selected.set(item.id) }}>{{ item.label }}</button>
+                        </li>
+                      }
+                    </ul>
+                  </div>
                 }
-              </ul>
+              </div>
             } @else {
               <p class="inspector-meta">Nothing else connects to this one.</p>
             }
           </div>
         } @else {
-          <p class="inspector-meta">Click a node to see what it uses and what uses it.</p>
+          <p class="inspector-meta">Click a card to see what it needs, what needs it, and to decide what happens to it.</p>
         }
 
         @if (externals().length) {

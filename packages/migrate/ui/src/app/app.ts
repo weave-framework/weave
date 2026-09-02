@@ -4,7 +4,17 @@ import ButtonToggle from '@weave-framework/ui/button-toggle';
 import Checkbox from '@weave-framework/ui/checkbox';
 import Input from '@weave-framework/ui/input';
 import type { Edge, Entry, Graph, GraphNode, Listing, Peek, Unit, Workspace } from '../../../src/types.js';
-import { CARD_H, CARD_HEAD, CARD_W, layout, pathThrough, relatedEdges, type Layout, type PlacedNode } from './layout.js';
+import {
+  CARD_H,
+  CARD_HEAD,
+  CARD_W,
+  dependencyClosure,
+  layout,
+  pathThrough,
+  relatedEdges,
+  type Layout,
+  type PlacedNode,
+} from './layout.js';
 
 // Capitalized tags in the template resolve to these imports. The editor tooling understands that; eslint,
 // running without it, sees three unused bindings — so the repo's convention is to name them here.
@@ -83,6 +93,13 @@ export function setup(): {
   graphError: Signal<string>;
   summary: Signal<Record<string, number | string> | null>;
   selected: Signal<string>;
+  decisions: Signal<Record<string, 'migrate' | 'skip' | 'open' | 'leave'>>;
+  decisionFor: (nodeId: string) => string;
+  decide: (nodeId: string, value: 'migrate' | 'skip' | 'open' | 'leave') => void;
+  migrateWithDependencies: (nodeId: string) => void;
+  closureSize: (nodeId: string) => number;
+  decisionCounts: Computed<{ migrate: number; skip: number; open: number; leave: number; total: number }>;
+  clearDecisions: () => void;
   pick: (nodeId: string) => void;
   clearSelection: () => void;
   onCanvasClick: (event: MouseEvent) => void;
@@ -113,6 +130,7 @@ export function setup(): {
   summaryLine: Computed<string>;
   lazyCount: Computed<number>;
   selectedNode: Computed<PlacedNode | null>;
+  linkGroups: Computed<Array<{ title: string; items: Array<{ label: string; kind: string; external: boolean; id: string }> }>>;
   selectedLinks: Computed<Array<{ dir: 'uses' | 'used by'; kind: string; label: string; external: boolean }>>;
   externals: Computed<PlacedNode[]>;
   query: Signal<string>;
@@ -532,6 +550,40 @@ export function setup(): {
     });
   });
 
+  /**
+   * The selected node's connections, grouped by what the relationship IS.
+   *
+   * A flat list of thirteen lines reading "uses injects X" makes a reader do the grouping in their head. The
+   * question a person actually has is "what does this thing need, and who needs it" — two questions, so two
+   * groups, each with its own count.
+   */
+  const linkGroups: Computed<Array<{ title: string; items: Array<{ label: string; kind: string; external: boolean; id: string }> }>> =
+    computed(() => {
+      const g: Graph | null = graph();
+      const nodeId: string = selected();
+      if (!g || !nodeId) return [];
+
+      const uses: Array<{ label: string; kind: string; external: boolean; id: string }> = [];
+      const usedBy: Array<{ label: string; kind: string; external: boolean; id: string }> = [];
+      for (const e of g.edges) {
+        if (e.from !== nodeId && e.to !== nodeId) continue;
+        const otherId: string = e.from === nodeId ? e.to : e.from;
+        const other: GraphNode | undefined = g.nodes.find((n: GraphNode): boolean => n.id === otherId);
+        if (!other) continue;
+        const item: { label: string; kind: string; external: boolean; id: string } = {
+          label: other.label,
+          kind: e.kind,
+          external: other.kind === 'external',
+          id: other.id,
+        };
+        (e.from === nodeId ? uses : usedBy).push(item);
+      }
+      const groups: Array<{ title: string; items: Array<{ label: string; kind: string; external: boolean; id: string }> }> = [];
+      if (uses.length) groups.push({ title: `Needs ${uses.length}`, items: uses });
+      if (usedBy.length) groups.push({ title: `Needed by ${usedBy.length}`, items: usedBy });
+      return groups;
+    });
+
   /** The heaviest external nodes — the decisions this step exists to collect, ordered by how much rides on them. */
   const externals: Computed<PlacedNode[]> = computed<PlacedNode[]>(() => {
     const l: Layout | null = placed();
@@ -664,6 +716,75 @@ export function setup(): {
     onCleanup((): void => document.removeEventListener('keydown', onKey));
   });
 
+  /* ── decisions ──
+     The graph could be looked at and nothing more. A card is where a person says what happens to the thing it
+     stands for, and what that means depends on whether the walk ever read it:
+
+       read already (routes, modules, components)  →  migrate it, or leave it out
+       never read (an external class or library)    →  open it (read and migrate it), or leave it behind
+
+     Kept in one map keyed by node id, because that is what has to become the file the converter reads: a
+     decision is only useful if it survives the session that made it. */
+  const decisions: Signal<Record<string, 'migrate' | 'skip' | 'open' | 'leave'>> = signal<
+    Record<string, 'migrate' | 'skip' | 'open' | 'leave'>
+  >({});
+
+  const decisionFor = (nodeId: string): string => decisions()[nodeId] ?? '';
+
+  const decide = (nodeId: string, value: 'migrate' | 'skip' | 'open' | 'leave'): void => {
+    decisions.set((current: Record<string, 'migrate' | 'skip' | 'open' | 'leave'>) => {
+      const next: Record<string, 'migrate' | 'skip' | 'open' | 'leave'> = { ...current };
+      // Choosing the same answer again clears it — the same way clicking a selected card deselects it.
+      if (next[nodeId] === value) delete next[nodeId];
+      else next[nodeId] = value;
+      return next;
+    });
+  };
+
+  /**
+   * "Migrate this and everything it needs."
+   *
+   * Marks the forward closure — what this node renders, injects, loads and is guarded by — and marks unread
+   * dependencies as `open`, since they cannot be migrated without being read first. That distinction is the
+   * whole reason the two verbs exist.
+   */
+  const migrateWithDependencies = (nodeId: string): void => {
+    const g: Graph | null = graph();
+    if (!g) return;
+    const closure: Set<string> = dependencyClosure(g, nodeId);
+    decisions.set((current: Record<string, 'migrate' | 'skip' | 'open' | 'leave'>) => {
+      const next: Record<string, 'migrate' | 'skip' | 'open' | 'leave'> = { ...current };
+      for (const nid of closure) {
+        const node: GraphNode | undefined = g.nodes.find((n: GraphNode): boolean => n.id === nid);
+        if (!node) continue;
+        next[nid] = node.kind === 'external' ? 'open' : 'migrate';
+      }
+      return next;
+    });
+  };
+
+  /** How many things this node would pull in — shown on the button, so the click is not a surprise. */
+  const closureSize = (nodeId: string): number => {
+    const g: Graph | null = graph();
+    return g && nodeId ? dependencyClosure(g, nodeId).size : 0;
+  };
+
+  /** A running tally, so the page always says what has been decided so far. */
+  const decisionCounts: Computed<{ migrate: number; skip: number; open: number; leave: number; total: number }> = computed(() => {
+    const all: Array<'migrate' | 'skip' | 'open' | 'leave'> = Object.values(decisions());
+    return {
+      migrate: all.filter((d): boolean => d === 'migrate').length,
+      skip: all.filter((d): boolean => d === 'skip').length,
+      open: all.filter((d): boolean => d === 'open').length,
+      leave: all.filter((d): boolean => d === 'leave').length,
+      total: all.length,
+    };
+  });
+
+  const clearDecisions = (): void => {
+    decisions.set({});
+  };
+
   /** Everything on the selected node's path — lit up, while the rest of the canvas dims. */
   const highlighted: Computed<Set<string>> = computed<Set<string>>(() => {
     const g: Graph | null = graph();
@@ -774,6 +895,13 @@ export function setup(): {
     graphError,
     summary,
     selected,
+    decisions,
+    decisionFor,
+    decide,
+    migrateWithDependencies,
+    closureSize,
+    decisionCounts,
+    clearDecisions,
     pick,
     clearSelection,
     onCanvasClick,
@@ -805,6 +933,7 @@ export function setup(): {
     lazyCount,
     selectedNode,
     selectedLinks,
+    linkGroups,
     externals,
     query,
     setKind,
