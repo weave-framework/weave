@@ -323,7 +323,8 @@
             }
             @for (n of view().nodes; track n.id) {
               <g class="card" class:is-selected={{ selected() === n.id }} class:dim={{ !isLit(n.id) }}
-                 class:kept={{ isKept(n.id) }} on:click={{ () => pick(n.id) }}>
+                 class:kept={{ isKept(n.id) }} class:dropped={{ decisionFor(n.id) === 'skip' || decisionFor(n.id) === 'leave' }}
+                 on:click={{ () => pick(n.id) }} on:dblclick={{ () => expand(n.id) }}>
                 <rect class="card-body" x={{ n.x }} y={{ n.y }} width={{ CARD_W }} height={{ CARD_H }} rx="6" />
                 <path class={{ 'card-head card-head--' + n.kind }} class:lazy={{ n.lazy }}
                       d={{ 'M ' + n.x + ' ' + (n.y + 6) + ' a 6 6 0 0 1 6 -6 h ' + (CARD_W - 12) +
@@ -338,10 +339,14 @@
                     shared with {{ n.sharedWith }} other route(s)
                   </text>
                 }
-                @if (decisionFor(n.id)) {
-                  <rect class={{ 'decision-strip decision-strip--' + decisionFor(n.id) }}
-                        x={{ n.x }} y={{ n.y + CARD_H - 4 }} width={{ CARD_W }} height="4" />
+                @if (isKept(n.id)) {
+                  <text class="card-check" x={{ n.x + CARD_W - 26 }} y={{ n.y + 14 }}>✓</text>
                 }
+                @if (decisionFor(n.id) === 'skip' || decisionFor(n.id) === 'leave') {
+                  <text class="card-check" x={{ n.x + CARD_W - 26 }} y={{ n.y + 14 }}>✕</text>
+                }
+                <text class="card-more" x={{ n.x + CARD_W - 9 }} y={{ n.y + CARD_H - 8 }}
+                      on:click={{ (e: MouseEvent) => expandFrom(e, n.id) }}>⋯</text>
                 @if (guardMark(n)) {
                   <text class="card-guards" x={{ n.x + CARD_W - 9 }} y={{ n.y + CARD_H - 8 }}>{{ guardMark(n) }}</text>
                 }
@@ -350,12 +355,12 @@
                 }
               </g>
             }
-            @if (hasSelection()) {
+            @if (hasExpanded()) {
               <foreignObject x={{ expandedX() }} y={{ expandedY() }} width={{ EXPANDED_W }} height={{ EXPANDED_H }}>
                 <div class="expanded" on:click={{ stopClick }}>
                   <div class={{ 'expanded-head expanded-head--' + sel().kind }}>
                     <span class="expanded-tag">{{ cardTag(sel()) }}</span>
-                    <button type="button" class="expanded-close" aria-label="Close" on:click={{ clearSelection }}>✕</button>
+                    <button type="button" class="expanded-close" aria-label="Close" on:click={{ collapse }}>✕</button>
                   </div>
 
                   <h3 class="expanded-title">{{ sel().label }}</h3>

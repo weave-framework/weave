@@ -969,11 +969,29 @@ td.loc {
   color: var(--red);
 }
 
-/* A decision belongs on the card too — the panel is where you make it, the canvas is where you see it. */
-.decision-strip--migrate { fill: var(--green); }
-.decision-strip--open { fill: var(--accent); }
-.decision-strip--skip,
-.decision-strip--leave { fill: var(--muted); }
+/* ── one decision mark, not three ──
+   A card had a coloured header for its KIND, a green outline for being kept and a differently-coloured strip
+   for which kind of keeping — three colours in three places on one card, reported as looking like a Christmas
+   tree, and rightly. The header keeps saying what the thing IS; a single tick says what was decided about it. */
+.card-check {
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 700;
+  fill: #fff;
+  text-anchor: end;
+  pointer-events: none;
+}
+/* The way into the opened card, for anyone who does not think of double-clicking. */
+.card-more {
+  font-family: var(--sans);
+  font-size: 15px;
+  fill: var(--muted);
+  text-anchor: end;
+  cursor: pointer;
+}
+.card:hover .card-more {
+  fill: var(--accent);
+}
 
 .tally {
   display: inline-flex;
@@ -1143,4 +1161,11 @@ td.loc {
 .card.kept .card-body {
   stroke: var(--green);
   stroke-width: 2;
+}
+/* Left out reads as left out: it recedes rather than gaining a colour of its own. */
+.card.dropped {
+  opacity: 0.5;
+}
+.card.dropped .card-body {
+  stroke-dasharray: 4 3;
 }

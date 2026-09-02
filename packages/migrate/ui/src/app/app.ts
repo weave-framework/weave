@@ -102,6 +102,11 @@ export function setup(): {
   clearDecisions: () => void;
   pick: (nodeId: string) => void;
   clearSelection: () => void;
+  expanded: Signal<string>;
+  expand: (nodeId: string) => void;
+  expandFrom: (event: MouseEvent, nodeId: string) => void;
+  collapse: () => void;
+  hasExpanded: Computed<boolean>;
   onCanvasClick: (event: MouseEvent) => void;
   zoom: Signal<number>;
   zoomIn: () => void;
@@ -613,10 +618,43 @@ export function setup(): {
    */
   const pick = (nodeId: string): void => {
     selected.set(selected() === nodeId ? '' : nodeId);
+    // Selecting a different card while one is open moves the open card too; selecting nothing closes it.
+    if (expanded() && expanded() !== nodeId) expanded.set('');
+  };
+
+  /**
+   * Which card is opened, kept apart from which card is SELECTED.
+   *
+   * Reported: a single click began opening the panel immediately, and there was no longer a way to just look at
+   * what a card connects to. One click selects and lights the path; opening is a second, deliberate act —
+   * double-click, or the ⋯ on the card.
+   */
+  const expanded: Signal<string> = signal('');
+
+  const expand = (nodeId: string): void => {
+    selected.set(nodeId);
+    expanded.set(nodeId);
+  };
+
+  const collapse = (): void => {
+    expanded.set('');
+  };
+
+  /**
+   * Open from the ⋯ without the click also reaching the card underneath.
+   *
+   * It does reach it otherwise, and `pick` toggles: clicking ⋯ on an already-selected card deselected it, which
+   * closed the very panel the ⋯ had just opened. Stopping the event here is the only place that ordering can be
+   * controlled, since the card's own handler runs afterwards either way.
+   */
+  const expandFrom = (event: MouseEvent, nodeId: string): void => {
+    event.stopPropagation();
+    expand(nodeId);
   };
 
   const clearSelection = (): void => {
     selected.set('');
+    expanded.set('');
   };
 
   /**
@@ -717,7 +755,10 @@ export function setup(): {
   // on it would never fire.
   effect((): void => {
     const onKey = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') clearSelection();
+      if (e.key !== 'Escape') return;
+      // Escape closes the card first, and only clears the selection when nothing is open — one step at a time.
+      if (expanded()) collapse();
+      else clearSelection();
     };
     document.addEventListener('keydown', onKey);
     onCleanup((): void => document.removeEventListener('keydown', onKey));
@@ -908,6 +949,8 @@ export function setup(): {
     () => selectedNode() ?? { id: '', kind: 'module', label: '', detail: '', weight: 0, x: 0, y: 0, r: 0, level: 0 },
   );
   const hasSelection: Computed<boolean> = computed<boolean>(() => selectedNode() !== null);
+  /** Is a card open? Separate from selection, which only lights a path. */
+  const hasExpanded: Computed<boolean> = computed<boolean>(() => expanded() !== '' && selectedNode() !== null);
   const summaryLine: Computed<string> = computed<string>(() => {
     const sm: Record<string, number | string> | null = summary();
     return sm ? `${sm.files} files · ${sm.components} components · ${sm.routes} routes` : '';
@@ -948,6 +991,11 @@ export function setup(): {
     clearDecisions,
     pick,
     clearSelection,
+    expanded,
+    expand,
+    expandFrom,
+    collapse,
+    hasExpanded,
     onCanvasClick,
     zoom,
     zoomIn,
