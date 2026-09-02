@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "projects": {
+    "complete": { "root": "projects/complete", "projectType": "library" },
+    "filename": { "root": "projects/filename", "projectType": "library" },
+    "harness": { "root": "projects/harness", "projectType": "application" }
+  }
+}

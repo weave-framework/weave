@@ -120,13 +120,22 @@ function packageJsonUnit(dir: string): Unit | null {
   return { name: raw?.name ?? basename(dir), root: dir, type: null, declaredBy: 'package.json' };
 }
 
-/** An `angular.json` sitting directly in `dir`, describing this one project. */
-function angularJsonUnit(dir: string): Unit | null {
-  if (!existsSync(join(dir, 'angular.json'))) return null;
+/**
+ * The units an `angular.json` in `dir` declares — however many that is.
+ *
+ * A folder holding an `angular.json` is not automatically ONE project. Measured on a real repository
+ * (`tk-integration-ui-common-main`), five of its component folders each declare 2-4 libraries in their own
+ * `angular.json`, with roots like `projects/complete` and `projects/filename`. Treating such a folder as a single
+ * unit collapsed 13 real projects into 5, and threw away every name and type with them — including two marked
+ * `application`, which a reader would very likely choose NOT to migrate.
+ *
+ * When the file exists but declares nothing, the folder is still an Angular project — with an unstated type,
+ * because "there is an angular.json here" says nothing about whether this is an app or a library.
+ */
+function angularJsonUnitsAt(dir: string): Unit[] {
+  if (!existsSync(join(dir, 'angular.json'))) return [];
   const declared: Unit[] = angularJsonUnits(dir);
-  // A single-project `angular.json` describes THIS folder; a multi-project one is a workspace, handled by the caller.
-  if (declared.length === 1) return { ...declared[0], root: dir };
-  return declared.length ? null : { name: basename(dir), root: dir, type: 'application', declaredBy: 'angular.json' };
+  return declared.length ? declared : [{ name: basename(dir), root: dir, type: null, declaredBy: 'angular.json' }];
 }
 
 /**
@@ -158,11 +167,17 @@ function basename(dir: string): string {
 }
 
 /**
- * Is `dir` itself a unit? Checked in declaration-strength order: an `angular.json` describes a project outright,
- * a `project.json` names and types it, and a `package.json` depending on Angular is the weakest but real signal.
+ * What does `dir` itself declare? Zero, one, or several units.
+ *
+ * Checked in declaration-strength order: an `angular.json` describes its projects outright (and may describe
+ * MANY), a `project.json` names and types one, and a `package.json` depending on Angular is the weakest but real
+ * signal — it is how Nx identifies a workspace member with no `project.json` of its own.
  */
-export function unitAt(dir: string): Unit | null {
-  return angularJsonUnit(dir) ?? projectJsonUnit(dir) ?? packageJsonUnit(dir);
+export function unitsAt(dir: string): Unit[] {
+  const fromAngular: Unit[] = angularJsonUnitsAt(dir);
+  if (fromAngular.length) return fromAngular;
+  const one: Unit | null = projectJsonUnit(dir) ?? packageJsonUnit(dir);
+  return one ? [one] : [];
 }
 
 /**
@@ -175,9 +190,9 @@ export function findUnits(root: string, maxDepth: number = MAX_DEPTH): Unit[] {
   const walk = (dir: string, depth: number): void => {
     if (depth > maxDepth) return;
     if (depth >= 1) {
-      const unit: Unit | null = unitAt(dir);
-      if (unit) {
-        found.push(unit);
+      const units: Unit[] = unitsAt(dir);
+      if (units.length) {
+        found.push(...units);
         return;
       }
     }

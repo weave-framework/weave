@@ -13,7 +13,7 @@ export {
   findUnits,
   inspect,
   readSignals,
-  unitAt,
+  unitsAt,
   type DeclaredBy,
   type Signal,
   type Unit,

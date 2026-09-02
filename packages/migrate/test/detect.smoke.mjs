@@ -64,6 +64,22 @@ ok(names(untyped)[0] === 'thing', 'untyped: the Nx Angular project is found by n
 ok(untyped.units[0]?.type === null, 'untyped: a missing projectType reads as null, never as "application"');
 ok(untyped.units[0]?.declaredBy === 'project.json', 'untyped: declared by project.json');
 
+/* ── one folder, several projects — found on a REAL repository, not imagined here.
+   In tk-integration-ui-common-main, five component folders each declare 2-4 libraries in their own
+   angular.json, with roots like projects/complete. Collapsing such a folder into one unit lost 13 real
+   projects behind 5 entries, every name and type with them. The package.json beside it must NOT win. */
+const multi = d.inspect(join(fx, 'multi'));
+ok(multi.units.length === 3, `multi: one folder declaring 3 projects yields 3 units (got ${multi.units.length})`);
+ok(names(multi).join(',') === 'complete,filename,harness', `multi: each carries its own name (got ${names(multi).join(',')})`);
+const byMulti = Object.fromEntries(multi.units.map((u) => [u.name, u]));
+ok(byMulti.harness?.type === 'application', 'multi: the one marked application keeps that type — it is the one you may not want');
+ok(byMulti.complete?.type === 'library', 'multi: the libraries keep theirs');
+ok(!names(multi).includes('@tie/component.dialog'), 'multi: the sibling package.json does not stand in for the projects');
+ok(
+  new Set(multi.units.map((u) => u.root)).size === 3,
+  'multi: the three units are three different folders, not three names for one',
+);
+
 /* ── regression: everything the old walk found must still be found, now with names and types ── */
 const mono = d.inspect(nxMono);
 ok(names(mono).join(',') === 'admin,shop,ui', `nx-mono: still finds admin, shop and ui (got ${names(mono).join(',')})`);
@@ -75,7 +91,7 @@ ok(!names(mono).includes('secondary'), 'nx-mono: the non-Angular @nx/js library 
 /* ── the root is never a unit, however Angular-looking its own package.json is ──
    npm-ws's root declares @angular/core, the way a real monorepo root does. Asked about directly it answers
    "yes, a unit"; the walk must still never offer it, or the whole repository becomes a migration target. */
-ok(d.unitAt(join(fx, 'npm-ws')) !== null, 'a monorepo root LOOKS like a unit when asked directly');
+ok(d.unitsAt(join(fx, 'npm-ws')).length === 1, 'a monorepo root LOOKS like a unit when asked directly');
 ok(
   !d.findUnits(join(fx, 'npm-ws')).some((u) => u.root === join(fx, 'npm-ws')),
   'the walk never offers the root itself as a migration target',
