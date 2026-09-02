@@ -259,6 +259,8 @@ jobs:
         run: pnpm verify:detect
       - name: migrate service
         run: pnpm verify:migrate-server
+      - name: migrate UI
+        run: pnpm verify:migrate-ui
       - name: Nx plugin
         run: pnpm verify:nx
       - name: TypeScript plugin

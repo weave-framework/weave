@@ -1,0 +1,57 @@
+/* Global stylesheet: design tokens, reset and the page ground.
+ *
+ * These live here rather than beside the component because component styles are SCOPED to the elements that
+ * component renders — `:root` and `body` are not among them, and Weave says so at build time rather than
+ * letting the rules compile into selectors that match nothing.
+ */
+
+/* Tokens lifted from the docs site (docs/src/styles/_tokens.scss) so the tool reads as part of Weave. */
+:root {
+  color-scheme: light;
+  --bg: #ffffff;
+  --bg-soft: #f7f8fa;
+  --surface: #f1f3f6;
+  --raised: #ffffff;
+  --code-bg: #f6f8fa;
+  --fg: #1a1f29;
+  --fg-soft: #3a424f;
+  --muted: #687180;
+  --border: #e2e6ec;
+  --field-line: #828b9a;
+  --accent: #1373b0;
+  --green: #69be46;
+  --red: #d2051e;
+  --mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+  --sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --bg: #0f1115;
+    --bg-soft: #14171d;
+    --surface: #181c23;
+    --raised: #1e242e;
+    --code-bg: #0c0e12;
+    --fg: #e7ebf0;
+    --fg-soft: #c2c9d2;
+    --muted: #8b94a3;
+    --border: #272d38;
+    --field-line: #646d7d;
+    --accent: #1e8cd2;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg-soft);
+  color: var(--fg);
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.55;
+}
+

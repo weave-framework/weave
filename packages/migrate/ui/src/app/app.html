@@ -1,0 +1,125 @@
+<main class="shell">
+  <header class="banner">
+    <h1>weave migrate</h1>
+    <span class="note">Reads your source app. Never writes to it.</span>
+  </header>
+
+  <ol class="steps" aria-label="Progress">
+    <li aria-current="step">What to migrate</li>
+    <li>What to open</li>
+    <li>Decisions</li>
+    <li>Review</li>
+  </ol>
+
+  <section>
+    <h2>Migrate from</h2>
+    <div class="sources">
+      <button type="button" class="source" aria-pressed="true">
+        <span class="name">Angular</span>
+        <span class="state">Supported</span>
+      </button>
+      <button type="button" class="source" disabled>
+        <span class="name">React</span>
+        <span class="state">Not built yet</span>
+      </button>
+      <button type="button" class="source" disabled>
+        <span class="name">Vue</span>
+        <span class="state">Not built yet</span>
+      </button>
+    </div>
+  </section>
+
+  <section>
+    <h2>Source</h2>
+    <form class="finder" on:submit|preventDefault={{ scan }}>
+      <input
+        class="path"
+        type="text"
+        placeholder="Path to your Angular project"
+        aria-label="Path to your Angular project"
+        bind:value={{ path }}
+      />
+      <button type="submit" class="go" disabled={{ phase() === 'scanning' || !path().trim() }}>
+        {{ phase() === 'scanning' ? 'Scanning…' : 'Scan' }}
+      </button>
+    </form>
+
+    @if (phase() === 'scanning') {
+      <p class="scanning" role="status">
+        <span class="spinner" aria-hidden="true"></span>
+        Walking directories — a large workspace takes a few seconds.
+      </p>
+    }
+
+    @if (phase() === 'failed') {
+      <p class="failed" role="alert">{{ error() }}</p>
+    }
+
+    @if (hasResult()) {
+      <div class="signals">
+        @for (s of found().signals; track s.file) {
+          <span class="sig" class:found={{ s.found }}>{{ s.file }}</span>
+        }
+      </div>
+      <p class="verdict">
+        Scanned {{ found().scannedDepth }} levels deep, skipping <code>node_modules</code>. Took {{ elapsed() }} ms.
+      </p>
+    }
+  </section>
+
+  @if (hasResult()) {
+    <section>
+      <h2>What to migrate</h2>
+      <p class="lede">
+        Pick what you already know you want. Everything it depends on is resolved in the next step — you do not
+        have to find it yourself.
+      </p>
+
+      @if (found().units.length) {
+        <div class="tablewrap">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col"><span class="sr-only">Pick</span></th>
+                <th scope="col">Project</th>
+                <th scope="col">Type</th>
+                <th scope="col">Declared by</th>
+                <th scope="col">Location</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (u of found().units; track u.root) {
+                <tr class:picked={{ isPicked(u) }}>
+                  <td class="pick">
+                    <input
+                      type="checkbox"
+                      .checked={{ isPicked(u) }}
+                      on:change={{ () => toggle(u) }}
+                      aria-label={{ 'Migrate ' + u.name }}
+                    />
+                  </td>
+                  <td class="unit">{{ u.name }}</td>
+                  <td><span class="kind" class:unstated={{ u.type === null }}>{{ typeLabel(u) }}</span></td>
+                  <td class="declared">{{ u.declaredBy }}</td>
+                  <td class="loc">{{ relative(u) }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+
+        <div class="foot">
+          <p>{{ found().units.length }} project(s) found in {{ found().root }}</p>
+          <button type="button" class="go" disabled={{ picked().length === 0 }}>
+            {{ picked().length === 0 ? 'Pick at least one' : 'Continue with ' + picked().length + ' project(s)' }}
+          </button>
+        </div>
+      } @else {
+        <p class="empty">
+          No Angular projects here. That is an answer, not a failure — this may simply not be an Angular
+          repository, or the projects may sit deeper than {{ found().scannedDepth }} levels.
+        </p>
+      }
+    </section>
+  }
+</main>
