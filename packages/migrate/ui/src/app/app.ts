@@ -4,7 +4,7 @@ import ButtonToggle from '@weave-framework/ui/button-toggle';
 import Checkbox from '@weave-framework/ui/checkbox';
 import Input from '@weave-framework/ui/input';
 import type { Edge, Entry, Graph, GraphNode, Listing, Peek, Unit, Workspace } from '../../../src/types.js';
-import { layout, relatedEdges, type Layout, type PlacedNode } from './layout.js';
+import { CARD_H, CARD_HEAD, CARD_W, layout, pathThrough, relatedEdges, type Layout, type PlacedNode } from './layout.js';
 
 // Capitalized tags in the template resolve to these imports. The editor tooling understands that; eslint,
 // running without it, sees three unused bindings — so the repo's convention is to name them here.
@@ -85,6 +85,14 @@ export function setup(): {
   selected: Signal<string>;
   analyseSelection: () => void;
   placed: Computed<Layout | null>;
+  highlighted: Computed<Set<string>>;
+  isLit: (nodeId: string) => boolean;
+  edgeLit: (from: string, to: string) => boolean;
+  cardTag: (node: PlacedNode) => string;
+  cardTitle: (node: PlacedNode) => string;
+  CARD_W: number;
+  CARD_H: number;
+  CARD_HEAD: number;
   view: Computed<Layout>;
   hasGraph: Computed<boolean>;
   sel: Computed<PlacedNode>;
@@ -524,6 +532,43 @@ export function setup(): {
       .map((n): PlacedNode => ({ ...n, x: 0, y: 0, r: 0, level: 0 }));
   });
 
+  /** Everything on the selected node's path — lit up, while the rest of the canvas dims. */
+  const highlighted: Computed<Set<string>> = computed<Set<string>>(() => {
+    const g: Graph | null = graph();
+    const id: string = selected();
+    return g && id ? pathThrough(g, id) : new Set<string>();
+  });
+
+  /** Is this node on the lit path? With nothing selected everything is lit, so the canvas reads normally. */
+  const isLit = (nodeId: string): boolean => {
+    const set: Set<string> = highlighted();
+    return set.size === 0 || set.has(nodeId);
+  };
+
+  /** Is this edge on the lit path? Both ends must be, or a line would glow into the dark. */
+  const edgeLit = (from: string, to: string): boolean => {
+    const set: Set<string> = highlighted();
+    return set.size === 0 || (set.has(from) && set.has(to));
+  };
+
+  /**
+   * A card's title, trimmed to what actually fits.
+   *
+   * SVG text has no overflow handling — it simply runs on, straight across the next card. At 11.5px in a
+   * monospace face roughly 21 characters fit inside a 168px card, and `administration.application-settings` is
+   * thirty-four. The full name stays reachable in the tooltip and the inspector.
+   */
+  const cardTitle = (node: PlacedNode): string => (node.label.length > 21 ? `${node.label.slice(0, 20)}…` : node.label);
+
+  /** What a card's header says: the kind, and the count that matters for it. */
+  const cardTag = (node: PlacedNode): string => {
+    if (node.kind === 'module') return 'MODULE';
+    if (node.kind === 'external') return 'NOT READ';
+    if (node.kind === 'component') return 'COMPONENT';
+    if (node.kind === 'service') return 'SERVICE';
+    return node.lazy ? 'LAZY ROUTE' : 'ROUTE';
+  };
+
   /* Non-null projections, for the same reason as `found`: `@if (x; as y)` does not narrow under `weave check`,
      and its alias binds only on the leading branch. Named states read better than working around both. */
   const EMPTY_LAYOUT: Layout = { nodes: [], edges: [], width: 0, height: 0 };
@@ -566,6 +611,14 @@ export function setup(): {
     selected,
     analyseSelection,
     placed,
+    highlighted,
+    isLit,
+    edgeLit,
+    cardTag,
+    cardTitle,
+    CARD_W,
+    CARD_H,
+    CARD_HEAD,
     view,
     hasGraph,
     sel,

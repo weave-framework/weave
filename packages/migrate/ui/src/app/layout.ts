@@ -38,21 +38,28 @@ export interface Layout {
   height: number;
 }
 
-/** Horizontal distance between depth levels. */
-const LEVEL_GAP: number = 260;
+/** Card size. Nodes are cards, not dots: a dot needs a label beside it, and labels beside dots collide with
+ *  the very edges they sit among. Text inside a card cannot collide with anything. */
+export const CARD_W: number = 168;
+export const CARD_H: number = 58;
+/** Height of the coloured header strip that carries the node's kind and identifier. */
+export const CARD_HEAD: number = 20;
+
+/** Horizontal distance between depth levels — a card's width plus room for the edges between columns. */
+const LEVEL_GAP: number = 300;
 /** Vertical distance between siblings. */
-const ROW_GAP: number = 34;
+const ROW_GAP: number = 76;
 /** Left/top padding. The first version used 40 and the top row sat against the frame with no air above it. */
 const PAD: number = 64;
 
 /** Room kept to the right of the last column, so a long label has somewhere to go instead of being clipped. */
-const LABEL_ROOM: number = 220;
+const LABEL_ROOM: number = CARD_W + 80;
 
 /** Smallest vertical gap between two nodes in the same column, so nothing hides behind anything. */
-const MIN_SEPARATION: number = 22;
+const MIN_SEPARATION: number = CARD_H + 14;
 
 /** Where guards and other unread classes are parked: one column past everything else. */
-const SIDE_GAP: number = 200;
+const SIDE_GAP: number = 260;
 
 /** Radius for a node: a gentle curve, so a weight of 35 is bigger than 1 without being thirty-five times bigger. */
 function radius(weight: number): number {
@@ -168,7 +175,7 @@ export function layout(graph: Graph): Layout {
     placed.set(gid, {
       ...node,
       x: rightmost + SIDE_GAP,
-      y: PAD + i * (ROW_GAP + 8),
+      y: PAD + i * (CARD_H + 22),
       r: radius(node.weight),
       level: -1,
     });
@@ -183,8 +190,47 @@ export function layout(graph: Graph): Layout {
   }
 
   const width: number = Math.max(...nodes.map((n: PlacedNode): number => n.x), 0) + LABEL_ROOM;
-  const height: number = Math.max(...nodes.map((n: PlacedNode): number => n.y), 0) + PAD;
+  const height: number = Math.max(...nodes.map((n: PlacedNode): number => n.y), 0) + CARD_H + PAD;
   return { nodes, edges, width, height };
+}
+
+/**
+ * Every node on the path through `nodeId`: what leads to it, and everything it leads to.
+ *
+ * Selecting a card should light up its route, not just the card — that is the difference between "here is a
+ * node" and "here is how this part of the app is reached". Walks both directions over the structural edges.
+ */
+export function pathThrough(graph: Graph, nodeId: string): Set<string> {
+  const out: Set<string> = new Set<string>([nodeId]);
+  if (!nodeId) return out;
+
+  const forward: Map<string, string[]> = new Map<string, string[]>();
+  const backward: Map<string, string[]> = new Map<string, string[]>();
+  for (const e of graph.edges) {
+    if (e.kind !== 'child' && e.kind !== 'loads') continue;
+    forward.set(e.from, [...(forward.get(e.from) ?? []), e.to]);
+    backward.set(e.to, [...(backward.get(e.to) ?? []), e.from]);
+  }
+
+  const walk = (start: string, map: Map<string, string[]>): void => {
+    const stack: string[] = [start];
+    while (stack.length) {
+      const current: string = stack.pop() as string;
+      for (const next of map.get(current) ?? []) {
+        if (out.has(next)) continue;
+        out.add(next);
+        stack.push(next);
+      }
+    }
+  };
+  walk(nodeId, forward);
+  walk(nodeId, backward);
+
+  // Guards hang off the selected node itself rather than off its path — they are why it can be entered.
+  for (const e of graph.edges) {
+    if (e.kind === 'guards' && e.from === nodeId) out.add(e.to);
+  }
+  return out;
 }
 
 /** The non-structural edges touching one node — what to reveal when it is selected. */

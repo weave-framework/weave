@@ -281,17 +281,40 @@
       }
 
       @if (hasGraph()) {
+        <ul class="legend">
+          <li><span class="swatch swatch--module"></span>module</li>
+          <li><span class="swatch swatch--route"></span>route</li>
+          <li><span class="swatch swatch--component"></span>component</li>
+          <li><span class="swatch swatch--service"></span>service</li>
+          <li><span class="swatch swatch--external"></span>not read yet — a class the code uses that the walk never opened</li>
+          <li><span class="swatch swatch--cut"></span>lazy boundary</li>
+        </ul>
+
         <div class="canvas">
           <svg viewBox={{ '0 0 ' + view().width + ' ' + view().height }} width={{ view().width }} height={{ view().height }} role="img"
                aria-label="Route tree with lazy boundaries">
+            <!-- Edges first, so every one of them runs UNDER the cards rather than across their text. -->
             @for (e of view().edges; track e.from + '>' + e.to) {
-              <line class="edge" class:cut={{ e.kind === 'loads' }} class:guard={{ e.kind === 'guards' }}
-                    x1={{ e.x1 }} y1={{ e.y1 }} x2={{ e.x2 }} y2={{ e.y2 }} />
+              <path class="edge" class:cut={{ e.kind === 'loads' }} class:guard={{ e.kind === 'guards' }}
+                    class:dim={{ !edgeLit(e.from, e.to) }}
+                    d={{ 'M ' + (e.x1 + CARD_W) + ' ' + (e.y1 + CARD_H / 2) +
+                         ' C ' + (e.x1 + CARD_W + 60) + ' ' + (e.y1 + CARD_H / 2) +
+                         ', ' + (e.x2 - 60) + ' ' + (e.y2 + CARD_H / 2) +
+                         ', ' + e.x2 + ' ' + (e.y2 + CARD_H / 2) }} />
             }
             @for (n of view().nodes; track n.id) {
-              <g class="node" class:is-selected={{ selected() === n.id }} on:click={{ () => selected.set(n.id) }}>
-                <circle class={{ 'dot dot--' + n.kind }} class:lazy={{ n.lazy }} cx={{ n.x }} cy={{ n.y }} r={{ n.r }} />
-                <text class="node-label" x={{ n.x + n.r + 6 }} y={{ n.y + 4 }}>{{ n.label }}</text>
+              <g class="card" class:is-selected={{ selected() === n.id }} class:dim={{ !isLit(n.id) }}
+                 on:click={{ () => selected.set(n.id) }}>
+                <rect class="card-body" x={{ n.x }} y={{ n.y }} width={{ CARD_W }} height={{ CARD_H }} rx="6" />
+                <path class={{ 'card-head card-head--' + n.kind }} class:lazy={{ n.lazy }}
+                      d={{ 'M ' + n.x + ' ' + (n.y + 6) + ' a 6 6 0 0 1 6 -6 h ' + (CARD_W - 12) +
+                           ' a 6 6 0 0 1 6 6 v ' + (CARD_HEAD - 6) + ' h ' + (-CARD_W) + ' z' }} />
+                <text class="card-tag" x={{ n.x + 9 }} y={{ n.y + 14 }}>{{ cardTag(n) }}</text>
+                <text class="card-title" x={{ n.x + 9 }} y={{ n.y + CARD_HEAD + 20 }}>{{ cardTitle(n) }}</text>
+                <title>{{ n.label }}{{ n.detail ? ' — ' + n.detail : '' }}</title>
+                @if (n.weight) {
+                  <text class="card-weight" x={{ n.x + CARD_W - 9 }} y={{ n.y + 14 }}>{{ n.weight }}</text>
+                }
               </g>
             }
           </svg>
