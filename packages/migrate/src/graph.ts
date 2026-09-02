@@ -53,10 +53,30 @@ function resolveLazy(route: RouteFact, files: string[]): string | null {
   );
 }
 
-/** A readable label for a route: its path, or a name for the two paths that have none. */
+/**
+ * The module a routes file stands for.
+ *
+ * `src/app/app-modules/login/index.ts` is the login module; naming the node after the file made it read as a
+ * file, which is not what a lazy route points at. An `index.ts` takes its folder's name, anything else keeps
+ * its own basename — `documents.module.ts` is already saying which module it is.
+ */
+function moduleName(file: string, root: string): string {
+  const rel: string = shortPath(file, root);
+  const parts: string[] = rel.split('/').filter(Boolean);
+  const base: string = (parts[parts.length - 1] ?? rel).replace(/\.ts$/, '');
+  if (base !== 'index') return base.replace(/\.module$/, '');
+  return parts[parts.length - 2] ?? base;
+}
+
+/**
+ * A readable label for a route.
+ *
+ * A bare `/` for `path: ''` was unreadable on a canvas: dozens of lone slashes saying nothing about which route
+ * they were. Angular's two nameless paths get named for what they DO, which is what a reader is looking for.
+ */
 function routeLabel(route: RouteFact): string {
-  if (route.path === '') return '/';
-  if (route.path === '**') return '(not found)';
+  if (route.path === '') return route.redirectTo ? '(redirect)' : '(default)';
+  if (route.path === '**') return '(fallback)';
   return route.path ?? '(no path)';
 }
 
@@ -88,8 +108,10 @@ export function buildGraph(facts: MigrationFacts): Graph {
     add({
       id: id('module', file),
       kind: 'module',
-      label: shortPath(file, root),
-      detail: `${facts.routes.filter((r: RouteFact): boolean => r.file === file).length} route(s)`,
+      label: moduleName(file, root),
+      // The path belongs in the detail line: a lazy route points at a MODULE, and `index.ts` is only where that
+      // module happens to live. Labelling nodes with the filename made every one of them read as a file.
+      detail: `${facts.routes.filter((r: RouteFact): boolean => r.file === file).length} route(s) · ${shortPath(file, root)}`,
       weight: 0,
       lazy: false,
     });

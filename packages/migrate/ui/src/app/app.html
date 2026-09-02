@@ -1,4 +1,4 @@
-<main class="shell">
+<main class="shell" class:wide={{ step() === 2 }}>
   <header class="banner">
     <h1>weave migrate</h1>
     <span class="note">Reads your source app. Never writes to it.</span>
@@ -28,13 +28,17 @@
   }
 
   @if (session() === 'ok' || session() === 'unknown') {
-  <ol class="steps" aria-label="Progress">
-    <li aria-current="step">What to migrate</li>
-    <li>What to open</li>
-    <li>Decisions</li>
-    <li>Review</li>
-  </ol>
+  <nav class="steps" aria-label="Progress">
+    <button type="button" class="step" aria-current={{ step() === 1 ? 'step' : 'false' }} on:click={{ () => step.set(1) }}>
+      <span class="step-no">1</span> What to migrate
+    </button>
+    <button type="button" class="step" aria-current={{ step() === 2 ? 'step' : 'false' }} disabled={{ !hasGraph() && !analysing() }}
+            on:click={{ () => step.set(2) }}>
+      <span class="step-no">2</span> What it depends on
+    </button>
+  </nav>
 
+  @if (step() === 1) {
   <section>
     <h2>Migrate from</h2>
     <ButtonToggle
@@ -253,7 +257,9 @@
     </section>
   }
 
-  @if (analysing() || graphError() || placed()) {
+  }
+
+  @if (step() === 2) {
     <section class="graph-section">
       <h2>What it depends on</h2>
 
@@ -279,7 +285,7 @@
           <svg viewBox={{ '0 0 ' + view().width + ' ' + view().height }} width={{ view().width }} height={{ view().height }} role="img"
                aria-label="Route tree with lazy boundaries">
             @for (e of view().edges; track e.from + '>' + e.to) {
-              <line class="edge" class:cut={{ e.kind === 'loads' }}
+              <line class="edge" class:cut={{ e.kind === 'loads' }} class:guard={{ e.kind === 'guards' }}
                     x1={{ e.x1 }} y1={{ e.y1 }} x2={{ e.x2 }} y2={{ e.y2 }} />
             }
             @for (n of view().nodes; track n.id) {

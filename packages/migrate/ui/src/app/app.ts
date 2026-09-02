@@ -77,6 +77,7 @@ export function setup(): {
   path: Signal<string>;
   phase: Signal<Phase>;
   session: Signal<Session>;
+  step: Signal<1 | 2>;
   analysing: Signal<boolean>;
   pickedLabel: Computed<string>;
   graphError: Signal<string>;
@@ -128,6 +129,12 @@ export function setup(): {
   relative: (unit: Unit) => string;
   typeLabel: (unit: Unit) => string;
 } {
+  /**
+   * Which step is on screen. A wizard shows one step at a time — stacking them made the page grow without end
+   * and squeezed the canvas into a column meant for prose.
+   */
+  const step: Signal<1 | 2> = signal<1 | 2>(1);
+
   const path: Signal<string> = signal('');
   // `@if (workspace(); as found)` would read better, but `weave check` emits the alias as a SECOND call inside
   // the if — `if (workspace()) { const found = (workspace()); }` — and TypeScript never narrows a call result,
@@ -428,6 +435,7 @@ export function setup(): {
   const selected: Signal<string> = signal('');
 
   const analyse = (target: string): void => {
+    step.set(2);
     analysing.set(true);
     graphError.set('');
     graph.set(null);
@@ -550,6 +558,7 @@ export function setup(): {
     hasResult,
     session,
     missingRoutes,
+    step,
     analysing,
     pickedLabel,
     graphError,
