@@ -10,7 +10,7 @@
 import { build as esbuild } from 'esbuild';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -149,6 +149,41 @@ try {
 
   const sessionDenied = await api('/api/session');
   ok(sessionDenied.status === 403, `/api/session refuses with no token and no cookie (got ${sessionDenied.status})`);
+
+  /* ── browsing: the picker has to be ours, because no browser will hand a server a real path ── */
+  const roots = await (await api(`/api/browse?token=${server.token}`)).json();
+  ok(roots.path === '', 'no path asks for the filesystem roots, and that is not an error');
+  ok(roots.parent === null, 'the roots listing has no parent to go up to');
+  ok(roots.entries.length > 0, `the roots listing offers somewhere to start (got ${roots.entries.length})`);
+  ok(Array.isArray(roots.shortcuts) && roots.shortcuts.length > 0, 'shortcuts come with every listing');
+
+  const inFixtures = await (await api(`/api/browse?token=${server.token}&path=${encodeURIComponent(fx)}`)).json();
+  const names = inFixtures.entries.map((e) => e.name).sort();
+  ok(names.includes('multi') && names.includes('npm-ws'), `the fixture folders are listed (got ${names.join(',')})`);
+  ok(inFixtures.parent !== null, 'a folder below the root can go up');
+
+  const npmWs = inFixtures.entries.find((e) => e.name === 'npm-ws');
+  ok(npmWs?.markers.includes('nx.json'), `markers are visible while choosing (got ${npmWs?.markers.join(',')})`);
+  ok(npmWs?.markers.includes('package.json'), 'and more than one of them');
+
+  const pnpmWs = inFixtures.entries.find((e) => e.name === 'pnpm-ws');
+  ok(pnpmWs?.markers.includes('pnpm-workspace.yaml'), 'including the pnpm marker the old detection never knew');
+
+  // node_modules and dot-folders are never a migration target, and in a real repo they are most of a listing.
+  // They cannot be committed as fixtures, so the test makes them.
+  const noisy = mkdtempSync(join(tmpdir(), 'weave-migrate-noise-'));
+  for (const d of ['node_modules', '.git', 'src', 'libs']) mkdirSync(join(noisy, d));
+  writeFileSync(join(noisy, 'a-file.txt'), 'not a folder', 'utf8');
+  const listed = await (await api(`/api/browse?token=${server.token}&path=${encodeURIComponent(noisy)}`)).json();
+  const listedNames = listed.entries.map((e) => e.name).sort();
+  ok(listedNames.join(',') === 'libs,src', `node_modules, dot-folders and files are all left out (got ${listedNames.join(',')})`);
+  rmSync(noisy, { recursive: true, force: true });
+
+  const nowhere = await api(`/api/browse?token=${server.token}&path=${encodeURIComponent(join(fx, 'nope'))}`);
+  ok(nowhere.status === 404, `browsing a folder that is not there is a 404 (got ${nowhere.status})`);
+
+  const browseNoToken = await api('/api/browse');
+  ok(browseNoToken.status === 403, `browsing needs the token like everything else (got ${browseNoToken.status})`);
 
   /* ── bound to loopback, so the network cannot reach it at all ── */
   ok(server.url.startsWith('http://127.0.0.1:'), 'the printed URL is loopback, not a hostname that could resolve outward');

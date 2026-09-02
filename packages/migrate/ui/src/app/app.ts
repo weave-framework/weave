@@ -1,5 +1,5 @@
 import { computed, signal, type Computed, type Signal } from '@weave-framework/runtime';
-import type { Unit, Workspace } from '../../../src/detect.js';
+import type { Entry, Listing, Unit, Workspace } from '../../../src/types.js';
 
 /** What the screen is doing. `scanning` is the only state that makes the reader wait. */
 export type Phase = 'idle' | 'scanning' | 'done' | 'failed';
@@ -18,10 +18,13 @@ function urlToken(): string {
   return new URLSearchParams(location.search).get('token') ?? '';
 }
 
-/** Build an API URL, carrying the token only while it is still in ours. */
-function apiUrl(path: string): string {
+/** Build an API URL, carrying the token only while it is still in ours, plus any query the caller needs. */
+function apiUrl(path: string, query: Record<string, string> = {}): string {
+  const params: URLSearchParams = new URLSearchParams(query);
   const t: string = urlToken();
-  return t ? `${path}?token=${encodeURIComponent(t)}` : path;
+  if (t) params.set('token', t);
+  const qs: string = params.toString();
+  return qs ? `${path}?${qs}` : path;
 }
 
 /** Drop the token from the address bar once the cookie holds it — a URL with a key in it gets pasted. */
@@ -31,6 +34,23 @@ function tidyAddressBar(): void {
   history.replaceState(null, '', clean);
 }
 
+/** Where recently used paths are kept. Per browser, per artifact origin — never sent anywhere. */
+const RECENT_KEY: string = 'weave-migrate-recent';
+const RECENT_MAX: number = 6;
+
+/** Read the recent list, tolerating a storage that throws (private windows, blocked site data) or holds junk. */
+function readRecent(): string[] {
+  try {
+    const raw: unknown = JSON.parse(localStorage.getItem(RECENT_KEY) ?? '[]');
+    return Array.isArray(raw) ? raw.filter((x: unknown): x is string => typeof x === 'string').slice(0, RECENT_MAX) : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Empty listing, so the template never handles null here either. */
+const NO_LISTING: Listing = { path: '', parent: null, entries: [], shortcuts: [] };
+
 /** Stand-in for "nothing scanned yet", so the template never handles null. */
 const EMPTY: Workspace = { root: '', signals: [], units: [], scannedDepth: 0 };
 
@@ -38,6 +58,16 @@ export function setup(): {
   path: Signal<string>;
   phase: Signal<Phase>;
   session: Signal<Session>;
+  browsing: Signal<boolean>;
+  listing: Signal<Listing>;
+  listingError: Signal<string>;
+  recent: Signal<string[]>;
+  openBrowser: () => void;
+  closeBrowser: () => void;
+  goTo: (target: string) => void;
+  goUp: () => void;
+  useFolder: (target: string) => void;
+  markerLabel: (entry: Entry) => string;
   found: Computed<Workspace>;
   hasResult: Computed<boolean>;
   error: Signal<string>;
@@ -132,9 +162,93 @@ export function setup(): {
       session.set('denied');
     });
 
+  /* ── the folder picker ──
+     A browser will not hand a server a real path — `showDirectoryPicker()` returns a handle identified only by
+     NAME, and `<input webkitdirectory>` gives paths relative to whatever was chosen. So the picker is ours,
+     reading the filesystem through the service. It costs a panel and buys something a native dialog cannot
+     give: the markers are visible while choosing, so you see where the Angular projects are before scanning. */
+  const browsing: Signal<boolean> = signal(false);
+  const listing: Signal<Listing> = signal<Listing>(NO_LISTING);
+  const listingError: Signal<string> = signal('');
+  const recent: Signal<string[]> = signal<string[]>(readRecent());
+
+  const goTo = (target: string): void => {
+    listingError.set('');
+    void fetch(apiUrl('/api/browse', { path: target }))
+      .then(async (res: Response): Promise<void> => {
+        const body: unknown = await res.json();
+        if (!res.ok) {
+          listingError.set(String((body as { error?: string }).error ?? `could not read that folder (${res.status})`));
+          return;
+        }
+        listing.set(body as Listing);
+      })
+      .catch((e: unknown): void => {
+        listingError.set(e instanceof Error ? e.message : String(e));
+      });
+  };
+
+  const openBrowser = (): void => {
+    browsing.set(true);
+    // Open where the typed path already points, so the picker continues the thought instead of restarting it.
+    goTo(path().trim());
+  };
+
+  const closeBrowser = (): void => {
+    browsing.set(false);
+  };
+
+  /** Up one level, or back to the roots when there is no parent — never a button that does nothing. */
+  const goUp = (): void => {
+    goTo(listing().parent ?? '');
+  };
+
+  /** Take this folder as the source, remember it, and scan straight away — the click already said "this one". */
+  const useFolder = (target: string): void => {
+    path.set(target);
+    browsing.set(false);
+    recent.set((current: string[]): string[] => {
+      const next: string[] = [target, ...current.filter((p: string): boolean => p !== target)].slice(0, RECENT_MAX);
+      try {
+        localStorage.setItem(RECENT_KEY, JSON.stringify(next));
+      } catch {
+        /* a browser that refuses storage still gets a working picker — it just will not remember */
+      }
+      return next;
+    });
+    scan();
+  };
+
+  /** What a folder's markers say, in one short phrase — or nothing, which is also an answer. */
+  const markerLabel = (entry: Entry): string => entry.markers.join(' · ');
+
   /** The result, never null — `hasResult()` says whether it means anything yet. */
   const found: Computed<Workspace> = computed<Workspace>(() => workspace() ?? EMPTY);
   const hasResult: Computed<boolean> = computed<boolean>(() => workspace() !== null);
 
-  return { path, phase, error, elapsed, picked, scan, toggle, isPicked, relative, typeLabel, found, hasResult, session };
+  return {
+    path,
+    phase,
+    error,
+    elapsed,
+    picked,
+    scan,
+    toggle,
+    isPicked,
+    relative,
+    typeLabel,
+    found,
+    hasResult,
+    session,
+    browsing,
+    listing,
+    listingError,
+    recent,
+    openBrowser,
+    closeBrowser,
+    goTo,
+    goUp,
+    useFolder,
+    markerLabel,
+  };
 }

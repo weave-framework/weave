@@ -51,10 +51,66 @@
         aria-label="Path to your Angular project"
         bind:value={{ path }}
       />
+      <button type="button" class="browse" on:click={{ openBrowser }}>Browse…</button>
       <button type="submit" class="go" disabled={{ phase() === 'scanning' || !path().trim() }}>
         {{ phase() === 'scanning' ? 'Scanning…' : 'Scan' }}
       </button>
     </form>
+
+    @if (recent().length && !browsing()) {
+      <div class="recent">
+        <span class="recent-label">Recent</span>
+        @for (r of recent(); track r) {
+          <button type="button" class="chip" on:click={{ () => useFolder(r) }}>{{ r }}</button>
+        }
+      </div>
+    }
+
+    @if (browsing()) {
+      <div class="picker">
+        <div class="picker-bar">
+          <button type="button" class="up" on:click={{ goUp }}>↑ Up</button>
+          <code class="here">{{ listing().path || 'This computer' }}</code>
+          <button type="button" class="close" on:click={{ closeBrowser }} aria-label="Close the folder picker">✕</button>
+        </div>
+
+        @if (listing().shortcuts.length) {
+          <div class="shortcuts">
+            @for (sc of listing().shortcuts; track sc.path) {
+              <button type="button" class="chip" on:click={{ () => goTo(sc.path) }}>{{ sc.name }}</button>
+            }
+          </div>
+        }
+
+        @if (listingError()) {
+          <p class="failed" role="alert">{{ listingError() }}</p>
+        }
+
+        <ul class="folders">
+          @for (e of listing().entries; track e.path) {
+            <li>
+              <button type="button" class="folder" on:click={{ () => goTo(e.path) }}>
+                <span class="folder-name">{{ e.name }}</span>
+                @if (e.markers.length) {
+                  <span class="folder-markers">{{ markerLabel(e) }}</span>
+                }
+              </button>
+              <button type="button" class="use" on:click={{ () => useFolder(e.path) }}>Use</button>
+            </li>
+          } @empty {
+            <li class="folder-empty">No sub-folders here.</li>
+          }
+        </ul>
+
+        @if (listing().path) {
+          <div class="picker-foot">
+            <button type="button" class="go" on:click={{ () => useFolder(listing().path) }}>
+              Use this folder
+            </button>
+          </div>
+        }
+      </div>
+    }
 
     @if (phase() === 'scanning') {
       <p class="scanning" role="status">

@@ -18,43 +18,7 @@
 
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-
-/** Project kinds a workspace can declare. `null` means no file said. */
-export type UnitType = 'application' | 'library' | null;
-
-/** Which file declared a unit — shown in the UI so the reader knows where the name and type came from. */
-export type DeclaredBy = 'angular.json' | 'project.json' | 'package.json';
-
-/** One migratable project: an application or a library. A service or component lives inside one. */
-export interface Unit {
-  /** The project's declared name, or its folder name when nothing declares one. */
-  name: string;
-  /** Absolute path to the project root. */
-  root: string;
-  /** What the workspace says this is. `null` when unstated — never guessed. */
-  type: UnitType;
-  /** The file this unit was read from. */
-  declaredBy: DeclaredBy;
-}
-
-/** A workspace marker at the root: present or not. Both halves matter — an absence is information too. */
-export interface Signal {
-  /** The file or folder looked for, exactly as it appears on disk. */
-  file: string;
-  found: boolean;
-}
-
-/** Everything the first screen needs about a source repository. */
-export interface Workspace {
-  /** Absolute path that was inspected. */
-  root: string;
-  /** Every marker looked for, in a fixed order, found or not. */
-  signals: Signal[];
-  /** The migratable projects found inside, sorted by path. */
-  units: Unit[];
-  /** How deep the directory walk went — the UI says this, because a deeper project is not reported. */
-  scannedDepth: number;
-}
+import type { Signal, Unit, UnitType, Workspace } from './types.js';
 
 /** How deep to walk looking for units. A found unit is a leaf; the walk does not descend into it. */
 export const MAX_DEPTH: number = 5;
@@ -229,3 +193,5 @@ export function inspect(dir: string): Workspace {
   const units: Unit[] = declared.length > 1 ? declared : findUnits(root);
   return { root, signals, units, scannedDepth: MAX_DEPTH };
 }
+
+export type { DeclaredBy, Signal, Unit, UnitType, Workspace } from './types.js';

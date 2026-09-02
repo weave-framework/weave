@@ -23,6 +23,7 @@ import { randomBytes } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { extname, isAbsolute, join, relative, sep } from 'node:path';
+import { browse, type Listing } from './browse.js';
 import { inspect, type Workspace } from './detect.js';
 
 /** A running migration service. */
@@ -286,6 +287,25 @@ export async function serve(options: ServeOptions = {}): Promise<MigrateServer> 
     // cannot read it. Reaching here at all is the answer.
     if (url.pathname === '/api/session') {
       json(res, 200, { ok: true });
+      return;
+    }
+
+    if (url.pathname === '/api/browse' && req.method === 'GET') {
+      // An empty `path` is not an error here — it is the request for the filesystem roots, which is where the
+      // picker opens.
+      const at: string = url.searchParams.get('path') ?? '';
+      if (at && !existsSync(at)) {
+        json(res, 404, { error: `nothing at ${at}` });
+        return;
+      }
+      try {
+        const listing: Listing = browse(at);
+        json(res, 200, listing);
+      } catch (e: unknown) {
+        // A folder can exist and still refuse to be read — a permission wall, a disconnected network drive.
+        // That is a fact about that folder, not a broken service, so it answers 403 and says which one.
+        json(res, 403, { error: `cannot read ${at || 'the filesystem roots'}: ${e instanceof Error ? e.message : String(e)}` });
+      }
       return;
     }
 
