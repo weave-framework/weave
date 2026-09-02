@@ -92,6 +92,7 @@ export function setup(): {
   zoomReset: () => void;
   zoomFit: () => void;
   zoomLabel: Computed<string>;
+  canvasRef: (el: HTMLElement) => void;
   analyseSelection: () => void;
   placed: Computed<Layout | null>;
   highlighted: Computed<Set<string>>;
@@ -591,7 +592,7 @@ export function setup(): {
 
   /** Scale that fits the whole drawing across the canvas element, so "everything at once" is one click. */
   const zoomFit = (): void => {
-    const host: Element | null = document.querySelector('.canvas');
+    const host: HTMLElement | null = canvasEl();
     const width: number = placed()?.width ?? 0;
     if (!host || !width) return;
     const available: number = host.clientWidth - 24;
@@ -599,6 +600,59 @@ export function setup(): {
   };
 
   const zoomLabel: Computed<string> = computed<string>(() => `${Math.round(zoom() * 100)}%`);
+
+  /**
+   * The scrolling box around the canvas — needed to keep a point still while the scale changes.
+   *
+   * A signal, not a plain variable: the effect below runs when `setup` does, long before the canvas exists (it
+   * only appears after an analysis). A plain variable was still null at that moment, the effect returned, and
+   * nothing ever re-ran it — the wheel listener was never attached at all.
+   */
+  const canvasEl: Signal<HTMLElement | null> = signal<HTMLElement | null>(null);
+  const canvasRef = (el: HTMLElement): void => {
+    canvasEl.set(el);
+  };
+
+  /**
+   * Ctrl/⌘ + wheel zooms the graph instead of the browser.
+   *
+   * `preventDefault` needs a non-passive listener, which a `on:wheel` binding cannot promise — so it is attached
+   * by hand. Without it the browser's own page zoom wins and the canvas never sees the gesture.
+   *
+   * The point under the cursor stays under the cursor: scale alone would slide the drawing out from under the
+   * hand, which is exactly the moment a zoom stops feeling like zoom.
+   */
+  effect((): void => {
+    const host: HTMLElement | null = canvasEl();
+    if (!host) return;
+
+    const onWheel = (event: WheelEvent): void => {
+      if (!event.ctrlKey && !event.metaKey) return; // a plain wheel is still a scroll
+      event.preventDefault();
+
+      const before: number = zoom();
+      const factor: number = event.deltaY < 0 ? 1.12 : 1 / 1.12;
+      const after: number = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round(before * factor * 100) / 100));
+      if (after === before) return;
+
+      const box: DOMRect = host.getBoundingClientRect();
+      const pointerX: number = event.clientX - box.left;
+      const pointerY: number = event.clientY - box.top;
+      // Where the cursor is in the drawing's own coordinates, which do not change with scale.
+      const contentX: number = (host.scrollLeft + pointerX) / before;
+      const contentY: number = (host.scrollTop + pointerY) / before;
+
+      zoom.set(after);
+      // After the new size renders, put the same content point back under the cursor.
+      requestAnimationFrame((): void => {
+        host.scrollLeft = contentX * after - pointerX;
+        host.scrollTop = contentY * after - pointerY;
+      });
+    };
+
+    host.addEventListener('wheel', onWheel, { passive: false });
+    onCleanup((): void => host.removeEventListener('wheel', onWheel));
+  });
 
   // Escape clears the selection wherever focus happens to be — the canvas is not focusable, so a key handler
   // on it would never fire.
@@ -729,6 +783,7 @@ export function setup(): {
     zoomReset,
     zoomFit,
     zoomLabel,
+    canvasRef,
     analyseSelection,
     placed,
     highlighted,

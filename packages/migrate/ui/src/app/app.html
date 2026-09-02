@@ -291,12 +291,13 @@
           <Button variant="outline" label="Zoom in" on:click={{ zoomIn }}>+</Button>
           <Button variant="ghost" on:click={{ zoomFit }}>Fit</Button>
           <Button variant="ghost" on:click={{ zoomReset }}>100%</Button>
+          <span class="zoom-hint">Ctrl + scroll to zoom</span>
           @if (selected()) {
             <Button variant="ghost" class="clear-sel" on:click={{ clearSelection }}>Clear selection</Button>
           }
         </div>
 
-        <div class="canvas" on:click={{ onCanvasClick }}>
+        <div class="canvas" ref={{ canvasRef }} on:click={{ onCanvasClick }}>
           <svg viewBox={{ '0 0 ' + view().width + ' ' + view().height }}
                width={{ Math.round(view().width * zoom()) }} height={{ Math.round(view().height * zoom()) }}
                role="img" aria-label="Route tree with lazy boundaries">
