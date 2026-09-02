@@ -25,6 +25,7 @@
     "verify:ssg": "node packages/cli/test/ssg.smoke.mjs",
     "verify:migrate": "node packages/cli/test/migrate.smoke.mjs",
     "verify:detect": "node packages/migrate/test/detect.smoke.mjs",
+    "verify:migrate-server": "node packages/migrate/test/server.smoke.mjs",
     "verify:resume": "node tools/verify-resume.mjs",
     "verify:demo": "node tools/verify-demo.mjs",
     "verify:prose": "node tools/verify-prose.mjs",

@@ -20,3 +20,5 @@ export {
   type UnitType,
   type Workspace,
 } from './detect.js';
+
+export { serve, type MigrateServer, type ServeOptions } from './server.js';
