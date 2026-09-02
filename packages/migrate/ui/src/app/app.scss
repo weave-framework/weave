@@ -828,3 +828,21 @@ td.loc {
 .edge.hidden {
   display: none;
 }
+
+.canvas-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin: 0.875rem 0 0.5rem;
+}
+.zoom-level {
+  font-family: var(--mono);
+  font-size: 0.78125rem;
+  color: var(--muted);
+  min-width: 3rem;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.canvas-bar .clear-sel {
+  margin-left: auto;
+}

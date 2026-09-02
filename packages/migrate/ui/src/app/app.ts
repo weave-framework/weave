@@ -1,4 +1,4 @@
-import { computed, debounced, effect, signal, type Computed, type Signal } from '@weave-framework/runtime';
+import { computed, debounced, effect, onCleanup, signal, type Computed, type Signal } from '@weave-framework/runtime';
 import Button from '@weave-framework/ui/button';
 import ButtonToggle from '@weave-framework/ui/button-toggle';
 import Checkbox from '@weave-framework/ui/checkbox';
@@ -83,6 +83,15 @@ export function setup(): {
   graphError: Signal<string>;
   summary: Signal<Record<string, number | string> | null>;
   selected: Signal<string>;
+  pick: (nodeId: string) => void;
+  clearSelection: () => void;
+  onCanvasClick: (event: MouseEvent) => void;
+  zoom: Signal<number>;
+  zoomIn: () => void;
+  zoomOut: () => void;
+  zoomReset: () => void;
+  zoomFit: () => void;
+  zoomLabel: Computed<string>;
   analyseSelection: () => void;
   placed: Computed<Layout | null>;
   highlighted: Computed<Set<string>>;
@@ -535,6 +544,72 @@ export function setup(): {
       .map((n): PlacedNode => ({ ...n, x: 0, y: 0, r: 0, level: 0 }));
   });
 
+  /**
+   * Select a card, or clear it by clicking the one already selected.
+   *
+   * Reported: once something was picked there was no way back to the whole picture — every click only moved the
+   * selection, never removed it. A click on the same card now clears; so does Escape, and so does the canvas
+   * background.
+   */
+  const pick = (nodeId: string): void => {
+    selected.set(selected() === nodeId ? '' : nodeId);
+  };
+
+  const clearSelection = (): void => {
+    selected.set('');
+  };
+
+  /**
+   * A click on empty canvas clears; a click that landed on a card does not.
+   *
+   * Decided by asking the event where it landed rather than by stopping propagation on the card: `|stop` on an
+   * SVG `<g>` did not keep this handler from firing, and the selection was cleared in the same tick it was
+   * made — the card looked unclickable. Reading `target` cannot be undone by anything upstream.
+   */
+  const onCanvasClick = (event: MouseEvent): void => {
+    const target: Element | null = event.target as Element | null;
+    if (target?.closest('.card')) return;
+    clearSelection();
+  };
+
+  /* ── zoom ──
+     A real app draws 2000x4000 of canvas. Scrolling that at 1:1 to find one card is not looking at a graph, it
+     is looking through a keyhole. The viewBox stays fixed and the rendered size scales, so scrolling keeps
+     working normally at every level and nothing is re-laid-out. */
+  const zoom: Signal<number> = signal(1);
+  const ZOOM_MIN: number = 0.25;
+  const ZOOM_MAX: number = 2;
+
+  const zoomBy = (factor: number): void => {
+    zoom.set((z: number): number => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round(z * factor * 100) / 100)));
+  };
+  const zoomIn = (): void => zoomBy(1.25);
+  const zoomOut = (): void => zoomBy(0.8);
+  const zoomReset = (): void => {
+    zoom.set(1);
+  };
+
+  /** Scale that fits the whole drawing across the canvas element, so "everything at once" is one click. */
+  const zoomFit = (): void => {
+    const host: Element | null = document.querySelector('.canvas');
+    const width: number = placed()?.width ?? 0;
+    if (!host || !width) return;
+    const available: number = host.clientWidth - 24;
+    zoom.set(Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round((available / width) * 100) / 100)));
+  };
+
+  const zoomLabel: Computed<string> = computed<string>(() => `${Math.round(zoom() * 100)}%`);
+
+  // Escape clears the selection wherever focus happens to be — the canvas is not focusable, so a key handler
+  // on it would never fire.
+  effect((): void => {
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') clearSelection();
+    };
+    document.addEventListener('keydown', onKey);
+    onCleanup((): void => document.removeEventListener('keydown', onKey));
+  });
+
   /** Everything on the selected node's path — lit up, while the rest of the canvas dims. */
   const highlighted: Computed<Set<string>> = computed<Set<string>>(() => {
     const g: Graph | null = graph();
@@ -645,6 +720,15 @@ export function setup(): {
     graphError,
     summary,
     selected,
+    pick,
+    clearSelection,
+    onCanvasClick,
+    zoom,
+    zoomIn,
+    zoomOut,
+    zoomReset,
+    zoomFit,
+    zoomLabel,
     analyseSelection,
     placed,
     highlighted,

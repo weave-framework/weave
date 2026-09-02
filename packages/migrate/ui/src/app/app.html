@@ -285,9 +285,21 @@
           <li><span class="mark">⛨2</span>guarded — select the card to see which</li>
         </ul>
 
-        <div class="canvas">
-          <svg viewBox={{ '0 0 ' + view().width + ' ' + view().height }} width={{ view().width }} height={{ view().height }} role="img"
-               aria-label="Route tree with lazy boundaries">
+        <div class="canvas-bar">
+          <Button variant="outline" label="Zoom out" on:click={{ zoomOut }}>−</Button>
+          <span class="zoom-level">{{ zoomLabel() }}</span>
+          <Button variant="outline" label="Zoom in" on:click={{ zoomIn }}>+</Button>
+          <Button variant="ghost" on:click={{ zoomFit }}>Fit</Button>
+          <Button variant="ghost" on:click={{ zoomReset }}>100%</Button>
+          @if (selected()) {
+            <Button variant="ghost" class="clear-sel" on:click={{ clearSelection }}>Clear selection</Button>
+          }
+        </div>
+
+        <div class="canvas" on:click={{ onCanvasClick }}>
+          <svg viewBox={{ '0 0 ' + view().width + ' ' + view().height }}
+               width={{ Math.round(view().width * zoom()) }} height={{ Math.round(view().height * zoom()) }}
+               role="img" aria-label="Route tree with lazy boundaries">
             <!-- Edges first, so every one of them runs UNDER the cards rather than across their text. -->
             @for (e of view().edges; track e.from + '>' + e.to) {
               <path class="edge" class:cut={{ e.kind === 'loads' }} class:guard={{ e.kind === 'guards' }}
@@ -300,7 +312,7 @@
             }
             @for (n of view().nodes; track n.id) {
               <g class="card" class:is-selected={{ selected() === n.id }} class:dim={{ !isLit(n.id) }}
-                 on:click={{ () => selected.set(n.id) }}>
+                 on:click={{ () => pick(n.id) }}>
                 <rect class="card-body" x={{ n.x }} y={{ n.y }} width={{ CARD_W }} height={{ CARD_H }} rx="6" />
                 <path class={{ 'card-head card-head--' + n.kind }} class:lazy={{ n.lazy }}
                       d={{ 'M ' + n.x + ' ' + (n.y + 6) + ' a 6 6 0 0 1 6 -6 h ' + (CARD_W - 12) +
