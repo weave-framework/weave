@@ -257,11 +257,19 @@
     <section class="graph-section">
       <h2>What it depends on</h2>
 
-      @if (analysing() && !hasGraph()) {
-        <p class="scanning" role="status">
-          <span class="spinner" aria-hidden="true"></span>
-          Reading every file the entry point reaches — a real app takes a second or two.
-        </p>
+      @if (analysing()) {
+        <div class="progress" role="status">
+          <div class="progress-track">
+            <div class="progress-fill" style:width={{ progressPercent() + '%' }}></div>
+          </div>
+          <p class="progress-text">
+            {{ progressLine() || 'Reading the entry point…' }}
+          </p>
+          <p class="progress-note">
+            Every library inside your workspace is read now, so nothing surprises you later. Packages from npm
+            are carried over as dependencies and never read.
+          </p>
+        </div>
       }
 
       @if (graphError()) {
@@ -295,24 +303,10 @@
           @if (selected()) {
             <Button variant="ghost" class="clear-sel" on:click={{ clearSelection }}>Clear selection</Button>
           }
-          @if (analysing() && hasGraph()) {
-            <span class="reading" role="status">
-              <span class="spinner" aria-hidden="true"></span>
-              Reading{{ pendingOpens().length ? ' ' + pendingOpens().length + ' more' : '' }}…
-            </span>
-          } @else if (pendingOpens().length) {
-            <span class="reading" role="status">
-              <span class="spinner" aria-hidden="true"></span>
-              About to read {{ pendingOpens().length }}…
-            </span>
-          }
-          @if (openedLibs().length) {
-            <span class="opened-count">{{ openedLibs().length }} opened</span>
-          }
+
           @if (decisionCounts().total) {
             <span class="tally">
               <span class="tally-item tally--migrate">{{ decisionCounts().migrate }} migrate</span>
-              <span class="tally-item tally--open">{{ decisionCounts().open }} open</span>
               <span class="tally-item tally--skip">{{ decisionCounts().skip + decisionCounts().leave }} left out</span>
               <button type="button" class="linkish" on:click={{ clearDecisions }}>reset</button>
             </span>
@@ -385,27 +379,14 @@
                   <div class="expanded-actions">
                     @if (sel().kind === 'external') {
                       @if (sel().library) {
-                        <label class="tick">
-                          <input type="checkbox" .checked={{ decisionFor(sel().id) === 'open' }}
-                                 on:change={{ () => decide(sel().id, 'open') }} />
-                          Open and migrate
-                        </label>
-                      }
-                      <label class="tick">
-                        <input type="checkbox" .checked={{ decisionFor(sel().id) === 'leave' }}
-                               on:change={{ () => decide(sel().id, 'leave') }} />
-                        Leave behind
-                      </label>
-                      @if (sel().library) {
                         <p class="expanded-note">
-                          Not read yet, so its own dependencies are unknown. Ticking reads
-                          <code>{{ sel().library }}</code> and draws what it finds — tick several and they are
-                          read together.
+                          Comes from <code>{{ sel().library }}</code>, which is outside your workspace — it is
+                          carried over as a dependency, not migrated, so there is nothing to decide here.
                         </p>
                       } @else {
                         <p class="expanded-note">
-                          An injected type with no definition in reach — there is no library to open, so its
-                          calls will arrive as TODOs.
+                          An injected type with no definition anywhere in reach. Its calls will arrive as TODOs
+                          with the original code beside them.
                         </p>
                       }
                     } @else {

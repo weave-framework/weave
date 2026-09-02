@@ -89,19 +89,19 @@ export function setup(): {
   session: Signal<Session>;
   step: Signal<1 | 2>;
   analysing: Signal<boolean>;
+  progress: Signal<{ done: number; total: number; reading: string } | null>;
+  progressLine: Computed<string>;
+  progressPercent: Computed<number>;
   pickedLabel: Computed<string>;
   graphError: Signal<string>;
   summary: Signal<Record<string, number | string> | null>;
   selected: Signal<string>;
-  decisions: Signal<Record<string, 'migrate' | 'skip' | 'open' | 'leave'>>;
-  openedLibs: Signal<string[]>;
-  pendingOpens: Computed<string[]>;
-  openMarked: () => void;
+  decisions: Signal<Record<string, 'migrate' | 'skip' | 'leave'>>;
   decisionFor: (nodeId: string) => string;
-  decide: (nodeId: string, value: 'migrate' | 'skip' | 'open' | 'leave') => void;
+  decide: (nodeId: string, value: 'migrate' | 'skip' | 'leave') => void;
   migrateWithDependencies: (nodeId: string) => void;
   closureSize: (nodeId: string) => number;
-  decisionCounts: Computed<{ migrate: number; skip: number; open: number; leave: number; total: number }>;
+  decisionCounts: Computed<{ migrate: number; skip: number; leave: number; total: number }>;
   clearDecisions: () => void;
   pick: (nodeId: string) => void;
   clearSelection: () => void;
@@ -488,11 +488,35 @@ export function setup(): {
   const summary: Signal<Record<string, number | string> | null> = signal<Record<string, number | string> | null>(null);
   const selected: Signal<string> = signal('');
 
-  /** Libraries the reader chose to open. Each one widens the next analysis. */
-  const openedLibs: Signal<string[]> = signal<string[]>([]);
   /** The path last analysed, so re-opening can re-run against the same unit. */
   const analysedPath: Signal<string> = signal('');
 
+  /** How far the read has got: `{done, total, reading}`, or null when nothing is running. */
+  const progress: Signal<{ done: number; total: number; reading: string } | null> = signal<{
+    done: number;
+    total: number;
+    reading: string;
+  } | null>(null);
+
+  const progressLine: Computed<string> = computed<string>(() => {
+    const p: { done: number; total: number; reading: string } | null = progress();
+    if (!p) return '';
+    return `Reading ${p.done + 1} of ${p.total} · ${p.reading}`;
+  });
+
+  const progressPercent: Computed<number> = computed<number>(() => {
+    const p: { done: number; total: number; reading: string } | null = progress();
+    return p && p.total ? Math.round((p.done / p.total) * 100) : 0;
+  });
+
+  /**
+   * Analyse a project, reading every workspace library it reaches.
+   *
+   * One wait instead of a session of them. Marking things to open, and the whole question of what to open, is
+   * gone: the local code is read up front, npm packages are carried over untouched, and the graph is complete
+   * before anyone is asked to decide anything. That was the point of the report — a decision should not be able
+   * to surprise you with a hundred files you never saw.
+   */
   const analyse = (target: string, keepView: boolean = false): void => {
     analysedPath.set(target);
     step.set(2);
@@ -507,24 +531,32 @@ export function setup(): {
     }
     const host: HTMLElement | null = canvasEl();
     const keepScroll: { x: number; y: number } | null = keepView && host ? { x: host.scrollLeft, y: host.scrollTop } : null;
-    void fetch(apiUrl('/api/analyze'), {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ path: target, open: openedLibs() }),
-    })
-      .then(async (res: Response): Promise<void> => {
-        const body: unknown = await res.json();
-        analysing.set(false);
-        if (!res.ok) {
-          graphError.set(String((body as { error?: string }).error ?? `analysis failed (${res.status})`));
-          return;
-        }
-        const payload: { graph: Graph; summary: Record<string, number | string> } = body as {
-          graph: Graph;
-          summary: Record<string, number | string>;
-        };
-        graph.set(payload.graph);
-        summary.set(payload.summary);
+    progress.set(null);
+    const source: EventSource = new EventSource(apiUrl('/api/analyze-stream', { path: target }));
+
+    const finish = (): void => {
+      source.close();
+      analysing.set(false);
+      progress.set(null);
+    };
+
+    source.addEventListener('progress', (event: MessageEvent): void => {
+      progress.set(JSON.parse(event.data) as { done: number; total: number; reading: string });
+    });
+
+    source.addEventListener('failed', (event: MessageEvent): void => {
+      graphError.set(String((JSON.parse(event.data) as { error?: string }).error ?? 'analysis failed'));
+      finish();
+    });
+
+    source.addEventListener('done', (event: MessageEvent): void => {
+      const payload: { graph: Graph; summary: Record<string, number | string> } = JSON.parse(event.data) as {
+        graph: Graph;
+        summary: Record<string, number | string>;
+      };
+      finish();
+      graph.set(payload.graph);
+      summary.set(payload.summary);
         // Put the view back exactly where it was — a widened graph is the same drawing with more in it, and
         // being thrown back to the top left after every open is most of what made this unusable.
         if (keepScroll) {
@@ -535,11 +567,14 @@ export function setup(): {
             el.scrollTop = keepScroll.y;
           });
         }
-      })
-      .catch((e: unknown): void => {
-        analysing.set(false);
-        graphError.set(e instanceof Error ? e.message : String(e));
-      });
+    });
+
+    // A stream that dies without a `done` is still a failure the reader has to see.
+    source.addEventListener('error', (): void => {
+      if (!analysing()) return;
+      graphError.set('the connection to the migration service dropped mid-analysis');
+      finish();
+    });
   };
 
   /** Just the folder name of the first pick — a full Windows path on a button reads as a bug. */
@@ -799,8 +834,8 @@ export function setup(): {
 
      Kept in one map keyed by node id, because that is what has to become the file the converter reads: a
      decision is only useful if it survives the session that made it. */
-  const decisions: Signal<Record<string, 'migrate' | 'skip' | 'open' | 'leave'>> = signal<
-    Record<string, 'migrate' | 'skip' | 'open' | 'leave'>
+  const decisions: Signal<Record<string, 'migrate' | 'skip' | 'leave'>> = signal<
+    Record<string, 'migrate' | 'skip' | 'leave'>
   >({});
 
   const decisionFor = (nodeId: string): string => decisions()[nodeId] ?? '';
@@ -812,58 +847,9 @@ export function setup(): {
    * never grow past its first level, and a service marked "open and migrate" still showed zero dependencies.
    * Opening one is what makes the next level exist.
    */
-  /**
-   * The libraries marked to open that have not been read yet.
-   *
-   * Reported: opening one at a time meant a full re-analysis per click, and "I need five of these but I am not
-   * sure which" turned into five waits. Marking is now free; reading happens once, for everything marked.
-   */
-  const pendingOpens: Computed<string[]> = computed<string[]>(() => {
-    const g: Graph | null = graph();
-    const map: Record<string, string> = decisions();
-    if (!g) return [];
-    const libs: string[] = [];
-    for (const node of g.nodes) {
-      if (map[node.id] !== 'open' || !node.library) continue;
-      if (!openedLibs().includes(node.library) && !libs.includes(node.library)) libs.push(node.library);
-    }
-    return libs;
-  });
-
-  /** Read everything marked, in one pass, and redraw in place. */
-  const openMarked = (): void => {
-    const libs: string[] = pendingOpens();
-    if (!libs.length) return;
-    openedLibs.set((current: string[]): string[] => [...current, ...libs]);
-    const target: string = analysedPath();
-    if (target) analyse(target, true);
-  };
-
-  /**
-   * Ticking is the only action: marking a library reads it, on its own.
-   *
-   * The read is DEFERRED rather than immediate, and the difference is the whole point. Firing on each tick
-   * meant five services were five full re-analyses — reported, and it was as slow as it sounds. Firing when
-   * ticking stops means five ticks in a row are one pass, while a single tick still reads by itself with no
-   * second button to find.
-   *
-   * 700 ms: long enough to tick through a list without triggering, short enough that one tick does not feel
-   * like it was ignored.
-   */
-  const marked: Computed<string> = debounced((): string => pendingOpens().join('|'), 1200);
-  effect((): void => {
-    const waiting: string = marked();
-    // Subscribed on purpose, not read through `untrack`: anything ticked WHILE a read is running has to be
-    // picked up when that read finishes. Skipping without subscribing left them queued forever — measured,
-    // "1 opened" with "About to read 2…" sitting there permanently.
-    const busy: boolean = analysing();
-    if (!waiting || busy) return;
-    openMarked();
-  });
-
-  const decide = (nodeId: string, value: 'migrate' | 'skip' | 'open' | 'leave'): void => {
-    decisions.set((current: Record<string, 'migrate' | 'skip' | 'open' | 'leave'>) => {
-      const next: Record<string, 'migrate' | 'skip' | 'open' | 'leave'> = { ...current };
+  const decide = (nodeId: string, value: 'migrate' | 'skip' | 'leave'): void => {
+    decisions.set((current: Record<string, 'migrate' | 'skip' | 'leave'>) => {
+      const next: Record<string, 'migrate' | 'skip' | 'leave'> = { ...current };
       // Choosing the same answer again clears it — the same way clicking a selected card deselects it.
       if (next[nodeId] === value) delete next[nodeId];
       else next[nodeId] = value;
@@ -882,12 +868,15 @@ export function setup(): {
     const g: Graph | null = graph();
     if (!g) return;
     const closure: Set<string> = dependencyClosure(g, nodeId);
-    decisions.set((current: Record<string, 'migrate' | 'skip' | 'open' | 'leave'>) => {
-      const next: Record<string, 'migrate' | 'skip' | 'open' | 'leave'> = { ...current };
+    decisions.set((current: Record<string, 'migrate' | 'skip' | 'leave'>) => {
+      const next: Record<string, 'migrate' | 'skip' | 'leave'> = { ...current };
       for (const nid of closure) {
         const node: GraphNode | undefined = g.nodes.find((n: GraphNode): boolean => n.id === nid);
         if (!node) continue;
-        next[nid] = node.kind === 'external' ? 'open' : 'migrate';
+        // An external is an npm package now — carried over as a dependency, never migrated — so the
+        // closure marks only what is ours to move.
+        if (node.kind === 'external') continue;
+        next[nid] = 'migrate';
       }
       return next;
     });
@@ -900,12 +889,11 @@ export function setup(): {
   };
 
   /** A running tally, so the page always says what has been decided so far. */
-  const decisionCounts: Computed<{ migrate: number; skip: number; open: number; leave: number; total: number }> = computed(() => {
-    const all: Array<'migrate' | 'skip' | 'open' | 'leave'> = Object.values(decisions());
+  const decisionCounts: Computed<{ migrate: number; skip: number; leave: number; total: number }> = computed(() => {
+    const all: Array<'migrate' | 'skip' | 'leave'> = Object.values(decisions());
     return {
       migrate: all.filter((d): boolean => d === 'migrate').length,
       skip: all.filter((d): boolean => d === 'skip').length,
-      open: all.filter((d): boolean => d === 'open').length,
       leave: all.filter((d): boolean => d === 'leave').length,
       total: all.length,
     };
@@ -998,14 +986,14 @@ export function setup(): {
     const map: Record<string, string> = decisions();
     const a: string | undefined = map[from];
     const b: string | undefined = map[to];
-    const kept = (v: string | undefined): boolean => v === 'migrate' || v === 'open';
+    const kept = (v: string | undefined): boolean => v === 'migrate';
     return kept(a) && kept(b);
   };
 
   /** Is this node marked to be carried over, either way of being carried over? */
   const isKept = (nodeId: string): boolean => {
     const d: string = decisionFor(nodeId);
-    return d === 'migrate' || d === 'open';
+    return d === 'migrate';
   };
 
   /** What a card's header says: the kind, and the count that matters for it. */
@@ -1060,14 +1048,14 @@ export function setup(): {
     missingRoutes,
     step,
     analysing,
+    progress,
+    progressLine,
+    progressPercent,
     pickedLabel,
     graphError,
     summary,
     selected,
     decisions,
-    openedLibs,
-    pendingOpens,
-    openMarked,
     decisionFor,
     decide,
     migrateWithDependencies,

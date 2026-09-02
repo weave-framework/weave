@@ -210,6 +210,27 @@ try {
 
   ok(routes?.includes('/api/peek'), 'and it is announced in the route list');
 
+  /* ── the analysis stream ──
+     Reading a real app takes tens of seconds, so the page needs to know how far along it is. The fixture here
+     is tiny, but what matters is the shape: progress events, then exactly one terminal event. */
+  const streamUrl = `http://127.0.0.1:${server.port}/api/analyze-stream?token=${server.token}&path=${encodeURIComponent(join(fx, 'pnpm-ws', 'projects', 'shop'))}`;
+  const streamRes = await fetch(streamUrl);
+  ok(streamRes.status === 200, `the stream answers 200 (got ${streamRes.status})`);
+  ok(
+    (streamRes.headers.get('content-type') ?? '').startsWith('text/event-stream'),
+    `and as an event stream (got ${streamRes.headers.get('content-type')})`,
+  );
+  const streamBody = await streamRes.text();
+  const events = [...streamBody.matchAll(/^event: (\w+)$/gm)].map((m) => m[1]);
+  ok(events.length > 0, `it emits events (got ${events.length})`);
+  ok(events.filter((e) => e === 'done' || e === 'failed').length === 1, `exactly one terminal event (got ${events.join(',')})`);
+  ok(events[events.length - 1] === 'done' || events[events.length - 1] === 'failed', 'and it comes last');
+
+  const streamNoToken = await fetch(`http://127.0.0.1:${server.port}/api/analyze-stream?path=${encodeURIComponent(fx)}`);
+  ok(streamNoToken.status === 403, `the stream needs the token like everything else (got ${streamNoToken.status})`);
+
+  ok(routes?.includes('/api/analyze-stream'), 'and it is announced in the route list');
+
   /* ── bound to loopback, so the network cannot reach it at all ── */
   ok(server.url.startsWith('http://127.0.0.1:'), 'the printed URL is loopback, not a hostname that could resolve outward');
   ok(server.url.includes(server.token), 'the printed URL carries the token, so opening it just works');

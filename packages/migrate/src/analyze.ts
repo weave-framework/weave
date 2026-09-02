@@ -2068,6 +2068,27 @@ function narrowTo(walk: DependencyWalk, names: string[]): DependencyWalk {
  * `only` narrows the unit to the names actually wanted from it — see `narrowTo`. Without it a library is taken
  * whole, which is right when the user pointed AT that library and wrong when they merely import one type from it.
  */
+/** Progress while widening: how many units are read, how many are known about, and what is being read now. */
+export interface Progress {
+  done: number;
+  total: number;
+  reading: string;
+}
+
+/** Called as each unit is about to be read. Synchronous — the walk itself is. */
+export type ProgressFn = (progress: Progress) => void;
+
+/**
+ * Every workspace library this unit reaches but has not read.
+ *
+ * The npm half is deliberately excluded: those packages are carried over as dependencies, not migrated, so
+ * reading them would be work that changes nothing. `path` is exactly that distinction — a specifier that
+ * resolves through the workspace's own tsconfig aliases has one, an npm import does not.
+ */
+export function localLibraries(facts: MigrationFacts): string[] {
+  return [...new Set(outOfReach(facts).filter((r: Reach): boolean => !!r.path).map((r: Reach): string => r.name))];
+}
+
 /**
  * The project a path belongs to. A user may point at a file, at `src/`, or at the project folder; all three mean
  * the same unit. Climbs until it finds a project marker, never past the filesystem root, and never treats `src`
@@ -2101,7 +2122,42 @@ export function unitRootFor(input: string): string {
  * Only the names actually USED are pulled in. Analysing a whole library to satisfy an import of one symbol once
  * migrated 200 interfaces to get at one.
  */
-export function assembleFactsOpening(unitDir: string, open: string[]): MigrationFacts {
+export async function assembleFactsOpeningAsync(unitDir: string, open: string[], onProgress?: ProgressFn): Promise<MigrationFacts> {
+  let facts: MigrationFacts = assembleFacts(unitDir);
+  if (!open.length) return facts;
+
+  const opened: Set<string> = new Set<string>();
+  const readUnits: Set<string> = new Set<string>();
+
+  for (let round: number = 0; round < 10; round++) {
+    const all: boolean = open.includes('*');
+    const gaps: Reach[] = outOfReach(facts).filter(
+      (g: Reach): boolean => (all || open.includes(g.name)) && !opened.has(g.name) && !!g.path,
+    );
+    if (!gaps.length) break;
+    for (const gap of gaps) {
+      opened.add(gap.name);
+      const unit: string = unitRootFor(gap.path as string);
+      if (readUnits.has(unit)) continue;
+      readUnits.add(unit);
+      onProgress?.({ done: readUnits.size, total: readUnits.size + gaps.length, reading: gap.name });
+      // Hand the event loop back before each unit. The walk itself is synchronous, and without this the whole
+      // analysis runs in one tick: every progress event written to the socket sits in a buffer until the
+      // response ends, so the reader watches "0%" for twenty seconds and then sees the finished graph. Yielding
+      // costs nothing measurable and is the difference between a progress bar and a decoration.
+      await new Promise<void>((resolve): void => {
+        setImmediate(resolve);
+      });
+      const extra: MigrationFacts = assembleFacts(unit, gap.uses);
+      if (!extra.entry) continue;
+      facts = mergeFacts(facts, extra);
+      facts = { ...facts, internal: facts.internal.filter((i: string): boolean => i !== gap.name) };
+    }
+  }
+  return facts;
+}
+
+export function assembleFactsOpening(unitDir: string, open: string[], onProgress?: ProgressFn): MigrationFacts {
   let facts: MigrationFacts = assembleFacts(unitDir);
   if (!open.length) return facts;
 
@@ -2111,7 +2167,12 @@ export function assembleFactsOpening(unitDir: string, open: string[]): Migration
   // Bounded like the terminal's loop: each pass can reveal more libraries, and a chain that keeps revealing
   // them is a repository problem, not something to chase forever.
   for (let round: number = 0; round < 10; round++) {
-    const gaps: Reach[] = outOfReach(facts).filter((g: Reach): boolean => open.includes(g.name) && !opened.has(g.name) && !!g.path);
+    // `open: ['*']` means "everything local, however deep" — a newly read library can name workspace code the
+    // first pass never saw, and stopping at the original list would leave exactly the gaps this exists to close.
+    const all: boolean = open.includes('*');
+    const gaps: Reach[] = outOfReach(facts).filter(
+      (g: Reach): boolean => (all || open.includes(g.name)) && !opened.has(g.name) && !!g.path,
+    );
     if (!gaps.length) break;
     for (const gap of gaps) {
       opened.add(gap.name);
@@ -2121,6 +2182,7 @@ export function assembleFactsOpening(unitDir: string, open: string[]): Migration
       // again. The names are still recorded as opened; only the reading is skipped.
       if (readUnits.has(unit)) continue;
       readUnits.add(unit);
+      onProgress?.({ done: readUnits.size, total: readUnits.size + gaps.length, reading: gap.name });
       const extra: MigrationFacts = assembleFacts(unit, gap.uses);
       if (!extra.entry) continue;
       facts = mergeFacts(facts, extra);
