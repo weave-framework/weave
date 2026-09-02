@@ -4,6 +4,18 @@
     <span class="note">Reads your source app. Never writes to it.</span>
   </header>
 
+  @if (session() === 'stale') {
+    <section class="locked" role="alert">
+      <h2>This page is newer than the service it reached</h2>
+      <p>
+        It needs {{ missingRoutes().join(', ') }}, and the service answering does not serve
+        {{ missingRoutes().length === 1 ? 'it' : 'them' }}. An earlier <code>weave migrate</code> is almost
+        certainly still running and handing out this freshly built page.
+      </p>
+      <p class="hint">Stop every running <code>weave migrate</code>, start one, and open the link it prints.</p>
+    </section>
+  }
+
   @if (session() === 'denied') {
     <section class="locked" role="alert">
       <h2>This page is not connected to a migration session</h2>
@@ -15,7 +27,7 @@
     </section>
   }
 
-  @if (session() !== 'denied') {
+  @if (session() === 'ok' || session() === 'unknown') {
   <ol class="steps" aria-label="Progress">
     <li aria-current="step">What to migrate</li>
     <li>What to open</li>

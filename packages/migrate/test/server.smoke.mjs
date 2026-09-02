@@ -150,6 +150,14 @@ try {
   const sessionDenied = await api('/api/session');
   ok(sessionDenied.status === 403, `/api/session refuses with no token and no cookie (got ${sessionDenied.status})`);
 
+  // `dist/` is shared, so a service started before the UI was rebuilt serves the NEW page and then 404s the
+  // routes it asks for. The page can only say so if the service says what it serves.
+  const routes = (await sessionOk.json()).routes;
+  ok(Array.isArray(routes), 'the session answer lists the routes this build serves');
+  for (const r of ['/api/session', '/api/inspect', '/api/browse']) {
+    ok(routes?.includes(r), `it lists ${r}`);
+  }
+
   /* ── browsing: the picker has to be ours, because no browser will hand a server a real path ── */
   const roots = await (await api(`/api/browse?token=${server.token}`)).json();
   ok(roots.path === '', 'no path asks for the filesystem roots, and that is not an error');

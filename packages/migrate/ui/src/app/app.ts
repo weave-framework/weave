@@ -5,7 +5,14 @@ import type { Entry, Listing, Unit, Workspace } from '../../../src/types.js';
 export type Phase = 'idle' | 'scanning' | 'done' | 'failed';
 
 /** Whether this page is talking to the service it belongs to. `unknown` only until the first answer. */
-export type Session = 'unknown' | 'ok' | 'denied';
+export type Session = 'unknown' | 'ok' | 'denied' | 'stale';
+
+/**
+ * Routes this page calls. Checked against what the service says it serves, because `dist/` is shared: a service
+ * started before the UI was rebuilt hands out the NEW page and then 404s the routes it asks for. Without this
+ * the reader sees `no route GET /api/browse` and has no way to guess that a second, older server is the reason.
+ */
+const NEEDED_ROUTES: string[] = ['/api/inspect', '/api/browse'];
 
 /**
  * The session token, when it is still in the URL.
@@ -58,6 +65,7 @@ export function setup(): {
   path: Signal<string>;
   phase: Signal<Phase>;
   session: Signal<Session>;
+  missingRoutes: Signal<string[]>;
   browsing: Signal<boolean>;
   listing: Signal<Listing>;
   listingError: Signal<string>;
@@ -153,10 +161,21 @@ export function setup(): {
    * is safe precisely because the cookie has by then been set by the very response that answered this.
    */
   const session: Signal<Session> = signal<Session>('unknown');
+  const missingRoutes: Signal<string[]> = signal<string[]>([]);
   void fetch(apiUrl('/api/session'))
-    .then((res: Response): void => {
-      session.set(res.ok ? 'ok' : 'denied');
-      if (res.ok) tidyAddressBar();
+    .then(async (res: Response): Promise<void> => {
+      if (!res.ok) {
+        session.set('denied');
+        return;
+      }
+      tidyAddressBar();
+      const body: { routes?: string[] } = (await res.json()) as { routes?: string[] };
+      // An older service predates the field entirely, which is itself the answer: it cannot serve what this
+      // page needs, so treat "no list" as "nothing matches" rather than assuming the best.
+      const served: string[] = Array.isArray(body.routes) ? body.routes : [];
+      const missing: string[] = NEEDED_ROUTES.filter((r: string): boolean => !served.includes(r));
+      missingRoutes.set(missing);
+      session.set(missing.length ? 'stale' : 'ok');
     })
     .catch((): void => {
       session.set('denied');
@@ -240,6 +259,7 @@ export function setup(): {
     found,
     hasResult,
     session,
+    missingRoutes,
     browsing,
     listing,
     listingError,

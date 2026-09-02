@@ -49,6 +49,13 @@ export interface ServeOptions {
 /** How many ports past the requested one to try before giving up — the same budget `weave dev` uses. */
 const PORT_ATTEMPTS: number = 20;
 
+/**
+ * Every API route this build serves, sent with `/api/session` so a page can tell whether the service it reached
+ * is the one it was built against. Add a route, add it here — the pairing is what makes a stale service
+ * announce itself instead of answering 404 to a page that has every reason to expect otherwise.
+ */
+const ROUTES: string[] = ['/api/session', '/api/inspect', '/api/browse'];
+
 /** Largest request body accepted, in bytes. A path is short; anything larger is not a path. */
 const MAX_BODY: number = 64 * 1024;
 
@@ -285,8 +292,13 @@ export async function serve(options: ServeOptions = {}): Promise<MigrateServer> 
 
     // How the page asks "am I still allowed?" without being able to see the cookie — it is HttpOnly, so script
     // cannot read it. Reaching here at all is the answer.
+    //
+    // It also answers "am I talking to a service that speaks my dialect?". The UI is built into `dist/`, which a
+    // service started earlier serves just as happily as a current one — so a stale process hands out a NEW page
+    // that asks for routes it has never heard of, and the reader gets `no route GET /api/browse` with no way to
+    // know a second server is the reason. Listing the routes lets the page say that itself.
     if (url.pathname === '/api/session') {
-      json(res, 200, { ok: true });
+      json(res, 200, { ok: true, routes: ROUTES });
       return;
     }
 
