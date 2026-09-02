@@ -566,6 +566,8 @@ export function setup(): {
     if (node.kind === 'external') return 'NOT READ';
     if (node.kind === 'component') return 'COMPONENT';
     if (node.kind === 'service') return 'SERVICE';
+    // A folded card is the route AND the module it opens; saying only "route" would hide half of what it is.
+    if (node.folded) return 'LAZY MODULE';
     return node.lazy ? 'LAZY ROUTE' : 'ROUTE';
   };
 

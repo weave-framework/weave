@@ -100,6 +100,8 @@ export interface GraphNode {
   guards?: string[];
   /** A named outlet, when this route targets one. */
   outlet?: string | null;
+  /** True when this route absorbed the module it alone loads — the card is both. */
+  folded?: boolean;
   /** The node this one is drawn inside, when it belongs to a group. */
   parent?: string;
 }

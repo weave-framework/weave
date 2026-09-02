@@ -201,6 +201,54 @@ export function buildGraph(facts: MigrationFacts): Graph {
     link(id('service', edge.from), to, 'injects');
   }
 
+  /* ── fold each lazy route into the module it alone loads ──
+     `LAZY ROUTE error` pointing at `MODULE errors` is one thing drawn twice: the route IS the way into that
+     module, and nothing else reaches it. Two cards and a line where one card says the same, repeated for every
+     lazy boundary — 49 of them in one app.
+
+     Only folded when the module has exactly ONE incoming `loads`. Three routes loading the same module
+     (`documents`, `archived`, `active` all land on documents/index.ts) is not a duplicate; it is a shared
+     module, and collapsing it would erase the fact that three paths lead to the same place. */
+  const loadsInto: Map<string, string[]> = new Map<string, string[]>();
+  for (const e of edges) {
+    if (e.kind !== 'loads') continue;
+    loadsInto.set(e.to, [...(loadsInto.get(e.to) ?? []), e.from]);
+  }
+
+  const folded: Map<string, string> = new Map<string, string>(); // module id -> route id that absorbs it
+  for (const [moduleId, routeIds] of loadsInto) {
+    if (routeIds.length !== 1) continue;
+    const routeId: string = routeIds[0];
+    const routeNode: GraphNode | undefined = nodes.get(routeId);
+    const moduleNode: GraphNode | undefined = nodes.get(moduleId);
+    if (!routeNode || !moduleNode) continue;
+    folded.set(moduleId, routeId);
+    // The card keeps the route's path — that is what a reader recognises from the URL — and gains the module's
+    // own line, so nothing is lost by the fold.
+    routeNode.detail = moduleNode.detail;
+    routeNode.folded = true;
+  }
+
+  if (folded.size) {
+    for (const moduleId of folded.keys()) nodes.delete(moduleId);
+    const remap = (nodeId: string): string => folded.get(nodeId) ?? nodeId;
+    const kept: Edge[] = [];
+    const seenEdges: Set<string> = new Set<string>();
+    for (const e of edges) {
+      const from: string = remap(e.from);
+      const to: string = remap(e.to);
+      // The absorbed `loads` edge now points at itself — it has become the card.
+      if (from === to) continue;
+      if (!nodes.has(from) || !nodes.has(to)) continue;
+      const key: string = `${from}>${to}>${e.kind}`;
+      if (seenEdges.has(key)) continue;
+      seenEdges.add(key);
+      kept.push({ from, to, kind: e.kind });
+    }
+    edges.length = 0;
+    edges.push(...kept);
+  }
+
   /* ── weight: how many things point at this ── */
   for (const edge of edges) {
     const target: GraphNode | undefined = nodes.get(edge.to);
