@@ -88,8 +88,11 @@ export function setup(): {
   highlighted: Computed<Set<string>>;
   isLit: (nodeId: string) => boolean;
   edgeLit: (from: string, to: string) => boolean;
+  guardEdgeVisible: (from: string, to: string) => boolean;
   cardTag: (node: PlacedNode) => string;
   cardTitle: (node: PlacedNode) => string;
+  cardComponent: (node: PlacedNode) => string;
+  guardMark: (node: PlacedNode) => string;
   CARD_W: number;
   CARD_H: number;
   CARD_HEAD: number;
@@ -552,6 +555,17 @@ export function setup(): {
   };
 
   /**
+   * A guard edge is drawn only while something is selected.
+   *
+   * With 107 of them into three nodes, drawing them by default put a mesh over the entire tree. The card's own
+   * mark says a route is guarded; the lines are for the moment you ask which.
+   */
+  const guardEdgeVisible = (from: string, to: string): boolean => {
+    const set: Set<string> = highlighted();
+    return set.size > 0 && set.has(from) && set.has(to);
+  };
+
+  /**
    * A card's title, trimmed to what actually fits.
    *
    * SVG text has no overflow handling — it simply runs on, straight across the next card. At 11.5px in a
@@ -559,6 +573,23 @@ export function setup(): {
    * thirty-four. The full name stays reachable in the tooltip and the inspector.
    */
   const cardTitle = (node: PlacedNode): string => (node.label.length > 21 ? `${node.label.slice(0, 20)}…` : node.label);
+
+  /** The component a route opens, trimmed to the card — the answer to "what does (default) actually show". */
+  const cardComponent = (node: PlacedNode): string => {
+    const name: string = node.component ?? '';
+    return name.length > 22 ? `${name.slice(0, 21)}…` : name;
+  };
+
+  /**
+   * Guards, as a mark on the card rather than a line to somewhere.
+   *
+   * Nearly every route has them: 107 edges into three nodes, which drew a mesh over the whole tree and hid the
+   * thing the tree was for. The count says they exist; the lines appear only when something is selected.
+   */
+  const guardMark = (node: PlacedNode): string => {
+    const count: number = node.guards?.length ?? 0;
+    return count ? `⛨${count}` : '';
+  };
 
   /** What a card's header says: the kind, and the count that matters for it. */
   const cardTag = (node: PlacedNode): string => {
@@ -616,8 +647,11 @@ export function setup(): {
     highlighted,
     isLit,
     edgeLit,
+    guardEdgeVisible,
     cardTag,
     cardTitle,
+    cardComponent,
+    guardMark,
     CARD_W,
     CARD_H,
     CARD_HEAD,

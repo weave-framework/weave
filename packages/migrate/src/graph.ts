@@ -249,6 +249,24 @@ export function buildGraph(facts: MigrationFacts): Graph {
     edges.push(...kept);
   }
 
+  /* ── what a route actually opens ──
+     A card reading `(default)` says nothing: the component is the thing that route shows, and the reader asked
+     the obvious question — these empty defaults have their own components. It goes on the card.
+
+     `sharedWith` counts the OTHER routes rendering the same component, because two routes reaching one screen
+     with different parameters is a fact about the app worth seeing without clicking. */
+  const rendersOf: Map<string, number> = new Map<string, number>();
+  for (const route of facts.routes) {
+    if (route.component) rendersOf.set(route.component, (rendersOf.get(route.component) ?? 0) + 1);
+  }
+  facts.routes.forEach((route: RouteFact, index: number): void => {
+    if (!route.component) return;
+    const node: GraphNode | undefined = nodes.get(id('route', `${route.file}#${index}`));
+    if (!node) return;
+    node.component = route.component;
+    node.sharedWith = (rendersOf.get(route.component) ?? 1) - 1;
+  });
+
   /* ── weight: how many things point at this ── */
   for (const edge of edges) {
     const target: GraphNode | undefined = nodes.get(edge.to);

@@ -100,6 +100,10 @@ export interface GraphNode {
   guards?: string[];
   /** A named outlet, when this route targets one. */
   outlet?: string | null;
+  /** The component this route renders, when it has one. Shown ON the card: it is what the route opens. */
+  component?: string;
+  /** How many OTHER routes render the same component — a shared screen, reached with different parameters. */
+  sharedWith?: number;
   /** True when this route absorbed the module it alone loads — the card is both. */
   folded?: boolean;
   /** The node this one is drawn inside, when it belongs to a group. */

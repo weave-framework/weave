@@ -41,7 +41,7 @@ export interface Layout {
 /** Card size. Nodes are cards, not dots: a dot needs a label beside it, and labels beside dots collide with
  *  the very edges they sit among. Text inside a card cannot collide with anything. */
 export const CARD_W: number = 168;
-export const CARD_H: number = 58;
+export const CARD_H: number = 76;
 /** Height of the coloured header strip that carries the node's kind and identifier. */
 export const CARD_HEAD: number = 20;
 

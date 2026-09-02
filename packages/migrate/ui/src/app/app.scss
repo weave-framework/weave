@@ -799,3 +799,34 @@ td.loc {
 .card.dim {
   opacity: 0.22;
 }
+
+/* The component a route opens — the answer to "what does (default) actually show". */
+.card-component {
+  font-family: var(--mono);
+  font-size: 10px;
+  fill: var(--green);
+  pointer-events: none;
+}
+/* Two routes reaching one screen with different parameters is worth seeing without clicking. */
+.card-shared {
+  font-family: var(--sans);
+  font-size: 9px;
+  fill: var(--muted);
+  pointer-events: none;
+}
+.card-guards {
+  font-family: var(--mono);
+  font-size: 10px;
+  fill: var(--orange);
+  text-anchor: end;
+  pointer-events: none;
+}
+.legend .mark {
+  font-family: var(--mono);
+  font-size: 0.6875rem;
+  color: var(--orange);
+}
+/* Guard edges exist for every route; drawn by default they mesh over the tree they run through. */
+.edge.hidden {
+  display: none;
+}
