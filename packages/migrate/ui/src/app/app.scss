@@ -723,6 +723,7 @@ td.loc {
 .swatch--component { background: var(--green); }
 .swatch--service { background: var(--orange); }
 .swatch--external { background: var(--red); }
+.swatch--npm { background: var(--muted); }
 .swatch--cut {
   border-radius: 0;
   height: 0;
@@ -764,6 +765,8 @@ td.loc {
 .card-head--component { fill: var(--green); }
 .card-head--service { fill: var(--orange); }
 .card-head--external { fill: var(--red); }
+// An npm class is not a problem to solve, so it must not wear the colour that means "look here".
+.card-head--external.npm { fill: var(--muted); }
 .card-head.lazy { fill: var(--accent); }
 
 .card-tag {

@@ -2122,6 +2122,51 @@ export function unitRootFor(input: string): string {
  * Only the names actually USED are pulled in. Analysing a whole library to satisfy an import of one symbol once
  * migrated 200 interfaces to get at one.
  */
+/** One file to start reading from, and every symbol the aliases pointing at it asked for. */
+interface UnitPlan {
+  /** The folder the file belongs to — the base for workspace-root and tsconfig lookup. */
+  unit: string;
+  /** Where the walk starts. A tsconfig alias names an exact file; that file is the entry, not a guess. */
+  entry: string;
+  /** The out-of-reach names this file answers — all of them get marked opened together. */
+  names: string[];
+  /** Every symbol wanted across those names, so one read serves all of them. */
+  uses: string[];
+}
+
+/**
+ * Group the gaps still worth opening by the FILE that answers them.
+ *
+ * Two habits made this wrong twice over. Grouping by containing folder collapses seventeen `@app/modules/*`
+ * aliases — each its own barrel — onto one application folder, and marking them all opened while reading only
+ * the first one's symbols drops the other sixteen without a word. And deriving the entry from that folder
+ * throws away what the alias already told us: `findEntryPoint` walks up to the application and answers
+ * `src/main.ts`, so the module barrel the alias pointed at is never opened at all.
+ *
+ * A path alias resolves to an exact file. That file is where the walk starts.
+ */
+function planUnits(gaps: Reach[]): Map<string, UnitPlan> {
+  const plans: Map<string, UnitPlan> = new Map<string, UnitPlan>();
+  for (const gap of gaps) {
+    const entry: string = gap.path as string;
+    const key: string = entry.toLowerCase();
+    let plan: UnitPlan | undefined = plans.get(key);
+    if (!plan) {
+      plan = { unit: unitRootFor(entry), entry, names: [], uses: [] };
+      plans.set(key, plan);
+    }
+    plan.names.push(gap.name);
+    for (const use of gap.uses) if (!plan.uses.includes(use)) plan.uses.push(use);
+  }
+  for (const plan of plans.values()) plan.uses.sort();
+  return plans;
+}
+
+/** A file read for exactly these symbols needs no second read; read for fewer, it does. */
+function readKey(plan: UnitPlan): string {
+  return `${plan.entry.toLowerCase()} ${plan.uses.join(',')}`;
+}
+
 export async function assembleFactsOpeningAsync(unitDir: string, open: string[], onProgress?: ProgressFn): Promise<MigrationFacts> {
   let facts: MigrationFacts = assembleFacts(unitDir);
   if (!open.length) return facts;
@@ -2135,12 +2180,15 @@ export async function assembleFactsOpeningAsync(unitDir: string, open: string[],
       (g: Reach): boolean => (all || open.includes(g.name)) && !opened.has(g.name) && !!g.path,
     );
     if (!gaps.length) break;
-    for (const gap of gaps) {
-      opened.add(gap.name);
-      const unit: string = unitRootFor(gap.path as string);
-      if (readUnits.has(unit)) continue;
-      readUnits.add(unit);
-      onProgress?.({ done: readUnits.size, total: readUnits.size + gaps.length, reading: gap.name });
+    const plans: Map<string, UnitPlan> = planUnits(gaps);
+    let done: number = 0;
+    for (const plan of plans.values()) {
+      for (const name of plan.names) opened.add(name);
+      done++;
+      const key: string = readKey(plan);
+      if (readUnits.has(key)) continue;
+      readUnits.add(key);
+      onProgress?.({ done, total: plans.size, reading: plan.names[0] });
       // Hand the event loop back before each unit. The walk itself is synchronous, and without this the whole
       // analysis runs in one tick: every progress event written to the socket sits in a buffer until the
       // response ends, so the reader watches "0%" for twenty seconds and then sees the finished graph. Yielding
@@ -2148,10 +2196,10 @@ export async function assembleFactsOpeningAsync(unitDir: string, open: string[],
       await new Promise<void>((resolve): void => {
         setImmediate(resolve);
       });
-      const extra: MigrationFacts = assembleFacts(unit, gap.uses);
+      const extra: MigrationFacts = assembleFacts(plan.unit, plan.uses, plan.entry);
       if (!extra.entry) continue;
       facts = mergeFacts(facts, extra);
-      facts = { ...facts, internal: facts.internal.filter((i: string): boolean => i !== gap.name) };
+      facts = { ...facts, internal: facts.internal.filter((i: string): boolean => !plan.names.includes(i)) };
     }
   }
   return facts;
@@ -2162,7 +2210,7 @@ export function assembleFactsOpening(unitDir: string, open: string[], onProgress
   if (!open.length) return facts;
 
   const opened: Set<string> = new Set<string>();
-  /** Unit directories already read, so one folder behind five aliases is read once. */
+  /** Folder+symbols already read, so one folder behind five aliases is read once — for what all five need. */
   const readUnits: Set<string> = new Set<string>();
   // Bounded like the terminal's loop: each pass can reveal more libraries, and a chain that keeps revealing
   // them is a repository problem, not something to chase forever.
@@ -2174,27 +2222,30 @@ export function assembleFactsOpening(unitDir: string, open: string[], onProgress
       (g: Reach): boolean => (all || open.includes(g.name)) && !opened.has(g.name) && !!g.path,
     );
     if (!gaps.length) break;
-    for (const gap of gaps) {
-      opened.add(gap.name);
-      const unit: string = unitRootFor(gap.path as string);
-      // Several aliases routinely resolve to ONE unit (`@org/api` and `@org/auth` living in one libs folder).
-      // Reading it once per alias is where most of the waiting went, and every re-read merged the same rows in
-      // again. The names are still recorded as opened; only the reading is skipped.
-      if (readUnits.has(unit)) continue;
-      readUnits.add(unit);
-      onProgress?.({ done: readUnits.size, total: readUnits.size + gaps.length, reading: gap.name });
-      const extra: MigrationFacts = assembleFacts(unit, gap.uses);
+    const plans: Map<string, UnitPlan> = planUnits(gaps);
+    let done: number = 0;
+    for (const plan of plans.values()) {
+      for (const name of plan.names) opened.add(name);
+      done++;
+      const key: string = readKey(plan);
+      if (readUnits.has(key)) continue;
+      readUnits.add(key);
+      onProgress?.({ done, total: plans.size, reading: plan.names[0] });
+      const extra: MigrationFacts = assembleFacts(plan.unit, plan.uses, plan.entry);
       if (!extra.entry) continue;
       facts = mergeFacts(facts, extra);
-      // It is no longer an unfollowed edge, so it must stop being listed as one.
-      facts = { ...facts, internal: facts.internal.filter((i: string): boolean => i !== gap.name) };
+      // They are no longer unfollowed edges, so they must stop being listed as such.
+      facts = { ...facts, internal: facts.internal.filter((i: string): boolean => !plan.names.includes(i)) };
     }
   }
   return facts;
 }
 
-export function assembleFacts(unitDir: string, only?: string[]): MigrationFacts {
-  const entry: string | null = findEntryPoint(unitDir);
+export function assembleFacts(unitDir: string, only?: string[], from?: string): MigrationFacts {
+  // A tsconfig path alias resolves to an exact file, and when the caller has one it beats any guess made
+  // from the folder: `findEntryPoint` walks up to the nearest project and answers its entry, which for a
+  // module barrel inside an application is `src/main.ts` — the application, not the module asked for.
+  const entry: string | null = from ?? findEntryPoint(unitDir);
   const empty: MigrationFacts = {
     unit: unitDir, entry: null, files: [], angular: [], internal: [], packages: [], packageUsage: [],
     components: [], services: [], di: [], routes: [], forms: [], calls: [], branches: [], cycles: [], unresolved: [],

@@ -1,0 +1,1 @@
+{ "name": "alias-modules-workspace", "private": true, "workspaces": ["app"] }

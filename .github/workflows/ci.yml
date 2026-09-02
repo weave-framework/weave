@@ -259,6 +259,8 @@ jobs:
         run: pnpm verify:detect
       - name: migrate service
         run: pnpm verify:migrate-server
+      - name: migrate — every local library behind an alias is read
+        run: pnpm verify:migrate-opening
       - name: migrate UI
         run: pnpm verify:migrate-ui
       - name: Nx plugin

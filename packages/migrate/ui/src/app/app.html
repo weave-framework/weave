@@ -288,7 +288,8 @@
           <li><span class="swatch swatch--route"></span>route</li>
           <li><span class="swatch swatch--component"></span>component</li>
           <li><span class="swatch swatch--service"></span>service</li>
-          <li><span class="swatch swatch--external"></span>not read yet — a class the code uses that the walk never opened</li>
+          <li><span class="swatch swatch--npm"></span>from npm — carried over as it is, never migrated</li>
+          <li><span class="swatch swatch--external"></span>workspace code that could not be read — a real gap</li>
           <li><span class="swatch swatch--cut"></span>lazy boundary</li>
           <li><span class="swatch swatch--uses"></span>renders inside</li>
           <li><span class="swatch swatch--ngmodule"></span>NgModule — declares and imports</li>
@@ -338,7 +339,7 @@
                  class:kept={{ isKept(n.id) }} class:dropped={{ decisionFor(n.id) === 'skip' || decisionFor(n.id) === 'leave' }}
                  on:click={{ () => pick(n.id) }} on:dblclick={{ () => expand(n.id) }}>
                 <rect class="card-body" x={{ n.x }} y={{ n.y }} width={{ CARD_W }} height={{ CARD_H }} rx="6" />
-                <path class={{ 'card-head card-head--' + n.kind }} class:lazy={{ n.lazy }}
+                <path class={{ 'card-head card-head--' + n.kind }} class:lazy={{ n.lazy }} class:npm={{ n.kind === 'external' && !n.libraryPath }}
                       d={{ 'M ' + n.x + ' ' + (n.y + 6) + ' a 6 6 0 0 1 6 -6 h ' + (CARD_W - 12) +
                            ' a 6 6 0 0 1 6 6 v ' + (CARD_HEAD - 6) + ' h ' + (-CARD_W) + ' z' }} />
                 <text class="card-tag" x={{ n.x + 9 }} y={{ n.y + 14 }}>{{ cardTag(n) }}</text>
@@ -436,9 +437,11 @@
 
         @if (externals().length) {
           <div class="externals">
-            <h3>Not read yet — {{ externals().length }} to decide on</h3>
+            <h3>Coming from outside — {{ externals().length }}</h3>
             <p class="inspector-meta">
-              Classes the code injects that the walk never opened. Ordered by how much rides on them.
+              Injected classes with no source of ours behind them. npm packages are carried over as they are;
+              anything marked <strong>UNREAD</strong> is workspace code the walk failed to open. Ordered by how
+              much rides on them.
             </p>
             <ul class="ext-list">
               @for (x of externals().slice(0, 12); track x.id) {

@@ -1003,7 +1003,10 @@ export function setup(): {
     if (node.root) return node.kind === 'module' ? 'ROOT MODULE' : 'ROOT ROUTE';
     if (node.kind === 'ngmodule') return 'NGMODULE';
     if (node.kind === 'module') return 'MODULE';
-    if (node.kind === 'external') return 'NOT READ';
+    // Two very different things used to share one word. A class from npm is never migrated and never read —
+    // that is the plan, not a shortfall. A class backed by a workspace file that stayed shut IS a shortfall,
+    // and calling both "not read" made the normal case look broken and hid the real one among 26 of them.
+    if (node.kind === 'external') return node.libraryPath ? 'UNREAD' : 'NPM';
     if (node.kind === 'component') return 'COMPONENT';
     if (node.kind === 'service') return 'SERVICE';
     // A folded card is the route AND the module it opens; saying only "route" would hide half of what it is.
