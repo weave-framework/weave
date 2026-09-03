@@ -433,7 +433,7 @@
                             <li>
                               <span class="expanded-kind">{{ item.kind }}</span>
                               <button type="button" class="expanded-jump" class:ext={{ item.external }}
-                                      on:click={{ () => selected.set(item.id) }}>{{ item.label }}</button>
+                                      on:click={{ () => jumpTo(item.id) }}>{{ item.label }}</button>
                             </li>
                           }
                         </ul>
@@ -447,6 +447,39 @@
             }
           </svg>
         </div>
+
+        @if (hasSelection()) {
+          <div class="picked-links">
+            <div class="picked-head">
+              <span class="picked-kind">{{ cardTag(sel()) }}</span>
+              <strong>{{ sel().label }}</strong>
+              @if (sel().component) {
+                <span class="picked-screen">{{ sel().component }}</span>
+              }
+              @if (sel().file) {
+                <code class="picked-file">{{ sel().file }}</code>
+              }
+            </div>
+            <div class="picked-groups">
+              @for (grp of linkGroups(); track grp.title) {
+                <div class="picked-group">
+                  <h4>{{ grp.title }}</h4>
+                  <ul>
+                    @for (item of grp.items; track item.kind + item.id) {
+                      <li>
+                        <span class="picked-rel">{{ item.kind }}</span>
+                        <button type="button" class="picked-jump" class:ext={{ item.external }}
+                                on:click={{ () => jumpTo(item.id) }}>{{ item.label }}</button>
+                      </li>
+                    }
+                  </ul>
+                </div>
+              } @empty {
+                <p class="picked-none">Nothing else connects to this one.</p>
+              }
+            </div>
+          </div>
+        }
 
         @if (externals().length) {
           <div class="externals">

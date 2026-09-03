@@ -16,7 +16,7 @@ import {
   type Layout,
   type PlacedNode,
 } from './layout.js';
-import { collapse as foldGroups, groupKeyFromId, isGroupId, type GroupSummary } from './group.js';
+import { collapse as foldGroups, groupKeyFromId, groupKeyOf, isGroupId, type GroupSummary } from './group.js';
 
 // Capitalized tags in the template resolve to these imports. The editor tooling understands that; eslint,
 // running without it, sees three unused bindings — so the repo's convention is to name them here.
@@ -138,6 +138,7 @@ export function setup(): {
   groups: Computed<GroupSummary[]>;
   toggleGroup: (key: string) => void;
   isGroupOpen: (key: string) => boolean;
+  jumpTo: (nodeId: string) => void;
   foldAll: () => void;
   openGroups: Signal<string[]>;
   sel: Computed<PlacedNode>;
@@ -626,6 +627,25 @@ export function setup(): {
 
   const isGroupOpen = (key: string): boolean => openGroups().includes(key);
 
+  /**
+   * Select a node by id, opening whatever folder it is folded inside.
+   *
+   * The links panel names the REAL neighbour — `AdministrationUsersComponent`, not the folder it was folded
+   * into — which is the useful answer and also a card that may not be on the canvas. Setting the selection
+   * to a folded id selected nothing, and the panel that had just offered the link vanished: a dead end at
+   * the exact moment the reader followed the trail. Opening the folder first makes the link mean what it
+   * looks like it means.
+   */
+  const jumpTo = (nodeId: string): void => {
+    const g: Graph | null = graph();
+    const node: GraphNode | undefined = g?.nodes.find((n: GraphNode): boolean => n.id === nodeId);
+    const key: string | null = node ? groupKeyOf(node) : null;
+    if (key !== null && !openGroups().includes(key)) {
+      openGroups.set((current: string[]): string[] => [...current, key]);
+    }
+    selected.set(nodeId);
+  };
+
   /** Fold everything back — the way home from any depth. */
   const foldAll = (): void => {
     openGroups.set([]);
@@ -965,9 +985,16 @@ export function setup(): {
     decisions.set({});
   };
 
-  /** Everything on the selected node's path — lit up, while the rest of the canvas dims. */
+  /**
+   * Everything on the selected node's path — lit up, while the rest of the canvas dims.
+   *
+   * Computed on the FOLDED graph, because that is what is drawn. Against the raw graph it answers with node
+   * ids that are not on the canvas — a component that has been folded into its folder — so every edge on
+   * screen failed the "both ends lit" test and the whole picture dimmed at once. Reported as selecting a route
+   * and seeing no dependencies at all: the path was found, in a graph nobody was looking at.
+   */
   const highlighted: Computed<Set<string>> = computed<Set<string>>(() => {
-    const g: Graph | null = graph();
+    const g: Graph | undefined = folded()?.graph;
     const id: string = selected();
     return g && id ? pathThrough(g, id) : new Set<string>();
   });
@@ -1162,6 +1189,7 @@ export function setup(): {
     groups,
     toggleGroup,
     isGroupOpen,
+    jumpTo,
     foldAll,
     openGroups,
     sel,

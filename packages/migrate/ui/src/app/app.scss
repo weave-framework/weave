@@ -1355,3 +1355,83 @@ td.loc {
   padding: 3px 4px;
   text-decoration: underline;
 }
+
+/* What the selected card connects to, always in the same place under the canvas.
+   Two earlier attempts were wrong in opposite directions: a popup opened on every single click, so there was
+   no way to just look; removing it left a click that lit a path and told you nothing about what it led to.
+   This lists the REAL neighbours — the components and services themselves, not the folder card they were
+   folded into — because the folder answers "where", and the question here is "what". */
+.picked-links {
+  margin-top: 0.875rem;
+  padding: 0.75rem 0.875rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+}
+
+.picked-head {
+  align-items: baseline;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 0.6rem;
+  padding-bottom: 0.5rem;
+
+  strong { font-size: 15px; }
+}
+
+.picked-kind {
+  background: var(--bg-soft);
+  border-radius: 3px;
+  color: var(--fg-soft);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  padding: 2px 6px;
+}
+
+.picked-screen { color: var(--green); font-size: 13px; }
+.picked-file { color: var(--fg-soft); font-family: var(--mono); font-size: 11px; margin-left: auto; }
+
+.picked-groups {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+}
+
+.picked-group {
+  min-width: 15rem;
+
+  h4 {
+    color: var(--fg-soft);
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    margin: 0 0 0.35rem;
+    text-transform: uppercase;
+  }
+
+  ul { list-style: none; margin: 0; padding: 0; }
+  li { align-items: baseline; display: flex; gap: 8px; padding: 1px 0; }
+}
+
+.picked-rel {
+  color: var(--fg-soft);
+  font-size: 11px;
+  min-width: 4.5rem;
+}
+
+.picked-jump {
+  background: none;
+  border: 0;
+  color: var(--accent);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  padding: 0;
+  text-align: left;
+
+  &:hover { text-decoration: underline; }
+  &.ext { color: var(--muted); }
+}
+
+.picked-none { color: var(--fg-soft); font-size: 13px; margin: 0; }

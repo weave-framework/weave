@@ -127,6 +127,41 @@ const openDrawn = layout(opened.graph);
 ok(openDrawn.nodes.length === opened.graph.nodes.length,
    `opened: every node is placed (${openDrawn.nodes.length}/${opened.graph.nodes.length})`);
 
+/* Lighting a selection. The path must be computed on the graph that is DRAWN, not the one behind it.
+   Reported as "I selected a route and it shows no dependencies at all": the path was found against the raw
+   graph, so it named a component that folding had replaced with its folder card. Every edge on screen then
+   failed the "both ends lit" test, and the whole picture dimmed at once. */
+const { pathThrough } = bundles.layout;
+const drawnIds = new Set(folded.graph.nodes.map((n) => n.id));
+const litFolded = pathThrough(folded.graph, 'route:home');
+ok([...litFolded].every((id) => drawnIds.has(id)),
+   `every lit id is a card on the canvas (${[...litFolded].filter((id) => !drawnIds.has(id)).join(', ') || 'all of them'})`);
+ok(litFolded.has('group:app'),
+   `the route lights the folder its component fell into (${[...litFolded].join(', ')})`);
+const litRaw = pathThrough(graph, 'route:home');
+ok([...litRaw].some((id) => !drawnIds.has(id)),
+   'the raw graph really does name ids that are not on the folded canvas — so the two are not interchangeable');
+
+// The symptom itself, reproduced: an edge is drawn lit only when BOTH ends are on the path.
+const bothEnds = (lit) => folded.graph.edges.filter((e) => lit.has(e.from) && lit.has(e.to)).length;
+ok(bothEnds(litFolded) > 0, `selecting a route lights at least one edge (${bothEnds(litFolded)})`);
+ok(bothEnds(litRaw) < bothEnds(litFolded),
+   `the raw path would light fewer edges on the drawn canvas (${bothEnds(litRaw)} vs ${bothEnds(litFolded)}) — which is the reported blank selection`);
+
+/* Following a link. The links panel names the real neighbour, which may be a card that folding has replaced
+   with its folder — so selecting it has to open that folder first, or the trail dead-ends at the moment the
+   reader follows it: reported as the panel vanishing on click, selecting nothing. */
+const { groupKeyOf } = bundles.group;
+const buried = graph.nodes.find((n) => n.id === 'component:HomeCard');
+const buriedKey = groupKeyOf(buried);
+ok(buriedKey === 'app', `a folded component reports the folder holding it (got ${buriedKey})`);
+ok(!folded.graph.nodes.some((n) => n.id === buried.id), 'and it really is off the canvas while that folder is shut');
+const reopened = collapse(graph, new Set([buriedKey]));
+ok(reopened.graph.nodes.some((n) => n.id === buried.id),
+   'opening the folder it reports brings it back — which is what following a link must do');
+ok(groupKeyOf(graph.nodes.find((n) => n.id === 'route:home')) === null,
+   'a spine node reports no folder to open, because it is never folded');
+
 /* Fitting. Measured against a real graph and a real pane: 1512x1704 inside 1122x495. */
 const { fitScale } = bundles.layout;
 ok(Math.round(fitScale(1512, 1704, 1122, 495) * 100) === 28,
