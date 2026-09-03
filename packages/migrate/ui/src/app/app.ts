@@ -9,6 +9,7 @@ import {
   CARD_HEAD,
   CARD_W,
   dependencyClosure,
+  fitScale,
   layout,
   pathThrough,
   relatedEdges,
@@ -492,12 +493,16 @@ export function setup(): {
   const progressLine: Computed<string> = computed<string>(() => {
     const p: { done: number; total: number; reading: string } | null = progress();
     if (!p) return '';
-    return `Reading ${p.done + 1} of ${p.total} · ${p.reading}`;
+    // No `+ 1` here. The service counts the unit it is about to read, so adding one produced
+    // "Reading 13 of 12" on the last library of a round — reported from a screenshot.
+    return `Reading ${p.done} of ${p.total} · ${p.reading}`;
   });
 
   const progressPercent: Computed<number> = computed<number>(() => {
     const p: { done: number; total: number; reading: string } | null = progress();
-    return p && p.total ? Math.round((p.done / p.total) * 100) : 0;
+    // Capped below 100: a round can finish having discovered another round's worth of work, and a bar
+    // that reaches the end and then keeps going is worse than one that never quite gets there.
+    return p && p.total ? Math.min(96, Math.round((p.done / p.total) * 100)) : 0;
   });
 
   /**
@@ -547,6 +552,8 @@ export function setup(): {
       };
       finish();
       graph.set(payload.graph);
+      // The first sight of a graph should be the whole graph, not its top-left corner at 100%.
+      fitSoon();
       summary.set(payload.summary);
         // Put the view back exactly where it was — a widened graph is the same drawing with more in it, and
         // being thrown back to the top left after every open is most of what made this unusable.
@@ -624,6 +631,7 @@ export function setup(): {
     openGroups.set([]);
     selected.set('');
     expanded.set('');
+    fitSoon();
   };
 
   /** The node currently selected, if any. */
@@ -783,12 +791,32 @@ export function setup(): {
   };
 
   /** Scale that fits the whole drawing across the canvas element, so "everything at once" is one click. */
+  /**
+   * Scale so the WHOLE graph is in view — both directions.
+   *
+   * It fitted the width only, which on a graph 1512 wide and 1704 tall inside a 1122x495 box set 73% and
+   * left the reader looking at a quarter of it, with the button reporting success. Fitting means fitting.
+   */
   const zoomFit = (): void => {
     const host: HTMLElement | null = canvasEl();
-    const width: number = placed()?.width ?? 0;
-    if (!host || !width) return;
-    const available: number = host.clientWidth - 24;
-    zoom.set(Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round((available / width) * 100) / 100)));
+    const view: Layout | null = placed();
+    if (!host || !view) return;
+    zoom.set(Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, 
+      Math.round(fitScale(view.width, view.height, host.clientWidth, host.clientHeight) * 100) / 100)));
+  };
+
+  /**
+   * Fit once the new layout is on screen.
+   *
+   * A graph nobody has seen yet opens at 100%, which for a real application is a quarter of it in a window
+   * that has to be scrolled in both directions to find out what is there. The button existed; nobody looks
+   * for a button before they have seen the thing it acts on. Deferred a frame because the layout this
+   * measures is computed from the signal that is being set right now.
+   */
+  const fitSoon = (): void => {
+    requestAnimationFrame((): void => {
+      requestAnimationFrame(zoomFit);
+    });
   };
 
   const zoomLabel: Computed<string> = computed<string>(() => `${Math.round(zoom() * 100)}%`);

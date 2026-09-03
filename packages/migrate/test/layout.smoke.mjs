@@ -51,6 +51,8 @@ const graph = {
     node('module:app', 'module'),
     node('route:home', 'route'),
     node('route:admin', 'route'),
+    // A route WITH a folder: the shape that was being swallowed into a group.
+    node('route:profile', 'route', 'app/home'),
     node('component:Home', 'component', 'app/home'),
     node('component:HomeCard', 'component', 'app/home'),
     node('component:Admin', 'component', 'app/admin'),
@@ -90,6 +92,17 @@ ok(missing.length === 0, missing.length ? `left off the canvas: ${missing.join('
 ok(drawn.nodes.some((n) => n.id === 'group:orphans'),
    'a folder nothing structural points at is still drawn');
 
+/* The route tree is the spine, and folding part of it breaks the picture's whole point. Reported from a
+   screenshot: selecting a lazy route showed a link to its parent and nothing else, because its one child was a
+   route WITH a component — so it had a folder, and was swallowed into the application's group. */
+ok(folded.graph.nodes.some((n) => n.id === 'route:profile'),
+   'a route with a folder is drawn, not folded into that folder');
+for (const spine of ['route:home', 'route:admin', 'module:app']) {
+  ok(folded.graph.nodes.some((n) => n.id === spine), `${spine} is drawn even when folded`);
+}
+ok(folded.graph.edges.some((e) => e.from === 'route:home' && e.to.startsWith('group:')),
+   'a route still links to the folder its component fell into');
+
 // ── what folding is for.
 ok(folded.graph.nodes.length < graph.nodes.length,
    `folding reduces the card count (${graph.nodes.length} -> ${folded.graph.nodes.length})`);
@@ -113,6 +126,17 @@ ok(opened.graph.nodes.some((n) => n.id === 'component:Home'), 'an opened folder 
 const openDrawn = layout(opened.graph);
 ok(openDrawn.nodes.length === opened.graph.nodes.length,
    `opened: every node is placed (${openDrawn.nodes.length}/${opened.graph.nodes.length})`);
+
+/* Fitting. Measured against a real graph and a real pane: 1512x1704 inside 1122x495. */
+const { fitScale } = bundles.layout;
+ok(Math.round(fitScale(1512, 1704, 1122, 495) * 100) === 28,
+   `fit uses the tighter axis, not the width (got ${Math.round(fitScale(1512, 1704, 1122, 495) * 100)}%, width alone would be 73%)`);
+ok(fitScale(1512, 1704, 1122, 495) < (1122 - 24) / 1512,
+   'a graph taller than its box is not left three quarters off-screen');
+ok(fitScale(200, 200, 1200, 900) === 1, 'a small graph is not blown up to fill the box');
+ok(fitScale(1512, 1704, 0, 399) === 1, 'a pane with no width yields 1, not an unreadable 25%');
+ok(fitScale(1512, 1704, 1122, 0) === 1, 'a pane with no height yields 1 too');
+ok(fitScale(0, 0, 1200, 900) === 1, 'an empty graph yields 1');
 
 for (const name of ['layout', 'group']) rmSync(join(here, `.layout.${name}.mjs`), { force: true });
 console.log(`\n${failures ? `${failures} failing` : 'all green'}\n`);

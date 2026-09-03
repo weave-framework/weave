@@ -349,3 +349,23 @@ export function relatedEdges(graph: Graph, nodeId: string): Edge[] {
     (e: Edge): boolean => (e.kind === 'injects' || e.kind === 'renders' || e.kind === 'guards') && (e.from === nodeId || e.to === nodeId),
   );
 }
+
+/**
+ * The scale at which a graph of `width` x `height` fits inside a box of `boxW` x `boxH`.
+ *
+ * Separated from the DOM so it can be checked. Two things it must not do, both found by measuring rather than
+ * by reading: fit the width only — on a graph 1512 wide and 1704 tall in a 1122x495 box that left three
+ * quarters of it out of view while the button reported success — and scale UP, which turns a six-card graph
+ * into a wall of enormous boxes.
+ *
+ * A box with no useful size yields 1 rather than a number. It happens for real: fitting can be asked for
+ * before the pane has been measured, and a box of zero width would otherwise answer "25%" and show the reader
+ * a graph too small to read.
+ */
+export function fitScale(width: number, height: number, boxW: number, boxH: number): number {
+  // Room for the scrollbar and border; without it the fit itself brings a scrollbar into existence.
+  const CHROME: number = 24;
+  const MIN_BOX: number = 200;
+  if (!width || !height || boxW < MIN_BOX || boxH < MIN_BOX) return 1;
+  return Math.min(1, (boxW - CHROME) / width, (boxH - CHROME) / height);
+}

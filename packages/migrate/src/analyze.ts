@@ -2174,6 +2174,13 @@ export async function assembleFactsOpeningAsync(unitDir: string, open: string[],
   const opened: Set<string> = new Set<string>();
   const readUnits: Set<string> = new Set<string>();
 
+  /* Progress counted across the WHOLE read, not per round. Reading reveals more libraries, so the work is
+     discovered as it goes, and counting per round made the number fall back to 1 twice in a single run —
+     65 of 65, then 1 of 19, then 1 of 12 — which reads as the analysis starting over. Both of these only
+     ever grow: `read` is what has been read, `known` is everything discovered so far. */
+  let read: number = 0;
+  let known: number = 0;
+
   for (let round: number = 0; round < 10; round++) {
     const all: boolean = open.includes('*');
     const gaps: Reach[] = outOfReach(facts).filter(
@@ -2181,14 +2188,14 @@ export async function assembleFactsOpeningAsync(unitDir: string, open: string[],
     );
     if (!gaps.length) break;
     const plans: Map<string, UnitPlan> = planUnits(gaps);
-    let done: number = 0;
+    known += plans.size;
     for (const plan of plans.values()) {
       for (const name of plan.names) opened.add(name);
-      done++;
+      read++;
       const key: string = readKey(plan);
       if (readUnits.has(key)) continue;
       readUnits.add(key);
-      onProgress?.({ done, total: plans.size, reading: plan.names[0] });
+      onProgress?.({ done: read, total: known, reading: plan.names[0] });
       // Hand the event loop back before each unit. The walk itself is synchronous, and without this the whole
       // analysis runs in one tick: every progress event written to the socket sits in a buffer until the
       // response ends, so the reader watches "0%" for twenty seconds and then sees the finished graph. Yielding
@@ -2212,6 +2219,13 @@ export function assembleFactsOpening(unitDir: string, open: string[], onProgress
   const opened: Set<string> = new Set<string>();
   /** Folder+symbols already read, so one folder behind five aliases is read once — for what all five need. */
   const readUnits: Set<string> = new Set<string>();
+
+  /* Progress counted across the WHOLE read, not per round. Reading reveals more libraries, so the work is
+     discovered as it goes, and counting per round made the number fall back to 1 twice in a single run —
+     65 of 65, then 1 of 19, then 1 of 12 — which reads as the analysis starting over. Both of these only
+     ever grow: `read` is what has been read, `known` is everything discovered so far. */
+  let read: number = 0;
+  let known: number = 0;
   // Bounded like the terminal's loop: each pass can reveal more libraries, and a chain that keeps revealing
   // them is a repository problem, not something to chase forever.
   for (let round: number = 0; round < 10; round++) {
@@ -2223,14 +2237,14 @@ export function assembleFactsOpening(unitDir: string, open: string[], onProgress
     );
     if (!gaps.length) break;
     const plans: Map<string, UnitPlan> = planUnits(gaps);
-    let done: number = 0;
+    known += plans.size;
     for (const plan of plans.values()) {
       for (const name of plan.names) opened.add(name);
-      done++;
+      read++;
       const key: string = readKey(plan);
       if (readUnits.has(key)) continue;
       readUnits.add(key);
-      onProgress?.({ done, total: plans.size, reading: plan.names[0] });
+      onProgress?.({ done: read, total: known, reading: plan.names[0] });
       const extra: MigrationFacts = assembleFacts(plan.unit, plan.uses, plan.entry);
       if (!extra.entry) continue;
       facts = mergeFacts(facts, extra);

@@ -554,7 +554,10 @@ td.loc {
   border-radius: 6px;
   background: var(--bg);
   overflow: auto;
-  max-height: 32rem;
+  /* Tall enough to be worth fitting into. A fixed 32rem left a 1122x495 window on a graph twice that tall,
+     so "Fit" could only ever fit the width. It takes the room the viewport actually has, with a floor for
+     short windows and a ceiling so the page below stays reachable. */
+  height: clamp(26rem, calc(100vh - 22rem), 52rem);
 }
 .canvas svg {
   display: block;
