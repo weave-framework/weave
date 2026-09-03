@@ -45,8 +45,9 @@ export const CARD_H: number = 76;
 /** Height of the coloured header strip that carries the node's kind and identifier. */
 export const CARD_HEAD: number = 20;
 
-/** Horizontal distance between depth levels — a card's width plus room for the edges between columns. */
-const LEVEL_GAP: number = 300;
+/** Horizontal distance between depth levels — a card is 168 wide, so this leaves 72 for the edges between
+ *  columns. Was 300, which on a graph eleven columns deep spent 1300 pixels on nothing but gaps. */
+const LEVEL_GAP: number = 240;
 /** Vertical distance between siblings. */
 const ROW_GAP: number = 76;
 /** Left/top padding. The first version used 40 and the top row sat against the frame with no air above it. */
@@ -133,12 +134,35 @@ export function layout(graph: Graph): Layout {
 
   const seen: Set<string> = new Set<string>();
   for (const rootId of roots) place(rootId, 0, seen);
+  /**
+   * How far down each column is already filled.
+   *
+   * The route tree shares one running row counter on purpose: its leaves live in different columns and must
+   * not overlap each other vertically. Every LATER pass places into a column of its own, and sharing that
+   * same counter is what made the canvas a staircase — each new column started where the previous one ended,
+   * so 95 cards needed 5652 pixels of height and the reader's own words were "labai keistas isdestymas".
+   * Measured: the last column began at y=3712 with nothing above it.
+   */
+  const columnBottom: Map<number, number> = new Map<number, number>();
+  const noteColumn = (n: PlacedNode): void => {
+    columnBottom.set(n.x, Math.max(columnBottom.get(n.x) ?? PAD - ROW_GAP, n.y));
+  };
+  for (const n of placed.values()) noteColumn(n);
+
+  /** Place a node at the next free row of ITS column, and remember the column got taller. */
+  const putInColumn = (node: GraphNode, x: number, level: number): PlacedNode => {
+    const y: number = (columnBottom.get(x) ?? PAD - ROW_GAP) + ROW_GAP;
+    const p: PlacedNode = { ...node, x, y, r: radius(node.weight), level };
+    placed.set(node.id, p);
+    columnBottom.set(x, y);
+    return p;
+  };
+
   // Anything the structural walk never reached (an orphan route file) still deserves a place rather than
   // vanishing — silently dropping nodes is how a diagram starts lying.
   for (const node of graph.nodes) {
     if (placed.has(node.id) || (node.kind !== 'module' && node.kind !== 'route')) continue;
-    placed.set(node.id, { ...node, x: PAD, y: PAD + row * ROW_GAP, r: radius(node.weight), level: 0 });
-    row += 1;
+    putInColumn(node, PAD, 0);
   }
 
   /* ── components, beside the route that renders them ──
@@ -158,8 +182,7 @@ export function layout(graph: Graph): Layout {
   const placeComponent = (nodeId: string, x: number, level: number, depth: number): void => {
     const node: GraphNode | undefined = byId.get(nodeId);
     if (!node || placed.has(nodeId) || depth > 8) return;
-    placed.set(nodeId, { ...node, x, y: PAD + row * ROW_GAP, r: radius(node.weight), level });
-    row += 1;
+    putInColumn(node, x, level);
     for (const child of usedBy.get(nodeId) ?? []) placeComponent(child, x + LEVEL_GAP, level + 1, depth + 1);
   };
 
@@ -167,6 +190,7 @@ export function layout(graph: Graph): Layout {
     const from: PlacedNode | undefined = placed.get(e.from);
     const node: GraphNode | undefined = byId.get(e.to);
     if (!from || !node || placed.has(e.to)) continue;
+    noteColumn({ ...node, x: from.x + LEVEL_GAP, y: from.y, r: radius(node.weight), level: from.level + 1 });
     placed.set(e.to, { ...node, x: from.x + LEVEL_GAP, y: from.y, r: radius(node.weight), level: from.level + 1 });
     // and everything that component puts on screen, after it
     for (const child of usedBy.get(e.to) ?? []) placeComponent(child, from.x + LEVEL_GAP * 2, from.level + 2, 1);
@@ -180,8 +204,7 @@ export function layout(graph: Graph): Layout {
   for (const e of declares) {
     const ngModule: GraphNode | undefined = byId.get(e.from);
     if (!ngModule || placed.has(e.from)) continue;
-    placed.set(e.from, { ...ngModule, x: rightOfTree, y: PAD + row * ROW_GAP, r: radius(ngModule.weight), level: 0 });
-    row += 1;
+    putInColumn(ngModule, rightOfTree, 0);
     // and everything it declares, in the column after it
     for (const owned of declares.filter((d: Edge): boolean => d.from === e.from)) {
       placeComponent(owned.to, rightOfTree + LEVEL_GAP, 1, 1);

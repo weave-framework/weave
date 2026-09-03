@@ -61,6 +61,18 @@ const graph = {
     // Reached by nothing structural — the shape that used to disappear.
     node('component:Orphan', 'component', 'orphans'),
     node('external:HttpClient', 'external'),
+    node('component:Widget1', 'component', 'widgets'),
+    node('component:Widget2', 'component', 'widgets'),
+    node('component:Widget3', 'component', 'widgets'),
+    node('component:Widget4', 'component', 'widgets'),
+    node('component:Widget5', 'component', 'widgets'),
+    node('component:Widget6', 'component', 'widgets'),
+    node('component:Widget7', 'component', 'widgets'),
+    node('component:Widget8', 'component', 'widgets'),
+    node('component:Widget9', 'component', 'widgets'),
+    node('component:Widget10', 'component', 'widgets'),
+    // Ten widgets under one folder, all used by one component: enough cards in one column that a
+    // staircase shows up as height, which three cards cannot do.
   ],
   edges: [
     { from: 'module:app', to: 'route:home', kind: 'child' },
@@ -72,6 +84,16 @@ const graph = {
     { from: 'component:Admin', to: 'service:Api', kind: 'injects' },
     { from: 'component:Admin', to: 'service:Auth', kind: 'injects' },
     { from: 'service:Api', to: 'external:HttpClient', kind: 'injects' },
+    { from: 'component:Admin', to: 'component:Widget1', kind: 'uses' },
+    { from: 'component:Admin', to: 'component:Widget2', kind: 'uses' },
+    { from: 'component:Admin', to: 'component:Widget3', kind: 'uses' },
+    { from: 'component:Admin', to: 'component:Widget4', kind: 'uses' },
+    { from: 'component:Admin', to: 'component:Widget5', kind: 'uses' },
+    { from: 'component:Admin', to: 'component:Widget6', kind: 'uses' },
+    { from: 'component:Admin', to: 'component:Widget7', kind: 'uses' },
+    { from: 'component:Admin', to: 'component:Widget8', kind: 'uses' },
+    { from: 'component:Admin', to: 'component:Widget9', kind: 'uses' },
+    { from: 'component:Admin', to: 'component:Widget10', kind: 'uses' },
   ],
 };
 
@@ -126,6 +148,32 @@ ok(opened.graph.nodes.some((n) => n.id === 'component:Home'), 'an opened folder 
 const openDrawn = layout(opened.graph);
 ok(openDrawn.nodes.length === opened.graph.nodes.length,
    `opened: every node is placed (${openDrawn.nodes.length}/${opened.graph.nodes.length})`);
+
+/* No staircase. Every pass after the route tree places into a column of its own, and they used to share the
+   tree's running row counter — so each new column started where the previous one ended and the canvas grew
+   downwards forever. Measured on a real application: 95 cards needed 5652 pixels of height, the last column
+   beginning at y=3712 with nothing above it. Reported as "labai keistas isdestymas".
+
+   The property is that height follows the TALLEST COLUMN, not the total number of cards. */
+const columnsOf = (l) => {
+  const by = new Map();
+  for (const n of l.nodes) by.set(n.x, [...(by.get(n.x) ?? []), n]);
+  return [...by.values()];
+};
+// Everything open: ten widgets in one column, which is where a staircase becomes visible AS height.
+const wideOpen = layout(collapse(graph, new Set(['app', 'widgets', 'services'])).graph);
+
+for (const [name, l] of [["folded", drawn], ["opened", openDrawn], ["all open", wideOpen]]) {
+  const cols = columnsOf(l);
+  const tallest = Math.max(...cols.map((c) => c.length));
+  // Row pitch plus generous room for padding and the separation pass.
+  const ceiling = tallest * 120 + 400;
+  ok(l.height <= ceiling,
+     `${name}: height follows the tallest column, not the card count (${Math.round(l.height)} <= ${ceiling}, ${l.nodes.length} cards in ${cols.length} columns, tallest ${tallest})`);
+  const startsHigh = cols.filter((c) => Math.min(...c.map((n) => n.y)) < l.height / 2).length;
+  ok(startsHigh === cols.length,
+     `${name}: every column starts in the top half (${startsHigh}/${cols.length})`);
+}
 
 /* Lighting a selection. The path must be computed on the graph that is DRAWN, not the one behind it.
    Reported as "I selected a route and it shows no dependencies at all": the path was found against the raw
