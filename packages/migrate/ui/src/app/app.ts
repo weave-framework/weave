@@ -15,6 +15,7 @@ import {
   type Layout,
   type PlacedNode,
 } from './layout.js';
+import { collapse as foldGroups, groupKeyFromId, isGroupId, type GroupSummary } from './group.js';
 
 // Capitalized tags in the template resolve to these imports. The editor tooling understands that; eslint,
 // running without it, sees three unused bindings — so the repo's convention is to name them here.
@@ -133,6 +134,11 @@ export function setup(): {
   CARD_HEAD: number;
   view: Computed<Layout>;
   hasGraph: Computed<boolean>;
+  groups: Computed<GroupSummary[]>;
+  toggleGroup: (key: string) => void;
+  isGroupOpen: (key: string) => boolean;
+  foldAll: () => void;
+  openGroups: Signal<string[]>;
   sel: Computed<PlacedNode>;
   hasSelection: Computed<boolean>;
   summaryLine: Computed<string>;
@@ -577,11 +583,48 @@ export function setup(): {
     if (chosen) analyse(chosen);
   };
 
-  /** The laid-out graph, recomputed only when the graph itself changes. */
-  const placed: Computed<Layout | null> = computed<Layout | null>(() => {
+  /**
+   * Which folder groups are open. Everything else is one card.
+   *
+   * The opening view is folded because 227 cards is not a drawing, and no arrangement of that many is. What a
+   * person wants first is the shape — which of this is the application, which is the shared library — and that
+   * is five cards, not two hundred.
+   */
+  const openGroups: Signal<string[]> = signal<string[]>([]);
+
+  /** The graph as it is currently folded, and what each group card stands for. */
+  const folded: Computed<{ graph: Graph; groups: GroupSummary[]; worthGrouping: boolean } | null> = computed(() => {
     const g: Graph | null = graph();
-    return g ? layout(g) : null;
+    return g ? foldGroups(g, new Set(openGroups())) : null;
   });
+
+  /** The laid-out graph, recomputed when the graph changes or a group is opened. */
+  const placed: Computed<Layout | null> = computed<Layout | null>(() => {
+    const f: { graph: Graph } | null = folded();
+    return f ? layout(f.graph) : null;
+  });
+
+  /** Every group, open or not — the list beside the canvas, and the migration checklist later. */
+  const groups: Computed<GroupSummary[]> = computed<GroupSummary[]>(() => folded()?.groups ?? []);
+
+  /** Open a folded group, or fold an open one back. */
+  const toggleGroup = (key: string): void => {
+    openGroups.set((current: string[]): string[] =>
+      current.includes(key) ? current.filter((k: string): boolean => k !== key) : [...current, key],
+    );
+    // A card that is no longer on the canvas cannot stay selected or open.
+    selected.set('');
+    expanded.set('');
+  };
+
+  const isGroupOpen = (key: string): boolean => openGroups().includes(key);
+
+  /** Fold everything back — the way home from any depth. */
+  const foldAll = (): void => {
+    openGroups.set([]);
+    selected.set('');
+    expanded.set('');
+  };
 
   /** The node currently selected, if any. */
   const selectedNode: Computed<PlacedNode | null> = computed<PlacedNode | null>(() => {
@@ -663,6 +706,12 @@ export function setup(): {
    * background.
    */
   const pick = (nodeId: string): void => {
+    // A group card stands for its contents, so the useful thing a click can do is show them. Selecting it
+    // would light a path made of edges that are summaries, which is a picture of nothing in particular.
+    if (isGroupId(nodeId)) {
+      toggleGroup(groupKeyFromId(nodeId));
+      return;
+    }
     selected.set(selected() === nodeId ? '' : nodeId);
     // Selecting a different card while one is open moves the open card too; selecting nothing closes it.
     if (expanded() && expanded() !== nodeId) expanded.set('');
@@ -986,6 +1035,7 @@ export function setup(): {
     // "Nothing points here" is worth its own word: a way into the app, or something orphaned. Either way the
     // reader should not have to wonder whether the card is a bug.
     if (node.root) return node.kind === 'module' ? 'ROOT MODULE' : 'ROOT ROUTE';
+    if (node.kind === 'group') return `${node.weight} INSIDE`;
     if (node.kind === 'ngmodule') return 'NGMODULE';
     if (node.kind === 'module') return 'MODULE';
     // Two very different things used to share one word. A class from npm is never migrated and never read —
@@ -1081,6 +1131,11 @@ export function setup(): {
     CARD_HEAD,
     view,
     hasGraph,
+    groups,
+    toggleGroup,
+    isGroupOpen,
+    foldAll,
+    openGroups,
     sel,
     hasSelection,
     summaryLine,

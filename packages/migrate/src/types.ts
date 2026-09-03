@@ -78,7 +78,15 @@ export interface Peek {
 /* ─────────────────────────── the dependency graph ─────────────────────────── */
 
 /** What a node stands for. The kind decides how it is drawn and what it can connect to. */
-export type NodeKind = 'module' | 'route' | 'component' | 'service' | 'external' | 'ngmodule';
+export type NodeKind =
+  | 'module'
+  | 'route'
+  | 'component'
+  | 'service'
+  | 'external'
+  | 'ngmodule'
+  /** A folded folder standing for the nodes inside it. Made by the viewer, never by the analysis. */
+  | 'group';
 
 /** How one node depends on another. */
 export type EdgeKind = 'child' | 'loads' | 'renders' | 'guards' | 'injects' | 'uses' | 'declares' | 'imports';

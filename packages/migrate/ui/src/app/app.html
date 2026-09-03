@@ -281,7 +281,22 @@
       }
 
       @if (hasGraph()) {
+        <div class="folders">
+          <span class="folders-lead">Folders</span>
+          @for (g of groups(); track g.key) {
+            <button type="button" class="folder-chip" class:open={{ isGroupOpen(g.key) }}
+                    on:click={{ () => toggleGroup(g.key) }}
+                    title={{ isGroupOpen(g.key) ? 'Fold ' + g.label + ' back into one card' : 'Open ' + g.label }}>
+              {{ g.label }}<span class="folder-n">{{ g.total }}</span>
+            </button>
+          }
+          @if (openGroups().length) {
+            <button type="button" class="folder-reset" on:click={{ foldAll }}>Fold all back</button>
+          }
+        </div>
+
         <ul class="legend">
+          <li><span class="swatch swatch--group"></span>folder — click to see inside</li>
           <li><span class="swatch swatch--module"></span>module</li>
           <li><span class="swatch swatch--route"></span>route</li>
           <li><span class="swatch swatch--component"></span>component</li>

@@ -439,6 +439,33 @@ export function buildGraph(facts: MigrationFacts): Graph {
     node.sharedWith = (rendersOf.get(route.component) ?? 1) - 1;
   });
 
+  /* A route has no file of its own worth grouping by — every route in an application is declared in one of two
+     or three routing files, so grouping by those would put the whole app in one pile. It belongs where its
+     SCREEN lives: `/documents` sits with the documents folder because that is what a person means by it.
+     Without this the folder key covers 170 of 227 nodes; with it, 183, and the route tree stops being a
+     separate thing floating beside the groups. A module node follows the routes it declares, when they agree.
+     The 44 left over are the npm classes and the routes with no component of their own — redirects and
+     wildcards — which have no folder to belong to and should not be given one. */
+  for (const node of nodes.values()) {
+    if (node.kind !== 'route' || !node.component) continue;
+    const screen: GraphNode | undefined = nodes.get(id('component', node.component));
+    if (screen?.folder !== undefined) node.folder = screen.folder;
+  }
+  for (const file of routeFiles) {
+    const node: GraphNode | undefined = nodes.get(id('module', file));
+    if (!node) continue;
+    const folders: string[] = [
+      ...new Set(
+        facts.routes
+          .map((r: RouteFact, i: number): GraphNode | undefined => (r.file === file ? nodes.get(id('route', `${r.file}#${i}`)) : undefined))
+          .map((n: GraphNode | undefined): string | undefined => n?.folder)
+          .filter((f: string | undefined): f is string => f !== undefined),
+      ),
+    ];
+    // Only when its routes agree: a routing file spanning five folders belongs to none of them.
+    if (folders.length === 1) node.folder = folders[0];
+  }
+
   /* ── say what an external actually IS ──
      Reported, and fair: a list reading "10 LayoutService" names a thing with no origin and no purpose — where
      is it from, who needs it, why does it matter. All three are already known: `outOfReach` traces most of

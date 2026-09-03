@@ -188,12 +188,17 @@ export function layout(graph: Graph): Layout {
     }
   }
 
-  // Anything still unplaced — a component no module declares, a module that declares nothing — is part of the
-  // app too. A diagram that quietly omits things cannot be trusted about the things it does show.
+  // Anything still unplaced — a component no module declares, a module that declares nothing, a folded folder
+  // nothing on the spine points at — is part of the app too. A diagram that quietly omits things cannot be
+  // trusted about the things it does show.
+  //
+  // This pass used to name the kinds it would rescue, which made it commit the very fault it warns against:
+  // `component` and `ngmodule` were listed, so the three folder groups holding 77 nodes between them were
+  // dropped without a word. It rescues everything now, and `verify:migrate-layout` fails if any node is left
+  // off the canvas.
   const farRight: number = Math.max(...[...placed.values()].map((n: PlacedNode): number => n.x), PAD) + LEVEL_GAP;
   for (const node of graph.nodes) {
     if (placed.has(node.id)) continue;
-    if (node.kind !== 'component' && node.kind !== 'ngmodule') continue;
     placeComponent(node.id, farRight, 0, 1);
   }
 

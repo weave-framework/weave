@@ -724,6 +724,7 @@ td.loc {
 .swatch--service { background: var(--orange); }
 .swatch--external { background: var(--red); }
 .swatch--npm { background: var(--muted); }
+.swatch--group { background: var(--fg); }
 .swatch--cut {
   border-radius: 0;
   height: 0;
@@ -764,6 +765,7 @@ td.loc {
 .card-head--route { fill: var(--muted); }
 .card-head--component { fill: var(--green); }
 .card-head--service { fill: var(--orange); }
+.card-head--group { fill: var(--fg); }
 .card-head--external { fill: var(--red); }
 // An npm class is not a problem to solve, so it must not wear the colour that means "look here".
 .card-head--external.npm { fill: var(--muted); }
@@ -1291,4 +1293,62 @@ td.loc {
   }
 
   span { font-weight: 500; }
+}
+
+/* The folder bar. Every group is here whether it is open or folded, so the way back is always one click and
+   never hidden inside the canvas — the canvas is 4000px wide and a control on it can be scrolled out of sight. */
+.folders {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 10px;
+}
+
+.folders-lead {
+  color: var(--fg-soft);
+  font-size: 12px;
+  margin-right: 2px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.folder-chip {
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--fg);
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  font-size: 13px;
+  gap: 6px;
+  padding: 3px 10px;
+
+  &:hover { border-color: var(--accent); }
+
+  /* An open folder is showing its contents, so it reads as pressed rather than as available. */
+  &.open {
+    background: var(--fg);
+    border-color: var(--fg);
+    color: var(--bg);
+  }
+}
+
+.folder-n {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.7;
+}
+
+.folder-reset {
+  background: none;
+  border: 0;
+  color: var(--accent);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  padding: 3px 4px;
+  text-decoration: underline;
 }
