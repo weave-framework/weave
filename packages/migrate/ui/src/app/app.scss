@@ -1275,3 +1275,20 @@ td.loc {
   opacity: 0.45;
   stroke-dasharray: 2 3;
 }
+
+/* One project at a time, so the control is a radio. Styled by hand rather than through the library's Checkbox:
+   there is no Radio in the row's budget of vertical space, and the label doubles as the project name. */
+.choose {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+
+  input {
+    accent-color: var(--accent);
+    cursor: pointer;
+    margin: 0;
+  }
+
+  span { font-weight: 500; }
+}

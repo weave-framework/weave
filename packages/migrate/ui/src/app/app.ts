@@ -156,9 +156,6 @@ export function setup(): {
   kind: Signal<'all' | 'application' | 'library' | 'unstated'>;
   shown: Computed<Unit[]>;
   counts: Computed<{ all: number; application: number; library: number; unstated: number }>;
-  pickShown: () => void;
-  clearPicked: () => void;
-  allShownPicked: Computed<boolean>;
   hint: Computed<'ask' | 'missing' | 'file' | 'markers' | 'bare'>;
   hintMarkers: Computed<string>;
   missingRoutes: Signal<string[]>;
@@ -176,9 +173,9 @@ export function setup(): {
   hasResult: Computed<boolean>;
   error: Signal<string>;
   elapsed: Signal<number>;
-  picked: Signal<string[]>;
+  picked: Signal<string>;
   scan: () => void;
-  toggle: (unit: Unit) => void;
+  choose: (unit: Unit) => void;
   isPicked: (unit: Unit) => boolean;
   relative: (unit: Unit) => string;
   typeLabel: (unit: Unit) => string;
@@ -199,7 +196,11 @@ export function setup(): {
   const workspace: Signal<Workspace | null> = signal<Workspace | null>(null);
   const error: Signal<string> = signal('');
   const elapsed: Signal<number> = signal(0);
-  const picked: Signal<string[]> = signal<string[]>([]);
+  /* One project, not a set. The multi-select was a promise the rest of the code never kept: analysis has
+     always run on `picked()[0]` alone, so ticking a second box changed nothing except what the reader
+     believed was about to happen. And one graph per project is the right shape anyway — two applications
+     merged onto one canvas would put 400+ cards up with no way to tell whose library is whose. */
+  const picked: Signal<string> = signal<string>('');
 
   /**
    * What is at the typed path, looked up as you stop typing.
@@ -271,7 +272,7 @@ export function setup(): {
     phase.set('scanning');
     error.set('');
     workspace.set(null);
-    picked.set([]);
+    picked.set('');
     const started: number = performance.now();
 
     void fetch(apiUrl('/api/inspect'), {
@@ -297,13 +298,12 @@ export function setup(): {
       });
   };
 
-  const toggle = (unit: Unit): void => {
-    picked.set((current: string[]): string[] =>
-      current.includes(unit.root) ? current.filter((r: string): boolean => r !== unit.root) : [...current, unit.root],
-    );
+  /** Choose this project, or clear it by choosing the one already chosen. */
+  const choose = (unit: Unit): void => {
+    picked.set(picked() === unit.root ? '' : unit.root);
   };
 
-  const isPicked = (unit: Unit): boolean => picked().includes(unit.root);
+  const isPicked = (unit: Unit): boolean => picked() === unit.root;
 
   /** A unit's path relative to the workspace root — the absolute one is noise once the root is on screen. */
   const relative = (unit: Unit): string => {
@@ -463,21 +463,6 @@ export function setup(): {
   ];
   const source: Signal<string> = signal('angular');
 
-  /** Pick every unit currently shown — the filter is the selection tool, so this respects it. */
-  const pickShown = (): void => {
-    const roots: string[] = shown().map((u: Unit): string => u.root);
-    picked.set((current: string[]): string[] => [...new Set([...current, ...roots])]);
-  };
-
-  /** Clear the whole selection, including anything a filter is currently hiding — otherwise "clear" lies. */
-  const clearPicked = (): void => {
-    picked.set([]);
-  };
-
-  const allShownPicked: Computed<boolean> = computed<boolean>(() => {
-    const list: Unit[] = shown();
-    return list.length > 0 && list.every((u: Unit): boolean => picked().includes(u.root));
-  });
 
   /* ── step two: the dependency graph ──
      Analysis is a full TypeScript walk — measured at 1-2 s on a real app, against 150 ms for the shallow scan
@@ -577,19 +562,19 @@ export function setup(): {
     });
   };
 
-  /** Just the folder name of the first pick — a full Windows path on a button reads as a bug. */
+  /** Just the folder name of the pick — a full Windows path on a button reads as a bug. */
   const pickedLabel: Computed<string> = computed<string>(() => {
-    const first: string = picked()[0] ?? '';
+    const first: string = picked();
     // Split on both separators without a regex: an escaped backslash inside one has been mangled twice today
     // by the tooling writing this file, and a literal pair of characters cannot be.
     const parts: string[] = first.split('\\').join('/').split('/').filter(Boolean);
     return parts[parts.length - 1] ?? '';
   });
 
-  /** Analyse the first project that was picked — the graph answers about one unit at a time. */
+  /** Analyse the chosen project. */
   const analyseSelection = (): void => {
-    const first: string | undefined = picked()[0];
-    if (first) analyse(first);
+    const chosen: string = picked();
+    if (chosen) analyse(chosen);
   };
 
   /** The laid-out graph, recomputed only when the graph itself changes. */
@@ -1042,7 +1027,7 @@ export function setup(): {
     elapsed,
     picked,
     scan,
-    toggle,
+    choose,
     isPicked,
     relative,
     typeLabel,
@@ -1119,9 +1104,6 @@ export function setup(): {
     kind,
     shown,
     counts,
-    pickShown,
-    clearPicked,
-    allShownPicked,
     hint,
     hintMarkers,
     browsing,

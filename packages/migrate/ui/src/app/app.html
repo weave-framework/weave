@@ -195,15 +195,9 @@
         </div>
 
         <div class="bulk">
-          <Button variant="ghost" disabled={{ allShownPicked() || !shown().length }} on:click={{ pickShown }}>
-            Select {{ shown().length === counts().all ? 'all' : 'these ' + shown().length }}
-          </Button>
-          <Button variant="ghost" disabled={{ !picked().length }} on:click={{ clearPicked }}>
-            Clear selection
-          </Button>
           <span class="bulk-count">
             {{ shown().length }} shown{{ shown().length === counts().all ? '' : ' of ' + counts().all }} ·
-            {{ picked().length }} picked
+            {{ picked() ? "1 chosen" : "none chosen" }}
           </span>
         </div>
 
@@ -221,7 +215,11 @@
               @for (u of shown(); track u.root) {
                 <tr class:picked={{ isPicked(u) }}>
                   <td class="unit">
-                    <Checkbox checked={{ isPicked(u) }} onChange={{ () => toggle(u) }} label={{ u.name }} />
+                    <label class="choose">
+                      <input type="radio" name="project" .checked={{ isPicked(u) }}
+                             on:change={{ () => choose(u) }} />
+                      <span>{{ u.name }}</span>
+                    </label>
                   </td>
                   <td><span class="kind" class:unstated={{ u.type === null }}>{{ typeLabel(u) }}</span></td>
                   <td class="declared">{{ u.declaredBy }}</td>
@@ -238,8 +236,8 @@
 
         <div class="foot">
           <p>{{ found().units.length }} project(s) found in {{ found().root }}</p>
-          <Button disabled={{ picked().length === 0 || analysing() }} on:click={{ analyseSelection }}>
-            {{ analysing() ? 'Analysing…' : picked().length === 0 ? 'Pick at least one' : 'Analyse ' + pickedLabel() }}
+          <Button disabled={{ !picked() || analysing() }} on:click={{ analyseSelection }}>
+            {{ analysing() ? 'Analysing…' : !picked() ? 'Choose a project' : 'Analyse ' + pickedLabel() }}
           </Button>
         </div>
       } @else {
