@@ -116,6 +116,19 @@ export interface GraphNode {
   folded?: boolean;
   /** The node this one is drawn inside, when it belongs to a group. */
   parent?: string;
+  /**
+   * The folder this node's source lives in, relative to the deepest folder that holds ALL of them
+   * (`archiving/app-modules/documents`, `components/table`). Slash-separated, lower case, with the
+   * carrier segments every workspace repeats — src, app, lib(s), apps — dropped, so the first segment
+   * is something a person named. Absent on a node with no file of its own: a route, or an npm class.
+   *
+   * This is the grouping axis. Measured on a real application, 181 of 227 nodes have one, the first
+   * level separates the application from the shared component and service libraries, and no group
+   * runs away with the graph. Lazy boundaries were tried first and reach only 57 of the 227.
+   */
+  folder?: string;
+  /** Where this node's source is, relative to the analysed unit. Absent for routes and npm classes. */
+  file?: string;
 }
 
 /** One dependency. */

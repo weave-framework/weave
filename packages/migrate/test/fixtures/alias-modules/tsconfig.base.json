@@ -3,7 +3,8 @@
     "baseUrl": ".",
     "paths": {
       "@fx/one": ["app/src/modules/one/index.ts"],
-      "@fx/two": ["app/src/modules/two/index.ts"]
+      "@fx/two": ["app/src/modules/two/index.ts"],
+      "@fx/three": ["shared/three/src/index.ts"]
     }
   }
 }

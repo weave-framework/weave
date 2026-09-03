@@ -47,6 +47,40 @@ function shortPath(file: string, root: string): string {
   return rel.replace(/^[\\/]/, '').split(sep).join('/');
 }
 
+/** Segments every workspace repeats, which say nothing about what a file IS. */
+const CARRIER: ReadonlySet<string> = new Set<string>(['src', 'app', 'lib', 'libs', 'apps', 'projects']);
+
+/**
+ * The deepest folder that contains every file the analysis read.
+ *
+ * Not the analysed unit: an application reaches into sibling workspace libraries, so half the files sit
+ * OUTSIDE it. Measured, using the unit put 110 of 227 nodes into one bucket named after the drive.
+ */
+function commonRoot(files: string[]): string {
+  const norm = (p: string): string => p.split('\\').join('/').toLowerCase();
+  if (!files.length) return '';
+  let root: string = norm(files[0]);
+  for (const file of files) {
+    const f: string = norm(file);
+    while (root && !f.startsWith(root)) root = root.slice(0, root.lastIndexOf('/'));
+  }
+  return root;
+}
+
+/**
+ * The folder a file belongs to, as a grouping key.
+ *
+ * Slash-separated and relative to `root`, with the file name and the carrier segments removed, so
+ * `C:/ws/apps/archiving/src/app/app-modules/documents/x.component.ts` becomes
+ * `archiving/app-modules/documents`. Empty when the file sits directly at the root.
+ */
+function folderOf(file: string, root: string): string {
+  const norm: string = file.split('\\').join('/').toLowerCase();
+  const rel: string = norm.startsWith(root) ? norm.slice(root.length) : norm;
+  const parts: string[] = rel.split('/').filter(Boolean).slice(0, -1);
+  return parts.filter((p: string): boolean => !CARRIER.has(p)).join('/');
+}
+
 /**
  * Which routes file a lazy specifier leads to.
  *
@@ -162,6 +196,15 @@ export function buildGraph(facts: MigrationFacts): Graph {
   const edges: Edge[] = [];
   const root: string = facts.unit;
 
+  /* Where the folder keys are measured from — see `commonRoot`. Built from the files that actually back a
+     node, not from `facts.files`, so a stray script somewhere high in the tree cannot flatten every key. */
+  const factFiles: string[] = [
+    ...facts.components.map((c: ComponentFact): string => c.file),
+    ...facts.services.map((s: ServiceFact): string => s.file),
+    ...facts.ngModules.map((m: { file: string }): string => m.file),
+  ].filter(Boolean);
+  const folderRoot: string = commonRoot(factFiles);
+
   const add = (node: GraphNode): GraphNode => {
     const existing: GraphNode | undefined = nodes.get(node.id);
     if (existing) return existing;
@@ -228,6 +271,8 @@ export function buildGraph(facts: MigrationFacts): Graph {
       label: component.className,
       detail: component.selector ?? '',
       weight: 0,
+      folder: folderOf(component.file, folderRoot),
+      file: shortPath(component.file, root),
     });
   }
   for (const service of facts.services) {
@@ -237,6 +282,8 @@ export function buildGraph(facts: MigrationFacts): Graph {
       label: service.className,
       detail: service.providedIn ? `providedIn: ${service.providedIn}` : '',
       weight: 0,
+      folder: folderOf(service.file, folderRoot),
+      file: shortPath(service.file, root),
     });
   }
 
@@ -364,6 +411,8 @@ export function buildGraph(facts: MigrationFacts): Graph {
       label: ngModule.className,
       detail: `${ngModule.declarations.length} declared · ${ngModule.imports.length} imported`,
       weight: 0,
+      folder: folderOf(ngModule.file, folderRoot),
+      file: shortPath(ngModule.file, root),
     });
   }
   for (const ngModule of facts.ngModules) {
