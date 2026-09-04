@@ -383,3 +383,21 @@ if (wrong.length) {
   );
 }
 console.log(`✔ install instructions name the shipped builds (${named.size} reference${named.size === 1 ? '' : 's'})`);
+
+/* The packaging tool is not a dependency of this project.
+
+   `@vscode/vsce` sat in the extension's devDependencies and dragged secretlint and typed-rest-client behind
+   it — 207 packages, and six open Dependabot alerts (fast-uri x4 high, qs x2 medium) for a tool whose whole
+   job is to zip a directory. Nothing in CI runs it; one manual script does, and a pinned `npx` serves that
+   just as well — reproducible, and out of the tree. */
+const lock = readFileSync(join(root, 'pnpm-lock.yaml'), 'utf8');
+if (lock.includes('@vscode/vsce')) {
+  throw new Error(
+    [
+      'the packaging tool is back in the dependency tree.',
+      '  `@vscode/vsce` belongs in a pinned `npx` invocation, not in devDependencies: it is run by hand',
+      '  at release time, never by CI, and installing it costs 207 packages and their vulnerability reports.',
+    ].join('\n')
+  );
+}
+console.log('✔ the packaging tool is invoked with a pinned npx, not installed');
