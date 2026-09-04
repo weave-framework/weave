@@ -404,7 +404,7 @@ export function fitScale(width: number, height: number, boxW: number, boxH: numb
  * A selection is not a new drawing. Everything already placed keeps its exact position; only the cards that
  * were not there before need somewhere to go, and they go beside the neighbour that pulled them in.
  */
-export function layoutBeside(graph: Graph, previous: Layout): Layout {
+export function layoutBeside(graph: Graph, previous: Layout, order: readonly string[] = []): Layout {
   const known: Map<string, PlacedNode> = new Map(previous.nodes.map((n: PlacedNode): [string, PlacedNode] => [n.id, n]));
   const placed: Map<string, PlacedNode> = new Map<string, PlacedNode>();
 
@@ -416,8 +416,18 @@ export function layoutBeside(graph: Graph, previous: Layout): Layout {
   /** Occupied cells, so a new card lands somewhere empty rather than on top of an existing one. */
   const taken: Set<string> = new Set([...placed.values()].map((n: PlacedNode): string => `${n.x},${n.y}`));
 
-  for (const node of graph.nodes) {
-    if (placed.has(node.id)) continue;
+  /* New cards are placed in the order they were REVEALED, not the order they happen to sit in the graph.
+     Graph order means a card revealed on the third click can be placed before one revealed on the first, take
+     its cell, and push it elsewhere: 5 of 48 cards moved on the third step of a trail. Reveal order is
+     append-only, so a card placed once keeps its cell for as long as it stays on the canvas. */
+  const rank = (id: string): number => {
+    const i: number = order.indexOf(id);
+    return i === -1 ? Number.MAX_SAFE_INTEGER : i;
+  };
+  const pending: GraphNode[] = graph.nodes.filter((n: GraphNode): boolean => !placed.has(n.id));
+  pending.sort((a: GraphNode, b: GraphNode): number => rank(a.id) - rank(b.id));
+
+  for (const node of pending) {
     // Whoever it connects to that already has a place — that is where it belongs.
     const anchorId: string | undefined = graph.edges
       .filter((e: Edge): boolean => e.from === node.id || e.to === node.id)

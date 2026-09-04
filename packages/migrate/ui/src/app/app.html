@@ -316,8 +316,11 @@
           <Button variant="ghost" on:click={{ zoomFit }}>Fit</Button>
           <Button variant="ghost" on:click={{ zoomReset }}>100%</Button>
           <span class="zoom-hint">Ctrl + scroll to zoom</span>
-          @if (selected()) {
+          @if (selected() || revealed().length) {
             <Button variant="ghost" class="clear-sel" on:click={{ clearSelection }}>Clear selection</Button>
+          }
+          @if (revealed().length) {
+            <span class="trail-count">{{ revealed().length }} followed onto the canvas</span>
           }
 
           @if (decisionCounts().total) {

@@ -249,6 +249,25 @@ ok(placedAt.size === withNeighbour.nodes.length,
 ok(withNeighbour.width >= stable.width && withNeighbour.height >= stable.height,
    `the canvas never shrinks under the reader (${Math.round(stable.width)}x${Math.round(stable.height)} -> ${Math.round(withNeighbour.width)}x${Math.round(withNeighbour.height)})`);
 
+/* Following a trail: reveals accumulate, and each step must leave the previous ones exactly where they are.
+   Placing new cards in GRAPH order instead of reveal order lets a card revealed on step three take the cell
+   of one revealed on step one — measured live, 5 of 48 cards moved on the third click of a trail. */
+/* Two widgets, both hanging off the same anchor, revealed in the OPPOSITE order to the one they sit in
+   the graph. That is what makes the ordering load-bearing: with graph order the later reveal takes the
+   earlier one's cell, and with reveal order it cannot. */
+const trail1 = ['component:Widget5'];
+const trail2 = ['component:Widget5', 'component:Widget2'];
+const step1 = layoutBeside(collapse(graph, new Set(), new Set(trail1)).graph, stable, trail1);
+const step2 = layoutBeside(collapse(graph, new Set(), new Set(trail2)).graph, stable, trail2);
+const at1 = new Map(step1.nodes.map((n) => [n.id, `${n.x},${n.y}`]));
+const movedOnStep2 = step2.nodes.filter((n) => at1.has(n.id) && at1.get(n.id) !== `${n.x},${n.y}`);
+ok(movedOnStep2.length === 0,
+   movedOnStep2.length
+     ? `${movedOnStep2.length} card(s) moved on the next step: ${movedOnStep2.slice(0, 3).map((n) => `${n.id} ${at1.get(n.id)} -> ${n.x},${n.y}`).join("; ")}`
+     : `a second step leaves all ${step1.nodes.length} cards of the first exactly where they were`);
+ok(step2.nodes.length > step1.nodes.length,
+   `and the trail grows (${step1.nodes.length} -> ${step2.nodes.length} cards)`);
+
 /* Fitting. Measured against a real graph and a real pane: 1512x1704 inside 1122x495. */
 const { fitScale } = bundles.layout;
 ok(Math.round(fitScale(1512, 1704, 1122, 495) * 100) === 28,

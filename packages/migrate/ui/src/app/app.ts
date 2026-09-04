@@ -142,6 +142,7 @@ export function setup(): {
   jumpTo: (nodeId: string) => void;
   foldAll: () => void;
   openGroups: Signal<string[]>;
+  revealed: Signal<string[]>;
   sel: Computed<PlacedNode>;
   hasSelection: Computed<boolean>;
   summaryLine: Computed<string>;
@@ -602,28 +603,34 @@ export function setup(): {
   const openGroups: Signal<string[]> = signal<string[]>([]);
 
   /**
-   * The selected card's immediate neighbours, which stay on the canvas whatever folder they belong to.
+   * Cards lifted out of their folders and kept on the canvas.
    *
-   * Without this, selecting a card whose neighbours are folded lights one edge to a folder and looks like
-   * nothing happened — reported as "pasirinkau komponenta ir nieko nenutiko". Lifting only the neighbours
-   * answers the question without unfolding a folder of seventy other things to do it.
+   * This ACCUMULATES, and that is the whole point. Deriving it from the current selection alone answered one
+   * question and then forgot it: selecting the next card put the previous one back in its folder, so a chain
+   * could never be walked. The only way to go deeper was to open a folder, which for `components` means 72
+   * cards that connect to everything — the reader's "viskas susimakaluoja".
+   *
+   * Following a trail adds to what is on screen. `Clear selection` puts it all back.
    */
-  const revealed: Computed<Set<string>> = computed<Set<string>>(() => {
+  const revealed: Signal<string[]> = signal<string[]>([]);
+
+  /** Lift a card and its immediate neighbours onto the canvas, keeping whatever was already lifted. */
+  const reveal = (nodeId: string): void => {
     const g: Graph | null = graph();
-    const id: string = selected();
-    const out: Set<string> = new Set<string>();
-    if (!g || !id) return out;
+    if (!g || !nodeId || isGroupId(nodeId)) return;
+    const add: string[] = [nodeId];
     for (const e of g.edges) {
-      if (e.from === id) out.add(e.to);
-      if (e.to === id) out.add(e.from);
+      if (e.from === nodeId) add.push(e.to);
+      if (e.to === nodeId) add.push(e.from);
     }
-    return out;
-  });
+    revealed.set((current: string[]): string[] => [...new Set([...current, ...add])]);
+  };
+
 
   /** The graph as it is currently folded, and what each group card stands for. */
   const folded: Computed<{ graph: Graph; groups: GroupSummary[]; worthGrouping: boolean } | null> = computed(() => {
     const g: Graph | null = graph();
-    return g ? foldGroups(g, new Set(openGroups()), revealed()) : null;
+    return g ? foldGroups(g, new Set(openGroups()), new Set(revealed())) : null;
   });
 
   /**
@@ -644,7 +651,7 @@ export function setup(): {
     const base: Layout | null = baseLayout();
     const f: { graph: Graph } | null = folded();
     if (!base || !f) return base;
-    return f.graph.nodes.length === base.nodes.length ? base : layoutBeside(f.graph, base);
+    return f.graph.nodes.length === base.nodes.length ? base : layoutBeside(f.graph, base, revealed());
   });
 
 
@@ -680,10 +687,12 @@ export function setup(): {
       openGroups.set((current: string[]): string[] => [...current, key]);
     }
     selected.set(nodeId);
+    reveal(nodeId);
   };
 
   /** Fold everything back — the way home from any depth. */
   const foldAll = (): void => {
+    revealed.set([]);
     openGroups.set([]);
     selected.set('');
     expanded.set('');
@@ -776,7 +785,10 @@ export function setup(): {
       toggleGroup(groupKeyFromId(nodeId));
       return;
     }
-    selected.set(selected() === nodeId ? '' : nodeId);
+    const next: string = selected() === nodeId ? '' : nodeId;
+    selected.set(next);
+    // Following the trail adds to the canvas rather than replacing what is on it.
+    if (next) reveal(next);
     // Selecting a different card while one is open moves the open card too; selecting nothing closes it.
     if (expanded() && expanded() !== nodeId) expanded.set('');
   };
@@ -812,6 +824,7 @@ export function setup(): {
   };
 
   const clearSelection = (): void => {
+    revealed.set([]);
     selected.set('');
     expanded.set('');
   };
@@ -1228,6 +1241,7 @@ export function setup(): {
     jumpTo,
     foldAll,
     openGroups,
+    revealed,
     sel,
     hasSelection,
     summaryLine,

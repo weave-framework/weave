@@ -1452,3 +1452,10 @@ td.loc {
 }
 
 .picked-none { color: var(--fg-soft); font-size: 13px; margin: 0; }
+
+/* How many cards a trail has put on screen. Following dependencies adds to the canvas, and without a count
+   the reader has no idea how much of what they are looking at came from their own clicks. */
+.trail-count {
+  color: var(--fg-soft);
+  font-size: 12px;
+}
