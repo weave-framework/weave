@@ -229,6 +229,26 @@ ok(reopened.graph.nodes.some((n) => n.id === buried.id),
 ok(groupKeyOf(graph.nodes.find((n) => n.id === 'route:home')) === null,
    'a spine node reports no folder to open, because it is never folded');
 
+/* A selection must not redraw the picture. `layout` is deterministic, so adding one card re-flows every
+   other one — measured live, selecting a card moved cards out from under the pointer, so the next click
+   landed on something else. That single fact is every complaint about selecting: "nieko nenutiko", a card
+   that "pats pasikeite is pilko i zalia", needing three clicks before anything was drawn. */
+const { layoutBeside } = bundles.layout;
+const stable = layout(collapse(graph, new Set()).graph);
+const withNeighbour = layoutBeside(collapse(graph, new Set(), new Set(['component:Home'])).graph, stable);
+const wasAt = new Map(stable.nodes.map((n) => [n.id, `${n.x},${n.y}`]));
+const shifted = withNeighbour.nodes.filter((n) => wasAt.has(n.id) && wasAt.get(n.id) !== `${n.x},${n.y}`);
+ok(shifted.length === 0,
+   shifted.length
+     ? `${shifted.length} card(s) moved when one was revealed: ${shifted.slice(0, 3).map((n) => `${n.id} ${wasAt.get(n.id)} -> ${n.x},${n.y}`).join("; ")}`
+     : `every one of the ${stable.nodes.length} cards already drawn stays exactly where it was`);
+ok(withNeighbour.nodes.some((n) => n.id === 'component:Home'), 'and the revealed card is on the canvas');
+const placedAt = new Set(withNeighbour.nodes.map((n) => `${n.x},${n.y}`));
+ok(placedAt.size === withNeighbour.nodes.length,
+   `the revealed card lands on an empty spot (${placedAt.size} spots for ${withNeighbour.nodes.length} cards)`);
+ok(withNeighbour.width >= stable.width && withNeighbour.height >= stable.height,
+   `the canvas never shrinks under the reader (${Math.round(stable.width)}x${Math.round(stable.height)} -> ${Math.round(withNeighbour.width)}x${Math.round(withNeighbour.height)})`);
+
 /* Fitting. Measured against a real graph and a real pane: 1512x1704 inside 1122x495. */
 const { fitScale } = bundles.layout;
 ok(Math.round(fitScale(1512, 1704, 1122, 495) * 100) === 28,

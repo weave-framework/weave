@@ -11,6 +11,7 @@ import {
   dependencyClosure,
   fitScale,
   layout,
+  layoutBeside,
   pathThrough,
   relatedEdges,
   type Layout,
@@ -625,11 +626,27 @@ export function setup(): {
     return g ? foldGroups(g, new Set(openGroups()), revealed()) : null;
   });
 
-  /** The laid-out graph, recomputed when the graph changes or a group is opened. */
-  const placed: Computed<Layout | null> = computed<Layout | null>(() => {
-    const f: { graph: Graph } | null = folded();
-    return f ? layout(f.graph) : null;
+  /**
+   * Positions come from the graph WITHOUT the selection's revealed neighbours.
+   *
+   * `layout` is deterministic, so adding one card re-flows every other one: selecting a card moved 17 of 36,
+   * and the card under the pointer became a different card. Every complaint about the selection — "nieko
+   * nenutiko", a card that "pats pasikeite is pilko i zalia", needing three clicks — is that one fact. So the
+   * arrangement is decided before the selection is taken into account, and stays put while one is made.
+   */
+  const baseLayout: Computed<Layout | null> = computed<Layout | null>(() => {
+    const g: Graph | null = graph();
+    return g ? layout(foldGroups(g, new Set(openGroups())).graph) : null;
   });
+
+  /** The laid-out graph: the stable arrangement, plus wherever the revealed neighbours had to go. */
+  const placed: Computed<Layout | null> = computed<Layout | null>(() => {
+    const base: Layout | null = baseLayout();
+    const f: { graph: Graph } | null = folded();
+    if (!base || !f) return base;
+    return f.graph.nodes.length === base.nodes.length ? base : layoutBeside(f.graph, base);
+  });
+
 
   /** Every group, open or not — the list beside the canvas, and the migration checklist later. */
   const groups: Computed<GroupSummary[]> = computed<GroupSummary[]>(() => folded()?.groups ?? []);

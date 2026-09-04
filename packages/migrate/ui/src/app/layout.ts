@@ -392,3 +392,56 @@ export function fitScale(width: number, height: number, boxW: number, boxH: numb
   if (!width || !height || boxW < MIN_BOX || boxH < MIN_BOX) return 1;
   return Math.min(1, (boxW - CHROME) / width, (boxH - CHROME) / height);
 }
+
+/**
+ * Re-place a graph that differs from `previous` only by a few added cards.
+ *
+ * `layout` is deterministic, which is right, and it means adding one node re-flows everything: selecting a
+ * card lifted its neighbour out of a folder and 17 of 36 cards moved. The card under the pointer became a
+ * different card, so the next click landed on something else — reported as "nieko nenutiko", as a card that
+ * "pats pasikeite is pilko i zalia", and as needing three clicks to see anything.
+ *
+ * A selection is not a new drawing. Everything already placed keeps its exact position; only the cards that
+ * were not there before need somewhere to go, and they go beside the neighbour that pulled them in.
+ */
+export function layoutBeside(graph: Graph, previous: Layout): Layout {
+  const known: Map<string, PlacedNode> = new Map(previous.nodes.map((n: PlacedNode): [string, PlacedNode] => [n.id, n]));
+  const placed: Map<string, PlacedNode> = new Map<string, PlacedNode>();
+
+  for (const node of graph.nodes) {
+    const old: PlacedNode | undefined = known.get(node.id);
+    if (old) placed.set(node.id, { ...node, x: old.x, y: old.y, r: old.r, level: old.level });
+  }
+
+  /** Occupied cells, so a new card lands somewhere empty rather than on top of an existing one. */
+  const taken: Set<string> = new Set([...placed.values()].map((n: PlacedNode): string => `${n.x},${n.y}`));
+
+  for (const node of graph.nodes) {
+    if (placed.has(node.id)) continue;
+    // Whoever it connects to that already has a place — that is where it belongs.
+    const anchorId: string | undefined = graph.edges
+      .filter((e: Edge): boolean => e.from === node.id || e.to === node.id)
+      .map((e: Edge): string => (e.from === node.id ? e.to : e.from))
+      .find((id: string): boolean => placed.has(id));
+    const anchor: PlacedNode | undefined = anchorId ? placed.get(anchorId) : undefined;
+    const x: number = (anchor?.x ?? PAD) + LEVEL_GAP;
+    let y: number = anchor?.y ?? PAD;
+    // Straight down from the anchor's row until a free cell turns up.
+    while (taken.has(`${x},${y}`)) y += MIN_SEPARATION;
+    taken.add(`${x},${y}`);
+    placed.set(node.id, { ...node, x, y, r: radius(node.weight), level: (anchor?.level ?? 0) + 1 });
+  }
+
+  const nodes: PlacedNode[] = [...placed.values()];
+  const edges: PlacedEdge[] = [];
+  for (const e of graph.edges) {
+    const a: PlacedNode | undefined = placed.get(e.from);
+    const b: PlacedNode | undefined = placed.get(e.to);
+    if (a && b) edges.push({ ...e, x1: a.x, y1: a.y, x2: b.x, y2: b.y });
+  }
+  // The canvas may need to grow for the new cards, but never shrinks below what it already was: a canvas that
+  // resizes under the reader is the same complaint in another form.
+  const width: number = Math.max(previous.width, Math.max(...nodes.map((n: PlacedNode): number => n.x), 0) + LABEL_ROOM);
+  const height: number = Math.max(previous.height, Math.max(...nodes.map((n: PlacedNode): number => n.y), 0) + CARD_H + PAD);
+  return { nodes, edges, width, height };
+}
