@@ -819,6 +819,16 @@ td.loc {
   stroke: var(--fg);
   stroke-width: 2.5;
 }
+/* On the selected card's path, but not the card itself.
+
+   Two levels — lit and dimmed — left the selection indistinguishable from the ten cards answering for it,
+   once they were all bright together. A thin accent outline marks a neighbour; the selection keeps the
+   heavy dark one, so it still reads as the thing being asked about. */
+.card.neighbour .card-body {
+  stroke: var(--accent);
+  stroke-width: 1.5;
+}
+
 .card.dim {
   opacity: 0.22;
 }
@@ -878,8 +888,10 @@ td.loc {
 }
 
 /* An injected dependency is shared by design; its lines only appear when a card is selected. */
+/* The colour of what it points AT. It was red, which in this legend means "workspace code that could not be
+   read — a real gap": a line into an orange service drawn in the colour of a defect. */
 .edge.injects {
-  stroke: var(--red);
+  stroke: var(--orange);
   stroke-width: 1;
   opacity: 0.45;
 }

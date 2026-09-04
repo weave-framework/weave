@@ -125,6 +125,7 @@ export function setup(): {
   placed: Computed<Layout | null>;
   highlighted: Computed<Set<string>>;
   isLit: (nodeId: string) => boolean;
+  isNeighbour: (nodeId: string) => boolean;
   edgeLit: (from: string, to: string) => boolean;
   guardEdgeVisible: (from: string, to: string) => boolean;
   cardTag: (node: PlacedNode) => string;
@@ -1048,6 +1049,20 @@ export function setup(): {
     return g && id ? pathThrough(g, id) : new Set<string>();
   });
 
+  /**
+   * Directly connected to the selection — one edge away, in either direction.
+   *
+   * Distinct from `isLit`, which also covers the route path all the way up to the root. Reported: once the
+   * selection and the ten cards answering for it were all bright, the selection stopped standing out among
+   * them. A neighbour is outlined; the selection keeps the heavier mark.
+   */
+  const isNeighbour = (nodeId: string): boolean => {
+    const g: Graph | undefined = folded()?.graph;
+    const id: string = selected();
+    if (!g || !id || nodeId === id) return false;
+    return g.edges.some((e: Edge): boolean => (e.from === id && e.to === nodeId) || (e.to === id && e.from === nodeId));
+  };
+
   /** Is this node on the lit path? With nothing selected everything is lit, so the canvas reads normally. */
   const isLit = (nodeId: string): boolean => {
     const set: Set<string> = highlighted();
@@ -1226,6 +1241,7 @@ export function setup(): {
     placed,
     highlighted,
     isLit,
+    isNeighbour,
     edgeLit,
     guardEdgeVisible,
     cardTag,

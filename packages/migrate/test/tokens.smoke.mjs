@@ -54,5 +54,37 @@ console.log(`  ${styleFiles.length} stylesheet(s) · ${declared.size} declared �
 ok(missing.length === 0, missing.length ? `undefined and silently invisible: ${missing.join(', ')}` : 'no token is read without being defined');
 for (const token of missing) console.log(`      ${token} — first read in ${used.get(token).replace(uiSrc, 'ui/src')}`);
 
+/* Three levels of attention, and each has to look different from the other two.
+
+   Reported: with only "lit" and "dimmed", a selected card and the twelve cards answering for it were all
+   bright together, and the selection stopped standing out among them. The selected card, a neighbour, and
+   an ordinary card must not share a stroke. */
+const blockFor = (selector) => {
+  const at = all.indexOf(selector);
+  if (at < 0) return null;
+  const open = all.indexOf('{', at);
+  const close = all.indexOf('}', open);
+  return open < 0 || close < 0 ? null : all.slice(open + 1, close);
+};
+const strokeOf = (selector) => {
+  const body = blockFor(selector);
+  if (body === null) return null;
+  const stroke = /stroke:\s*([^;]+)/.exec(body)?.[1]?.trim() ?? '-';
+  const width = /stroke-width:\s*([^;]+)/.exec(body)?.[1]?.trim() ?? '-';
+  return `${stroke} ${width}`;
+};
+const selectedStroke = strokeOf('.card.is-selected .card-body');
+const neighbourStroke = strokeOf('.card.neighbour .card-body');
+ok(selectedStroke !== null, `the selected card has a stroke of its own (${selectedStroke})`);
+ok(neighbourStroke !== null, `a neighbour has a stroke of its own (${neighbourStroke})`);
+ok(selectedStroke !== neighbourStroke,
+   `the selection is distinguishable from what answers for it (${selectedStroke} vs ${neighbourStroke})`);
+
+/* An edge takes the colour of what it points AT. `injects` was red, which in this legend means "workspace
+   code that could not be read" — a line into an orange service drawn in the colour of a defect. */
+const injectsBody = blockFor('.edge.injects');
+ok(injectsBody !== null && injectsBody.includes('var(--orange)'),
+   'an injection edge is the colour of the service it points at, not of a defect');
+
 console.log(`\n${failures ? `${failures} failing` : 'all green'}\n`);
 process.exit(failures ? 1 : 0);

@@ -353,6 +353,7 @@
             }
             @for (n of view().nodes; track n.id) {
               <g class="card" class:is-selected={{ selected() === n.id }} class:dim={{ !isLit(n.id) }}
+                 class:neighbour={{ isNeighbour(n.id) }}
                  class:kept={{ isKept(n.id) }} class:dropped={{ decisionFor(n.id) === 'skip' || decisionFor(n.id) === 'leave' }}
                  on:click={{ () => pick(n.id) }} on:dblclick={{ () => expand(n.id) }}>
                 <rect class="card-body" x={{ n.x }} y={{ n.y }} width={{ CARD_W }} height={{ CARD_H }} rx="6" />
