@@ -600,10 +600,29 @@ export function setup(): {
    */
   const openGroups: Signal<string[]> = signal<string[]>([]);
 
+  /**
+   * The selected card's immediate neighbours, which stay on the canvas whatever folder they belong to.
+   *
+   * Without this, selecting a card whose neighbours are folded lights one edge to a folder and looks like
+   * nothing happened — reported as "pasirinkau komponenta ir nieko nenutiko". Lifting only the neighbours
+   * answers the question without unfolding a folder of seventy other things to do it.
+   */
+  const revealed: Computed<Set<string>> = computed<Set<string>>(() => {
+    const g: Graph | null = graph();
+    const id: string = selected();
+    const out: Set<string> = new Set<string>();
+    if (!g || !id) return out;
+    for (const e of g.edges) {
+      if (e.from === id) out.add(e.to);
+      if (e.to === id) out.add(e.from);
+    }
+    return out;
+  });
+
   /** The graph as it is currently folded, and what each group card stands for. */
   const folded: Computed<{ graph: Graph; groups: GroupSummary[]; worthGrouping: boolean } | null> = computed(() => {
     const g: Graph | null = graph();
-    return g ? foldGroups(g, new Set(openGroups())) : null;
+    return g ? foldGroups(g, new Set(openGroups()), revealed()) : null;
   });
 
   /** The laid-out graph, recomputed when the graph changes or a group is opened. */

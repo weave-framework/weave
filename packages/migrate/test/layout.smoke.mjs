@@ -196,6 +196,25 @@ ok(bothEnds(litFolded) > 0, `selecting a route lights at least one edge (${bothE
 ok(bothEnds(litRaw) < bothEnds(litFolded),
    `the raw path would light fewer edges on the drawn canvas (${bothEnds(litRaw)} vs ${bothEnds(litFolded)}) — which is the reported blank selection`);
 
+/* Revealing a selection's neighbours. Selecting a card whose neighbours are all folded lit one edge to a
+   folder card and looked, in the reader's words, like "nieko nenutiko". The neighbours are lifted out of
+   their folders — just them, not the folder's other seventy members. */
+const neighbours = new Set(graph.edges.filter((e) => e.from === 'route:home' || e.to === 'route:home')
+  .map((e) => (e.from === 'route:home' ? e.to : e.from)));
+const revealed = collapse(graph, new Set(), neighbours);
+ok(revealed.graph.nodes.some((n) => n.id === 'component:Home'),
+   'a folded neighbour of the selection is drawn in its own right');
+ok(revealed.graph.nodes.some((n) => n.kind === 'group' && n.folder === 'app'),
+   'its folder is still folded — only the neighbour was lifted, not the whole folder');
+ok(!revealed.graph.nodes.some((n) => n.id === 'component:HomeCard'),
+   'a non-neighbour in that same folder stays folded');
+const revealedLit = pathThrough(revealed.graph, 'route:home');
+ok(revealedLit.has('component:Home'),
+   `the path now names the real neighbour rather than its folder (${[...revealedLit].join(', ')})`);
+const appCard = revealed.graph.nodes.find((n) => n.kind === 'group' && n.folder === 'app');
+ok(appCard.weight < folded.groups.find((g) => g.key === 'app').total,
+   `the folder card counts what is STILL inside it (${appCard.weight} of ${folded.groups.find((g) => g.key === 'app').total})`);
+
 /* Following a link. The links panel names the real neighbour, which may be a card that folding has replaced
    with its folder — so selecting it has to open that folder first, or the trail dead-ends at the moment the
    reader follows it: reported as the panel vanishing on click, selecting nothing. */

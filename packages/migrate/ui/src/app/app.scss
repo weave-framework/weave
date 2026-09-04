@@ -735,6 +735,10 @@ td.loc {
 }
 
 .edge {
+  /* Line width in SCREEN pixels, not canvas pixels. Without this every stroke scales with the zoom, and at
+     44% a 1px dashed NgModule edge becomes a 0.44px line with 0.9px dashes — present in the DOM, invisible
+     to a person. Reported as "su ngmodule nera jokiu priklausomybiu linijos": there were three, all drawn. */
+  vector-effect: non-scaling-stroke;
   fill: none;
   stroke: var(--border);
   stroke-width: 1.25;
@@ -752,6 +756,19 @@ td.loc {
 }
 /* Selecting a card lights its path; everything off the path recedes rather than disappearing, so the shape of
    the app is still visible around what you are looking at. */
+/* On the path of whatever is selected. Every edge kind sets its own weight and opacity for the resting
+   canvas, where they must not shout; once a card is selected the ones that answer for it have to win against
+   all of them at once.
+
+   The class is doubled deliberately. `.edge.lit` and `.edge.ngmod` have identical specificity, so the winner
+   was whichever came later in the file — and `.edge.ngmod` does, which left a selected NgModule's three
+   edges drawn at 1px and 45% while claiming to be lit. Doubling makes this win by weight rather than by
+   position, so adding another edge kind below cannot silently take the lighting back. */
+.edge.lit.lit {
+  opacity: 1;
+  stroke-width: 2.5;
+}
+
 .edge.dim {
   opacity: 0.07;
 }

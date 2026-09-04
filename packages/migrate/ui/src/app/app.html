@@ -337,6 +337,7 @@
             @for (e of view().edges; track e.from + '>' + e.to) {
               <path class="edge" class:cut={{ e.kind === 'loads' }} class:guard={{ e.kind === 'guards' }}
                     class:dim={{ !edgeLit(e.from, e.to) }}
+                    class:lit={{ hasSelection() && edgeLit(e.from, e.to) }}
                     class:injects={{ e.kind === 'injects' }}
                     class:uses={{ e.kind === 'uses' }}
                     class:ngmod={{ e.kind === 'declares' || e.kind === 'imports' }}
