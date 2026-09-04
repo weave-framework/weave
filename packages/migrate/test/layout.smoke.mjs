@@ -61,6 +61,10 @@ const graph = {
     // Reached by nothing structural — the shape that used to disappear.
     node('component:Orphan', 'component', 'orphans'),
     node('external:HttpClient', 'external'),
+    // Hangs off the ROOT, whose y is the average of its children's rows and therefore off-grid. A card
+    // revealed beside it lands on that same off-grid row, a few pixels from one already there — which is
+    // an overlap that comparing exact coordinates cannot see.
+    node('component:Badge', 'component', 'chrome'),
     node('component:Widget1', 'component', 'widgets'),
     node('component:Widget2', 'component', 'widgets'),
     node('component:Widget3', 'component', 'widgets'),
@@ -84,6 +88,7 @@ const graph = {
     { from: 'component:Admin', to: 'service:Api', kind: 'injects' },
     { from: 'component:Admin', to: 'service:Auth', kind: 'injects' },
     { from: 'service:Api', to: 'external:HttpClient', kind: 'injects' },
+    { from: 'module:app', to: 'component:Badge', kind: 'uses' },
     { from: 'component:Admin', to: 'component:Widget1', kind: 'uses' },
     { from: 'component:Admin', to: 'component:Widget2', kind: 'uses' },
     { from: 'component:Admin', to: 'component:Widget3', kind: 'uses' },
@@ -235,7 +240,7 @@ ok(groupKeyOf(graph.nodes.find((n) => n.id === 'route:home')) === null,
    that "pats pasikeite is pilko i zalia", needing three clicks before anything was drawn. */
 const { layoutBeside } = bundles.layout;
 const stable = layout(collapse(graph, new Set()).graph);
-const withNeighbour = layoutBeside(collapse(graph, new Set(), new Set(['component:Home'])).graph, stable);
+const withNeighbour = layoutBeside(collapse(graph, new Set(), new Set(['component:Home', 'component:Badge'])).graph, stable, ['component:Home', 'component:Badge']);
 const wasAt = new Map(stable.nodes.map((n) => [n.id, `${n.x},${n.y}`]));
 const shifted = withNeighbour.nodes.filter((n) => wasAt.has(n.id) && wasAt.get(n.id) !== `${n.x},${n.y}`);
 ok(shifted.length === 0,
@@ -243,9 +248,27 @@ ok(shifted.length === 0,
      ? `${shifted.length} card(s) moved when one was revealed: ${shifted.slice(0, 3).map((n) => `${n.id} ${wasAt.get(n.id)} -> ${n.x},${n.y}`).join("; ")}`
      : `every one of the ${stable.nodes.length} cards already drawn stays exactly where it was`);
 ok(withNeighbour.nodes.some((n) => n.id === 'component:Home'), 'and the revealed card is on the canvas');
-const placedAt = new Set(withNeighbour.nodes.map((n) => `${n.x},${n.y}`));
-ok(placedAt.size === withNeighbour.nodes.length,
-   `the revealed card lands on an empty spot (${placedAt.size} spots for ${withNeighbour.nodes.length} cards)`);
+/* Overlap, not coordinate equality. Counting distinct "x,y" strings only answers this question when every
+   card sits on a grid, and they do not: the tree gives a parent the average of its children's rows. A card
+   at y=140 and one at y=154 have two distinct positions and are drawn on top of each other, both being 76
+   pixels tall. Reported from a screenshot after a few clicks along a trail — this assertion was green for
+   the whole time that was happening. */
+const overlapsIn = (view) => {
+  const out = [];
+  for (let a = 0; a < view.nodes.length; a++) {
+    for (let b = a + 1; b < view.nodes.length; b++) {
+      const p = view.nodes[a];
+      const q = view.nodes[b];
+      if (Math.abs(p.x - q.x) < 168 && Math.abs(p.y - q.y) < 90) out.push(`${p.id}@${p.x},${p.y} x ${q.id}@${q.x},${q.y}`);
+    }
+  }
+  return out;
+};
+const firstOverlaps = overlapsIn(withNeighbour);
+ok(firstOverlaps.length === 0,
+   firstOverlaps.length
+     ? `${firstOverlaps.length} card(s) drawn on top of each other: ${firstOverlaps.slice(0, 3).join("; ")}`
+     : `no two of the ${withNeighbour.nodes.length} cards overlap`);
 ok(withNeighbour.width >= stable.width && withNeighbour.height >= stable.height,
    `the canvas never shrinks under the reader (${Math.round(stable.width)}x${Math.round(stable.height)} -> ${Math.round(withNeighbour.width)}x${Math.round(withNeighbour.height)})`);
 

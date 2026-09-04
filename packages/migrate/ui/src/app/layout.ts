@@ -413,8 +413,21 @@ export function layoutBeside(graph: Graph, previous: Layout, order: readonly str
     if (old) placed.set(node.id, { ...node, x: old.x, y: old.y, r: old.r, level: old.level });
   }
 
-  /** Occupied cells, so a new card lands somewhere empty rather than on top of an existing one. */
-  const taken: Set<string> = new Set([...placed.values()].map((n: PlacedNode): string => `${n.x},${n.y}`));
+  /**
+   * Whether a card at (x, y) would touch anything already placed.
+   *
+   * Overlap, not an exact coordinate match. The first version kept a Set of `"x,y"` strings, which is only the
+   * same question when every card sits on a grid — and they do not: the tree gives a parent the average of its
+   * children's rows, so a card can sit at y=140 while the next free slot is calculated as 154. Fourteen pixels
+   * apart, both 76 pixels tall, both drawn, one on top of the other. Reported from a screenshot after a few
+   * clicks along a trail: a MODULE card and a SERVICE card sharing one spot.
+   */
+  const collides = (x: number, y: number): boolean => {
+    for (const n of placed.values()) {
+      if (Math.abs(n.x - x) < CARD_W && Math.abs(n.y - y) < MIN_SEPARATION) return true;
+    }
+    return false;
+  };
 
   /* New cards are placed in the order they were REVEALED, not the order they happen to sit in the graph.
      Graph order means a card revealed on the third click can be placed before one revealed on the first, take
@@ -436,9 +449,8 @@ export function layoutBeside(graph: Graph, previous: Layout, order: readonly str
     const anchor: PlacedNode | undefined = anchorId ? placed.get(anchorId) : undefined;
     const x: number = (anchor?.x ?? PAD) + LEVEL_GAP;
     let y: number = anchor?.y ?? PAD;
-    // Straight down from the anchor's row until a free cell turns up.
-    while (taken.has(`${x},${y}`)) y += MIN_SEPARATION;
-    taken.add(`${x},${y}`);
+    // Straight down from the anchor's row until nothing is in the way.
+    while (collides(x, y)) y += MIN_SEPARATION;
     placed.set(node.id, { ...node, x, y, r: radius(node.weight), level: (anchor?.level ?? 0) + 1 });
   }
 
