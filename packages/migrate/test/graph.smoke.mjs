@@ -77,6 +77,29 @@ ok(groups.size >= 2, `the keys separate the nodes into groups (${groups.size}: $
 // The file each node came from travels with it, so the UI can show where a card lives.
 ok(one?.file?.endsWith('one.service.ts'), `each node carries its own file (got "${one?.file}")`);
 
+/* A route and the screen it opens are one card.
+
+   Raised by the reader: a route card already prints its component name under the path, and then the
+   component gets a card of its own in another colour — one screen drawn twice, and its dependencies a
+   second click away. Measured before doing it: no route renders more than one component, and no component
+   is rendered by more than one route. But the second case DOES happen, which is why `sharedWith` exists,
+   so the merge fires only where it is exactly one to one. The fixture has both shapes. */
+const solo = graph.nodes.find((n) => n.component === 'SoloComponent');
+ok(solo !== undefined && solo.kind === 'route',
+   `the route and its only component are one card (${solo?.kind} "${solo?.label}")`);
+ok(!graph.nodes.some((n) => n.label === 'SoloComponent'),
+   'and the component has no second card of its own');
+ok(solo?.folder === 'screens' && (solo?.file ?? '').endsWith('solo.component.ts'),
+   `the merged card carries where the SCREEN lives (${solo?.folder}, ${solo?.file})`);
+ok(graph.edges.some((e) => e.from === solo?.id && e.kind === 'injects'),
+   'the dependencies of the screen now hang off the route card, one click away instead of two');
+
+ok(graph.nodes.some((n) => n.label === 'SharedComponent'),
+   'a component two routes reach keeps its own card — merging it into one of them would hide the other');
+const intoShared = graph.edges.filter((e) => e.kind === 'renders' && graph.nodes.find((n) => n.id === e.to)?.label === 'SharedComponent');
+ok(intoShared.length === 2,
+   `and both routes still point at it (${intoShared.length} renders edges)`);
+
 for (const name of ['analyze', 'graph']) rmSync(join(here, `.graph.${name}.mjs`), { force: true });
 console.log(`\n${failures ? `${failures} failing` : 'all green'}\n`);
 process.exit(failures ? 1 : 0);

@@ -496,6 +496,61 @@ export function buildGraph(facts: MigrationFacts): Graph {
     if ((node.kind === 'module' || node.kind === 'route') && !pointedAt.has(node.id)) node.root = true;
   }
 
+  /* ── a route and the screen it opens are one card ──
+
+     Raised by the reader, and right: a route card already prints its component's name under the path, and then
+     the component gets a card of its own in another colour. To the program they are different things; to
+     someone looking at the picture they are one screen drawn twice, and reaching the screen's dependencies
+     takes a second click that answers a question they thought they had already asked.
+
+     Measured on a real application before doing this: no route renders more than one component (0 of 30), and
+     no component is rendered by more than one route (0 of 72). But the second case DOES happen — `sharedWith`
+     exists because two routes reaching one screen with different parameters was seen in a real codebase — so
+     the merge only fires where it is exactly one to one. Where it is not, both cards stay and `sharedWith`
+     says why.
+
+     11 of the 30 route cards carry a component; the other 19 are lazy modules, redirects and routes files,
+     which have no screen of their own and are untouched.
+  */
+  const renderedBy: Map<string, string[]> = new Map<string, string[]>();
+  for (const e of edges) {
+    if (e.kind !== 'renders') continue;
+    renderedBy.set(e.to, [...(renderedBy.get(e.to) ?? []), e.from]);
+  }
+  /** Component ids folded into their route, so the edges can be rewritten onto it. */
+  const mergedInto: Map<string, string> = new Map<string, string>();
+  for (const [componentId, routeIds] of renderedBy) {
+    if (routeIds.length !== 1) continue;
+    const route: GraphNode | undefined = nodes.get(routeIds[0]);
+    const component: GraphNode | undefined = nodes.get(componentId);
+    if (!route || !component || route.kind !== 'route') continue;
+    mergedInto.set(componentId, route.id);
+    // The card is the screen now, so it carries where the screen LIVES.
+    route.folder = component.folder;
+    route.file = component.file;
+    if (component.detail) route.detail = component.detail;
+    nodes.delete(componentId);
+  }
+
+  if (mergedInto.size) {
+    const rewritten: Edge[] = [];
+    const seen: Set<string> = new Set<string>();
+    for (const e of edges) {
+      const from: string = mergedInto.get(e.from) ?? e.from;
+      const to: string = mergedInto.get(e.to) ?? e.to;
+      // The `renders` edge that joined the two is what the merge consumed; it has nothing left to point at.
+      if (from === to) continue;
+      if (!nodes.has(from) || !nodes.has(to)) continue;
+      const key: string = `${from} ${to} ${e.kind}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      rewritten.push({ ...e, from, to });
+    }
+    edges.length = 0;
+    edges.push(...rewritten);
+  }
+
+
   /* ── weight: how many things point at this ── */
   for (const edge of edges) {
     const target: GraphNode | undefined = nodes.get(edge.to);

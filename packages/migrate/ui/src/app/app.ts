@@ -1139,6 +1139,8 @@ export function setup(): {
     // "Nothing points here" is worth its own word: a way into the app, or something orphaned. Either way the
     // reader should not have to wonder whether the card is a bug.
     if (node.root) return node.kind === 'module' ? 'ROOT MODULE' : 'ROOT ROUTE';
+    // A route that carries its component IS the screen — one thing, and the word a person would use for it.
+    if (node.kind === 'route' && node.component && !node.folded) return node.lazy ? 'LAZY SCREEN' : 'SCREEN';
     if (node.kind === 'group') return `${node.weight} INSIDE`;
     if (node.kind === 'ngmodule') return 'NGMODULE';
     if (node.kind === 'module') return 'MODULE';
