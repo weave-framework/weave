@@ -177,7 +177,7 @@ function readIncoming(input: unknown, unit: string): MigrationState {
   if (typeof asState.unit === 'string') out.unit = asState.unit;
   if (asState.decisions && typeof asState.decisions === 'object') {
     for (const [key, value] of Object.entries(asState.decisions as Record<string, unknown>)) {
-      if (value === 'migrate' || value === 'skip') out.decisions[key] = value as Decision;
+      if (value === 'migrate') out.decisions[key] = value as Decision;
     }
   }
   if (asState.done && typeof asState.done === 'object') {

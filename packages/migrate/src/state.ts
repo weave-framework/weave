@@ -15,7 +15,7 @@ import { join } from 'node:path';
  */
 
 /** What has been decided about one node. */
-export type Decision = 'migrate' | 'skip';
+export type Decision = 'migrate';
 
 /** One thing already carried across, and where it landed. */
 export interface Done {
@@ -94,7 +94,7 @@ function pickDecisions(input: unknown): Record<string, Decision> {
   const out: Record<string, Decision> = {};
   if (!input || typeof input !== 'object') return out;
   for (const [key, value] of Object.entries(input as Record<string, unknown>)) {
-    if (value === 'migrate' || value === 'skip') out[key] = value;
+    if (value === 'migrate') out[key] = value;
   }
   return out;
 }

@@ -89,7 +89,7 @@ const EMPTY: Workspace = { root: '', signals: [], units: [], scannedDepth: 0 };
 /** What `/api/state` answers with. Narrow on purpose: the page reads only what it is going to use. */
 interface StatePayload {
   state?: {
-    decisions?: Record<string, 'migrate' | 'skip'>;
+    decisions?: Record<string, 'migrate'>;
     done?: Record<string, { at: string; to: string }>;
   };
 }
@@ -107,12 +107,13 @@ export function setup(): {
   graphError: Signal<string>;
   summary: Signal<Record<string, number | string> | null>;
   selected: Signal<string>;
-  decisions: Signal<Record<string, 'migrate' | 'skip'>>;
+  decisions: Signal<Record<string, 'migrate'>>;
   decisionFor: (nodeId: string) => string;
-  decide: (nodeId: string, value: 'migrate' | 'skip') => void;
+  decide: (nodeId: string, value: 'migrate') => void;
+  markFrom: (event: MouseEvent, nodeId: string) => void;
   migrateWithDependencies: (nodeId: string) => void;
   closureSize: (nodeId: string) => number;
-  decisionCounts: Computed<{ migrate: number; skip: number; total: number }>;
+  decisionCounts: Computed<{ migrate: number; total: number }>;
   stateNote: Signal<string>;
   clearDecisions: () => void;
   pick: (nodeId: string) => void;
@@ -978,8 +979,8 @@ export function setup(): {
 
      Kept in one map keyed by node id, because that is what has to become the file the converter reads: a
      decision is only useful if it survives the session that made it. */
-  const decisions: Signal<Record<string, 'migrate' | 'skip'>> = signal<
-    Record<string, 'migrate' | 'skip'>
+  const decisions: Signal<Record<string, 'migrate'>> = signal<
+    Record<string, 'migrate'>
   >({});
 
   /**
@@ -1054,9 +1055,20 @@ export function setup(): {
     });
   }, 400);
 
-  const decide = (nodeId: string, value: 'migrate' | 'skip'): void => {
-    decisions.set((current: Record<string, 'migrate' | 'skip'>) => {
-      const next: Record<string, 'migrate' | 'skip'> = { ...current };
+  /**
+   * Mark this card for migration, or unmark it — from the card itself.
+   *
+   * Stops the event, because the card underneath toggles the selection and would undo the panel that the
+   * tick just changed. Same reason `expandFrom` does it.
+   */
+  const markFrom = (event: MouseEvent, nodeId: string): void => {
+    event.stopPropagation();
+    decide(nodeId, 'migrate');
+  };
+
+  const decide = (nodeId: string, value: 'migrate'): void => {
+    decisions.set((current: Record<string, 'migrate'>) => {
+      const next: Record<string, 'migrate'> = { ...current };
       const key: string = keyOf(nodeId);
       // Choosing the same answer again clears it — the same way clicking a selected card deselects it.
       if (next[key] === value) delete next[key];
@@ -1077,8 +1089,8 @@ export function setup(): {
     const g: Graph | null = graph();
     if (!g) return;
     const closure: Set<string> = dependencyClosure(g, nodeId);
-    decisions.set((current: Record<string, 'migrate' | 'skip'>) => {
-      const next: Record<string, 'migrate' | 'skip'> = { ...current };
+    decisions.set((current: Record<string, 'migrate'>) => {
+      const next: Record<string, 'migrate'> = { ...current };
       for (const nid of closure) {
         const node: GraphNode | undefined = g.nodes.find((n: GraphNode): boolean => n.id === nid);
         if (!node) continue;
@@ -1101,11 +1113,10 @@ export function setup(): {
   };
 
   /** A running tally, so the page always says what has been decided so far. */
-  const decisionCounts: Computed<{ migrate: number; skip: number; total: number }> = computed(() => {
-    const all: Array<'migrate' | 'skip'> = Object.values(decisions());
+  const decisionCounts: Computed<{ migrate: number; total: number }> = computed(() => {
+    const all: Array<'migrate'> = Object.values(decisions());
     return {
       migrate: all.filter((d): boolean => d === 'migrate').length,
-      skip: all.filter((d): boolean => d === 'skip').length,
       total: all.length,
     };
   });
@@ -1299,6 +1310,7 @@ export function setup(): {
     decisions,
     decisionFor,
     decide,
+    markFrom,
     migrateWithDependencies,
     closureSize,
     decisionCounts,

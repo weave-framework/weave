@@ -330,7 +330,6 @@
           @if (decisionCounts().total) {
             <span class="tally">
               <span class="tally-item tally--migrate">{{ decisionCounts().migrate }} migrate</span>
-              <span class="tally-item tally--skip">{{ decisionCounts().skip }} left out</span>
               <button type="button" class="linkish" on:click={{ clearDecisions }}>reset</button>
             </span>
           }
@@ -358,8 +357,8 @@
             @for (n of view().nodes; track n.id) {
               <g class="card" class:is-selected={{ selected() === n.id }} class:dim={{ !isLit(n.id) }}
                  class:neighbour={{ isNeighbour(n.id) }}
-                 class:kept={{ isKept(n.id) }} class:dropped={{ decisionFor(n.id) === 'skip' }}
-                 on:click={{ () => pick(n.id) }}>
+                 class:kept={{ isKept(n.id) }}
+                 on:click={{ () => pick(n.id) }} on:dblclick={{ () => expand(n.id) }}>
                 <rect class="card-body" x={{ n.x }} y={{ n.y }} width={{ CARD_W }} height={{ CARD_H }} rx="6" />
                 <path class={{ 'card-head card-head--' + n.kind }} class:lazy={{ n.lazy }} class:npm={{ n.kind === 'external' && !n.libraryPath }}
                       d={{ 'M ' + n.x + ' ' + (n.y + 6) + ' a 6 6 0 0 1 6 -6 h ' + (CARD_W - 12) +
@@ -374,19 +373,81 @@
                     shared with {{ n.sharedWith }} other route(s)
                   </text>
                 }
-                @if (isKept(n.id)) {
-                  <text class="card-check" x={{ n.x + CARD_W - 26 }} y={{ n.y + 14 }}>✓</text>
-                }
-                @if (decisionFor(n.id) === 'skip') {
-                  <text class="card-check" x={{ n.x + CARD_W - 26 }} y={{ n.y + 14 }}>✕</text>
-                }
+                <!-- Marking, on the card. One click, where the card is — no dialog to open and close, and
+                     no panel at the foot of a canvas thousands of pixels tall. Filled once it is going. -->
+                <g class="card-mark" class:on={{ isKept(n.id) }}
+                   on:click={{ (e: MouseEvent) => markFrom(e, n.id) }}>
+                  <circle cx={{ n.x + 15 }} cy={{ n.y + CARD_H - 13 }} r="9" />
+                  <text x={{ n.x + 15 }} y={{ n.y + CARD_H - 9 }}>✓</text>
+                </g>
+                <text class="card-more" x={{ n.x + CARD_W - 9 }} y={{ n.y + CARD_H - 8 }}
+                      on:click={{ (e: MouseEvent) => expandFrom(e, n.id) }}>⋯</text>
                 @if (guardMark(n)) {
-                  <text class="card-guards" x={{ n.x + CARD_W - 9 }} y={{ n.y + CARD_H - 8 }}>{{ guardMark(n) }}</text>
+                  <text class="card-guards" x={{ n.x + CARD_W - 30 }} y={{ n.y + CARD_H - 8 }}>{{ guardMark(n) }}</text>
                 }
                 @if (n.weight) {
                   <text class="card-weight" x={{ n.x + CARD_W - 9 }} y={{ n.y + 14 }}>{{ n.weight }}</text>
                 }
               </g>
+            }
+            @if (hasExpanded()) {
+              <foreignObject x={{ expandedX() }} y={{ expandedY() }} width={{ EXPANDED_W }} height={{ EXPANDED_H }}>
+                <div class="expanded" on:click={{ stopClick }}>
+                  <div class={{ 'expanded-head expanded-head--' + sel().kind }}>
+                    <span class="expanded-tag">{{ cardTag(sel()) }}</span>
+                    <button type="button" class="expanded-close" aria-label="Close" on:click={{ collapse }}>✕</button>
+                  </div>
+
+                  <h3 class="expanded-title">{{ sel().label }}</h3>
+                  @if (sel().detail) {
+                    <p class="expanded-detail">{{ sel().detail }}</p>
+                  }
+
+                  <div class="expanded-actions">
+                    @if (sel().kind === 'external') {
+                      @if (sel().library) {
+                        <p class="expanded-note">
+                          Comes from <code>{{ sel().library }}</code>, which is outside your workspace — it is
+                          carried over as a dependency, not migrated, so there is nothing to decide here.
+                        </p>
+                      } @else {
+                        <p class="expanded-note">
+                          An injected type with no definition anywhere in reach. Its calls will arrive as TODOs
+                          with the original code beside them.
+                        </p>
+                      }
+                    } @else {
+                      <label class="tick">
+                        <input type="checkbox" .checked={{ decisionFor(sel().id) === 'migrate' }}
+                               on:change={{ () => decide(sel().id, 'migrate') }} />
+                        Migrate this
+                      </label>
+                      <button type="button" class="expanded-all" on:click={{ () => migrateWithDependencies(sel().id) }}>
+                        Take everything it needs ({{ closureSize(sel().id) }})
+                      </button>
+                    }
+                  </div>
+
+                  <div class="expanded-links">
+                    @for (grp of linkGroups(); track grp.title) {
+                      <div class="expanded-group">
+                        <h4>{{ grp.title }}</h4>
+                        <ul>
+                          @for (item of grp.items; track item.kind + item.id) {
+                            <li>
+                              <span class="expanded-kind">{{ item.kind }}</span>
+                              <button type="button" class="expanded-jump" class:ext={{ item.external }}
+                                      on:click={{ () => jumpTo(item.id) }}>{{ item.label }}</button>
+                            </li>
+                          }
+                        </ul>
+                      </div>
+                    } @empty {
+                      <p class="expanded-note">Nothing else connects to this one.</p>
+                    }
+                  </div>
+                </div>
+              </foreignObject>
             }
           </svg>
         </div>
@@ -419,8 +480,6 @@
               } @else {
                 <button type="button" class="decide" class:on={{ decisionFor(sel().id) === 'migrate' }}
                         on:click={{ () => decide(sel().id, 'migrate') }}>Migrate</button>
-                <button type="button" class="decide decide--skip" class:on={{ decisionFor(sel().id) === 'skip' }}
-                        on:click={{ () => decide(sel().id, 'skip') }}>Leave out</button>
                 <button type="button" class="decide decide--all"
                         on:click={{ () => migrateWithDependencies(sel().id) }}>
                   Migrate with everything it needs ({{ closureSize(sel().id) }})

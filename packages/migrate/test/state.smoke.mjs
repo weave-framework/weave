@@ -46,12 +46,12 @@ ok(fresh.version === 1 && Object.keys(fresh.decisions).length === 0,
 // ── a round trip
 const state = emptyState('apps/archiving');
 state.decisions['component:AppComponent'] = 'migrate';
-state.decisions['route:src/app/app.routes.ts#0'] = 'skip';
+state.decisions['route:src/app/app.routes.ts#0'] = 'migrate';
 state.done['service:ApiService'] = { at: '2026-09-04T10:00:00.000Z', to: '../weave-app' };
 writeState(dir, state);
 const back = readState(dir);
 ok(back.decisions['component:AppComponent'] === 'migrate', 'a decision comes back as it went in');
-ok(back.decisions['route:src/app/app.routes.ts#0'] === 'skip', 'and so does a second one, under a path key');
+ok(back.decisions['route:src/app/app.routes.ts#0'] === 'migrate', 'and so does a second one, under a path key');
 ok(back.done['service:ApiService']?.to === '../weave-app', 'what was already carried across comes back too');
 ok(back.unit === 'apps/archiving', 'the unit it describes is recorded');
 
@@ -83,6 +83,14 @@ writeFileSync(file, JSON.stringify({
 }), 'utf8');
 ok(readState(dir).decisions['component:Keep'] === 'migrate',
    'a field this version has never heard of does not stop it reading the rest');
+
+/* One decision, not two. `skip` marked a state nothing ever acted on — not marked already means not
+   migrated — and having both on screen read as a puzzle: "kodel turime du migtukus". A file naming it was
+   written by something else, and its marks are not this tool's to act on. */
+writeFileSync(file, JSON.stringify({ version: 1, decisions: { a: 'skip', b: 'migrate' }, done: {} }), 'utf8');
+const single = readState(dir);
+ok(single.decisions.a === undefined, 'a decision word this version does not have is dropped');
+ok(single.decisions.b === 'migrate', 'and the one it does have survives beside it');
 
 rmSync(dir, { recursive: true, force: true });
 rmSync(bundle, { force: true });
