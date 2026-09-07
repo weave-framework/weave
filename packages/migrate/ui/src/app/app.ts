@@ -1026,7 +1026,7 @@ export function setup(): {
         done.set(state?.done ?? {});
         stateLoaded.set(target);
         const n: number = Object.keys(state?.decisions ?? {}).length;
-        stateNote.set(n ? `${n} decision(s) restored from .weave-migrate.json` : '');
+        stateNote.set(n ? `${n} decision(s) restored from your project's .weave-migrate.json` : '');
       })
       .catch((): void => {
         decisions.set({});
@@ -1049,7 +1049,7 @@ export function setup(): {
     void fetch(apiUrl('/api/state'), {
       method: 'PUT',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ path: target, state: { version: 1, unit: pickedLabel(), decisions: decisions(), done: done() } }),
+      body: JSON.stringify({ path: target, state: { source: target, decisions: decisions(), done: done() } }),
     }).catch((): void => {
       stateNote.set('could not save your decisions — check the service is still running');
     });

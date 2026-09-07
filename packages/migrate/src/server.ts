@@ -26,7 +26,7 @@ import { extname, isAbsolute, join, relative, sep } from 'node:path';
 import { assembleFactsOpening, assembleFactsOpeningAsync, type MigrationFacts, type Progress } from './analyze.js';
 import { browse, peek, type Listing } from './browse.js';
 import { buildGraph } from './graph.js';
-import { emptyState, readState, writeState, STATE_FILE, type Decision, type Done, type MigrationState } from './state.js';
+import { emptyPlan, readPlan, readState, sourceKey, writePlan, STATE_FILE, type MigrationState, type SourcePlan } from './state.js';
 import type { Graph } from './types.js';
 import { inspect, type Workspace } from './detect.js';
 
@@ -48,6 +48,13 @@ export interface ServeOptions {
   port?: number;
   /** Directory holding the built UI. When it does not exist, the service still answers `/api/*`. */
   uiDir?: string;
+  /**
+   * Where the migration plan is kept: the project being migrated INTO.
+   *
+   * Defaults to the working directory, which is where `weave migrate` was run — the Weave project. The
+   * source application is read and never written to, so the plan cannot live beside it.
+   */
+  intoDir?: string;
 }
 
 /** How many ports past the requested one to try before giving up — the same budget `weave dev` uses. */
@@ -159,36 +166,6 @@ type BodyResult = { ok: true; text: string } | { ok: false; reason: 'too-large' 
  * Past the limit the chunks are dropped and the stream is drained instead of parsed, so an oversized request
  * costs a read, not memory.
  */
-/**
- * Take a page's idea of the state and keep only what this version understands.
- *
- * The page is trusted no further than any other client: it sends a whole document, and everything in it is
- * checked before it reaches a file in someone else's repository. An unknown decision, a half-written history
- * entry, or a key that is not a string is dropped rather than written and puzzled over later.
- */
-function readIncoming(input: unknown, unit: string): MigrationState {
-  const out: MigrationState = emptyState(unit);
-  if (!input || typeof input !== 'object') return out;
-  const asState: { decisions?: unknown; done?: unknown; unit?: unknown } = input as {
-    decisions?: unknown;
-    done?: unknown;
-    unit?: unknown;
-  };
-  if (typeof asState.unit === 'string') out.unit = asState.unit;
-  if (asState.decisions && typeof asState.decisions === 'object') {
-    for (const [key, value] of Object.entries(asState.decisions as Record<string, unknown>)) {
-      if (value === 'migrate') out.decisions[key] = value as Decision;
-    }
-  }
-  if (asState.done && typeof asState.done === 'object') {
-    for (const [key, value] of Object.entries(asState.done as Record<string, unknown>)) {
-      if (!value || typeof value !== 'object') continue;
-      const entry: { at?: unknown; to?: unknown } = value as { at?: unknown; to?: unknown };
-      if (typeof entry.at === 'string' && typeof entry.to === 'string') out.done[key] = { at: entry.at, to: entry.to } as Done;
-    }
-  }
-  return out;
-}
 
 function readBody(req: IncomingMessage): Promise<BodyResult> {
   return new Promise((resolve: (r: BodyResult) => void): void => {
@@ -290,6 +267,7 @@ function listen(server: Server, port?: number): Promise<number> {
 export async function serve(options: ServeOptions = {}): Promise<MigrateServer> {
   const token: string = randomBytes(24).toString('hex');
   const uiDir: string | undefined = options.uiDir;
+  const intoDir: string = options.intoDir ?? process.cwd();
 
   const server: Server = createServer((req: IncomingMessage, res: ServerResponse): void => {
     void handle(req, res);
@@ -427,13 +405,23 @@ data: ${JSON.stringify(data)}
      * no merge: the page holds the whole set and sends the whole set, so two tabs editing the same project
      * cannot interleave into something neither of them chose.
      */
+    /*
+     * The plan for a source, kept in the project being migrated INTO — the directory the service was
+     * started from.
+     *
+     * Not beside the source. That application is read and never written to: it is a working repository,
+     * quite possibly somebody else's, and leaving files in it was the objection that produced this shape.
+     * One file can hold plans for several sources, so the source is named rather than replaced.
+     */
     if (url.pathname === '/api/state' && req.method === 'GET') {
-      const at: string | null = url.searchParams.get('path');
-      if (!at || !existsSync(at)) {
-        json(res, 404, { error: `nothing at ${String(at)}` });
+      const from: string | null = url.searchParams.get('path');
+      if (!from) {
+        json(res, 400, { error: 'which source?' });
         return;
       }
-      json(res, 200, { state: readState(at), file: STATE_FILE });
+      const state: MigrationState = readState(intoDir);
+      const plan: SourcePlan = state.sources[sourceKey(from)] ?? emptyPlan(from);
+      json(res, 200, { state: plan, file: join(intoDir, STATE_FILE) });
       return;
     }
 
@@ -443,25 +431,25 @@ data: ${JSON.stringify(data)}
         json(res, body.reason === 'too-large' ? 413 : 400, { error: 'could not read the request body' });
         return;
       }
-      let at: unknown;
+      let from: unknown;
       let incoming: unknown;
       try {
         const parsed: { path?: unknown; state?: unknown } = JSON.parse(body.text) as { path?: unknown; state?: unknown };
-        at = parsed.path;
+        from = parsed.path;
         incoming = parsed.state;
       } catch {
         json(res, 400, { error: 'body must be JSON' });
         return;
       }
-      if (typeof at !== 'string' || !at.trim() || !existsSync(at)) {
-        json(res, 404, { error: `nothing at ${String(at)}` });
+      if (typeof from !== 'string' || !from.trim()) {
+        json(res, 400, { error: 'which source?' });
         return;
       }
-      // Everything is run through the same reader the file goes through, so a page cannot write a shape
-      // that the next read would silently discard.
-      const clean: MigrationState = readIncoming(incoming, typeof at === 'string' ? at : '');
-      const written: string = writeState(at, clean);
-      json(res, 200, { ok: true, file: written, decisions: Object.keys(clean.decisions).length, done: Object.keys(clean.done).length });
+      // Through the same reader the file goes through, so a page cannot write a shape the next read
+      // would silently discard.
+      const plan: SourcePlan = readPlan(incoming);
+      const written: string = writePlan(intoDir, from, plan);
+      json(res, 200, { ok: true, file: written, decisions: Object.keys(plan.decisions).length });
       return;
     }
 
