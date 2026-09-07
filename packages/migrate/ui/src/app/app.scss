@@ -1404,9 +1404,9 @@ td.loc {
   bottom: 0;
   box-shadow: 0 -6px 18px rgb(0 0 0 / 8%);
   left: 0;
-  max-height: 42vh;
+  max-height: 30vh;
   overflow-y: auto;
-  padding: 0.7rem 1rem 0.9rem;
+  padding: 0.55rem 1rem 0.7rem;
   position: fixed;
   right: 0;
   z-index: 20;
@@ -1414,7 +1414,7 @@ td.loc {
 
 /* Room under the page so the pinned panel never covers the last thing on it. */
 .shell.wide {
-  padding-bottom: 44vh;
+  padding-bottom: 32vh;
 }
 
 .picked-head {
@@ -1444,10 +1444,13 @@ td.loc {
 .picked-groups {
   display: flex;
   flex-wrap: wrap;
-  gap: 1.5rem;
+  gap: 0.4rem 1.75rem;
 }
 
 .picked-group {
+  /* Take the room going, so the grid below has somewhere to put a second and third column. Sized by
+     content alone it stayed one link wide, and ten links stayed ten rows. */
+  flex: 1 1 24rem;
   min-width: 15rem;
 
   h4 {
@@ -1458,8 +1461,23 @@ td.loc {
     text-transform: uppercase;
   }
 
-  ul { list-style: none; margin: 0; padding: 0; }
-  li { align-items: baseline; display: flex; gap: 8px; padding: 1px 0; }
+  /* A card with ten dependencies listed one per line is most of the panel. Flowing them into columns turns
+     ten rows into three, which is the difference between a strip at the bottom and half the window. */
+  ul {
+    column-gap: 1.5rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  li {
+    align-items: baseline;
+    display: flex;
+    gap: 8px;
+    padding: 0;
+  }
 }
 
 .picked-rel {
