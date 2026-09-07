@@ -1390,12 +1390,31 @@ td.loc {
    no way to just look; removing it left a click that lit a path and told you nothing about what it led to.
    This lists the REAL neighbours — the components and services themselves, not the folder card they were
    folded into — because the folder answers "where", and the question here is "what". */
+/* Pinned to the bottom of the window while a card is selected.
+
+   It used to sit under the canvas, which on a real graph means 2853 pixels down the page: a reader selects a
+   card near the top and the buttons for deciding about it are nowhere on screen. Reported as "as paspaudziu
+   pelyte ir parodo visas priklausomybes, o tai kaip man pasirinkti. nera jokio pasirinkimo" — they were
+   there, and unreachable, which is the same thing.
+
+   It appears only with a selection, and `Clear selection` dismisses it. */
 .picked-links {
-  margin-top: 0.875rem;
-  padding: 0.75rem 0.875rem;
-  border: 1px solid var(--border);
-  border-radius: 6px;
   background: var(--surface);
+  border-top: 1px solid var(--border);
+  bottom: 0;
+  box-shadow: 0 -6px 18px rgb(0 0 0 / 8%);
+  left: 0;
+  max-height: 42vh;
+  overflow-y: auto;
+  padding: 0.7rem 1rem 0.9rem;
+  position: fixed;
+  right: 0;
+  z-index: 20;
+}
+
+/* Room under the page so the pinned panel never covers the last thing on it. */
+.shell.wide {
+  padding-bottom: 44vh;
 }
 
 .picked-head {
