@@ -1176,7 +1176,7 @@ export function setup(): {
   const view: Computed<Layout> = computed<Layout>(() => placed() ?? EMPTY_LAYOUT);
   const hasGraph: Computed<boolean> = computed<boolean>(() => placed() !== null);
   const sel: Computed<PlacedNode> = computed<PlacedNode>(
-    () => selectedNode() ?? { id: '', kind: 'module', label: '', detail: '', weight: 0, x: 0, y: 0, r: 0, level: 0 },
+    () => selectedNode() ?? { id: '', key: '', kind: 'module', label: '', detail: '', weight: 0, x: 0, y: 0, r: 0, level: 0 },
   );
   const hasSelection: Computed<boolean> = computed<boolean>(() => selectedNode() !== null);
   /** Is a card open? Separate from selection, which only lights a path. */

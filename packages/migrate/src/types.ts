@@ -95,6 +95,15 @@ export type EdgeKind = 'child' | 'loads' | 'renders' | 'guards' | 'injects' | 'u
 export interface GraphNode {
   /** Opaque, stable within one graph. */
   id: string;
+  /**
+   * Stable across runs, machines and checkouts — what a saved decision is filed under.
+   *
+   * `id` cannot serve. A route id is `route:C:\_WORK\…\app.routes.ts#0`, which names one person's disk, and
+   * 30 of a real application's 216 nodes are shaped that way. Class-named nodes already key on their class;
+   * route and module nodes key on their path relative to the analysed unit instead. Two people with the same
+   * repository checked out in different folders then produce the same key for the same thing.
+   */
+  key: string;
   kind: NodeKind;
   /** What to draw on it. */
   label: string;

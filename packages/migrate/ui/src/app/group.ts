@@ -128,6 +128,8 @@ export function collapse(graph: Graph, opened: ReadonlySet<string>, revealed: Re
     if (!inside.length) continue;
     nodes.push({
       id: `${GROUP_PREFIX}${summary.key}`,
+      // A folder card is made by the viewer and stands for a folder, so its own name is already stable.
+      key: `${GROUP_PREFIX}${summary.key}`,
       kind: 'group',
       label: summary.label,
       detail: summary.counts.map((c: { kind: string; n: number }): string => `${c.n} ${c.kind}`).join(' · '),

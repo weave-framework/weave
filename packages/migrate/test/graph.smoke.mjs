@@ -100,6 +100,27 @@ const intoShared = graph.edges.filter((e) => e.kind === 'renders' && graph.nodes
 ok(intoShared.length === 2,
    `and both routes still point at it (${intoShared.length} renders edges)`);
 
+/* A key that survives being written down.
+
+   Decisions are about to be saved to a file that travels with the repository, so what they are filed under
+   has to mean the same thing on another machine. `id` cannot serve: a route id is
+   `route:C:/_WORK/.../app.routes.ts#0`, and 30 of a real application's 216 nodes are shaped that way. */
+const drive = /^[a-z]:/i;
+const tailOf = (s) => s.slice(s.indexOf(':') + 1);
+const rooted = graph.nodes.filter((n) => drive.test(tailOf(n.key)));
+ok(rooted.length === 0,
+   rooted.length ? `${rooted.length} key(s) still name a disk, e.g. ${rooted[0].key}` : `no key names a disk (${graph.nodes.length} nodes)`);
+ok(new Set(graph.nodes.map((n) => n.key)).size === graph.nodes.length,
+   `keys are unique (${new Set(graph.nodes.map((n) => n.key)).size} of ${graph.nodes.length})`);
+const routeNode = graph.nodes.find((n) => n.kind === 'route');
+ok(routeNode !== undefined && routeNode.key !== routeNode.id,
+   `a route keys on its path relative to the unit (${routeNode?.key})`);
+ok(!(routeNode?.key ?? '').includes(String.fromCharCode(92)),
+   'and that path is written with forward slashes, so two operating systems agree');
+const classNode = graph.nodes.find((n) => n.kind === 'component');
+ok(classNode !== undefined && classNode.key === classNode.id,
+   `a class-named node keys on its class, unchanged (${classNode?.key})`);
+
 for (const name of ['analyze', 'graph']) rmSync(join(here, `.graph.${name}.mjs`), { force: true });
 console.log(`\n${failures ? `${failures} failing` : 'all green'}\n`);
 process.exit(failures ? 1 : 0);

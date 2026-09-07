@@ -205,11 +205,14 @@ export function buildGraph(facts: MigrationFacts): Graph {
   ].filter(Boolean);
   const folderRoot: string = commonRoot(factFiles);
 
-  const add = (node: GraphNode): GraphNode => {
+  /* Callers give everything but `key`, which starts as the id and is refined once the graph has settled — see
+     "a key that survives being written down" at the end of this function. */
+  const add = (node: Omit<GraphNode, 'key'>): GraphNode => {
     const existing: GraphNode | undefined = nodes.get(node.id);
     if (existing) return existing;
-    nodes.set(node.id, node);
-    return node;
+    const full: GraphNode = { ...node, key: node.id };
+    nodes.set(node.id, full);
+    return full;
   };
   const link = (from: string, to: string, kind: Edge['kind']): void => {
     if (from === to || !nodes.has(from) || !nodes.has(to)) return;
@@ -550,6 +553,20 @@ export function buildGraph(facts: MigrationFacts): Graph {
     edges.push(...rewritten);
   }
 
+
+  /* ── a key that survives being written down ──
+
+     Every node gets one, in one place, after the graph has settled. Ids are fine inside a run and useless
+     outside it: a route id carries the absolute path of the file it was declared in, so a decision saved
+     against it would not be found again on another machine, or after the folder was moved. A class name is
+     already stable; a path is made stable by taking it relative to the analysed unit. */
+  for (const node of nodes.values()) {
+    const tail: string = node.id.slice(node.id.indexOf(':') + 1);
+    node.key =
+      node.kind === 'module' || node.kind === 'route'
+        ? `${node.kind}:${shortPath(tail.split('#')[0], root)}${tail.includes('#') ? `#${tail.split('#')[1]}` : ''}`
+        : node.id;
+  }
 
   /* ── weight: how many things point at this ── */
   for (const edge of edges) {
