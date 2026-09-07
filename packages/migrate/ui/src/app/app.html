@@ -381,11 +381,14 @@
                 <!-- Marking, in the header strip. It sat at the bottom-left, exactly on top of the green
                      component name — reported as "chekbox persidengia su tekstu". The strip holds only the
                      kind and the weight, so there is room for it and nothing to collide with. -->
-                <g class="card-mark" class:on={{ isKept(n.id) }}
+                <g class="card-mark" class:on={{ isKept(n.id) }} class:done={{ isDone(n.id) }}
                    on:click={{ (e: MouseEvent) => markFrom(e, n.id) }}>
                   <circle cx={{ n.x + CARD_W - 34 }} cy={{ n.y + 10 }} r="7" />
                   <text x={{ n.x + CARD_W - 34 }} y={{ n.y + 14 }}>✓</text>
                 </g>
+                @if (isDone(n.id)) {
+                  <text class="card-done" x={{ n.x + 10 }} y={{ n.y + CARD_H - 8 }}>migrated</text>
+                }
                 <text class="card-more" x={{ n.x + CARD_W - 9 }} y={{ n.y + CARD_H - 8 }}
                       on:click={{ (e: MouseEvent) => expandFrom(e, n.id) }}>⋯</text>
                 @if (guardMark(n)) {
@@ -558,11 +561,60 @@
       </ul>
     }
 
-    <h3>Source files behind all of it — {{ plan().files.length }}</h3>
-    <p class="means-note">Read, never written. Paths are relative to the project you picked.</p>
-    <ul class="means-files">
-      @for (f of plan().files; track f) { <li><code>{{ f }}</code></li> }
-    </ul>
+    <h3>What would be created — {{ writePlan()?.fresh ?? 0 }} file(s)</h3>
+    <p class="means-note">
+      Written into your Weave project, never into the app you are reading. A file that already exists is
+      never touched.
+    </p>
+
+    <div class="means-where">
+      <label for="subdir">Folder inside <code>src/</code></label>
+      <input id="subdir" type="text" placeholder="leave empty for src/ itself"
+             bind:value={{ subdir }} on:change={{ askPlan }} />
+      <Button variant="ghost" on:click={{ askPlan }} disabled={{ planning() }}>
+        {{ planning() ? 'Working it out…' : 'Refresh' }}
+      </Button>
+    </div>
+
+    @if (writePlan()) {
+      <ul class="means-files">
+        @for (f of shownPlan().files; track f.path) {
+          <li class:exists={{ f.status === 'skip-exists' }}>
+            <code>{{ f.path }}</code>@if (f.status === 'skip-exists') { <span> — already there, left alone</span> }
+          </li>
+        }
+      </ul>
+
+      @if (shownPlan().missing.length) {
+        <p class="means-warn-line">
+          This code needs packages your app does not have. Run this first:
+          <code>{{ shownPlan().install }}</code>
+        </p>
+      }
+      @if (shownPlan().carried.length) {
+        <p class="means-note">
+          The written code still imports {{ shownPlan().carried.join(', ') }} — those stay dependencies of your app.
+        </p>
+      }
+      @if (shownPlan().unplanned.length) {
+        <p class="means-note">
+          Nothing to write for {{ shownPlan().unplanned.join(', ') }} — they have no source file of their own.
+        </p>
+      }
+
+      <div class="means-go">
+        <Button variant="primary" on:click={{ writeFiles }} disabled={{ writing() || !shownPlan().fresh }}>
+          {{ writing() ? 'Writing…' : 'Write these ' + shownPlan().fresh + ' file(s)' }}
+        </Button>
+        @if (writeNote()) { <span class="means-said">{{ writeNote() }}</span> }
+      </div>
+    } @else {
+      <p class="means-note">
+        @if (planning()) { Working out what this would create… }
+        @else { <button type="button" class="linkish" on:click={{ askPlan }}>Work out what this would create</button> }
+      </p>
+      @if (writeNote()) { <p class="means-warn-line">{{ writeNote() }}</p> }
+    }
 
     }
 

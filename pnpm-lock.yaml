@@ -194,6 +194,9 @@ importers:
 
   packages/migrate:
     dependencies:
+      '@weave-framework/cli':
+        specifier: workspace:*
+        version: link:../cli
       '@weave-framework/runtime':
         specifier: workspace:*
         version: link:../runtime

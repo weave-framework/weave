@@ -19,6 +19,7 @@ import {
 } from './layout.js';
 import { collapse as foldGroups, groupKeyFromId, isGroupId, type GroupSummary } from './group.js';
 import { consequence, suggested, undecided, type Consequence } from './consequence.js';
+import type { WritePlan, Written } from '../../../src/write.js';
 
 // Capitalized tags in the template resolve to these imports. The editor tooling understands that; eslint,
 // running without it, sees three unused bindings — so the repo's convention is to name them here.
@@ -172,6 +173,15 @@ export function setup(): {
   plan: Computed<Consequence>;
   openDecisions: Computed<number>;
   withSuggestion: Computed<number>;
+  subdir: Signal<string>;
+  writePlan: Signal<WritePlan | null>;
+  planning: Signal<boolean>;
+  writing: Signal<boolean>;
+  writeNote: Signal<string>;
+  shownPlan: Computed<WritePlan>;
+  askPlan: () => void;
+  writeFiles: () => void;
+  isDone: (nodeId: string) => boolean;
   query: Signal<string>;
   setKind: (v: string | string[]) => void;
   kindOptions: Computed<Array<{ value: string; label: string; disabled?: boolean }>>;
@@ -1134,6 +1144,127 @@ export function setup(): {
   /** How many carry a Weave suggestion — the ones with somewhere to start. */
   const withSuggestion: Computed<number> = computed<number>(() => suggested(plan().outside));
 
+  /* ── turning marks into files ──
+
+     The step ended in three lists and a reader asking what to do with them, which was a fair question: a
+     preview is what you show BEFORE an action, and there was no action. The converter has been able to write
+     Weave files since M4 — the terminal command has used it all along. This is the web UI finally calling it.
+
+     Two things are deliberate. The plan is asked for from the server rather than guessed, so the list on
+     screen is the list that gets written. And the keys are sent from HERE, closure included, because the page
+     already worked out what a mark drags in and computing it again on the server would let the files written
+     disagree with the list the reader approved. */
+
+  /** Where the output goes inside the target project. Empty means straight into `src/`. */
+  const subdir: Signal<string> = signal<string>('');
+
+  /** The server's answer to "what would this create", or null before it has been asked. */
+  const writePlan: Signal<WritePlan | null> = signal<WritePlan | null>(null);
+  const planning: Signal<boolean> = signal<boolean>(false);
+  const writing: Signal<boolean> = signal<boolean>(false);
+  const writeNote: Signal<string> = signal<string>('');
+
+  /**
+   * The plan, projected non-null for the template.
+   *
+   * `@if (writePlan(); as w)` reads better, but `weave check` compiles the alias as a SECOND call inside the
+   * if, and TypeScript never narrows a call result — so `w` stays nullable and every use of it is an error.
+   * The same workaround is already used above for `workspace`; this is the same disagreement, not a new one.
+   */
+  const shownPlan: Computed<WritePlan> = computed<WritePlan>(
+    () => writePlan() ?? { outRoot: 'src', files: [], fresh: 0, missing: [], install: '', carried: [], unplanned: [] },
+  );
+
+  /** Everything this selection covers: what was marked, and what it drags in. */
+  const wantedKeys = (): string[] => {
+    const p: Consequence = plan();
+    return [...p.chosen, ...p.carried].map((n: GraphNode): string => n.key);
+  };
+
+  /** Ask what the marks would create. Cheap enough to redo whenever the marks or the folder change. */
+  const askPlan = (): void => {
+    const target: string = picked();
+    const keys: string[] = wantedKeys();
+    if (!target || !keys.length) {
+      writePlan.set(null);
+      return;
+    }
+    planning.set(true);
+    // NOT `writeNote.set('')`. The write refreshes the plan when it finishes, and clearing here wiped the
+    // "22 file(s) written" line a fraction of a second after it appeared — the reader saw 22 files land and
+    // nothing say so. A note is cleared by the next action that could invalidate it, which is the write.
+    void fetch(apiUrl('/api/plan'), {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ path: target, subdir: subdir(), keys, open: ['*'] }),
+    })
+      .then((res: Response): Promise<unknown> => (res.ok ? res.json() : Promise.reject(new Error(String(res.status)))))
+      .then((payload: unknown): void => {
+        writePlan.set((payload as { plan: WritePlan }).plan);
+      })
+      .catch((): void => {
+        writePlan.set(null);
+        writeNote.set('could not work out what this would create — check the service is still running');
+      })
+      .finally((): void => {
+        planning.set(false);
+      });
+  };
+
+  /**
+   * Write them.
+   *
+   * The only thing this whole service creates. It creates it in the project the service was started from; the
+   * application being read is untouched, as it is everywhere else. A file that already exists is never
+   * overwritten — the target is the reader's own project, and there is no undo here for hand-edited code.
+   */
+  const writeFiles = (): void => {
+    const target: string = picked();
+    const keys: string[] = wantedKeys();
+    if (!target || !keys.length || writing()) return;
+    writing.set(true);
+    writeNote.set('');
+    void fetch(apiUrl('/api/convert'), {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ path: target, subdir: subdir(), keys, open: ['*'] }),
+    })
+      .then((res: Response): Promise<unknown> => (res.ok ? res.json() : Promise.reject(new Error(String(res.status)))))
+      .then((payload: unknown): void => {
+        const out: Written[] = (payload as { written: Written[] }).written ?? [];
+        // Recorded against the KEY, so the canvas can show what has already been carried across and a large
+        // application can be migrated over several sittings — which is what the marks were asked for.
+        const at: string = new Date().toISOString();
+        const byFile: Map<string, string> = new Map<string, string>();
+        // FIRST wins. A component writes a `.ts` and a `.html` from one source, and last-wins recorded the
+        // template as the place it landed — true, but the module is the file a person would go and open.
+        for (const w of out) if (w.from && !byFile.has(w.from)) byFile.set(w.from, w.path);
+        done.set((current: Record<string, { at: string; to: string }>) => {
+          const next: Record<string, { at: string; to: string }> = { ...current };
+          const g: Graph | null = graph();
+          for (const node of g?.nodes ?? []) {
+            if (!node.file) continue;
+            // `node.file` is already forward-slashed by the graph's own `shortPath`, so there is
+            // nothing to normalise here — and the planned source is normalised the same way.
+            for (const [from, to] of byFile) if (from.endsWith(node.file)) next[node.key] = { at, to };
+          }
+          return next;
+        });
+        saveState();
+        writeNote.set(out.length ? `${out.length} file(s) written into ${writePlan()?.outRoot ?? 'src'}` : 'nothing new to write — every file already exists');
+        askPlan();
+      })
+      .catch((): void => {
+        writeNote.set('the write failed — nothing was created');
+      })
+      .finally((): void => {
+        writing.set(false);
+      });
+  };
+
+  /** True when this node has already been carried across. Drawn on the card, so progress is visible. */
+  const isDone = (nodeId: string): boolean => !!done()[keyOf(nodeId)];
+
   /**
    * Everything on the selected node's path — lit up, while the rest of the canvas dims.
    *
@@ -1379,6 +1510,15 @@ export function setup(): {
     plan,
     openDecisions,
     withSuggestion,
+    subdir,
+    writePlan,
+    planning,
+    writing,
+    writeNote,
+    shownPlan,
+    askPlan,
+    writeFiles,
+    isDone,
     query,
     setKind,
     kindOptions,

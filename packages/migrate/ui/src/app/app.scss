@@ -1570,3 +1570,76 @@ td.loc {
 .means-becomes em {
   color: var(--muted);
 }
+
+/* ── the write step ── */
+.means-where {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+.means-where label {
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+.means-where code {
+  font-family: var(--mono);
+}
+.means-where input {
+  font-family: var(--mono);
+  font-size: 0.8125rem;
+  padding: 0.375rem 0.5rem;
+  border: 1px solid var(--border);
+  border-bottom-color: var(--field-line);
+  border-radius: 4px;
+  background: var(--raised);
+  color: var(--fg);
+  min-width: 16rem;
+}
+.means-files li.exists {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+.means-files li.exists span {
+  text-decoration: none;
+}
+.means-warn-line {
+  border-left: 2px solid var(--orange);
+  padding: 0.5rem 0.75rem;
+  background: var(--bg-soft);
+  font-size: 0.8125rem;
+  margin: 0.75rem 0;
+}
+.means-warn-line code {
+  font-family: var(--mono);
+  color: var(--accent);
+  display: block;
+  margin-top: 0.25rem;
+}
+.means-go {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-top: 1.25rem;
+}
+.means-said {
+  font-size: 0.8125rem;
+  color: var(--fg-soft);
+}
+
+/* A card already carried across. Asked for at the very start: a large application is migrated over several
+   sittings, and without this the canvas looks identical on the second one. */
+.card-done {
+  font-size: 8px;
+  font-family: var(--sans);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  fill: var(--green);
+  pointer-events: none;
+}
+.card-mark.done circle {
+  fill: var(--green);
+  stroke: var(--green);
+}

@@ -27,6 +27,7 @@ import { assembleFactsOpening, assembleFactsOpeningAsync, type MigrationFacts, t
 import { browse, peek, type Listing } from './browse.js';
 import { buildGraph } from './graph.js';
 import { emptyPlan, readPlan, readState, sourceKey, writePlan, STATE_FILE, type MigrationState, type SourcePlan } from './state.js';
+import { planFor, writePlanned, type WritePlan, type Written } from './write.js';
 import type { Graph } from './types.js';
 import { inspect, type Workspace } from './detect.js';
 
@@ -65,7 +66,39 @@ const PORT_ATTEMPTS: number = 20;
  * is the one it was built against. Add a route, add it here — the pairing is what makes a stale service
  * announce itself instead of answering 404 to a page that has every reason to expect otherwise.
  */
-const ROUTES: string[] = ['/api/session', '/api/inspect', '/api/browse', '/api/peek', '/api/analyze', '/api/analyze-stream', '/api/state'];
+
+/**
+ * The last analysis, kept so the write step does not redo it.
+ *
+ * Measured on a real application: `assembleFactsOpening` walks 96 workspace libraries and takes the better
+ * part of a minute. The graph on screen already came from one, and asking "what would this create" then ran
+ * it again from scratch — a minute of nothing per click of Refresh, and another for the write itself.
+ *
+ * One entry, because there is one reader and one project on screen. Keyed by what the answer depends on, so
+ * pointing at a different application, or opening more libraries, re-reads rather than serving the last one.
+ */
+let lastFacts: { key: string; facts: MigrationFacts; graph: Graph } | null = null;
+
+/** Put an analysis in the cache, whoever produced it. */
+function remember(dir: string, open: string[], facts: MigrationFacts, graph: Graph): void {
+  lastFacts = { key: cacheKey(dir, open), facts, graph };
+}
+
+/** What the answer depends on: the unit, and which libraries were opened. */
+function cacheKey(dir: string, open: string[]): string {
+  return `${dir}::${[...open].sort().join(',')}`;
+}
+
+/** The facts for a unit, from cache when the question is the one already answered. */
+function factsFor(dir: string, open: string[]): { facts: MigrationFacts; graph: Graph } {
+  const key: string = cacheKey(dir, open);
+  if (lastFacts && lastFacts.key === key) return lastFacts;
+  const facts: MigrationFacts = assembleFactsOpening(dir, open);
+  const graph: Graph = buildGraph(facts);
+  lastFacts = { key, facts, graph };
+  return lastFacts;
+}
+const ROUTES: string[] = ['/api/session', '/api/inspect', '/api/browse', '/api/peek', '/api/analyze', '/api/analyze-stream', '/api/state', '/api/plan', '/api/convert'];
 
 /** Largest request body accepted, in bytes. A path is short; anything larger is not a path. */
 const MAX_BODY: number = 64 * 1024;
@@ -379,8 +412,13 @@ data: ${JSON.stringify(data)}
           res.end();
           return;
         }
+        // This is the route the page actually uses, so it is the one that must fill the cache. Filling only
+        // the non-streaming twin left the write step cold-starting a 96-library walk it had just watched
+        // finish — a cache that never hit on the only path anyone takes.
+        const graphFor: Graph = buildGraph(facts);
+        remember(at, ['*'], facts, graphFor);
         send('done', {
-          graph: buildGraph(facts),
+          graph: graphFor,
           summary: {
             files: facts.files.length,
             components: facts.components.length,
@@ -453,6 +491,59 @@ data: ${JSON.stringify(data)}
       return;
     }
 
+
+    /*
+     * What the marks would create, and then creating it.
+     *
+     * These are the only routes that write anything, and they write into `intoDir` — the project the service
+     * was started from. The application being read is never touched by either of them.
+     *
+     * `keys` comes from the page rather than being worked out again here. The screen already resolves what a
+     * mark drags in, that logic is gated where it lives, and computing it twice would let the files written
+     * disagree with the list the reader approved.
+     */
+    if ((url.pathname === '/api/plan' || url.pathname === '/api/convert') && req.method === 'POST') {
+      const body: BodyResult = await readBody(req);
+      if (!body.ok) {
+        json(res, body.reason === 'too-large' ? 413 : 400, { error: 'could not read the request body' });
+        return;
+      }
+      let from: unknown;
+      let subdir: string = '';
+      let keys: string[] = [];
+      let open: string[] = [];
+      try {
+        const parsed: { path?: unknown; subdir?: unknown; keys?: unknown; open?: unknown } = JSON.parse(body.text) as {
+          path?: unknown; subdir?: unknown; keys?: unknown; open?: unknown;
+        };
+        from = parsed.path;
+        if (typeof parsed.subdir === 'string') subdir = parsed.subdir.replace(/^[\/]+|[\/]+$/g, '');
+        if (Array.isArray(parsed.keys)) keys = parsed.keys.filter((x: unknown): x is string => typeof x === 'string');
+        if (Array.isArray(parsed.open)) open = parsed.open.filter((x: unknown): x is string => typeof x === 'string');
+      } catch {
+        json(res, 400, { error: 'body must be JSON' });
+        return;
+      }
+      if (typeof from !== 'string' || !from.trim() || !existsSync(from)) {
+        json(res, 404, { error: `nothing at ${String(from)}` });
+        return;
+      }
+      if (!keys.length) {
+        json(res, 400, { error: 'nothing is marked \u2014 nothing to plan' });
+        return;
+      }
+      const { facts: factsForWrite, graph: graphForWrite } = factsFor(from, open);
+      if (url.pathname === '/api/plan') {
+        const plan: WritePlan = planFor(factsForWrite, graphForWrite, intoDir, subdir, keys);
+        json(res, 200, { plan, into: intoDir });
+        return;
+      }
+      const written: Written[] = writePlanned(factsForWrite, graphForWrite, intoDir, subdir, keys);
+      json(res, 200, { written, into: intoDir });
+      return;
+    }
+
+
     if (url.pathname === '/api/analyze' && req.method === 'POST') {
       const body: BodyResult = await readBody(req);
       if (!body.ok) {
@@ -474,14 +565,13 @@ data: ${JSON.stringify(data)}
         json(res, 404, { error: `nothing at ${String(target)}` });
         return;
       }
-      // The expensive one: a full TypeScript walk of the unit, measured at 1-2 s on a real app. The UI shows a
-      // spinner for it rather than pretending it is instant.
-      const facts: MigrationFacts = assembleFactsOpening(target, open);
+      // The expensive one. Measured on a real application with every workspace library opened: 96 libraries
+      // and the better part of a minute — which is why the answer is kept rather than recomputed per click.
+      const { facts, graph } = factsFor(target, open);
       if (!facts.entry) {
         json(res, 422, { error: 'no entry file (main.ts / index.ts) — point at the project folder itself' });
         return;
       }
-      const graph: Graph = buildGraph(facts);
       json(res, 200, {
         graph,
         summary: {

@@ -3040,6 +3040,14 @@ export interface WriteItem {
   content: string;
   /** `write` — new file. `skip-exists` — something is already there, so we do NOT touch it. */
   status: 'write' | 'skip-exists';
+  /**
+   * The SOURCE file this was converted from, absolute, when there is one.
+   *
+   * Added so a caller can write part of a unit: the web UI marks cards, a card knows its source file, and
+   * without this there is no way back from a planned output to the thing the reader chose. Absent on the
+   * few items that come from the unit as a whole rather than from one file — the tokens module, the guards.
+   */
+  source?: string;
   /** Classes this template uses that are styled outside the component — recorded so the CLI can report them
    *  once for the whole run instead of the reader finding the same note file by file. */
   styleGaps?: ExternalStyleUse[];
@@ -3438,17 +3446,18 @@ export function planWrites(facts: MigrationFacts, targetDir: string, subdir: str
     const root: string = findWorkspaceRoot(facts.unit);
     const note: string = styleNote(gaps, (f: string) => relative(root, f).split(sep).join('/'));
     const tsPath: string = join(targetDir, 'src', subdir, dir, `${base}.ts`);
-    items.push({ path: tsPath, content: tsBody, status: existsSync(tsPath) ? 'skip-exists' : 'write' });
+    items.push({ path: tsPath, content: tsBody, source: cf.file, status: existsSync(tsPath) ? 'skip-exists' : 'write' });
     const htmlPath: string = join(targetDir, 'src', subdir, dir, `${base}.html`);
     items.push({
       path: htmlPath,
       content: html === null ? `${todo('the original template could not be read — port it by hand')}\n` : `${note}${pair.html}\n`,
+      source: cf.file,
       status: existsSync(htmlPath) ? 'skip-exists' : 'write',
       ...(gaps.length ? { styleGaps: gaps } : {}),
     });
     for (const item of sheets) {
       const path: string = join(targetDir, 'src', subdir, dir, item.name);
-      items.push({ path, content: item.content, status: existsSync(path) ? 'skip-exists' : 'write' });
+      items.push({ path, content: item.content, source: cf.file, status: existsSync(path) ? 'skip-exists' : 'write' });
     }
   }
   // Services (M5): a `providedIn:'root'` one becomes a store, anything else a context — drafted, not guessed.
@@ -3461,7 +3470,7 @@ export function planWrites(facts: MigrationFacts, targetDir: string, subdir: str
     const base: string = (rel.split(/[\\/]/).pop() ?? '').replace(/\.ts$/, '');
     const draft: { baseName: string; ts: string } = convertService(sf, importedNamesFrom(sf.file, 'rxjs'), migrated, returners);
     const path: string = join(targetDir, 'src', subdir, dir, `${base || draft.baseName}.ts`);
-    items.push({ path, content: draft.ts, status: existsSync(path) ? 'skip-exists' : 'write' });
+    items.push({ path, content: draft.ts, source: sf.file, status: existsSync(path) ? 'skip-exists' : 'write' });
   }
   // Pipes → functions, directives → `use:` actions. Both are real conversions, not carries.
   for (const pf of facts.pipes ?? []) {
@@ -3469,19 +3478,19 @@ export function planWrites(facts: MigrationFacts, targetDir: string, subdir: str
     const dir: string = dirname(rel) === '.' ? '' : dirname(rel);
     const base: string = (rel.split(/[\\/]/).pop() ?? '').replace(/\.ts$/, '');
     const path: string = join(targetDir, 'src', subdir, dir, `${base}.ts`);
-    items.push({ path, content: convertPipe(pf).ts, status: existsSync(path) ? 'skip-exists' : 'write' });
+    items.push({ path, content: convertPipe(pf).ts, source: pf.file, status: existsSync(path) ? 'skip-exists' : 'write' });
   }
   for (const df of facts.directives ?? []) {
     const rel: string = outputPathFor(df.file, facts);
     const dir: string = dirname(rel) === '.' ? '' : dirname(rel);
     const base: string = (rel.split(/[\\/]/).pop() ?? '').replace(/\.ts$/, '');
     const path: string = join(targetDir, 'src', subdir, dir, `${base}.ts`);
-    items.push({ path, content: convertDirective(df).ts, status: existsSync(path) ? 'skip-exists' : 'write' });
+    items.push({ path, content: convertDirective(df).ts, source: df.file, status: existsSync(path) ? 'skip-exists' : 'write' });
   }
   // Route resolvers → a route `loader`. They carry no decorator, so they used to be carried as plain TypeScript.
   for (const rf of facts.resolvers ?? []) {
     const path: string = outputFileFor(rf.file, facts, targetDir, false, subdir);
-    items.push({ path, content: convertResolver(rf).ts, status: existsSync(path) ? 'skip-exists' : 'write' });
+    items.push({ path, content: convertResolver(rf).ts, source: rf.file, status: existsSync(path) ? 'skip-exists' : 'write' });
   }
 
   // NgModules: not code in Weave, but a wiring note that records what only the module knew.
@@ -3490,7 +3499,7 @@ export function planWrites(facts: MigrationFacts, targetDir: string, subdir: str
     const dir: string = dirname(rel) === '.' ? '' : dirname(rel);
     const base: string = (rel.split(/[\\/]/).pop() ?? '').replace(/\.ts$/, '');
     const path: string = join(targetDir, 'src', subdir, dir, `${base}.ts`);
-    items.push({ path, content: convertNgModule(nm), status: existsSync(path) ? 'skip-exists' : 'write' });
+    items.push({ path, content: convertNgModule(nm), source: nm.file, status: existsSync(path) ? 'skip-exists' : 'write' });
   }
   // InjectionTokens → one contexts module (a token is a value-injection, which is exactly what a context is).
   const tokensTs: string | null = convertTokens(facts.tokens ?? []);
@@ -3519,7 +3528,7 @@ export function planWrites(facts: MigrationFacts, targetDir: string, subdir: str
     const carried: string | null = carryFile(file, facts, returners);
     if (carried === null) continue;
     const path: string = join(targetDir, 'src', subdir, dir, `${base}.ts`);
-    items.push({ path, content: carried, status: existsSync(path) ? 'skip-exists' : 'write' });
+    items.push({ path, content: carried, source: file, status: existsSync(path) ? 'skip-exists' : 'write' });
   }
   // Route guards (M5.5) — one module, because Weave's `beforeEach` is global rather than per-route.
   const guards: string | null = convertGuards(facts.routes);

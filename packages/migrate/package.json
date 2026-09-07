@@ -15,6 +15,7 @@
     "dist"
   ],
   "dependencies": {
+    "@weave-framework/cli": "workspace:*",
     "@weave-framework/runtime": "workspace:*",
     "@weave-framework/ui": "workspace:*"
   },
