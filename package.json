@@ -30,6 +30,7 @@
     "verify:migrate-graph": "node packages/migrate/test/graph.smoke.mjs",
     "verify:migrate-layout": "node packages/migrate/test/layout.smoke.mjs",
     "verify:migrate-state": "node packages/migrate/test/state.smoke.mjs",
+    "verify:migrate-consequence": "node packages/migrate/test/consequence.smoke.mjs",
     "migrate": "node tools/serve-migrate.mjs",
     "verify:migrate-ui": "node packages/migrate/test/tokens.smoke.mjs && node packages/cli/bin/weave.mjs check packages/migrate/ui/src && node packages/cli/bin/weave.mjs build --config packages/migrate/ui/weave.config.ts",
     "verify:resume": "node tools/verify-resume.mjs",

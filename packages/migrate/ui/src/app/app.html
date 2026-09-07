@@ -37,6 +37,10 @@
             on:click={{ () => step.set(2) }}>
       <span class="step-no">2</span> What it depends on
     </button>
+    <button type="button" class="step" aria-current={{ step() === 3 ? 'step' : 'false' }} disabled={{ !decisionCounts().migrate }}
+            on:click={{ () => step.set(3) }}>
+      <span class="step-no">3</span> What it means
+    </button>
   </nav>
 
   @if (step() === 1) {
@@ -331,6 +335,7 @@
             <span class="tally">
               <span class="tally-item tally--migrate">{{ decisionCounts().migrate }} migrate</span>
               <button type="button" class="linkish" on:click={{ clearDecisions }}>reset</button>
+              <button type="button" class="linkish tally-next" on:click={{ () => step.set(3) }}>what this means →</button>
             </span>
           }
         </div>
@@ -452,38 +457,103 @@
             }
           </svg>
         </div>
-
-
-        @if (externals().length) {
-          <div class="externals">
-            <h3>Coming from outside — {{ externals().length }}</h3>
-            <p class="inspector-meta">
-              Injected classes with no source of ours behind them. npm packages are carried over as they are;
-              anything marked <strong>UNREAD</strong> is workspace code the walk failed to open. Ordered by how
-              much rides on them.
-            </p>
-            <ul class="ext-list">
-              @for (x of externals().slice(0, 12); track x.id) {
-                <li>
-                  <span class="ext-weight">{{ x.weight }}</span>
-                  <span class="ext-body">
-                    <span class="ext-name">{{ x.label }}</span>
-                    @if (x.library) {
-                      <span class="ext-from">from <code>{{ x.library }}</code></span>
-                    } @else {
-                      <span class="ext-from ext-unknown">an injection token, defined somewhere the walk did not reach</span>
-                    }
-                    @if (x.usedBy?.length) {
-                      <span class="ext-users">injected by {{ (x.usedBy ?? []).slice(0, 3).join(', ') }}@if ((x.usedBy ?? []).length > 3) { , +{{ (x.usedBy ?? []).length - 3 }} more }</span>
-                    }
-                  </span>
-                </li>
-              }
-            </ul>
-          </div>
-        }
       }
     </section>
+  }
+
+  @if (step() === 3) {
+  <section class="means">
+    <h2>What your marks mean</h2>
+    <p class="lede">
+      Nothing has been written yet. This is what would be, and the part of it no migration can do for you.
+    </p>
+
+    <div class="means-grid">
+      <div class="means-fact">
+        <span class="means-n">{{ plan().chosen.length }}</span>
+        <span class="means-k">you marked</span>
+      </div>
+      <div class="means-fact">
+        <span class="means-n">{{ plan().carried.length }}</span>
+        <span class="means-k">come with them</span>
+      </div>
+      <div class="means-fact" class:means-warn={{ openDecisions() > 0 }}>
+        <span class="means-n">{{ openDecisions() }}</span>
+        <span class="means-k">need you to decide</span>
+      </div>
+      <div class="means-fact">
+        <span class="means-n">{{ plan().files.length }}</span>
+        <span class="means-k">source files</span>
+      </div>
+    </div>
+
+    @if (!plan().chosen.length) {
+      <p class="means-empty">Nothing is marked yet. Go back to step two and tick a card.</p>
+    } @else {
+
+    @if (plan().carried.length) {
+      <h3>Coming along, though you did not mark them — {{ plan().carried.length }}</h3>
+      <p class="means-note">
+        Reached from something you did mark. They will be written too, so they are listed here rather than
+        discovered afterwards.
+      </p>
+      <ul class="means-list">
+        @for (n of plan().carried; track n.id) {
+          <li>
+            <span class="means-kind">{{ n.kind }}</span>
+            <span class="means-name">{{ n.label }}</span>
+            @if (n.file) { <code class="means-file">{{ n.file }}</code> }
+          </li>
+        }
+      </ul>
+    }
+
+    @if (plan().outside.length) {
+      <h3>Cannot come across as they are — {{ plan().outside.length }}</h3>
+      <p class="means-note">
+        Injected classes with no source of ours behind them. This is the list for <strong>your</strong>
+        selection, not for the whole application.
+      </p>
+      <ul class="means-list means-outside">
+        @for (o of plan().outside; track o.node.id) {
+          <li class:ok={{ o.handled === 'automatic' }} class:bad={{ o.handled === 'unread' }}>
+            <span class="means-name">{{ o.node.label }}</span>
+            @if (o.node.library) {
+              <span class="means-from">from <code>{{ o.node.library }}</code></span>
+            }
+            @switch (o.handled) {
+              @case ('automatic') {
+                <span class="means-verdict ok">handled — {{ o.note }}</span>
+              }
+              @case ('template-only') {
+                <span class="means-verdict">yours to wire — {{ o.note }}</span>
+              }
+              @case ('unread') {
+                <span class="means-verdict bad">
+                  UNREAD — workspace code this walk failed to open. That is a shortfall here, not in your app.
+                </span>
+              }
+              @default {
+                <span class="means-verdict">no mapping — it stays as written, and the build will say so</span>
+              }
+            }
+          </li>
+        }
+      </ul>
+    }
+
+    <h3>Source files behind all of it — {{ plan().files.length }}</h3>
+    <p class="means-note">Read, never written. Paths are relative to the project you picked.</p>
+    <ul class="means-files">
+      @for (f of plan().files; track f) { <li><code>{{ f }}</code></li> }
+    </ul>
+
+    }
+
+    <div class="means-back">
+      <Button variant="ghost" on:click={{ () => step.set(2) }}>Back to the picture</Button>
+    </div>
+  </section>
   }
   }
 </main>

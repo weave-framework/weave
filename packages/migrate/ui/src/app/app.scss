@@ -617,34 +617,6 @@ td.loc {
   color: var(--red);
 }
 
-.externals {
-  margin-top: 1rem;
-}
-.ext-list {
-  list-style: none;
-  margin: 0.5rem 0 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.1875rem;
-}
-.ext-list li {
-  font-family: var(--mono);
-  font-size: 0.8125rem;
-  color: var(--fg-soft);
-  display: flex;
-  gap: 0.625rem;
-  align-items: baseline;
-}
-.ext-weight {
-  display: inline-block;
-  min-width: 2rem;
-  text-align: right;
-  color: var(--red);
-  font-weight: 600;
-}
-
-
 .steps {
   display: flex;
   flex-wrap: wrap;
@@ -895,38 +867,6 @@ td.loc {
   stroke: var(--orange);
   stroke-width: 1;
   opacity: 0.45;
-}
-
-.ext-list li {
-  align-items: baseline;
-}
-.ext-body {
-  display: flex;
-  flex-direction: column;
-  gap: 0.0625rem;
-  min-width: 0;
-}
-.ext-name {
-  font-family: var(--mono);
-  font-size: 0.8125rem;
-  color: var(--fg);
-}
-.ext-from {
-  font-family: var(--sans);
-  font-size: 0.75rem;
-  color: var(--muted);
-}
-.ext-from code {
-  font-family: var(--mono);
-  color: var(--accent);
-}
-.ext-unknown {
-  color: var(--orange);
-}
-.ext-users {
-  font-family: var(--sans);
-  font-size: 0.75rem;
-  color: var(--muted);
 }
 
 /* ── decisions ── */
@@ -1467,4 +1407,144 @@ td.loc {
 
     text { fill: #fff; }
   }
+}
+
+
+/* ── step three: what the marks mean ──
+   The list of outside classes used to sit under the canvas, against the whole application, before anything
+   was chosen — 27 entries answering a question nobody had asked yet. Here it is the same data narrowed to a
+   selection, which is what makes it a to-do list instead of a statistic. */
+.means {
+  max-width: 62rem;
+}
+.means .lede {
+  color: var(--muted);
+  margin: 0.25rem 0 1.5rem;
+}
+.means-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 2rem;
+}
+.means-fact {
+  background: var(--raised);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.875rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+/* The one number that is a call to action gets the only colour on the row. */
+.means-fact.means-warn {
+  border-color: var(--orange);
+}
+.means-n {
+  font-size: 1.75rem;
+  font-weight: 600;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.means-fact.means-warn .means-n {
+  color: var(--orange);
+}
+.means-k {
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+.means h3 {
+  font-size: 0.9375rem;
+  margin: 1.75rem 0 0.25rem;
+}
+.means-note {
+  color: var(--muted);
+  font-size: 0.8125rem;
+  margin: 0 0 0.625rem;
+  max-width: 44rem;
+}
+.means-empty {
+  color: var(--muted);
+}
+.means-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.means-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.375rem 0.625rem;
+  border-left: 2px solid var(--border);
+  background: var(--bg-soft);
+  font-size: 0.8125rem;
+}
+.means-outside li.ok {
+  border-left-color: var(--green);
+}
+.means-outside li.bad {
+  border-left-color: var(--red);
+}
+.means-kind {
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  min-width: 5.5rem;
+}
+.means-name {
+  font-family: var(--mono);
+  color: var(--fg);
+}
+.means-from {
+  color: var(--muted);
+}
+.means-from code,
+.means-file {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--accent);
+}
+.means-verdict {
+  flex-basis: 100%;
+  color: var(--fg-soft);
+  font-size: 0.75rem;
+}
+.means-verdict.ok {
+  color: var(--green);
+}
+.means-verdict.bad {
+  color: var(--red);
+}
+.means-files {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  columns: 2;
+  column-gap: 1.5rem;
+}
+.means-files li {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--fg-soft);
+  break-inside: avoid;
+  padding: 0.0625rem 0;
+}
+.means-back {
+  margin-top: 2rem;
+}
+
+@media (max-width: 40rem) {
+  .means-files {
+    columns: 1;
+  }
+}
+
+.tally-next {
+  font-weight: 600;
 }

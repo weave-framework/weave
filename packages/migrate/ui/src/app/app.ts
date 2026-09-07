@@ -18,6 +18,7 @@ import {
   type PlacedNode,
 } from './layout.js';
 import { collapse as foldGroups, groupKeyFromId, isGroupId, type GroupSummary } from './group.js';
+import { consequence, undecided, type Consequence } from './consequence.js';
 
 // Capitalized tags in the template resolve to these imports. The editor tooling understands that; eslint,
 // running without it, sees three unused bindings — so the repo's convention is to name them here.
@@ -98,7 +99,7 @@ export function setup(): {
   path: Signal<string>;
   phase: Signal<Phase>;
   session: Signal<Session>;
-  step: Signal<1 | 2>;
+  step: Signal<1 | 2 | 3>;
   analysing: Signal<boolean>;
   progress: Signal<{ done: number; total: number; reading: string } | null>;
   progressLine: Computed<string>;
@@ -168,7 +169,8 @@ export function setup(): {
   isKept: (nodeId: string) => boolean;
   linkGroups: Computed<Array<{ title: string; items: Array<{ label: string; kind: string; external: boolean; id: string }> }>>;
   selectedLinks: Computed<Array<{ dir: 'uses' | 'used by'; kind: string; label: string; external: boolean }>>;
-  externals: Computed<PlacedNode[]>;
+  plan: Computed<Consequence>;
+  openDecisions: Computed<number>;
   query: Signal<string>;
   setKind: (v: string | string[]) => void;
   kindOptions: Computed<Array<{ value: string; label: string; disabled?: boolean }>>;
@@ -202,10 +204,11 @@ export function setup(): {
   typeLabel: (unit: Unit) => string;
 } {
   /**
-   * Which step is on screen. A wizard shows one step at a time — stacking them made the page grow without end
+   * Which step is on screen. Three: pick a project, mark what to take, then see what the marks imply
+   * before anything is written. A wizard shows one step at a time — stacking them made the page grow without end
    * and squeezed the canvas into a column meant for prose.
    */
-  const step: Signal<1 | 2> = signal<1 | 2>(1);
+  const step: Signal<1 | 2 | 3> = signal<1 | 2 | 3>(1);
 
   const path: Signal<string> = signal('');
   // `@if (workspace(); as found)` would read better, but `weave check` emits the alias as a SECOND call inside
@@ -772,19 +775,6 @@ export function setup(): {
       return groups;
     });
 
-  /** The heaviest external nodes — the decisions this step exists to collect, ordered by how much rides on them. */
-  const externals: Computed<PlacedNode[]> = computed<PlacedNode[]>(() => {
-    const l: Layout | null = placed();
-    const g: Graph | null = graph();
-    if (!g) return [];
-    const known: Set<string> = new Set((l?.nodes ?? []).map((n: PlacedNode): string => n.id));
-    void known;
-    return g.nodes
-      .filter((n): boolean => n.kind === 'external')
-      .sort((a, b) => b.weight - a.weight)
-      .map((n): PlacedNode => ({ ...n, x: 0, y: 0, r: 0, level: 0 }));
-  });
-
   /**
    * Select a card, or clear it by clicking the one already selected.
    *
@@ -1127,6 +1117,20 @@ export function setup(): {
   };
 
   /**
+   * What the marks imply — step three, worked out from the graph already on screen.
+   *
+   * The old panel listed all 27 of the application's outside classes under the canvas, at the moment nothing
+   * had been chosen. Asked what it was for, the honest answer was "so the number exists", and the reader was
+   * right to ask. Against a selection the same data reads as a to-do list: measured on one real application,
+   * the median route touches 12 of those 27 and 18 of its 28 routes fewer than half — and the converter
+   * answers two of the 27 by itself.
+   */
+  const plan: Computed<Consequence> = computed<Consequence>(() => consequence(graph(), decisions()));
+
+  /** How many outside classes still want a person — what step three is actually asking the reader to look at. */
+  const openDecisions: Computed<number> = computed<number>(() => undecided(plan().outside));
+
+  /**
    * Everything on the selected node's path — lit up, while the rest of the canvas dims.
    *
    * Computed on the FOLDED graph, because that is what is drawn. Against the raw graph it answers with node
@@ -1368,7 +1372,8 @@ export function setup(): {
     stopClick,
     edgeDecided,
     isKept,
-    externals,
+    plan,
+    openDecisions,
     query,
     setKind,
     kindOptions,
