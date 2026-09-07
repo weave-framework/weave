@@ -644,10 +644,6 @@ td.loc {
   font-weight: 600;
 }
 
-/* Step two is a canvas, not prose: the column width that suits reading strangles a graph. */
-.shell.wide {
-  max-width: min(96rem, 96vw);
-}
 
 .steps {
   display: flex;
@@ -1398,109 +1394,15 @@ td.loc {
    there, and unreachable, which is the same thing.
 
    It appears only with a selection, and `Clear selection` dismisses it. */
-.picked-links {
-  background: var(--surface);
-  border-top: 1px solid var(--border);
-  bottom: 0;
-  box-shadow: 0 -6px 18px rgb(0 0 0 / 8%);
-  left: 0;
-  max-height: 30vh;
-  overflow-y: auto;
-  padding: 0.55rem 1rem 0.7rem;
-  position: fixed;
-  right: 0;
-  z-index: 20;
-}
 
-/* Room under the page so the pinned panel never covers the last thing on it. */
-.shell.wide {
-  padding-bottom: 32vh;
-}
 
-.picked-head {
-  align-items: baseline;
-  border-bottom: 1px solid var(--border);
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 0.6rem;
-  padding-bottom: 0.5rem;
 
-  strong { font-size: 15px; }
-}
 
-.picked-kind {
-  background: var(--bg-soft);
-  border-radius: 3px;
-  color: var(--fg-soft);
-  font-size: 10px;
-  letter-spacing: 0.06em;
-  padding: 2px 6px;
-}
 
-.picked-screen { color: var(--green); font-size: 13px; }
-.picked-file { color: var(--fg-soft); font-family: var(--mono); font-size: 11px; margin-left: auto; }
 
-.picked-groups {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem 1.75rem;
-}
 
-.picked-group {
-  /* Take the room going, so the grid below has somewhere to put a second and third column. Sized by
-     content alone it stayed one link wide, and ten links stayed ten rows. */
-  flex: 1 1 24rem;
-  min-width: 15rem;
 
-  h4 {
-    color: var(--fg-soft);
-    font-size: 11px;
-    letter-spacing: 0.06em;
-    margin: 0 0 0.35rem;
-    text-transform: uppercase;
-  }
 
-  /* A card with ten dependencies listed one per line is most of the panel. Flowing them into columns turns
-     ten rows into three, which is the difference between a strip at the bottom and half the window. */
-  ul {
-    column-gap: 1.5rem;
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
-    list-style: none;
-    margin: 0;
-    padding: 0;
-  }
-
-  li {
-    align-items: baseline;
-    display: flex;
-    gap: 8px;
-    padding: 0;
-  }
-}
-
-.picked-rel {
-  color: var(--fg-soft);
-  font-size: 11px;
-  min-width: 4.5rem;
-}
-
-.picked-jump {
-  background: none;
-  border: 0;
-  color: var(--accent);
-  cursor: pointer;
-  font: inherit;
-  font-size: 13px;
-  padding: 0;
-  text-align: left;
-
-  &:hover { text-decoration: underline; }
-  &.ext { color: var(--muted); }
-}
-
-.picked-none { color: var(--fg-soft); font-size: 13px; margin: 0; }
 
 /* How many cards a trail has put on screen. Following dependencies adds to the canvas, and without a count
    the reader has no idea how much of what they are looking at came from their own clicks. */
@@ -1520,53 +1422,8 @@ td.loc {
    It used to live behind the ⋯ dialog: open, tick, close — three acts for one answer, and the two tickboxes
    read as a puzzle ("Migrate this" / "Leave out" are not independent, they are one choice). Two buttons that
    show which one is on say the same thing without the dialog or the puzzle. */
-.picked-actions {
-  align-items: center;
-  border-bottom: 1px solid var(--border);
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 0.6rem;
-  padding-bottom: 0.6rem;
-}
 
-.decide {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--w-radius, 4px);
-  color: var(--fg);
-  cursor: pointer;
-  font: inherit;
-  font-size: 13px;
-  font-weight: 600;
-  padding: 5px 12px;
 
-  &:hover { border-color: var(--accent); }
-
-  /* The answer that is currently chosen, so the pair reads as one setting rather than two switches. */
-  &.on {
-    background: var(--green);
-    border-color: var(--green);
-    color: var(--bg);
-  }
-
-  &--skip.on {
-    background: var(--muted);
-    border-color: var(--muted);
-  }
-
-  &--all {
-    font-weight: 500;
-    margin-left: auto;
-  }
-}
-
-.picked-why {
-  color: var(--fg-soft);
-  font-size: 13px;
-  margin: 0;
-  max-width: 46rem;
-}
 
 /* The tick on the card.
    Marking belongs where the card is. It lived behind the ⋯ dialog, then in a panel at the foot of a canvas
