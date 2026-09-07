@@ -695,6 +695,11 @@ td.loc {
   opacity: 0.35;
 }
 
+/* Step two is a canvas, not prose: the column width that suits reading strangles a graph. */
+.shell.wide {
+  max-width: min(96rem, 96vw);
+}
+
 /* ── the canvas: cards, not dots ── */
 .legend {
   display: flex;
@@ -1191,9 +1196,14 @@ td.loc {
   opacity: 0.85;
   stroke-dasharray: none;
 }
+/* Marked. Reported as "beveik nesimato ka as pasirinkau": a 2px outline among two hundred cards is
+   something you look for, not something you see. Weight in screen pixels so it holds when zoomed out, and
+   a tint so the card itself reads as chosen rather than merely edged. */
 .card.kept .card-body {
+  fill: color-mix(in srgb, var(--green) 12%, var(--raised));
   stroke: var(--green);
-  stroke-width: 2;
+  stroke-width: 2.5;
+  vector-effect: non-scaling-stroke;
 }
 /* Left out reads as left out: it recedes rather than gaining a colour of its own. */
 .card.dropped {
@@ -1433,22 +1443,22 @@ td.loc {
   cursor: pointer;
 
   circle {
-    fill: var(--surface);
-    stroke: var(--border);
-    stroke-width: 1.5;
+    fill: #fff;
+    stroke: rgb(0 0 0 / 25%);
+    stroke-width: 1;
     vector-effect: non-scaling-stroke;
   }
 
   text {
     fill: transparent;
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 700;
     text-anchor: middle;
   }
 
   &:hover circle { stroke: var(--green); }
 
-  /* Going. Filled, so a glance across the canvas answers "what have I marked" without reading anything. */
+  /* Going. Filled, so one look across the canvas answers "what have I marked". */
   &.on {
     circle {
       fill: var(--green);

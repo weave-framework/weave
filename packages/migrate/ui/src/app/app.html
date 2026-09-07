@@ -373,12 +373,13 @@
                     shared with {{ n.sharedWith }} other route(s)
                   </text>
                 }
-                <!-- Marking, on the card. One click, where the card is — no dialog to open and close, and
-                     no panel at the foot of a canvas thousands of pixels tall. Filled once it is going. -->
+                <!-- Marking, in the header strip. It sat at the bottom-left, exactly on top of the green
+                     component name — reported as "chekbox persidengia su tekstu". The strip holds only the
+                     kind and the weight, so there is room for it and nothing to collide with. -->
                 <g class="card-mark" class:on={{ isKept(n.id) }}
                    on:click={{ (e: MouseEvent) => markFrom(e, n.id) }}>
-                  <circle cx={{ n.x + 15 }} cy={{ n.y + CARD_H - 13 }} r="9" />
-                  <text x={{ n.x + 15 }} y={{ n.y + CARD_H - 9 }}>✓</text>
+                  <circle cx={{ n.x + CARD_W - 34 }} cy={{ n.y + 10 }} r="7" />
+                  <text x={{ n.x + CARD_W - 34 }} y={{ n.y + 14 }}>✓</text>
                 </g>
                 <text class="card-more" x={{ n.x + CARD_W - 9 }} y={{ n.y + CARD_H - 8 }}
                       on:click={{ (e: MouseEvent) => expandFrom(e, n.id) }}>⋯</text>
@@ -386,7 +387,7 @@
                   <text class="card-guards" x={{ n.x + CARD_W - 30 }} y={{ n.y + CARD_H - 8 }}>{{ guardMark(n) }}</text>
                 }
                 @if (n.weight) {
-                  <text class="card-weight" x={{ n.x + CARD_W - 9 }} y={{ n.y + 14 }}>{{ n.weight }}</text>
+                  <text class="card-weight" x={{ n.x + CARD_W - 12 }} y={{ n.y + 14 }}>{{ n.weight }}</text>
                 }
               </g>
             }
