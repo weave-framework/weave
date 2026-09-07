@@ -26,6 +26,7 @@ import { extname, isAbsolute, join, relative, sep } from 'node:path';
 import { assembleFactsOpening, assembleFactsOpeningAsync, type MigrationFacts, type Progress } from './analyze.js';
 import { browse, peek, type Listing } from './browse.js';
 import { buildGraph } from './graph.js';
+import { emptyState, readState, writeState, STATE_FILE, type Decision, type Done, type MigrationState } from './state.js';
 import type { Graph } from './types.js';
 import { inspect, type Workspace } from './detect.js';
 
@@ -57,7 +58,7 @@ const PORT_ATTEMPTS: number = 20;
  * is the one it was built against. Add a route, add it here — the pairing is what makes a stale service
  * announce itself instead of answering 404 to a page that has every reason to expect otherwise.
  */
-const ROUTES: string[] = ['/api/session', '/api/inspect', '/api/browse', '/api/peek', '/api/analyze', '/api/analyze-stream'];
+const ROUTES: string[] = ['/api/session', '/api/inspect', '/api/browse', '/api/peek', '/api/analyze', '/api/analyze-stream', '/api/state'];
 
 /** Largest request body accepted, in bytes. A path is short; anything larger is not a path. */
 const MAX_BODY: number = 64 * 1024;
@@ -158,6 +159,37 @@ type BodyResult = { ok: true; text: string } | { ok: false; reason: 'too-large' 
  * Past the limit the chunks are dropped and the stream is drained instead of parsed, so an oversized request
  * costs a read, not memory.
  */
+/**
+ * Take a page's idea of the state and keep only what this version understands.
+ *
+ * The page is trusted no further than any other client: it sends a whole document, and everything in it is
+ * checked before it reaches a file in someone else's repository. An unknown decision, a half-written history
+ * entry, or a key that is not a string is dropped rather than written and puzzled over later.
+ */
+function readIncoming(input: unknown, unit: string): MigrationState {
+  const out: MigrationState = emptyState(unit);
+  if (!input || typeof input !== 'object') return out;
+  const asState: { decisions?: unknown; done?: unknown; unit?: unknown } = input as {
+    decisions?: unknown;
+    done?: unknown;
+    unit?: unknown;
+  };
+  if (typeof asState.unit === 'string') out.unit = asState.unit;
+  if (asState.decisions && typeof asState.decisions === 'object') {
+    for (const [key, value] of Object.entries(asState.decisions as Record<string, unknown>)) {
+      if (value === 'migrate' || value === 'skip' || value === 'leave') out.decisions[key] = value as Decision;
+    }
+  }
+  if (asState.done && typeof asState.done === 'object') {
+    for (const [key, value] of Object.entries(asState.done as Record<string, unknown>)) {
+      if (!value || typeof value !== 'object') continue;
+      const entry: { at?: unknown; to?: unknown } = value as { at?: unknown; to?: unknown };
+      if (typeof entry.at === 'string' && typeof entry.to === 'string') out.done[key] = { at: entry.at, to: entry.to } as Done;
+    }
+  }
+  return out;
+}
+
 function readBody(req: IncomingMessage): Promise<BodyResult> {
   return new Promise((resolve: (r: BodyResult) => void): void => {
     const chunks: Buffer[] = [];
@@ -385,6 +417,51 @@ data: ${JSON.stringify(data)}
         send('failed', { error: e instanceof Error ? e.message : String(e) });
       }
       res.end();
+      return;
+    }
+
+    /*
+     * The decisions a reader has made, kept in the SOURCE project so they survive the tab closing.
+     *
+     * GET answers with whatever is on disk (an empty state when there is nothing), PUT replaces it. There is
+     * no merge: the page holds the whole set and sends the whole set, so two tabs editing the same project
+     * cannot interleave into something neither of them chose.
+     */
+    if (url.pathname === '/api/state' && req.method === 'GET') {
+      const at: string | null = url.searchParams.get('path');
+      if (!at || !existsSync(at)) {
+        json(res, 404, { error: `nothing at ${String(at)}` });
+        return;
+      }
+      json(res, 200, { state: readState(at), file: STATE_FILE });
+      return;
+    }
+
+    if (url.pathname === '/api/state' && req.method === 'PUT') {
+      const body: BodyResult = await readBody(req);
+      if (!body.ok) {
+        json(res, body.reason === 'too-large' ? 413 : 400, { error: 'could not read the request body' });
+        return;
+      }
+      let at: unknown;
+      let incoming: unknown;
+      try {
+        const parsed: { path?: unknown; state?: unknown } = JSON.parse(body.text) as { path?: unknown; state?: unknown };
+        at = parsed.path;
+        incoming = parsed.state;
+      } catch {
+        json(res, 400, { error: 'body must be JSON' });
+        return;
+      }
+      if (typeof at !== 'string' || !at.trim() || !existsSync(at)) {
+        json(res, 404, { error: `nothing at ${String(at)}` });
+        return;
+      }
+      // Everything is run through the same reader the file goes through, so a page cannot write a shape
+      // that the next read would silently discard.
+      const clean: MigrationState = readIncoming(incoming, typeof at === 'string' ? at : '');
+      const written: string = writeState(at, clean);
+      json(res, 200, { ok: true, file: written, decisions: Object.keys(clean.decisions).length, done: Object.keys(clean.done).length });
       return;
     }
 
