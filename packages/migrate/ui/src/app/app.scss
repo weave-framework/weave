@@ -1478,3 +1478,55 @@ td.loc {
   color: var(--fg-soft);
   font-size: 12px;
 }
+
+/* Marking, where the card you selected already is.
+   It used to live behind the ⋯ dialog: open, tick, close — three acts for one answer, and the two tickboxes
+   read as a puzzle ("Migrate this" / "Leave out" are not independent, they are one choice). Two buttons that
+   show which one is on say the same thing without the dialog or the puzzle. */
+.picked-actions {
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 0.6rem;
+  padding-bottom: 0.6rem;
+}
+
+.decide {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--w-radius, 4px);
+  color: var(--fg);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 5px 12px;
+
+  &:hover { border-color: var(--accent); }
+
+  /* The answer that is currently chosen, so the pair reads as one setting rather than two switches. */
+  &.on {
+    background: var(--green);
+    border-color: var(--green);
+    color: var(--bg);
+  }
+
+  &--skip.on {
+    background: var(--muted);
+    border-color: var(--muted);
+  }
+
+  &--all {
+    font-weight: 500;
+    margin-left: auto;
+  }
+}
+
+.picked-why {
+  color: var(--fg-soft);
+  font-size: 13px;
+  margin: 0;
+  max-width: 46rem;
+}

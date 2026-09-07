@@ -275,7 +275,7 @@ export function buildGraph(facts: MigrationFacts): Graph {
       detail: component.selector ?? '',
       weight: 0,
       folder: folderOf(component.file, folderRoot),
-      file: shortPath(component.file, root),
+      file: shortPath(component.file, folderRoot),
     });
   }
   for (const service of facts.services) {
@@ -286,7 +286,7 @@ export function buildGraph(facts: MigrationFacts): Graph {
       detail: service.providedIn ? `providedIn: ${service.providedIn}` : '',
       weight: 0,
       folder: folderOf(service.file, folderRoot),
-      file: shortPath(service.file, root),
+      file: shortPath(service.file, folderRoot),
     });
   }
 
@@ -415,7 +415,7 @@ export function buildGraph(facts: MigrationFacts): Graph {
       detail: `${ngModule.declarations.length} declared · ${ngModule.imports.length} imported`,
       weight: 0,
       folder: folderOf(ngModule.file, folderRoot),
-      file: shortPath(ngModule.file, root),
+      file: shortPath(ngModule.file, folderRoot),
     });
   }
   for (const ngModule of facts.ngModules) {

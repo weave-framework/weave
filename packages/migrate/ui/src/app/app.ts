@@ -17,7 +17,7 @@ import {
   type Layout,
   type PlacedNode,
 } from './layout.js';
-import { collapse as foldGroups, groupKeyFromId, groupKeyOf, isGroupId, type GroupSummary } from './group.js';
+import { collapse as foldGroups, groupKeyFromId, isGroupId, type GroupSummary } from './group.js';
 
 // Capitalized tags in the template resolve to these imports. The editor tooling understands that; eslint,
 // running without it, sees three unused bindings — so the repo's convention is to name them here.
@@ -89,7 +89,7 @@ const EMPTY: Workspace = { root: '', signals: [], units: [], scannedDepth: 0 };
 /** What `/api/state` answers with. Narrow on purpose: the page reads only what it is going to use. */
 interface StatePayload {
   state?: {
-    decisions?: Record<string, 'migrate' | 'skip' | 'leave'>;
+    decisions?: Record<string, 'migrate' | 'skip'>;
     done?: Record<string, { at: string; to: string }>;
   };
 }
@@ -107,12 +107,12 @@ export function setup(): {
   graphError: Signal<string>;
   summary: Signal<Record<string, number | string> | null>;
   selected: Signal<string>;
-  decisions: Signal<Record<string, 'migrate' | 'skip' | 'leave'>>;
+  decisions: Signal<Record<string, 'migrate' | 'skip'>>;
   decisionFor: (nodeId: string) => string;
-  decide: (nodeId: string, value: 'migrate' | 'skip' | 'leave') => void;
+  decide: (nodeId: string, value: 'migrate' | 'skip') => void;
   migrateWithDependencies: (nodeId: string) => void;
   closureSize: (nodeId: string) => number;
-  decisionCounts: Computed<{ migrate: number; skip: number; leave: number; total: number }>;
+  decisionCounts: Computed<{ migrate: number; skip: number; total: number }>;
   stateNote: Signal<string>;
   clearDecisions: () => void;
   pick: (nodeId: string) => void;
@@ -693,14 +693,14 @@ export function setup(): {
    * looks like it means.
    */
   const jumpTo = (nodeId: string): void => {
-    const g: Graph | null = graph();
-    const node: GraphNode | undefined = g?.nodes.find((n: GraphNode): boolean => n.id === nodeId);
-    const key: string | null = node ? groupKeyOf(node) : null;
-    if (key !== null && !openGroups().includes(key)) {
-      openGroups.set((current: string[]): string[] => [...current, key]);
-    }
-    selected.set(nodeId);
+    // Lift the one card, rather than opening the folder holding it.
+    //
+    // Opening the folder was the first fix for a link that led nowhere, and it overshot twice: `components`
+    // holds 72 cards that connect to everything, and opening anything recomputes the arrangement — measured,
+    // following one link moved 16 of 47 cards, so the reader lost the place they were reading. Revealing
+    // leaves every card already drawn exactly where it is.
     reveal(nodeId);
+    selected.set(nodeId);
   };
 
   /** Fold everything back — the way home from any depth. */
@@ -973,13 +973,13 @@ export function setup(): {
      The graph could be looked at and nothing more. A card is where a person says what happens to the thing it
      stands for, and what that means depends on whether the walk ever read it:
 
-       read already (routes, modules, components)  →  migrate it, or leave it out
+       read already (routes, modules, components)  →  migrate it, or leave it out (two answers, not three)
        never read (an external class or library)    →  open it (read and migrate it), or leave it behind
 
      Kept in one map keyed by node id, because that is what has to become the file the converter reads: a
      decision is only useful if it survives the session that made it. */
-  const decisions: Signal<Record<string, 'migrate' | 'skip' | 'leave'>> = signal<
-    Record<string, 'migrate' | 'skip' | 'leave'>
+  const decisions: Signal<Record<string, 'migrate' | 'skip'>> = signal<
+    Record<string, 'migrate' | 'skip'>
   >({});
 
   /**
@@ -1054,9 +1054,9 @@ export function setup(): {
     });
   }, 400);
 
-  const decide = (nodeId: string, value: 'migrate' | 'skip' | 'leave'): void => {
-    decisions.set((current: Record<string, 'migrate' | 'skip' | 'leave'>) => {
-      const next: Record<string, 'migrate' | 'skip' | 'leave'> = { ...current };
+  const decide = (nodeId: string, value: 'migrate' | 'skip'): void => {
+    decisions.set((current: Record<string, 'migrate' | 'skip'>) => {
+      const next: Record<string, 'migrate' | 'skip'> = { ...current };
       const key: string = keyOf(nodeId);
       // Choosing the same answer again clears it — the same way clicking a selected card deselects it.
       if (next[key] === value) delete next[key];
@@ -1077,15 +1077,17 @@ export function setup(): {
     const g: Graph | null = graph();
     if (!g) return;
     const closure: Set<string> = dependencyClosure(g, nodeId);
-    decisions.set((current: Record<string, 'migrate' | 'skip' | 'leave'>) => {
-      const next: Record<string, 'migrate' | 'skip' | 'leave'> = { ...current };
+    decisions.set((current: Record<string, 'migrate' | 'skip'>) => {
+      const next: Record<string, 'migrate' | 'skip'> = { ...current };
       for (const nid of closure) {
         const node: GraphNode | undefined = g.nodes.find((n: GraphNode): boolean => n.id === nid);
         if (!node) continue;
         // An external is an npm package now — carried over as a dependency, never migrated — so the
         // closure marks only what is ours to move.
         if (node.kind === 'external') continue;
-        next[nid] = 'migrate';
+        // By KEY, like every other write. Marking by id filled the map with entries nothing could read back:
+        // "migrate everything this needs" looked as though it did nothing, and the marks were gone on reload.
+        next[node.key] = 'migrate';
       }
       return next;
     });
@@ -1099,12 +1101,11 @@ export function setup(): {
   };
 
   /** A running tally, so the page always says what has been decided so far. */
-  const decisionCounts: Computed<{ migrate: number; skip: number; leave: number; total: number }> = computed(() => {
-    const all: Array<'migrate' | 'skip' | 'leave'> = Object.values(decisions());
+  const decisionCounts: Computed<{ migrate: number; skip: number; total: number }> = computed(() => {
+    const all: Array<'migrate' | 'skip'> = Object.values(decisions());
     return {
       migrate: all.filter((d): boolean => d === 'migrate').length,
       skip: all.filter((d): boolean => d === 'skip').length,
-      leave: all.filter((d): boolean => d === 'leave').length,
       total: all.length,
     };
   });
@@ -1216,8 +1217,9 @@ export function setup(): {
   /** An edge between two things both marked for migration — the path someone has already committed to. */
   const edgeDecided = (from: string, to: string): boolean => {
     const map: Record<string, string> = decisions();
-    const a: string | undefined = map[from];
-    const b: string | undefined = map[to];
+    // Both ends arrive as ids; the map is keyed by the portable key.
+    const a: string | undefined = map[keyOf(from)];
+    const b: string | undefined = map[keyOf(to)];
     const kept = (v: string | undefined): boolean => v === 'migrate';
     return kept(a) && kept(b);
   };
