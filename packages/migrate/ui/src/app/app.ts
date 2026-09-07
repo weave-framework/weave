@@ -18,7 +18,7 @@ import {
   type PlacedNode,
 } from './layout.js';
 import { collapse as foldGroups, groupKeyFromId, isGroupId, type GroupSummary } from './group.js';
-import { consequence, undecided, type Consequence } from './consequence.js';
+import { consequence, suggested, undecided, type Consequence } from './consequence.js';
 
 // Capitalized tags in the template resolve to these imports. The editor tooling understands that; eslint,
 // running without it, sees three unused bindings — so the repo's convention is to name them here.
@@ -171,6 +171,7 @@ export function setup(): {
   selectedLinks: Computed<Array<{ dir: 'uses' | 'used by'; kind: string; label: string; external: boolean }>>;
   plan: Computed<Consequence>;
   openDecisions: Computed<number>;
+  withSuggestion: Computed<number>;
   query: Signal<string>;
   setKind: (v: string | string[]) => void;
   kindOptions: Computed<Array<{ value: string; label: string; disabled?: boolean }>>;
@@ -1130,6 +1131,9 @@ export function setup(): {
   /** How many outside classes still want a person — what step three is actually asking the reader to look at. */
   const openDecisions: Computed<number> = computed<number>(() => undecided(plan().outside));
 
+  /** How many carry a Weave suggestion — the ones with somewhere to start. */
+  const withSuggestion: Computed<number> = computed<number>(() => suggested(plan().outside));
+
   /**
    * Everything on the selected node's path — lit up, while the rest of the canvas dims.
    *
@@ -1374,6 +1378,7 @@ export function setup(): {
     isKept,
     plan,
     openDecisions,
+    withSuggestion,
     query,
     setKind,
     kindOptions,

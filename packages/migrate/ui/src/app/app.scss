@@ -1548,3 +1548,25 @@ td.loc {
 .tally-next {
   font-weight: 600;
 }
+
+/* The suggestion sits under the verdict, indented, so the eye reads "what it is" then "what to do".
+   `likely` is drawn quieter than `certain` on purpose: a reading and a settled mapping must not look alike. */
+.means-becomes {
+  flex-basis: 100%;
+  font-size: 0.75rem;
+  color: var(--fg-soft);
+  padding-left: 0.75rem;
+  border-left: 2px solid var(--green);
+  margin-top: 0.125rem;
+}
+.means-becomes.likely {
+  border-left-color: var(--border);
+  color: var(--muted);
+}
+.means-becomes code {
+  font-family: var(--mono);
+  color: var(--accent);
+}
+.means-becomes em {
+  color: var(--muted);
+}

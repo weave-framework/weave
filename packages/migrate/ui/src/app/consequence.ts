@@ -1,4 +1,4 @@
-import { handledFor, handledNote, type Handled } from '../../../src/handled.js';
+import { handledFor, handledNote, suggestFor, type Handled, type Suggestion } from '../../../src/handled.js';
 import type { Graph, GraphNode } from '../../../src/types.js';
 import { dependencyClosure } from './layout.js';
 
@@ -29,6 +29,11 @@ export interface Outsider {
   handled: Handled;
   /** The converter's own note, when it has one. Empty otherwise. */
   note: string;
+  /**
+   * What it could become in Weave, when anything can. A suggestion for a person to act on — nothing
+   * here rewrites code, and two of these say the class disappears rather than naming a replacement.
+   */
+  suggest?: Suggestion;
 }
 
 /** The consequences of everything marked so far. */
@@ -92,7 +97,14 @@ export function consequence(graph: Graph | null, decisions: Record<string, 'migr
     graph.edges.filter((e): boolean => e.kind === 'injects' && e.to === labelId(graph, label) && reached.has(e.from)).length;
 
   const outside: Outsider[] = outsideNodes
-    .map((node: GraphNode): Outsider => ({ node, handled: handledFor(node.label, node.library), note: handledNote(node.label) }))
+    .map((node: GraphNode): Outsider => ({
+      node,
+      handled: handledFor(node.label, node.library),
+      note: handledNote(node.label),
+      // A class the converter rewrites already has its answer printed as the verdict; attaching the
+      // suggestion too would say the same thing twice, once under each heading.
+      suggest: handledFor(node.label, node.library) === 'automatic' ? undefined : suggestFor(node.label),
+    }))
     .sort((a: Outsider, b: Outsider): number => {
       const byUse: number = injectedBy(b.node.label) - injectedBy(a.node.label);
       return byUse !== 0 ? byUse : a.node.label.localeCompare(b.node.label);
@@ -113,7 +125,18 @@ function byLabel(a: GraphNode, b: GraphNode): number {
   return a.label.localeCompare(b.label);
 }
 
-/** How many of the outside classes still need a person to decide something — the number the step exists for. */
+/**
+ * How many outside classes are left with no answer at all — not merely unhandled by the converter.
+ *
+ * It counted everything the converter does not rewrite, which put `MatSnackBar` in the same bucket as a
+ * class nobody can say anything about. Now a suggestion counts as an answer: what is left is the work
+ * that has nowhere to start.
+ */
 export function undecided(list: Outsider[]): number {
-  return list.filter((o: Outsider): boolean => o.handled !== 'automatic').length;
+  return list.filter((o: Outsider): boolean => o.handled !== 'automatic' && !o.suggest).length;
+}
+
+/** How many carry a suggestion — the ones a reader can act on immediately. */
+export function suggested(list: Outsider[]): number {
+  return list.filter((o: Outsider): boolean => !!o.suggest).length;
 }

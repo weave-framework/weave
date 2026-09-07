@@ -479,7 +479,11 @@
       </div>
       <div class="means-fact" class:means-warn={{ openDecisions() > 0 }}>
         <span class="means-n">{{ openDecisions() }}</span>
-        <span class="means-k">need you to decide</span>
+        <span class="means-k">nothing to point at</span>
+      </div>
+      <div class="means-fact">
+        <span class="means-n">{{ withSuggestion() }}</span>
+        <span class="means-k">have a Weave answer</span>
       </div>
       <div class="means-fact">
         <span class="means-n">{{ plan().files.length }}</span>
@@ -534,8 +538,20 @@
                 </span>
               }
               @default {
-                <span class="means-verdict">no mapping — it stays as written, and the build will say so</span>
+                @if (!o.suggest) {
+                  <span class="means-verdict">no mapping — it stays as written, and the build will say so</span>
+                }
               }
+            }
+            @if (o.suggest; as s) {
+              <span class="means-becomes" class:likely={{ s.sure === 'likely' }}>
+                @if (s.shape === 'gone') {
+                  <strong>it goes away</strong> — {{ s.why }}
+                } @else {
+                  becomes <code>{{ s.symbol }}</code>@if (s.from) { from <code>{{ s.from }}</code> } — {{ s.why }}
+                }
+                @if (s.sure === 'likely') { <em>(a reading, not a settled mapping)</em> }
+              </span>
             }
           </li>
         }

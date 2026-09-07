@@ -21,7 +21,7 @@
 import { build as esbuild } from 'esbuild';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { readFileSync, rmSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync } from 'node:fs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repo = join(here, '..', '..', '..');
@@ -46,8 +46,8 @@ for (const [name, entry] of [
   await esbuild({ entryPoints: [entry], bundle: true, format: 'esm', platform: 'node', outfile: out, packages: 'external' });
   bundles[name] = await import(pathToFileURL(out).href);
 }
-const { consequence, undecided } = bundles.consequence;
-const { handledFor, CONVERTED, TEMPLATE_ONLY } = bundles.handled;
+const { consequence, suggested, undecided } = bundles.consequence;
+const { handledFor, CONVERTED, TEMPLATE_ONLY, SUGGESTS } = bundles.handled;
 
 /* ── the narrowing, on a graph shaped to make failure visible ──
    Two screens that share nothing. Marking one must report ITS outsider and not the other's — the fixture the
@@ -100,7 +100,11 @@ ok(handledFor('MatDialog', '@angular/material/dialog') === 'template-only',
    'MatDialog is mapped in markup only — injected, it is left alone');
 ok(handledFor('TranslateService', '@ngx-translate/core') === 'none', 'a library with no mapping says so');
 ok(handledFor('ToastrService', undefined) === 'unread', 'a class traced to no library is UNREAD, not "no mapping"');
-ok(undecided(one.outside) === 1, `one of this selection's two still wants a person (${undecided(one.outside)})`);
+/* Router is rewritten outright and TranslateService has a Weave answer, so this selection leaves nothing
+   open. Before suggestions existed this counted 1, which lumped `MatSnackBar` in with a class nobody can
+   say anything about. */
+ok(undecided(one.outside) === 0, `a selection whose outsiders all have answers leaves nothing open (${undecided(one.outside)})`);
+ok(suggested(one.outside) === 1, `and one of them is answered by a suggestion rather than a rewrite (${suggested(one.outside)})`);
 
 /* ── the same code, on what the analysis really produces ── */
 const facts = bundles.analyze.assembleFactsOpening(app, ['*']);
@@ -131,6 +135,70 @@ ok(String(declared) === String(Object.keys(CONVERTED).sort()),
 /* Every Material class we call template-only must actually appear in the converter, or the note is invented. */
 const missing = Object.keys(TEMPLATE_ONLY).filter((n) => !source.includes(n.replace(/^Mat/, 'mat').replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase()) && !source.includes(n));
 ok(missing.length === 0, `every template-only class is one the converter knows (${missing.join(', ') || 'all of them'})`);
+
+
+/* ── every suggested Weave API must actually exist ──
+   The reader asked for this and guessed it was impossible. It is not — 19 of that application's 27 outside
+   classes have something to point at. But a suggestion naming an API that does not exist is worse than
+   silence: it sends someone to write an import that cannot resolve, on the authority of a tool that sounded
+   certain. So every symbol in the table is looked up in the real package here, and nothing ships unlooked-up.
+
+   `shape` decides where to look, which is why it exists at all:
+     function/type  a named export from the package's entry
+     component      a subpath whose module is a Weave component (`setup` + a template)
+     template       syntax, not an import
+     global         the platform, not an import
+     gone           there is no replacement, and saying so is the answer */
+const uiPkg = JSON.parse(readFileSync(join(repo, 'packages', 'ui', 'package.json'), 'utf8'));
+const entryFor = (spec) => {
+  if (!spec.startsWith('@weave-framework/')) return null;
+  const rest = spec.slice('@weave-framework/'.length);
+  if (rest.startsWith('ui/')) {
+    const sub = uiPkg.exports['./' + rest.slice(3)];
+    return sub ? join(repo, 'packages', 'ui', sub.import) : null;
+  }
+  return join(repo, 'packages', rest, 'src', 'index.ts');
+};
+
+const broken = [];
+const looked = [];
+for (const [name, s] of Object.entries(SUGGESTS)) {
+  if (s.shape === 'template' || s.shape === 'global' || s.shape === 'gone') {
+    if (s.from) broken.push(`${name}: ${s.shape} must name no package, got ${s.from}`);
+    if (s.shape === 'gone' && s.symbol) broken.push(`${name}: "gone" must name no symbol, got ${s.symbol}`);
+    continue;
+  }
+  const entry = entryFor(s.from);
+  if (!entry || !existsSync(entry)) { broken.push(`${name}: ${s.from} resolves to nothing`); continue; }
+  const text = readFileSync(entry, 'utf8');
+  const wanted = s.symbol.split('.')[0];
+  const exported =
+    s.shape === 'component'
+      ? /export\s+function\s+setup\b/.test(text)
+      : new RegExp(String.raw`export\s+(?:declare\s+)?(?:async\s+)?(?:function|const|let|class|type|interface)\s+` + wanted + String.raw`\b`).test(text) ||
+        new RegExp(String.raw`export\s*\{[^}]*\b` + wanted + String.raw`\b[^}]*\}`).test(text);
+  if (!exported) broken.push(`${name}: ${wanted} is not exported by ${s.from}`);
+  else looked.push(name);
+}
+ok(looked.length >= 10, `${looked.length} suggestions were looked up in a real package file`);
+ok(broken.length === 0, `every suggested API exists where it says (${broken.join(' | ') || 'all of them'})`);
+
+/* The two that say "it goes away" are the most valuable rows in the table, and the easiest to lose. */
+ok(SUGGESTS.ChangeDetectorRef?.shape === 'gone' && SUGGESTS.NgZone?.shape === 'gone',
+   'the classes with no counterpart say so rather than being left blank');
+
+/* The two tables must stay disjoint, or the screen prints one answer twice under two headings. */
+const overlap = Object.keys(SUGGESTS).filter((n) => CONVERTED[n]);
+ok(overlap.length === 0, `no class is both rewritten and merely suggested (${overlap.join(', ') || 'none'})`);
+
+/* A suggestion is an answer, so it must stop counting as an open question. */
+const outsiders = [
+  { node: { label: 'MatSnackBar' }, handled: 'none', suggest: SUGGESTS.MatSnackBar },
+  { node: { label: 'Mystery' }, handled: 'unread', suggest: undefined },
+];
+ok(undecided(outsiders) === 1, `only the one with nothing to point at is still open (${undecided(outsiders)})`);
+ok(suggested(outsiders) === 1, `and one has somewhere to start (${suggested(outsiders)})`);
+
 
 for (const name of ['analyze', 'graph', 'handled', 'consequence']) rmSync(join(here, `.consequence.${name}.mjs`), { force: true });
 console.log(`\n${failures ? `${failures} failing` : 'all green'}\n`);
