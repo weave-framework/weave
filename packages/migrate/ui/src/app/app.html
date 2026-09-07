@@ -1,7 +1,8 @@
 <main class="shell" class:wide={{ step() === 2 }}>
   <header class="banner">
     <h1>weave migrate</h1>
-    <span class="note">Reads your source app. Never writes to it.</span>
+    <span class="note">Reads your source app. Writes nothing there but your own decisions,
+      in <code>.weave-migrate.json</code>, and only once you make one.</span>
   </header>
 
   @if (session() === 'stale') {
@@ -318,6 +319,9 @@
           <span class="zoom-hint">Ctrl + scroll to zoom</span>
           @if (selected() || revealed().length) {
             <Button variant="ghost" class="clear-sel" on:click={{ clearSelection }}>Clear selection</Button>
+          }
+          @if (stateNote()) {
+            <span class="state-note">{{ stateNote() }}</span>
           }
           @if (revealed().length) {
             <span class="trail-count">{{ revealed().length }} followed onto the canvas</span>

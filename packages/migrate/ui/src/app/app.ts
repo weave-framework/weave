@@ -86,6 +86,14 @@ const NO_LISTING: Listing = { path: '', parent: null, entries: [], shortcuts: []
 /** Stand-in for "nothing scanned yet", so the template never handles null. */
 const EMPTY: Workspace = { root: '', signals: [], units: [], scannedDepth: 0 };
 
+/** What `/api/state` answers with. Narrow on purpose: the page reads only what it is going to use. */
+interface StatePayload {
+  state?: {
+    decisions?: Record<string, 'migrate' | 'skip' | 'leave'>;
+    done?: Record<string, { at: string; to: string }>;
+  };
+}
+
 export function setup(): {
   path: Signal<string>;
   phase: Signal<Phase>;
@@ -105,6 +113,7 @@ export function setup(): {
   migrateWithDependencies: (nodeId: string) => void;
   closureSize: (nodeId: string) => number;
   decisionCounts: Computed<{ migrate: number; skip: number; leave: number; total: number }>;
+  stateNote: Signal<string>;
   clearDecisions: () => void;
   pick: (nodeId: string) => void;
   clearSelection: () => void;
@@ -518,6 +527,9 @@ export function setup(): {
    * to surprise you with a hundred files you never saw.
    */
   const analyse = (target: string, keepView: boolean = false): void => {
+    // The marks saved beside this project, read alongside the analysis rather than after it: the graph and
+    // the decisions about it arrive together, so nothing is ever drawn unmarked and then marked.
+    if (stateFor() !== target) loadState(target);
     analysedPath.set(target);
     step.set(2);
     analysing.set(true);
@@ -970,7 +982,17 @@ export function setup(): {
     Record<string, 'migrate' | 'skip' | 'leave'>
   >({});
 
-  const decisionFor = (nodeId: string): string => decisions()[nodeId] ?? '';
+  /**
+   * Decisions are filed under `GraphNode.key`, not `id`.
+   *
+   * They are written to a file that lives in the source repository, and an id names one person's disk:
+   * `route:C:_WORK…app.routes.ts#0`. The key is the same thing said portably. Everything the template
+   * touches still passes an id, and the translation happens here.
+   */
+  const keyOf = (nodeId: string): string =>
+    folded()?.graph.nodes.find((n: GraphNode): boolean => n.id === nodeId)?.key ?? nodeId;
+
+  const decisionFor = (nodeId: string): string => decisions()[keyOf(nodeId)] ?? '';
 
   /**
    * Open a library for real: record the decision, then widen the walk and redraw.
@@ -979,14 +1001,69 @@ export function setup(): {
    * never grow past its first level, and a service marked "open and migrate" still showed zero dependencies.
    * Opening one is what makes the next level exist.
    */
+  /** Which project the marks on screen belong to, so they are saved beside the right code. */
+  const stateFor: Signal<string> = signal<string>('');
+  /** True once the file has been read, so the first save cannot fire before the first load lands. */
+  const stateLoaded: Signal<string> = signal<string>('');
+  /** What the file said when it was read — used to keep a history entry the page never touches. */
+  const done: Signal<Record<string, { at: string; to: string }>> = signal<Record<string, { at: string; to: string }>>({});
+  const stateNote: Signal<string> = signal<string>('');
+
+  /**
+   * Read the marks saved beside a project, if any.
+   *
+   * A failure here is silent by design: an unreadable file means starting with a clean canvas, which is
+   * exactly what happened before this existed. Refusing to show the graph over it would be worse.
+   */
+  const loadState = (target: string): void => {
+    stateFor.set(target);
+    void fetch(apiUrl('/api/state', { path: target }))
+      .then((res: Response): Promise<unknown> => (res.ok ? res.json() : Promise.reject(new Error(String(res.status)))))
+      .then((payload: unknown): void => {
+        const state: StatePayload['state'] = (payload as StatePayload).state;
+        decisions.set(state?.decisions ?? {});
+        done.set(state?.done ?? {});
+        stateLoaded.set(target);
+        const n: number = Object.keys(state?.decisions ?? {}).length;
+        stateNote.set(n ? `${n} decision(s) restored from .weave-migrate.json` : '');
+      })
+      .catch((): void => {
+        decisions.set({});
+        done.set({});
+        stateLoaded.set(target);
+        stateNote.set('');
+      });
+  };
+
+  /**
+   * Save the marks back, debounced.
+   *
+   * Debounced because a decision is one click and a reader makes several in a row; writing a file per click
+   * would put a burst of identical-looking commits-worth of churn into their working tree. Guarded on
+   * `stateLoaded` so the empty set the page starts with cannot overwrite a file before it has been read.
+   */
+  const saveState: () => void = debounced((): void => {
+    const target: string = stateFor();
+    if (!target || stateLoaded() !== target) return;
+    void fetch(apiUrl('/api/state'), {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ path: target, state: { version: 1, unit: pickedLabel(), decisions: decisions(), done: done() } }),
+    }).catch((): void => {
+      stateNote.set('could not save your decisions — check the service is still running');
+    });
+  }, 400);
+
   const decide = (nodeId: string, value: 'migrate' | 'skip' | 'leave'): void => {
     decisions.set((current: Record<string, 'migrate' | 'skip' | 'leave'>) => {
       const next: Record<string, 'migrate' | 'skip' | 'leave'> = { ...current };
+      const key: string = keyOf(nodeId);
       // Choosing the same answer again clears it — the same way clicking a selected card deselects it.
-      if (next[nodeId] === value) delete next[nodeId];
-      else next[nodeId] = value;
+      if (next[key] === value) delete next[key];
+      else next[key] = value;
       return next;
     });
+    saveState();
   };
 
   /**
@@ -1012,6 +1089,7 @@ export function setup(): {
       }
       return next;
     });
+    saveState();
   };
 
   /** How many things this node would pull in — shown on the button, so the click is not a surprise. */
@@ -1033,6 +1111,7 @@ export function setup(): {
 
   const clearDecisions = (): void => {
     decisions.set({});
+    saveState();
   };
 
   /**
@@ -1221,6 +1300,7 @@ export function setup(): {
     migrateWithDependencies,
     closureSize,
     decisionCounts,
+    stateNote,
     clearDecisions,
     pick,
     clearSelection,

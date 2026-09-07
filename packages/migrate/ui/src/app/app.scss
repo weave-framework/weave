@@ -1471,3 +1471,10 @@ td.loc {
   color: var(--fg-soft);
   font-size: 12px;
 }
+
+/* Where the decisions came from. Marks that reappear without explanation read as a bug the first time; one
+   line naming the file turns that into "it remembered", which is the whole point of writing it. */
+.state-note {
+  color: var(--fg-soft);
+  font-size: 12px;
+}
