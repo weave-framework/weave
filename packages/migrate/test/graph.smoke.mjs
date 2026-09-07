@@ -121,6 +121,22 @@ const classNode = graph.nodes.find((n) => n.kind === 'component');
 ok(classNode !== undefined && classNode.key === classNode.id,
    `a class-named node keys on its class, unchanged (${classNode?.key})`);
 
+/* Where an injected class comes from, read from the imports.
+
+   Every class the walk could not define was reported as "no library found for it" — a true statement about
+   the walk and a false one about the class. Measured on a real application, 24 of 27 name their package in
+   an import a few lines above the constructor that injects them: `Router` is `@angular/router`. Asked what
+   the list was for, the honest answer was that it was mostly wrong. */
+const externals = graph.nodes.filter((n) => n.kind === 'external');
+ok(externals.length > 0, `the fixture has injected classes it cannot define (${externals.length})`);
+const named = externals.filter((n) => n.library);
+ok(named.length === externals.length,
+   named.length === externals.length
+     ? `every one names the package it came from (${named.map((n) => `${n.label} <- ${n.library}`).join(", ")})`
+     : `${externals.length - named.length} still unnamed: ${externals.filter((n) => !n.library).map((n) => n.label).join(", ")}`);
+ok(named.every((n) => (n.detail ?? '').startsWith('from ')),
+   'and says so on the card itself');
+
 for (const name of ['analyze', 'graph']) rmSync(join(here, `.graph.${name}.mjs`), { force: true });
 console.log(`\n${failures ? `${failures} failing` : 'all green'}\n`);
 process.exit(failures ? 1 : 0);

@@ -18,6 +18,7 @@ import {
   outOfReach,
   parseFile,
   resolveRelative,
+  symbolOrigins,
   type ComponentFact,
   type DiEdge,
   type MigrationFacts,
@@ -475,6 +476,10 @@ export function buildGraph(facts: MigrationFacts): Graph {
      these to a library and the DI edges say who injects them. Carrying that onto the node turns a number into
      a decision someone can actually make. */
   const reach: Reach[] = outOfReach(facts);
+  /* Where each of these actually comes from, read from the import statements. `outOfReach` answers for the
+     workspace libraries it could have opened; it says nothing about `@angular/router`, so every Angular and
+     Material class was reported as "no library found for it" — true of the walk, false of the class. */
+  const origins: Record<string, string> = symbolOrigins(facts.files);
   for (const node of nodes.values()) {
     if (node.kind !== 'external') continue;
     const injectors: string[] = [...new Set(facts.di.filter((e: DiEdge): boolean => e.to === node.label).map((e: DiEdge): string => e.from))];
@@ -484,6 +489,11 @@ export function buildGraph(facts: MigrationFacts): Graph {
       node.library = from.name;
       if (from.path) node.libraryPath = from.path;
       node.detail = `from ${from.name}`;
+    }
+    // Not a workspace library, but the imports still name it: `Router` is `@angular/router`.
+    if (!node.library && origins[node.label]) {
+      node.library = origins[node.label];
+      node.detail = `from ${origins[node.label]}`;
     }
   }
 

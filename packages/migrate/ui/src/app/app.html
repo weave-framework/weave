@@ -471,7 +471,7 @@
                     @if (x.library) {
                       <span class="ext-from">from <code>{{ x.library }}</code></span>
                     } @else {
-                      <span class="ext-from ext-unknown">no library found for it — an injected type with no definition in reach</span>
+                      <span class="ext-from ext-unknown">an injection token, defined somewhere the walk did not reach</span>
                     }
                     @if (x.usedBy?.length) {
                       <span class="ext-users">injected by {{ (x.usedBy ?? []).slice(0, 3).join(', ') }}@if ((x.usedBy ?? []).length > 3) { , +{{ (x.usedBy ?? []).length - 3 }} more }</span>
