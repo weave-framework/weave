@@ -109,6 +109,14 @@ export function sourceAliases(facts: MigrationFacts): Map<string, string> {
 export interface LibraryResult {
   library: NeededLibrary;
   created: boolean;
+  /**
+   * Whether the library is THERE, which is not the same as whether this run made it.
+   *
+   * One that already existed is not created and is perfectly usable; one that failed is neither. Collapsing
+   * the two is how 247 files came to be written into 51 folders that no `project.json` and no tsconfig path
+   * referred to — a state strictly worse than not having run at all.
+   */
+  usable: boolean;
   /** Why not, when it was not. Shown to the reader rather than swallowed. */
   note: string;
 }
@@ -127,7 +135,7 @@ export function createLibraries(targetDir: string, libs: NeededLibrary[]): Libra
   const results: LibraryResult[] = [];
   for (const library of libs) {
     if (existsSync(join(targetDir, library.directory, library.name, 'project.json'))) {
-      results.push({ library, created: false, note: 'already a project here — left as it is' });
+      results.push({ library, created: false, usable: true, note: 'already a project here — left as it is' });
       continue;
     }
     const args: string[] = [
@@ -143,10 +151,10 @@ export function createLibraries(targetDir: string, libs: NeededLibrary[]): Libra
     ];
     try {
       execFileSync('npx', args, { cwd: targetDir, stdio: 'pipe', timeout: 120_000, shell: process.platform === 'win32' });
-      results.push({ library, created: true, note: '' });
+      results.push({ library, created: true, usable: true, note: '' });
     } catch (error: unknown) {
       const why: string = error instanceof Error ? error.message.split('\n')[0] : String(error);
-      results.push({ library, created: false, note: why });
+      results.push({ library, created: false, usable: false, note: why });
     }
   }
   return results;

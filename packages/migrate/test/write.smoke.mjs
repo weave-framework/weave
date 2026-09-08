@@ -17,7 +17,7 @@
  * Run: `node packages/migrate/test/write.smoke.mjs` (wired as `pnpm verify:migrate-write`).
  */
 import { build as esbuild } from 'esbuild';
-import { dirname, join } from 'node:path';
+import { dirname, join, relative } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -45,8 +45,8 @@ for (const [name, entry] of [
   await esbuild({ entryPoints: [entry], bundle: true, format: 'esm', platform: 'node', outfile: out, packages: 'external' });
   bundles[name] = await import(pathToFileURL(out).href);
 }
-const { planFor, writePlanned } = bundles.write;
-const { librariesFor, shapeOf, sourceAliases: ws_sourceAliases } = bundles.workspace;
+const { convert, planFor, writePlanned } = bundles.write;
+const { createLibraries, librariesFor, shapeOf, sourceAliases: ws_sourceAliases } = bundles.workspace;
 
 /** Every file under a directory, so 'nothing was added' can be asserted rather than assumed. */
 const treeOf = (dir, depth = 0, out = []) => {
@@ -188,6 +188,70 @@ ok(readdirSync(b).length > 0, 'the target project is no longer empty');
    source passed it: the file it planted held no such marker. The gate was vacuous, and it took a mutation to
    find out — which is the whole argument for running one. */
 ok(sameTree(app, sourceBefore), 'nothing was written into the source application');
+
+/* ── a library that could not be made takes its files with it ──
+   Found by running the whole application at an Nx target with no Nx installed: all 55 libraries failed and
+   247 files were written regardless, into 51 folders that no `project.json` and no tsconfig path referred to.
+   Nothing resolved and the reader would have had to delete the lot by hand — strictly worse than not running. */
+const d = into();
+const threeSrc = facts.files.find((f) => /three\.service\.ts$/.test(f));
+const blockedDir = (facts.granted ?? []).find((g) => threeSrc && !relative(g, threeSrc).startsWith('..'));
+ok(!!blockedDir, `the library to block was found (${blockedDir})`);
+const withLib = writePlanned(facts, graph, d, '', [three.key], 'workspace', []);
+ok(withLib.length > 0, `with its library made, the file is written (${withLib.length})`);
+const e2 = into();
+const withoutLib = writePlanned(facts, graph, e2, '', [three.key], 'workspace', [blockedDir]);
+ok(withoutLib.length === 0, `with its library missing, nothing is written (${withoutLib.length})`);
+ok(readdirSync(e2).length === 0, 'and the target is left exactly as it was');
+// Blocking one library must not block another's files.
+const e3 = into();
+const other = writePlanned(facts, graph, e3, '', [one.key], 'workspace', [blockedDir]);
+ok(other.length > 0, `a different library's files are still written (${other.length})`);
+/* `usable` is not `created`. A library that was already there is not made by this run and is perfectly good;
+   one that failed is neither. Collapsing them blocks the files of libraries that exist — and a mutation that
+   did exactly that stayed green until this ran `createLibraries` itself rather than passing it a list. */
+const e4 = into();
+mkdirSync(join(e4, 'libs', 'already'), { recursive: true });
+writeFileSync(join(e4, 'libs', 'already', 'project.json'), '{"name":"already"}', 'utf8');
+const seenLibs = createLibraries(e4, [{ name: 'already', directory: 'libs', importPath: '@x/already', from: blockedDir }]);
+ok(seenLibs[0]?.created === false, 'a library that was already there is not reported as created');
+ok(seenLibs[0]?.usable === true, 'but it IS usable — its files must still be written');
+
+/* Not ONE library could be made — which is not "a library failed", it is Nx or the plugin missing from this
+   workspace. Running the whole application at such a target wrote the app's own 90 files anyway, leaving code
+   importing 55 libraries that do not exist. Nothing is written now, and `stopped` says why. */
+const e5 = into();
+writeFileSync(join(e5, 'nx.json'), '{}', 'utf8');
+writeFileSync(join(e5, 'tsconfig.base.json'), JSON.stringify({ compilerOptions: { paths: {} } }), 'utf8');
+const halted = convert(facts, graph, e5, 'libs', sourced.map((n) => n.key));
+ok(halted.libraries.length > 0, `an Nx target needs libraries (${halted.libraries.length})`);
+ok(halted.libraries.every((r) => !r.usable), 'and none can be made here — there is no Nx in this folder');
+ok(halted.stopped === true, 'so the run stops rather than writing half a migration');
+ok(halted.written.length === 0, `and writes nothing at all (${halted.written.length})`);
+ok(!existsSync(join(e5, 'src')), 'not even the application’s own files');
+rmSync(e5, { recursive: true, force: true });
+
+/* But a run where SOME libraries are fine must go ahead with those. The stop is for a target with no Nx at
+   all, not for one library failing — a mutation turning `some` into `every` stayed green until this existed,
+   because in the case above BOTH libraries fail and the two readings agree. */
+const e6 = into();
+writeFileSync(join(e6, 'nx.json'), '{}', 'utf8');
+writeFileSync(join(e6, 'tsconfig.base.json'), JSON.stringify({ compilerOptions: { paths: {} } }), 'utf8');
+// Make one of the two libraries exist already, so it is usable without any Nx being run.
+for (const lib of librariesFor(facts, facts.files, 'libs')) {
+  mkdirSync(join(e6, 'libs', lib.name), { recursive: true });
+  writeFileSync(join(e6, 'libs', lib.name, 'project.json'), JSON.stringify({ name: lib.name }), 'utf8');
+  break;
+}
+const partial = convert(facts, graph, e6, 'libs', sourced.map((n) => n.key));
+ok(partial.libraries.some((r) => r.usable), 'one library is there already');
+ok(partial.libraries.some((r) => !r.usable), 'and one could not be made');
+ok(partial.stopped === false, 'a partly-ready workspace is not a reason to stop');
+ok(partial.written.length > 0, `so what can be written is written (${partial.written.length})`);
+ok(partial.blocked > 0, `and the rest is reported as blocked (${partial.blocked})`);
+rmSync(e6, { recursive: true, force: true });
+rmSync(e4, { recursive: true, force: true });
+for (const dir of [d, e2, e3]) rmSync(dir, { recursive: true, force: true });
 
 /* ── a file that exists is never touched ── */
 const first = written[0];

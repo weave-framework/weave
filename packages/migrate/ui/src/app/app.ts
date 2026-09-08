@@ -1261,7 +1261,16 @@ export function setup(): {
           return next;
         });
         saveState();
-        writeNote.set(out.length ? `${out.length} file(s) written into ${writePlan()?.outRoot ?? 'src'}` : 'nothing new to write — every file already exists');
+        const stuck: number = madeLibs.filter((r: LibraryResult): boolean => !r.usable).length;
+        // A library that could not be made takes its files with it, so the count and the reason belong in
+        // the same sentence — "0 files written" with no cause reads as the tool doing nothing.
+        writeNote.set(
+          stuck
+            ? `${out.length} file(s) written — ${stuck} librar${stuck === 1 ? 'y' : 'ies'} could not be created, so their files were left alone`
+            : out.length
+              ? `${out.length} file(s) written into ${writePlan()?.outRoot ?? 'src'}`
+              : 'nothing new to write — every file already exists',
+        );
         askPlan();
       })
       .catch((): void => {

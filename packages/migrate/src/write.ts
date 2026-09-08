@@ -132,6 +132,10 @@ export interface WriteResult {
   written: Written[];
   /** Empty for a single-project target; one entry per library on an Nx one. */
   libraries: LibraryResult[];
+  /** How many libraries could not be made — whose files were therefore not written either. */
+  blocked: number;
+  /** True when NOTHING was written because no library could be made at all. */
+  stopped: boolean;
 }
 
 /**
@@ -146,16 +150,32 @@ export function convert(facts: MigrationFacts, graph: Graph, targetDir: string, 
   const layout: WriteLayout = shape === 'nx' ? 'workspace' : 'flat';
   const libraries: LibraryResult[] =
     shape === 'nx' ? createLibraries(targetDir, planFor(facts, graph, targetDir, subdir, keys, layout).libraries) : [];
-  return { written: writePlanned(facts, graph, targetDir, subdir, keys, layout), libraries };
+  // Found by running the whole application at it: with no Nx installed all 55 libraries failed, and 247 files
+  // were written anyway — into 51 folders that no `project.json` and no tsconfig path referred to. Nothing
+  // resolved, and the reader would have had to delete the lot by hand. A library that could not be made now
+  // takes its files with it, so a failure leaves the target as it was rather than half-filled.
+  const blocked: string[] = libraries.filter((r: LibraryResult): boolean => !r.usable).map((r: LibraryResult): string => r.library.from);
+  // Not one library could be made — which is not "a library failed", it is Nx or the Weave plugin missing
+  // from this workspace. Writing the application's own 90 files then leaves code importing 55 libraries
+  // that do not exist, in a target the reader would have to clean up before trying again. Nothing is
+  // written, and the reason is returned instead.
+  if (libraries.length && !libraries.some((r: LibraryResult): boolean => r.usable)) {
+    return { written: [], libraries, blocked: blocked.length, stopped: true };
+  }
+  return { written: writePlanned(facts, graph, targetDir, subdir, keys, layout, blocked), libraries, blocked: blocked.length, stopped: false };
 }
 
-export function writePlanned(facts: MigrationFacts, graph: Graph, targetDir: string, subdir: string, keys: string[], layout: WriteLayout = 'flat'): Written[] {
+export function writePlanned(facts: MigrationFacts, graph: Graph, targetDir: string, subdir: string, keys: string[], layout: WriteLayout = 'flat', blocked: string[] = []): Written[] {
   const wanted: Set<string> = new Set<string>(keys);
   const sources: Set<string> = new Set<string>();
   for (const node of graph.nodes) if (wanted.has(node.key) && node.file) sources.add(norm(node.file));
 
+  const off: string[] = blocked.map(norm);
   const done: Written[] = [];
   for (const item of planWrites(facts, targetDir, subdir, layout)) {
+    // A file whose library could not be created has nowhere real to land: it would sit in a folder that
+    // no `project.json` and no tsconfig path refers to, which is worse than not writing it at all.
+    if (item.source && off.some((dir: string): boolean => norm(item.source as string).startsWith(`${dir}/`))) continue;
     if (item.source) {
       const from: string = norm(item.source);
       let mine: boolean = false;

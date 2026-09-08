@@ -547,7 +547,7 @@ data: ${JSON.stringify(data)}
         return;
       }
       const result: WriteResult = convert(factsForWrite, graphForWrite, intoDir, subdir, keys);
-      json(res, 200, { written: result.written, libraries: result.libraries, into: intoDir });
+      json(res, 200, { written: result.written, libraries: result.libraries, blocked: result.blocked, stopped: result.stopped, into: intoDir });
       return;
     }
 
