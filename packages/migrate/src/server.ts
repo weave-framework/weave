@@ -27,7 +27,9 @@ import { assembleFactsOpening, assembleFactsOpeningAsync, type MigrationFacts, t
 import { browse, peek, type Listing } from './browse.js';
 import { buildGraph } from './graph.js';
 import { emptyPlan, readPlan, readState, sourceKey, writePlan, STATE_FILE, type MigrationState, type SourcePlan } from './state.js';
-import { planFor, writePlanned, type WritePlan, type Written } from './write.js';
+import { convert, planFor, type WritePlan, type WriteResult } from './write.js';
+import { shapeOf } from './workspace.js';
+import type { WriteLayout } from '../../cli/src/migrate-convert.js';
 import type { Graph } from './types.js';
 import { inspect, type Workspace } from './detect.js';
 
@@ -78,6 +80,11 @@ const PORT_ATTEMPTS: number = 20;
  * pointing at a different application, or opening more libraries, re-reads rather than serving the last one.
  */
 let lastFacts: { key: string; facts: MigrationFacts; graph: Graph } | null = null;
+
+/** An Nx target gets one project per source library; anything else gets one application's `src/`. */
+function layoutFor(targetDir: string): WriteLayout {
+  return shapeOf(targetDir) === 'nx' ? 'workspace' : 'flat';
+}
 
 /** Put an analysis in the cache, whoever produced it. */
 function remember(dir: string, open: string[], facts: MigrationFacts, graph: Graph): void {
@@ -534,12 +541,13 @@ data: ${JSON.stringify(data)}
       }
       const { facts: factsForWrite, graph: graphForWrite } = factsFor(from, open);
       if (url.pathname === '/api/plan') {
-        const plan: WritePlan = planFor(factsForWrite, graphForWrite, intoDir, subdir, keys);
+        // The layout follows the target: an Nx workspace gets projects, one application gets one `src/`.
+        const plan: WritePlan = planFor(factsForWrite, graphForWrite, intoDir, subdir, keys, layoutFor(intoDir));
         json(res, 200, { plan, into: intoDir });
         return;
       }
-      const written: Written[] = writePlanned(factsForWrite, graphForWrite, intoDir, subdir, keys);
-      json(res, 200, { written, into: intoDir });
+      const result: WriteResult = convert(factsForWrite, graphForWrite, intoDir, subdir, keys);
+      json(res, 200, { written: result.written, libraries: result.libraries, into: intoDir });
       return;
     }
 

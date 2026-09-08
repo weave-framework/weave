@@ -20,6 +20,7 @@ import {
 import { collapse as foldGroups, groupKeyFromId, isGroupId, type GroupSummary } from './group.js';
 import { consequence, suggested, undecided, type Consequence } from './consequence.js';
 import type { WritePlan, Written } from '../../../src/write.js';
+import type { LibraryResult } from '../../../src/workspace.js';
 
 // Capitalized tags in the template resolve to these imports. The editor tooling understands that; eslint,
 // running without it, sees three unused bindings — so the repo's convention is to name them here.
@@ -178,6 +179,7 @@ export function setup(): {
   planning: Signal<boolean>;
   writing: Signal<boolean>;
   writeNote: Signal<string>;
+  libraries: Signal<LibraryResult[]>;
   shownPlan: Computed<WritePlan>;
   askPlan: () => void;
   writeFiles: () => void;
@@ -1164,6 +1166,9 @@ export function setup(): {
   const writing: Signal<boolean> = signal<boolean>(false);
   const writeNote: Signal<string> = signal<string>('');
 
+  /** What became of each library the write had to create. Empty on a single-project target. */
+  const libraries: Signal<LibraryResult[]> = signal<LibraryResult[]>([]);
+
   /**
    * The plan, projected non-null for the template.
    *
@@ -1172,7 +1177,7 @@ export function setup(): {
    * The same workaround is already used above for `workspace`; this is the same disagreement, not a new one.
    */
   const shownPlan: Computed<WritePlan> = computed<WritePlan>(
-    () => writePlan() ?? { outRoot: 'src', files: [], fresh: 0, missing: [], install: '', carried: [], unplanned: [] },
+    () => writePlan() ?? { outRoot: 'src', files: [], fresh: 0, missing: [], install: '', carried: [], unplanned: [], shape: 'single', libraries: [] },
   );
 
   /** Everything this selection covers: what was marked, and what it drags in. */
@@ -1232,6 +1237,11 @@ export function setup(): {
       .then((res: Response): Promise<unknown> => (res.ok ? res.json() : Promise.reject(new Error(String(res.status)))))
       .then((payload: unknown): void => {
         const out: Written[] = (payload as { written: Written[] }).written ?? [];
+        // Libraries the run had to create first. Reported whatever happened to them: an Nx that is not
+        // installed, or a workspace without the Weave plugin, is something to say out loud rather than
+        // a silent half-migration.
+        const madeLibs: LibraryResult[] = (payload as { libraries?: LibraryResult[] }).libraries ?? [];
+        libraries.set(madeLibs);
         // Recorded against the KEY, so the canvas can show what has already been carried across and a large
         // application can be migrated over several sittings — which is what the marks were asked for.
         const at: string = new Date().toISOString();
@@ -1515,6 +1525,7 @@ export function setup(): {
     planning,
     writing,
     writeNote,
+    libraries,
     shownPlan,
     askPlan,
     writeFiles,

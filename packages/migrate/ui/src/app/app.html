@@ -586,6 +586,37 @@
       </ul>
 
       @if (shownPlan().missing.length) {
+      @if (shownPlan().shape === 'nx') {
+        <p class="means-note">
+          Your target is an Nx workspace, so each source library becomes a project of its own — created by
+          running <code>nx g @weave-framework/nx:library</code> in it, under the name your code already
+          imports it by, so nothing has to be rewritten.
+        </p>
+        @if (shownPlan().libraries.length) {
+          <ul class="means-list">
+            @for (l of shownPlan().libraries; track l.importPath) {
+              <li>
+                <span class="means-name">{{ l.importPath }}</span>
+                <span class="means-from">→ <code>{{ l.directory ? l.directory + '/' + l.name : l.name }}</code></span>
+              </li>
+            }
+          </ul>
+        }
+      }
+
+      @if (libraries().length) {
+        <h3>Libraries created — {{ libraries().length }}</h3>
+        <ul class="means-list">
+          @for (r of libraries(); track r.library.importPath) {
+            <li class:ok={{ r.created }} class:bad={{ !r.created && !r.note.includes('already') }}>
+              <span class="means-name">{{ r.library.importPath }}</span>
+              @if (r.created) { <span class="means-verdict ok">created</span> }
+              @else { <span class="means-verdict">{{ r.note }}</span> }
+            </li>
+          }
+        </ul>
+      }
+
         <p class="means-warn-line">
           This code needs packages your app does not have. Run this first:
           <code>{{ shownPlan().install }}</code>

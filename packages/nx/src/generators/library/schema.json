@@ -30,6 +30,11 @@
     "importPath": {
       "type": "string",
       "description": "The specifier other code imports this library by (e.g. @acme/auth). Registered in tsconfig.base.json."
+    },
+    "empty": {
+      "type": "boolean",
+      "description": "Create the project without the starter component (the barrel is still written).",
+      "default": false
     }
   },
   "required": [

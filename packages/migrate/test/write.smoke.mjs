@@ -39,12 +39,14 @@ for (const [name, entry] of [
   ['analyze', join(repo, 'packages', 'migrate', 'src', 'analyze.ts')],
   ['graph', join(repo, 'packages', 'migrate', 'src', 'graph.ts')],
   ['write', join(repo, 'packages', 'migrate', 'src', 'write.ts')],
+  ['workspace', join(repo, 'packages', 'migrate', 'src', 'workspace.ts')],
 ]) {
   const out = join(here, `.write.${name}.mjs`);
   await esbuild({ entryPoints: [entry], bundle: true, format: 'esm', platform: 'node', outfile: out, packages: 'external' });
   bundles[name] = await import(pathToFileURL(out).href);
 }
 const { planFor, writePlanned } = bundles.write;
+const { librariesFor, shapeOf, sourceAliases: ws_sourceAliases } = bundles.workspace;
 
 /** Every file under a directory, so 'nothing was added' can be asserted rather than assumed. */
 const treeOf = (dir, depth = 0, out = []) => {
@@ -94,6 +96,85 @@ ok(nested.files.every((f) => f.path.startsWith('src/legacy/')),
    `and every file lands under it (${nested.files[0]?.path ?? 'none'})`);
 ok(justOne.files.every((f) => f.path.startsWith('src/')), `an empty folder puts it in src/ itself (${justOne.files[0]?.path})`);
 
+/* ── the workspace layout ──
+   A source workspace library is a PROJECT in the target, not a folder inside one app. Measured on a real
+   Angular workspace: flat output held 24 imports naming 12 source libraries and answered to none of them,
+   because the boundary that gave them their names was gone. */
+const three = sourced.find((n) => n.label === 'ThreeService');
+const appNode = sourced.find((n) => n.label === 'ShellComponent');
+ok(!!three, 'the fixture has a service from a SEPARATE workspace library to place');
+const flat = planFor(facts, graph, a, '', [three.key], 'flat');
+const ws = planFor(facts, graph, a, '', [three.key], 'workspace');
+ok(flat.files.length === ws.files.length, `both layouts write the same files (${flat.files.length})`);
+ok(flat.files.every((f) => f.path.startsWith('src/')), `flat puts a library inside the app (${flat.files[0]?.path})`);
+// The EXACT path, not a prefix match: `/^three\/src\/lib\//` also accepted
+// `three/src/lib/three/three.service.ts`, which repeats the library name inside its own project.
+ok(
+  String(ws.files.map((f) => f.path)) === 'three/src/lib/three.service.ts',
+  `workspace gives it its own project (${ws.files.map((f) => f.path).join(', ')})`
+);
+ok(!ws.files.some((f) => f.path.startsWith('src/three/')), 'and does not also leave it inside the app');
+// A file from the analysed unit itself is the application in either layout.
+const appFile = sourced.find((n) => n.label === 'ShellComponent');
+ok(
+  planFor(facts, graph, a, '', [appFile.key], 'workspace').files.every((f) => f.path.startsWith('src/')),
+  'the application’s own files stay in src/ under both layouts',
+);
+// The chosen folder still applies, so a workspace target can put migrated projects under `services/`.
+const wsNested = planFor(facts, graph, a, 'services', [three.key], 'workspace');
+ok(
+  String(wsNested.files.map((f) => f.path)) === 'services/three/src/lib/three.service.ts',
+  `and the chosen folder holds the projects (${wsNested.files[0]?.path})`
+);
+// …and only the projects. `subdir` says where LIBRARIES live, so applying it to the application filed the app
+// under its own libraries: `src/libs/archiving/…`, which reads as though the app were one of them.
+ok(
+  planFor(facts, graph, a, 'libs', [appNode.key], 'workspace').files.every((f) => !f.path.startsWith('src/libs/')),
+  `the chosen folder never appears in the application's own path (${planFor(facts, graph, a, 'libs', [appNode.key], 'workspace').files[0]?.path})`,
+);
+
+/* ── which libraries the target must have ──
+   The import path is taken from the SOURCE workspace's own tsconfig, never invented. That is the whole trick:
+   recreate `@sps-services/auth` under that name and the converted imports resolve with nothing rewritten. On
+   the real Angular workspace this finds 12 libraries for one route — the same 12 the broken imports named. */
+const aliases = ws_sourceAliases(facts);
+ok(aliases.size >= 4, `the source workspace's own aliases are read (${aliases.size})`);
+const norm = (p) => p.split('\\').join('/');
+const filesFor = (node) => facts.files.filter((f) => node.file && norm(f).endsWith(node.file));
+const needed = librariesFor(facts, filesFor(three), 'libs');
+ok(needed.length === 1, `a service from one library needs one library (${needed.length})`);
+ok(needed[0]?.importPath === '@fx/three', `under the name the SOURCE gave it (${needed[0]?.importPath})`);
+ok(needed[0]?.name === 'three' && needed[0]?.directory === 'libs', `at libs/three (${needed[0]?.directory}/${needed[0]?.name})`);
+/* The application is not one of its own libraries, however the walk happened to grant it.
+   This needs a workspace whose tsconfig aliases the APP ITSELF, or the assertion passes for the wrong reason:
+   in the shared fixture the app has no alias, so `librariesFor` skips it on "no import path" and the guard
+   that actually matters is never reached. A mutation deleting that guard stayed green until this existed. */
+const wsRoot = mkdtempSync(join(tmpdir(), 'weave-ws-'));
+mkdirSync(join(wsRoot, 'app', 'src'), { recursive: true });
+mkdirSync(join(wsRoot, 'services', 'auth', 'src'), { recursive: true });
+writeFileSync(
+  join(wsRoot, 'tsconfig.base.json'),
+  JSON.stringify({ compilerOptions: { paths: { '@x/app': ['app/src/index.ts'], '@x/auth': ['services/auth/src/index.ts'] } } }),
+  'utf8',
+);
+const appDir = join(wsRoot, 'app');
+const authDir = join(wsRoot, 'services', 'auth');
+const fake = { unit: appDir, granted: [appDir, authDir], files: [] };
+ok(ws_sourceAliases(fake).size === 2, `both aliases are read, the app's included (${ws_sourceAliases(fake).size})`);
+const bothDirs = [join(appDir, 'src', 'a.ts'), join(authDir, 'src', 'b.ts')];
+const picked = librariesFor(fake, bothDirs, 'libs');
+ok(
+  String(picked.map((l) => l.importPath)) === '@x/auth',
+  `only the library is listed, never the application (${picked.map((l) => l.importPath).join(', ') || 'none'})`,
+);
+rmSync(wsRoot, { recursive: true, force: true });
+ok(!librariesFor(facts, [], 'libs').length, 'no files means no libraries');
+// A target with nx.json is an Nx workspace; anything else is one application.
+ok(shapeOf(a) === 'single', 'a plain folder is a single project');
+writeFileSync(join(a, 'nx.json'), '{}', 'utf8');
+ok(shapeOf(a) === 'nx', 'a folder with nx.json is an Nx workspace');
+rmSync(join(a, 'nx.json'), { force: true });
+
 /* ── writing ── */
 const b = into();
 const written = writePlanned(facts, graph, b, '', [one.key]);
@@ -132,6 +213,6 @@ ok(needs.missing.length === 0 || needs.install.length > 0,
    `and an install line when any are missing (${needs.missing.join(', ') || 'none missing'})`);
 
 for (const dir of [a, b, c]) rmSync(dir, { recursive: true, force: true });
-for (const name of ['analyze', 'graph', 'write']) rmSync(join(here, `.write.${name}.mjs`), { force: true });
+for (const name of ['analyze', 'graph', 'write', 'workspace']) rmSync(join(here, `.write.${name}.mjs`), { force: true });
 console.log(`\n${failures ? `${failures} failing` : 'all green'}\n`);
 process.exit(failures ? 1 : 0);

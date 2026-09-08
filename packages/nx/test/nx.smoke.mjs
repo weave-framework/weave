@@ -210,6 +210,31 @@ try {
     'a library given no import path registers none'
   );
 
+  /* ---- `empty`: the project without the starter component ----
+     A library normally ships one component so it is not born empty. `weave migrate` recreates an Angular
+     workspace's libraries and then fills them, so for that caller the starter is boilerplate the reader would
+     have to find and delete in every single one. The barrel is still written: the import path has to resolve. */
+  await plugin.libraryGenerator(tree, { name: 'from-angular', directory: 'services', importPath: '@acme/from-angular', empty: true, style: 'none' });
+  ok(!tree.exists('services/from-angular/src/lib/from-angular/from-angular.ts'), 'an empty library ships no starter component');
+  ok(!tree.exists('services/from-angular/src/lib/from-angular/from-angular.html'), 'and no starter template');
+  ok(tree.exists('services/from-angular/src/index.ts'), 'but it still has a barrel for the import path to reach');
+  ok(
+    tree.read('services/from-angular/src/index.ts', 'utf-8').includes('export'),
+    'and the barrel is a MODULE — an empty file would be a script, and unimportable'
+  );
+  ok(
+    !tree.read('services/from-angular/src/index.ts', 'utf-8').includes('./lib/'),
+    'the barrel does not re-export a component that was never written'
+  );
+  ok(readProjectConfiguration(tree, 'from-angular').projectType === 'library', 'an empty library is still a registered project');
+  ok(
+    String(basePaths()['@acme/from-angular']) === 'services/from-angular/src/index.ts',
+    `and is still importable (got ${String(basePaths()['@acme/from-angular'])})`
+  );
+  // The default is unchanged: a library asked for nothing still gets its starter.
+  await plugin.libraryGenerator(tree, { name: 'with-starter', style: 'none' });
+  ok(tree.exists('libs/with-starter/src/lib/with-starter/with-starter.ts'), 'a library that did not ask for empty still ships one');
+
   /* ---- FW-3: every executor declared in executors.json actually ships ---- */
   // Root cause of the missing `build` executor: the unanchored `.gitignore` rule `build/` swallowed
   // `packages/nx/src/executors/build/`, so its source was never committed and the published tarball

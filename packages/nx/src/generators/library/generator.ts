@@ -28,6 +28,17 @@ export interface LibraryGeneratorSchema {
    * and no target library answered to that name.
    */
   importPath?: string;
+  /**
+   * Create the PROJECT without the starter component.
+   *
+   * A generated library normally ships one component so it is not born empty, which is right for a person
+   * typing the command and wrong for a tool about to fill it: `weave migrate` recreates an Angular workspace's
+   * libraries and then writes converted files into them, and a starter component is boilerplate the reader
+   * would have to find and delete in every one. Nx's own generators carry `--minimal` for the same reason.
+   *
+   * The barrel is still written, because the import path registered above has to resolve to something.
+   */
+  empty?: boolean;
   style?: 'css' | 'scss' | 'none';
 }
 
@@ -49,7 +60,9 @@ export async function libraryGenerator(
   const src: string = joinPathFragments(root, 'src');
   const style: 'css' | 'scss' | 'none' = schema.style ?? 'css';
 
-  const files: GenFile[] = componentFiles(joinPathFragments(src, 'lib', fileName), fileName, style);
+  const files: GenFile[] = schema.empty
+    ? []
+    : componentFiles(joinPathFragments(src, 'lib', fileName), fileName, style);
   // Write everything except the Weave `.html` template now; the template is written after
   // formatFiles so Prettier can't mangle its `{{ }}` bindings.
   const htmlFiles: GenFile[] = files.filter((f) => f.path.endsWith('.html'));
@@ -57,7 +70,12 @@ export async function libraryGenerator(
     if (file.path.endsWith('.html')) continue;
     tree.write(file.path, file.content);
   }
-  tree.write(joinPathFragments(src, 'index.ts'), `export { setup } from './lib/${fileName}/${fileName}.js';\n`);
+  // `export {}` rather than an empty file: with nothing in it TypeScript treats the barrel as a SCRIPT, not a
+  // module, and the import path registered below then resolves to something that is not importable at all.
+  tree.write(
+    joinPathFragments(src, 'index.ts'),
+    schema.empty ? `export {};\n` : `export { setup } from './lib/${fileName}/${fileName}.js';\n`,
+  );
 
   const project: ProjectConfiguration = {
     root,

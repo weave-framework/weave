@@ -3157,6 +3157,44 @@ export function safeSubdir(input: string): string | null {
 }
 
 /**
+ * How a migration lays its output out.
+ *
+ * `flat` puts everything inside one application's `src/`, which is right when the target IS one application.
+ * `workspace` gives each source library its own project folder, which is what an Nx target needs: measured on
+ * one real Angular workspace, the converted files held 24 imports naming 12 source libraries, and flat output
+ * answers to none of those names because the library boundary is gone.
+ */
+export type WriteLayout = 'flat' | 'workspace';
+
+/**
+ * The folder a converted file lands in, relative to the target project root. ONE rule, because eleven copies
+ * of `join(targetDir, 'src', subdir, dir, …)` is eleven chances for the writer and the symbol table to
+ * disagree — which the comment on `outputFileFor` already warned about while the duplication stood.
+ *
+ *   flat        src/<subdir>/<prefix>/<rest>
+ *   workspace   <subdir>/<prefix>/src/lib/<rest>     — `<prefix>` is now a PROJECT, not a folder
+ *
+ * A file from the analysed unit itself has no prefix and stays in `src/` either way: the application is the
+ * application in both layouts.
+ */
+export function outputDirFor(sourceFile: string, facts: MigrationFacts, subdir: string, layout: WriteLayout = 'flat'): string {
+  const rel: string = outputPathFor(sourceFile, facts);
+  const dir: string = dirname(rel) === '.' ? '' : dirname(rel);
+  const { dir: unitDir, prefix } = unitOf(sourceFile, facts);
+  // The analysed application can be a granted unit too — it is when the walk was told to open everything — so
+  // a prefix alone does not mean "library". A file inside the unit being migrated is the APPLICATION, and it
+  // belongs in `src/` under either layout; only the units around it become projects of their own.
+  const isApp: boolean = !relative(facts.unit, sourceFile).startsWith('..') && !relative(unitDir, facts.unit).startsWith('..');
+  if (layout === 'flat') return join('src', subdir, dir);
+  // In a workspace `subdir` says where the PROJECTS go, so it has no business in the application's own path:
+  // it put the app at `src/libs/archiving/…`, which reads as though the app were filed under its own libraries.
+  if (!prefix || isApp) return join('src', dir);
+  // The prefix led the relative path; in a workspace it leads the project path instead, so it is not repeated.
+  const inside: string = dir === prefix ? '' : dir.slice(prefix.length + 1);
+  return join(subdir, prefix, 'src', 'lib', inside);
+}
+
+/**
  * The absolute path a source file's conversion lands at. ONE calculation, shared by the writer and the symbol
  * table — computing it twice is how the table came to point at `./app/root` for a file written to `app/app.ts`,
  * which is exactly the class of mismatch the table exists to remove.
@@ -3165,11 +3203,10 @@ export function safeSubdir(input: string): string | null {
  * because deriving it from the CLASS made `breadcrumbs.component.ts` and `BreadcrumbsService` both want
  * `breadcrumbs.ts`, and the second silently overwrote the first.
  */
-export function outputFileFor(sourceFile: string, facts: MigrationFacts, targetDir: string, component: boolean = false, subdir: string = ''): string {
+export function outputFileFor(sourceFile: string, facts: MigrationFacts, targetDir: string, component: boolean = false, subdir: string = '', layout: WriteLayout = 'flat'): string {
   const rel: string = outputPathFor(sourceFile, facts);
-  const dir: string = dirname(rel) === '.' ? '' : dirname(rel);
   const name: string = rel.split(/[\\/]/).pop() ?? '';
-  return join(targetDir, 'src', subdir, dir, `${component ? weaveBaseName(name) : name.replace(/\.ts$/, '')}.ts`);
+  return join(targetDir, outputDirFor(sourceFile, facts, subdir, layout), `${component ? weaveBaseName(name) : name.replace(/\.ts$/, '')}.ts`);
 }
 
 /**
@@ -3372,11 +3409,11 @@ export function convertedDecls(facts: MigrationFacts): ConvertedDecl[] {
   ];
 }
 
-export function symbolTable(facts: MigrationFacts, targetDir: string, subdir: string = ''): Map<string, WeaveSymbol> {
+export function symbolTable(facts: MigrationFacts, targetDir: string, subdir: string = '', layout: WriteLayout = 'flat'): Map<string, WeaveSymbol> {
   const table: Map<string, WeaveSymbol> = new Map<string, WeaveSymbol>();
   const converted: ConvertedDecl[] = convertedDecls(facts);
   for (const d of converted) {
-    table.set(d.className, { from: d.className, to: d.to, isDefault: d.isDefault, file: outputFileFor(d.file, facts, targetDir, d.kind === 'component', subdir), kind: d.kind });
+    table.set(d.className, { from: d.className, to: d.to, isDefault: d.isDefault, file: outputFileFor(d.file, facts, targetDir, d.kind === 'component', subdir, layout), kind: d.kind });
   }
   // Everything a CARRIED file exports belongs in the table too. Only converted classes were listed, so a type
   // imported through a workspace alias — `import { IBreadcrumb } from '@my-org/interfaces'` — was migrated into
@@ -3384,7 +3421,7 @@ export function symbolTable(facts: MigrationFacts, targetDir: string, subdir: st
   const decorated: Set<string> = new Set<string>(converted.map((d) => d.file));
   for (const file of facts.files) {
     if (decorated.has(file)) continue;
-    const out: string = outputFileFor(file, facts, targetDir, false, subdir);
+    const out: string = outputFileFor(file, facts, targetDir, false, subdir, layout);
     for (const name of exportedNames(file)) {
       // A decorated class wins: it is the one whose NAME changed, and the carried scan must not shadow it.
       if (!table.has(name)) table.set(name, { from: name, to: name, isDefault: false, file: out, kind: 'carried' });
@@ -3410,11 +3447,11 @@ function sheetIndex(facts: MigrationFacts): Map<string, string[]> {
   return built;
 }
 
-export function planWrites(facts: MigrationFacts, targetDir: string, subdir: string = ''): WriteItem[] {
+export function planWrites(facts: MigrationFacts, targetDir: string, subdir: string = '', layout: WriteLayout = 'flat'): WriteItem[] {
   const items: WriteItem[] = [];
   // The whole-unit mapping, built FIRST: every emitted file is resolved against it at the end, so a rename that
   // landed here cannot be missed over there.
-  const table: Map<string, WeaveSymbol> = symbolTable(facts, targetDir, subdir);
+  const table: Map<string, WeaveSymbol> = symbolTable(facts, targetDir, subdir, layout);
   // What this run converts, so a call from one converted file into another is not reported as unknown.
   const migrated: Map<string, MigratedService> = migratedServices(facts.services);
   // The whole unit's `Observable<…>` returners, gathered BEFORE any file is converted. A chain's source is
@@ -3424,7 +3461,6 @@ export function planWrites(facts: MigrationFacts, targetDir: string, subdir: str
   const opts: ConvertOptions = { components: componentNameMap(facts), migrated, returners };
   for (const cf of facts.components) {
     const rel: string = outputPathFor(cf.file, facts);
-    const dir: string = dirname(rel) === '.' ? '' : dirname(rel);
     const base: string = weaveBaseName(rel.split(/[\\/]/).pop() ?? cf.className);
     const html: string | null = readComponentTemplate(cf);
     // A component that also uses reactive forms gets its `form({ … })` drafted into the same setup().
@@ -3445,9 +3481,9 @@ export function planWrites(facts: MigrationFacts, targetDir: string, subdir: str
     const gaps: ExternalStyleUse[] = html === null ? [] : externalStyleUses(templateClassNames(pair.html), own, sheetIndex(facts));
     const root: string = findWorkspaceRoot(facts.unit);
     const note: string = styleNote(gaps, (f: string) => relative(root, f).split(sep).join('/'));
-    const tsPath: string = join(targetDir, 'src', subdir, dir, `${base}.ts`);
+    const tsPath: string = join(targetDir, outputDirFor(cf.file, facts, subdir, layout), `${base}.ts`);
     items.push({ path: tsPath, content: tsBody, source: cf.file, status: existsSync(tsPath) ? 'skip-exists' : 'write' });
-    const htmlPath: string = join(targetDir, 'src', subdir, dir, `${base}.html`);
+    const htmlPath: string = join(targetDir, outputDirFor(cf.file, facts, subdir, layout), `${base}.html`);
     items.push({
       path: htmlPath,
       content: html === null ? `${todo('the original template could not be read — port it by hand')}\n` : `${note}${pair.html}\n`,
@@ -3456,7 +3492,7 @@ export function planWrites(facts: MigrationFacts, targetDir: string, subdir: str
       ...(gaps.length ? { styleGaps: gaps } : {}),
     });
     for (const item of sheets) {
-      const path: string = join(targetDir, 'src', subdir, dir, item.name);
+      const path: string = join(targetDir, outputDirFor(cf.file, facts, subdir, layout), item.name);
       items.push({ path, content: item.content, source: cf.file, status: existsSync(path) ? 'skip-exists' : 'write' });
     }
   }
@@ -3466,39 +3502,35 @@ export function planWrites(facts: MigrationFacts, targetDir: string, subdir: str
   // and the second silently overwrote the first.
   for (const sf of facts.services) {
     const rel: string = outputPathFor(sf.file, facts);
-    const dir: string = dirname(rel) === '.' ? '' : dirname(rel);
     const base: string = (rel.split(/[\\/]/).pop() ?? '').replace(/\.ts$/, '');
     const draft: { baseName: string; ts: string } = convertService(sf, importedNamesFrom(sf.file, 'rxjs'), migrated, returners);
-    const path: string = join(targetDir, 'src', subdir, dir, `${base || draft.baseName}.ts`);
+    const path: string = join(targetDir, outputDirFor(sf.file, facts, subdir, layout), `${base || draft.baseName}.ts`);
     items.push({ path, content: draft.ts, source: sf.file, status: existsSync(path) ? 'skip-exists' : 'write' });
   }
   // Pipes → functions, directives → `use:` actions. Both are real conversions, not carries.
   for (const pf of facts.pipes ?? []) {
     const rel: string = outputPathFor(pf.file, facts);
-    const dir: string = dirname(rel) === '.' ? '' : dirname(rel);
     const base: string = (rel.split(/[\\/]/).pop() ?? '').replace(/\.ts$/, '');
-    const path: string = join(targetDir, 'src', subdir, dir, `${base}.ts`);
+    const path: string = join(targetDir, outputDirFor(pf.file, facts, subdir, layout), `${base}.ts`);
     items.push({ path, content: convertPipe(pf).ts, source: pf.file, status: existsSync(path) ? 'skip-exists' : 'write' });
   }
   for (const df of facts.directives ?? []) {
     const rel: string = outputPathFor(df.file, facts);
-    const dir: string = dirname(rel) === '.' ? '' : dirname(rel);
     const base: string = (rel.split(/[\\/]/).pop() ?? '').replace(/\.ts$/, '');
-    const path: string = join(targetDir, 'src', subdir, dir, `${base}.ts`);
+    const path: string = join(targetDir, outputDirFor(df.file, facts, subdir, layout), `${base}.ts`);
     items.push({ path, content: convertDirective(df).ts, source: df.file, status: existsSync(path) ? 'skip-exists' : 'write' });
   }
   // Route resolvers → a route `loader`. They carry no decorator, so they used to be carried as plain TypeScript.
   for (const rf of facts.resolvers ?? []) {
-    const path: string = outputFileFor(rf.file, facts, targetDir, false, subdir);
+    const path: string = outputFileFor(rf.file, facts, targetDir, false, subdir, layout);
     items.push({ path, content: convertResolver(rf).ts, source: rf.file, status: existsSync(path) ? 'skip-exists' : 'write' });
   }
 
   // NgModules: not code in Weave, but a wiring note that records what only the module knew.
   for (const nm of facts.ngModules ?? []) {
     const rel: string = outputPathFor(nm.file, facts);
-    const dir: string = dirname(rel) === '.' ? '' : dirname(rel);
     const base: string = (rel.split(/[\\/]/).pop() ?? '').replace(/\.ts$/, '');
-    const path: string = join(targetDir, 'src', subdir, dir, `${base}.ts`);
+    const path: string = join(targetDir, outputDirFor(nm.file, facts, subdir, layout), `${base}.ts`);
     items.push({ path, content: convertNgModule(nm), source: nm.file, status: existsSync(path) ? 'skip-exists' : 'write' });
   }
   // InjectionTokens → one contexts module (a token is a value-injection, which is exactly what a context is).
@@ -3523,11 +3555,10 @@ export function planWrites(facts: MigrationFacts, targetDir: string, subdir: str
   for (const file of facts.files) {
     if (covered.has(file)) continue;
     const rel: string = outputPathFor(file, facts);
-    const dir: string = dirname(rel) === '.' ? '' : dirname(rel);
     const base: string = (rel.split(/[\\/]/).pop() ?? '').replace(/\.ts$/, '');
     const carried: string | null = carryFile(file, facts, returners);
     if (carried === null) continue;
-    const path: string = join(targetDir, 'src', subdir, dir, `${base}.ts`);
+    const path: string = join(targetDir, outputDirFor(file, facts, subdir, layout), `${base}.ts`);
     items.push({ path, content: carried, source: file, status: existsSync(path) ? 'skip-exists' : 'write' });
   }
   // Route guards (M5.5) — one module, because Weave's `beforeEach` is global rather than per-route.

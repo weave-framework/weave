@@ -8,9 +8,11 @@ import {
   planWrites,
   requiredWeavePackages,
   type WriteItem,
+  type WriteLayout,
 } from '../../cli/src/migrate-convert.js';
 import type { MigrationFacts } from './analyze.js';
 import type { Graph, GraphNode } from './types.js';
+import { createLibraries, librariesFor, shapeOf, type LibraryResult, type NeededLibrary, type TargetShape } from './workspace.js';
 
 /**
  * Turning marks into files.
@@ -53,6 +55,10 @@ export interface WritePlan {
   carried: string[];
   /** Marked things whose files nothing planned — named rather than silently dropped. */
   unplanned: string[];
+  /** What the target is: an Nx workspace, or one application. */
+  shape: TargetShape;
+  /** Source libraries the target must have before these files can resolve each other. */
+  libraries: NeededLibrary[];
 }
 
 /**
@@ -62,7 +68,7 @@ export interface WritePlan {
  * that logic is gated where it lives. Repeating it here would give two answers to one question, and the one
  * the reader saw would not be the one that wrote the files.
  */
-export function planFor(facts: MigrationFacts, graph: Graph, targetDir: string, subdir: string, keys: string[]): WritePlan {
+export function planFor(facts: MigrationFacts, graph: Graph, targetDir: string, subdir: string, keys: string[], layout: WriteLayout = 'flat'): WritePlan {
   const wanted: Set<string> = new Set<string>(keys);
   /* A marked node names its source relative to the unit; a planned item names it absolutely. Comparing them
      needs one shape, and the relative one is the only one both have. */
@@ -74,7 +80,7 @@ export function planFor(facts: MigrationFacts, graph: Graph, targetDir: string, 
     else unplanned.push(node.label);
   }
 
-  const all: WriteItem[] = planWrites(facts, targetDir, subdir);
+  const all: WriteItem[] = planWrites(facts, targetDir, subdir, layout);
   const mine: WriteItem[] = all.filter((item: WriteItem): boolean => {
     // The unit-wide files — the contexts module, the guards — belong to whatever is written, not to one card.
     if (!item.source) return true;
@@ -83,7 +89,9 @@ export function planFor(facts: MigrationFacts, graph: Graph, targetDir: string, 
     return false;
   });
 
-  const outRoot: string = join('src', subdir);
+  // In a workspace the projects live at the root, not under the app's `src/`.
+  const shape: TargetShape = shapeOf(targetDir);
+  const outRoot: string = layout === 'workspace' ? subdir || '.' : join('src', subdir);
   const files: PlannedFile[] = mine.map(
     (item: WriteItem): PlannedFile => ({
       path: norm(relative(targetDir, item.path)),
@@ -100,6 +108,8 @@ export function planFor(facts: MigrationFacts, graph: Graph, targetDir: string, 
     install: missing.length ? installCommand(detectPackageManager(targetDir), missing) : '',
     carried: carriedPackages(mine),
     unplanned,
+    shape,
+    libraries: shape === 'nx' ? librariesFor(facts, [...sourceFilesOf(mine)], subdir) : [],
   };
 }
 
@@ -117,13 +127,35 @@ export interface Written {
  * `planWrites` marks those `skip-exists`; this refuses them a second time, because the plan may have been made
  * a while ago and the check is one line.
  */
-export function writePlanned(facts: MigrationFacts, graph: Graph, targetDir: string, subdir: string, keys: string[]): Written[] {
+/** What a write run did, including the libraries it had to create first. */
+export interface WriteResult {
+  written: Written[];
+  /** Empty for a single-project target; one entry per library on an Nx one. */
+  libraries: LibraryResult[];
+}
+
+/**
+ * Create the libraries, then write the files.
+ *
+ * In that order and not the other way round: a converted file imports `@sps-services/auth`, and until a project
+ * answers to that name the code that lands does not resolve. On a single-project target there are no libraries
+ * to make and this is just the write.
+ */
+export function convert(facts: MigrationFacts, graph: Graph, targetDir: string, subdir: string, keys: string[]): WriteResult {
+  const shape: TargetShape = shapeOf(targetDir);
+  const layout: WriteLayout = shape === 'nx' ? 'workspace' : 'flat';
+  const libraries: LibraryResult[] =
+    shape === 'nx' ? createLibraries(targetDir, planFor(facts, graph, targetDir, subdir, keys, layout).libraries) : [];
+  return { written: writePlanned(facts, graph, targetDir, subdir, keys, layout), libraries };
+}
+
+export function writePlanned(facts: MigrationFacts, graph: Graph, targetDir: string, subdir: string, keys: string[], layout: WriteLayout = 'flat'): Written[] {
   const wanted: Set<string> = new Set<string>(keys);
   const sources: Set<string> = new Set<string>();
   for (const node of graph.nodes) if (wanted.has(node.key) && node.file) sources.add(norm(node.file));
 
   const done: Written[] = [];
-  for (const item of planWrites(facts, targetDir, subdir)) {
+  for (const item of planWrites(facts, targetDir, subdir, layout)) {
     if (item.source) {
       const from: string = norm(item.source);
       let mine: boolean = false;
@@ -136,6 +168,13 @@ export function writePlanned(facts: MigrationFacts, graph: Graph, targetDir: str
     done.push({ path: norm(relative(targetDir, item.path)), ...(item.source ? { from: norm(item.source) } : {}) });
   }
   return done;
+}
+
+/** The absolute source files behind a set of planned writes. */
+function sourceFilesOf(items: WriteItem[]): Set<string> {
+  const out: Set<string> = new Set<string>();
+  for (const item of items) if (item.source) out.add(item.source);
+  return out;
 }
 
 /** One separator, so a Windows path and a posix one compare as the same path. */
