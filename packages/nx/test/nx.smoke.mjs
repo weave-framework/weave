@@ -190,6 +190,26 @@ try {
   ok(readProjectConfiguration(tree, 'ui-kit').projectType === 'library', 'registered as a library');
   ok(typeof libTask === 'function', 'library generator returns a task callback (function)');
 
+  /* ---- a library nobody can import is not a library ----
+     `addProjectConfiguration` tells NX the project exists; nothing in it tells TYPESCRIPT how to resolve a
+     name to it. Found while making `weave migrate` recreate an Angular workspace's libraries: every converted
+     file imported `@sps-services/auth` and no generated library answered to that name. */
+  const basePaths = () => JSON.parse(tree.read('tsconfig.base.json', 'utf-8')).compilerOptions?.paths ?? {};
+  ok(basePaths()['@acme/auth'] === undefined, 'nothing claims that name before the library exists');
+  await plugin.libraryGenerator(tree, { name: 'auth', directory: 'services', importPath: '@acme/auth', style: 'none' });
+  ok(tree.exists('services/auth/src/index.ts'), 'a library under a chosen directory writes its barrel there');
+  ok(
+    String(basePaths()['@acme/auth']) === 'services/auth/src/index.ts',
+    `the import path resolves to that barrel (got ${String(basePaths()['@acme/auth'])})`
+  );
+  ok(basePaths()['@acme/auth'] !== undefined && Object.keys(basePaths()).length >= 1, 'and is written where tsconfig keeps them');
+  // A library asked for no import path must not invent one — the old behaviour stays the default.
+  await plugin.libraryGenerator(tree, { name: 'quiet-lib', style: 'none' });
+  ok(
+    !Object.keys(basePaths()).some((k) => k.includes('quiet-lib')),
+    'a library given no import path registers none'
+  );
+
   /* ---- FW-3: every executor declared in executors.json actually ships ---- */
   // Root cause of the missing `build` executor: the unanchored `.gitignore` rule `build/` swallowed
   // `packages/nx/src/executors/build/`, so its source was never committed and the published tarball

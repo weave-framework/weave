@@ -7,7 +7,10 @@
     "name": {
       "type": "string",
       "description": "Library name.",
-      "$default": { "$source": "argv", "index": 0 },
+      "$default": {
+        "$source": "argv",
+        "index": 0
+      },
       "x-prompt": "What name would you like to use for the library?"
     },
     "directory": {
@@ -16,10 +19,20 @@
     },
     "style": {
       "type": "string",
-      "enum": ["css", "scss", "none"],
+      "enum": [
+        "css",
+        "scss",
+        "none"
+      ],
       "description": "Stylesheet language (or none).",
       "default": "css"
+    },
+    "importPath": {
+      "type": "string",
+      "description": "The specifier other code imports this library by (e.g. @acme/auth). Registered in tsconfig.base.json."
     }
   },
-  "required": ["name"]
+  "required": [
+    "name"
+  ]
 }

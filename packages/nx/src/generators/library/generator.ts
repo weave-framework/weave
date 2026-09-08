@@ -19,6 +19,15 @@ import { componentFiles, type GenFile } from '../component/files.js';
 export interface LibraryGeneratorSchema {
   name: string;
   directory?: string;
+  /**
+   * The specifier other code imports this library by (`@acme/auth`).
+   *
+   * Without one a generated library is unreachable: `addProjectConfiguration` writes `project.json`, which
+   * tells Nx the project exists, and nothing tells TypeScript how to resolve a name to it. Found while making
+   * `weave migrate` recreate an Angular workspace's libraries — every converted file imported `@sps-services/auth`
+   * and no target library answered to that name.
+   */
+  importPath?: string;
   style?: 'css' | 'scss' | 'none';
 }
 
@@ -60,6 +69,10 @@ export async function libraryGenerator(
   };
   addProjectConfiguration(tree, schema.name, project);
 
+  // The barrel, registered so the name resolves. Nx's own JS library generator does this; ours did not, and a
+  // library nobody can import is not a library.
+  if (schema.importPath) registerImportPath(tree, schema.importPath, joinPathFragments(src, 'index.ts'));
+
   // A Weave component imports the runtime; the `check` target needs the CLI. Adding them
   // returns an install task — a function, the shape Nx requires a generator to return.
   const installTask: GeneratorCallback = addDependenciesToPackageJson(
@@ -73,6 +86,30 @@ export async function libraryGenerator(
   for (const file of htmlFiles) tree.write(file.path, file.content);
 
   return installTask;
+}
+
+/**
+ * Point a bare specifier at a library's barrel, in the workspace's base tsconfig.
+ *
+ * `tsconfig.base.json` is where an Nx workspace keeps these; a workspace that uses `tsconfig.json` instead is
+ * handled too, because both exist in the wild and picking the wrong one writes a mapping nothing reads.
+ */
+export function registerImportPath(tree: Tree, importPath: string, barrel: string): void {
+  const file: string | undefined = ['tsconfig.base.json', 'tsconfig.json'].find((f: string): boolean => tree.exists(f));
+  if (!file) return;
+  const raw: string = tree.read(file, 'utf-8') ?? '{}';
+  let json: { compilerOptions?: { paths?: Record<string, string[]> } };
+  try {
+    json = JSON.parse(raw) as { compilerOptions?: { paths?: Record<string, string[]> } };
+  } catch {
+    // A base tsconfig with comments in it is common and not ours to rewrite badly.
+    return;
+  }
+  json.compilerOptions = json.compilerOptions ?? {};
+  json.compilerOptions.paths = json.compilerOptions.paths ?? {};
+  json.compilerOptions.paths[importPath] = [barrel];
+  tree.write(file, `${JSON.stringify(json, null, 2)}
+`);
 }
 
 export default libraryGenerator;
