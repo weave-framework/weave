@@ -111,12 +111,18 @@ function messagesIn(paths) {
   for (const f of paths.flatMap(filesUnder)) {
     const src = readFileSync(f, 'utf8');
     for (const m of src.matchAll(/(?:throw new (?:Error|ParseError|TypeError)|console\.(?:error|warn))\(([\s\S]{0,320}?)\);/g)) {
-      // A backtick inside a template literal is written `\``, and that backslash survived into the
-      // extracted text — so a page quoting the message with real backticks never matched. Unescape it.
+      // A backtick inside a template literal is written `\``, and the fragments below are cut at every quote
+      // character — so a message is cut at an escaped backtick and keeps the backslash (9 of them do). That
+      // debris is load-bearing: `runsOf` splits on it, which stops words on either side of a dropped
+      // `"${path}"` from being glued into a sequence no page contains. Restoring the backtick here was tried
+      // and made the router page's `has no \`component\`` message read as unshown, though the page quotes it.
+      //
+      // A `.replace(/\`/g, '`')` used to sit here claiming to unescape it. `\`` in a regex is only a
+      // backtick, so it replaced a backtick with itself, and it ran after the cut, where none was left to
+      // find — it never did anything, which is why removing it changes no output.
       const text = [...m[1].matchAll(/[`'"]([^`'"]{20,200})[`'"]/g)]
         .map((x) => x[1])
         .join(' ')
-        .replace(/\`/g, '`')
         .replace(/\s+/g, ' ')
         .trim();
       if (!text || INTERNAL.test(text)) continue;

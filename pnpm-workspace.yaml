@@ -44,6 +44,11 @@ overrides:
   # while v5 exports `{ expand }`, so minimatch 5 would call an object. The extension moved to
   # `vscode-languageclient@10` (minimatch 10 → brace-expansion 5) instead — see editor/vscode/package.json.
   'brace-expansion@>=3.0.0 <=5.0.7': '>=5.0.8'
+  # smol-toml <= 1.7.0 — GHSA-7w5x-hrqm-74c2 / CVE-2026-85730, denial of service via a malformed TOML
+  # document; patched 1.7.1. It arrives through nx, which pins it EXACTLY (`1.6.1`, and still so in
+  # nx 23.2.1), so bumping nx cannot reach it — only an override can. `<2` keeps it on the major nx
+  # asked for. Build tooling: no Weave package reads TOML at runtime.
+  'smol-toml@<=1.7.0': '>=1.7.1 <2'
 
 # esbuild ships a platform binary via a postinstall script. This environment's
 # pnpm requires explicit per-package build approval.
