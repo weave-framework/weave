@@ -80,7 +80,11 @@ writeFileSync(
 {
   const r = run(['build'], app);
   ok(r.status === 0, `the build succeeds (got ${r.status}: ${r.out.slice(0, 300)})`);
-  ok(/weave build → .*dist\/ \(\d+ ms\)/.test(r.out), `it reports the elapsed time (got ${r.out.trim().split('\n')[0]})`);
+  // Either arrow. This gate captures the CLI through a pipe, and on Windows a captured run prints ASCII on
+  // purpose: the process doing the capturing decodes our UTF-8 bytes with an OEM code page, which turned
+  // `→` into `ΓåÆ` in a real build log. Which arrow it is belongs to `verify:cli-glyphs`; what this line
+  // asks is whether the build says what it produced and how long it took.
+  ok(/weave build (→|->) .*dist\/ \(\d+ ms\)/.test(r.out), `it reports the elapsed time (got ${r.out.trim().split('\n')[0]})`);
   // The entry name carries a content hash, so this asserts the SHAPE of the summary line, not a name.
   ok(/main-[A-Za-z0-9]+\.js\s+[\d.]+ (B|kB|MB)/.test(r.out), `it lists the entry with a size (got ${JSON.stringify(r.out)})`);
   ok(/\(source maps\)/.test(r.out), 'it summarises source maps in one line rather than listing them');

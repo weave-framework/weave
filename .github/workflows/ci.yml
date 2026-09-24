@@ -265,6 +265,8 @@ jobs:
         run: pnpm verify:migrate-graph
       - name: migrate — every node reaches the canvas
         run: pnpm verify:migrate-layout
+      - name: CLI — a captured build log stays readable
+        run: pnpm verify:cli-glyphs
       - name: migrate UI
         run: pnpm verify:migrate-ui
       - name: Nx plugin

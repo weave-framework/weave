@@ -29,6 +29,7 @@
     "verify:migrate-opening": "node packages/migrate/test/opening.smoke.mjs",
     "verify:migrate-graph": "node packages/migrate/test/graph.smoke.mjs",
     "verify:migrate-layout": "node packages/migrate/test/layout.smoke.mjs",
+    "verify:cli-glyphs": "node packages/cli/test/glyphs.smoke.mjs",
     "migrate": "node tools/serve-migrate.mjs",
     "verify:migrate-ui": "node packages/migrate/test/tokens.smoke.mjs && node packages/cli/bin/weave.mjs check packages/migrate/ui/src && node packages/cli/bin/weave.mjs build --config packages/migrate/ui/weave.config.ts",
     "verify:resume": "node tools/verify-resume.mjs",
