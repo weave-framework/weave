@@ -9,6 +9,7 @@ import { discoverCustomElements, generateEntry, generateServerEntry, type Custom
 import { checkProject, impactOf, type Diagnostic } from '@weave-framework/check';
 import { readdirSync, readFileSync, statSync, writeFileSync, type Dirent } from 'node:fs';
 import { join } from 'node:path';
+import { installAsciiFallback } from './glyphs.js';
 
 function flag(args: string[], name: string): string | undefined {
   const i: number = args.indexOf(name);
@@ -105,6 +106,13 @@ examples
   weave dev --state empty          open the app in a state you saved earlier
   weave merge --install            once per clone: git merges templates by structure
 
+environment
+  NO_COLOR                       no ANSI colour, whatever the terminal is
+  WEAVE_ASCII=1                  plain ASCII output — set it when a build step captures this log and
+                                 shows mojibake where an arrow should be (a captured log decoding UTF-8
+                                 bytes as an OEM code page turns an arrow into three Cyrillic letters)
+  WEAVE_UNICODE=1                keep the real characters even when the output is captured
+
 docs: https://weaveframework.dev`;
 
 /** Human-readable byte size — the build summary's whole vocabulary. */
@@ -151,6 +159,9 @@ export { defineConfig } from './config.js';
 export type { WeaveConfig } from './config.js';
 
 export async function main(argv: string[]): Promise<void> {
+  // Before anything prints. When the output is being captured on Windows, the decoration drops to ASCII:
+  // the capturing process decodes our UTF-8 bytes with an OEM code page, and `→` arrives as `ΓåÆ`.
+  installAsciiFallback();
   const [cmd, ...rest] = argv;
 
   // `--help` anywhere, `help`, or no command at all: print the help and succeed. Asking a tool what it can

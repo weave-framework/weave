@@ -271,6 +271,8 @@ jobs:
         run: pnpm verify:migrate-consequence
       - name: migrate — marks become files, and only those
         run: pnpm verify:migrate-write
+      - name: CLI — a captured build log stays readable
+        run: pnpm verify:cli-glyphs
       - name: migrate UI
         run: pnpm verify:migrate-ui
       - name: Nx plugin
