@@ -38,9 +38,61 @@ my-app/
 
 A **component** is a `.ts` file that exports a `setup` function, paired with a sibling `.html` template (and an optional `.scss`). That's the whole convention — no class, no decorator, no registration.
 
-## 1. Configure the build
+## 1. Write your first component
 
-`weave.config.ts` is the one file that tells the CLI where your app starts and how to build it. Nothing
+Start with the thing you will write most: a component. The logic lives in `app.ts`. `setup` runs **once**, when the component is created, and it owns the
+component's state. Its local values are what the template can read.
+
+~~~ts title="src/app/app.ts"
+import { signal } from '@weave-framework/runtime';
+
+export function setup() {
+  const count = signal(0);
+  const inc = (): void => {
+    count.set((n) => n + 1);
+  };
+}
+~~~
+
+No `return` — the compiler reads the template, sees it uses `count` and `inc`, and writes
+`return { count, inc }` for you. Write one yourself when you want to expose something under a different
+name or keep a value private; it is then used exactly as written.
+
+The markup lives in `app.html`. Read a signal with `{{ count() }}`; wire an event with `on:click={{ inc }}`. (Every binding in a Weave template uses double braces — more in [Templates](/learn/templates).)
+
+~~~html title="src/app/app.html"
+<main class="app">
+  <h1>Hello, Weave</h1>
+  <button on:click={{ inc }}>
+    clicked {{ count() }} times
+  </button>
+</main>
+~~~
+
+And the styles in `app.scss`. They're **scoped to this component** automatically — no `.app` leaking into the rest of the page:
+
+~~~scss title="src/app/app.scss"
+.app {
+  font-family: system-ui, sans-serif;
+  text-align: center;
+  padding: 2rem;
+}
+button {
+  font: inherit;
+  padding: 0.6em 1.2em;
+  cursor: pointer;
+}
+~~~
+
+That's a complete component. Here's one running live on this very page — the same `signal` + `on:click`, with a reset button added. Click it:
+
+:::demo counter
+
+When you click, only the number text changes. The button isn't re-rendered, and `setup` never runs a second time. That's fine-grained reactivity at work — and it's the subject of the [next page](/learn/signals).
+
+## 2. Configure the build
+
+Now the one file that tells the CLI where that component is and how to build the app: `weave.config.ts`. Nothing
 here is magic and nothing is required except a starting point — every line below is either a path or a
 plain string.
 
@@ -107,58 +159,6 @@ other; nothing checks that they agree until the page runs, and the symptom is a 
 :::callout tip "No script tag?"
 Right — you don't write `<script src=…>` yourself. With `root` set, Weave generates the entry module, registers any custom elements, and mounts the root into `mount`. (Need a hand-written entry instead? Use `entry` rather than `root` — see [Custom elements & bootstrap](/learn/custom-elements).)
 :::
-
-## 2. Write your first component
-
-The logic lives in `app.ts`. `setup` runs **once**, when the component is created, and it owns the
-component's state. Its local values are what the template can read.
-
-~~~ts title="src/app/app.ts"
-import { signal } from '@weave-framework/runtime';
-
-export function setup() {
-  const count = signal(0);
-  const inc = (): void => {
-    count.set((n) => n + 1);
-  };
-}
-~~~
-
-No `return` — the compiler reads the template, sees it uses `count` and `inc`, and writes
-`return { count, inc }` for you. Write one yourself when you want to expose something under a different
-name or keep a value private; it is then used exactly as written.
-
-The markup lives in `app.html`. Read a signal with `{{ count() }}`; wire an event with `on:click={{ inc }}`. (Every binding in a Weave template uses double braces — more in [Templates](/learn/templates).)
-
-~~~html title="src/app/app.html"
-<main class="app">
-  <h1>Hello, Weave</h1>
-  <button on:click={{ inc }}>
-    clicked {{ count() }} times
-  </button>
-</main>
-~~~
-
-And the styles in `app.scss`. They're **scoped to this component** automatically — no `.app` leaking into the rest of the page:
-
-~~~scss title="src/app/app.scss"
-.app {
-  font-family: system-ui, sans-serif;
-  text-align: center;
-  padding: 2rem;
-}
-button {
-  font: inherit;
-  padding: 0.6em 1.2em;
-  cursor: pointer;
-}
-~~~
-
-That's a complete component. Here's one running live on this very page — the same `signal` + `on:click`, with a reset button added. Click it:
-
-:::demo counter
-
-When you click, only the number text changes. The button isn't re-rendered, and `setup` never runs a second time. That's fine-grained reactivity at work — and it's the subject of the [next page](/learn/signals).
 
 ## 3. Run it
 

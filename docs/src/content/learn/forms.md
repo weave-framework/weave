@@ -4,6 +4,60 @@
 
 There are three building blocks — `field`, `group` (aka `form`), and `fieldArray` — plus a `use:control` directive that wires a field to a DOM input, and a `validators` bag of ready-made checks. We'll walk through each, including the sharp edges.
 
+## A whole form, first
+
+Before the model, the thing itself. A sign-in form with validation, error display and a gated submit is
+one `setup` and one template:
+
+:::tabs
+~~~ts title="sign-in.ts"
+import { field, form, validators } from '@weave-framework/forms';
+import { control } from '@weave-framework/forms/dom';
+
+export function setup(props: { signIn: (email: string, password: string) => Promise<void> }) {
+  const login = form({
+    email: field('', [validators.required(), validators.email()]),
+    password: field('', [validators.required(), validators.minLength(8)]),
+  });
+  const onSubmit = login.submit(async ({ email, password }) => {
+    await props.signIn(email, password);
+  });
+  // no return: the template reads `login`, `onSubmit` and `control`, so the compiler exposes them
+}
+~~~
+~~~html title="sign-in.html"
+<form on:submit={{ onSubmit }} novalidate>
+  <label>
+    <span>Email</span>
+    <input type="email" use:control={{ login.controls.email }} />
+    @if (login.controls.email.touched() && login.controls.email.error()) {
+      <span class="msg">{{ login.controls.email.error() }}</span>
+    }
+  </label>
+  <label>
+    <span>Password</span>
+    <input type="password" use:control={{ login.controls.password }} />
+    @if (login.controls.password.touched() && login.controls.password.error()) {
+      <span class="msg">{{ login.controls.password.error() }}</span>
+    }
+  </label>
+  @if (login.submitError()) {
+    <p class="form-error">Could not sign in.</p>
+  }
+  <button type="submit" disabled={{ login.submitting() }}>
+    {{ login.submitting() ? 'Signing in…' : 'Sign in' }}
+  </button>
+</form>
+~~~
+:::
+
+Three things carry it: `field` holds a value and its validators, `form` groups fields and knows whether
+all of them are valid, `use:control` wires an input to a field (value both ways, `touched` on blur,
+`aria-invalid` when it matters), and `login.submit(…)` turns your handler into one that reveals every
+error, waits for async checks, focuses the first bad control, and only then runs. An error shows once the
+field has been **touched**, so a fresh form is not red before anyone typed. Everything below is the detail
+of those pieces.
+
 ## The mental model: one `Control`, three shapes
 
 Everything in `@weave-framework/forms` is a **`Control`**. A `field`, a `group`, and a `fieldArray` all implement the same interface, which is why they nest to any depth (`form → fieldArray → group → field`) and aggregate validity/values/touched the whole way up. One interface, three shapes — that's the whole design.

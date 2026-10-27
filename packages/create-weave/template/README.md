@@ -97,9 +97,16 @@ components you use, is the Sass route: [weaveframework.dev/ui/installation](http
 - **Not at the domain root?** Set `base: '/my-app/'` in `weave.config.ts` — a GitHub Pages *project* site
   lives under the repository name, and without `base` the page comes up blank.
 
+## Working with an AI assistant
+
+`AGENTS.md` is the project's conventions in one page, written for a coding assistant, and the scaffold
+ships one skill per subsystem from the framework's authors (a `SKILL.md` per area, under the editor-skills
+directory). Point your assistant at `AGENTS.md`; it tells it which skill to read before touching an area.
+
 ## Learn more
 
 - [Quick start](https://weaveframework.dev/learn/quick-start)
+- [Testing a component](https://weaveframework.dev/learn/recipes#testing-a-component)
 - [Thinking in signals](https://weaveframework.dev/learn/signals)
 - [Templates](https://weaveframework.dev/learn/templates) · [Components](https://weaveframework.dev/learn/components)
 - [Router](https://weaveframework.dev/learn/router) · [Forms](https://weaveframework.dev/learn/forms) · [Data](https://weaveframework.dev/learn/data)

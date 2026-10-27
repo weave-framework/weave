@@ -16,6 +16,15 @@
 
 ## Unreleased
 
+- **docs, create-weave:** the example before the table, and a page for the assistant. The quick start
+  now writes the first component before it explains the build config, since the component is what a
+  newcomer came to write and the config is one file they copy. The forms page opens with a whole sign-in
+  form — fields, validation, `use:control`, a gated submit — before the `Control` interface table and the
+  error-precedence rules. Recipes gained *Testing a component*: `@weave-framework/ui/testing`'s `mount`
+  takes any component, which the page did not say. The scaffold ships `AGENTS.md` — the conventions in
+  one page for a coding assistant, pointing at the bundled skills — so an assistant that does not read the
+  skills directory on its own gets the same conventions.
+
 - **feat(cli, runtime):** `weave dev --keep-state` carries the named signals across each live reload.
   Live reload is a full page reload, and every save threw the screen away — the filled form, the open
   dialog, the tenth page of the list — so the developer drove the app back there by hand after each edit.

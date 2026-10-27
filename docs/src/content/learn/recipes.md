@@ -455,6 +455,34 @@ The `|| false` makes an empty query a "not ready" source, so `resource` skips th
 
 [Back to the start: Introduction :icon[arrow-right]](/learn/introduction) · [Reference: @weave-framework/data :icon[arrow-right]](/reference/data)
 
+## Testing a component
+
+A Weave component is a function that returns DOM, so a test mounts it, pokes it, and reads the DOM back.
+`@weave-framework/ui/testing` is the harness the UI library's own suite runs on, and it takes **any**
+component, not only the library's — the built default export, or the `{ template, setup }` pair straight
+from the source:
+
+~~~ts title="counter.test.ts"
+import { mount, click, tick } from '@weave-framework/ui/testing';
+import { setup } from './counter';
+import template from './counter.html?raw'; // or read the file with your runner's helper
+
+const { el, dispose } = mount({ template, setup });
+click(el.querySelector('button')!);
+await tick();
+if (el.textContent !== 'clicked 1 times') throw new Error(el.textContent ?? '');
+dispose();
+~~~
+
+It runs in a real browser — the components create real DOM — so pair it with a runner that gives you one
+(Playwright, or Vitest's browser mode). There is no query language and no assertions in it on purpose: your
+runner already has both. `press`, `click`, `overlay`, `focused` and `tick` are the whole surface, and the
+[Tooling page](/learn/tooling#testing-components) describes each.
+
+It ships inside `@weave-framework/ui` because that is where it is exercised hardest; an app that uses none
+of the library's components still installs the package to get it, and the testing entry pulls in nothing
+else — an ordinary bundle carries none of it.
+
 ## When a recipe does not work
 
 Every recipe here is ordinary Weave, so its failures are the ordinary ones — and three account for
