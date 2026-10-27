@@ -10,6 +10,7 @@ import { checkProject, impactOf, type Diagnostic } from '@weave-framework/check'
 import { readdirSync, readFileSync, statSync, writeFileSync, type Dirent } from 'node:fs';
 import { join } from 'node:path';
 import { installAsciiFallback } from './glyphs.js';
+import { formatDiagnostic } from './format.js';
 
 function flag(args: string[], name: string): string | undefined {
   const i: number = args.indexOf(name);
@@ -94,6 +95,7 @@ options
   --impact <file>        List what renders this component, directly and transitively (check)
   --devtools             Show the reactive-graph panel in the page (dev)
   --state <name>         Start in a state saved from that panel (dev)
+  --no-check             Do not run weave check after each rebuild (dev)
   --ssg                  Prerender every route to static HTML (build)
   --eager                Inline routes instead of code-splitting them (routes)
   -h, --help             Print this
@@ -156,6 +158,10 @@ function summarizeBuild(outDir: string, startedAt: number, checked: boolean = fa
 }
 
 export { defineConfig } from './config.js';
+// The dev server's after-rebuild check runs in a worker that imports the CLI bundle by its own URL and
+// calls this; it has to be reachable from the bundle's entry. Not public API.
+/** @internal */
+export { checkForDev } from './dev.js';
 export type { WeaveConfig } from './config.js';
 
 export async function main(argv: string[]): Promise<void> {
@@ -307,6 +313,9 @@ weave build --check: ${errors} error${errors === 1 ? '' : 's'} — nothing was w
         // Saved states are tooling scratch space, so they live in `.weave/` next to the config the
         // command was run against — not inside the source tree.
         statesDir: join(process.cwd(), '.weave', 'states'),
+        // The same roots `weave build --check` checks. Off only when asked: a project that carries old
+        // type errors can quiet the panel with `--no-check` while it works through them.
+        check: rest.includes('--no-check') ? undefined : { roots: [config.root] },
       });
       console.log(`weave dev → ${url}`);
       // Discoverable without being imposed: the panel is real, and it is off unless asked for.
@@ -463,8 +472,3 @@ function applyFixes(diags: Diagnostic[]): number {
   return applied;
 }
 
-function formatDiagnostic(d: Diagnostic): string {
-  // TS diagnostics carry a `TS<code>`; a template parse error (code 0) has none.
-  const code: string = d.code ? ` TS${d.code}` : '';
-  return `${d.file}:${d.line}:${d.col} - ${d.category}${code}: ${d.message}`;
-}

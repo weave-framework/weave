@@ -99,7 +99,8 @@
     "verify:authorship": "node tools/verify-authorship.mjs",
     "verify:template-ranges": "node tools/verify-template-ranges.mjs",
     "verify:scaffold-docs": "node tools/verify-scaffold-docs.mjs",
-    "verify:dev-port-flag": "node packages/cli/test/dev-port-flag.smoke.mjs"
+    "verify:dev-port-flag": "node packages/cli/test/dev-port-flag.smoke.mjs",
+    "verify:dev-check": "node packages/cli/test/dev-check.smoke.mjs"
   },
   "keywords": [
     "reactive",

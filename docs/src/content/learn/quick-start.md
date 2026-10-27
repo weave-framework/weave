@@ -190,8 +190,9 @@ that for you until the page runs.
 
 **The button renders as `() => …` instead of a number.** A signal is read by *calling* it:
 `{{ count() }}`, not `{{ count }}`. This is the single most common first mistake in Weave. Nothing
-throws — the page just prints the function — but `weave check` names it precisely, which is the argument
-for running it before you go hunting.
+throws — the page just prints the function — but a few seconds after you save, `weave dev` runs
+`weave check` for you and a panel at the bottom of the page says exactly this: *a signal is read with
+`()`*. The same sentence is in the terminal.
 :::
 
 :::callout tip "Running the CLI"

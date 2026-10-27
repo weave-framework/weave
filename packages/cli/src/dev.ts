@@ -28,6 +28,9 @@ import { request as httpsRequest } from 'node:https';
 import type { AddressInfo } from 'node:net';
 import { mkdir, writeFile, readFile, readdir } from 'node:fs/promises';
 import { join, extname, relative, sep, isAbsolute } from 'node:path';
+import { Worker } from 'node:worker_threads';
+import { checkProject, type Diagnostic } from '@weave-framework/check';
+import { formatDiagnostic } from './format.js';
 import { weave, type WeaveState } from './plugin.js';
 import type { ProxyTable, ProxyRule } from './config.js';
 import { entryPlugin, VIRTUAL_ENTRY } from './entry.js';
@@ -62,6 +65,48 @@ export interface DevConfig {
    * should answer `/__weave_state` — the devtools panel saves to it and reads it back.
    */
   statesDir?: string;
+  /**
+   * Run `weave check` over these roots after every successful rebuild, and push the result to the page.
+   *
+   * The most common first mistake — `{{ count }}` for `{{ count() }}` — renders a function's source text
+   * and throws nothing; the checker names it precisely, but it is a separate command a newcomer does not
+   * know to run. The check runs in a worker thread AFTER the reload has gone out, so the page never waits
+   * on it (a full project check is seconds), and arrives as a `check:` message the shell paints at the
+   * bottom of the page without covering it. Unset ⇒ no check (the CLI's `--no-check`).
+   */
+  check?: { roots: string[] };
+}
+
+/** What one after-rebuild check found: the formatted diagnostics (empty when clean) and the error count. */
+export interface DevCheckResult {
+  text: string;
+  errors: number;
+}
+
+/**
+ * The worker's half of the after-rebuild check: run the project checker and format what it found the way
+ * `weave check` prints it, so the page shows the sentence the terminal would. Exported because the worker
+ * reaches it by importing THIS module's own URL — the one way to get at the bundled checker from a worker
+ * without the worker having to resolve `@weave-framework/check` from wherever it happens to run.
+ * @internal
+ */
+export function checkForDev(roots: string[]): DevCheckResult {
+  const diags: Diagnostic[] = checkProject(roots);
+  const errors: number = diags.filter((d) => d.category === 'error').length;
+  if (!diags.length) return { text: '', errors: 0 };
+  const lines: string[] = diags.map(formatDiagnostic);
+  if (errors) lines.push('', `weave check: ${errors} error${errors === 1 ? '' : 's'}`);
+  return { text: lines.join('\n'), errors };
+}
+
+/** Standing result of the last after-rebuild check, handed to a client the moment it connects. */
+interface CheckState {
+  last: string;
+}
+
+/** The SSE frame that carries a check result (an empty result clears the panel). */
+function checkFrame(text: string): string {
+  return `data: check:${encodeURIComponent(text)}\n\n`;
 }
 
 export interface DevServer {
@@ -225,6 +270,42 @@ async function devInMemory(config: DevConfig): Promise<DevServer> {
   const outputs: Map<string, Uint8Array> = new Map();
   const clients: Set<ServerResponse> = new Set();
 
+  // The after-rebuild check. One worker at a time: a rebuild that lands while a check is running makes
+  // that check's answer about a file that is gone, so it is terminated and a fresh one starts. The result
+  // is kept so a page that reloads (and so reconnects) AFTER the check finished still hears it.
+  const checkState: CheckState = { last: '' };
+  let checker: Worker | null = null;
+  let hadErrors: boolean = false;
+  const runCheck = (roots: string[]): void => {
+    if (checker) void checker.terminate();
+    // Written so it runs whether Node evaluates it as CommonJS or as an ES module (a parent started with
+    // `--input-type=module` hands that flag to its workers, and `require` is not defined there): only
+    // dynamic `import()`, which both module systems have.
+    const w: Worker = new Worker(
+      "import('node:worker_threads').then(({ workerData, parentPort }) => import(workerData.url)" +
+        '.then((m) => parentPort.postMessage(m.checkForDev(workerData.roots)))' +
+        ".catch((e) => parentPort.postMessage({ text: 'weave check could not run: ' + ((e && e.stack) || e), errors: 1 })));",
+      { eval: true, workerData: { url: import.meta.url, roots } }
+    );
+    checker = w;
+    w.on('message', (result: DevCheckResult): void => {
+      if (checker !== w) return; // superseded by a newer rebuild's check
+      checkState.last = result.text;
+      for (const res of clients) res.write(checkFrame(result.text));
+      // The terminal gets what `weave check` would have printed — and one line when it comes clean again,
+      // so a developer watching the terminal rather than the page sees the fix land.
+      if (result.errors) console.error(`\n${result.text}\n`);
+      else if (hadErrors) console.log('weave check: no type errors');
+      hadErrors = result.errors > 0;
+    });
+    w.on('error', (err: Error): void => {
+      console.error(`weave dev: the after-rebuild check failed — ${err.message}`);
+    });
+    w.on('exit', (): void => {
+      if (checker === w) checker = null;
+    });
+  };
+
   const capture: Plugin = {
     name: 'weave:dev-capture',
     setup(build: PluginBuild): void {
@@ -252,6 +333,8 @@ async function devInMemory(config: DevConfig): Promise<DevServer> {
           outputs.set('/' + rel, file.contents);
         }
         for (const res of clients) res.write('data: reload\n\n'); // tell every client to reload
+        // After the reload is out, never before it: the check is seconds and the page must not wait on it.
+        if (config.check) runCheck(config.check.roots);
       });
     },
   };
@@ -277,7 +360,7 @@ async function devInMemory(config: DevConfig): Promise<DevServer> {
   await ctx.watch();
 
   const server: Server = createServer((req: IncomingMessage, res: ServerResponse): void => {
-    void handleRequest(req, res, config, outputs, clients, assetMap);
+    void handleRequest(req, res, config, outputs, clients, assetMap, checkState);
   });
   const port: number = await listen(server, config.port);
   return { ctx, url: `http://127.0.0.1:${port}` };
@@ -343,7 +426,8 @@ async function handleRequest(
   config: DevConfig,
   outputs: Map<string, Uint8Array>,
   clients: Set<ServerResponse>,
-  assetMap: Map<string, string> = new Map()
+  assetMap: Map<string, string> = new Map(),
+  checkState: CheckState = { last: '' }
 ): Promise<void> {
   const raw: string = (req.url ?? '/').split('?')[0];
   // Everything below matches paths as if the app were at the root; the configured base is stripped here
@@ -373,6 +457,9 @@ async function handleRequest(
     });
     res.write('\n');
     clients.add(res);
+    // A page reloads before its check finishes and reconnects after — this connection is the one that has
+    // to hear a result that is already standing.
+    if (checkState.last) res.write(checkFrame(checkState.last));
     req.on('close', (): void => {
       clients.delete(res);
     });

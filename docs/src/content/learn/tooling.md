@@ -51,11 +51,21 @@ In both modes a request with no file extension falls back to the HTML shell, so 
 | `--config <path>` | both | auto-discover | Point at an explicit config file; forces config mode. |
 | `[entry]` (positional) | legacy | `src/main.ts` | The hand-written entry module. The first non-`-` argument. Ignored in config mode (the config's `entry`/`root` wins). |
 | `--serve <dir>` | legacy only | `.` | Static web root esbuild serves from. No effect in config mode (uses `publicDir`). |
-| `--port <n>` | legacy only | esbuild picks | Server port. **In config mode this CLI flag is ignored** — set the port with `dev.port` in the config instead. |
+| `--port <n>` | both | config `dev.port`, else a free port | Server port. The flag wins over the config's `dev.port`; when the port is taken, the server steps to the next free one and says which. |
+| `--no-check` | config | off | Skip the type-check that otherwise runs after every rebuild (below). |
 
-:::callout info "Two different ports"
-There are two separate port knobs and they don't cross over. The `--port <n>` *CLI flag* only takes effect in legacy mode. In config mode the port comes from `dev.port` in `weave.config.ts`, and the CLI flag is not read. If you set one and nothing changes, you're probably in the other mode.
+:::callout info "The port, in one place"
+`dev.port` in `weave.config.ts` is the project's default; `--port <n>` overrides it for one run. (Before 3.5 the flag was read only in legacy mode and silently ignored with a config present — if a note somewhere still says so, it is describing that older behaviour.)
 :::
+
+**After every successful rebuild, `weave dev` runs `weave check`** over the project — in a worker, after the
+page has already reloaded, so nothing waits on it — and shows what it found in a panel along the bottom of
+the page, in the checker's own words. The page keeps running above it; fix the file, save, and the panel goes
+when the check comes back clean. The same text goes to the terminal, so whichever one you are looking at
+tells you. This is the loop where the first-day mistake gets caught: `{{ count }}` for `{{ count() }}` renders
+the signal's source text and throws nothing, and now the page says *a signal is read with `()`* a few seconds
+after the save. A project that carries old type errors can quiet the panel with `--no-check` while it works
+through them; `weave check` itself is unchanged.
 
 :::callout tip "If a template-only edit seems ignored"
 The dev server watches your `.ts`, `.html`, and `.scss`/`.sass`. Editing a SCSS partial that's pulled in via `@use`/`@import` rebuilds the components that depend on it, because the loader tracks those loaded files. But a codegen-time change — a brand-new route file, new `.md` content, a freshly-added config option — runs at startup, so it needs a restart. When in doubt, restart `weave dev`.

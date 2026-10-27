@@ -119,7 +119,16 @@ export function injectHtml(html: string, opts: InjectOptions): string {
     // possible outcome for someone who has just started, and the one every framework's newcomer hits.
     // It is deliberately conditional on an EMPTY page: an app that rendered and then threw somewhere is
     // the developer's own console to read, and covering a working screen with a modal would be worse.
-    const client: string = `<script>(function(){var o;
+    // A third message, `check:<text>`, carries what `weave check` found after the rebuild. It is NOT the
+    // overlay: the app runs, so it is painted as a panel along the bottom that the page stays usable
+    // above, and an empty `check:` takes it down again.
+    const client: string = `<script>(function(){var o,k;
+function panel(t){if(!t){if(k){k.remove();k=undefined;}return;}
+if(!k){k=document.createElement("div");k.id="__weave_check";
+k.setAttribute("style","position:fixed;left:0;right:0;bottom:0;z-index:2147483646;max-height:40vh;overflow:auto;margin:0;padding:12px 16px;"
++"background:#1b1b1fef;color:#ffd79a;font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap;border-top:2px solid #ffb74d");
+document.body.appendChild(k);}
+k.textContent=t+"\\n\\n(weave dev ran weave check after the rebuild. The page still runs; fix the file and save.)";}
 function show(t){if(!o){o=document.createElement("div");o.id="__weave_error";
 o.setAttribute("style","position:fixed;inset:0;z-index:2147483647;overflow:auto;margin:0;padding:24px;"
 +"background:#1b1b1fef;color:#ffb4ab;font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap");
@@ -138,6 +147,7 @@ addEventListener("unhandledrejection",function(e){runtime(e.reason);});
 new EventSource(${jsLiteral(opts.liveReload)})
 .addEventListener("message",function(e){var d=e.data||"";
 if(d.indexOf("error:")===0){show(decodeURIComponent(d.slice(6)));return;}
+if(d.indexOf("check:")===0){panel(decodeURIComponent(d.slice(6)));return;}
 if(o){o.remove();o=undefined;}location.reload();});})();</script>`;
     out = out.replace(/<\/body>/i, `    ${client}\n  </body>`);
   }

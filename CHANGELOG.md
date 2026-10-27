@@ -16,6 +16,18 @@
 
 ## Unreleased
 
+- **feat(cli):** `weave dev` runs `weave check` after every successful rebuild and shows the result in
+  the page. The single most common first mistake — `{{ count }}` for `{{ count() }}` — renders the
+  signal's source text and throws nothing; the checker has named it precisely for a long time
+  (*a signal is read with `()`*), but as a separate command a newcomer does not know to run. The check
+  runs in a worker thread AFTER the reload has gone out, so the page never waits on it (a full project
+  check is seconds), and arrives over the live-reload channel as a `check:` message painted as a panel
+  along the bottom — not the overlay, because the app runs. A page that reloads before the check lands
+  is handed the standing result when it reconnects; a clean check clears the panel; the terminal gets the
+  same text. `--no-check` turns it off for a project working through old errors. `weave check` itself,
+  its output and its exit codes are unchanged. `verify:dev-check` drives the real server against the
+  real mistake and pins all four halves (report, late client, repair, no stale result).
+
 - **fix(create-weave):** the scaffold's first component is the quick start's first component. The page
   teaches the short form — no `return`, no annotations, the compiler exposes what the template reads —
   and the scaffold shipped `export function setup(): { count: Signal<number>; inc: () => void }` with a
