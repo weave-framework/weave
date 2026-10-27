@@ -16,6 +16,36 @@
 
 ## Unreleased
 
+- **perf(compiler, runtime):** fewer nodes and fewer calls per rendered row, measured before and after on
+  the same harness. An interpolation that is an element's only child (`<td>{{ r.id }}</td>`) now compiles
+  to a placeholder text node the binding writes into (`bindData`), not a comment anchor plus a text node
+  created and inserted at bind time — two nodes and an `insertBefore` per interpolation become one node and
+  nothing. Node navigation is a `firstChild`/`nextSibling` chain from the nearest captured parent, not a
+  `child(_r, 0, 3, 2)` call allocating a rest array and indexing a NodeList per captured node per clone.
+  A `@for` row's `$first`/`$last`/`$even`/`$odd` are prototype methods, not four closures allocated per
+  row. Emptying a list is one `Range.deleteContents()` when no row has a leave transition and the rows
+  still share a parent with the anchor (a disposed `<Portal>` does not — the suite caught it), else the
+  per-node path as before. `node benchmarks/bench.mjs` on this machine, old → new, same run protocol:
+  geometric mean 1.26× → 1.20× vanilla for bare rows and 1.63× → 1.40× for a component per row; `clear`
+  2.44× → 1.95× and 3.80× → 2.70×. Individual rows of that table move ±20% between runs; the geometric
+  means and `clear` moved consistently. Resumable output is unchanged (it keeps its own text markers).
+  The 1,666 browser tests, the render smokes and the size gate are green; the SPA core stayed inside its
+  budget.
+
+- **feat(benchmarks):** the benchmark grew a column and a profiler. A **component per row** column
+  (`<Row r={{ r }} />` inside `@for`, which is what applications write) sits beside the bare `<tr>` one —
+  and measured 1.6× where the bare row measured 1.26×, so an optimisation can no longer win on the bare
+  row and lose unseen on the real one. Ratios are taken per suite and then the median of ratios, because
+  the three implementations run back to back inside one suite and a slower suite slows all three; the
+  ratio of two medians across suites disagreed with itself by 30% between consecutive runs.
+  `benchmarks/profile.mjs` prints self time per function for one operation under Chromium's sampling
+  profiler. Its first run found the harness itself at fault: function-mode compile output ends in
+  `return render(ctx, {})`, so a component rendered once per row re-parsed its template 10,000 times —
+  13.8% of the column's self time that no shipped app pays. The harness now hoists the parse the way a
+  built module does. The same profile puts layout at ~60% of a 10,000-row create and the reactive core
+  (`track`, `effect`, `dispose`) at about 2%, which is why the Set-to-array rewrite of the core that
+  was on the list was NOT done: the measurement does not point there.
+
 - **feat(cli):** `weave add component <Name>` writes a new component — `.ts`, `.html`, and a stylesheet
   in the project's `styleLang` — into a folder of its own next to the root component, where a PascalCase
   tag in the root template resolves it with no import, and says so. `--dir` and `--style` override the

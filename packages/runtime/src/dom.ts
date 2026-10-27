@@ -103,6 +103,18 @@ export function bindText(anchorNode: Comment, fn: () => unknown): void {
   });
 }
 
+/**
+ * Reactive text that is an element's ONLY child: the compiler puts a placeholder text node in the template
+ * instead of a comment anchor, so there is nothing to create or insert here — the clone already holds the
+ * node, and binding is one effect writing `data`. Two DOM nodes and an `insertBefore` per interpolation
+ * become one node and nothing, which for a list is per row. @internal
+ */
+export function bindData(t: Text, fn: () => unknown): void {
+  effect(() => {
+    t.data = stringify(fn());
+  });
+}
+
 /* ──────────────────────────── attributes / properties ──────────────────────────── */
 
 /**
@@ -778,6 +790,28 @@ export interface ForContext<T> {
   odd: () => boolean;
 }
 
+/**
+ * The positional accessors every `@for` row context shares, as prototype methods over `index`/`count`. They
+ * used to be four arrow closures allocated per row — for a 10,000-row list, 40,000 functions whose bodies
+ * are one comparison each, most never called (a template that names `$first` is rare). A method reached
+ * through the prototype costs nothing per row; the compiler always emits them as calls (`_row.first()`),
+ * so `this` is the row context.
+ */
+const ROW_PROTO: Pick<ForContext<unknown>, 'first' | 'last' | 'even' | 'odd'> = {
+  first(this: ForContext<unknown>): boolean {
+    return this.index() === 0;
+  },
+  last(this: ForContext<unknown>): boolean {
+    return this.index() === this.count() - 1;
+  },
+  even(this: ForContext<unknown>): boolean {
+    return this.index() % 2 === 0;
+  },
+  odd(this: ForContext<unknown>): boolean {
+    return this.index() % 2 === 1;
+  },
+};
+
 interface EachRow<T> extends Row {
   owner: Owner;
   itemSig: Signal<T>;
@@ -824,10 +858,27 @@ export function eachBlock<T>(
   // so emptying a `@for` animates out instead of snapping (a transition node with no
   // outro registered removes synchronously).
   const removeRows = (): void => {
-    rows.forEach((r) => {
+    if (!rows.length) return;
+    // The rows sit contiguously before the anchor (reconcileKeyed keeps them so), which makes the whole
+    // list one Range: a single `deleteContents` instead of a `remove()` per node — for a thousand rows, one
+    // DOM call instead of a thousand. Only when no node registered a leave transition (`out:`): those have to
+    // go one by one, each after its outro. The headless render has no Range; it takes the per-node path. So
+    // does a block torn down after its parent already left the tree (a disposed `<Portal>`): the anchor has no
+    // parent then, and a Range cannot be set around it.
+    const parent: Node | null = anchor.parentNode;
+    let plain: boolean = typeof document.createRange === 'function' && !!parent && rows[0].node.parentNode === parent;
+    for (const r of rows) {
       disposeOwner(r.owner);
-      for (const n of rowSpan(r)) removeWithOutro(n);
-    });
+      if (plain) for (const n of rowSpan(r)) if ((n as Outroable).__wOut) plain = false;
+    }
+    if (plain) {
+      const range: Range = document.createRange();
+      range.setStartBefore(rows[0].node);
+      range.setEndBefore(anchor);
+      range.deleteContents();
+    } else {
+      for (const r of rows) for (const n of rowSpan(r)) removeWithOutro(n);
+    }
     rows = [];
   };
 
@@ -851,15 +902,10 @@ export function eachBlock<T>(
     rows = reconcileKeyed(parent, anchor, rows, data, keyOf, (item, i) => {
       const itemSig: Signal<T> = signal(item) as Signal<T>;
       const indexSig: Signal<number> = signal(i);
-      const ctx: ForContext<T> = {
-        item: itemSig,
-        index: indexSig,
-        count: countSig,
-        first: () => indexSig() === 0,
-        last: () => indexSig() === countSig() - 1,
-        even: () => indexSig() % 2 === 0,
-        odd: () => indexSig() % 2 === 1,
-      };
+      const ctx: ForContext<T> = Object.create(ROW_PROTO) as ForContext<T>;
+      ctx.item = itemSig;
+      ctx.index = indexSig;
+      ctx.count = countSig;
       const owner: Owner = runInOwner(host, () => createOwner(null));
       // Untrack the row construction: its own bindings create their own effects, so a signal read
       // synchronously during render must NOT subscribe this block effect (else an unrelated change

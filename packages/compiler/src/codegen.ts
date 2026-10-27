@@ -529,9 +529,15 @@ function compileFragment(
     }
     let v: string | undefined = nodeVars.get(key);
     if (!v) {
+      // A property chain, not `child(_r, 0, 3, 2)`: the helper allocated a rest array and indexed a NodeList
+      // for every captured node of every clone, which for a 10,000-row list is tens of thousands of calls
+      // doing nothing the chain does not. The parent is captured first (recursively, so each level once), and
+      // this node is one `firstChild` plus `path[i]` `nextSibling`s from it — siblings share their parent's
+      // walk instead of each repeating it from the root.
+      const from: string = path.length > 1 ? nodeExpr(path.slice(0, -1)) : '_r';
       v = `_n${nodeVarN++}`;
       nodeVars.set(key, v);
-      nodeDecls.push(`const ${v} = ${gen.H('child')}(_r, ${path.join(', ')});`);
+      nodeDecls.push(`const ${v} = ${from}.firstChild${'.nextSibling'.repeat(path[path.length - 1])};`);
     }
     return v;
   };
@@ -639,6 +645,11 @@ function compileFragment(
     // cursor walk (emitCursorWalk) — this only DECIDES eligibility, so a construct with no server representation
     // opts the fragment out (it client-renders on resume). Position no longer matters: the sequential cursor
     // reaches a node after a block by stepping from the block's `]`, so `@let` (and anything else) is fine there.
+    // An interpolation that is an element's ONLY child needs no comment anchor: the template can hold a
+    // placeholder text node at that position and the binding writes its `data`. Eager target only — the
+    // resumable one isolates dynamic text with its own markers, and the adopt walk expects them.
+    const soleInterp: boolean =
+      !adopt && !gen.resumable && basePath.length > 0 && children.length === 1 && children[0].type === 'interp';
     for (const node of children) {
       if (node.type === 'let') {
         html += '<!---->'; // placeholder slot keeps child indices stable; the cursor steps past it (pending += 1)
@@ -657,7 +668,7 @@ function compileFragment(
         // nested-resumes; a slot adopts (E1.17). A `w:element`/@defer/@await has no adopt path at any position.
         if (!(isAdoptableBlock(node) || isComponentNode(node))) gen.cannotAdopt(`\`${describe(node)}\` in a position resume cannot adopt`);
       }
-      emitNode(node, [...basePath, dom], cur, isHost);
+      emitNode(node, [...basePath, dom], cur, isHost, soleInterp);
       dom++;
     }
   }
@@ -686,7 +697,7 @@ function compileFragment(
     emitBlockReplay(path, (a) => `${gen.H('keyBlock')}(${a}, () => ${rewrite(node.expr, sc).code}, ${contentFn});`);
   }
 
-  function emitNode(node: TemplateNode, path: number[], sc: Scope, isHost: boolean = false): void {
+  function emitNode(node: TemplateNode, path: number[], sc: Scope, isHost: boolean = false, sole: boolean = false): void {
     switch (node.type) {
       case 'text':
         html += escapeText(node.value);
@@ -696,8 +707,16 @@ function compileFragment(
         // formatter opts in). This no-op keeps the switch total if that ever changes.
         return;
       case 'interp': {
-        html += '<!---->';
         const { code, reactive } = rewrite(node.expr, sc);
+        if (sole && reactive) {
+          // `<td>{{ r.id }}</td>`: the placeholder text node IS the bound node (the only child, index 0), so the
+          // clone carries it and nothing is created or inserted at bind time. The first effect run replaces the
+          // space synchronously, before the clone reaches the document.
+          html += ' ';
+          stmts.push(`${gen.H('bindData')}(${nodeExpr(path)}, () => (${code}));`);
+          return;
+        }
+        html += '<!---->';
         if (reactive) {
           // The resumable target isolates the dynamic text with a `<!--$-->` marker (bindTextResumable) so the
           // client can adopt exactly it (an adjacent static+dynamic text run would otherwise merge); the adopt

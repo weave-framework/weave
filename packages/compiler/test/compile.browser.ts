@@ -431,3 +431,33 @@ test('emitted code escapes sequences that would break out of a JS string literal
   assert.ok(decoded.includes('</script>'), 'the value round-trips to the original text');
   assert.ok(decoded.includes(`a${LS}b${PS}c`), 'the separators round-trip too');
 });
+
+test('a sole-child interpolation binds a placeholder text node, not a comment anchor', () => {
+  const { code } = compileTemplate('<tr><td>{{ a() }}</td><td>x {{ a() }}</td></tr>', { mode: 'function', scope: ['a'] });
+  // The first cell's only child is the interpolation: the template holds a text node there and `bindData`
+  // writes it — nothing is created or inserted at bind time. The second cell mixes static text with the
+  // interpolation and keeps the anchor + `bindText` shape.
+  // The emitted source text escapes the closing tag as `<\/td>`, so the literal here carries a backslash.
+  assert.ok(code.includes('<td> <\\/td>'), 'a placeholder text node stands where the text goes');
+  assert.ok(code.includes('bindData('), 'the sole interpolation uses bindData');
+  assert.ok(code.includes('x <!---->'), 'a mixed cell keeps its comment anchor');
+  assert.ok(code.includes('bindText('), 'and binds through bindText');
+  const a: Signal<number> = signal(1);
+  const el: Element = render('<tr><td>{{ a() }}</td><td>x {{ a() }}</td></tr>', { a }, ['a']);
+  host().appendChild(el);
+  assert.equal(el.textContent, '1x 1');
+  a.set(2);
+  assert.equal(el.textContent, '2x 2');
+  assert.equal(el.firstElementChild!.childNodes.length, 1, 'the sole cell holds exactly one node');
+});
+
+test('node navigation is a firstChild/nextSibling chain from the nearest captured parent, never child()', () => {
+  const { code } = compileTemplate('<section><h1>{{ a() }}</h1><p>{{ a() }} and {{ a() }}</p><ul><li class={{ a() }}></li></ul></section>', {
+    mode: 'function',
+    scope: ['a'],
+  });
+  assert.ok(!/\bchild\(/.test(code), 'no child(_r, …) call is emitted');
+  assert.ok(/\.firstChild(\.nextSibling)+/.test(code), 'siblings are reached by nextSibling steps');
+  // The <p> is captured once and its two interpolations walk from it, not from the root.
+  assert.ok(/const (_n\d+) = _r\.firstChild\.nextSibling;\s*\n\s*const _n\d+ = \1\.firstChild/.test(code), 'children walk from their captured parent');
+});

@@ -97,23 +97,86 @@ function vanillaImpl(root) {
 }
 
 /* ---------- Weave implementation ---------- */
+/**
+ * Compile a template to a render function the way a built module behaves: the `template(html)` parses are
+ * hoisted and run ONCE, and the returned `render` closes over them. Function-mode output ends in
+ * `return render(ctx, {})`, which re-ran the hoisted template parses on every call — harmless for a root
+ * rendered once, and a 10,000-fold innerHTML parse for a component rendered once per row: 13.8% of the
+ * component column's self time was `template()` before this, a cost no shipped app pays (CDP profile,
+ * `profile.mjs`). A probe must pay what the real build pays.
+ */
+function compileRender(html, scope) {
+  const { code } = compileTemplate(html, { mode: 'function', scope });
+  const factory = new Function('rt', '_c', code.replace(/return render\(ctx, \{\}\);?\s*$/, 'return render;'));
+  return factory;
+}
+
 function weaveImpl(root) {
   const rt = { ...dom, signal };
   const html =
     '<table><tbody>@for (r of rows(); track r.id) {' +
     '<tr class={{ r.id === sel() ? "danger" : "" }}><td>{{ r.id }}</td><td><a>{{ r.label }}</a></td></tr>' +
     '}</tbody></table>';
-  const { code } = compileTemplate(html, { mode: 'function', scope: ['rows', 'sel'] });
-  const render = new Function('ctx', 'rt', '_c', code);
+  const render = compileRender(html, ['rows', 'sel'])(rt, {});
 
   const rows = signal([]);
   const sel = signal(-1);
-  const node = render({ rows, sel }, rt, {});
+  const node = render({ rows, sel }, {});
   root.appendChild(node);
 
   return {
     create(data) {
       // fresh objects each op; keyed reconcile does the DOM work
+      rows.set(data.map((d) => ({ id: d.id, label: d.label })));
+    },
+    updateEvery10th() {
+      const cur = rows();
+      const next = cur.slice();
+      for (let i = 0; i < next.length; i += 10) next[i] = { ...next[i], label: next[i].label + ' !!!' };
+      rows.set(next);
+    },
+    swap() {
+      const cur = rows();
+      if (cur.length < 999) return;
+      const next = cur.slice();
+      const t = next[1]; next[1] = next[998]; next[998] = t;
+      rows.set(next);
+    },
+    select() {
+      sel.set(rows()[1]?.id ?? -1);
+    },
+    remove() {
+      const next = rows().slice();
+      next.splice(1, 1);
+      rows.set(next);
+    },
+    clear() {
+      rows.set([]);
+    },
+  };
+}
+
+/* ---------- Weave, a component per row ---------- */
+// Real applications put a COMPONENT in the row (`<TaskCard>` inside `@for`), not a bare `<tr>`: the row is
+// then a fragment bracketed by marker comments, `defineComponent` builds a props object and a ctx over it per
+// instance, and the child's bindings read props through that prototype chain. None of that was measured by
+// the bare-row implementation above, so an optimisation could win there and lose here unseen.
+function weaveComponentImpl(root) {
+  const rt = { ...dom, signal };
+  const rowHtml =
+    '<tr class={{ r.id === sel() ? "danger" : "" }}><td>{{ r.id }}</td><td><a>{{ r.label }}</a></td></tr>';
+  const Row = dom.defineComponent(compileRender(rowHtml, ['r', 'sel'])(rt, {}));
+  const html =
+    '<table><tbody>@for (r of rows(); track r.id) {<Row r={{ r }} sel={{ sel }} />}</tbody></table>';
+  const render = compileRender(html, ['rows', 'sel'])(rt, { Row });
+
+  const rows = signal([]);
+  const sel = signal(-1);
+  const node = render({ rows, sel }, {});
+  root.appendChild(node);
+
+  return {
+    create(data) {
       rows.set(data.map((d) => ({ id: d.id, label: d.label })));
     },
     updateEvery10th() {
@@ -197,18 +260,57 @@ globalThis.__bench = () => {
 
   const results = [];
   for (const o of ops) {
-    const vs = [], ws = [];
+    const vs = [], ws = [], cs = [];
     for (let s = 0; s < SUITES; s++) {
       vs.push(benchOp(vanillaImpl, o.reps, o.warmup, o.setup, o.op));
       ws.push(benchOp(weaveImpl, o.reps, o.warmup, o.setup, o.op));
+      cs.push(benchOp(weaveComponentImpl, o.reps, o.warmup, o.setup, o.op));
     }
     const vanilla = median(vs);
     const weave = median(ws);
-    // Sub-timer-resolution baselines (e.g. select toggling two classes) can't yield a
-    // trustworthy ratio — report the absolute times and omit the factor rather than
-    // print a noise-driven "7×" / divide-by-zero.
-    const factor = vanilla >= 0.1 ? weave / vanilla : null;
-    results.push({ key: o.key, label: o.label, vanilla, weave, factor });
+    const component = median(cs);
+    // The ratio is taken PER SUITE and then the median of those ratios — not the ratio of two medians. The
+    // three implementations run back to back inside one suite, so a machine that is slower during suite 3
+    // (thermal state, a background process) slows all three together and the per-suite ratio stays put;
+    // the ratio of medians taken across suites did not, and consecutive runs of this file disagreed by 30%.
+    // Sub-timer-resolution baselines (e.g. select toggling two classes) can't yield a trustworthy ratio —
+    // report the absolute times and omit the factor rather than print a noise-driven "7×" / divide-by-zero.
+    const ratio = (xs) => (vanilla >= 0.1 ? median(xs.map((x, i) => x / vs[i])) : null);
+    const factor = ratio(ws);
+    const componentFactor = ratio(cs);
+    results.push({ key: o.key, label: o.label, vanilla, weave, factor, component, componentFactor });
   }
   return results;
+};
+
+/**
+ * Profiling entry (`profile.mjs`): run ONE operation of ONE implementation `reps` times, with its setup,
+ * and return the operation time only (setup and data building are outside the clock, as in `__bench`).
+ */
+globalThis.__profile = (opKey, impl, reps) => {
+  const makeImpl = { vanilla: vanillaImpl, weave: weaveImpl, component: weaveComponentImpl }[impl];
+  const N = 1000;
+  const BIG = 10000;
+  const OPS = {
+    create1k: { setup: null, op: (i) => i.create(buildData(N)) },
+    create10k: { setup: null, op: (i) => i.create(buildData(BIG)) },
+    update10th: { setup: (i) => i.create(buildData(N)), op: (i) => i.updateEvery10th() },
+    swap: { setup: (i) => i.create(buildData(N)), op: (i) => i.swap() },
+    select: { setup: (i) => i.create(buildData(N)), op: (i) => i.select() },
+    remove: { setup: (i) => i.create(buildData(N)), op: (i) => i.remove() },
+    clear: { setup: (i) => i.create(buildData(N)), op: (i) => i.clear() },
+  };
+  const o = OPS[opKey];
+  let total = 0;
+  for (let r = 0; r < reps; r++) {
+    const root = document.createElement('div');
+    root.style.cssText = 'position:absolute;left:-99999px;top:0';
+    document.body.appendChild(root);
+    const impl = makeImpl(root);
+    if (o.setup) o.setup(impl);
+    void document.body.offsetHeight;
+    total += time(() => o.op(impl));
+    root.remove();
+  }
+  return total;
 };

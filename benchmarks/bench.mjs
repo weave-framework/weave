@@ -49,14 +49,16 @@ if (json) {
 const pad = (s, n) => String(s).padEnd(n);
 const num = (v, n) => v.toFixed(2).padStart(n);
 console.log('\nWeave vs vanilla JS — median of many reps, headless Chromium\n');
-console.log(pad('operation', 24) + pad('vanilla ms', 12) + pad('weave ms', 12) + 'slowdown');
-console.log('-'.repeat(56));
+// Two Weave columns: a bare `<tr>` row, and a component per row (what real applications write).
+console.log(pad('operation', 24) + pad('vanilla ms', 12) + pad('weave ms', 12) + pad('slowdown', 10) + pad('component ms', 14) + 'slowdown');
+console.log('-'.repeat(82));
+const fx = (f) => (f == null ? '   —' : f.toFixed(2) + '×');
 for (const r of results) {
-  const f = r.factor == null ? '   —' : r.factor.toFixed(2) + '×';
-  console.log(pad(r.label, 24) + num(r.vanilla, 8) + '    ' + num(r.weave, 8) + '    ' + f);
+  console.log(pad(r.label, 24) + num(r.vanilla, 8) + '    ' + num(r.weave, 8) + '    ' + pad(fx(r.factor), 10) + num(r.component, 10) + '    ' + fx(r.componentFactor));
 }
 const rated = results.filter((r) => r.factor != null);
 const geo = Math.exp(rated.reduce((s, r) => s + Math.log(r.factor), 0) / rated.length);
-console.log('-'.repeat(56));
-console.log(pad('geometric mean (rated ops)', 48) + geo.toFixed(2) + '×');
+const geoC = Math.exp(rated.reduce((s, r) => s + Math.log(r.componentFactor), 0) / rated.length);
+console.log('-'.repeat(82));
+console.log(pad('geometric mean (rated ops)', 48) + pad(geo.toFixed(2) + '×', 10) + pad('', 14) + geoC.toFixed(2) + '×');
 console.log('\n(slowdown = weave ÷ vanilla on this machine — comparable to js-framework-benchmark factors)\n');
