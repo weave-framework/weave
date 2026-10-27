@@ -25,6 +25,7 @@ weave build          # production build → dist/ (index.html, main.js, app.css)
 weave build --ssg    # prerender each route to a real index.html (static generation)
 weave check          # type-check every component against its template (run before commit)
 weave routes <dir>   # (re)generate routes.gen.ts from a pages dir; --eager for static imports
+weave add component <Name>  # write <name>/<name>.{ts,html,<styleLang>} next to the root component; --dir, --style; never overwrites
 weave mcp            # run the Weave MCP server over stdio (AI-editor integration)
 ```
 Flags: `--config <file>`, `--out <dir>`, `--port <n>`, `--no-minify`. `--out` overrides the config's `outDir`.

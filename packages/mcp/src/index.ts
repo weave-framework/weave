@@ -48,4 +48,9 @@ export {
 export { compileTemplateTool } from './tools/compile-template.js';
 export { checkTool } from './tools/check.js';
 export { routesTool } from './tools/routes.js';
-export { scaffoldComponentTool, generateComponent, type GeneratedFile } from './tools/scaffold-component.js';
+export {
+  scaffoldComponentTool,
+  generateComponent,
+  type GeneratedFile,
+  type GeneratedStyleLang,
+} from './tools/scaffold-component.js';

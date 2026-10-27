@@ -248,6 +248,11 @@ jobs:
       # adjacent to the config's, because a version that started it second passed against the bug.
       - name: weave dev --port wins over the config
         run: pnpm verify:dev-port-flag
+      # The component generator existed and only an AI editor could call it. `weave add component`
+      # writes the files where a PascalCase tag finds them, in the project's style language, in the short
+      # form, never over an existing file — and the result has to BUILD from the root template.
+      - name: weave add component writes a component the template finds
+        run: pnpm verify:add-component
       # `deserialize` rebuilt objects with assignment, and `__proto__` is not an ordinary key: a
       # snapshot could choose an object's prototype, invisibly to `Object.keys` and `JSON.stringify`.
       - name: A snapshot cannot choose an object's prototype

@@ -32,7 +32,8 @@ src/
 ```
 
 A **component** is a `.ts` exporting `setup`, plus a sibling `.html` (and optional stylesheet). No class,
-no decorator, no registration. Add one by creating the two files:
+no decorator, no registration. `npx weave add component Greeting` writes the files for you; by hand it
+is the two files:
 
 ```ts
 // src/app/greeting/greeting.ts

@@ -16,6 +16,16 @@
 
 ## Unreleased
 
+- **feat(cli):** `weave add component <Name>` writes a new component — `.ts`, `.html`, and a stylesheet
+  in the project's `styleLang` — into a folder of its own next to the root component, where a PascalCase
+  tag in the root template resolves it with no import, and says so. `--dir` and `--style` override the
+  two defaults; an existing file stops the command before anything is written. The generator is the one
+  `@weave-framework/mcp` has offered AI editors as `weave_scaffold_component`; everyone else was
+  creating the files by hand and guessing the convention. Both front doors now emit the short form the
+  quick start teaches (no `return`, no annotations) — the generated file is the one people copy from —
+  and the generator learned `sass`. `verify:add-component` writes one into a real project in both style
+  languages, refuses a second time, and builds the app with the tag in its root template.
+
 - **feat(ui, cli):** the UI library installs in one step, with no Sass. `@weave-framework/ui` now
   ships a prebuilt `weave-ui.css` — `theme()` with its defaults plus `all-styles()`, exported as
   `@weave-framework/ui/weave-ui.css` — and a `styles` entry in `weave.config.ts` may name a package's

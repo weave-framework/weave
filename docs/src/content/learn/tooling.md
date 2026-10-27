@@ -32,6 +32,7 @@ The config is auto-discovered in the current working directory. `--config <path>
 | `weave build` | One-shot production bundle into `dist/` (or `outDir`) |
 | `weave check` | Static type-check of your templates and components |
 | `weave routes` | Generate the file-based route module from a pages dir |
+| `weave add component <Name>` | Write a new component's files next to the root component (see [below](#weave-add-component)) |
 | `weave migrate` | Assisted migration of an existing Angular app into this one (see [below](#migrating-an-existing-app-weave-migrate)) |
 | `weave mcp` | Start the MCP server over stdio (see [below](#ai-editor-integration-mcp)) |
 
@@ -103,6 +104,36 @@ weave check --fix      # apply the fixes it is certain of, then re-check
 
 It exits non-zero when there are **errors**, so it drops straight into CI as a gate. Template mistakes are
 reported as **warnings**, so adding them to a project that was green does not turn it red.
+
+### weave add component
+
+Writes a new component — the `.ts`, the `.html`, and a stylesheet in the project's `styleLang` — into a
+folder of its own next to the root component, so a PascalCase tag in the root template finds it with no
+import:
+
+~~~bash
+weave add component UserCard
+# weave add → src/app/user-card/user-card.ts
+# weave add → src/app/user-card/user-card.html
+# weave add → src/app/user-card/user-card.css
+~~~
+
+~~~html title="src/app/app.html"
+<UserCard />
+~~~
+
+The generated `setup()` is the short form the [quick start](/learn/quick-start) teaches — no `return`, the
+compiler exposes what the template reads — with a working counter inside to replace. It never overwrites:
+a file that already exists stops the command before anything is written.
+
+| Flag | Default | Effect |
+|------|---------|--------|
+| `<Name>` (positional) | — | `UserCard` or `user-card`; the folder and files are kebab-case, the tag is PascalCase. |
+| `--dir <path>` | the root component's directory | Where the component's folder goes. A tag resolves from the *parent's* directory (`./user-card/user-card`), so a component for templates under `src/shared/` goes in `--dir src/shared`. |
+| `--style <lang>` | the config's `styleLang` | `css`, `scss`, `sass`, or `none` for no stylesheet. |
+
+The same generator is what the [MCP server](#ai-editor-integration-mcp) offers an AI editor as
+`weave_scaffold_component`.
 
 ### weave routes
 

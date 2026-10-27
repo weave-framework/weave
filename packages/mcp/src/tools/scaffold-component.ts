@@ -20,11 +20,11 @@ const kebab = (s: string): string =>
     .toLowerCase()
     .replace(/[^a-z0-9-]/g, '');
 
+/** The stylesheet a generated component gets: a language, or none. */
+export type GeneratedStyleLang = 'css' | 'scss' | 'sass' | 'none';
+
 /** Generate a component's files. `styleLang` of `'none'` omits the stylesheet. */
-export function generateComponent(
-  name: string,
-  styleLang: 'css' | 'scss' | 'none' = 'css'
-): GeneratedFile[] {
+export function generateComponent(name: string, styleLang: GeneratedStyleLang = 'css'): GeneratedFile[] {
   const base: string = kebab(name) || 'component';
   const files: GeneratedFile[] = [];
 
@@ -34,14 +34,18 @@ export function generateComponent(
   // reasonably copy it elsewhere expecting it to attach a stylesheet. Say what is actually true.
   const styleNote: string =
     styleLang === 'none' ? '' : `\n// ${base}.${styleLang} beside this file is picked up automatically.`;
+  // The short form the quick start teaches and the scaffold ships: no `return` (the compiler exposes
+  // what the template reads) and no annotations. A generated file is the one people copy from, so it
+  // has to show the form they are meant to write.
   files.push({
     path: `${base}/${base}.ts`,
     content:
-      `import { signal, type Signal } from '@weave-framework/runtime';\n\n` +
-      `export function setup(): { count: Signal<number>; inc: () => void } {\n` +
-      `  const count: Signal<number> = signal(0);\n` +
-      `  const inc = (): void => { count.set((n) => n + 1); };\n` +
-      `  return { count, inc };\n` +
+      `import { signal } from '@weave-framework/runtime';\n\n` +
+      `export function setup() {\n` +
+      `  const count = signal(0);\n` +
+      `  const inc = (): void => {\n` +
+      `    count.set((n) => n + 1);\n` +
+      `  };\n` +
       `}${styleNote}\n`,
   });
 
@@ -56,7 +60,8 @@ export function generateComponent(
   if (styleLang !== 'none') {
     files.push({
       path: `${base}/${base}.${styleLang}`,
-      content: `.${base} {\n  display: block;\n}\n`,
+      // The indented syntax has no braces or semicolons.
+      content: styleLang === 'sass' ? `.${base}\n  display: block\n` : `.${base} {\n  display: block;\n}\n`,
     });
   }
 
@@ -73,7 +78,7 @@ export const scaffoldComponentTool: McpTool = {
       name: { type: 'string', description: 'Component name (PascalCase or kebab-case), e.g. "UserCard".' },
       styleLang: {
         type: 'string',
-        enum: ['css', 'scss', 'none'],
+        enum: ['css', 'scss', 'sass', 'none'],
         description: 'Stylesheet language, or "none" to skip the stylesheet. Default "css".',
       },
     },
@@ -81,8 +86,8 @@ export const scaffoldComponentTool: McpTool = {
   },
   handler: (args: Record<string, unknown>): McpToolResult => {
     const name: string = String(args.name ?? '');
-    const styleLang: 'css' | 'scss' | 'none' =
-      args.styleLang === 'scss' || args.styleLang === 'none' ? args.styleLang : 'css';
+    const styleLang: GeneratedStyleLang =
+      args.styleLang === 'scss' || args.styleLang === 'sass' || args.styleLang === 'none' ? args.styleLang : 'css';
     return jsonResult({ files: generateComponent(name, styleLang) });
   },
 };

@@ -7,8 +7,8 @@ import { loadConfig } from './config.js';
 import type { ResolvedConfig } from './config.js';
 import { discoverCustomElements, generateEntry, generateServerEntry, type CustomElement } from './entry.js';
 import { checkProject, impactOf, type Diagnostic } from '@weave-framework/check';
-import { readdirSync, readFileSync, statSync, writeFileSync, type Dirent } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync, type Dirent } from 'node:fs';
+import { dirname, join, relative, resolve } from 'node:path';
 import { installAsciiFallback } from './glyphs.js';
 import { formatDiagnostic } from './format.js';
 
@@ -80,6 +80,7 @@ commands
   build                  Write a minified, deployable bundle to dist/
   check [paths…]         Type-check templates and the rest of your .ts (default root: src)
   routes [dir]           Regenerate the file-based route module (default dir: src/routes)
+  add component <Name>   Write a new component (.ts + .html + stylesheet) next to the root component
   migrate                Assisted migration of an Angular project into Weave
   mcp                    Run the Weave MCP server over stdio (for AI editors)
   merge --install        Register the template merge driver, so git stops inventing conflicts
@@ -96,6 +97,8 @@ options
   --devtools             Show the reactive-graph panel in the page (dev)
   --state <name>         Start in a state saved from that panel (dev)
   --no-check             Do not run weave check after each rebuild (dev)
+  --dir <path>           Where to write the component (add; default: the root component's directory)
+  --style <lang>         css | scss | sass | none for the component's stylesheet (add; default: the config's styleLang)
   --ssg                  Prerender every route to static HTML (build)
   --eager                Inline routes instead of code-splitting them (routes)
   -h, --help             Print this
@@ -105,6 +108,7 @@ examples
   weave build --ssg                prerender every route
   weave check src lib              type-check two roots
   weave routes src/pages           regenerate routes from a pages directory
+  weave add component UserCard     src/app/user-card/user-card.{ts,html,css}, ready for <UserCard />
   weave dev --state empty          open the app in a state you saved earlier
   weave merge --install            once per clone: git merges templates by structure
 
@@ -399,6 +403,48 @@ weave build --check: ${errors} error${errors === 1 ? '' : 's'} — nothing was w
     const out: string | undefined = flag(rest, '--out');
     const written: string = generateRoutes(dir, { out, lazy: !rest.includes('--eager') });
     console.log(`weave routes → ${written}`);
+    return;
+  }
+
+  if (cmd === 'add') {
+    // `weave add component <Name>` — the generator the MCP server has offered AI editors all along, for
+    // everyone else. Files land where a PascalCase tag in the root template resolves them
+    // (`./user-card/user-card` from the parent's directory), in the project's own style language.
+    const [kind, name, ...more] = rest;
+    if (kind !== 'component') {
+      console.error(`weave add: ${kind ? `cannot add \`${kind}\`` : 'what to add?'} — \`component\` is what can be added.\n`);
+      console.error('  weave add component <Name>       e.g. weave add component UserCard');
+      process.exit(1);
+    }
+    if (!name || name.startsWith('-')) {
+      console.error('weave add component: a name is needed — PascalCase or kebab-case, e.g. `UserCard` or `user-card`.');
+      process.exit(1);
+    }
+    // Lazy, like `weave mcp`: the generator lives in @weave-framework/mcp so both front doors share it.
+    const { generateComponent } = await import('@weave-framework/mcp');
+    const where: string = flag(more, '--dir') ?? (config?.rootComponent ? dirname(config.rootComponent) : 'src');
+    const wantStyle: string | undefined = flag(more, '--style');
+    const style: 'css' | 'scss' | 'sass' | 'none' =
+      wantStyle === 'css' || wantStyle === 'scss' || wantStyle === 'sass' || wantStyle === 'none'
+        ? wantStyle
+        : (config?.styleLang ?? 'css');
+    const files: Array<{ path: string; content: string }> = generateComponent(name, style);
+    const targets: string[] = files.map((f) => resolve(process.cwd(), where, f.path));
+    // Refuse before writing anything: a half-written component is worse than none, and an existing file
+    // is someone's work.
+    const taken: string | undefined = targets.find((t) => existsSync(t));
+    if (taken) {
+      console.error(`weave add component: ${relative(process.cwd(), taken)} already exists — nothing was written.`);
+      process.exit(1);
+    }
+    for (let i: number = 0; i < files.length; i++) {
+      mkdirSync(dirname(targets[i]), { recursive: true });
+      writeFileSync(targets[i], files[i].content);
+      console.log(`weave add → ${relative(process.cwd(), targets[i])}`);
+    }
+    const tag: string = files[0].path.split('/')[0].replace(/(^|-)([a-z0-9])/g, (_m, _s, c: string) => c.toUpperCase());
+    console.log(`\nUse it from a template in ${where}: <${tag} /> — a tag that starts with a capital letter is a component,`);
+    console.log(`and this one is found by its folder, so no import is needed there.`);
     return;
   }
 
