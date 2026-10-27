@@ -16,6 +16,17 @@
 
 ## Unreleased
 
+- **feat(cli, runtime):** `weave dev --keep-state` carries the named signals across each live reload.
+  Live reload is a full page reload, and every save threw the screen away — the filled form, the open
+  dialog, the tenth page of the list — so the developer drove the app back there by hand after each edit.
+  The dev server already knew how to capture and apply a state (the devtools States tab, `--state`); this
+  is the same mechanism on the reload path: before the page reloads, the client saves the named signals,
+  and the fresh page applies them once, after the mount, only on a load a reload caused (a sessionStorage
+  flag), so a new tab or a new dev session starts clean. What survives is exactly what a saved state
+  holds — signals with a `name`; the rule is unchanged. `keepStateAcrossReloads` is the runtime half,
+  exported for the generated entry. `verify:dev-keep-state` drives a real server and browser: click to 44,
+  save a file, see the edit, still 44; the same without the flag is back at 41.
+
 - **perf(compiler, runtime):** fewer nodes and fewer calls per rendered row, measured before and after on
   the same harness. An interpolation that is an element's only child (`<td>{{ r.id }}</td>`) now compiles
   to a placeholder text node the binding writes into (`bindData`), not a comment anchor plus a text node
@@ -34,7 +45,7 @@
 
 - **feat(benchmarks):** the benchmark grew a column and a profiler. A **component per row** column
   (`<Row r={{ r }} />` inside `@for`, which is what applications write) sits beside the bare `<tr>` one —
-  and measured 1.6× where the bare row measured 1.26×, so an optimisation can no longer win on the bare
+  and measured 1.6× where the bare row measured 1.26×, so an optimization can no longer win on the bare
   row and lose unseen on the real one. Ratios are taken per suite and then the median of ratios, because
   the three implementations run back to back inside one suite and a slower suite slows all three; the
   ratio of two medians across suites disagreed with itself by 30% between consecutive runs.

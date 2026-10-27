@@ -55,11 +55,12 @@ function requireAppEntry(config: ResolvedConfig, cmd: string): void {
 function virtualEntryFor(
   config: ResolvedConfig,
   devtools: boolean = false,
-  state?: string
+  state?: string,
+  keepState: boolean = false
 ): { code: string; resolveDir: string } | undefined {
   if (!config.rootComponent) return undefined;
   const elements: CustomElement[] = discoverCustomElements(config.root);
-  const code: string = generateEntry(config.rootComponent, config.mount, config.root, elements, { devtools, state });
+  const code: string = generateEntry(config.rootComponent, config.mount, config.root, elements, { devtools, state, keepState });
   return { code, resolveDir: config.root };
 }
 
@@ -96,6 +97,7 @@ options
   --impact <file>        List what renders this component, directly and transitively (check)
   --devtools             Show the reactive-graph panel in the page (dev)
   --state <name>         Start in a state saved from that panel (dev)
+  --keep-state           Keep the named signals' values across each live reload (dev)
   --no-check             Do not run weave check after each rebuild (dev)
   --dir <path>           Where to write the component (add; default: the root component's directory)
   --style <lang>         css | scss | sass | none for the component's stylesheet (add; default: the config's styleLang)
@@ -294,6 +296,7 @@ weave build --check: ${errors} error${errors === 1 ? '' : 's'} — nothing was w
   if (cmd === 'dev') {
     const devtools: boolean = rest.includes('--devtools');
     const state: string | undefined = flag(rest, '--state');
+    const keepState: boolean = rest.includes('--keep-state');
     if (config) {
       requireAppEntry(config, 'dev');
       syncRoutes(config); // file-based routing: regenerate routes.gen.ts before serving
@@ -301,7 +304,7 @@ weave build --check: ${errors} error${errors === 1 ? '' : 's'} — nothing was w
       // `main.js` lives at the web root); nothing is written to disk.
       const { url } = await dev({
         entry: config.entry,
-        virtualEntry: virtualEntryFor(config, devtools, state),
+        virtualEntry: virtualEntryFor(config, devtools, state, keepState),
         base: config.base,
         servedir: config.publicDir,
         outdir: config.publicDir,
@@ -325,6 +328,7 @@ weave build --check: ${errors} error${errors === 1 ? '' : 's'} — nothing was w
       // Discoverable without being imposed: the panel is real, and it is off unless asked for.
       if (!devtools) console.log('  (--devtools shows the reactive graph in the page)');
       if (state) console.log(`  (starting in the saved state \`${state}\`)`);
+      if (keepState) console.log('  (named signals are kept across each live reload)');
       return;
     }
     const servedir: string = flag(rest, '--serve') ?? '.';

@@ -55,6 +55,41 @@ export function devServerStates(): StatesAdapter {
   };
 }
 
+/** The state name the reload path saves under and reads back. */
+const RELOAD_STATE: string = 'last-reload';
+/** The sessionStorage flag the live-reload client sets right before it reloads — so the next load, and only it, applies. */
+const RELOAD_FLAG: string = '__weaveKeepState';
+
+/**
+ * Carry the named signals across a live reload — what `weave dev --keep-state` emits after the mount.
+ *
+ * Live reload is a full page reload, and every save threw the screen away: the filled form, the open
+ * dialog, the tenth page of the list. The reload client finds `globalThis.__weaveSaveState` and calls it
+ * before reloading, which captures the named signals the way the States tab does and saves them under one
+ * fixed name; the fresh page applies them once, after the mount. Only on a load the reload caused — the
+ * client leaves a flag in sessionStorage, and this reads and clears it — so a new tab or a new dev session
+ * starts clean, and yesterday's state is not resurrected by accident.
+ *
+ * What survives is exactly what `--state` would capture: signals with a `name`. An unnamed signal is not
+ * state (see `captureState`), and nothing here changes that rule.
+ */
+export function keepStateAcrossReloads(): void {
+  const states: StatesAdapter = devServerStates();
+  (globalThis as Record<string, unknown>).__weaveSaveState = (): Promise<void> => states.save(RELOAD_STATE);
+  let flagged: boolean = false;
+  try {
+    flagged = sessionStorage.getItem(RELOAD_FLAG) === '1';
+    if (flagged) sessionStorage.removeItem(RELOAD_FLAG);
+  } catch {
+    /* no storage (a sandboxed frame): then nothing marks this load as a reload, and nothing is applied */
+  }
+  if (!flagged) return;
+  void states
+    .apply(RELOAD_STATE)
+    .then((applied: number) => console.info(`weave: kept ${applied} named signal${applied === 1 ? '' : 's'} across the reload.`))
+    .catch((err: Error) => console.warn(`weave: could not keep the state across the reload — ${err.message}`));
+}
+
 /**
  * Apply a saved state at start-up — what `weave dev --state <name>` emits after the mount.
  *

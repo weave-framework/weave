@@ -102,7 +102,8 @@
     "verify:dev-port-flag": "node packages/cli/test/dev-port-flag.smoke.mjs",
     "verify:dev-check": "node packages/cli/test/dev-check.smoke.mjs",
     "verify:ui-css": "node tools/verify-ui-css.mjs",
-    "verify:add-component": "node packages/cli/test/add-component.smoke.mjs"
+    "verify:add-component": "node packages/cli/test/add-component.smoke.mjs",
+    "verify:dev-keep-state": "node packages/cli/test/dev-keep-state.smoke.mjs"
   },
   "keywords": [
     "reactive",

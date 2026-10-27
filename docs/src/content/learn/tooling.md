@@ -54,6 +54,7 @@ In both modes a request with no file extension falls back to the HTML shell, so 
 | `--serve <dir>` | legacy only | `.` | Static web root esbuild serves from. No effect in config mode (uses `publicDir`). |
 | `--port <n>` | both | config `dev.port`, else a free port | Server port. The flag wins over the config's `dev.port`; when the port is taken, the server steps to the next free one and says which. |
 | `--no-check` | config | off | Skip the type-check that otherwise runs after every rebuild (below). |
+| `--keep-state` | config | off | Carry the **named** signals' values across each live reload, so a save does not throw the screen away (see [any screen, in any state](#any-screen-in-any-state-in-one-second)). |
 
 :::callout info "The port, in one place"
 `dev.port` in `weave.config.ts` is the project's default; `--port <n>` overrides it for one run. (Before 3.5 the flag was read only in legacy mode and silently ignored with a config present — if a note somewhere still says so, it is describing that older behaviour.)
@@ -734,6 +735,20 @@ weave dev --state empty     # open the app already in that state
 **Apply** in the panel does the same thing live, without a reload, which is the fast way to flip between
 states while you work on the screen.
 
+The same mechanism can ride the live reload itself. Live reload is a full page reload, and every save threw
+the screen away — the filled form, the open dialog, the tenth page of the list — so you drove the app back
+there by hand after each edit:
+
+~~~bash
+weave dev --keep-state      # a save reloads the page, and the named signals come back as they were
+~~~
+
+Before the page reloads, the client saves the named signals; the fresh page applies them once, right after
+the mount, and only on a load that a reload caused — a new tab or a new `weave dev` starts clean. What
+survives is exactly what a saved state holds: **signals with a `name`**. An unnamed `draft` resets, as it
+would in a saved state, and that is the same rule, not a second one. The browser console says how many
+signals came back.
+
 The mechanism is small enough to run on this page. These are the same functions the panel calls —
 `enableDevtools`, `captureState`, `applyState` — and the third row is the control:
 
@@ -849,7 +864,7 @@ your tests. `pnpm verify:ui-testing` measures that an ordinary bundle carries no
 Equivalently, `weave mcp` starts the same server. The tools are `weave_compile_template` (validate markup → real compiler errors), `weave_check` (project diagnostics), `weave_routes` (file-based route tree), and `weave_scaffold_component` (generate a component's files — returned, never written without you).
 
 :::callout info "What you just learned"
-One `weave` CLI does it all — once `@weave-framework/cli` is a dev dependency you run it as `weave <cmd>` (via `npm run`/`npx`). The commands are `dev` (watch + live-reload), `build` (static `dist/`, plus `--ssg` prerendering), `check` (template + child-prop type-checking), `routes` (file-based route gen), `merge` (a git merge driver for templates), and `mcp` (the AI-editor server). `dev` also takes `--devtools` (the reactive-graph panel) and `--state <name>` (open the app in a state you saved from it). The big idea: a `weave.config.ts` switches `dev`/`build` into the full config-driven pipeline, while no config drops you into a bare legacy flag-driven one — and `dev` behaves quite differently between them (in-memory server vs esbuild's serve, port from config vs `--port`). Flags like `--config`, `--out`, `--serve`, `--port`, `--no-minify`, and `--eager` each belong to a specific command and pipeline. `styleLang` really compiles `css`/`scss`/`sass` differently, and editor support is a shared Volar server behind a VS Code extension and a WebStorm/LSP4IJ plugin.
+One `weave` CLI does it all — once `@weave-framework/cli` is a dev dependency you run it as `weave <cmd>` (via `npm run`/`npx`). The commands are `dev` (watch + live-reload), `build` (static `dist/`, plus `--ssg` prerendering), `check` (template + child-prop type-checking), `routes` (file-based route gen), `merge` (a git merge driver for templates), and `mcp` (the AI-editor server). `dev` also takes `--devtools` (the reactive-graph panel), `--state <name>` (open the app in a state you saved from it), `--keep-state` (carry the named signals across each live reload) and `--no-check` (skip the type-check it otherwise runs after every rebuild), and `add component <Name>` writes a new component's files. The big idea: a `weave.config.ts` switches `dev`/`build` into the full config-driven pipeline, while no config drops you into a bare legacy flag-driven one — and `dev` behaves quite differently between them (in-memory server vs esbuild's serve; `--port` works in both and wins over the config's `dev.port`). Flags like `--config`, `--out`, `--serve`, `--port`, `--no-minify`, and `--eager` each belong to a specific command and pipeline. `styleLang` really compiles `css`/`scss`/`sass` differently, and editor support is a shared Volar server behind a VS Code extension and a WebStorm/LSP4IJ plugin.
 :::
 
 [Next: Recipes :icon[arrow-right]](/learn/recipes) · [Reference: configuration :icon[arrow-right]](/reference/config) · [Installation :icon[arrow-right]](/learn/installation)

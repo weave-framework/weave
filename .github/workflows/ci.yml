@@ -354,6 +354,11 @@ jobs:
       # server, and the client that reconnects after the reload — all four halves pinned.
       - name: weave dev type-checks after each rebuild
         run: pnpm verify:dev-check
+      # A save used to throw the screen away: live reload is a full reload. `--keep-state` saves the named
+      # signals before the reload and applies them once after it. Driven in a real browser, with the control
+      # (no flag) proving the page really reloaded and really reset.
+      - name: weave dev --keep-state survives a live reload
+        run: pnpm verify:dev-keep-state
       # Root-absolute asset URLs made a GitHub Pages project site (which the docs recommend by name) a
       # white page, and nothing versioned the bundle a CDN was holding.
       - name: Sub-path deploys resolve, and assets carry a content version

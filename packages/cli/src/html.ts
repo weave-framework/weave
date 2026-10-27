@@ -122,6 +122,9 @@ export function injectHtml(html: string, opts: InjectOptions): string {
     // A third message, `check:<text>`, carries what `weave check` found after the rebuild. It is NOT the
     // overlay: the app runs, so it is painted as a panel along the bottom that the page stays usable
     // above, and an empty `check:` takes it down again.
+    // On `reload`, an app started with `weave dev --keep-state` has published `__weaveSaveState`: the client
+    // lets it save the named signals FIRST, marks the coming load as a reload in sessionStorage, and only
+    // then reloads — so the fresh page can put the screen back where it was.
     const client: string = `<script>(function(){var o,k;
 function panel(t){if(!t){if(k){k.remove();k=undefined;}return;}
 if(!k){k=document.createElement("div");k.id="__weave_check";
@@ -148,7 +151,10 @@ new EventSource(${jsLiteral(opts.liveReload)})
 .addEventListener("message",function(e){var d=e.data||"";
 if(d.indexOf("error:")===0){show(decodeURIComponent(d.slice(6)));return;}
 if(d.indexOf("check:")===0){panel(decodeURIComponent(d.slice(6)));return;}
-if(o){o.remove();o=undefined;}location.reload();});})();</script>`;
+if(o){o.remove();o=undefined;}
+var keep=window.__weaveSaveState;
+if(typeof keep==="function"){keep().catch(function(){}).then(function(){try{sessionStorage.setItem("__weaveKeepState","1");}catch(e){}location.reload();});return;}
+location.reload();});})();</script>`;
     out = out.replace(/<\/body>/i, `    ${client}\n  </body>`);
   }
 

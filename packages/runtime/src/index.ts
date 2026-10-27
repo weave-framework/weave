@@ -49,7 +49,7 @@ export {
 } from './devtools.js';
 
 export { mountDevtoolsPanel, type DevtoolsPanelOptions } from './devtools-panel.js';
-export { devServerStates, startInState, type StatesAdapter } from './dev-states.js';
+export { devServerStates, startInState, keepStateAcrossReloads, type StatesAdapter } from './dev-states.js';
 
 export { linkedSignal, debounced, watch, fromObservable, toObservable } from './extras.js';
 export type { InteropObserver, Unsubscribable, Subscribable } from './extras.js';

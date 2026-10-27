@@ -46,7 +46,7 @@ writes: a real list puts a component in the row. That row is then a fragment bra
 by marker comments, `defineComponent` builds a props object and a context over it per
 instance, and the child's bindings read props through that prototype chain. None of it
 was measured until the column existed — and it measured **1.6×** where the bare row
-measured **1.26×**. An optimisation can no longer win on the bare row and lose unseen
+measured **1.26×**. An optimization can no longer win on the bare row and lose unseen
 on the real one.
 
 ## Where the time goes: `profile.mjs`
