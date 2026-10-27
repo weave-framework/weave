@@ -58,7 +58,7 @@ All relative paths in the config are resolved against the **directory containing
 | `base` | `string` | `''` (the domain root) | Where the app is **served** from when that is not `/` — `/my-app/` for a project site, `/docs/` behind a reverse proxy. Every URL Weave injects is prefixed with it, the dev server answers under it, and the router adopts it as its basename. Normalized to `''` or `/prefix`, never with a trailing slash. |
 | `styleLang` | `'css' \| 'scss' \| 'sass'` | `'css'` | Component style language. The loader pairs each component with its sibling `<base>.<styleLang>` — no probing of other extensions. |
 | `routesDir` | `string` | — (off) | File-based routing directory. When set, `weave build`/`dev` regenerate `routes.gen.ts` from it before bundling. |
-| `styles` | `string[]` | `[]` | Global entry stylesheets, compiled and concatenated in order (first = base) **before** component CSS. |
+| `styles` | `string[]` | `[]` | Global entry stylesheets, compiled and concatenated in order (first = base) **before** component CSS. An entry is a file under the project, or a stylesheet a package ships, named the way an import names it — `'@weave-framework/ui/weave-ui.css'` — and resolved through node. |
 | `dev.port` | `number` | — (auto) | Dev-server listen port. When unset, the dev server picks a port. |
 | `dev.proxy` | `Record<string, string \| ProxyRule>` | — (off) | Dev-server proxy table — forward matching request paths to a backend so API calls stay same-origin. See below. |
 | `build.minify` | `boolean` | `true` | Minify the production JS/CSS bundle. |

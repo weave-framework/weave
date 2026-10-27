@@ -14,6 +14,7 @@ import { normalizeBase } from './build.js';
 import type { BuildResult, PluginBuild } from 'esbuild';
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
+import { createRequire } from 'node:module';
 import { resolve, dirname, join, isAbsolute } from 'node:path';
 import type { StyleLang } from './styles.js';
 
@@ -178,6 +179,20 @@ async function importConfigModule(file: string): Promise<WeaveConfig> {
 
 function resolveConfig(raw: WeaveConfig, root: string): ResolvedConfig {
   const abs = (p: string): string => (isAbsolute(p) ? p : resolve(root, p));
+  // A `styles` entry is a file under the project — or a stylesheet a PACKAGE ships, named the way an
+  // import names it (`'@weave-framework/ui/weave-ui.css'`). The second is what makes the UI library a
+  // one-line install with no Sass. Decided by shape, then by disk: a spec that is not relative, not
+  // absolute and not a file under the project is resolved through node from the project root, and when
+  // node has no answer either, the project path stands so the error names the file that was asked for.
+  const styleEntry = (p: string): string => {
+    const local: string = abs(p);
+    if (isAbsolute(p) || p.startsWith('./') || p.startsWith('../') || existsSync(local)) return local;
+    try {
+      return createRequire(join(root, 'package.json')).resolve(p);
+    } catch {
+      return local;
+    }
+  };
   // A config declaring NEITHER is legal: a component LIBRARY has no app to bootstrap, yet it
   // still has to declare `styleLang` — the loader pairs a component with `<base>.<styleLang>`
   // and does not probe, so anything compiling that library's components must know the value,
@@ -201,7 +216,7 @@ function resolveConfig(raw: WeaveConfig, root: string): ResolvedConfig {
     outDir: abs(raw.outDir ?? 'dist'),
     styleLang: raw.styleLang ?? 'css',
     routesDir: raw.routesDir ? abs(raw.routesDir) : undefined,
-    styles: (raw.styles ?? []).map(abs),
+    styles: (raw.styles ?? []).map(styleEntry),
     port: raw.dev?.port,
     proxy: raw.dev?.proxy,
     minify: raw.build?.minify ?? true,

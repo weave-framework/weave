@@ -59,32 +59,20 @@ type-check the props you pass.
 ## Adding the UI component library
 
 The scaffold is deliberately bare. Buttons, inputs, dialogs, tables and the rest live in a separate
-package, and its styles are Sass — so there are four steps, not one:
+package. Two steps:
 
 ```bash
-npm install @weave-framework/ui sass
+npm install @weave-framework/ui
 ```
 
-1. Set `styleLang: 'scss'` in `weave.config.ts` and rename `src/app/app.css` → `src/app/app.scss`.
-2. Create `src/styles/main.scss` with the theme:
-
-   ```scss
-   @use 'pkg:@weave-framework/ui' as weave;
-
-   @include weave.theme(); // the design tokens, on :root
-   @include weave.all-styles(); // the component CSS that reads them
-   ```
-
-3. Register it as a **global** stylesheet in `weave.config.ts` — this line is what makes it work:
+1. Add the library's stylesheet as a **global** entry in `weave.config.ts` — the theme and every
+   component's CSS, prebuilt, no Sass:
 
    ```ts
-   styles: ['src/styles/main.scss'],
+   styles: ['@weave-framework/ui/weave-ui.css'],
    ```
 
-   It must be a global entry, not a component stylesheet: component styles are scoped, and scoping a
-   `:root` block gives you a selector that can never match.
-
-4. Import components per subpath and use them:
+2. Import components per subpath and use them:
 
    ```ts
    import Button from '@weave-framework/ui/button';
@@ -94,7 +82,9 @@ npm install @weave-framework/ui sass
    <Button on:click={{ save }}>Save</Button>
    ```
 
-Full list and theming knobs: [weaveframework.dev/ui](https://weaveframework.dev/ui/theming).
+Retheme from plain CSS — every token is a custom property: `:root { --weave-color-accent: #b25dff; }`
+in a global stylesheet of your own recolours every component. A fully custom theme, or shipping only the
+components you use, is the Sass route: [weaveframework.dev/ui/installation](https://weaveframework.dev/ui/installation).
 
 ## Deploying
 

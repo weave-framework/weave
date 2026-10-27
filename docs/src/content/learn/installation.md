@@ -71,9 +71,10 @@ yarn dev
 Open the printed URL (default <http://localhost:5173>). You have a running Weave app with **live reload** — edit `src/app/app.html` and the page updates on save.
 
 :::callout info "The UI component library is NOT included"
-`@weave-framework/ui` — the buttons, inputs, dialogs and tables — is a separate install, and its styles need
-three lines of setup that nothing warns you about if you skip them (the component renders, unstyled). Four
-steps, once: [UI → Installation](/ui/installation). The scaffold's own `README.md` carries the same recipe.
+`@weave-framework/ui` — the buttons, inputs, dialogs and tables — is a separate install: the package, plus
+one `styles` line in `weave.config.ts` for its prebuilt stylesheet. Skip the line and the component renders,
+unstyled, and nothing warns you. Two steps, once: [UI → Installation](/ui/installation). The scaffold's own
+`README.md` carries the same recipe.
 :::
 
 :::callout tip "What you got"

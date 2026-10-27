@@ -156,6 +156,11 @@ jobs:
       # noticed because no ui component uses either yet.
       - name: UI typed default covers every compiler tail
         run: pnpm verify:ui-typed-default
+      # The first <Button> took four steps, three about Sass, and missing one rendered an unstyled control
+      # in silence. The package now ships a prebuilt weave-ui.css and a `styles` entry may name it by its
+      # package path; proven through the real CLI on a plain-CSS app with that one line.
+      - name: The UI library installs with one styles line and no Sass
+        run: pnpm verify:ui-css
       - name: Component extension
         run: pnpm verify:extend
       - name: CLI assets

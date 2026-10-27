@@ -7,7 +7,20 @@ system: how to load it, how tokens are named, and every knob you can turn.
 
 ## The one-time setup
 
-Pull the library's Sass in through its package entry (the `pkg:` importer resolves it), then emit two things: the
+The short form needs no Sass: the package ships the default output of everything below as one prebuilt
+stylesheet, and a single global entry loads it —
+
+```ts title="weave.config.ts"
+export default defineConfig({
+  styles: ['@weave-framework/ui/weave-ui.css'], // the default theme + every component's CSS
+});
+```
+
+Every token it sets is an ordinary custom property on `:root`, so retuning from plain CSS (the last section
+of this page) works exactly the same on top of it. Reach for the Sass engine when you want `theme()` with
+overrides, or to ship only the components you use.
+
+The Sass form: pull the library's Sass in through its package entry (the `pkg:` importer resolves it), then emit two things: the
 **theme** (all the token values) and the **structural styles** (the component CSS that reads them) — from a
 **global** stylesheet listed in `styles`, not from a component's own:
 

@@ -216,6 +216,7 @@
       "types": "./src/cdk/mask.ts",
       "import": "./src/cdk/mask.ts"
     },
+    "./weave-ui.css": "./dist/weave-ui.css",
     "./package.json": "./package.json",
     "./testing": {
       "types": "./src/testing/index.ts",
@@ -448,6 +449,7 @@
         "types": "./dist/cdk/mask.d.ts",
         "import": "./dist/cdk/mask.js"
       },
+      "./weave-ui.css": "./dist/weave-ui.css",
       "./package.json": "./package.json",
       "./testing": {
         "types": "./dist/testing/index.d.ts",

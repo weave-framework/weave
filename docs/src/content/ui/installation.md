@@ -1,67 +1,44 @@
 # Installation
 
-The UI library is a separate package. A scaffolded Weave app does **not** include it, so getting the
-first `<Button>` on screen takes four steps rather than one — three of them about styles, because the
-components are painted entirely from Sass-emitted design tokens.
+The UI library is a separate package. A scaffolded Weave app does **not** include it, and getting the
+first `<Button>` on screen is two steps: install the package, and add its stylesheet to your config.
+There is no Sass to install and no style language to switch.
 
-Do all four. Skipping the style setup is the one failure that says nothing: the component renders, the
-build succeeds, and you get an unstyled native control.
+Do both. Skipping the stylesheet is the one failure that says nothing: the component renders, the build
+succeeds, and you get an unstyled native control.
 
 ## 1. Install the package
 
 ```bash
-npm install @weave-framework/ui sass
+npm install @weave-framework/ui
 ```
 
-`sass` is what compiles the library's stylesheets. (The Weave CLI already carries it as an optional
-dependency, so it may be present — installing it explicitly makes the requirement your project's own.)
+## 2. Add its stylesheet as a global entry
 
-## 2. Switch the project to Sass
-
-The library's styles are Sass, so your project's style language has to be too:
+The package ships `weave-ui.css` — the default theme (every design token, on `:root`) plus the CSS of every
+built-in component, prebuilt. Register it as a **global** entry in `weave.config.ts`, named the way an
+import names it:
 
 ~~~ts title="weave.config.ts"
 export default defineConfig({
   root: 'src/app/app',
-  styleLang: 'scss', // ← was 'css' (the default)
+  styles: ['@weave-framework/ui/weave-ui.css'], // ← global: compiled first, unscoped
   // …
 });
 ~~~
 
-Rename your existing component stylesheets to match — `src/app/app.css` → `src/app/app.scss`. Plain CSS
-is valid Sass, so their contents need no change.
+Your own component stylesheets stay whatever they are — plain `.css` is fine, `styleLang` does not change.
 
-## 3. Emit the theme from a GLOBAL stylesheet
-
-Create the stylesheet that pulls in the library:
-
-~~~scss title="src/styles/main.scss"
-@use 'pkg:@weave-framework/ui' as weave;
-
-@include weave.theme(); // the design tokens, on :root
-@include weave.all-styles(); // the component CSS that reads them
-~~~
-
-…and register it as a **global** entry — this line is what makes it work:
-
-~~~ts title="weave.config.ts"
-export default defineConfig({
-  root: 'src/app/app',
-  styleLang: 'scss',
-  styles: ['src/styles/main.scss'], // ← global: compiled first, unscoped
-});
-~~~
-
-:::callout warn "It must be a global entry, not a component stylesheet"
+:::callout warn "It must be a `styles` entry, not a component stylesheet"
 Component styles are **scoped**: every selector is rewritten to match only the elements that component
-renders. Put the theme in `src/app/app.scss` and `:root { --weave-… }` becomes `[data-w-xxxxxx]:root`,
-a selector that can never match — so no token is ever defined, and every component renders unstyled
-while ~120 KB of CSS ships. The compiler warns when it scopes a `:root`/`html`/`body` rule, and the fix
-is always the same: move it to a global stylesheet listed in `styles`.
+renders. A theme pulled into a component's stylesheet puts its `:root { --weave-… }` under a
+`[data-w-xxxxxx]:root` selector that can never match — so no token is ever defined, and every component
+renders unstyled while ~120 KB of CSS ships. The compiler warns when it scopes a `:root`/`html`/`body`
+rule, and the fix is always the same: a global entry listed in `styles`.
 See [Styling → app-wide styles](/learn/styling#app-wide-styles).
 :::
 
-## 4. Import components and use them
+## 3. Import components and use them
 
 Each component is a default export on its own subpath:
 
@@ -73,7 +50,6 @@ export function setup() {
   const save = (): void => {
     /* … */
   };
-  return { save };
 }
 ~~~
 
@@ -84,10 +60,57 @@ export function setup() {
 That's it — the button is themed, keyboard-accessible, and reads the tokens you can now retune from one
 place.
 
-## Shipping less CSS
+## Retheming from plain CSS
 
-`all-styles()` emits the CSS for **every** built-in component. It is the simplest start; once you know
-what you use, pull the components' Sass entries individually instead:
+Every value the library paints with is a CSS custom property, so a global stylesheet of your own —
+listed in `styles` *after* the library's — changes the whole library, or one component, or one subtree:
+
+~~~css title="src/styles/theme.css"
+:root {
+  --weave-color-accent: #b25dff; /* every component's accent */
+  --weave-shape-radius: 4px;
+}
+.sidebar {
+  --weave-button-background: transparent; /* only buttons inside the sidebar */
+}
+~~~
+
+~~~ts title="weave.config.ts"
+styles: ['@weave-framework/ui/weave-ui.css', 'src/styles/theme.css'],
+~~~
+
+[Styling & theming](/ui/theming) lists every token.
+
+## The Sass route: a custom theme, or less CSS
+
+`weave-ui.css` is the default output of the library's Sass engine. Use the engine directly when you want
+`theme()` with overrides computed at build time, or to ship only the components you use (`weave-ui.css`
+carries all of them, ~120 KB). Three things change:
+
+1. **Install `sass`** alongside the library: `npm install @weave-framework/ui sass`.
+2. **Switch the project to Sass** — `styleLang: 'scss'` in `weave.config.ts`, and rename your component
+   stylesheets to match (`src/app/app.css` → `src/app/app.scss`; plain CSS is valid Sass).
+3. **Author the global entry yourself**, and list it in `styles` instead of `weave-ui.css`:
+
+~~~scss title="src/styles/main.scss"
+@use 'pkg:@weave-framework/ui' as weave;
+
+@include weave.theme(( color: ( accent: #2f9e8f ) )); // the design tokens, on :root — with overrides
+@include weave.all-styles(); // the component CSS that reads them
+~~~
+
+~~~ts title="weave.config.ts"
+styleLang: 'scss',
+styles: ['src/styles/main.scss'],
+~~~
+
+`sass` is what compiles the library's stylesheets. (The Weave CLI already carries it as an optional
+dependency, so it may be present — installing it explicitly makes the requirement your project's own.)
+
+### Shipping less CSS
+
+`all-styles()` emits the CSS for **every** built-in component. Once you know what you use, pull the
+components' Sass entries individually instead:
 
 ~~~scss title="src/styles/main.scss"
 @use 'pkg:@weave-framework/ui' as weave;
@@ -105,8 +128,10 @@ Almost every problem with a Weave UI component is one of five, and none of them 
 before anything else — between them they account for nearly every "the component does not work".
 
 :::callout trap "It renders, and it looks like nothing"
-You imported the component but not its stylesheet. Every component needs **two** lines, and they live in
-different files:
+The stylesheet is not loaded. With the prebuilt file that means the `styles` line is missing from
+`weave.config.ts`, or sits in a component stylesheet instead of a global entry. On the per-component
+Sass route it means the component's own entry was not pulled in — every component needs **two** lines
+there, and they live in different files:
 
 ~~~ts title="the component, in your .ts"
 import Button from '@weave-framework/ui/button';
@@ -115,15 +140,15 @@ import Button from '@weave-framework/ui/button';
 @use 'pkg:@weave-framework/ui/button';
 ~~~
 
-Miss the second and you get correct, accessible, completely unstyled markup. That is the single most
-common first problem, and it is deliberate: styles are opt-in per component so an app ships only the CSS
-it uses.
+Miss the second and you get correct, accessible, completely unstyled markup. That is deliberate on that
+route: styles are opt-in per component so an app ships only the CSS it uses.
 :::
 
-**The theme is missing, so everything is slightly wrong.** `@use 'pkg:@weave-framework/ui' as weave;`
-plus the theme emit belongs in a **global** stylesheet, once. Put it in a component's `.scss` and the
-tokens are scoped to that component — every other component then falls back, and the symptom is colours
-and spacing that are *almost* right rather than obviously broken.
+**The theme is missing, so everything is slightly wrong.** The theme — `weave-ui.css`, or
+`@use 'pkg:@weave-framework/ui' as weave;` plus the theme emit — belongs in a **global** stylesheet,
+once. Put it in a component's `.scss` and the tokens are scoped to that component — every other
+component then falls back, and the symptom is colours and spacing that are *almost* right rather than
+obviously broken.
 
 **A `<Select>` or `<Autocomplete>` that renders `undefined` in every row.** Its options are objects the
 defaults cannot read. Since 3.0.0 the type asks for the two accessors, so this is a compile error rather

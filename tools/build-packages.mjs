@@ -61,6 +61,9 @@ for (const p of LIB_ORDER) {
     // component pre-compiled, then tsc that staged tree. See tools/build-ui-components.mjs.
     run('node', ['tools/build-ui-components.mjs'], 'compile @weave-framework/ui components → .compiled');
     run('npx', ['tsc', '-p', 'packages/ui/tsconfig.compiled.json'], 'tsc build @weave-framework/ui');
+    // The prebuilt stylesheet (`@weave-framework/ui/weave-ui.css`): the default theme + every
+    // component's CSS, so an app installs the library with one `styles` line and no Sass.
+    run('node', ['tools/build-ui-css.mjs'], 'compile @weave-framework/ui/weave-ui.css');
     continue;
   }
   run('npx', ['tsc', '-p', `packages/${p}/tsconfig.build.json`], `tsc build @weave-framework/${p}`);

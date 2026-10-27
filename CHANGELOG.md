@@ -16,6 +16,18 @@
 
 ## Unreleased
 
+- **feat(ui, cli):** the UI library installs in one step, with no Sass. `@weave-framework/ui` now
+  ships a prebuilt `weave-ui.css` — `theme()` with its defaults plus `all-styles()`, exported as
+  `@weave-framework/ui/weave-ui.css` — and a `styles` entry in `weave.config.ts` may name a package's
+  stylesheet the way an import names it; it is resolved through node when it is not a file under the
+  project. Before, the first `<Button>` was four steps and three of them were about styles (install
+  `sass`, switch `styleLang`, rename the component stylesheets, author and register a global Sass
+  entry), and missing any one rendered a correct, accessible, completely unstyled control in silence.
+  Theming from plain CSS was already possible — every token is a custom property on `:root` — so the
+  Sass entry stays the route for `theme($overrides)` and for shipping only the components in use.
+  `verify:ui-css` builds the stylesheet and then builds a plain-CSS app with the one line through the
+  real CLI. `build:packages` compiles the file; it is not committed.
+
 - **feat(cli):** `weave dev` runs `weave check` after every successful rebuild and shows the result in
   the page. The single most common first mistake — `{{ count }}` for `{{ count() }}` — renders the
   signal's source text and throws nothing; the checker has named it precisely for a long time
