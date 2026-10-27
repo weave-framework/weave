@@ -15,6 +15,8 @@ npx weave routes
 
 Everywhere below we write `weave <cmd>` for short — that's the command as it runs from your project's scripts or `npx`. See [Installation](/learn/installation) for setup.
 
+Three environment variables shape the output, and `weave --help` lists them. `NO_COLOR` turns off ANSI colour. When the output is **captured** rather than shown — an MSBuild step, a CI runner, a redirect to a file — and the capturing process is on Windows, the CLI's decoration (arrows, dashes, ticks) drops to plain ASCII on its own, because a captured log there is decoded with the console's OEM code page and `→` would come out as Cyrillic; a terminal, and a pipe on Linux or macOS, are unchanged. `WEAVE_ASCII=1` forces the ASCII form anywhere, and `WEAVE_UNICODE=1` keeps the real characters even when captured.
+
 ## The two pipelines
 
 Here's the one thing that explains almost everything else. Every command checks for a config file first, and that single fact decides which of two pipelines you get:

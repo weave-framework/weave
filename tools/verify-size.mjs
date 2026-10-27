@@ -50,7 +50,16 @@ const BUDGETS = [
     // (An earlier note here said this gate measures the UNMINIFIED dist, so doc comments count against a
     // number no consumer downloads. That has not been true since `gzBytes` gained `minify: true`: every
     // figure below is minified-then-gzipped, and a comment costs nothing.)
-    budget: 7_104,
+    // → 7_232 (+128, a deliberate call, made by the author on 2026-10-27): the per-row work of 3.5.0 — an
+    // only-child interpolation compiles to a placeholder text node the binding writes into, node navigation
+    // is a firstChild/nextSibling chain, a row's $first/$last/$even/$odd are prototype methods, and emptying
+    // a list is one Range.deleteContents() — measured 7,199 B, 95 over the old line. Each new path was
+    // weighed with THIS gate: without the Range clear the core fits with ~0 headroom and gives back the
+    // measured clear speed-up (2.44× → 1.95×, 3.80× → 2.70× vs vanilla); without the row prototype it is
+    // still 66 over; trimming the new code by hand made it 9 bytes LARGER, because gzip had already folded
+    // the repeats. The ceiling is tight on purpose — 33 bytes over the measurement, under the ×1.05 rule
+    // above — so the next core change is a conversation here, not a drift.
+    budget: 7_232,
   },
   // Phase E entries — opt-in, NOT part of the SPA core (0 bytes for apps that don't import them).
   // runtime/serialize (E0.1): the wire-format codec, used by SSR-resume + local-first. Baseline 3.1 KB.

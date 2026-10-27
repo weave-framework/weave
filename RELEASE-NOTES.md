@@ -3,6 +3,109 @@
 Human-readable highlights, one section per release — everything notable that landed since
 the previous one. For the granular, per-version log see [CHANGELOG.md](CHANGELOG.md).
 
+## 3.5.0 — 2026-10-27
+
+A **minor**, and its theme is the first hour. The framework was asked two questions — what would make
+it faster, and what would make it easy for someone with little programming experience — and most of
+what follows is the second answer. Nothing you have written changes; everything new is a command, a
+flag, a file, or a line you no longer need.
+
+### The file on your disk is the file in the docs
+
+`npm create weave` used to scaffold a root component with an annotated `return`, while the quick start
+taught the short form — no `return`, no annotations, the compiler exposes what the template reads. The
+file a newcomer copies from is the one on their disk, so the two are now byte-equal, and a gate keeps
+them so. The quick start itself writes the first component before it explains the build config, the
+forms page opens with a whole sign-in form, and the recipes gained *Testing a component*. The scaffold
+ships `AGENTS.md`: the project's conventions on one page for a coding assistant, pointing at the bundled
+skills.
+
+### `weave dev` type-checks after every rebuild, and the page tells you
+
+The single most common first mistake — `{{ count }}` for `{{ count() }}` — renders the signal's source
+text and throws nothing. `weave check` has named it precisely for a long time, but as a separate command
+a newcomer does not know to run. `weave dev` now runs it after each successful rebuild, in a worker, after
+the reload has already gone out, so the page never waits on it, and paints the result as a panel along the
+bottom of the page: not the error overlay, because the app runs. A clean check clears the panel; the
+terminal gets the same text. `--no-check` turns it off for a project working through old errors.
+
+### The UI library installs in one line
+
+```ts
+styles: ['@weave-framework/ui/weave-ui.css'],
+```
+
+`@weave-framework/ui` ships a prebuilt stylesheet — the theme with its defaults plus every component's
+CSS — and a `styles` entry in `weave.config.ts` may name a package's file the way an import names it.
+Before, the first `<Button>` was four steps, three of them about styles, and missing any one rendered a
+correct, accessible, completely unstyled control in silence. Theming from plain CSS was already
+possible, since every token is a custom property on `:root`; the Sass entry stays the route for
+`theme($overrides)` and for shipping only the components you use.
+
+### `weave add component <Name>`
+
+Writes the `.ts`, the `.html` and a stylesheet in your `styleLang` into a folder next to the root
+component, where a PascalCase tag in the root template resolves it with no import, and says so. It is
+the generator the MCP server has offered AI editors all along; everyone else was creating the files by
+hand and guessing the convention. Both front doors emit the short form the quick start teaches.
+
+### `weave dev --keep-state`
+
+Live reload is a full page reload, and every save threw the screen away: the filled form, the open
+dialog, the tenth page of the list. With the flag, the named signals are captured before the reload and
+applied once after the mount — only on a load the reload caused, so a new tab or a new session starts
+clean. What survives is exactly what a saved state holds: signals with a `name`.
+
+### Fewer nodes and fewer calls per rendered row, measured
+
+An interpolation that is an element's only child (`<td>{{ r.id }}</td>`) compiles to a placeholder text
+node the binding writes into, not a comment anchor plus a text node inserted at bind time. Node
+navigation is a `firstChild`/`nextSibling` chain, not a `child(_r, 0, 3, 2)` call per captured node per
+clone. A `@for` row's `$first`/`$last`/`$even`/`$odd` are prototype methods, not four closures per row.
+Emptying a list is one `Range.deleteContents()` where the rows still share a parent with their anchor.
+
+`node benchmarks/bench.mjs` on one machine, old core → new, same protocol: geometric mean **1.26× →
+1.20×** vanilla for bare rows, **1.63× → 1.40×** for a component per row. The benchmark grew that
+component-per-row column so an optimization can no longer win on the bare row and lose unseen on the
+real one, and `benchmarks/profile.mjs` prints self time per function. The profile is also why the
+rewrite of the reactive core that was on the list was *not* done: it measures at about 2% of a
+10,000-row create, and layout at 60%.
+
+The SPA core (reactive + dom) grows from 7,104 to 7,199 bytes gzipped for this, and its budget line
+moves to 7,232 — a deliberate call, with the per-path measurements recorded next to the number in
+`tools/verify-size.mjs`.
+
+### A build log that no longer comes out as mojibake
+
+A `weave build` captured by an MSBuild step or a CI runner on Windows printed its arrows and dashes as
+Cyrillic. The bytes were right; the capturing process decoded them with the console's OEM code page.
+Piped on Windows, the CLI's decoration now drops to ASCII; a terminal, and a pipe on Linux or macOS,
+are unchanged. `WEAVE_ASCII=1` and `WEAVE_UNICODE=1` override it either way, beside `NO_COLOR`.
+
+### An Nx library you can import
+
+`nx g @weave-framework/nx:library --importPath @acme/auth` registers the specifier in the workspace's
+base tsconfig, pointed at the library's barrel. Before, the library existed for Nx and not for
+TypeScript, so nothing could import it. Without the option the behaviour is unchanged.
+
+### Housekeeping
+
+Three advisories closed in build tooling that no published package carries: `smol-toml` pinned past a
+denial-of-service advisory, `@vscode/vsce` taken out of the dependency tree (six alerts were behind it),
+and a CodeQL finding in a docs audit script that turned out to be a line doing nothing.
+
+### Upgrading
+
+- **`weave dev` now type-checks after each rebuild.** A project with standing type errors sees them in a
+  panel in the page from the first save; `--no-check` quiets it while you work through them. `weave
+  check` itself, its output and its exit codes are unchanged.
+- **`weave dev --port` wins over `dev.port` in `weave.config.ts`.** It used to be read only without a
+  config, so the flag was silently ignored. If you relied on that, the config value is still the default.
+- **Compiler and runtime move together**, as always: compiled output now calls `bindData`, which the
+  3.5.0 runtime exports. Mixing a 3.5.0 compiler with an older runtime was never supported.
+- **`weave migrate` is unchanged.** Its rebuild as a local web UI is underway in the repository as a
+  private package and is not part of this release.
+
 ## 3.4.1 — 2026-09-01
 
 A **patch**, and if your app has `lazy()` routes you want it: `3.4.0`'s `weave build` wrote the wrong

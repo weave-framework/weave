@@ -22,6 +22,11 @@ this list is a live intention, not a historical note.
   The command is built as a front door with a source-framework module behind it: the dependency walk, the plan
   writer and the output layout are language-level and already shared, so a second source framework is a module,
   not a second tool. React is the next one intended.
+- **`weave migrate` as a local web UI.** The shipped command is a CLI, and the volume of information a
+  migration puts through a terminal is the actual complaint. The replacement is a local web service with a
+  UI — you point it at the source project, see its dependency graph drawn, and decide on the cards what each
+  piece becomes — built as its own package, so nothing inside the framework moves for it. It is in the
+  repository as a private package until it is ready; the current `weave migrate` stays until then.
 
 ## Deliberately out of scope
 

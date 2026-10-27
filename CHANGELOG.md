@@ -14,7 +14,7 @@
 > already left it behind — Phase E ran 94 commits without a bump, and then released as one MINOR. The public
 > promise wins; the habit is retired.)*
 
-## Unreleased
+## 3.5.0
 
 - **docs, create-weave:** the example before the table, and a page for the assistant. The quick start
   now writes the first component before it explains the build config, since the component is what a
@@ -49,8 +49,11 @@
   geometric mean 1.26× → 1.20× vanilla for bare rows and 1.63× → 1.40× for a component per row; `clear`
   2.44× → 1.95× and 3.80× → 2.70×. Individual rows of that table move ±20% between runs; the geometric
   means and `clear` moved consistently. Resumable output is unchanged (it keeps its own text markers).
-  The 1,666 browser tests, the render smokes and the size gate are green; the SPA core stayed inside its
-  budget.
+  The 1,666 browser tests and the render smokes are green. The SPA core measures 7,199 B gzipped against
+  a 7,104 B budget, 95 over; the budget goes 7,104 → 7,232 (+128), a deliberate call recorded in
+  `tools/verify-size.mjs` with the measurements that justify it — dropping the `Range` clear fits with no
+  headroom and gives back the `clear` speed-up, dropping the row prototype is still 66 over, and trimming
+  the new code by hand made it 9 bytes larger.
 
 - **feat(benchmarks):** the benchmark grew a column and a profiler. A **component per row** column
   (`<Row r={{ r }} />` inside `@for`, which is what applications write) sits beside the bare `<tr>` one —
@@ -114,6 +117,40 @@
   printed `http://127.0.0.1:8000` and never mentioned the flag. The flag wins over the config.
   `verify:dev-port-flag` starts the flag server first, on a port not adjacent to the config's — its
   first version started it second and passed against the bug, because a taken port steps to the next.
+
+- **fix(cli):** a captured build log came out as mojibake. Reported from a colleague's build: every
+  arrow and dash of a `weave build` had turned into Cyrillic — `weave build ГåЁ ...\dist/`. The bytes
+  were right (UTF-8, confirmed with `od -c` on our own output); the reader was wrong: when the output is
+  CAPTURED rather than shown — an MSBuild `Exec`, a CI step, a redirect — `process.stdout.isTTY` is
+  undefined and the capturing process on Windows decodes with the OEM code page. The CLI prints nine
+  decorative characters (`— • → … ✓ ⚠ ✖ · ▲`) across 82 lines in ten files, so the fix sits at the
+  stream, not at the call sites: piped on Windows, the decoration drops to ASCII; a terminal, and a pipe
+  on Linux or macOS, are unchanged. Only string chunks are rewritten and only those nine characters — a
+  path holding a non-ASCII character is content. `WEAVE_ASCII=1` and `WEAVE_UNICODE=1` override it in
+  either direction, beside the `NO_COLOR` the CLI already honours; `weave --help` lists all three.
+  `verify:cli-glyphs` captures the real binary through a pipe and asserts not one byte above 127.
+
+- **fix(nx):** a generated library nobody could import. `nx g @weave-framework/nx:library` called
+  `addProjectConfiguration`, which tells Nx the project exists, and nothing told TypeScript how to
+  resolve a name to it — correct on paper, unimportable in practice. `--importPath @acme/auth` now
+  registers that specifier in the workspace's base tsconfig (`tsconfig.base.json` where there is one,
+  `tsconfig.json` otherwise, since both exist in the wild), pointed at the library's own barrel. Without
+  the option nothing is registered, which is the old behaviour and stays the default.
+
+- **security (build tooling only; no published package carried any of these):** `smol-toml` is pinned
+  past GHSA-7w5x-hrqm-74c2 (a denial of service via a malformed TOML document) with a scoped pnpm
+  override, because nx pins it exactly and bumping nx cannot reach it; no Weave package reads TOML.
+  `@vscode/vsce` left the dependency tree — it pulled `fast-uri` (four alerts) and `qs` (two) behind it,
+  nothing in CI ran it, and the one script that packages the VS Code extension now invokes it through a
+  pinned `npx`; `verify:editor-plugins` goes red if it returns to the lockfile (`pnpm install`: 207
+  fewer packages). A CodeQL `js/identity-replacement` in `tools/audit-scenarios.mjs` was a line that
+  replaced a backtick with itself; it is gone, and the audit's output is byte-identical before and after.
+
+- **repository, not this release:** `@weave-framework/migrate` exists in the workspace as a
+  `private: true` package — `weave migrate` being rebuilt as a local web service with a UI, on the
+  principle that a migration is an add-on and nothing in the framework moves for it. It is not
+  published and not reachable from the CLI. The `weave migrate` this release ships is the 3.4.x command,
+  unchanged.
 
 ## 3.4.1
 

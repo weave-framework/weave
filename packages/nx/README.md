@@ -51,6 +51,7 @@ Override the inferred target names in `nx.json` if they collide with another plu
 ```bash
 nx g @weave-framework/nx:application my-app          # a Weave app project (+ build/serve/check)
 nx g @weave-framework/nx:library ui-kit              # a component library (imported from source)
+nx g @weave-framework/nx:library auth --importPath @acme/auth   # …and registered in the base tsconfig, so `@acme/auth` resolves
 nx g @weave-framework/nx:component UserCard --project my-app   # a component into a project
 ```
 

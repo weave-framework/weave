@@ -17,7 +17,7 @@ npm install -D @weave-framework/mcp
 | `weave_compile_template` | Compile a Weave template string → emitted code, or the real compiler error. Validate markup before shipping it. |
 | `weave_check` | Type-check a Weave project (templates + child-props) → diagnostics with file/line/col/message. |
 | `weave_routes` | Turn a list of page files into Weave's file-based route tree (`[id]`→`:id`, `index`→`""`, `_layout`→nested). |
-| `weave_scaffold_component` | Generate a component's boilerplate files (`.ts` + `.html` [+ stylesheet]). Returns the files — never writes without you. |
+| `weave_scaffold_component` | Generate a component's boilerplate files (`.ts` + `.html` [+ stylesheet], `styleLang` of `css`, `scss`, `sass` or `none`) in the short form the quick start teaches. Returns the files — never writes without you. The same generator is `weave add component <Name>` on the command line. |
 
 ## Usage
 

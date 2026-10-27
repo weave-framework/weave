@@ -1,6 +1,6 @@
 # @weave-framework/cli
 
-The Weave CLI — `weave build` (add `--ssg` for static generation), `weave dev` (watch + live-reload), `weave check`, `weave routes`, `weave merge`, `weave migrate`, `weave mcp`.
+The Weave CLI — `weave build` (add `--ssg` for static generation), `weave dev` (watch + live-reload), `weave check`, `weave add component`, `weave routes`, `weave merge`, `weave migrate`, `weave mcp`.
 
 Part of **[Weave](https://weaveframework.dev/)** — a fine-grained reactive, signal-native UI framework: no Virtual DOM, zero third-party runtime dependencies.
 
@@ -13,20 +13,27 @@ npm install -D @weave-framework/cli
 | Command | What it does |
 |---------|--------------|
 | `weave build` | Bundle the app for production. `--ssg` also prerenders every route to HTML. |
-| `weave dev` | Dev server: watch, rebuild, live-reload. `--devtools` shows the reactive graph in the page; `--state <name>` opens the app in a state saved from that panel. |
+| `weave dev` | Dev server: watch, rebuild, live-reload. After each rebuild it runs `weave check` and paints the result into the page (`--no-check` turns that off). `--port <n>` wins over the config's `dev.port`; `--devtools` shows the reactive graph in the page; `--state <name>` opens the app in a state saved from that panel; `--keep-state` carries the named signals across each live reload. |
 | `weave check` | Type-check the project, templates included, and report template mistakes that compile clean but fail silently. `--fix` repairs the ones with exactly one right answer; `--impact <file>` lists what renders a component. |
+| `weave add component <Name>` | Write a new component — `.ts`, `.html` and a stylesheet in your `styleLang` — into its own folder next to the root component, where a `<Name />` tag in the root template resolves it with no import. `--dir` and `--style css\|scss\|sass\|none` override the defaults; an existing file stops it before anything is written. |
 | `weave routes` | Regenerate the file-based route module from `routesDir`. |
 | `weave merge` | A git merge driver for templates. `--install` (once per clone) registers it, and from then on two people editing one template stop colliding over changes that touch different nodes. |
 | `weave migrate` | Assisted migration of an existing Angular app into this one. Reads your source project, writes a plan, then the converted code. |
 | `weave mcp` | Start the Weave MCP server over stdio, for MCP-capable AI editors. |
 
 ```
-usage: weave <build|dev|check|routes|migrate|mcp> [entry|paths…] [--config file] [--out dir]
+usage: weave <build|dev|check|add|routes|migrate|mcp> [entry|paths…] [--config file] [--out dir]
              [--serve dir] [--port n] [--no-minify] [--eager] [--ssg] [--fix]
 ```
 
 `weave --help` (or `-h`, or no command) prints the full help; `weave dev` steps to the next free port when the
 one it wants is taken; and a finished `weave build` lists what it emitted, with sizes.
+
+When the output is captured rather than shown — an MSBuild step, a CI runner, a redirect to a file — and the
+capturing process is on Windows, the CLI's decoration (arrows, dashes, ticks) drops to plain ASCII, because a
+captured log there is decoded with the console's OEM code page and `→` comes out as Cyrillic. A terminal, and
+a pipe on Linux or macOS, are unchanged. `WEAVE_ASCII=1` forces the ASCII form anywhere, `WEAVE_UNICODE=1`
+keeps the real characters even when captured, and `NO_COLOR` turns off ANSI colour.
 
 ### Named app states, and merging templates by their tree
 

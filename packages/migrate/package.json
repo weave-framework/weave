@@ -1,6 +1,6 @@
 {
   "name": "@weave-framework/migrate",
-  "version": "3.4.1",
+  "version": "3.5.0",
   "private": true,
   "description": "Assisted migration into Weave — a local web service with a UI. PRIVATE until the UI ships: `private: true` keeps it out of the publish run, and it is removed the release this package is ready for.",
   "type": "module",

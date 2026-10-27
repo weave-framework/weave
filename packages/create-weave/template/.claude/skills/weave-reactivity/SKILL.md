@@ -183,6 +183,7 @@ console.log(inspect());                             // [{ id, name, kind, value 
 | `applyState(state)` | set every named signal the object mentions; returns how many were actually set. Names the app no longer has are skipped, not an error |
 | `devServerStates()` | a `StatesAdapter` talking to `weave dev`'s own endpoints — what the panel's **States** tab uses (`mountDevtoolsPanel({ states: devServerStates() })`) |
 | `startInState(name)` | apply a saved state at start-up; what `weave dev --state <name>` emits after the mount |
+| `keepStateAcrossReloads()` | carry the named signals across a live reload; what `weave dev --keep-state` emits after the mount. The reload client saves them before the page reloads and the fresh page applies them once, only on a load the reload caused — a new tab or a new dev session starts clean. Same rule as a saved state: signals with a `name` |
 
 `StatesAdapter = { list(): Promise<string[]>; apply(name): Promise<number>; save(name): Promise<void> }` —
 implement it yourself to keep states somewhere other than the dev server.

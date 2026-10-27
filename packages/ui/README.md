@@ -1,6 +1,6 @@
 # @weave-framework/ui
 
-Weave UI — a signal-native component library with the Weave design system, plus a headless behavior layer (CDK). Ships SCSS; zero third-party runtime deps.
+Weave UI — a signal-native component library with the Weave design system, plus a headless behavior layer (CDK). Ships a prebuilt stylesheet and the Sass it was built from; zero third-party runtime deps.
 
 Part of **[Weave](https://weaveframework.dev/)** — a fine-grained reactive, signal-native UI framework: no Virtual DOM, zero third-party runtime dependencies.
 
@@ -10,10 +10,22 @@ npm install @weave-framework/ui
 
 ## Quick start
 
-Three steps: emit the styles once **from a global stylesheet**, register that stylesheet, then import
-components per subpath. Full walkthrough: [UI → Installation](https://weaveframework.dev/ui/installation).
+Two steps: register the library's stylesheet as a **global** entry, then import components per subpath.
+Full walkthrough: [UI → Installation](https://weaveframework.dev/ui/installation).
 
-**1. Styles** — the whole library is painted from CSS custom properties emitted by one Sass engine:
+**1. Styles** — the package ships `weave-ui.css`, prebuilt: the theme's default token values as `:root`
+custom properties plus every component's CSS. One line in `weave.config.ts`, no Sass:
+
+```ts
+// weave.config.ts
+export default defineConfig({
+  styles: ['@weave-framework/ui/weave-ui.css'], // global — component stylesheets are scoped, and a
+});                                              // scoped `:root` compiles to a selector that never matches
+```
+
+Retheme from plain CSS — every token is a custom property, so `:root { --weave-color-accent: #b25dff; }`
+in a global stylesheet of your own recolours every component. For `theme($overrides)` or for shipping only
+the components you use, emit the styles yourself from a Sass entry instead (`styleLang: 'scss'`):
 
 ```scss
 // src/styles/main.scss
@@ -23,17 +35,7 @@ components per subpath. Full walkthrough: [UI → Installation](https://weavefra
 @include weave.all-styles(); // the component CSS that consumes them
 ```
 
-**2. Register it as a GLOBAL stylesheet** (and set `styleLang: 'scss'`):
-
-```ts
-// weave.config.ts
-export default defineConfig({
-  styleLang: 'scss',
-  styles: ['src/styles/main.scss'], // global — component stylesheets are scoped, and a scoped
-});                                 // `:root` compiles to a selector that can never match
-```
-
-**3. Components** — each is a default export on its own subpath:
+**2. Components** — each is a default export on its own subpath:
 
 ```ts
 import Button from '@weave-framework/ui/button';
