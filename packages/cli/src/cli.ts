@@ -295,7 +295,10 @@ weave build --check: ${errors} error${errors === 1 ? '' : 's'} — nothing was w
         base: config.base,
         servedir: config.publicDir,
         outdir: config.publicDir,
-        port: config.port,
+        // The flag over the config: it is the more specific statement and the one typed last. It used to
+        // be read only in the config-less branch below, so with a config present `--port` was ignored
+        // without a word while the help text promised it.
+        port: Number(flag(rest, '--port')) || config.port,
         styleLang: config.styleLang,
         styles: config.styles,
         index: config.index,

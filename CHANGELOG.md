@@ -14,6 +14,23 @@
 > already left it behind — Phase E ran 94 commits without a bump, and then released as one MINOR. The public
 > promise wins; the habit is retired.)*
 
+## Unreleased
+
+- **fix(create-weave):** the scaffold's first component is the quick start's first component. The page
+  teaches the short form — no `return`, no annotations, the compiler exposes what the template reads —
+  and the scaffold shipped `export function setup(): { count: Signal<number>; inc: () => void }` with a
+  hand-written `return`. The file on a newcomer's disk is the one they copy, so the two now have to be
+  byte-equal: `verify:scaffold-docs` compares them and compiles the scaffold through the real loader
+  to prove the synthesized return still reaches `count` and `inc`. The demo app's `void TaskCard;`
+  keep-alive lines are gone for the same reason — they existed for this repository's lint, and a
+  reader took them for something Weave needs.
+
+- **fix(cli):** `weave dev --port <n>` is honoured when a `weave.config.ts` is present. The flag was
+  read in the config-less branch only, so against a config saying `dev: { port: 8000 }` the command
+  printed `http://127.0.0.1:8000` and never mentioned the flag. The flag wins over the config.
+  `verify:dev-port-flag` starts the flag server first, on a port not adjacent to the config's — its
+  first version started it second and passed against the bug, because a taken port steps to the next.
+
 ## 3.4.1
 
 - **fix(cli):** the `<script>` the build injects into `index.html` is the **entry**, not one of the app's

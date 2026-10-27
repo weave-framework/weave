@@ -33,6 +33,11 @@ export default tseslint.config(
       // The same, for the new migration package: these trees stand in for someone else's repository — a pnpm
       // workspace, an Nx project declared only by its package.json — so they must look like one, not like ours.
       'packages/migrate/test/fixtures/**',
+      // The scaffold is the first file a newcomer opens, and it is written the way the quick start
+      // teaches: no `return`, no annotations, the compiler exposes what the template reads. This
+      // repository's explicit-type rules are for the framework's source, not for the user's first
+      // component; `verify:scaffold-docs` holds it equal to the docs instead.
+      'packages/create-weave/template/**',
       '**/*.mjs',
       '**/*.js',
     ],
@@ -66,6 +71,17 @@ export default tseslint.config(
       // retracted idea keeps looking alive in the source. Enabling this cost 0 errors — the debt was never
       // owed, the question was simply never asked.
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+    },
+  },
+  {
+    // A component's script imports the children its TEMPLATE renders — `import TaskCard from …` for a
+    // `<TaskCard>` tag — and the script itself never names them. The typescript-plugin knows that a
+    // PascalCase import is a tag in the sibling template; eslint cannot read the template, so the demo
+    // carried `void TaskCard;` lines to keep it quiet, and newcomers copied a keep-alive nobody needs.
+    // A PascalCase binding is a component by Weave's own tag rule, so that is the exemption.
+    files: ['examples/demo/**/*.ts'],
+    rules: {
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^[A-Z]' }],
     },
   }
 );

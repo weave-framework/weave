@@ -2,8 +2,6 @@ import { fade, fly, type TransitionFn } from '@weave-framework/runtime';
 import { Portal } from '@weave-framework/runtime/dom';
 import { useToasts, type Toast, type ToastStore } from '../../stores/toast';
 
-// `<Portal>` is referenced in toast-host.html.
-void Portal;
 
 interface ToastHostSetup {
   toasts: () => Toast[];

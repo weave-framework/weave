@@ -238,6 +238,11 @@ jobs:
       # `fetch` resolves `../` before sending and a guard tested through it is never reached.
       - name: The dev server stays inside the directory it serves
         run: pnpm verify:dev-traversal
+      # `--port` was read in the config-less branch only; with a weave.config.ts present the flag the
+      # help text promised was ignored without a word. The flag server starts FIRST here, on a port not
+      # adjacent to the config's, because a version that started it second passed against the bug.
+      - name: weave dev --port wins over the config
+        run: pnpm verify:dev-port-flag
       # `deserialize` rebuilt objects with assignment, and `__proto__` is not an ordinary key: a
       # snapshot could choose an object's prototype, invisibly to `Object.keys` and `JSON.stringify`.
       - name: A snapshot cannot choose an object's prototype
@@ -249,6 +254,11 @@ jobs:
         run: pnpm verify:install-spec
       - name: weave check
         run: pnpm verify:check
+      # The scaffold's first component and the quick start's first component were two different files:
+      # the page taught the short form (no return, no annotations) and the scaffold shipped the heavy
+      # one. The file on the newcomer's disk is the one they copy, so the two are held byte-equal.
+      - name: The scaffold is the quick start
+        run: pnpm verify:scaffold-docs
       - name: Prettier plugin
         run: pnpm verify:prettier
       - name: MCP server

@@ -18,11 +18,6 @@ interface BoardSetup {
   cardOut: { duration: number };
 }
 
-// `<TaskCard>` / `<Link>` are referenced in index.html — capitalized tags resolve
-// to these module-level imports, so they need no entry in setup's return.
-void TaskCard;
-void BoardInsights;
-void Link;
 
 /** The board route (path `''`): three status columns with a debounced filter. */
 export function setup(): BoardSetup {

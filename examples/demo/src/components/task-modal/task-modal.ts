@@ -3,9 +3,6 @@ import { Portal, type TransitionFn } from '@weave-framework/runtime/dom';
 import TaskForm from '../task-form/task-form';
 import { useEditor, type EditorStore } from '../../stores/editor';
 
-// `<Portal>` / `<TaskForm>` are referenced in task-modal.html.
-void Portal;
-void TaskForm;
 
 interface TaskModalSetup {
   editor: EditorStore;

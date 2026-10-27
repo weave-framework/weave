@@ -97,7 +97,9 @@
     "verify:all": "node tools/verify-all.mjs",
     "verify:no-private": "node tools/verify-no-private-paths.mjs",
     "verify:authorship": "node tools/verify-authorship.mjs",
-    "verify:template-ranges": "node tools/verify-template-ranges.mjs"
+    "verify:template-ranges": "node tools/verify-template-ranges.mjs",
+    "verify:scaffold-docs": "node tools/verify-scaffold-docs.mjs",
+    "verify:dev-port-flag": "node packages/cli/test/dev-port-flag.smoke.mjs"
   },
   "keywords": [
     "reactive",

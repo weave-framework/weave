@@ -26,7 +26,7 @@ weave.config.ts     the build's single source of truth (root component, shell, o
 src/
   index.html        the HTML shell — Weave injects the script and stylesheet itself
   app/
-    app.ts          the root component: a `setup()` that returns what the template may read
+    app.ts          the root component: a `setup()` whose locals the template may read
     app.html        its template
     app.css         its styles — scoped to this component automatically
 ```
@@ -38,7 +38,7 @@ no decorator, no registration. Add one by creating the two files:
 // src/app/greeting/greeting.ts
 export function setup(props: { name: string }) {
   const name = () => props.name; // a getter, so it stays live
-  return { name };
+  // no return: the compiler reads the template and exposes what it uses
 }
 ```
 

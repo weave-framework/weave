@@ -14,12 +14,6 @@ interface ShellSetup {
   routeFadeParams: { duration: number };
 }
 
-// Used as components in app.html (capitalized tags resolve to these imports).
-void RouterView;
-void Link;
-void ErrorBoundary;
-void TaskModal;
-void ToastHost;
 
 /** Root shell: app chrome + an error boundary around the routed view. */
 export function setup(): ShellSetup {

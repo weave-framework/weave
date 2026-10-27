@@ -1,7 +1,5 @@
 import { Link, currentPath } from '@weave-framework/router';
 
-// `<Link>` is used in [...rest].html.
-void Link;
 
 interface NotFoundSetup {
   path: () => string;

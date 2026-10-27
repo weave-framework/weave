@@ -4,8 +4,6 @@ import { Link } from '@weave-framework/router';
 import { api } from '../../data/api';
 import type { Task } from '../../types';
 
-// `<Link>` is used in task-detail.html.
-void Link;
 
 interface TaskDetailSetup {
   id: () => string;
